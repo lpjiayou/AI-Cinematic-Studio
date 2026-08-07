@@ -15,20 +15,21 @@
 | [验证 Gate](verification-gates.md) | 定义 Phase 0、Phase 1、Phase 2 的最低验证门槛 |
 | [测试证据标准](test-evidence-standard.md) | 定义证据内容、质量、状态、保留和评审规则 |
 | [Release 验证](release-validation.md) | 定义发布前、发布中和发布后的验证与决策流程 |
+| [Repository 测试资产](../../tests/README.md) | 记录当前已跟踪 Unit/Contract 测试与 Integration/E2E 目录状态 |
 
 测试治理与 [层级边界](../../architecture/layer-boundaries.md)、[依赖规则](../../architecture/dependency-rules.md)、[完成定义](../../governance/DEFINITION_OF_DONE.md)、[代码评审规则](../../governance/CODE_REVIEW_RULES.md) 和 [架构变更流程](../../governance/ARCHITECTURE_CHANGE_PROCESS.md) 共同生效，不替代其中任何一项门禁。
 
 ## 3. 测试层级总览
 
-| 层级 | 核心目标 | 未来资产位置或证据归属 |
+| 层级 | 核心目标 | 当前资产位置或证据归属 |
 | --- | --- | --- |
-| Unit | 验证最小可隔离单元的确定性行为 | `tests/unit/` |
-| Contract | 验证公开接口、事件、错误和数据契约的兼容性 | `tests/contract/` |
-| Integration | 验证获批组件或技术边界之间的真实协作 | `tests/integration/` |
-| E2E | 通过正式入口验证获批系统路径的整体结果 | `tests/e2e/` |
-| Production Validation | 发布后在受控范围内确认版本、健康状态和关键技术假设 | Release 证据记录；本任务不新增测试目录 |
+| Unit | 验证最小可隔离单元的确定性行为 | `tests/unit/`；当前存在四个 V5 Foundation 测试文件 |
+| Contract | 验证公开接口、事件、错误和数据契约的兼容性 | `tests/contract/`；当前存在四个 V5 Foundation 包契约测试文件 |
+| Integration | 验证获批组件或技术边界之间的真实协作 | `tests/integration/`；当前仅有 `.gitkeep` |
+| E2E | 通过正式入口验证获批系统路径的整体结果 | `tests/e2e/`；当前仅有 `.gitkeep` |
+| Production Validation | 发布后在受控范围内确认版本、健康状态和关键技术假设 | 当前没有 Production Validation；未来记录归入 Release 证据 |
 
-这些位置仍为空目录骨架。ACS-P0-005 不向其中添加测试文件、夹具、配置或依赖。
+ACS-P0-005 当时只建立目录与治理骨架；后续已跟踪任务在 Unit 和 Contract 目录中增加了 V5 Foundation 测试。该仓库事实不改写 ACS-P0-005 的历史范围，也不表示 Integration、E2E、Production Validation、Phase Gate 或 Implementation Authorization 已经完成。
 
 ## 4. 分层原则
 
@@ -45,7 +46,7 @@
 | Gate | 治理目标 |
 | --- | --- |
 | Phase 0 | 证明仓库、治理、架构、接口和数据文档基础完整且无越界实现 |
-| Phase 1 | 对未来获批的初始实现建立 Unit 与 Contract 为主、风险相称的验证证据 |
+| Phase 1 | 对获批的初始实现建立 Unit 与 Contract 为主、风险相称的验证证据 |
 | Phase 2 | 对未来获批的集成与发布候选建立完整的适用分层证据和 Release 验证准备 |
 
 Phase Gate 只定义验证成熟度，不定义 Phase 1 或 Phase 2 的产品范围、模块清单、技术栈和发布时间。任何实施仍需独立任务授权。
@@ -73,6 +74,6 @@ Phase Gate 只定义验证成熟度，不定义 Phase 1 或 Phase 2 的产品范
 - Gate 或 Release 决策责任人依据证据作出通过、暂停或回退决定。
 - 责任人尚未指定时必须由项目负责人明确指定，不能由文档假设某个团队已经存在。
 
-## 8. Phase 0.5 非目标
+## 8. ACS-P0-005 历史非目标
 
-本任务不编写测试代码、测试用例、业务场景、夹具、模拟器、配置、脚本或覆盖率规则，不选择测试框架、CI 平台、测试管理产品或发布工具，不安装任何依赖，也不实现或改变 V2.3 模块功能与架构。
+ACS-P0-005 不编写测试代码、测试用例、业务场景、夹具、模拟器、配置、脚本或覆盖率规则，不选择测试框架、CI 平台、测试管理产品或发布工具，不安装任何依赖，也不实现或改变 V2.3 模块功能与架构。后续测试资产存在不改变该历史事实。

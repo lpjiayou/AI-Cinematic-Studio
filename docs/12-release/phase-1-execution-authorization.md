@@ -8,7 +8,7 @@
 | ACS Phase | ACS Engineering Phase 1 Production Validation |
 | Architecture Baseline | AI Cinematic Studio V2.3，未修改 |
 | Phase 0 Exit | `SATISFIED`；依据 [Phase 0 Exit Record](phase-0-exit-record.md)，记录 Commit `8e15009f38926e4528e773f848cf63bee90af900` |
-| Gen2 Governing Input | [AI Cinematic Studio Generation 2 Development Charter](../../AI_CINEMATIC_STUDIO_GENERATION_2_DEVELOPMENT_CHARTER.md) |
+| Gen2 Governing Input | Charter 内容仅作为受限、未跟踪的评审输入；[Baseline Asset Acceptance Decision Record](baseline-asset-acceptance-decision-record.md) 将 Gen2 Charter 与 Gen2 Charter Integration Record 均记录为 `DEFER / NOT INCLUDED IN CURRENT BASELINE` |
 | Gen2 Source Status | 文件内容声明 `FINAL FOUNDING CHARTER`；当前文件未被 Git 跟踪，且其 Source Baseline `9da3835c3bf7f69ed4085fa28d6206fa3f84ed25` 无法在本仓库解析 |
 | Scope Envelope | `APPROVED FOR DESIGN AND AUTHORIZATION PREPARATION ONLY`；依据 [Phase 1 Scope Approval](phase-1-scope-approval.md)，记录 Commit `67986f9c6f7cb92335122a7a63446b4afdb5c375` |
 | Phase 1 Implementation Authorization | `BLOCKED / NOT GRANTED` |

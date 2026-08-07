@@ -16,7 +16,7 @@
 | Release / Production | `NOT AUTHORIZED` |
 | ADR | `NOT TRIGGERED`；本记录不改变架构语义且不创建 ADR |
 
-本草案建立 Phase 1 的责任角色、人员指派规则、证据责任和冲突处理方式。它以 [Phase 0 Exit Record](phase-0-exit-record.md)、[Phase 1 Production Validation Plan](phase-1-production-validation-plan.md)、[Verification Gates](../11-testing/verification-gates.md)、[Test Evidence Standard](../11-testing/test-evidence-standard.md)及 [Definition of Done](../../governance/DEFINITION_OF_DONE.md)为当前已跟踪治理输入；[Gen2 Charter Integration Record](../00-governance/gen2-charter-integration-record.md) 在评审时仍是未跟踪、未接受的工作树输入，只用于核对候选 Gen2 责任域，不能赋予本草案治理效力。
+本草案建立 Phase 1 的责任角色、人员指派规则、证据责任和冲突处理方式。它以 [Phase 0 Exit Record](phase-0-exit-record.md)、[Phase 1 Production Validation Plan](phase-1-production-validation-plan.md)、[Verification Gates](../11-testing/verification-gates.md)、[Test Evidence Standard](../11-testing/test-evidence-standard.md)及 [Definition of Done](../../governance/DEFINITION_OF_DONE.md)为当前已跟踪治理输入；[Baseline Asset Acceptance Decision Record](baseline-asset-acceptance-decision-record.md) 将 Gen2 Charter 与 Gen2 Charter Integration Record 均记录为 `DEFER / NOT INCLUDED IN CURRENT BASELINE`。二者在评审时仅作为未跟踪、未接受的工作树输入，用于核对候选 Gen2 责任域，不能赋予本草案治理效力。
 
 本记录定义“谁应对什么负责”，但不决定“工作是否可以开始”。责任不等于授权；Role 已定义、Person 被提名或接受责任，都不能单独授予代码、API、数据库、V4、V3、Compute、Integration、Release 或 Production 权限。
 
