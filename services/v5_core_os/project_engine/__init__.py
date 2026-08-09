@@ -1,4 +1,4 @@
-"""V5-internal package surface for the Project Engine MVP."""
+"""V5 Project package: compatibility engine plus public Project Context boundary."""
 
 from .engine import ProjectEngine
 from .errors import (
@@ -9,6 +9,13 @@ from .errors import (
     ValidationError,
 )
 from .models import Project, ProjectLifecycleState
+from .public import (
+    ProjectPublicBoundary,
+    ProjectPublicError,
+    create_in_memory_boundary,
+    create_local_development_boundary,
+    create_local_development_boundary_from_environment,
+)
 
 __all__ = [
     "DuplicateProjectError",
@@ -18,5 +25,10 @@ __all__ = [
     "ProjectEngineError",
     "ProjectLifecycleState",
     "ProjectNotFoundError",
+    "ProjectPublicBoundary",
+    "ProjectPublicError",
     "ValidationError",
+    "create_in_memory_boundary",
+    "create_local_development_boundary",
+    "create_local_development_boundary_from_environment",
 ]

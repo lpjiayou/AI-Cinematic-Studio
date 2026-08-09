@@ -36,6 +36,8 @@
   const fixture = JSON.parse(fixtureElement.textContent);
   const aiDirectorEndpoint = "/creator/internal/ai-director/plan";
   const seriesEndpoint = "/creator/internal/series";
+  const projectsEndpoint = "/creator/internal/projects";
+  const projectContextEndpoint = "/creator/internal/project-context";
   const confirmCreativePlanEndpoint = "/creator/internal/creative-plans/confirm";
   const episodesEndpoint = "/creator/internal/episodes";
   const scriptWorkspaceEndpoint = "/creator/internal/script-studio";
@@ -172,7 +174,7 @@
     selectedShotKey: fixture.shots[0].localKey,
     selectedPipelineKey: (fixture.pipeline.find((stage) => stage.label === "Preview") || fixture.pipeline[1]).localKey,
     wizardStep: 1,
-    wizardValues: { projectType: "series", title: "", contentType: "", episodeCount: "", duration: "60", aspectRatio: "9:16", platform: "", contentProfile: "", language: "中文", visualDirection: "", productionPreset: "" },
+    wizardValues: { projectType: "series", seriesRef: "", title: "", contentType: "", episodeCount: "", duration: "60", aspectRatio: "9:16", platform: "", contentProfile: contentProfileRef, language: "中文", visualDirection: "", productionPreset: "" },
     bottomDrawerOpen: false,
     aiDirectorPhase: "input",
     aiDirectorBrief: { ...fixture.aiDirector.briefDefaults },
@@ -183,6 +185,10 @@
     confirmedCreativePlan: null,
     seriesRecords: [],
     seriesDataStatus: "idle",
+    projectRecords: [],
+    projectDataStatus: "idle",
+    projectError: null,
+    projectPhase: "idle",
     selectedSeriesRef: null,
     selectedEpisodeRef: null,
     seriesEpisodePhase: "idle",
@@ -272,6 +278,23 @@
       state.seriesEpisodeError = "暂时无法读取系列与集数，请稍后重试。";
     }
     if (["/creator", "/creator/projects", "/creator/ai-director"].includes(state.activePath) || state.activePath.startsWith("/creator/projects/") || state.activePath.startsWith(`${projectShellBase}/`)) {
+      renderRoute(state.activePath);
+    }
+  }
+
+  async function loadProjectData({ force = false } = {}) {
+    if (state.projectDataStatus === "loading" || (!force && state.projectDataStatus === "ready")) return;
+    state.projectDataStatus = "loading";
+    state.projectError = null;
+    try {
+      const payload = await requestApplicationJson(withWorkspace(projectsEndpoint));
+      state.projectRecords = payload.projects || [];
+      state.projectDataStatus = "ready";
+    } catch (error) {
+      state.projectDataStatus = "error";
+      state.projectError = error && error.message ? error.message : "暂时无法读取项目，请稍后重试。";
+    }
+    if (state.activePath === "/creator" || state.activePath.startsWith("/creator/projects")) {
       renderRoute(state.activePath);
     }
   }
@@ -487,55 +510,51 @@
   }
 
   function renderProjects() {
-    const persistedSeries = state.seriesDataStatus === "loading" || state.seriesDataStatus === "idle"
-      ? renderLoadingState("正在读取系列与集数…")
-      : state.seriesDataStatus === "error"
-        ? renderErrorState("系列与集数暂时无法读取", "请确认本地 Creator Server 正在运行后重试。")
-        : state.seriesRecords.length
-          ? state.seriesRecords.map((series) => `
-              <article class="series-project-card">
-                <header>
-                  <div><span class="section-kicker">系列</span><h3>${escapeHtml(series.title)}</h3><p>${escapeHtml(series.description || "持续创作中的影片系列")}</p></div>
-                  <div class="series-card-actions">
-                    <span class="badge badge-available"><i></i>${escapeHtml(series.status === "active" ? "创作中" : series.status)}</span>
-                    <button class="button button-danger-subtle" type="button" data-action="delete-series" data-series-ref="${escapeHtml(series.seriesRef)}" data-series-title="${escapeHtml(series.title)}" data-episode-count="${(series.episodes || []).length}">删除系列</button>
-                  </div>
-                </header>
-                <div class="series-episode-list">
-                  ${(series.episodes || []).length ? series.episodes.map((episode) => `
-                    <article class="episode-project-row">
-                      <a class="episode-project-link" href="#/creator/projects/${encodeURIComponent(episode.episodeRef)}">
-                        <span class="episode-number">E${String(episode.episodeNumber).padStart(2, "0")}</span>
-                        <span><strong>${escapeHtml(episode.title)}</strong><small>来源：已确认的 AI导演方案 v${escapeHtml(episode.sourcePlanVersion)}</small></span>
-                        <em>打开项目 →</em>
-                      </a>
-                      <button class="button button-danger-subtle episode-delete-action" type="button" data-action="delete-episode" data-series-ref="${escapeHtml(series.seriesRef)}" data-series-title="${escapeHtml(series.title)}" data-episode-ref="${escapeHtml(episode.episodeRef)}" data-episode-title="${escapeHtml(episode.title)}">删除单集</button>
-                    </article>
-                  `).join("") : '<div class="series-empty">还没有集数。请在 AI导演确认方案后创建第一集。</div>'}
-                </div>
-              </article>
-            `).join("")
-          : renderEmptyState({
-              icon: "剧",
-              title: "还没有系列",
-              description: "在 AI导演中确认一个创意方案，然后创建系列与第一集。",
-              action: '<a class="button button-secondary" href="#/creator/ai-director">前往 AI导演</a>'
-            });
+    const waiting = [state.seriesDataStatus, state.projectDataStatus].some((value) => value === "idle" || value === "loading");
+    const failed = state.seriesDataStatus === "error" || state.projectDataStatus === "error";
+    const renderEpisodeRows = (project, series) => (series.episodes || []).length
+      ? series.episodes.map((episode) => `
+          <article class="episode-project-row">
+            <a class="episode-project-link" href="#/creator/projects/${encodeURIComponent(project.projectRef)}/episodes/${encodeURIComponent(episode.episodeRef)}">
+              <span class="episode-number">E${String(episode.episodeNumber).padStart(2, "0")}</span>
+              <span><strong>${escapeHtml(episode.title)}</strong><small>来源：已确认的 AI导演方案 v${escapeHtml(episode.sourcePlanVersion)}</small></span>
+              <em>进入制作 →</em>
+            </a>
+            <button class="button button-danger-subtle episode-delete-action" type="button" data-action="delete-episode" data-series-ref="${escapeHtml(series.seriesRef)}" data-series-title="${escapeHtml(series.title)}" data-episode-ref="${escapeHtml(episode.episodeRef)}" data-episode-title="${escapeHtml(episode.title)}">删除单集</button>
+          </article>
+        `).join("")
+      : '<div class="series-empty">项目已关联系列，尚未创建单集。</div>';
+    const projectCards = state.projectRecords.map((project) => {
+      const series = (project.seriesRefs || []).map(findSeries).find(Boolean);
+      return `
+        <article class="series-project-card project-record-card" data-project-ref="${escapeHtml(project.projectRef)}">
+          <header>
+            <div><span class="section-kicker">正式项目 · ${escapeHtml(project.projectType === "series" ? "系列制作" : project.projectType)}</span><h3>${escapeHtml(project.title)}</h3><p>${escapeHtml(project.description || "统一承载系列、单集与内容制作上下文")}</p></div>
+            <div class="series-card-actions"><span class="badge badge-available"><i></i>${project.status === "active" ? "创作中" : "已归档"}</span><a class="button button-secondary" href="#/creator/projects/${encodeURIComponent(project.projectRef)}">打开项目</a></div>
+          </header>
+          <dl class="project-record-meta"><div><dt>项目类型</dt><dd>${escapeHtml(project.projectType)}</dd></div><div><dt>内容配置</dt><dd>${escapeHtml(project.contentProfileRef)}</dd></div><div><dt>目标平台</dt><dd>${escapeHtml(project.targetPlatform || "未设置")}</dd></div><div><dt>计划集数</dt><dd>${escapeHtml(project.plannedEpisodeCount)}</dd></div></dl>
+          ${series ? `<div class="project-series-heading"><span>关联系列</span><strong>${escapeHtml(series.title)}</strong><small>${escapeHtml(series.seriesRef)}</small></div><div class="series-episode-list">${renderEpisodeRows(project, series)}</div>` : renderErrorState("关联系列暂时无法读取", "项目记录已保留，请刷新后重试。")}
+        </article>
+      `;
+    }).join("");
+    const assignedSeriesRefs = new Set(state.projectRecords.flatMap((project) => project.seriesRefs || []));
+    const unassigned = state.seriesRecords.filter((series) => !assignedSeriesRefs.has(series.seriesRef));
+    const unassignedCards = unassigned.map((series) => `
+      <article class="series-project-card unassigned-series-card">
+        <header><div><span class="section-kicker">既有系列 · 待关联</span><h3>${escapeHtml(series.title)}</h3><p>保留原有系列、单集与来源关系；可显式关联到一个新项目。</p></div><div class="series-card-actions"><button class="button button-secondary" type="button" data-action="associate-series-project" data-series-ref="${escapeHtml(series.seriesRef)}" data-series-title="${escapeHtml(series.title)}">建立项目上下文</button><button class="button button-danger-subtle" type="button" data-action="delete-series" data-series-ref="${escapeHtml(series.seriesRef)}" data-series-title="${escapeHtml(series.title)}" data-episode-count="${(series.episodes || []).length}">删除系列</button></div></header>
+        <div class="series-episode-list">${(series.episodes || []).map((episode) => `<article class="episode-project-row"><a class="episode-project-link" href="#/creator/projects/${encodeURIComponent(episode.episodeRef)}"><span class="episode-number">E${String(episode.episodeNumber).padStart(2, "0")}</span><span><strong>${escapeHtml(episode.title)}</strong><small>兼容入口 · 尚未关联项目</small></span><em>打开 →</em></a></article>`).join("") || '<div class="series-empty">还没有集数。</div>'}</div>
+      </article>
+    `).join("");
+    const records = waiting
+      ? renderLoadingState("正在读取项目、系列与单集…")
+      : failed
+        ? renderErrorState("项目上下文暂时无法读取", state.projectError || "请确认本地 Creator Server 正在运行后重试。")
+        : projectCards || renderEmptyState({ icon: "项", title: "还没有正式项目", description: "可以将一个现有系列显式关联为正式项目，保留全部既有身份与来源关系。", action: '<button class="button button-secondary" type="button" data-action="open-project-dialog">新建项目</button>' });
     return `
-      ${renderPageHeader({
-        eyebrow: "项目中心",
-        title: "项目",
-        description: "以真实系列与单集记录组织当前创作；正式项目管理能力尚未启用。",
-        status: "available",
-        meta: '<button class="button button-primary" type="button" data-action="open-project-dialog">新建项目</button>'
-      })}
-      <section class="project-center-toolbar" aria-label="项目筛选">
-        <div class="segmented-control"><button class="is-active" type="button">全部</button><button type="button" disabled>进行中</button><button type="button" disabled>已归档</button></div>
-        <span>不创建虚构项目；当前仅显示真实系列与单集。</span>
-      </section>
-      <section class="enterprise-panel project-register" aria-labelledby="series-projects-title"><header><div><span class="section-kicker">系列与单集</span><h3 id="series-projects-title">真实创作记录</h3></div><button class="button button-text" type="button" data-action="reload-series">刷新</button></header><div class="series-project-list">${persistedSeries}</div></section>
-      <section class="enterprise-panel project-context-gate"><span class="gate-index">项目</span><div><span class="section-kicker">项目能力准备</span><h3>正式项目上下文尚未建立</h3><p>新建项目向导可用于检查未来配置流程，但最终提交保持禁用，不会建立正式项目记录。</p></div><button class="button button-secondary" type="button" data-action="open-project-dialog">查看新建流程</button></section>
-      ${seriesApplicationNotice()}
+      ${renderPageHeader({ eyebrow: "项目中心", title: "项目", description: "以稳定项目身份组织系列、单集、故事与剧本制作上下文。", status: "available", meta: '<button class="button button-primary" type="button" data-action="open-project-dialog">新建项目</button>' })}
+      <section class="project-center-toolbar" aria-label="项目筛选"><div class="segmented-control"><button class="is-active" type="button">全部</button><button type="button" disabled>进行中</button><button type="button" disabled>已归档</button></div><span>${state.projectRecords.length} 个项目 · ${state.seriesRecords.length} 个系列</span></section>
+      <section class="enterprise-panel project-register" aria-labelledby="project-records-title"><header><div><span class="section-kicker">Project Context</span><h3 id="project-records-title">正式项目记录</h3></div><button class="button button-text" type="button" data-action="reload-projects">刷新</button></header><div class="series-project-list">${records}</div></section>
+      ${unassignedCards ? `<section class="enterprise-panel project-register compatibility-register"><header><div><span class="section-kicker">兼容性队列</span><h3>尚未关联项目的既有系列</h3><p>不会自动迁移或按名称匹配；由用户显式建立关系。</p></div></header><div class="series-project-list">${unassignedCards}</div></section>` : ""}
     `;
   }
 
@@ -984,8 +1003,33 @@
     return null;
   }
 
+  function findProject(projectRef) {
+    return state.projectRecords.find((project) => project.projectRef === projectRef) || null;
+  }
+
+  function findSeries(seriesRef) {
+    return state.seriesRecords.find((series) => series.seriesRef === seriesRef) || null;
+  }
+
+  function projectProductionContext(project, episodeRef = null) {
+    if (!project) return null;
+    const series = (project.seriesRefs || []).map(findSeries).find(Boolean) || null;
+    if (!series) return { project, series: null, episode: null };
+    const episode = episodeRef
+      ? (series.episodes || []).find((item) => item.episodeRef === episodeRef) || null
+      : (series.episodes || [])[0] || null;
+    return { project, series, episode };
+  }
+
+  function projectForSeries(seriesRef) {
+    return state.projectRecords.find((project) => (project.seriesRefs || []).includes(seriesRef)) || null;
+  }
+
   function productionContexts() {
-    return state.seriesRecords.flatMap((series) => (series.episodes || []).map((episode) => ({ series, episode })));
+    return state.seriesRecords.flatMap((series) => {
+      const project = projectForSeries(series.seriesRef);
+      return (series.episodes || []).map((episode) => ({ project, series, episode }));
+    });
   }
 
   function rememberProductionContext(persisted) {
@@ -1007,7 +1051,11 @@
   }
 
   function productionContextBase(persisted) {
-    return persisted ? `/creator/projects/${encodeURIComponent(persisted.episode.episodeRef)}` : "";
+    if (!persisted) return "";
+    if (persisted.project) return `/creator/projects/${encodeURIComponent(persisted.project.projectRef)}/episodes/${encodeURIComponent(persisted.episode.episodeRef)}`;
+    const project = projectForSeries(persisted.series.seriesRef);
+    if (project) return `/creator/projects/${encodeURIComponent(project.projectRef)}/episodes/${encodeURIComponent(persisted.episode.episodeRef)}`;
+    return `/creator/projects/${encodeURIComponent(persisted.episode.episodeRef)}`;
   }
 
   const storyViewSchemaVersion = "creator.story-view.v1";
@@ -1037,6 +1085,7 @@
     const targetDurationSec = storyboard.reduce((total, shot) => total + Number(shot.durationSec || 0), 0);
     return {
       schemaVersion: storyViewSchemaVersion,
+      projectRef: route.project ? route.project.projectRef : null,
       seriesRef: series.seriesRef,
       episodeRef: episode.episodeRef,
       sourcePlanRef: binding.sourcePlanRef,
@@ -1146,12 +1195,13 @@
             <div><dt>来源版本</dt><dd>导演方案 v${escapeHtml(projection.sourcePlanVersion)}</dd></div>
           </dl>
           <details class="advanced-lineage"><summary>高级溯源</summary><dl>
+            ${projection.projectRef ? `<div><dt>项目引用</dt><dd><code>${escapeHtml(projection.projectRef)}</code></dd></div>` : ""}
             <div><dt>系列引用</dt><dd><code>${escapeHtml(projection.seriesRef)}</code></dd></div>
             <div><dt>单集引用</dt><dd><code>${escapeHtml(projection.episodeRef)}</code></dd></div>
             <div><dt>来源方案引用</dt><dd><code>${escapeHtml(projection.sourcePlanRef)}</code></dd></div>
             <div><dt>来源结构</dt><dd><code>${escapeHtml(projection.sourcePlanSchemaVersion)}</code></dd></div>
           </dl></details>
-          <a class="button button-primary" href="#${escapeHtml(route.projectBase)}/script">进入剧本工作台</a>
+          <a class="button button-primary" href="#${escapeHtml(route.episodeBase || productionContextBase(route.persisted))}/script">进入剧本工作台</a>
           <p>继续使用同一单集；导航不会复制故事文本，也不会创建新的故事事实。</p>
         </article>
       </section>
@@ -1186,7 +1236,7 @@
         <article class="card episode-boundary-card">
           <span class="section-kicker">单集状态</span>
           <h3>单集制作记录</h3>
-          <p>当前单集可在刷新和本地服务重启后继续读取；正式项目管理能力尚未启用。</p>
+          <p>当前单集可在刷新和本地服务重启后继续读取，并继续使用同一正式项目上下文。</p>
           <ul><li>导演方案来源关系已保留</li><li>系列与单集关系已保留</li><li>剧本工作台继续使用同一单集上下文</li></ul>
         </article>
         <article class="card episode-source-plan-card">
@@ -1196,7 +1246,7 @@
             <div><dt>来源方案</dt><dd>已确认导演方案 v${escapeHtml(String(binding.sourcePlanVersion || 1))}</dd></div>
             <div><dt>来源结构</dt><dd>导演方案 v1</dd></div>
             <div><dt>版本</dt><dd>v${escapeHtml(binding.sourcePlanVersion || episode.sourcePlanVersion)}</dd></div>
-            <div><dt>正式项目</dt><dd>${episode.canonicalProjectRef ? "已关联" : "尚未建立"}</dd></div>
+            <div><dt>正式项目</dt><dd>${route.project ? escapeHtml(route.project.title) : "兼容入口 · 待关联"}</dd></div>
           </dl>
         </article>
       </section>
@@ -1559,6 +1609,33 @@
     "analytics-shell": ["数据", "未来显示可追溯的真实运营与交付证据。", "交付", "table"]
   });
 
+  function renderProjectOverview(route) {
+    const project = route.project;
+    const context = projectProductionContext(project);
+    const series = context && context.series;
+    const episodes = series ? series.episodes || [] : [];
+    return `
+      ${renderProjectContextBar(route)}
+      ${renderPageHeader({ eyebrow: "项目工作室", title: project.title, description: project.description || "统一承载系列、单集与制作来源关系。", status: "available", meta: localizedStatusBadge(project.status === "active" ? "创作中" : "已归档", project.status === "active" ? "available" : "neutral") })}
+      <section class="project-overview-grid">
+        <article class="enterprise-panel project-overview-hero"><span class="section-kicker">项目概览</span><h2>${escapeHtml(project.title)}</h2><p>${escapeHtml(project.description || "正式项目生产上下文")}</p><dl class="project-record-meta"><div><dt>项目类型</dt><dd>${escapeHtml(project.projectType)}</dd></div><div><dt>画幅</dt><dd>${escapeHtml(project.aspectRatio)}</dd></div><div><dt>单集目标</dt><dd>${escapeHtml(project.defaultDurationSec)} 秒</dd></div><div><dt>计划集数</dt><dd>${escapeHtml(project.plannedEpisodeCount)}</dd></div></dl></article>
+        <article class="enterprise-panel"><header><div><span class="section-kicker">生产关系</span><h3>系列与单集</h3></div><a class="text-link" href="#${route.projectBase}/episodes">查看分集</a></header>${series ? `<div class="project-lineage-summary"><div><span>系列</span><strong>${escapeHtml(series.title)}</strong><small>${escapeHtml(series.seriesRef)}</small></div><div><span>已创建单集</span><strong>${episodes.length}</strong><small>不会按计划集数批量创建</small></div></div>` : renderErrorState("关联系列暂时无法读取", "项目身份已保留，请刷新后重试。")}</article>
+      </section>
+      <section class="enterprise-panel project-production-spine"><header><div><span class="section-kicker">Production Spine</span><h3>真实制作链</h3></div></header><div class="project-spine-steps">${["项目","系列","单集","故事","剧本"].map((label, index) => `<span class="${index < 3 || episodes.length ? "is-ready" : ""}"><i>${index + 1}</i><strong>${label}</strong></span>`).join("")}</div></section>
+    `;
+  }
+
+  function renderProjectEpisodeList(route) {
+    const context = projectProductionContext(route.project);
+    const series = context && context.series;
+    const episodes = series ? series.episodes || [] : [];
+    return `
+      ${renderProjectContextBar(route)}
+      ${renderPageHeader({ eyebrow: "项目工作室 · 内容", title: "分集", description: "查看当前项目关联系列中的真实单集记录。", status: "available" })}
+      <section class="enterprise-panel"><header><div><span class="section-kicker">${series ? escapeHtml(series.title) : "关联系列"}</span><h3>已创建单集</h3></div><span>${episodes.length} 集</span></header>${episodes.length ? `<div class="enterprise-list">${episodes.map((episode) => `<a class="enterprise-list-row" href="#${route.projectBase}/episodes/${encodeURIComponent(episode.episodeRef)}"><span class="row-index">E${String(episode.episodeNumber).padStart(2, "0")}</span><span><strong>${escapeHtml(episode.title)}</strong><small>来源方案 v${escapeHtml(episode.sourcePlanVersion)} · ${escapeHtml(episode.status)}</small></span><em>进入制作</em></a>`).join("")}</div>` : renderEmptyState({ icon: "—", title: "尚未创建单集", description: "计划集数只是制作意图，不会自动创建单集记录。" })}</section>
+    `;
+  }
+
   function renderProjectContextBar(route) {
     const persisted = route.persisted;
     const episode = persisted && persisted.episode;
@@ -1570,12 +1647,13 @@
     } else if (route.type === "episode-project" && episode && episode.sourcePlanVersion) {
       version = `来源方案 v${episode.sourcePlanVersion}`;
     }
+    const project = route.project || (persisted && persisted.project) || (persisted && projectForSeries(persisted.series.seriesRef));
     const fields = [
-      ["项目", "尚未建立"], ["系列", persisted ? persisted.series.title : "尚未选择"],
+      ["项目", project ? project.title : "尚未建立"], ["系列", persisted ? persisted.series.title : project && project.seriesRefs.length ? (findSeries(project.seriesRefs[0]) || {}).title || "读取中" : "尚未选择"],
       ["单集", persisted ? `第 ${persisted.episode.episodeNumber} 集` : "尚未选择"],
       ["阶段", route.group || "—"], ["当前对象", route.label || "—"], ["版本", version]
     ];
-    return `<section class="project-context-bar" aria-label="制作上下文"><div class="context-gate"><span></span><strong>制作上下文</strong><small>${persisted ? "当前单集" : "尚未选择单集"}</small></div>${fields.map(([label,value]) => `<div><span>${escapeHtml(label)}</span><strong>${escapeHtml(value)}</strong></div>`).join("")}</section>`;
+    return `<section class="project-context-bar" aria-label="制作上下文"><div class="context-gate"><span></span><strong>制作上下文</strong><small>${project ? "正式项目" : persisted ? "兼容单集" : "尚未选择项目"}</small></div>${fields.map(([label,value]) => `<div><span>${escapeHtml(label)}</span><strong>${escapeHtml(value)}</strong></div>`).join("")}</section>`;
   }
 
   function renderEpisodeSelector(route) {
@@ -1670,10 +1748,93 @@
     const normalized = normalizePath(path);
     if (normalized === "/creator/dashboard") return { redirect: "/creator" };
     if (normalized === "/creator/creation") return { redirect: "/creator/create" };
+    const canonicalProjectMatch = normalized.match(/^\/creator\/projects\/([^/]+)(?:\/(.*))?$/);
+    if (canonicalProjectMatch && canonicalProjectMatch[1] !== "new") {
+      const project = findProject(decodeURIComponent(canonicalProjectMatch[1]));
+      if (project) {
+        const projectBase = `/creator/projects/${encodeURIComponent(project.projectRef)}`;
+        const suffix = canonicalProjectMatch[2] || "";
+        const defaultContext = projectProductionContext(project);
+        if (!suffix) return { redirect: `${projectBase}/overview` };
+        if (suffix === "overview") {
+          return {
+            type: "project-overview-real",
+            key: "overview",
+            label: "项目概览",
+            status: "available",
+            path: normalized,
+            projectBase,
+            project,
+            persisted: defaultContext && defaultContext.episode ? defaultContext : null,
+            context: "project-shell",
+            group: "概览",
+            breadcrumb: `${project.title} / 项目概览`
+          };
+        }
+        if (suffix === "episodes") {
+          return {
+            type: "project-episode-list-real",
+            key: "episodes",
+            label: "分集",
+            status: "available",
+            path: normalized,
+            projectBase,
+            project,
+            persisted: defaultContext && defaultContext.episode ? defaultContext : null,
+            context: "project-shell",
+            group: "内容",
+            breadcrumb: `${project.title} / 分集`
+          };
+        }
+        const episodeMatch = suffix.match(/^episodes\/([^/]+)(?:\/(story|script))?$/);
+        if (episodeMatch) {
+          const persisted = projectProductionContext(project, decodeURIComponent(episodeMatch[1]));
+          if (!persisted || !persisted.series || !persisted.episode) return null;
+          rememberProductionContext(persisted);
+          const target = episodeMatch[2] || "pipeline";
+          const episodeBase = `${projectBase}/episodes/${encodeURIComponent(persisted.episode.episodeRef)}`;
+          const route = {
+            key: target,
+            label: target === "pipeline" ? "分集工作台" : target === "story" ? "故事" : "剧本",
+            status: "available",
+            path: normalized,
+            projectBase,
+            episodeBase,
+            project,
+            persisted,
+            context: "episode",
+            group: "内容",
+            breadcrumb: `${project.title} / 第 ${persisted.episode.episodeNumber} 集 / ${target === "pipeline" ? "概览" : target === "story" ? "故事" : "剧本"}`
+          };
+          if (target === "pipeline") return { ...route, type: "episode-project" };
+          if (target === "story") return { ...route, type: "story-view" };
+          return { ...route, type: "script-studio" };
+        }
+        const projectPage = projectPages.find((page) => page.suffix === suffix);
+        if (projectPage) {
+          return {
+            ...projectPage,
+            path: normalized,
+            projectBase,
+            project,
+            persisted: defaultContext && defaultContext.episode ? defaultContext : null,
+            context: "project-shell",
+            breadcrumb: `${project.title} / ${projectPage.group} / ${projectPage.label}`
+          };
+        }
+        return null;
+      }
+    }
     const persistedProjectMatch = normalized.match(/^\/creator\/projects\/([^/]+)(?:\/([^/]+))?$/);
     if (persistedProjectMatch && !["new"].includes(persistedProjectMatch[1])) {
       const persisted = findPersistedEpisode(decodeURIComponent(persistedProjectMatch[1]));
       if (persisted) {
+        const linkedProject = projectForSeries(persisted.series.seriesRef);
+        if (linkedProject) {
+          const target = persistedProjectMatch[2] || "story";
+          const canonicalTarget = target === "pipeline" ? "" : `/${target}`;
+          return { redirect: `/creator/projects/${encodeURIComponent(linkedProject.projectRef)}/episodes/${encodeURIComponent(persisted.episode.episodeRef)}${canonicalTarget}` };
+        }
         rememberProductionContext(persisted);
         const dynamicBase = `/creator/projects/${encodeURIComponent(persisted.episode.episodeRef)}`;
         const pageKey = persistedProjectMatch[2];
@@ -1770,6 +1931,15 @@
     const items = route.context === "creation" ? creationModules.map((module) => ({ ...module, status: "planned" })) : [];
     if (groups) {
       const itemPath = (item) => {
+        const project = route.project || (productionContext && productionContext.project);
+        if (project) {
+          const base = route.projectBase || `/creator/projects/${encodeURIComponent(project.projectRef)}`;
+          if (item.key === "overview") return `${base}/overview`;
+          if (item.key === "episodes") return `${base}/episodes`;
+          if (item.key === "episode-workspace") return productionContext && productionContext.episode ? `${base}/episodes/${encodeURIComponent(productionContext.episode.episodeRef)}` : `${base}/episodes`;
+          if (item.key === "story" || item.key === "script") return productionContext && productionContext.episode ? `${base}/episodes/${encodeURIComponent(productionContext.episode.episodeRef)}/${item.key}` : `${base}/episodes`;
+          return `${base}/${item.suffix}`;
+        }
         if (!productionContext) return `${projectShellBase}/${item.suffix}`;
         const base = route.projectBase || productionContextBase(productionContext);
         if (item.key === "episode-workspace") return `${base}/pipeline`;
@@ -1777,9 +1947,11 @@
         return `${projectShellBase}/${item.suffix}`;
       };
       const isCurrent = (item) => route.key === item.key || (episodeContext && route.key === "pipeline" && item.key === "episode-workspace");
-      const contextLabel = productionContext
-        ? `${productionContext.series.title} · 第 ${productionContext.episode.episodeNumber} 集 · 尚无正式项目`
-        : "尚未选择单集";
+      const contextLabel = route.project
+        ? `${route.project.title}${productionContext && productionContext.episode ? ` · 第 ${productionContext.episode.episodeNumber} 集` : ""}`
+        : productionContext
+          ? `${productionContext.series.title} · 第 ${productionContext.episode.episodeNumber} 集 · 兼容入口`
+          : "尚未选择项目";
       const capabilityBadge = (item) => {
         if (!productionContext || !["story", "script"].includes(item.key)) return statusBadge(item.status);
         if (item.key === "story") return productionContext.episode.confirmedPlanBinding ? localizedStatusBadge("已就绪", "available") : localizedStatusBadge("待确认方案", "neutral");
@@ -1849,7 +2021,9 @@
     } else if (route && route.type === "assets") {
       detail = `<section class="inspector-section"><span class="inspector-label">权利状态</span>${governanceBadge("HOLD", "hold")}<p>正式使用前需要完成人工确认。</p></section>`;
     } else if (route && route.context === "project-shell") {
-      detail = `<section class="inspector-section"><span class="inspector-label">项目上下文</span><strong>尚未建立</strong><p>正式项目能力启用后，当前系列与单集将归入统一项目管理。</p></section><section class="inspector-section"><span class="inspector-label">页面状态</span><strong>${escapeHtml(route.label)}</strong><p>${route.status === "disabled" ? "受人工或能力门禁限制" : "等待正式上游输入"}</p></section>`;
+      detail = route.project
+        ? `<section class="inspector-section"><span class="inspector-label">项目上下文</span><strong>${escapeHtml(route.project.title)}</strong><p>${escapeHtml(route.project.projectType)} · ${escapeHtml(route.project.status === "active" ? "创作中" : "已归档")}</p><p>v${escapeHtml(route.project.version)} · ${escapeHtml(route.project.seriesRefs.length)} 个关联系列</p></section><section class="inspector-section"><span class="inspector-label">页面状态</span><strong>${escapeHtml(route.label)}</strong><p>${route.status === "disabled" ? "受人工或能力门禁限制" : "使用正式项目身份"}</p></section>`
+        : `<section class="inspector-section"><span class="inspector-label">项目上下文</span><strong>尚未建立</strong><p>当前为既有单集兼容入口，可从项目中心显式建立关系。</p></section>`;
     } else {
       detail = `<section class="inspector-section"><span class="inspector-label">工作区</span><strong>创作者工作区</strong><p>当前页面没有独立业务对象。</p></section>`;
     }
@@ -2032,6 +2206,9 @@
     if ((normalized === "/creator" || normalized === "/creator/projects" || normalized === "/creator/ai-director" || normalized.startsWith("/creator/projects/") || normalized.startsWith(`${projectShellBase}/`)) && state.seriesDataStatus === "idle") {
       loadSeriesData();
     }
+    if ((normalized === "/creator" || normalized.startsWith("/creator/projects")) && state.projectDataStatus === "idle") {
+      loadProjectData();
+    }
     const route = resolveRoute(normalized);
     if (route && route.redirect) {
       navigate(route.redirect, true);
@@ -2061,7 +2238,9 @@
       "creation-preview": () => renderCreationPreviewR1(resolved),
       works: renderWorksR1,
       "ai-director": renderAiDirector,
-      "project-wizard-page": () => `${renderPageHeader({ eyebrow: "项目能力准备", title: "新建项目", description: "配置未来项目上下文；最终提交仍受项目能力门禁控制。", status: "planned" })}<section class="enterprise-panel project-context-gate"><span class="gate-index">新建</span><div><h3>配置流程可以检查，提交保持禁用</h3><p>不会建立正式项目、制作或渲染记录。</p></div><button class="button button-primary" type="button" data-action="open-project-dialog">打开配置向导</button></section>`,
+      "project-wizard-page": () => `${renderPageHeader({ eyebrow: "项目生产上下文", title: "新建项目", description: "将现有系列显式关联到稳定的项目身份，并保留全部既有来源关系。", status: "available" })}<section class="enterprise-panel project-context-gate"><span class="gate-index">新建</span><div><h3>建立正式项目上下文</h3><p>创建操作由 Creator Application 调用 V5 Project 公共边界；不会批量创建单集、剧本或任务。</p></div><button class="button button-primary" type="button" data-action="open-project-dialog">打开配置向导</button></section>`,
+      "project-overview-real": () => renderProjectOverview(resolved),
+      "project-episode-list-real": () => renderProjectEpisodeList(resolved),
       "episode-project": () => renderEpisodeProject(resolved),
       "episode-selector": () => renderEpisodeSelector(resolved),
       "story-view": () => renderStoryView(resolved),
@@ -2128,13 +2307,21 @@
     return `<label><span>${escapeHtml(label)}</span><input name="${escapeHtml(name)}" value="${escapeHtml(value)}" autocomplete="off"></label>`;
   }
 
+  function wizardSeriesField(value) {
+    const options = state.seriesRecords.map((series) => {
+      const linked = Boolean(projectForSeries(series.seriesRef));
+      return `<option value="${escapeHtml(series.seriesRef)}" ${series.seriesRef === value ? "selected" : ""} ${linked ? "disabled" : ""}>${escapeHtml(series.title)}${linked ? " · 已关联项目" : ""}</option>`;
+    }).join("");
+    return `<label><span>关联系列</span><select name="seriesRef" required><option value="">请选择既有系列</option>${options}</select><small>显式保留 seriesRef、episodeRef 与现有来源关系。</small></label>`;
+  }
+
   function renderProjectWizard() {
     const values = state.wizardValues;
     const panels = {
-      1: `<section class="wizard-step"><div><span class="section-kicker">STEP 01</span><h3>选择项目类型</h3><p>类型只影响未来工作区结构，不会在本任务中创建项目。</p></div><div class="wizard-choice-grid">${[["series","系列短片","多集连续内容"],["single","单片","独立影片"],["campaign","Campaign","品牌内容系列"]].map(([value,label,copy]) => `<label><input type="radio" name="projectType" value="${value}" ${values.projectType === value ? "checked" : ""}><span><strong>${label}</strong><small>${copy}</small></span></label>`).join("")}</div></section>`,
-      2: `<section class="wizard-step"><div><span class="section-kicker">STEP 02</span><h3>基本信息</h3><p>这些值仅停留在当前弹窗状态。</p></div><div class="wizard-form-grid">${wizardField("项目名称","title",values.title)}${wizardField("内容类型","contentType",values.contentType,["","剧情短片","系列内容","品牌内容"])}${wizardField("计划集数","episodeCount",values.episodeCount)}${wizardField("单集时长（秒）","duration",values.duration)}${wizardField("画幅","aspectRatio",values.aspectRatio,["9:16","16:9","1:1"])}${wizardField("目标平台","platform",values.platform,["","短视频平台","流媒体","内部审看"])}</div></section>`,
+      1: `<section class="wizard-step"><div><span class="section-kicker">STEP 01</span><h3>选择项目类型</h3><p>当前启用系列项目，用于承载既有系列与单集的生产上下文。</p></div><div class="wizard-choice-grid"><label><input type="radio" name="projectType" value="series" checked><span><strong>系列项目</strong><small>关联一个现有系列，保留全部生产来源</small></span></label><label class="is-disabled"><input type="radio" name="projectType" value="standalone" disabled><span><strong>独立影片</strong><small>后续阶段开放</small></span></label><label class="is-disabled"><input type="radio" name="projectType" value="brand-film" disabled><span><strong>品牌影片</strong><small>后续阶段开放</small></span></label></div></section>`,
+      2: `<section class="wizard-step"><div><span class="section-kicker">STEP 02</span><h3>基本信息</h3><p>项目将通过 Creator Application 写入 V5 Project 公共边界。</p></div><div class="wizard-form-grid">${wizardSeriesField(values.seriesRef)}${wizardField("项目名称","title",values.title)}${wizardField("内容类型","contentType",values.contentType,["","剧情短片","系列内容","品牌内容"])}${wizardField("计划集数","episodeCount",values.episodeCount)}${wizardField("单集时长（秒）","duration",values.duration)}${wizardField("画幅","aspectRatio",values.aspectRatio,["9:16","16:9","1:1"])}${wizardField("目标平台","platform",values.platform,["","短视频平台","流媒体","内部审看"])}</div></section>`,
       3: `<section class="wizard-step"><div><span class="section-kicker">第 03 步</span><h3>制作默认值</h3><p>正式默认值需要由项目管理能力承担。</p></div><div class="wizard-form-grid">${wizardField("内容配置","contentProfile",values.contentProfile)}${wizardField("语言","language",values.language,["中文","英文","多语言"])}${wizardField("视觉方向","visualDirection",values.visualDirection)}${wizardField("制作预设","productionPreset",values.productionPreset,["","标准短片","高保真电影","快速审看"])}</div></section>`,
-      4: `<section class="wizard-step"><div><span class="section-kicker">STEP 04</span><h3>检查配置</h3><p>配置可以审查，但最终创建保持禁用。</p></div><dl class="wizard-review">${[["项目类型",values.projectType],["项目名称",values.title || "未填写"],["内容类型",values.contentType || "未选择"],["计划集数",values.episodeCount || "未填写"],["单集时长",`${values.duration || "—"} 秒`],["画幅",values.aspectRatio],["平台",values.platform || "未选择"],["语言",values.language],["视觉方向",values.visualDirection || "未填写"]].map(([label,value]) => `<div><dt>${escapeHtml(label)}</dt><dd>${escapeHtml(value)}</dd></div>`).join("")}</dl></section>`
+      4: `<section class="wizard-step"><div><span class="section-kicker">STEP 04</span><h3>检查并创建</h3><p>创建项目不会复制或改写系列、单集、故事与剧本身份。</p></div><dl class="wizard-review">${[["项目类型","系列项目"],["关联系列",(findSeries(values.seriesRef) || {}).title || "未选择"],["项目名称",values.title || "未填写"],["内容类型",values.contentType || "未选择"],["计划集数",values.episodeCount || "未填写"],["单集时长",`${values.duration || "—"} 秒`],["画幅",values.aspectRatio],["平台",values.platform || "未选择"],["语言",values.language],["视觉方向",values.visualDirection || "未填写"]].map(([label,value]) => `<div><dt>${escapeHtml(label)}</dt><dd>${escapeHtml(value)}</dd></div>`).join("")}</dl>${state.projectError ? `<p class="form-error" role="alert">${escapeHtml(state.projectError)}</p>` : ""}</section>`
     };
     document.getElementById("project-wizard-content").innerHTML = panels[state.wizardStep];
     projectDialog.querySelectorAll("[data-wizard-step-indicator]").forEach((item) => item.classList.toggle("is-current", Number(item.dataset.wizardStepIndicator) === state.wizardStep));
@@ -2144,11 +2331,21 @@
     previous.hidden = state.wizardStep === 1;
     next.hidden = state.wizardStep === 4;
     submit.hidden = state.wizardStep !== 4;
+    submit.disabled = state.projectPhase === "creating" || !values.seriesRef || !values.title.trim() || !Number(values.episodeCount || 0);
+    submit.textContent = state.projectPhase === "creating" ? "正在创建…" : "创建项目";
   }
 
   function openProjectDialog(trigger) {
     dialogReturnFocus = trigger || document.activeElement;
     state.wizardStep = 1;
+    if (!state.wizardValues.seriesRef) {
+      const available = state.seriesRecords.find((series) => !projectForSeries(series.seriesRef));
+      if (available) {
+        state.wizardValues.seriesRef = available.seriesRef;
+        if (!state.wizardValues.title) state.wizardValues.title = available.title;
+        if (!state.wizardValues.episodeCount) state.wizardValues.episodeCount = String(available.plannedEpisodeCount || 1);
+      }
+    }
     renderProjectWizard();
     projectDialog.showModal();
     window.requestAnimationFrame(() => {
@@ -2159,6 +2356,46 @@
 
   function closeProjectDialog() {
     if (projectDialog.open) projectDialog.close();
+  }
+
+  async function createProjectFromWizard() {
+    if (state.projectPhase === "creating") return;
+    const values = state.wizardValues;
+    state.projectError = null;
+    if (!values.seriesRef || !values.title.trim() || !Number(values.episodeCount || 0)) {
+      state.projectError = "请选择既有系列，并填写项目名称与计划集数。";
+      renderProjectWizard();
+      return;
+    }
+    state.projectPhase = "creating";
+    renderProjectWizard();
+    try {
+      const payload = await requestApplicationJson(projectsEndpoint, {
+        method: "POST",
+        body: JSON.stringify({
+          workspaceRef,
+          contentProfileRef,
+          projectType: "series",
+          seriesRef: values.seriesRef,
+          title: values.title.trim(),
+          description: values.contentType || "Creator 项目生产上下文",
+          targetPlatform: values.platform,
+          aspectRatio: values.aspectRatio,
+          defaultDurationSec: Number(values.duration || 60),
+          plannedEpisodeCount: Number(values.episodeCount)
+        })
+      });
+      state.projectPhase = "idle";
+      await loadProjectData({ force: true });
+      closeProjectDialog();
+      state.wizardValues = { projectType: "series", seriesRef: "", title: "", contentType: "", episodeCount: "", duration: "60", aspectRatio: "9:16", platform: "", contentProfile: contentProfileRef, language: "中文", visualDirection: "", productionPreset: "" };
+      showToast("项目上下文已建立");
+      navigate(`/creator/projects/${encodeURIComponent(payload.project.projectRef)}`);
+    } catch (error) {
+      state.projectPhase = "idle";
+      state.projectError = error && error.message ? error.message : "项目创建失败，请稍后重试。";
+      renderProjectWizard();
+    }
   }
 
   function openDeleteDialog(trigger, kind) {
@@ -2574,7 +2811,7 @@
     state.selectedShotKey = fixture.shots[0].localKey;
     state.selectedPipelineKey = (fixture.pipeline.find((stage) => stage.label === "Preview") || fixture.pipeline[1]).localKey;
     state.wizardStep = 1;
-    state.wizardValues = { projectType: "series", title: "", contentType: "", episodeCount: "", duration: "60", aspectRatio: "9:16", platform: "", contentProfile: "", language: "中文", visualDirection: "", productionPreset: "" };
+    state.wizardValues = { projectType: "series", seriesRef: "", title: "", contentType: "", episodeCount: "", duration: "60", aspectRatio: "9:16", platform: "", contentProfile: contentProfileRef, language: "中文", visualDirection: "", productionPreset: "" };
     state.aiDirectorPhase = "input";
     state.aiDirectorBrief = { ...fixture.aiDirector.briefDefaults };
     state.aiDirectorPlan = null;
@@ -2603,6 +2840,13 @@
     const action = button.dataset.action;
     if (!action) return;
     if (action === "open-project-dialog") openProjectDialog(button);
+    if (action === "associate-series-project") {
+      state.wizardValues.seriesRef = button.dataset.seriesRef || "";
+      state.wizardValues.title = button.dataset.seriesTitle || "";
+      const series = findSeries(state.wizardValues.seriesRef);
+      state.wizardValues.episodeCount = String(series ? series.plannedEpisodeCount : 1);
+      openProjectDialog(button);
+    }
     if (action === "close-project-dialog") closeProjectDialog();
     if (action === "delete-episode") openDeleteDialog(button, "episode");
     if (action === "delete-series") openDeleteDialog(button, "series");
@@ -2654,6 +2898,10 @@
       if (form) form.requestSubmit();
     }
     if (action === "reload-series") loadSeriesData({ force: true });
+    if (action === "reload-projects") {
+      loadSeriesData({ force: true });
+      loadProjectData({ force: true });
+    }
     if (action === "generate-script") generateScript();
     if (action === "confirm-script-version") confirmScriptVersion();
     if (action === "select-script-version") {
@@ -2765,7 +3013,7 @@
 
   projectForm.addEventListener("submit", (event) => {
     event.preventDefault();
-    showToast("正式项目能力尚未启用 · 未创建任何项目");
+    createProjectFromWizard();
   });
 
   projectDialog.addEventListener("close", () => {
