@@ -26,6 +26,11 @@
 
   const fixture = JSON.parse(fixtureElement.textContent);
   const aiDirectorEndpoint = "/creator/internal/ai-director/plan";
+  const seriesEndpoint = "/creator/internal/series";
+  const confirmCreativePlanEndpoint = "/creator/internal/creative-plans/confirm";
+  const episodesEndpoint = "/creator/internal/episodes";
+  const workspaceRef = fixture.project.workspaceRef;
+  const contentProfileRef = fixture.project.contentProfileRef;
   const projectRef = fixture.project.projectRef;
   const projectBase = `/creator/projects/${projectRef}`;
   const displayProjectTitle = "晚灯 · 第 1 集";
@@ -125,6 +130,12 @@
     aiDirectorConfirmed: false,
     aiDirectorError: null,
     aiDirectorProjectDraft: null,
+    confirmedCreativePlan: null,
+    seriesRecords: [],
+    seriesDataStatus: "idle",
+    seriesEpisodePhase: "idle",
+    seriesEpisodeError: null,
+    createdEpisode: null,
     previewState: "paused",
     previewMuted: true,
     sidebarCollapsed: false,
@@ -146,6 +157,60 @@
     const candidate = String(value || "").trim();
     const withSlash = candidate.startsWith("/") ? candidate : `/${candidate}`;
     return withSlash.length > 1 ? withSlash.replace(/\/+$/, "") : withSlash;
+  }
+
+  async function requestApplicationJson(path, options = {}) {
+    const response = await fetch(path, {
+      ...options,
+      headers: {
+        "Accept": "application/json",
+        ...(options.body ? { "Content-Type": "application/json" } : {}),
+        ...(options.headers || {})
+      }
+    });
+    const payload = await response.json();
+    if (!response.ok || !payload.ok) {
+      const error = new Error(payload && payload.error && payload.error.message ? payload.error.message : "暂时无法完成操作，请稍后重试。");
+      error.code = payload && payload.error ? payload.error.code : "application_error";
+      throw error;
+    }
+    return payload;
+  }
+
+  function withWorkspace(path) {
+    const separator = path.includes("?") ? "&" : "?";
+    return `${path}${separator}workspaceRef=${encodeURIComponent(workspaceRef)}`;
+  }
+
+  function withEpisodeScope(path, seriesRefValue) {
+    return `${withWorkspace(path)}&seriesRef=${encodeURIComponent(seriesRefValue)}`;
+  }
+
+  async function loadSeriesData({ force = false } = {}) {
+    if (state.seriesDataStatus === "loading" || (!force && state.seriesDataStatus === "ready")) return;
+    state.seriesDataStatus = "loading";
+    try {
+      const seriesPayload = await requestApplicationJson(withWorkspace(seriesEndpoint));
+      state.seriesRecords = await Promise.all((seriesPayload.series || []).map(async (series) => ({
+        ...series,
+        episodes: await Promise.all((series.episodes || []).map(async (episode) => {
+          const detail = await requestApplicationJson(
+            withEpisodeScope(
+              `${episodesEndpoint}/${encodeURIComponent(episode.episodeRef)}`,
+              series.seriesRef
+            )
+          );
+          return detail.episode;
+        }))
+      })));
+      state.seriesDataStatus = "ready";
+    } catch (error) {
+      state.seriesDataStatus = "error";
+      state.seriesEpisodeError = "暂时无法读取系列与集数，请稍后重试。";
+    }
+    if (["/creator/projects", "/creator/ai-director"].includes(state.activePath) || state.activePath.startsWith("/creator/projects/")) {
+      renderRoute(state.activePath);
+    }
   }
 
   function pathFromHash() {
@@ -211,6 +276,10 @@
     return '<span class="sr-only page-fixture-contract">FIXTURE ONLY · NOT A DOMAIN FACT · SESSION ONLY</span>';
   }
 
+  function seriesApplicationNotice() {
+    return '<span class="sr-only series-application-contract">SERIES AND EPISODE DOMAIN OWNER IS V5 CORE OS · LOCAL DEVELOPMENT DURABLE ADAPTER · NOT A CANONICAL PROJECT · NO PRODUCTION JOB</span>';
+  }
+
   function candidatePlanNotice() {
     return '<span class="sr-only candidate-plan-contract">候选创意方案 · 人工确认前不会进入后续流程 · 仅当前会话有效</span>';
   }
@@ -235,7 +304,7 @@
   function updateShellBoundaryCopy(route) {
     if (!fixtureBanner) return;
     fixtureBanner.dataset.context = route && route.type === "ai-director" ? "ai-director" : "workspace";
-    fixtureBanner.title = "当前为内部体验数据，不会保存、生成或发布。";
+    fixtureBanner.title = "演示媒体不是业务事实；系列与集数由本地开发服务管理。";
   }
 
   function renderLoadingState(label) {
@@ -319,6 +388,34 @@
   }
 
   function renderProjects() {
+    const persistedSeries = state.seriesDataStatus === "loading" || state.seriesDataStatus === "idle"
+      ? renderLoadingState("正在读取系列与集数…")
+      : state.seriesDataStatus === "error"
+        ? renderErrorState("系列与集数暂时无法读取", "请确认本地 Creator Server 正在运行后重试。")
+        : state.seriesRecords.length
+          ? state.seriesRecords.map((series) => `
+              <article class="series-project-card">
+                <header>
+                  <div><span class="section-kicker">系列</span><h3>${escapeHtml(series.title)}</h3><p>${escapeHtml(series.description || "持续创作中的影片系列")}</p></div>
+                  <span class="badge badge-available"><i></i>${escapeHtml(series.status === "active" ? "创作中" : series.status)}</span>
+                </header>
+                <div class="series-episode-list">
+                  ${(series.episodes || []).length ? series.episodes.map((episode) => `
+                    <a class="episode-project-row" href="#/creator/projects/${encodeURIComponent(episode.episodeRef)}">
+                      <span class="episode-number">E${String(episode.episodeNumber).padStart(2, "0")}</span>
+                      <span><strong>${escapeHtml(episode.title)}</strong><small>来源：已确认的 AI导演方案 v${escapeHtml(episode.sourcePlanVersion)}</small></span>
+                      <em>打开项目 →</em>
+                    </a>
+                  `).join("") : '<div class="series-empty">还没有集数。请在 AI导演确认方案后创建第一集。</div>'}
+                </div>
+              </article>
+            `).join("")
+          : renderEmptyState({
+              icon: "剧",
+              title: "还没有系列",
+              description: "在 AI导演中确认一个创意方案，然后创建系列与第一集。",
+              action: '<a class="button button-secondary" href="#/creator/ai-director">前往 AI导演</a>'
+            });
     const localDrafts = state.localProjectDrafts.length
       ? state.localProjectDrafts.map((draft) => `
           <article class="project-row local-draft-row">
@@ -342,6 +439,11 @@
         status: "fixture",
         meta: '<button class="button button-secondary" type="button" data-action="open-project-dialog">＋ 创建项目草稿</button>'
       })}
+      <section class="card project-list-panel persisted-series-panel" aria-labelledby="series-projects-title">
+        <div class="list-section-heading"><div><span class="section-kicker">系列与集数</span><h3 id="series-projects-title">Creator 项目</h3></div><button class="button button-text" type="button" data-action="reload-series">刷新</button></div>
+        <p class="series-boundary-copy">系列与集数由本地开发服务保存；它们不是 Canonical Project，也不会触发生成或生产任务。</p>
+        <div class="series-project-list">${persistedSeries}</div>
+      </section>
       <section class="card project-list-panel v2-project-list">
         <div class="list-section-heading"><div><span class="section-kicker">最近项目</span><h3>继续制作</h3></div><span>1 个项目</span></div>
         <article class="project-row fixture-project-row">
@@ -356,7 +458,7 @@
         <div class="list-section-heading local-heading"><div><span class="section-kicker">临时草稿</span><h3>当前会话</h3></div><span>${state.localProjectDrafts.length} 项</span></div>
         <div class="local-drafts">${localDrafts}</div>
       </section>
-      ${fixtureNotice()}
+      ${seriesApplicationNotice()}
     `;
   }
 
@@ -721,8 +823,27 @@
 
   function renderDirectorPlanning() {
     const production = state.aiDirectorPlan && state.aiDirectorPlan.productionPlan;
-    const canCreateDraft = Boolean(production && state.aiDirectorConfirmed && state.aiDirectorPhase !== "generating");
+    const canCreateEpisode = Boolean(production && state.confirmedCreativePlan && state.aiDirectorConfirmed && state.seriesEpisodePhase !== "creating");
     const listValue = (items, fallback) => Array.isArray(items) && items.length ? items.map(escapeHtml).join("、") : fallback;
+    const seriesOptions = state.seriesRecords.map((series) => `<option value="${escapeHtml(series.seriesRef)}">${escapeHtml(series.title)}</option>`).join("");
+    const handoff = state.aiDirectorConfirmed ? `
+      <form id="series-episode-form" class="series-episode-form">
+        <div class="series-handoff-heading"><span class="section-kicker">项目交接</span><strong>创建系列与集数</strong><p>把已确认方案关联到一个稳定的系列和 Episode Project。</p></div>
+        <label class="field-label">系列
+          <select name="seriesRef" data-action="select-series-mode" ${canCreateEpisode ? "" : "disabled"}>
+            <option value="__new__">新建系列</option>${seriesOptions}
+          </select>
+        </label>
+        <div class="new-series-fields">
+          <label class="field-label">系列名称<input name="seriesTitle" maxlength="80" value="晚灯" required></label>
+          <label class="field-label">计划集数<input name="plannedEpisodeCount" type="number" min="1" max="10000" value="12" required></label>
+        </div>
+        <label class="field-label">本集标题<input name="episodeTitle" maxlength="120" value="${escapeHtml(state.aiDirectorPlan.storyDirection.title || "Episode 001")}" required></label>
+        <label class="field-label">集数<input name="episodeNumber" type="number" min="1" max="100000" value="1" required></label>
+        ${state.seriesEpisodeError ? `<p class="form-error" role="alert">${escapeHtml(state.seriesEpisodeError)}</p>` : ""}
+        <div class="director-plan-action">${state.seriesEpisodePhase === "creating" ? renderButtonLoading("正在创建…") : `<button class="button button-secondary" type="submit" ${canCreateEpisode ? "" : "disabled"}>创建 Episode Project</button>`}<p>仅使用本地开发持久化；不是 Canonical Project，不会触发生成任务。</p></div>
+      </form>
+    ` : '<div class="director-plan-action"><button class="button button-primary" type="button" disabled>创建 Episode Project</button><p>人工确认并保存当前创意方案后，才可创建系列与集数。</p></div>';
     return `
       <section class="director-planning-panel" aria-labelledby="director-planning-title">
         <div class="card-heading"><div><span class="section-kicker">制作规划</span><h3 id="director-planning-title">把方案带入项目</h3></div></div>
@@ -734,7 +855,7 @@
           <div><dt>资产需求</dt><dd>${production ? listValue(production.visualAssets, "无") : "待生成"}</dd></div>
           <div><dt>声音需求</dt><dd>${production ? listValue(production.audioNeeds, "无") : "待生成"}</dd></div>
         </dl>
-        <div class="director-plan-action"><button class="button button-primary" type="button" data-action="create-ai-director-project-draft" ${canCreateDraft ? "" : "disabled"}>创建项目草稿</button><p>${state.aiDirectorConfirmed ? "仅当前会话有效，不会保存到系统。" : "确认导演方案后才可创建当前会话草稿。"}</p></div>
+        ${handoff}
       </section>
     `;
   }
@@ -800,6 +921,58 @@
           <div><dt>数据性质</dt><dd>非真实业务数据</dd></div>
         </dl>
         <div class="draft-handoff-actions"><a class="button button-secondary" href="#/creator/ai-director">返回AI导演</a><a class="button button-text" href="#${projectBase}/pipeline">打开晚灯项目</a></div>
+      </section>
+    `;
+  }
+
+  function findPersistedEpisode(episodeRef) {
+    for (const series of state.seriesRecords) {
+      const episode = (series.episodes || []).find((item) => item.episodeRef === episodeRef);
+      if (episode) return { series, episode };
+    }
+    return null;
+  }
+
+  function renderEpisodeProject(route) {
+    const { series, episode } = route.persisted;
+    const binding = episode.confirmedPlanBinding || {};
+    const sourcePlan = binding.sourcePlan || {};
+    const storyDirection = sourcePlan.storyDirection || {};
+    return `
+      ${renderPageHeader({
+        eyebrow: `${escapeHtml(series.title)} · 第 ${escapeHtml(episode.episodeNumber)} 集`,
+        title: episode.title,
+        description: "该 Episode Project 已关联到一个经人工确认的 AI导演 CreativePlan。",
+        status: "available",
+        meta: localizedStatusBadge("项目草稿", "neutral")
+      })}
+      <section class="episode-source-grid">
+        <article class="card episode-source-card">
+          <div class="card-heading"><div><span class="section-kicker">项目来源</span><h3>已确认的导演方案</h3></div>${localizedStatusBadge("已人工确认", "available")}</div>
+          <dl class="episode-source-list">
+            <div><dt>所属系列</dt><dd>${escapeHtml(series.title)}</dd></div>
+            <div><dt>集数</dt><dd>第 ${escapeHtml(episode.episodeNumber)} 集</dd></div>
+            <div><dt>方案版本</dt><dd>v${escapeHtml(episode.sourcePlanVersion)}</dd></div>
+            <div><dt>来源能力</dt><dd>AI导演 CreativePlan</dd></div>
+            <div><dt>项目状态</dt><dd>${episode.status === "draft" ? "草稿" : escapeHtml(episode.status)}</dd></div>
+          </dl>
+        </article>
+        <article class="card episode-boundary-card">
+          <span class="section-kicker">边界</span>
+          <h3>Episode Project</h3>
+          <p>当前对象可在刷新和本地服务重启后继续读取，但不是 Canonical Project，不会创建 Production Job。</p>
+          <ul><li>CreativePlan 来源关系已保留</li><li>Series 父子关系已保留</li><li>脚本工作室输入仅作为下一阶段桥接合同</li></ul>
+        </article>
+        <article class="card episode-source-plan-card">
+          <div class="card-heading"><div><span class="section-kicker">来源 CreativePlan</span><h3>${escapeHtml(storyDirection.title || "已确认导演方案")}</h3></div>${localizedStatusBadge("不可变绑定", "available")}</div>
+          <p>${escapeHtml(storyDirection.synopsis || "来源方案已保存，可供下一阶段读取。")}</p>
+          <dl class="episode-source-list">
+            <div><dt>来源方案</dt><dd>${escapeHtml(binding.sourcePlanRef || episode.sourcePlanRef)}</dd></div>
+            <div><dt>Schema</dt><dd>${escapeHtml(binding.sourcePlanSchemaVersion || episode.sourcePlanSchemaVersion)}</dd></div>
+            <div><dt>版本</dt><dd>v${escapeHtml(binding.sourcePlanVersion || episode.sourcePlanVersion)}</dd></div>
+            <div><dt>Canonical Project</dt><dd>${episode.canonicalProjectRef ? "已绑定" : "未绑定"}</dd></div>
+          </dl>
+        </article>
       </section>
     `;
   }
@@ -968,7 +1141,7 @@
 
   function renderPlaceholder(route) {
     const isDisabled = route.status === "disabled";
-    const parentRoute = route.context === "creation" ? "/creator/creation" : route.context === "project" ? `${projectBase}/pipeline` : "/creator/dashboard";
+    const parentRoute = route.context === "creation" ? "/creator/creation" : route.context === "project" ? `${route.projectBase || projectBase}/pipeline` : "/creator/dashboard";
     const statusText = isDisabled ? "暂不可用" : "即将上线";
     const title = route.label;
     const description = route.description || "当前只建立页面位置、状态与责任边界，不实现未来能力。";
@@ -1019,6 +1192,34 @@
     const normalized = normalizePath(path);
     if (normalized === `/creator/projects/${projectRef}`) {
       return { redirect: `${projectBase}/pipeline` };
+    }
+
+    const persistedProjectMatch = normalized.match(/^\/creator\/projects\/([^/]+)(?:\/([^/]+))?$/);
+    if (persistedProjectMatch && persistedProjectMatch[1] !== projectRef && !persistedProjectMatch[1].startsWith("local-")) {
+      const persisted = findPersistedEpisode(decodeURIComponent(persistedProjectMatch[1]));
+      if (persisted) {
+        const dynamicBase = `/creator/projects/${encodeURIComponent(persisted.episode.episodeRef)}`;
+        const pageKey = persistedProjectMatch[2];
+        if (!pageKey) return { redirect: `${dynamicBase}/pipeline` };
+        const page = projectPages.find((item) => item.key === pageKey);
+        if (!page) return null;
+        const baseRoute = {
+          ...page,
+          path: normalized,
+          projectBase: dynamicBase,
+          projectRef: persisted.episode.episodeRef,
+          persisted,
+          context: "project",
+          breadcrumb: `${persisted.series.title} / 第 ${persisted.episode.episodeNumber} 集 / ${page.label}`
+        };
+        if (pageKey === "pipeline") return { ...baseRoute, type: "episode-project" };
+        return {
+          ...baseRoute,
+          type: "placeholder",
+          eyebrow: `Episode Project · ${page.label}`,
+          description: "此阶段仍沿用 Creator Workspace 页面边界；M2 只建立系列、集数与已确认方案的关系。"
+        };
+      }
     }
 
     const localProjectMatch = normalized.match(/^\/creator\/projects\/(local-[a-z0-9-]+)$/);
@@ -1100,7 +1301,9 @@
   }
 
   function renderContextNav(route) {
-    const items = route.context === "project" ? projectPages : route.context === "creation" ? creationModules.map((module) => ({ ...module, status: "planned" })) : [];
+    const items = route.context === "project"
+      ? projectPages.map((page) => ({ ...page, path: `${route.projectBase || projectBase}/${page.key}` }))
+      : route.context === "creation" ? creationModules.map((module) => ({ ...module, status: "planned" })) : [];
     if (!items.length) {
       contextNavigation.hidden = true;
       contextNavigation.innerHTML = "";
@@ -1109,7 +1312,7 @@
     }
 
     const title = route.context === "project" ? "项目工作室" : "创作工具";
-    const subtitle = route.context === "project" ? displayProjectTitle : "即将上线";
+    const subtitle = route.context === "project" ? (route.persisted ? `${route.persisted.series.title} · 第 ${route.persisted.episode.episodeNumber} 集` : displayProjectTitle) : "即将上线";
     contextNavigation.hidden = false;
     workbench.classList.add("has-context-nav");
     contextNavigation.innerHTML = `
@@ -1143,6 +1346,8 @@
       detail = `<section class="inspector-section"><span class="inspector-label">能力状态</span>${localizedStatusBadge("开发中", "development")}<p>当前可体验创意规划流程。</p></section>`;
     } else if (route && route.type === "project-draft-handoff") {
       detail = `<section class="inspector-section"><span class="inspector-label">项目草稿</span><strong>${escapeHtml(route.draft.title)}</strong><p>仅当前会话有效 · 不会保存</p></section>`;
+    } else if (route && route.type === "episode-project") {
+      detail = `<section class="inspector-section"><span class="inspector-label">Episode Project</span><strong>${escapeHtml(route.persisted.episode.title)}</strong><p>${escapeHtml(route.persisted.series.title)} · 第 ${escapeHtml(route.persisted.episode.episodeNumber)} 集</p><p>来源：已确认导演方案 v${escapeHtml(route.persisted.episode.sourcePlanVersion)}</p></section>`;
     } else if (route && (route.type === "character" || route.type === "assets")) {
       detail = `<section class="inspector-section"><span class="inspector-label">权利状态</span>${governanceBadge("HOLD", "hold")}<p>正式使用前需要完成人工确认。</p></section>`;
     } else {
@@ -1155,11 +1360,14 @@
     if (state.aiDirectorPhase === "generating") {
       return { label: "正在整理导演方案…", disabled: true, note: "不会显示虚假进度" };
     }
+    if (state.seriesEpisodePhase === "creating") {
+      return { label: "正在创建系列与集数…", disabled: true, note: "本地开发服务正在保存关联" };
+    }
     if (state.aiDirectorConfirmed) {
-      return { label: "创建项目草稿", action: "create-ai-director-project-draft", note: "仅当前会话有效，不会保存到系统" };
+      return { label: "创建 Episode Project", action: "submit-series-episode", note: "关联到稳定系列 · 不创建 Canonical Project" };
     }
     if (state.aiDirectorPlan) {
-      return { label: "确认导演方案", action: "confirm-ai-director-plan", note: "人工确认后才能创建项目草稿" };
+      return { label: "确认导演方案", action: "confirm-ai-director-plan", note: "人工确认后才能创建系列与集数" };
     }
     if (state.aiDirectorPhase === "error") {
       return { label: "重新生成", action: "regenerate-ai-director", note: "创意输入仍保留在当前页面" };
@@ -1176,6 +1384,7 @@
       creation: { label: "返回首页", target: defaultRoute, note: "六项智能工具正在准备中" },
       "ai-director": aiDirectorStickyConfig(),
       "project-draft-handoff": { label: "打开晚灯项目", target: `${projectBase}/pipeline`, note: "项目草稿已建立 · 仅当前会话有效" },
+      "episode-project": { label: "查看全部项目", target: "/creator/projects", note: "Series → Episode → 已确认 CreativePlan" },
       pipeline: { label: "进入角色", target: `${projectBase}/character`, note: "项目制作流程总览 · 状态由创作者确认" },
       character: { label: "查看分镜", target: `${projectBase}/storyboard`, note: "晚灯角色 · 权利状态待确认" },
       storyboard: { label: "查看影片预览", target: `${projectBase}/preview`, note: "六镜头分镜墙 · 继续审看影片节奏" },
@@ -1184,13 +1393,13 @@
     };
     if (map[route.type]) return map[route.type];
     if (route.context === "creation") return { label: "返回创作中心", target: "/creator/creation", note: "功能即将上线" };
-    if (route.context === "project") return { label: "返回项目工作室", target: `${projectBase}/pipeline`, note: "页面状态不会自动改变项目进度" };
+    if (route.context === "project") return { label: "返回项目工作室", target: `${route.projectBase || projectBase}/pipeline`, note: "页面状态不会自动改变项目进度" };
     return { label: "返回首页", target: defaultRoute, note: "功能即将上线" };
   }
 
   function shouldRenderStickyBar(route) {
     if (!route) return false;
-    if (["dashboard", "ai-director", "pipeline", "storyboard", "preview", "export"].includes(route.type)) return true;
+    if (["dashboard", "ai-director", "pipeline", "storyboard", "preview", "export", "episode-project"].includes(route.type)) return true;
     return route.type === "placeholder" && route.key === "approval";
   }
 
@@ -1308,6 +1517,9 @@
 
   function renderRoute(path) {
     const normalized = normalizePath(path);
+    if ((normalized === "/creator/projects" || normalized === "/creator/ai-director" || normalized.startsWith("/creator/projects/")) && state.seriesDataStatus === "idle") {
+      loadSeriesData();
+    }
     const route = resolveRoute(normalized);
     if (route && route.redirect) {
       navigate(route.redirect, true);
@@ -1339,6 +1551,7 @@
       works: renderWorks,
       "ai-director": renderAiDirector,
       "project-draft-handoff": () => renderProjectDraftHandoff(resolved),
+      "episode-project": () => renderEpisodeProject(resolved),
       character: renderCharacter,
       storyboard: renderStoryboard,
       preview: renderPreview,
@@ -1442,17 +1655,18 @@
     const abortController = new AbortController();
     const timeout = window.setTimeout(() => abortController.abort(), 45_000);
     try {
-      const response = await fetch(aiDirectorEndpoint, {
+      const payload = await requestApplicationJson(aiDirectorEndpoint, {
         method: "POST",
-        headers: { "Content-Type": "application/json", "Accept": "application/json" },
         body: JSON.stringify({ brief }),
         signal: abortController.signal
       });
-      const payload = await response.json();
-      if (!response.ok || !payload.ok || !isCandidatePlan(payload.plan)) throw new Error("candidate-plan-unavailable");
+      if (!isCandidatePlan(payload.plan)) throw new Error("candidate-plan-unavailable");
       state.aiDirectorPlan = payload.plan;
       state.aiDirectorPlanVersion += 1;
       state.aiDirectorConfirmed = false;
+      state.confirmedCreativePlan = null;
+      state.seriesEpisodePhase = "idle";
+      state.seriesEpisodeError = null;
       state.aiDirectorPhase = "result";
       showToast("候选导演方案已生成 · 请完成人工确认");
     } catch (error) {
@@ -1471,13 +1685,36 @@
     }
   }
 
-  function confirmAiDirectorPlan() {
+  async function confirmAiDirectorPlan() {
     if (!state.aiDirectorPlan || state.aiDirectorPhase === "generating") return;
-    state.aiDirectorConfirmed = true;
-    state.aiDirectorPhase = "confirmed";
+    state.aiDirectorPhase = "confirming";
     state.aiDirectorError = null;
     renderRoute("/creator/ai-director");
-    showToast("导演方案已确认 · 仅当前会话有效");
+    try {
+      const payload = await requestApplicationJson(confirmCreativePlanEndpoint, {
+        method: "POST",
+        body: JSON.stringify({
+          workspaceRef,
+          humanConfirmed: true,
+          brief: state.aiDirectorBrief,
+          plan: state.aiDirectorPlan,
+          sourcePlanRef: `local-ai-director-plan-${state.aiDirectorPlanVersion}`,
+          sourcePlanVersion: state.aiDirectorPlanVersion
+        })
+      });
+      state.confirmedCreativePlan = payload.confirmedPlan;
+      state.aiDirectorConfirmed = true;
+      state.aiDirectorPhase = "confirmed";
+      await loadSeriesData({ force: true });
+      showToast("导演方案已完成人工确认");
+    } catch (error) {
+      state.aiDirectorConfirmed = false;
+      state.confirmedCreativePlan = null;
+      state.aiDirectorPhase = "result";
+      state.aiDirectorError = error.message || "暂时无法确认导演方案。";
+      showToast(state.aiDirectorError);
+    }
+    renderRoute("/creator/ai-director");
   }
 
   function buildAiDirectorProjectDraftInput(projectRefValue) {
@@ -1506,23 +1743,50 @@
     };
   }
 
-  function createAiDirectorProjectDraft() {
-    const projectRefValue = "local-project-wanlight-001";
-    const draftInput = buildAiDirectorProjectDraftInput(projectRefValue);
-    if (!draftInput) return;
-    const draft = {
-      ...draftInput,
-      title: `${state.aiDirectorBrief.topic} · 项目草稿`,
-      format: `${state.aiDirectorBrief.duration} · ${state.aiDirectorBrief.platform}`,
-      source: "AI Director candidate creative plan"
-    };
-    const existingIndex = state.localProjectDrafts.findIndex((item) => item.projectRef === projectRefValue);
-    if (existingIndex >= 0) state.localProjectDrafts.splice(existingIndex, 1, draft);
-    else state.localProjectDrafts.unshift(draft);
-    state.aiDirectorProjectDraft = draft;
-    state.aiDirectorPhase = "handoff";
-    navigate(`/creator/projects/${draft.projectRef}`);
-    showToast("项目草稿已建立 · 仅当前会话有效");
+  async function createSeriesEpisode(form) {
+    if (!state.confirmedCreativePlan || state.seriesEpisodePhase === "creating") return;
+    const formData = new FormData(form);
+    state.seriesEpisodePhase = "creating";
+    state.seriesEpisodeError = null;
+    renderRoute("/creator/ai-director");
+    try {
+      let seriesRefValue = String(formData.get("seriesRef") || "");
+      if (seriesRefValue === "__new__") {
+        const seriesPayload = await requestApplicationJson(seriesEndpoint, {
+          method: "POST",
+          body: JSON.stringify({
+            workspaceRef,
+            contentProfileRef,
+            title: String(formData.get("seriesTitle") || "晚灯").trim(),
+            description: "由已确认的 AI导演方案开始的创作系列",
+            plannedEpisodeCount: Number(formData.get("plannedEpisodeCount") || 1)
+          })
+        });
+        seriesRefValue = seriesPayload.series.seriesRef;
+      }
+      const episodePayload = await requestApplicationJson(episodesEndpoint, {
+        method: "POST",
+        body: JSON.stringify({
+          workspaceRef,
+          seriesRef: seriesRefValue,
+          creativePlanRef: state.confirmedCreativePlan.creativePlanRef,
+          episodeNumber: Number(formData.get("episodeNumber") || 1),
+          seasonNumber: 1,
+          volumeNumber: 1,
+          title: String(formData.get("episodeTitle") || "Episode 001").trim()
+        })
+      });
+      state.createdEpisode = episodePayload.episode;
+      state.seriesEpisodePhase = "created";
+      await loadSeriesData({ force: true });
+      navigate(`/creator/projects/${encodeURIComponent(episodePayload.episode.episodeRef)}`);
+      showToast("系列与集数已创建");
+    } catch (error) {
+      state.seriesEpisodePhase = "error";
+      state.seriesEpisodeError = error.message || "暂时无法创建系列与集数。";
+      renderRoute("/creator/ai-director");
+      showToast(state.seriesEpisodeError);
+    }
   }
 
   function resetFixture() {
@@ -1539,6 +1803,10 @@
     state.aiDirectorConfirmed = false;
     state.aiDirectorError = null;
     state.aiDirectorProjectDraft = null;
+    state.confirmedCreativePlan = null;
+    state.seriesEpisodePhase = "idle";
+    state.seriesEpisodeError = null;
+    state.createdEpisode = null;
     state.previewState = "paused";
     state.previewMuted = true;
     renderRoute(state.activePath);
@@ -1583,7 +1851,11 @@
     if (action === "run-ai-director") runAiDirector();
     if (action === "regenerate-ai-director") runAiDirector();
     if (action === "confirm-ai-director-plan") confirmAiDirectorPlan();
-    if (action === "create-ai-director-project-draft") createAiDirectorProjectDraft();
+    if (action === "submit-series-episode") {
+      const form = document.getElementById("series-episode-form");
+      if (form) form.requestSubmit();
+    }
+    if (action === "reload-series") loadSeriesData({ force: true });
     if (action === "select-asset-tab") {
       state.assetTab = button.dataset.tab;
       rerenderAndRestoreFocus(`[data-action="select-asset-tab"][data-tab="${state.assetTab}"]`);
@@ -1630,9 +1902,14 @@
   });
 
   document.addEventListener("submit", (event) => {
-    if (event.target.id !== "ai-director-form") return;
-    event.preventDefault();
-    runAiDirector();
+    if (event.target.id === "ai-director-form") {
+      event.preventDefault();
+      runAiDirector();
+    }
+    if (event.target.id === "series-episode-form") {
+      event.preventDefault();
+      createSeriesEpisode(event.target);
+    }
   });
 
   document.addEventListener("keydown", (event) => {

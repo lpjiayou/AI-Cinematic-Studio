@@ -500,10 +500,12 @@ class AiDirectorFrontendContractTests(unittest.TestCase):
         self.assertIn("plan.storyboardPlan", self.script)
         self.assertIn("state.aiDirectorPlan.productionPlan", self.script)
 
-    def test_human_confirmation_gate_controls_project_draft(self):
+    def test_human_confirmation_gate_controls_episode_project_creation(self):
         self.assertIn('data-action="confirm-ai-director-plan"', self.script)
         self.assertIn("if (!state.aiDirectorPlan || !state.aiDirectorConfirmed) return", self.script)
-        self.assertIn("确认导演方案后才可创建当前会话草稿", self.script)
+        self.assertIn("人工确认并保存当前创意方案后，才可创建系列与集数", self.script)
+        self.assertIn("state.confirmedCreativePlan", self.script)
+        self.assertIn("creativePlanRef: state.confirmedCreativePlan.creativePlanRef", self.script)
         self.assertIn("已确认（当前会话）", self.script)
 
     def test_confirmed_plan_is_structurally_referenced_by_project_draft_input(self):
@@ -529,7 +531,7 @@ class AiDirectorFrontendContractTests(unittest.TestCase):
         for marker in ("PROVIDER_API_KEY", "Authorization", "api.deepseek.com", "DeepSeek", "sk-"):
             self.assertNotIn(marker, combined)
         self.assertEqual(self.script.count("fetch("), 1)
-        self.assertIn('fetch(aiDirectorEndpoint, {', self.script)
+        self.assertIn('requestApplicationJson(aiDirectorEndpoint, {', self.script)
         self.assertIn('aiDirectorEndpoint = "/creator/internal/ai-director/plan"', self.script)
 
     def test_session_state_has_no_browser_or_database_persistence(self):
