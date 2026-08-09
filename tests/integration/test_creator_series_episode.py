@@ -32,9 +32,10 @@ class CreatorSeriesEpisodeHttpTests(unittest.TestCase):
     def setUp(self):
         self.repository = InMemorySeriesEpisodeAdapter()
         self.boundary = SeriesEpisodePublicBoundary(SeriesEpisodeService(self.repository))
+        self.provider = FakeTextProvider([])
         self.server = create_server(
             ("127.0.0.1", 0),
-            AiDirectorService(FakeTextProvider([])),
+            AiDirectorService(self.provider),
             APP_ROOT,
             series_episode_boundary=self.boundary,
         )
@@ -162,6 +163,28 @@ class CreatorSeriesEpisodeHttpTests(unittest.TestCase):
         self.assertEqual(bootstrap["schemaVersion"], "creator.script-studio.bootstrap-input.v1")
         self.assertEqual(bootstrap["storyboardPlan"], valid_plan()["storyboardPlan"])
         self.assertEqual(bootstrap["sourcePlanVersion"], 1)
+
+    def test_story_projection_source_chain_reads_episode_binding_without_provider(self):
+        series = self.create_series()
+        confirmed = self.confirm_plan()
+        episode = self.create_episode(series, confirmed)
+        status, payload = self.get_json(
+            f"{EPISODES_ENDPOINT}/{episode['episodeRef']}",
+            workspaceRef=WORKSPACE,
+            seriesRef=series["seriesRef"],
+        )
+        self.assertEqual(status, 200)
+        loaded = payload["episode"]
+        binding = loaded["confirmedPlanBinding"]
+        self.assertEqual(loaded["seriesRef"], series["seriesRef"])
+        self.assertEqual(loaded["episodeRef"], episode["episodeRef"])
+        self.assertEqual(binding["sourcePlanRef"], confirmed["sourcePlanRef"])
+        self.assertEqual(binding["sourcePlanSchemaVersion"], "creator.ai-director.plan.v1")
+        self.assertEqual(binding["sourcePlanVersion"], 1)
+        self.assertEqual(binding["sourcePlan"]["storyDirection"], valid_plan()["storyDirection"])
+        self.assertEqual(binding["sourcePlan"]["creativeInterpretation"], valid_plan()["creativeInterpretation"])
+        self.assertEqual(binding["sourcePlan"]["productionPlan"], valid_plan()["productionPlan"])
+        self.assertEqual(self.provider.requests, [])
 
     def test_unconfirmed_plan_ref_is_rejected_with_stable_json_error(self):
         series = self.create_series()
