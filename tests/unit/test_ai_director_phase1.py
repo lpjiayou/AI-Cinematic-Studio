@@ -509,7 +509,9 @@ class AiDirectorFrontendContractTests(unittest.TestCase):
         self.assertIn("人工确认并保存当前创意方案后，才可创建系列与集数", self.script)
         self.assertIn("state.confirmedCreativePlan", self.script)
         self.assertIn("creativePlanRef: state.confirmedCreativePlan.creativePlanRef", self.script)
-        self.assertIn("已确认（当前会话）", self.script)
+        self.assertIn("director-plan-state-confirmed", self.script)
+        self.assertIn("<strong>已确认</strong><small>当前会话</small>", self.script)
+        self.assertNotIn("已确认（当前会话）", self.script)
 
     def test_confirmed_plan_is_structurally_bound_to_episode_creation(self):
         self.assertNotIn("function buildAiDirectorProjectDraftInput", self.script)

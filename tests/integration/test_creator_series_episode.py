@@ -20,6 +20,8 @@ from services.v5_core_os.series_episode.foundation import (
     SqliteSeriesEpisodeAdapter,
 )
 from tests.unit.test_ai_director_phase1 import valid_brief, valid_plan
+from services.v5_core_os.script_studio import create_in_memory_boundary as create_script_boundary
+from tests.unit.test_script_studio_m3 import script_candidate
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -32,12 +34,14 @@ class CreatorSeriesEpisodeHttpTests(unittest.TestCase):
     def setUp(self):
         self.repository = InMemorySeriesEpisodeAdapter()
         self.boundary = SeriesEpisodePublicBoundary(SeriesEpisodeService(self.repository))
+        self.script_boundary = create_script_boundary(self.boundary)
         self.provider = FakeTextProvider([])
         self.server = create_server(
             ("127.0.0.1", 0),
             AiDirectorService(self.provider),
             APP_ROOT,
             series_episode_boundary=self.boundary,
+            script_studio_boundary=self.script_boundary,
         )
         self.thread = threading.Thread(target=self.server.serve_forever, daemon=True)
         self.thread.start()
@@ -60,6 +64,14 @@ class CreatorSeriesEpisodeHttpTests(unittest.TestCase):
     def get_json(self, path, **query):
         suffix = f"?{parse.urlencode(query)}" if query else ""
         with request.urlopen(f"{self.base_url}{path}{suffix}", timeout=5) as response:
+            return response.status, json.loads(response.read().decode("utf-8"))
+
+    def delete_json(self, path, **query):
+        suffix = f"?{parse.urlencode(query)}" if query else ""
+        with request.urlopen(
+            request.Request(f"{self.base_url}{path}{suffix}", method="DELETE"),
+            timeout=5,
+        ) as response:
             return response.status, json.loads(response.read().decode("utf-8"))
 
     def create_series(self, **overrides):
@@ -149,6 +161,76 @@ class CreatorSeriesEpisodeHttpTests(unittest.TestCase):
                 seriesRef="series-other",
             )
         self.assertEqual(context.exception.code, 404)
+
+    def test_delete_episode_endpoint_removes_record_and_keeps_sibling(self):
+        series = self.create_series()
+        plan = self.confirm_plan()
+        first = self.create_episode(series, plan)
+        second = self.create_episode(series, plan, episodeNumber=2, title="Episode 002")
+        status, payload = self.delete_json(
+            f"{EPISODES_ENDPOINT}/{first['episodeRef']}",
+            workspaceRef=WORKSPACE,
+            seriesRef=series["seriesRef"],
+        )
+        self.assertEqual(status, 200)
+        self.assertEqual(payload["deletion"]["deletedEpisodeCount"], 1)
+        _, remaining = self.get_json(SERIES_ENDPOINT, workspaceRef=WORKSPACE)
+        self.assertEqual([item["episodeRef"] for item in remaining["series"][0]["episodes"]], [second["episodeRef"]])
+
+    def test_delete_missing_episode_returns_structured_404(self):
+        series = self.create_series()
+        with self.assertRaises(error.HTTPError) as context:
+            self.delete_json(
+                f"{EPISODES_ENDPOINT}/episode-missing",
+                workspaceRef=WORKSPACE,
+                seriesRef=series["seriesRef"],
+            )
+        payload = json.loads(context.exception.read().decode("utf-8"))
+        self.assertEqual(context.exception.code, 404)
+        self.assertEqual(payload["error"]["code"], "not_found")
+
+    def test_delete_series_endpoint_cascades_episodes(self):
+        series = self.create_series()
+        plan = self.confirm_plan()
+        self.create_episode(series, plan)
+        self.create_episode(series, plan, episodeNumber=2, title="Episode 002")
+        status, payload = self.delete_json(
+            f"{SERIES_ENDPOINT}/{series['seriesRef']}",
+            workspaceRef=WORKSPACE,
+        )
+        self.assertEqual(status, 200)
+        self.assertEqual(payload["deletion"]["deletedEpisodeCount"], 2)
+        _, remaining = self.get_json(SERIES_ENDPOINT, workspaceRef=WORKSPACE)
+        self.assertEqual(remaining["series"], [])
+
+    def test_delete_episode_with_script_is_blocked_without_orphaning_lineage(self):
+        series = self.create_series()
+        episode = self.create_episode(series, self.confirm_plan())
+        self.script_boundary.create_version({
+            "workspaceRef": WORKSPACE,
+            "seriesRef": series["seriesRef"],
+            "episodeRef": episode["episodeRef"],
+            "changeKind": "ai-generation",
+            "content": {
+                key: script_candidate()[key]
+                for key in ("title", "logline", "synopsis", "targetDurationSec", "scenes")
+            },
+        })
+        with self.assertRaises(error.HTTPError) as context:
+            self.delete_json(
+                f"{EPISODES_ENDPOINT}/{episode['episodeRef']}",
+                workspaceRef=WORKSPACE,
+                seriesRef=series["seriesRef"],
+            )
+        payload = json.loads(context.exception.read().decode("utf-8"))
+        self.assertEqual(context.exception.code, 409)
+        self.assertEqual(payload["error"]["code"], "dependent_script_exists")
+        _, reloaded = self.get_json(
+            f"{EPISODES_ENDPOINT}/{episode['episodeRef']}",
+            workspaceRef=WORKSPACE,
+            seriesRef=series["seriesRef"],
+        )
+        self.assertEqual(reloaded["episode"]["episodeRef"], episode["episodeRef"])
 
     def test_script_studio_bridge_reads_binding_without_provider(self):
         series = self.create_series()
@@ -268,6 +350,19 @@ class CreatorSeriesEpisodeRestartIntegrationTests(unittest.TestCase):
             restarted = SeriesEpisodeService(SqliteSeriesEpisodeAdapter(path))
             loaded = restarted.get_episode(WORKSPACE, series["seriesRef"], episode["episodeRef"])
             self.assertEqual(loaded["confirmedPlanBinding"]["sourcePlanRef"], "source-plan-restart")
+
+    def test_http_deletion_state_survives_local_adapter_restart(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "v5-local-development.sqlite3"
+            first = SeriesEpisodeService(SqliteSeriesEpisodeAdapter(path))
+            series = first.create_series({
+                "workspaceRef": WORKSPACE,
+                "contentProfileRef": PROFILE,
+                "title": "Disposable",
+            })
+            first.delete_series(WORKSPACE, series["seriesRef"])
+            restarted = SeriesEpisodeService(SqliteSeriesEpisodeAdapter(path))
+            self.assertEqual(restarted.list_series(WORKSPACE), [])
 
 
 if __name__ == "__main__":

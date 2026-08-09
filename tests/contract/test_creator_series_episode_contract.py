@@ -103,6 +103,27 @@ class SeriesEpisodeRepositoryContractTests(unittest.TestCase):
                     self.assertEqual(binding.sourcePlanRef, "source-plan-contract")
                     self.assertIn("storyDirection", binding.sourcePlanJson)
 
+    def test_common_repository_contract_deletes_episode_and_binding_atomically(self):
+        with tempfile.TemporaryDirectory() as directory:
+            for name, adapter in self.adapter_cases(directory):
+                with self.subTest(adapter=name):
+                    _, series, _, episode = complete_chain(adapter)
+                    deleted = adapter.delete_episode(WORKSPACE, series["seriesRef"], episode["episodeRef"])
+                    self.assertEqual(deleted.episodeRef, episode["episodeRef"])
+                    self.assertIsNone(adapter.get_episode(WORKSPACE, series["seriesRef"], episode["episodeRef"]))
+                    self.assertIsNone(adapter.get_plan_binding(WORKSPACE, series["seriesRef"], episode["episodeRef"]))
+
+    def test_common_repository_contract_cascades_series_episode_records(self):
+        with tempfile.TemporaryDirectory() as directory:
+            for name, adapter in self.adapter_cases(directory):
+                with self.subTest(adapter=name):
+                    _, series, _, episode = complete_chain(adapter)
+                    deleted_series, deleted_episodes = adapter.delete_series(WORKSPACE, series["seriesRef"])
+                    self.assertEqual(deleted_series.seriesRef, series["seriesRef"])
+                    self.assertEqual([item.episodeRef for item in deleted_episodes], [episode["episodeRef"]])
+                    self.assertIsNone(adapter.get_series(WORKSPACE, series["seriesRef"]))
+                    self.assertEqual(adapter.list_episodes(WORKSPACE, series["seriesRef"]), [])
+
     def test_common_repository_contract_enforces_series_episode_scope(self):
         with tempfile.TemporaryDirectory() as directory:
             for name, adapter in self.adapter_cases(directory):
@@ -212,6 +233,8 @@ class CreatorSeriesEpisodeArchitectureContractTests(unittest.TestCase):
                 "get_episode",
                 "list_episodes",
                 "get_plan_binding",
+                "delete_episode",
+                "delete_series",
             },
         )
 

@@ -72,6 +72,17 @@ class SeriesEpisodePublicBoundary:
     ) -> dict[str, Any]:
         return self._invoke(self.__service.get_episode, workspace_ref, series_ref, episode_ref)
 
+    def delete_episode(
+        self,
+        workspace_ref: str,
+        series_ref: str,
+        episode_ref: str,
+    ) -> dict[str, Any]:
+        return self._invoke(self.__service.delete_episode, workspace_ref, series_ref, episode_ref)
+
+    def delete_series(self, workspace_ref: str, series_ref: str) -> dict[str, Any]:
+        return self._invoke(self.__service.delete_series, workspace_ref, series_ref)
+
     def build_script_studio_bootstrap(
         self,
         workspace_ref: str,

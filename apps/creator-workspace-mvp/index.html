@@ -37,7 +37,7 @@
         </div>
 
         <nav class="primary-nav" aria-label="一级导航">
-          <p class="nav-group-label">CREATOR WORKSPACE</p>
+          <p class="nav-group-label">创作者工作区</p>
           <a class="nav-item" href="#/creator" data-route="/creator" aria-label="首页">
             <span class="nav-index" aria-hidden="true">01</span>
             <span class="nav-copy"><strong>首页</strong><small>生产指挥中心</small></span>
@@ -60,18 +60,18 @@
           </a>
           <a class="nav-item" href="#/creator/works" data-route="/creator/works" aria-label="作品">
             <span class="nav-index" aria-hidden="true">06</span>
-            <span class="nav-copy"><strong>作品</strong><small>Master 与交付</small></span>
+            <span class="nav-copy"><strong>作品</strong><small>成片与交付</small></span>
           </a>
         </nav>
 
         <div class="sidebar-spacer"></div>
 
         <nav class="sidebar-utility" aria-label="工作区与帮助">
-          <a href="#/creator/account" data-utility="Workspace"><span class="utility-index" aria-hidden="true">W</span><span>工作空间</span></a>
-          <button type="button" data-utility="Settings" disabled title="设置将在 Enterprise 阶段启用"><span class="utility-index" aria-hidden="true">S</span><span>设置</span></button>
-          <button type="button" data-utility="Help" disabled title="帮助中心尚未接入"><span class="utility-index" aria-hidden="true">?</span><span>帮助</span></button>
+          <a href="#/creator/account" data-utility="workspace"><span class="utility-index" aria-hidden="true">工</span><span>工作空间</span></a>
+          <button type="button" data-utility="settings" disabled title="设置功能尚未启用"><span class="utility-index" aria-hidden="true">设</span><span>设置</span></button>
+          <button type="button" data-utility="help" disabled title="帮助中心尚未启用"><span class="utility-index" aria-hidden="true">?</span><span>帮助</span></button>
         </nav>
-        <div class="sidebar-user" data-utility="User"><span class="account-avatar" aria-hidden="true">创</span><span><strong>创作者</strong><small>Internal Content Lab</small></span></div>
+        <div class="sidebar-user" data-utility="user"><span class="account-avatar" aria-hidden="true">创</span><span><strong>创作者</strong><small>内部内容实验室</small></span></div>
       </aside>
 
       <button
@@ -107,17 +107,17 @@
           </div>
           <div class="header-actions" aria-label="全局操作">
             <details class="global-demo-status fixture-banner">
-              <summary aria-label="查看当前环境说明"><span class="fixture-symbol" aria-hidden="true">LAB</span><strong>Internal Content Lab</strong></summary>
+              <summary aria-label="查看当前环境说明"><span class="fixture-symbol" aria-hidden="true">体验</span><strong>内部内容实验室</strong></summary>
               <div class="global-demo-popover">
                 <strong>内部体验环境</strong>
                 <p>演示媒体不是业务事实；系列与集数由本地开发服务管理，不会生成或发布。</p>
-                <span class="sr-only">FIXTURE MEDIA ONLY · SERIES AND EPISODE OWNER IS V5 CORE OS · LOCAL DEVELOPMENT DURABLE ADAPTER · NOT A CANONICAL PROJECT</span>
+                <span class="sr-only">内部演示媒体，不代表正式业务数据。</span>
               </div>
             </details>
             <button class="header-slot" type="button" disabled title="当前没有真实任务"><span>任务</span><small>0</small></button>
             <button class="header-slot" type="button" disabled title="当前没有真实通知"><span>通知</span><small>0</small></button>
-            <button class="header-slot header-help" type="button" disabled title="帮助中心尚未接入"><span>帮助</span></button>
-            <a class="account-entry" href="#/creator/account" title="个人空间即将上线" aria-label="创作者个人空间，即将上线">
+            <button class="header-slot header-help" type="button" disabled title="帮助中心尚未启用"><span>帮助</span></button>
+            <a class="account-entry" href="#/creator/account" title="个人空间尚未启用" aria-label="创作者个人空间，尚未启用">
               <span class="account-avatar" aria-hidden="true">创</span>
               <span class="account-copy"><strong>创作者</strong></span>
             </a>
@@ -169,7 +169,7 @@
       <form method="dialog" id="project-form">
         <div class="modal-heading">
           <div>
-            <span class="eyebrow">PROJECT CONTEXT FOUNDATION</span>
+            <span class="eyebrow">项目能力准备</span>
             <h2 id="project-dialog-title">新建项目</h2>
           </div>
           <button class="icon-button" type="button" data-action="close-project-dialog" aria-label="关闭">×</button>
@@ -180,13 +180,37 @@
           <li data-wizard-step-indicator="3"><span>03</span>制作默认值</li>
           <li data-wizard-step-indicator="4"><span>04</span>检查</li>
         </ol>
-        <div class="boundary-callout"><strong>Project Context 尚未启用</strong><p>可以完整检查配置流程，但本任务不会创建 projectRef，也不会写入正式项目事实。</p></div>
+        <div class="boundary-callout"><strong>正式项目能力尚未启用</strong><p>可以完整检查配置流程，最终提交保持禁用，不会建立正式项目记录。</p></div>
         <div id="project-wizard-content"></div>
         <div class="modal-actions">
           <button class="button button-text" type="button" data-action="close-project-dialog">取消</button>
           <button class="button button-secondary" type="button" data-action="wizard-previous" hidden>上一步</button>
           <button class="button button-primary" type="button" data-action="wizard-next">下一步</button>
           <button class="button button-primary" type="submit" data-action="wizard-submit" disabled hidden>创建项目（尚未启用）</button>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog class="modal delete-confirmation" id="delete-dialog" aria-labelledby="delete-dialog-title" aria-describedby="delete-dialog-description">
+      <form method="dialog" id="delete-form">
+        <div class="modal-heading">
+          <div>
+            <span class="eyebrow">危险操作</span>
+            <h2 id="delete-dialog-title">确认删除？</h2>
+          </div>
+          <button class="icon-button" type="button" data-action="close-delete-dialog" aria-label="关闭删除确认">×</button>
+        </div>
+        <div class="delete-dialog-body">
+          <span class="delete-dialog-mark" aria-hidden="true">!</span>
+          <div>
+            <strong id="delete-dialog-subject">删除后不可恢复</strong>
+            <p id="delete-dialog-description">请确认要删除所选记录。</p>
+          </div>
+        </div>
+        <p class="form-error delete-dialog-error" id="delete-dialog-error" role="alert" hidden></p>
+        <div class="modal-actions">
+          <button class="button button-text" type="button" data-action="close-delete-dialog">取消</button>
+          <button class="button button-danger" id="delete-dialog-confirm" type="button" data-action="confirm-deletion">确认删除</button>
         </div>
       </form>
     </dialog>
