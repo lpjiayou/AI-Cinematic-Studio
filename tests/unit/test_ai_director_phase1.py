@@ -502,23 +502,26 @@ class AiDirectorFrontendContractTests(unittest.TestCase):
 
     def test_human_confirmation_gate_controls_episode_project_creation(self):
         self.assertIn('data-action="confirm-ai-director-plan"', self.script)
-        self.assertIn("if (!state.aiDirectorPlan || !state.aiDirectorConfirmed) return", self.script)
+        self.assertIn(
+            'if (!state.confirmedCreativePlan || state.seriesEpisodePhase === "creating") return',
+            self.script,
+        )
         self.assertIn("人工确认并保存当前创意方案后，才可创建系列与集数", self.script)
         self.assertIn("state.confirmedCreativePlan", self.script)
         self.assertIn("creativePlanRef: state.confirmedCreativePlan.creativePlanRef", self.script)
         self.assertIn("已确认（当前会话）", self.script)
 
-    def test_confirmed_plan_is_structurally_referenced_by_project_draft_input(self):
-        self.assertIn("function buildAiDirectorProjectDraftInput(projectRefValue)", self.script)
-        self.assertIn("if (!state.aiDirectorPlan || !state.aiDirectorConfirmed) return null", self.script)
-        self.assertIn('schemaVersion: "creator.project-draft-input.v1"', self.script)
-        self.assertIn("sourcePlan: plan", self.script)
-        self.assertIn("direction: plan.storyDirection", self.script)
-        self.assertIn("characters: plan.productionPlan.characters", self.script)
-        self.assertIn("scenes: plan.productionPlan.scenes", self.script)
-        self.assertIn("storyboard: plan.storyboardPlan", self.script)
-        self.assertIn("visualStyle: plan.visualStyle", self.script)
-        self.assertIn("productionPlan: plan.productionPlan", self.script)
+    def test_confirmed_plan_is_structurally_bound_to_episode_creation(self):
+        self.assertNotIn("function buildAiDirectorProjectDraftInput", self.script)
+        self.assertNotIn('schemaVersion: "creator.project-draft-input.v1"', self.script)
+        self.assertIn("function createSeriesEpisode(form)", self.script)
+        self.assertIn("creativePlanRef: state.confirmedCreativePlan.creativePlanRef", self.script)
+        self.assertIn("workspaceRef", self.script)
+        self.assertIn("seriesRef: seriesRefValue", self.script)
+        self.assertIn("episodeNumber:", self.script)
+        self.assertIn("seasonNumber: 1", self.script)
+        self.assertIn("volumeNumber: 1", self.script)
+        self.assertIn("episodePayload.episode.episodeRef", self.script)
 
     def test_regenerate_is_explicit_and_preserves_confirmed_plan_on_error(self):
         self.assertIn('data-action="regenerate-ai-director"', self.script)
@@ -538,11 +541,13 @@ class AiDirectorFrontendContractTests(unittest.TestCase):
         for marker in ("localStorage", "sessionStorage", "indexedDB", "database"):
             self.assertNotIn(marker, self.script)
         self.assertIn("aiDirectorPlanVersion", self.script)
-        self.assertIn('persistence: "session-only"', self.script)
+        self.assertIn("confirmedCreativePlan: null", self.script)
+        self.assertIn('confirmCreativePlanEndpoint = "/creator/internal/creative-plans/confirm"', self.script)
+        self.assertNotIn("aiDirectorProjectDraft", self.script)
 
     def test_existing_routes_preview_and_export_semantics_remain(self):
-        self.assertIn('"/creator/projects/:projectRef/preview"', self.script)
-        self.assertIn('"/creator/projects/:projectRef/export"', self.script)
+        self.assertIn('"/creator/projects/:projectRef/post/preview"', self.script)
+        self.assertIn('"/creator/projects/:projectRef/delivery/exports"', self.script)
         self.assertIn("候选预览", self.script)
         self.assertIn('data-capability="export" disabled', self.script)
 
