@@ -598,22 +598,23 @@ class CreatorWorkspaceMvpTest(unittest.TestCase):
         ):
             self.assertIn(marker, self.script)
 
-    def test_ai_director_project_draft_handoff_is_session_only(self):
+    def test_ai_director_handoff_uses_v5_owned_series_episode_objects(self):
         for marker in (
-            'const projectRefValue = "local-project-wanlight-001"',
-            'localKey: projectRefValue',
-            'projectRef: projectRefValue',
-            'persistence: "session-only"',
-            'domainFact: false',
-            'navigate(`/creator/projects/${draft.projectRef}`)',
-            'type: "project-draft-handoff"',
-            "项目草稿交接已建立",
-            "仅当前会话 · 不会保存",
+            'const seriesEndpoint = "/creator/internal/series"',
+            'const confirmCreativePlanEndpoint = "/creator/internal/creative-plans/confirm"',
+            'const episodesEndpoint = "/creator/internal/episodes"',
+            "function createSeriesEpisode(form)",
+            "creativePlanRef: state.confirmedCreativePlan.creativePlanRef",
+            'navigate(`/creator/projects/${encodeURIComponent(episodePayload.episode.episodeRef)}`)',
+            'type: "episode-project"',
+            "SERIES AND EPISODE DOMAIN OWNER IS V5 CORE OS",
+            "NOT A CANONICAL PROJECT",
         ):
-            self.assertIn(marker, self.script)
+            self.assertIn(marker, f"{self.index}\n{self.script}")
         self.assertNotIn("createProjectEntity(", self.script)
+        self.assertNotIn("Creator Application Project", self.script)
 
-    def test_ai_director_has_no_ai_api_or_persistence_implementation(self):
+    def test_ai_director_uses_only_same_origin_application_endpoints(self):
         combined = f"{self.index}\n{self.script}"
         forbidden = (
             "OpenAI",
@@ -629,6 +630,7 @@ class CreatorWorkspaceMvpTest(unittest.TestCase):
             self.assertNotIn(marker, combined)
         self.assertEqual(self.script.count("fetch("), 1)
         self.assertIn('const aiDirectorEndpoint = "/creator/internal/ai-director/plan"', self.script)
+        self.assertIn('const seriesEndpoint = "/creator/internal/series"', self.script)
         self.assertNotIn("api.deepseek.com", combined)
         self.assertNotIn("PROVIDER_API_KEY", combined)
 
@@ -695,14 +697,13 @@ class CreatorWorkspaceMvpTest(unittest.TestCase):
         ):
             self.assertNotIn(marker, visible_director_blocks)
 
-    def test_ai_director_polish_feedback_remains_local_and_non_authoritative(self):
+    def test_ai_director_feedback_preserves_candidate_and_non_canonical_boundaries(self):
         for marker in (
             "候选导演方案已生成 · 请完成人工确认",
-            "导演方案已确认 · 仅当前会话有效",
-            "项目草稿已建立 · 仅当前会话有效",
-            'const projectRefValue = "local-project-wanlight-001"',
-            'persistence: "session-only"',
-            'domainFact: false',
+            "导演方案已完成人工确认",
+            "系列与集数已创建",
+            "不是 Canonical Project",
+            "不会触发生成任务",
         ):
             self.assertIn(marker, self.script)
         for prohibited_claim in (
@@ -936,7 +937,8 @@ class CreatorWorkspaceMvpTest(unittest.TestCase):
         for marker in forbidden:
             self.assertNotIn(marker, combined)
         self.assertEqual(self.script.count("fetch("), 1)
-        self.assertIn('fetch(aiDirectorEndpoint, {', self.script)
+        self.assertIn('requestApplicationJson(aiDirectorEndpoint, {', self.script)
+        self.assertIn('requestApplicationJson(withWorkspace(seriesEndpoint))', self.script)
         self.assertIn('const aiDirectorEndpoint = "/creator/internal/ai-director/plan"', self.script)
         self.assertNotIn("https://", self.script)
 
