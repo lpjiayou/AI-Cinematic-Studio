@@ -1,54 +1,121 @@
 {
-  "taskId": "ACS-CREATOR-UI-R1-ENTERPRISE-REBASELINE-001",
-  "capturedAt": "2026-08-09T21:45:38+08:00",
+  "taskId": "UI-R1-RUNTIME-INTEGRATION-CORRECTION",
+  "baselineTaskId": "ACS-CREATOR-UI-R1-ENTERPRISE-REBASELINE-001",
+  "capturedAt": "2026-08-09T22:21:23.7113476+08:00",
   "browser": "Chrome/151.0.7922.108",
   "protocolVersion": "1.3",
   "transport": "System Google Chrome headless=new via Chrome DevTools Protocol",
+  "browserEvidencePolicy": {
+    "creatorServerHttpOnly": true,
+    "fileUrlUsed": false,
+    "baseUrl": "http://127.0.0.1:8765/",
+    "routeTransport": "HTTP document with canonical Creator hash navigation"
+  },
+  "serverIdentity": {
+    "worktree": "D:/Codex使用/AI CINEMATIC STUDIO-ui-r1",
+    "branch": "codex/creator-ui-enterprise-rebaseline-v3",
+    "head": "b1088ac6d0536639f0a277833765df80ba24ada4",
+    "staticRoot": "D:/Codex使用/AI CINEMATIC STUDIO-ui-r1/apps/creator-workspace-mvp",
+    "servedIndexSha256": "7C5A8B9E9C9BFCAEC80C312248F6D5D89548535E5601A7AE37F06C8755882D18",
+    "worktreeIndexSha256": "7C5A8B9E9C9BFCAEC80C312248F6D5D89548535E5601A7AE37F06C8755882D18",
+    "servedAssetMatch": true,
+    "enterpriseMarkerPresent": true,
+    "legacyUiNormalEntry": false,
+    "restartPersistence": "PASS"
+  },
   "viewport": {
     "width": 1440,
     "height": 1000,
     "deviceScaleFactor": 1
   },
-  "routeReview": {
-    "reviewed": 32,
-    "expected": 32,
+  "browserReview": {
+    "httpScreenshots": 11,
     "consoleErrors": 0,
     "pageErrors": 0,
     "networkErrors": 0,
     "httpErrors": 0,
-    "horizontalOverflowPages": 0
-  },
-  "responsiveReview": {
-    "viewports": ["1366x768", "1920x1080"],
-    "routesPerViewport": 4,
-    "failures": 0
-  },
-  "interactionReview": {
-    "sidebarCollapse": "PASS",
-    "inspectorOpenClose": "PASS",
-    "inspectorWorkspaceGainPx": 340,
-    "projectWizardSteps": 4,
-    "projectWizardSubmitDisabled": true
-  },
-  "productionSpineReview": {
+    "horizontalOverflowPages": 0,
     "storyRefresh": "PASS",
-    "storySourcePlanRefBefore": "local-ai-director-plan-1",
-    "storySourcePlanRefAfter": "local-ai-director-plan-1",
-    "scriptStudio": "PASS",
-    "scriptVersionCount": 2,
-    "confirmedScriptVersionPresent": true,
-    "liveProvider": "NOT RUN - provider credential absent from execution environment"
+    "browserBackForward": "PASS",
+    "responsive1366x768": "PASS",
+    "responsive1920x1080": "PASS",
+    "newProjectWizard": "PASS - final submit disabled"
+  },
+  "capabilityReview": {
+    "m1EnterprisePage": "PASS",
+    "m1DeepSeekLive": "HOLD - PROVIDER_API_KEY absent from process, user, and machine environment",
+    "m1UnavailableResponse": "PASS - same-origin structured product-language error without provider details",
+    "m2Runtime": "PASS - three durable Series and six durable Episodes read through Creator Server",
+    "storyRuntime": "PASS - creator.story-view.v1 lineage preserved",
+    "storySourcePlanRef": "local-ai-director-plan-1",
+    "storySourcePlanVersion": 1,
+    "storyToScriptSameEpisodeRef": "PASS",
+    "m3Runtime": "PASS - two immutable ScriptVersions and confirmed pointer read through Creator Server",
+    "m3ConfirmedScriptVersionRef": "script-version-fa965f8a98284d998b019ed8d4548ad4",
+    "m3RestartPersistence": "PASS"
+  },
+  "testReview": {
+    "javascriptSyntax": "PASS",
+    "unit": "226/226 PASS",
+    "contract": "45/45 PASS",
+    "integration": "24/24 PASS",
+    "total": "295/295 PASS"
   },
   "screenshots": [
-    {"file": "UI-R1-01-dashboard.png", "route": "/creator", "sha256": "8E18CD1559435C0A3D2CF33FD9BBD564E66375A5006A662EF98744ADE60D3DE5"},
-    {"file": "UI-R1-02-ai-director.png", "route": "/creator/ai-director", "sha256": "B6E1BE0AB52F7F8983255C861D2CB9ED2448FA97CC5C8D241941A3A995CB1B1E"},
-    {"file": "UI-R1-03-project-center.png", "route": "/creator/projects", "sha256": "A10212FDB8CBB523075D69D8C8F695686BD5B90290692BB74032FD9B42F8B4E3"},
-    {"file": "UI-R1-04-project-workspace.png", "route": "/creator/project-shell/overview", "sha256": "17E612AFC7AC44D25278E8D2411E11DEDAE915AA47FE3A899130E664D5138F3D"},
-    {"file": "UI-R1-05-story-real.png", "route": "/creator/projects/episode-a0f06d754f0e491fb58a40a11b9447b6/story", "sha256": "99B4B5F03689F666BCC4259543CF88540E5C8EB875ED8CD107384EAD0A3739EE"},
-    {"file": "UI-R1-06-script-studio-real.png", "route": "/creator/projects/episode-a0f06d754f0e491fb58a40a11b9447b6/script", "sha256": "4337DD0A485D30488A06E3DF61001FD7B1EBB17520882E49C945D7E926B82120"},
-    {"file": "UI-R1-07-storyboard-shell.png", "route": "/creator/project-shell/production/storyboard", "sha256": "C71F77B4086069683A8211F4AD3EFCA8BB9263A8E887F03398421191FECD36C0"},
-    {"file": "UI-R1-08-shot-editor-shell.png", "route": "/creator/project-shell/production/shots", "sha256": "A08EBCF05FFE6E2E257881C2B8D8DB36E549A4165C45FA465350CDA0EC06581B"},
-    {"file": "UI-R1-09-timeline-shell.png", "route": "/creator/project-shell/post/timeline", "sha256": "1DA90DAC41BAADA9A48144EC9453265D149743E4ADB37EC8D0AF52DDFD462BBA"},
-    {"file": "UI-R1-10-works.png", "route": "/creator/works", "sha256": "7B9C5E1C77B19380DD70FCD4BDB88217C3F0FCB2305817E46F47A37525C10EC3"}
+    {
+      "file": "UI-R1-HTTP-01-dashboard.png",
+      "url": "http://127.0.0.1:8765/#/creator",
+      "sha256": "BF1B2369CB32A36C288448AD09694EFF63EDBB230FE8291816135FC3431B29C9"
+    },
+    {
+      "file": "UI-R1-HTTP-02-ai-director.png",
+      "url": "http://127.0.0.1:8765/#/creator/ai-director",
+      "sha256": "76018F441C799BF08F2AF2A3A760CAB16A2A9318CD2602AEFDD80B15259230DC"
+    },
+    {
+      "file": "UI-R1-HTTP-03-projects.png",
+      "url": "http://127.0.0.1:8765/#/creator/projects",
+      "sha256": "815044A2E0A6EE30E4991D9F625FE5D2CD3FD17752A4D5C52BB7E09243BE8E71"
+    },
+    {
+      "file": "UI-R1-HTTP-04-project-workspace.png",
+      "url": "http://127.0.0.1:8765/#/creator/project-shell/overview",
+      "sha256": "17E612AFC7AC44D25278E8D2411E11DEDAE915AA47FE3A899130E664D5138F3D"
+    },
+    {
+      "file": "UI-R1-HTTP-05-story.png",
+      "url": "http://127.0.0.1:8765/#/creator/projects/episode-a0f06d754f0e491fb58a40a11b9447b6/story",
+      "sha256": "A2AB92608E143032ABA8BE2A047543505C252BCE5B6AC1511FEF326903154F30"
+    },
+    {
+      "file": "UI-R1-HTTP-06-script-studio.png",
+      "url": "http://127.0.0.1:8765/#/creator/projects/episode-a0f06d754f0e491fb58a40a11b9447b6/script",
+      "sha256": "F8973B4655ADB11551AC371D8440A93F620ACFDF9E05F490FE15B1A41F1526E3"
+    },
+    {
+      "file": "UI-R1-HTTP-07-storyboard.png",
+      "url": "http://127.0.0.1:8765/#/creator/project-shell/production/storyboard",
+      "sha256": "3323A34784E0DCD66FD06AD7E9C1E2E794548D0C4732659D13B47051027C91C8"
+    },
+    {
+      "file": "UI-R1-HTTP-08-shot-editor.png",
+      "url": "http://127.0.0.1:8765/#/creator/project-shell/production/shots",
+      "sha256": "E9A1B085B8E8D18D80C1F7F41EEB710422F4D5954CD8DA5D2A9C37F6DF322690"
+    },
+    {
+      "file": "UI-R1-HTTP-09-timeline.png",
+      "url": "http://127.0.0.1:8765/#/creator/project-shell/post/timeline",
+      "sha256": "0FE08C012462BB2202661237A4640599DB41927350BAF5BBA3C1179259F364F6"
+    },
+    {
+      "file": "UI-R1-HTTP-10-works.png",
+      "url": "http://127.0.0.1:8765/#/creator/works",
+      "sha256": "6F3A262A6F3FBE23987A678BD0CE9E9062855FA14B407C0CBFCC718574BE0F43"
+    },
+    {
+      "file": "UI-R1-HTTP-11-new-project-wizard.png",
+      "url": "http://127.0.0.1:8765/#/creator/projects (New Project Wizard open)",
+      "sha256": "87CD268EE72D457C20215DD187553674C7C640D5F840EF7F83887081AEECEB0C"
+    }
   ]
 }
