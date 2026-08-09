@@ -29,6 +29,12 @@
   const seriesEndpoint = "/creator/internal/series";
   const confirmCreativePlanEndpoint = "/creator/internal/creative-plans/confirm";
   const episodesEndpoint = "/creator/internal/episodes";
+  const scriptWorkspaceEndpoint = "/creator/internal/script-studio";
+  const scriptGenerateEndpoint = `${scriptWorkspaceEndpoint}/generate`;
+  const scriptManualVersionEndpoint = `${scriptWorkspaceEndpoint}/manual-version`;
+  const scriptRewriteEndpoint = `${scriptWorkspaceEndpoint}/rewrite-scene`;
+  const scriptConfirmEndpoint = `${scriptWorkspaceEndpoint}/confirm`;
+  const storyboardBootstrapEndpoint = `${scriptWorkspaceEndpoint}/storyboard-bootstrap`;
   const workspaceRef = fixture.project.workspaceRef;
   const contentProfileRef = fixture.project.contentProfileRef;
   const projectRef = fixture.project.projectRef;
@@ -70,6 +76,7 @@
   const projectPages = Object.freeze([
     { key: "pipeline", label: "生产流程", english: "Production Pipeline", status: "fixture" },
     { key: "story", label: "故事", english: "Story", status: "planned" },
+    { key: "script", label: "剧本", english: "Script Studio", status: "available" },
     { key: "ip-bible", label: "IP 圣经", english: "IP Bible", status: "planned" },
     { key: "character", label: "角色", english: "Character", status: "fixture" },
     { key: "scene", label: "场景", english: "Scene", status: "planned" },
@@ -93,6 +100,7 @@
     "/creator/projects/:projectRef",
     "/creator/projects/:projectRef/pipeline",
     "/creator/projects/:projectRef/story",
+    "/creator/projects/:projectRef/script",
     "/creator/projects/:projectRef/ip-bible",
     "/creator/projects/:projectRef/character",
     "/creator/projects/:projectRef/scene",
@@ -136,6 +144,14 @@
     seriesEpisodePhase: "idle",
     seriesEpisodeError: null,
     createdEpisode: null,
+    scriptWorkspaceStatus: "idle",
+    scriptWorkspaceScope: "",
+    scriptWorkspace: null,
+    selectedScriptVersionRef: null,
+    selectedScriptSceneRef: null,
+    scriptPhase: "idle",
+    scriptError: null,
+    storyboardBootstrap: null,
     previewState: "paused",
     previewMuted: true,
     sidebarCollapsed: false,
@@ -211,6 +227,58 @@
     if (["/creator/projects", "/creator/ai-director"].includes(state.activePath) || state.activePath.startsWith("/creator/projects/")) {
       renderRoute(state.activePath);
     }
+  }
+
+  function scriptScopeFromRoute(route = state.activeRoute) {
+    if (!route || !route.persisted) return null;
+    return {
+      workspaceRef,
+      seriesRef: route.persisted.series.seriesRef,
+      episodeRef: route.persisted.episode.episodeRef
+    };
+  }
+
+  function scriptScopeKey(scope) {
+    return scope ? `${scope.workspaceRef}/${scope.seriesRef}/${scope.episodeRef}` : "";
+  }
+
+  function scriptQuery(scope) {
+    return `workspaceRef=${encodeURIComponent(scope.workspaceRef)}&seriesRef=${encodeURIComponent(scope.seriesRef)}&episodeRef=${encodeURIComponent(scope.episodeRef)}`;
+  }
+
+  async function loadScriptWorkspace(route = state.activeRoute, { force = false, preserveSelection = true } = {}) {
+    const scope = scriptScopeFromRoute(route);
+    if (!scope) return;
+    const scopeKey = scriptScopeKey(scope);
+    if (state.scriptWorkspaceStatus === "loading") return;
+    if (!force && state.scriptWorkspaceStatus === "ready" && state.scriptWorkspaceScope === scopeKey) return;
+    state.scriptWorkspaceStatus = "loading";
+    state.scriptError = null;
+    if (state.activeRoute && state.activeRoute.type === "script-studio") renderRoute(state.activePath);
+    try {
+      const payload = await requestApplicationJson(`${scriptWorkspaceEndpoint}?${scriptQuery(scope)}`);
+      state.scriptWorkspaceScope = scopeKey;
+      state.scriptWorkspace = payload.workspace;
+      const versions = payload.workspace.versions || [];
+      const preferred = preserveSelection && versions.some((item) => item.scriptVersionRef === state.selectedScriptVersionRef)
+        ? state.selectedScriptVersionRef
+        : payload.workspace.script && payload.workspace.script.currentScriptVersionRef;
+      state.selectedScriptVersionRef = preferred || (versions.length ? versions[versions.length - 1].scriptVersionRef : null);
+      const selected = versions.find((item) => item.scriptVersionRef === state.selectedScriptVersionRef);
+      if (!selected || !(selected.scenes || []).some((scene) => scene.scriptSceneRef === state.selectedScriptSceneRef)) {
+        state.selectedScriptSceneRef = selected && selected.scenes.length ? selected.scenes[0].scriptSceneRef : null;
+      }
+      state.storyboardBootstrap = null;
+      if (payload.workspace.script && payload.workspace.script.confirmedScriptVersionRef) {
+        const bridge = await requestApplicationJson(`${storyboardBootstrapEndpoint}?${scriptQuery(scope)}`);
+        state.storyboardBootstrap = bridge.bootstrap;
+      }
+      state.scriptWorkspaceStatus = "ready";
+    } catch (error) {
+      state.scriptWorkspaceStatus = "error";
+      state.scriptError = error && error.message ? error.message : "剧本工作区暂时无法读取，请稍后重试。";
+    }
+    if (state.activeRoute && state.activeRoute.type === "script-studio") renderRoute(state.activePath);
   }
 
   function pathFromHash() {
@@ -977,6 +1045,154 @@
     `;
   }
 
+  function selectedScriptVersion() {
+    const versions = state.scriptWorkspace && state.scriptWorkspace.versions ? state.scriptWorkspace.versions : [];
+    return versions.find((item) => item.scriptVersionRef === state.selectedScriptVersionRef)
+      || (versions.length ? versions[versions.length - 1] : null);
+  }
+
+  function selectedScriptScene() {
+    const version = selectedScriptVersion();
+    if (!version) return null;
+    return (version.scenes || []).find((scene) => scene.scriptSceneRef === state.selectedScriptSceneRef)
+      || version.scenes[0]
+      || null;
+  }
+
+  function scriptChangeLabel(value) {
+    return {
+      "ai-generation": "初稿生成",
+      "manual-edit": "人工编辑",
+      "ai-scene-rewrite": "场景改写"
+    }[value] || "剧本版本";
+  }
+
+  function scriptLines(values) {
+    return (values || []).join("\n");
+  }
+
+  function dialogueLines(values) {
+    return (values || []).map((item) => `${item.speaker} | ${item.emotion || ""} | ${item.text}`).join("\n");
+  }
+
+  function renderScriptSource(route, bootstrap) {
+    const direction = bootstrap.storyDirection || {};
+    const draft = bootstrap.scriptDraft || {};
+    const generating = state.scriptPhase === "generating";
+    return `
+      ${renderPageHeader({
+        eyebrow: `${route.persisted.series.title} · 第 ${route.persisted.episode.episodeNumber} 集 · 剧本`,
+        title: "剧本工作室",
+        description: "从本集已确认的导演方案生成、编辑并确认可追溯的正式剧本版本。",
+        status: "available",
+        meta: localizedStatusBadge("尚未生成剧本", "neutral")
+      })}
+      <section class="script-source-layout" data-script-state="${generating ? "generating" : state.scriptError ? "error" : "empty"}">
+        <article class="card script-source-card">
+          <div class="card-heading"><div><span class="section-kicker">上游来源</span><h3>已确认的本集创意上下文</h3></div>${localizedStatusBadge("已人工确认", "available")}</div>
+          <h4>${escapeHtml(direction.title || route.persisted.episode.title)}</h4>
+          <p>${escapeHtml(direction.synopsis || draft.summary || "本集导演方案已确认，可进入剧本生产。")}</p>
+          <dl class="script-lineage-list">
+            <div><dt>系列</dt><dd>${escapeHtml(route.persisted.series.title)}</dd></div>
+            <div><dt>集数</dt><dd>第 ${escapeHtml(route.persisted.episode.episodeNumber)} 集</dd></div>
+            <div><dt>目标时长</dt><dd>${escapeHtml(draft.targetDurationSec || bootstrap.productionPlan && bootstrap.productionPlan.targetDurationSec || 30)} 秒</dd></div>
+            <div><dt>来源版本</dt><dd>导演方案 v${escapeHtml(bootstrap.sourcePlanVersion)}</dd></div>
+          </dl>
+        </article>
+        <article class="card script-start-card">
+          <span class="script-start-mark" aria-hidden="true">文</span>
+          <span class="section-kicker">Script Studio</span>
+          <h3>生成第一个不可变剧本版本</h3>
+          <p>生成结果会先经过本地结构与时长校验，并以待确认版本保存。生成成功不代表人工确认。</p>
+          ${state.scriptError ? renderErrorState("剧本生成未完成", state.scriptError) : ""}
+          <button class="button button-secondary" type="button" data-action="generate-script" ${generating ? "disabled" : ""}>${generating ? "正在生成剧本…" : "生成正式剧本"}</button>
+        </article>
+      </section>
+    `;
+  }
+
+  function renderScriptStudio(route) {
+    if (state.scriptWorkspaceStatus === "idle" || state.scriptWorkspaceStatus === "loading") {
+      return `${renderPageHeader({ eyebrow: "项目工作室 · 剧本", title: "剧本工作室", description: "正在读取本集剧本与版本历史。", status: "available" })}${renderLoadingState("正在读取剧本工作区")}`;
+    }
+    if (state.scriptWorkspaceStatus === "error" || !state.scriptWorkspace) {
+      return `${renderPageHeader({ eyebrow: "项目工作室 · 剧本", title: "剧本工作室", description: "本集剧本暂时无法读取。", status: "available" })}${renderErrorState("剧本工作区暂时不可用", state.scriptError || "请稍后重试。")}`;
+    }
+    const workspace = state.scriptWorkspace;
+    if (!workspace.script) return renderScriptSource(route, workspace.bootstrap);
+    const version = selectedScriptVersion();
+    const scene = selectedScriptScene();
+    const confirmedRef = workspace.script.confirmedScriptVersionRef;
+    const isSelectedConfirmed = Boolean(version && version.scriptVersionRef === confirmedRef);
+    const totalDuration = (version.scenes || []).reduce((sum, item) => sum + Number(item.estimatedDurationSec || 0), 0);
+    const phaseLabel = state.scriptPhase === "generating" ? "正在生成剧本…" : state.scriptPhase === "saving" ? "正在保存新版本…" : state.scriptPhase === "rewriting" ? "正在改写所选场景…" : state.scriptPhase === "confirming" ? "正在确认版本…" : "";
+    const confirmed = Boolean(confirmedRef);
+    return `
+      ${renderPageHeader({
+        eyebrow: `${route.persisted.series.title} · 第 ${route.persisted.episode.episodeNumber} 集 · 剧本`,
+        title: version.title,
+        description: `${version.scenes.length} 场 · 预计 ${totalDuration} 秒 · 当前选择 v${version.versionNumber}`,
+        status: "available",
+        meta: isSelectedConfirmed ? localizedStatusBadge("已确认版本", "available") : localizedStatusBadge("待人工确认", "neutral")
+      })}
+      ${state.scriptError ? renderErrorState("剧本操作未完成", state.scriptError) : ""}
+      ${phaseLabel ? `<div class="script-operation-state" role="status"><span class="button-spinner" aria-hidden="true"></span><strong>${escapeHtml(phaseLabel)}</strong></div>` : ""}
+      <section class="script-studio-layout" data-script-state="${state.scriptError ? "error" : confirmed ? "confirmed" : state.scriptPhase === "idle" ? "ready" : escapeHtml(state.scriptPhase)}">
+        <aside class="card script-scenes-panel" aria-label="剧本场景">
+          <div class="card-heading"><div><span class="section-kicker">场景</span><h3>本集结构</h3></div><span>${version.scenes.length} 场</span></div>
+          <div class="script-scene-list">${version.scenes.map((item) => `
+            <button type="button" class="script-scene-item ${scene && scene.scriptSceneRef === item.scriptSceneRef ? "is-selected" : ""}" data-action="select-script-scene" data-scene-ref="${escapeHtml(item.scriptSceneRef)}" aria-pressed="${scene && scene.scriptSceneRef === item.scriptSceneRef}">
+              <span>${String(item.sceneNumber).padStart(2, "0")}</span><strong>${escapeHtml(item.heading)}</strong><small>${escapeHtml(item.estimatedDurationSec)} 秒</small>
+            </button>`).join("")}</div>
+          <div class="script-source-mini"><span>来源</span><strong>已确认导演方案 v${escapeHtml(version.sourcePlanVersion)}</strong><small>${escapeHtml(version.sourcePlanRef)}</small></div>
+        </aside>
+        <main class="card script-editor-panel">
+          <form id="script-edit-form">
+            <input type="hidden" name="scriptSceneRef" value="${escapeHtml(scene.scriptSceneRef)}">
+            <div class="script-editor-heading"><div><span class="section-kicker">场景 ${escapeHtml(scene.sceneNumber)}</span><h3>${escapeHtml(scene.heading)}</h3></div><span>${escapeHtml(scene.estimatedDurationSec)} 秒</span></div>
+            <div class="script-form-grid script-form-grid-meta">
+              <label><span>剧本标题</span><input name="title" required maxlength="120" value="${escapeHtml(version.title)}"></label>
+              <label><span>场景标题</span><input name="heading" required maxlength="120" value="${escapeHtml(scene.heading)}"></label>
+              <label><span>地点</span><input name="location" required maxlength="120" value="${escapeHtml(scene.location)}"></label>
+              <label><span>时间</span><input name="timeOfDay" required maxlength="80" value="${escapeHtml(scene.timeOfDay)}"></label>
+            </div>
+            <label class="script-field-wide"><span>剧情梗概</span><textarea name="synopsis" required rows="3">${escapeHtml(version.synopsis)}</textarea></label>
+            <label class="script-field-wide"><span>场景动作</span><textarea name="action" required rows="5">${escapeHtml(scene.action)}</textarea></label>
+            <label class="script-field-wide"><span>对白 <small>每行：说话人 | 情绪 | 台词</small></span><textarea name="dialogue" rows="5">${escapeHtml(dialogueLines(scene.dialogue))}</textarea></label>
+            <div class="script-form-grid">
+              <label><span>旁白 <small>每行一条</small></span><textarea name="narration" rows="4">${escapeHtml(scriptLines(scene.narration))}</textarea></label>
+              <label><span>字幕意图 <small>每行一条，不含精确时间码</small></span><textarea name="subtitleText" rows="4">${escapeHtml(scriptLines(scene.subtitleText))}</textarea></label>
+            </div>
+            <div class="script-editor-actions"><span>保存会创建新的不可变 ScriptVersion。</span><button class="button button-secondary" type="submit" ${state.scriptPhase !== "idle" ? "disabled" : ""}>保存为新版本</button></div>
+          </form>
+          <form id="script-rewrite-form" class="script-rewrite-form">
+            <div><span class="section-kicker">局部改写</span><h4>只改写当前场景</h4><p>其他场景与本集已确认导演方案约束保持不变。</p></div>
+            <label><span>改写要求</span><input name="instruction" required maxlength="500" placeholder="例如：缩短对白，让情绪转折更克制"></label>
+            <button class="button button-secondary" type="submit" ${state.scriptPhase !== "idle" ? "disabled" : ""}>改写当前场景</button>
+          </form>
+        </main>
+        <aside class="card script-versions-panel" aria-label="剧本版本历史">
+          <div class="card-heading"><div><span class="section-kicker">版本历史</span><h3>${workspace.versions.length} 个版本</h3></div></div>
+          <div class="script-version-list">${[...workspace.versions].reverse().map((item) => `
+            <button type="button" class="script-version-item ${item.scriptVersionRef === version.scriptVersionRef ? "is-selected" : ""}" data-action="select-script-version" data-version-ref="${escapeHtml(item.scriptVersionRef)}" aria-pressed="${item.scriptVersionRef === version.scriptVersionRef}">
+              <span>v${item.versionNumber}</span><strong>${escapeHtml(scriptChangeLabel(item.changeKind))}</strong><small>${item.scriptVersionRef === confirmedRef ? "已确认" : "待确认"}</small>
+            </button>`).join("")}</div>
+          <section class="script-confirmation-card">
+            <span class="section-kicker">人工确认</span>
+            <strong>${isSelectedConfirmed ? `v${version.versionNumber} 已确认` : `确认 v${version.versionNumber}`}</strong>
+            <p>${isSelectedConfirmed ? "该不可变版本是当前确认版本。" : "确认只更新引用，不会改写任何历史版本。"}</p>
+            <button class="button button-secondary" type="button" data-action="confirm-script-version" ${isSelectedConfirmed || state.scriptPhase !== "idle" ? "disabled" : ""}>${isSelectedConfirmed ? "当前已确认" : "确认此版本"}</button>
+          </section>
+          <section class="storyboard-bridge-card">
+            <span class="section-kicker">下游桥接</span><strong>${state.storyboardBootstrap ? "分镜输入已就绪" : "等待剧本确认"}</strong>
+            <p>${state.storyboardBootstrap ? "已生成可追溯输入；仍需 M4 角色与 IP 绑定，不会开始分镜生产。" : "草稿版本不会开放分镜输入。"}</p>
+            ${state.storyboardBootstrap ? `<code>${escapeHtml(state.storyboardBootstrap.schemaVersion)}</code>` : ""}
+          </section>
+        </aside>
+      </section>
+    `;
+  }
+
   function renderCharacter() {
     return `
       ${renderPageHeader({
@@ -1213,6 +1429,7 @@
           breadcrumb: `${persisted.series.title} / 第 ${persisted.episode.episodeNumber} 集 / ${page.label}`
         };
         if (pageKey === "pipeline") return { ...baseRoute, type: "episode-project" };
+        if (pageKey === "script") return { ...baseRoute, type: "script-studio" };
         return {
           ...baseRoute,
           type: "placeholder",
@@ -1348,6 +1565,13 @@
       detail = `<section class="inspector-section"><span class="inspector-label">项目草稿</span><strong>${escapeHtml(route.draft.title)}</strong><p>仅当前会话有效 · 不会保存</p></section>`;
     } else if (route && route.type === "episode-project") {
       detail = `<section class="inspector-section"><span class="inspector-label">Episode Project</span><strong>${escapeHtml(route.persisted.episode.title)}</strong><p>${escapeHtml(route.persisted.series.title)} · 第 ${escapeHtml(route.persisted.episode.episodeNumber)} 集</p><p>来源：已确认导演方案 v${escapeHtml(route.persisted.episode.sourcePlanVersion)}</p></section>`;
+    } else if (route && route.type === "script-studio") {
+      const version = selectedScriptVersion();
+      const script = state.scriptWorkspace && state.scriptWorkspace.script;
+      const confirmed = Boolean(script && version && script.confirmedScriptVersionRef === version.scriptVersionRef);
+      detail = version
+        ? `<section class="inspector-section"><span class="inspector-label">剧本版本</span><strong>v${escapeHtml(version.versionNumber)} · ${escapeHtml(scriptChangeLabel(version.changeKind))}</strong><p>${escapeHtml(version.scenes.length)} 场 · ${escapeHtml(version.targetDurationSec)} 秒</p><p>${confirmed ? "已人工确认" : "等待人工确认"}</p></section>`
+        : `<section class="inspector-section"><span class="inspector-label">剧本工作室</span><strong>尚未生成剧本</strong><p>输入来自本集已确认导演方案。</p></section>`;
     } else if (route && (route.type === "character" || route.type === "assets")) {
       detail = `<section class="inspector-section"><span class="inspector-label">权利状态</span>${governanceBadge("HOLD", "hold")}<p>正式使用前需要完成人工确认。</p></section>`;
     } else {
@@ -1375,6 +1599,24 @@
     return { label: "生成创意方案", action: "run-ai-director", note: "整理故事、镜头与视觉方向" };
   }
 
+  function scriptStudioStickyConfig() {
+    if (state.scriptPhase !== "idle") {
+      const label = state.scriptPhase === "generating" ? "正在生成剧本…" : state.scriptPhase === "rewriting" ? "正在改写场景…" : state.scriptPhase === "saving" ? "正在保存版本…" : "正在确认版本…";
+      return { label, disabled: true, note: "当前操作完成前不会创建重复版本" };
+    }
+    if (!state.scriptWorkspace || !state.scriptWorkspace.script) {
+      return { label: "生成正式剧本", action: "generate-script", note: "读取本集已确认导演方案 · 生成后仍需人工确认" };
+    }
+    const selected = selectedScriptVersion();
+    const alreadyConfirmed = Boolean(selected && state.scriptWorkspace.script.confirmedScriptVersionRef === selected.scriptVersionRef);
+    return {
+      label: alreadyConfirmed ? "当前版本已确认" : "确认当前剧本版本",
+      action: "confirm-script-version",
+      disabled: alreadyConfirmed,
+      note: "只更新确认引用 · 历史版本保持不可变"
+    };
+  }
+
   function stickyConfig(route) {
     if (!route) return { label: "返回总览", target: defaultRoute, note: "未知路由 · 未创建任何事实" };
     const map = {
@@ -1385,11 +1627,12 @@
       "ai-director": aiDirectorStickyConfig(),
       "project-draft-handoff": { label: "打开晚灯项目", target: `${projectBase}/pipeline`, note: "项目草稿已建立 · 仅当前会话有效" },
       "episode-project": { label: "查看全部项目", target: "/creator/projects", note: "Series → Episode → 已确认 CreativePlan" },
+      "script-studio": scriptStudioStickyConfig(),
       pipeline: { label: "进入角色", target: `${projectBase}/character`, note: "项目制作流程总览 · 状态由创作者确认" },
       character: { label: "查看分镜", target: `${projectBase}/storyboard`, note: "晚灯角色 · 权利状态待确认" },
       storyboard: { label: "查看影片预览", target: `${projectBase}/preview`, note: "六镜头分镜墙 · 继续审看影片节奏" },
       preview: { label: "返回项目工作室", target: `${projectBase}/pipeline`, note: "候选预览 · 尚未正式导出" },
-      export: { label: "暂不可导出", disabled: true, note: "权利确认与导出能力尚未完成" }
+      export: { label: "暂不可导出", disabled: true, capability: "export", note: "权利确认与导出能力尚未完成" }
     };
     if (map[route.type]) return map[route.type];
     if (route.context === "creation") return { label: "返回创作中心", target: "/creator/creation", note: "功能即将上线" };
@@ -1399,7 +1642,7 @@
 
   function shouldRenderStickyBar(route) {
     if (!route) return false;
-    if (["dashboard", "ai-director", "pipeline", "storyboard", "preview", "export", "episode-project"].includes(route.type)) return true;
+    if (["dashboard", "ai-director", "pipeline", "storyboard", "preview", "export", "episode-project", "script-studio"].includes(route.type)) return true;
     return route.type === "placeholder" && route.key === "approval";
   }
 
@@ -1413,7 +1656,7 @@
     }
     const config = stickyConfig(route);
     const primary = config.disabled
-      ? `<button class="button button-primary" type="button" disabled data-capability="export">${escapeHtml(config.label)}</button>`
+      ? `<button class="button button-primary" type="button" disabled data-capability="${escapeHtml(config.capability || "disabled-action")}">${escapeHtml(config.label)}</button>`
       : config.action
         ? `<button class="button button-primary" type="button" data-action="${escapeHtml(config.action)}">${escapeHtml(config.label)}</button>`
         : `<a class="button button-primary" href="#${escapeHtml(config.target)}">${escapeHtml(config.label)}</a>`;
@@ -1552,6 +1795,7 @@
       "ai-director": renderAiDirector,
       "project-draft-handoff": () => renderProjectDraftHandoff(resolved),
       "episode-project": () => renderEpisodeProject(resolved),
+      "script-studio": () => renderScriptStudio(resolved),
       character: renderCharacter,
       storyboard: renderStoryboard,
       preview: renderPreview,
@@ -1566,6 +1810,12 @@
     closeMobileSidebar();
     if (resolved.type === "preview") bindPreviewEvents();
     content.focus({ preventScroll: true });
+    if (resolved.type === "script-studio") {
+      const nextScope = scriptScopeKey(scriptScopeFromRoute(resolved));
+      if (state.scriptWorkspaceStatus === "idle" || state.scriptWorkspaceScope !== nextScope) {
+        loadScriptWorkspace(resolved);
+      }
+    }
   }
 
   function showToast(message) {
@@ -1789,6 +2039,159 @@
     }
   }
 
+  function scriptContentFromVersion(version) {
+    return {
+      title: version.title,
+      logline: version.logline,
+      synopsis: version.synopsis,
+      targetDurationSec: version.targetDurationSec,
+      scenes: JSON.parse(JSON.stringify(version.scenes))
+    };
+  }
+
+  function parseScriptLines(value) {
+    return String(value || "").split(/\r?\n/).map((item) => item.trim()).filter(Boolean);
+  }
+
+  function parseDialogueLines(value) {
+    return parseScriptLines(value).map((line) => {
+      const parts = line.split("|").map((item) => item.trim());
+      if (parts.length < 3 || !parts[0] || !parts[1] || !parts.slice(2).join("|").trim()) {
+        throw new Error("对白请使用“说话人 | 情绪 | 台词”格式，每行一条。");
+      }
+      return { speaker: parts[0], emotion: parts[1], text: parts.slice(2).join("|").trim() };
+    });
+  }
+
+  async function refreshScriptAfterMutation(route, versionRef, message) {
+    state.selectedScriptVersionRef = versionRef || state.selectedScriptVersionRef;
+    state.scriptPhase = "idle";
+    state.scriptError = null;
+    await loadScriptWorkspace(route, { force: true, preserveSelection: true });
+    if (message) showToast(message);
+  }
+
+  async function generateScript() {
+    const route = state.activeRoute;
+    const scope = scriptScopeFromRoute(route);
+    if (!scope || state.scriptPhase !== "idle") return;
+    state.scriptPhase = "generating";
+    state.scriptError = null;
+    renderRoute(state.activePath);
+    try {
+      const payload = await requestApplicationJson(scriptGenerateEndpoint, {
+        method: "POST",
+        body: JSON.stringify(scope)
+      });
+      await refreshScriptAfterMutation(route, payload.scriptVersion.scriptVersionRef, "剧本 v1 已创建，等待人工确认");
+    } catch (error) {
+      state.scriptPhase = "idle";
+      state.scriptError = error && error.message ? error.message : "剧本生成暂时未完成，请稍后重试。";
+      renderRoute(state.activePath);
+    }
+  }
+
+  async function saveManualScriptVersion(form) {
+    const route = state.activeRoute;
+    const scope = scriptScopeFromRoute(route);
+    const workspace = state.scriptWorkspace;
+    const version = selectedScriptVersion();
+    const scene = selectedScriptScene();
+    if (!scope || !workspace || !workspace.script || !version || !scene || state.scriptPhase !== "idle") return;
+    const formData = new FormData(form);
+    try {
+      const contentValue = scriptContentFromVersion(version);
+      contentValue.title = String(formData.get("title") || "").trim();
+      contentValue.synopsis = String(formData.get("synopsis") || "").trim();
+      const editedScene = contentValue.scenes.find((item) => item.scriptSceneRef === scene.scriptSceneRef);
+      editedScene.heading = String(formData.get("heading") || "").trim();
+      editedScene.location = String(formData.get("location") || "").trim();
+      editedScene.timeOfDay = String(formData.get("timeOfDay") || "").trim();
+      editedScene.action = String(formData.get("action") || "").trim();
+      editedScene.dialogue = parseDialogueLines(formData.get("dialogue"));
+      editedScene.narration = parseScriptLines(formData.get("narration"));
+      editedScene.subtitleText = parseScriptLines(formData.get("subtitleText"));
+      if (!contentValue.title || !contentValue.synopsis || !editedScene.heading || !editedScene.location || !editedScene.timeOfDay || !editedScene.action) {
+        throw new Error("请完整填写剧本标题、梗概与当前场景的必填内容。");
+      }
+      state.scriptPhase = "saving";
+      state.scriptError = null;
+      renderRoute(state.activePath);
+      const payload = await requestApplicationJson(scriptManualVersionEndpoint, {
+        method: "POST",
+        body: JSON.stringify({
+          ...scope,
+          scriptRef: workspace.script.scriptRef,
+          baseScriptVersionRef: version.scriptVersionRef,
+          content: contentValue
+        })
+      });
+      await refreshScriptAfterMutation(route, payload.scriptVersion.scriptVersionRef, `剧本 v${payload.scriptVersion.versionNumber} 已保存`);
+    } catch (error) {
+      state.scriptPhase = "idle";
+      state.scriptError = error && error.message ? error.message : "新版本暂时无法保存。";
+      renderRoute(state.activePath);
+    }
+  }
+
+  async function rewriteScriptScene(form) {
+    const route = state.activeRoute;
+    const scope = scriptScopeFromRoute(route);
+    const workspace = state.scriptWorkspace;
+    const version = selectedScriptVersion();
+    const scene = selectedScriptScene();
+    if (!scope || !workspace || !workspace.script || !version || !scene || state.scriptPhase !== "idle") return;
+    const instruction = String(new FormData(form).get("instruction") || "").trim();
+    if (!instruction) return;
+    state.scriptPhase = "rewriting";
+    state.scriptError = null;
+    renderRoute(state.activePath);
+    try {
+      const payload = await requestApplicationJson(scriptRewriteEndpoint, {
+        method: "POST",
+        body: JSON.stringify({
+          ...scope,
+          scriptRef: workspace.script.scriptRef,
+          baseScriptVersionRef: version.scriptVersionRef,
+          scriptSceneRef: scene.scriptSceneRef,
+          instruction
+        })
+      });
+      await refreshScriptAfterMutation(route, payload.scriptVersion.scriptVersionRef, `场景改写已保存为 v${payload.scriptVersion.versionNumber}`);
+    } catch (error) {
+      state.scriptPhase = "idle";
+      state.scriptError = error && error.message ? error.message : "场景改写暂时未完成。";
+      renderRoute(state.activePath);
+    }
+  }
+
+  async function confirmScriptVersion() {
+    const route = state.activeRoute;
+    const scope = scriptScopeFromRoute(route);
+    const workspace = state.scriptWorkspace;
+    const version = selectedScriptVersion();
+    if (!scope || !workspace || !workspace.script || !version || state.scriptPhase !== "idle") return;
+    state.scriptPhase = "confirming";
+    state.scriptError = null;
+    renderRoute(state.activePath);
+    try {
+      await requestApplicationJson(scriptConfirmEndpoint, {
+        method: "POST",
+        body: JSON.stringify({
+          ...scope,
+          scriptRef: workspace.script.scriptRef,
+          scriptVersionRef: version.scriptVersionRef,
+          humanConfirmed: true
+        })
+      });
+      await refreshScriptAfterMutation(route, version.scriptVersionRef, `剧本 v${version.versionNumber} 已人工确认`);
+    } catch (error) {
+      state.scriptPhase = "idle";
+      state.scriptError = error && error.message ? error.message : "版本确认暂时未完成。";
+      renderRoute(state.activePath);
+    }
+  }
+
   function resetFixture() {
     state.assetTab = "basic";
     state.assetFilter = "all";
@@ -1856,6 +2259,20 @@
       if (form) form.requestSubmit();
     }
     if (action === "reload-series") loadSeriesData({ force: true });
+    if (action === "generate-script") generateScript();
+    if (action === "confirm-script-version") confirmScriptVersion();
+    if (action === "select-script-version") {
+      state.selectedScriptVersionRef = button.dataset.versionRef;
+      const version = selectedScriptVersion();
+      state.selectedScriptSceneRef = version && version.scenes.length ? version.scenes[0].scriptSceneRef : null;
+      state.scriptError = null;
+      rerenderAndRestoreFocus(`[data-action="select-script-version"][data-version-ref="${state.selectedScriptVersionRef}"]`);
+    }
+    if (action === "select-script-scene") {
+      state.selectedScriptSceneRef = button.dataset.sceneRef;
+      state.scriptError = null;
+      rerenderAndRestoreFocus(`[data-action="select-script-scene"][data-scene-ref="${state.selectedScriptSceneRef}"]`);
+    }
     if (action === "select-asset-tab") {
       state.assetTab = button.dataset.tab;
       rerenderAndRestoreFocus(`[data-action="select-asset-tab"][data-tab="${state.assetTab}"]`);
@@ -1909,6 +2326,14 @@
     if (event.target.id === "series-episode-form") {
       event.preventDefault();
       createSeriesEpisode(event.target);
+    }
+    if (event.target.id === "script-edit-form") {
+      event.preventDefault();
+      saveManualScriptVersion(event.target);
+    }
+    if (event.target.id === "script-rewrite-form") {
+      event.preventDefault();
+      rewriteScriptScene(event.target);
     }
   });
 
