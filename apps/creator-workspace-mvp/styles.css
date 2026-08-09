@@ -8359,3 +8359,184 @@ body .script-version-item.is-selected {
   border-color: rgba(15, 118, 110, 0.48);
   background: rgba(15, 118, 110, 0.08);
 }
+
+/* Story projection: read-only Episode → confirmed CreativePlan presentation. */
+.story-view {
+  display: grid;
+  grid-template-columns: minmax(0, 1.45fr) minmax(280px, 0.55fr);
+  gap: var(--space-6);
+  align-items: start;
+}
+
+.story-overview-card,
+.story-beats-card,
+.story-context-card,
+.story-lineage-card,
+.story-empty-card {
+  border-color: var(--color-border);
+  background: var(--color-surface);
+  color: var(--color-text);
+  box-shadow: var(--shadow-subtle);
+}
+
+.story-overview-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-3);
+  margin: var(--space-4) 0;
+}
+
+.story-overview-grid section,
+.story-copy-block,
+.story-structure,
+.story-context-meta > div {
+  padding: var(--space-4);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-control);
+  background: var(--color-surface-muted);
+}
+
+.story-overview-grid span,
+.story-copy-block > span,
+.story-structure > span,
+.story-context-card section > span {
+  display: block;
+  margin-bottom: var(--space-2);
+  color: var(--color-text-secondary);
+  font-size: var(--type-caption-size);
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+
+.story-copy-block + .story-copy-block {
+  margin-top: var(--space-3);
+}
+
+.story-copy-block p,
+.story-beat-list p,
+.story-lineage-card p {
+  margin: 0;
+  color: var(--color-text-secondary);
+}
+
+.story-beat-list {
+  display: grid;
+  gap: var(--space-3);
+  margin: var(--space-4) 0;
+  padding: 0;
+  list-style: none;
+}
+
+.story-beat-list li {
+  display: grid;
+  grid-template-columns: 76px minmax(0, 1fr);
+  gap: var(--space-3);
+  align-items: center;
+  padding: var(--space-3) var(--space-4);
+  border-left: 3px solid var(--color-brand);
+  border-radius: 0 var(--radius-control) var(--radius-control) 0;
+  background: var(--color-brand-subtle);
+}
+
+.story-beat-list li > span {
+  color: var(--color-brand);
+  font-weight: 800;
+}
+
+.story-context-card {
+  grid-column: 2;
+  grid-row: 1 / span 2;
+}
+
+.story-context-card section + section {
+  margin-top: var(--space-5);
+}
+
+.story-context-card ul {
+  display: grid;
+  gap: var(--space-2);
+  margin: 0;
+  padding-left: var(--space-5);
+  color: var(--color-text-secondary);
+}
+
+.story-context-meta {
+  display: grid;
+  gap: var(--space-3);
+  margin: var(--space-5) 0 0;
+}
+
+.story-context-meta dt,
+.story-context-meta dd,
+.story-lineage-card dt,
+.story-lineage-card dd {
+  margin: 0;
+}
+
+.story-context-meta dt,
+.story-lineage-card dt {
+  color: var(--color-text-secondary);
+  font-size: var(--type-caption-size);
+}
+
+.story-context-meta dd {
+  margin-top: var(--space-1);
+  font-weight: 700;
+}
+
+.story-lineage-card {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: minmax(200px, 0.7fr) minmax(0, 1.3fr) auto;
+  gap: var(--space-5);
+  align-items: center;
+}
+
+.story-lineage-card h3 {
+  margin: var(--space-1) 0 0;
+}
+
+.story-lineage-card dl {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-2) var(--space-4);
+  margin: 0;
+}
+
+.story-lineage-card dd {
+  overflow-wrap: anywhere;
+}
+
+.story-lineage-card p {
+  grid-column: 2 / -1;
+  font-size: var(--type-caption-size);
+}
+
+.story-muted-item {
+  color: var(--color-text-muted);
+}
+
+@media (max-width: 1100px) {
+  .story-view,
+  .story-lineage-card {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .story-context-card,
+  .story-lineage-card,
+  .story-lineage-card p {
+    grid-column: 1;
+    grid-row: auto;
+  }
+}
+
+@media (max-width: 640px) {
+  .story-overview-grid,
+  .story-lineage-card dl {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .story-beat-list li {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

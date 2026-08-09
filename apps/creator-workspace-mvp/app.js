@@ -75,7 +75,7 @@
 
   const projectPages = Object.freeze([
     { key: "pipeline", label: "生产流程", english: "Production Pipeline", status: "fixture" },
-    { key: "story", label: "故事", english: "Story", status: "planned" },
+    { key: "story", label: "故事", english: "Story", status: "available" },
     { key: "script", label: "剧本", english: "Script Studio", status: "available" },
     { key: "ip-bible", label: "IP 圣经", english: "IP Bible", status: "planned" },
     { key: "character", label: "角色", english: "Character", status: "fixture" },
@@ -1001,6 +1001,146 @@
     return null;
   }
 
+  const storyViewSchemaVersion = "creator.story-view.v1";
+
+  function buildStoryProjection(route) {
+    const persisted = route && route.persisted;
+    const episode = persisted && persisted.episode;
+    const series = persisted && persisted.series;
+    const binding = episode && episode.confirmedPlanBinding;
+    const sourcePlan = binding && binding.sourcePlan;
+    if (
+      !series
+      || !episode
+      || !binding
+      || !sourcePlan
+      || binding.sourcePlanSchemaVersion !== "creator.ai-director.plan.v1"
+      || sourcePlan.schemaVersion !== binding.sourcePlanSchemaVersion
+    ) {
+      return null;
+    }
+
+    const interpretation = sourcePlan.creativeInterpretation || {};
+    const direction = sourcePlan.storyDirection || {};
+    const production = sourcePlan.productionPlan || {};
+    const visualStyle = sourcePlan.visualStyle || {};
+    const storyboard = Array.isArray(sourcePlan.storyboardPlan) ? sourcePlan.storyboardPlan : [];
+    const targetDurationSec = storyboard.reduce((total, shot) => total + Number(shot.durationSec || 0), 0);
+    return {
+      schemaVersion: storyViewSchemaVersion,
+      seriesRef: series.seriesRef,
+      episodeRef: episode.episodeRef,
+      sourcePlanRef: binding.sourcePlanRef,
+      sourcePlanSchemaVersion: binding.sourcePlanSchemaVersion,
+      sourcePlanVersion: binding.sourcePlanVersion,
+      episodeNumber: episode.episodeNumber,
+      seriesTitle: series.title,
+      title: direction.title || episode.title,
+      logline: interpretation.logline || "",
+      coreTheme: interpretation.coreTheme || "",
+      targetEmotion: interpretation.targetEmotion || "",
+      synopsis: direction.synopsis || "",
+      keyBeats: Array.isArray(direction.keyBeats) ? direction.keyBeats : [],
+      narrativeStructure: interpretation.narrativeArc || "",
+      characters: Array.isArray(production.characters) ? production.characters : [],
+      scenes: Array.isArray(production.scenes) ? production.scenes : [],
+      targetDurationSec,
+      visualTone: visualStyle.atmosphere || interpretation.targetEmotion || ""
+    };
+  }
+
+  function renderStoryView(route) {
+    const projection = buildStoryProjection(route);
+    const persisted = route.persisted || {};
+    const series = persisted.series;
+    const episode = persisted.episode;
+    if (!projection) {
+      return `
+        ${renderPageHeader({
+          eyebrow: series && episode ? `${escapeHtml(series.title)} · 第 ${escapeHtml(episode.episodeNumber)} 集` : "项目工作室 · 故事",
+          title: "故事",
+          description: "查看本集经人工确认的故事基线。",
+          status: "available",
+          meta: localizedStatusBadge("等待上游确认", "neutral")
+        })}
+        <section class="card story-empty-card" data-story-state="missing-confirmed-plan">
+          ${renderEmptyState({
+            icon: "·",
+            title: "尚未确认故事方案",
+            description: "本集还没有已确认的导演方案。请先前往 AI导演完成方案确认，再返回查看故事基线。",
+            action: '<a class="button button-primary" href="#/creator/ai-director">前往 AI导演</a>'
+          })}
+        </section>
+      `;
+    }
+
+    const list = (values, emptyLabel) => values.length
+      ? values.map((value) => `<li>${escapeHtml(value)}</li>`).join("")
+      : `<li class="story-muted-item">${escapeHtml(emptyLabel)}</li>`;
+    return `
+      ${renderPageHeader({
+        eyebrow: `${escapeHtml(projection.seriesTitle)} · 第 ${escapeHtml(projection.episodeNumber)} 集`,
+        title: "故事",
+        description: "查看已确认导演方案形成的本集故事基线；正式剧本生成、编辑、版本与确认由剧本工作台负责。",
+        status: "available",
+        meta: localizedStatusBadge(`已确认导演方案 v${projection.sourcePlanVersion}`, "available")
+      })}
+      <section
+        class="story-view"
+        data-story-schema="${escapeHtml(projection.schemaVersion)}"
+        data-series-ref="${escapeHtml(projection.seriesRef)}"
+        data-episode-ref="${escapeHtml(projection.episodeRef)}"
+        data-source-plan-ref="${escapeHtml(projection.sourcePlanRef)}"
+        data-source-plan-version="${escapeHtml(projection.sourcePlanVersion)}"
+      >
+        <article class="card story-overview-card">
+          <div class="card-heading">
+            <div><span class="section-kicker">故事概览</span><h3>${escapeHtml(projection.title)}</h3></div>
+            ${localizedStatusBadge("只读基线", "available")}
+          </div>
+          <div class="story-overview-grid">
+            <section><span>核心主题</span><strong>${escapeHtml(projection.coreTheme || "尚未填写")}</strong></section>
+            <section><span>目标情绪</span><strong>${escapeHtml(projection.targetEmotion || "尚未填写")}</strong></section>
+          </div>
+          <div class="story-copy-block"><span>Logline</span><p>${escapeHtml(projection.logline || "尚未填写")}</p></div>
+          <div class="story-copy-block"><span>故事梗概</span><p>${escapeHtml(projection.synopsis || "尚未填写")}</p></div>
+        </article>
+
+        <article class="card story-beats-card">
+          <div class="card-heading"><div><span class="section-kicker">叙事推进</span><h3>关键剧情节点</h3></div></div>
+          <ol class="story-beat-list">
+            ${projection.keyBeats.length
+              ? projection.keyBeats.map((beat, index) => `<li><span>Beat ${index + 1}</span><p>${escapeHtml(beat)}</p></li>`).join("")
+              : '<li class="story-muted-item">当前方案未提供关键剧情节点。</li>'}
+          </ol>
+          <div class="story-structure"><span>叙事结构</span><strong>${escapeHtml(projection.narrativeStructure || "按关键剧情节点推进")}</strong></div>
+        </article>
+
+        <aside class="card story-context-card">
+          <div class="card-heading"><div><span class="section-kicker">制作上下文</span><h3>方案需求</h3></div></div>
+          <section><span>角色需求</span><ul>${list(projection.characters, "尚未列出角色需求")}</ul></section>
+          <section><span>场景需求</span><ul>${list(projection.scenes, "尚未列出场景需求")}</ul></section>
+          <dl class="story-context-meta">
+            <div><dt>目标时长</dt><dd>${escapeHtml(projection.targetDurationSec || "—")} 秒</dd></div>
+            <div><dt>视觉基调</dt><dd>${escapeHtml(projection.visualTone || "尚未填写")}</dd></div>
+          </dl>
+        </aside>
+
+        <article class="card story-lineage-card">
+          <div><span class="section-kicker">来源追溯</span><h3>已确认导演方案 v${escapeHtml(projection.sourcePlanVersion)}</h3></div>
+          <dl>
+            <div><dt>Series Ref</dt><dd><code>${escapeHtml(projection.seriesRef)}</code></dd></div>
+            <div><dt>Episode Ref</dt><dd><code>${escapeHtml(projection.episodeRef)}</code></dd></div>
+            <div><dt>Source Plan Ref</dt><dd><code>${escapeHtml(projection.sourcePlanRef)}</code></dd></div>
+            <div><dt>Source Schema</dt><dd><code>${escapeHtml(projection.sourcePlanSchemaVersion)}</code></dd></div>
+          </dl>
+          <a class="button button-primary" href="#${escapeHtml(route.projectBase)}/script">进入剧本工作台</a>
+          <p>继续使用同一 Episode；导航不会复制故事文本，也不会创建新的故事事实。</p>
+        </article>
+      </section>
+    `;
+  }
+
   function renderEpisodeProject(route) {
     const { series, episode } = route.persisted;
     const binding = episode.confirmedPlanBinding || {};
@@ -1429,6 +1569,7 @@
           breadcrumb: `${persisted.series.title} / 第 ${persisted.episode.episodeNumber} 集 / ${page.label}`
         };
         if (pageKey === "pipeline") return { ...baseRoute, type: "episode-project" };
+        if (pageKey === "story") return { ...baseRoute, type: "story-view" };
         if (pageKey === "script") return { ...baseRoute, type: "script-studio" };
         return {
           ...baseRoute,
@@ -1487,13 +1628,13 @@
       if (!projectPage) return null;
       const route = { ...projectPage, breadcrumb: `${displayProjectTitle} / ${projectPage.label}`, context: "project" };
       if (projectPage.key === "pipeline") return { ...route, type: "pipeline" };
+      if (projectPage.key === "story") return { ...route, type: "story-view" };
       if (projectPage.key === "character") return { ...route, type: "character" };
       if (projectPage.key === "storyboard") return { ...route, type: "storyboard" };
       if (projectPage.key === "preview") return { ...route, type: "preview" };
       if (projectPage.key === "export") return { ...route, type: "export" };
 
       const descriptions = {
-        story: "故事意图与版本参考的未来页面；当前不生成、改写或保存故事。",
         "ip-bible": "单项目世界观、角色规则与时间线的未来参考页面；当前功能即将上线。",
         scene: "项目场景规划的未来入口；当前不会创建场景或生成画面。",
         audio: "声音意图、来源与权利确认的未来入口；当前候选影片为静音版本。",
@@ -1565,6 +1706,11 @@
       detail = `<section class="inspector-section"><span class="inspector-label">项目草稿</span><strong>${escapeHtml(route.draft.title)}</strong><p>仅当前会话有效 · 不会保存</p></section>`;
     } else if (route && route.type === "episode-project") {
       detail = `<section class="inspector-section"><span class="inspector-label">Episode Project</span><strong>${escapeHtml(route.persisted.episode.title)}</strong><p>${escapeHtml(route.persisted.series.title)} · 第 ${escapeHtml(route.persisted.episode.episodeNumber)} 集</p><p>来源：已确认导演方案 v${escapeHtml(route.persisted.episode.sourcePlanVersion)}</p></section>`;
+    } else if (route && route.type === "story-view") {
+      const projection = buildStoryProjection(route);
+      detail = projection
+        ? `<section class="inspector-section"><span class="inspector-label">故事来源</span><strong>已确认导演方案 v${escapeHtml(projection.sourcePlanVersion)}</strong><p>${escapeHtml(projection.seriesTitle)} · 第 ${escapeHtml(projection.episodeNumber)} 集</p><p><code>${escapeHtml(projection.sourcePlanRef)}</code></p></section>`
+        : `<section class="inspector-section"><span class="inspector-label">故事来源</span><strong>尚未确认故事方案</strong><p>请先前往 AI导演确认本集方案。</p></section>`;
     } else if (route && route.type === "script-studio") {
       const version = selectedScriptVersion();
       const script = state.scriptWorkspace && state.scriptWorkspace.script;
@@ -1795,6 +1941,7 @@
       "ai-director": renderAiDirector,
       "project-draft-handoff": () => renderProjectDraftHandoff(resolved),
       "episode-project": () => renderEpisodeProject(resolved),
+      "story-view": () => renderStoryView(resolved),
       "script-studio": () => renderScriptStudio(resolved),
       character: renderCharacter,
       storyboard: renderStoryboard,
@@ -2436,6 +2583,8 @@
     creationModules,
     projectPages,
     canonicalRouteTemplates,
+    storyViewSchemaVersion,
+    buildStoryProjection,
     renderLoadingState,
     renderErrorState,
     renderButtonLoading

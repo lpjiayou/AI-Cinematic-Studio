@@ -1046,6 +1046,72 @@ class CreatorWorkspaceMvpTest(unittest.TestCase):
             self.assertIn(selector, self.styles)
         self.assertIn("@media (max-width: 900px)", self.styles)
 
+    def test_story_route_renders_read_only_confirmed_plan_projection(self):
+        self.assertIn(
+            '{ key: "story", label: "故事", english: "Story", status: "available" }',
+            self.script,
+        )
+        self.assertIn('if (pageKey === "story") return { ...baseRoute, type: "story-view" };', self.script)
+        self.assertIn('if (projectPage.key === "story") return { ...route, type: "story-view" };', self.script)
+        self.assertIn('"story-view": () => renderStoryView(resolved)', self.script)
+        self.assertIn('const storyViewSchemaVersion = "creator.story-view.v1"', self.script)
+        for marker in (
+            "function buildStoryProjection(route)",
+            "episode.confirmedPlanBinding",
+            "binding.sourcePlan",
+            "seriesRef: series.seriesRef",
+            "episodeRef: episode.episodeRef",
+            "sourcePlanRef: binding.sourcePlanRef",
+            "sourcePlanSchemaVersion: binding.sourcePlanSchemaVersion",
+            "sourcePlanVersion: binding.sourcePlanVersion",
+        ):
+            self.assertIn(marker, self.script)
+
+    def test_story_projection_does_not_create_provider_or_fixture_authority(self):
+        projection = self.script.split("function buildStoryProjection(route)", 1)[1].split(
+            "function renderStoryView(route)", 1
+        )[0]
+        for forbidden in (
+            "fixture.",
+            "fetch(",
+            "provider",
+            "DeepSeek",
+            "StoryRepository",
+            "localStorage",
+            "sessionStorage",
+        ):
+            self.assertNotIn(forbidden, projection)
+        self.assertNotIn("StoryRepository", self.script)
+        self.assertNotIn("creator.story.entity", self.script)
+
+    def test_story_missing_binding_has_upstream_empty_state_not_placeholder(self):
+        story_renderer = self.script.split("function renderStoryView(route)", 1)[1].split(
+            "function renderEpisodeProject(route)", 1
+        )[0]
+        for marker in (
+            "尚未确认故事方案",
+            "前往 AI导演",
+            'data-story-state="missing-confirmed-plan"',
+        ):
+            self.assertIn(marker, story_renderer)
+        self.assertNotIn("即将上线", story_renderer)
+
+    def test_story_to_script_navigation_preserves_episode_reference_without_text_copy(self):
+        story_renderer = self.script.split("function renderStoryView(route)", 1)[1].split(
+            "function renderEpisodeProject(route)", 1
+        )[0]
+        self.assertIn('href="#${escapeHtml(route.projectBase)}/script"', story_renderer)
+        self.assertIn("继续使用同一 Episode", story_renderer)
+        self.assertNotIn("URLSearchParams", story_renderer)
+        for selector in (
+            ".story-view",
+            ".story-overview-card",
+            ".story-beat-list",
+            ".story-context-card",
+            ".story-lineage-card",
+        ):
+            self.assertIn(selector, self.styles)
+
 
 if __name__ == "__main__":
     unittest.main()
