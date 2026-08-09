@@ -1,98 +1,236 @@
 # AI Cinematic Studio — Codex Agent Rules
 
-## Role
+> Status: LONG-TERM AGENT CONSTITUTION
+>
+> Scope: AI Cinematic Studio 全项目 Codex / Automation 长期执行规则
+>
+> This file defines HOW Codex works.
+>
+> It does not define temporary task details.
+> Current execution scope is defined by CURRENT_MILESTONE.md.
+
+---
+
+# 1. Role
 
 You are the implementation agent for AI Cinematic Studio.
 
-You execute the currently approved milestone.
+You execute the approved product roadmap.
 
-You do not redefine the product roadmap.
+You do not redefine the product.
 
-You do not independently decide which milestone should be developed next.
+You do not independently change:
+
+- product direction;
+- Production Spine;
+- milestone roadmap;
+- architecture layers;
+- domain ownership;
+- UI information architecture;
+- accepted contracts;
+- accepted Git baselines.
 
 The Project Lead controls:
 
-- product direction;
-- milestone acceptance;
+- final product direction;
+- final milestone acceptance;
 - architecture decisions;
-- domain ownership decisions;
-- milestone transitions.
+- domain ownership changes;
+- Production Spine changes;
+- roadmap rebaselining;
+- destructive migration approval;
+- milestone / execution-wave authorization.
 
-When the current milestone reaches all required gates, stop and wait for Project Lead acceptance.
+Codex may implement, test, commit, push and automatically transition
+between milestones only when CURRENT_MILESTONE.md explicitly authorizes
+an AUTO-SEQUENTIAL execution wave.
 
----
+Codex must never issue final:
 
-## Control Document Startup Rule
+FEATURE ACCEPTED
 
-Before any AI Cinematic Studio execution work:
+Only the Project Lead may issue final acceptance.
 
-1. read `AI_CINEMATIC_STUDIO_SYSTEM_MASTER_PLAN.md`;
-2. read `AGENTS.md`;
-3. read `CURRENT_MILESTONE.md`;
-4. inspect the current branch, HEAD, accepted base, and Git status.
+Codex may report:
 
-Before any Creator UI work, also read `AI_CINEMATIC_STUDIO_UI_MASTER_PLAN.md`.
+FEATURE ACCEPTED CANDIDATE
+READY FOR PROJECT LEAD ACCEPTANCE
 
-These files have distinct responsibilities:
-
-- System Master Plan: whole-system architecture and roadmap;
-- UI Master Plan: enterprise UX, information architecture, and visual architecture;
-- AGENTS.md: long-term Codex execution constitution;
-- CURRENT_MILESTONE.md: current execution state only.
-
-Do not use recent conversation context to silently override a higher-authority control document.
+or an explicitly defined technical checkpoint state.
 
 ---
 
-## Production Spine
+# 2. Source-of-Truth Hierarchy
 
-The fixed long-term production spine is:
+Before any major implementation work, Codex MUST read:
 
-AI Director
+1. AI_CINEMATIC_STUDIO_SYSTEM_MASTER_PLAN.md
+2. AI_CINEMATIC_STUDIO_UI_MASTER_PLAN.md
+3. AGENTS.md
+4. CURRENT_MILESTONE.md
+5. accepted Git / GitHub baseline
+6. current repository reality
+
+Authority order:
+
+SYSTEM MASTER PLAN
+↓
+UI MASTER PLAN
+↓
+AGENTS.md
+↓
+CURRENT_MILESTONE.md
+↓
+Accepted Git Baseline
+↓
+Repository Reality
+↓
+Temporary task instructions
+
+Temporary conversation instructions must not silently override
+higher-level project baselines.
+
+If a genuine conflict exists:
+
+STOP.
+
+Report the exact conflict.
+
+Do not guess which source should win.
+
+---
+
+# 3. Product Definition
+
+AI Cinematic Studio is not a collection of isolated AI tools.
+
+It is a Project-first AI film production system.
+
+The long-term objective is:
+
+real content demand
+→ structured production
+→ traceable audiovisual assets
+→ deterministic composition
+→ final works
+→ release
+→ real performance feedback
+→ next creative cycle
+
+The product must evolve as one connected production system.
+
+---
+
+# 4. Project First
+
+Project is the formal production root.
+
+Formal production facts must eventually belong to:
+
+Workspace
+→ Content Profile
+→ Project
+
+For Series projects:
+
+Project
 → Series
-→ Episode Project
-→ Series/IP Bible
-→ Script Studio
+→ Episode
+
+Project answers:
+
+What production are we making?
+
+Series answers:
+
+What long-running narrative / production context does it belong to?
+
+Episode answers:
+
+What specific production unit are we producing?
+
+Never collapse these identities.
+
+Never use:
+
+episodeRef == projectRef
+
+Never use:
+
+episodeRef == canonicalProjectId
+
+unless an explicitly accepted V5 contract defines such a relationship.
+
+---
+
+# 5. Long-Term Production Spine
+
+The fixed long-term Production Spine is:
+
+Workspace
+→ Content Profile
+→ Project
+→ AI Director
+→ Series
+→ Series Planning
+→ Series IP Bible / Character Intelligence
+→ Episode
+→ Episode CreativePlan
+→ Story Projection
+→ Script / ScriptVersion
+→ Consistency Validation
 → Storyboard
-→ Shot
-→ Asset
-→ Video/Audio
+→ Creative Shot
+→ Asset Requirement
+→ Asset / AssetVersion
+→ Image / Video / Audio Production
 → Timeline
+→ V3 Composition / Render
+→ Preview / QC / Approval
 → Episode Master
 → Series Release & Management
-→ Performance Feedback
-→ AI Director
+→ Performance Data
+→ AI Director / Content Profile Feedback
 
-All implementation must strengthen this production spine.
+All major implementation must strengthen this spine.
 
-Do not create capabilities that work independently but are disconnected from the production spine.
-
----
-
-## Core Principle
-
-Do not create isolated modules.
-
-Before implementing any capability, identify:
-
-1. Upstream authoritative object
-2. Input contract
-3. Output contract
-4. Direct downstream consumer
-5. Ref/version lineage
-6. Final traceability path
-
-If these cannot be clearly identified, stop implementation and report the blocking architecture question.
-
-A module that works correctly in isolation but cannot participate in the production spine is NOT considered complete.
+Do not create capabilities that function independently
+but are disconnected from this production chain.
 
 ---
 
-## Data Lineage Rule
+# 6. Core Integration Principle
 
-Connections between modules must use stable references and version lineage.
+A feature is not complete simply because:
 
-Do not treat any of the following as authoritative integration:
+- the page works;
+- the API returns 200;
+- unit tests pass;
+- a model generates output.
+
+Before implementing a capability, identify:
+
+1. upstream authoritative object;
+2. stable input contract;
+3. output contract;
+4. direct downstream consumer;
+5. Ref / Version lineage;
+6. final traceability path.
+
+If these cannot be identified:
+
+STOP.
+
+A module that works alone but cannot participate in the Production Spine
+is NOT complete.
+
+---
+
+# 7. Data Lineage Rule
+
+Connections must use stable references and version lineage.
+
+Do NOT use the following as authoritative integration:
 
 - copied text;
 - duplicated JSON;
@@ -100,221 +238,311 @@ Do not treat any of the following as authoritative integration:
 - titles;
 - episode numbers;
 - character names;
-- UI labels.
+- UI labels;
+- route strings.
 
-Prefer explicit relationships such as:
+Preferred relationships include:
 
-contentProfileRef
+workspaceRef
+→ contentProfileRef
+→ projectRef
 → seriesRef
 → episodeRef
-→ creativePlanRef
-→ scriptRef
-→ scriptVersionRef
-→ storyboardRef
-→ shotRef
+→ creativePlanRef / creativePlanVersion
+→ seriesPlanRef / seriesPlanVersionRef
+→ seriesBibleRef / seriesBibleVersionRef
+→ characterRef / characterStateRef
+→ scriptRef / scriptVersionRef
+→ consistencyValidationRef
+→ storyboardRef / storyboardVersionRef
+→ shotRef / shotVersionRef
 → assetRequirementRef
-→ assetRef
-→ assetVersionRef
+→ assetRef / assetVersionRef
+→ generationRequestRef / generationResultRef
 → videoAssetVersionRef / audioAssetVersionRef
-→ timelineRef
-→ timelineClipRef
+→ timelineRef / timelineVersionRef / timelineClipRef
+→ previewCandidateRef
 → episodeMasterRef
 → releasePackageRef
+→ performanceRecordRef
 
-Every downstream object should be able to identify the upstream object and version that produced it.
+Not every Ref exists yet.
 
-Final outputs should eventually be traceable back through the production chain.
+Future implementation must not create conflicting identity systems.
+
+Every downstream object should eventually identify the upstream object
+and version that produced it.
 
 ---
 
-## Current Execution Principle
+# 8. Vertical Closure
 
 Vertical closure first.
 
 Series architecture early.
 
-Batch capabilities later.
+Batch capability later.
 
-The execution strategy is:
+Execution scale:
 
-1 episode
-→ 3 episodes
-→ 10 episodes
-→ 30 episodes
-→ 100 episodes
+1 Episode
+→ 3 Episodes
+→ 10 Episodes
+→ 30 Episodes
+→ 100 Episodes
 
-Do not build large-scale batch orchestration before the single-episode production chain is proven.
+Do not build industrial batch orchestration before a real single-Episode
+production chain is proven.
 
-Do not implement future milestones early simply because the capability appears useful.
+Do not build platform infrastructure merely because it may be useful later.
 
----
+Real production first.
 
-## Milestone Roadmap
-
-M1 AI Director — ACCEPTED
-
-M2 Series + Episode Project — ACCEPTED
-
-M3 Script Studio — ACCEPTED
-
-M3-H Script Candidate Robustness Hotfix — ACCEPTED
-
-Story Projection Integration — ACCEPTED
-
-UI-R1 Enterprise UI Rebaseline — FEATURE ACCEPTED
-
-UI-R1 Accepted SHA — `c9536fc0c745d0bf9e9c3eb543f4ab6c0566798a`
-
-Canonical Workspace Promotion — IN PROGRESS
-
-M4 Project Context Foundation — PAUSED / NOT STARTED
-
-M5 Series Planning + Series Director — NOT STARTED
-
-M6 Series IP Bible + Character Intelligence — NOT STARTED
-
-M7 Narrative Closed Loop — NOT STARTED
-
-M8 Storyboard + Creative Shot Domain — NOT STARTED
-
-M9 Asset Requirement + Asset Intelligence — NOT STARTED
-
-M10 Image Generation — NOT STARTED
-
-M11 Video Production — NOT STARTED
-
-M12 Audio Production — NOT STARTED
-
-M13 V3 Timeline + Composition + Render — NOT STARTED
-
-M14 Preview / QC / Approval / Local Regeneration — NOT STARTED
-
-M15 Episode Master + Works — NOT STARTED
-
-M16 V4 Batch Production Orchestration — NOT STARTED
-
-M17 Series Release & Management — NOT STARTED
-
-M18 Performance Feedback — NOT STARTED
-
-M19 Commercial SaaS / Enterprise Hardening — NOT STARTED
-
-No capability milestone is CURRENT during Canonical Workspace Promotion.
-
-M4 and M5 are not authorized to execute.
-
-The accepted UI-R1 presentation baseline must preserve the accepted M1/M2/M3 production spine and must not create a second Domain authority.
-
-Do not automatically enter the next milestone.
+Scale second.
 
 ---
 
-## Architecture Direction
+# 9. Current Roadmap
+
+Accepted historical/product milestones:
+
+M1 — AI Director Core
+ACCEPTED
+
+M2 — Series + Episode Foundation
+ACCEPTED
+
+M3 — Script Studio
+ACCEPTED
+
+M3-H — Script Candidate Robustness
+ACCEPTED
+
+Story Projection Integration
+ACCEPTED
+
+UI-R1 — Enterprise Cinematic UI Rebaseline
+ACCEPTED
+
+Future roadmap:
+
+M4 — Project Context Foundation
+
+M5 — Series Planning + Series Director
+
+M6 — Series IP Bible + Character Intelligence
+
+M7 — Narrative Closed Loop
+
+M8 — Storyboard + Creative Shot Domain
+
+M9 — Asset Requirement + Asset Intelligence
+
+M10 — Image Generation
+
+M11 — Video Production
+
+M12 — Audio Production
+
+M13 — V3 Timeline + Composition + Render
+
+M14 — Preview / QC / Approval / Local Regeneration
+
+M15 — Episode Master + Works
+
+M16 — V4 Batch Production Orchestration
+
+M17 — Series Release & Management
+
+M18 — Performance Feedback
+
+M19 — Commercial SaaS / Enterprise Hardening
+
+The roadmap may only be changed by the Project Lead
+through an explicit system-level rebaseline.
+
+---
+
+# 10. Architecture Direction — V2.3
 
 The accepted dependency direction is:
 
-Application
-→ V5 Core OS
-→ V4 Platform
-→ V3 Render
-→ Compute
+Creator Application
+↓
+V5 Core OS
+↓
+V4 Platform
+↓
+V3 Render Core
+↓
+Compute
+↓
+Foundation
+
+Cross-cutting concerns include:
+
+- Content Safety;
+- Rights;
+- Security;
+- Audit;
+- Observability;
+- Logging;
+- Tenant / Workspace isolation;
+- Resource isolation;
+- Provenance.
 
 Rules:
 
 - No reverse dependency.
 - No cross-layer private imports.
-- No duplicate authoritative data owner.
-- Application must not directly own V5 domain facts.
-- Browser code must not directly access persistence.
-- Application must not directly execute SQL.
-- Application must not directly access private infrastructure adapters.
-- V4 must not become the owner of V5 domain facts.
-- External providers must not control project lifecycle or authoritative state.
+- No duplicate authoritative owner.
+- Browser must not access persistence directly.
+- Application must not execute SQL directly.
+- Application must not access private infrastructure adapters directly.
+- V4 must not own V5 domain facts.
+- V3 must not redefine V5 creative domain authority.
+- Compute must not own business state.
+- External AI providers must not control production lifecycle.
 
-If an implementation would violate this dependency direction, stop and report the conflict.
+If implementation violates this direction:
 
----
-
-## Domain Ownership Rule
-
-Every authoritative object must have one clear owner.
-
-Do not create a second authoritative implementation of an existing domain concept.
-
-For example:
-
-- Creator UI is presentation/application behavior.
-- Series / Episode authoritative facts belong to V5 Core OS.
-- AI providers generate candidates but do not own domain state.
-- V4 executes/provider-routes work but does not own Series/Episode/Script facts.
-- Persistence adapters implement repository contracts but do not define domain semantics.
-
-If ownership is ambiguous, stop before implementing.
+STOP.
 
 ---
 
-## Series / Episode Rule
+# 11. V5 Core OS Ownership
 
-Series is the parent production context.
+V5 Core OS is the long-term owner of authoritative production facts,
+including where applicable:
 
-Episode is a child of Series.
+- Identity;
+- Content Profile references;
+- Project;
+- Series;
+- Episode;
+- Series Planning;
+- Series Bible;
+- Character;
+- Character State;
+- Script;
+- Storyboard / Creative Shot Specification;
+- Asset Registry;
+- Asset Version;
+- Rights;
+- Provenance;
+- production version lineage;
+- approvals;
+- Master metadata;
+- Audit / Outbox;
+- durable production semantics.
 
-Episode is NOT equivalent to Canonical Project.
-
-Episode may eventually reference a Canonical Project through an accepted V5 contract.
-
-Do not fabricate Canonical Project identifiers from Creator UI.
-
-Do not use:
-
-episodeRef == projectRef
-
-or:
-
-episodeRef == canonicalProjectId
-
-unless an explicitly accepted contract establishes that relationship.
+Do not duplicate these facts in Creator Application.
 
 ---
 
-## Provider Rule
+# 12. V4 Platform Ownership
+
+V4 is the execution and AI platform boundary.
+
+Early V4 may provide:
+
+TextGenerationPort
+→ Provider Adapter
+
+Later V4 may provide:
+
+- Provider Registry;
+- Model Router;
+- Image Provider;
+- Video Provider;
+- Audio Provider;
+- Generation execution;
+- Queue;
+- DAG;
+- Worker;
+- Retry;
+- Recovery;
+- Compute Router;
+- GPU scheduling.
+
+V4 does not own:
+
+Project
+Series
+Episode
+Script
+Character
+Asset identity
+approval state
+publication state
+
+V4 executes work.
+
+V5 owns production facts.
+
+---
+
+# 13. V3 Render Ownership
+
+V3 Render Core owns deterministic audiovisual composition and render execution.
+
+Examples:
+
+- executable render representation;
+- composition;
+- tracks;
+- subtitles;
+- transitions;
+- virtual camera;
+- audio composition;
+- preview render;
+- final render;
+- encoding.
+
+V5 Creative Shot Specification is not the same thing as a V3 render node.
+
+Expected relationship:
+
+V5 Creative Shot Specification
+↓ stable contract
+V3 Executable Render Representation
+
+Do not create two authoritative Shot domains.
+
+---
+
+# 14. Provider Rule
 
 External AI providers are replaceable adapters.
 
-Current initial text provider may be DeepSeek, but domain contracts must remain provider-neutral.
-
 Providers may generate candidates.
 
-Providers do not own:
+Providers do NOT own:
 
-- domain state;
-- project lifecycle;
-- Series lifecycle;
-- Episode lifecycle;
-- Script lifecycle;
+- project identity;
+- series identity;
+- episode identity;
+- character identity;
+- Script identity;
+- Storyboard identity;
+- Asset identity;
+- lifecycle state;
 - approvals;
 - rights;
-- identities;
-- asset identities;
-- asset versions;
-- publication state;
-- Canonical Project identity.
+- publication state.
 
-All provider output must pass local schema validation before it becomes usable application data.
+Provider output must pass local validation
+before it becomes usable application/domain input.
 
-Human confirmation gates remain under application/domain control.
-
-Provider-specific configuration must remain inside provider/configuration boundaries.
-
-Do not expose provider implementation details in Creator UI.
+Provider-specific implementation must remain behind accepted boundaries.
 
 ---
 
-## DeepSeek Rule
+# 15. DeepSeek Rule
 
-DeepSeek may be used as the initial AI Director and Script Studio text intelligence provider.
+DeepSeek is currently an accepted initial text intelligence provider.
 
-The approved call path is:
+Approved path:
 
 Creator/Application
 → capability service
@@ -322,220 +550,605 @@ Creator/Application
 → DeepSeek Adapter
 → DeepSeek API
 
-Never implement:
+Never:
 
 Browser
 → DeepSeek API
 
 Never expose or commit the DeepSeek API key.
 
-Do not create a second DeepSeek/provider stack if an accepted V4 provider boundary already exists.
+Never create a second DeepSeek/provider stack
+if an accepted V4 TextGenerationPort already exists.
+
+DeepSeek may generate:
+
+candidate semantic content.
+
+The local system must create authoritative structural Refs such as:
+
+scriptRef
+scriptVersionRef
+scriptSceneRef
+seriesPlanRef
+seriesPlanVersionRef
+
+where those identities belong to the platform.
 
 ---
 
-## UI Rule
+# 16. Candidate vs Domain Fact
 
-The accepted UI-R1 Enterprise Dark Cinematic Creator UI is the stable visual baseline.
-
-UI may evolve when required by real capability integration.
-
-Allowed reasons for UI changes include:
-
-- new real capability interaction;
-- workflow efficiency;
-- real user feedback;
-- browser usability issues;
-- data presentation required by accepted domain changes.
-
-Do not perform unrelated visual redesign.
-
-Do not repeatedly redesign:
-
-- global navigation;
-- visual language;
-- product identity;
-- layout architecture;
-
-unless explicitly authorized by the Project Lead.
-
-UI refinement should follow capability development rather than replace it.
-
-There must be ONE CREATOR UI.
-
-Creator UI changes must modify the actual Creator Server runtime UI. Do not create or preserve a parallel static product shell as a normal product entry.
-
-Final UI evidence must use the Creator HTTP Runtime. A `file://` page may be used only for temporary local inspection and is never final Browser, Live, Integration, or visual acceptance evidence.
-
-The UI Shell may project accepted facts and presentation state, but it must not fabricate future Domain facts, identifiers, versions, lineage, permissions, jobs, or production status.
-
-Capabilities already accepted in M1, M2, M3, M3-H, and Story Projection remain real capabilities when presented in a new shell. Do not replace them with mock implementations or “coming soon” placeholders.
-
----
-
-## Persistence Rule
-
-Application code must depend on repository/public boundaries.
-
-Application must not directly execute SQL.
-
-Local SQLite may be used only when explicitly defined as:
-
-LOCAL DEVELOPMENT DURABLE ADAPTER
-
-It must never be represented as:
-
-PRODUCTION DATABASE
-
-Repository contracts must allow future replacement with production persistence such as PostgreSQL without rewriting domain/application contracts.
-
-Persistence implementations must support appropriate:
-
-- transaction boundaries;
-- rollback behavior;
-- restart roundtrip;
-- repository contract tests;
-- version semantics.
-
----
-
-## Versioning Rule
-
-Production artifacts that support history must use immutable versions.
-
-Do not mutate historical versions in place.
+AI output is candidate output.
 
 The general pattern is:
 
-Object
-├─ Version 1
-├─ Version 2
-├─ Version 3
-└─ confirmed/current reference
+AI Candidate
+↓
+Local Schema Validation
+↓
+Optional controlled repair
+↓
+Human Confirmation where required
+↓
+Authoritative / confirmed domain version
 
-Manual edits should create new versions when the domain requires historical traceability.
-
-AI rewrites should create new versions.
-
-Confirmation should update a reference to an immutable version rather than overwrite previous content.
-
----
-
-## Human Confirmation Rule
-
-AI output is candidate output until explicitly confirmed when confirmation is required by the current production stage.
-
-Do not interpret:
+Never interpret:
 
 AI generation success
 
 as:
 
-human approval.
+human confirmation.
 
-Do not interpret:
+Never interpret:
 
-schema validation
+Schema PASS
 
 as:
 
 creative approval.
 
-Do not interpret:
+Never interpret:
 
-technical validation
+technical PASS
 
 as:
 
-rights approval or publication approval.
+rights approval.
 
-When the milestone defines a Human Confirmation Gate, downstream production may consume only the confirmed version.
+Never interpret:
 
----
+consistency PASS
 
-## Integration Gate
+as:
 
-Every formally completed capability must answer:
-
-### Upstream
-
-What authoritative object does this capability consume?
-
-### Input
-
-What stable input contract does it accept?
-
-### Output
-
-What stable output contract does it produce?
-
-### Downstream
-
-Which capability consumes the output directly?
-
-### Lineage
-
-Which Ref / Version values preserve provenance?
-
-### Traceability
-
-Can the eventual final work trace back to this output and its upstream version?
-
-If any of these cannot be demonstrated, INTEGRATION PASS must not be reported.
+publication approval.
 
 ---
 
-## Scope Control
+# 17. Versioning Rule
 
-Do not expand scope because another capability appears useful.
+Production artifacts requiring history must use immutable versions.
+
+Pattern:
+
+Object
+├─ Version 1
+├─ Version 2
+├─ Version 3
+└─ current / confirmed reference
+
+Manual edits create new versions when traceability is required.
+
+AI rewrites create new versions.
+
+Historical versions are not overwritten.
+
+Confirmation updates a reference to an immutable version.
+
+Apply this pattern to domains such as:
+
+- SeriesPlanVersion;
+- SeriesBibleVersion;
+- ScriptVersion;
+- StoryboardVersion;
+- ShotVersion;
+- AssetVersion;
+- TimelineVersion;
+- MasterVersion.
+
+---
+
+# 18. Validation Staleness
+
+Validation is bound to the exact versions it validated.
+
+Example:
+
+ConsistencyValidation
+=
+ScriptVersion
++
+SeriesBibleVersion
++
+CharacterStateRefs
+
+If any authoritative input changes:
+
+old validation becomes:
+
+STALE
+
+A stale validation must not authorize downstream readiness.
+
+---
+
+# 19. UI Architecture Authority
+
+UI implementation MUST follow:
+
+AI_CINEMATIC_STUDIO_UI_MASTER_PLAN.md
+
+The Enterprise Cinematic UI baseline is accepted.
+
+Do not redesign the entire product during ordinary capability work.
+
+Future milestones should activate existing UI architecture,
+not invent new global structure.
+
+---
+
+# 20. One Creator UI Rule
+
+There is ONE Creator product UI.
+
+Do not create:
+
+Legacy UI
++
+New UI
+
+as two parallel products.
+
+All UI changes must modify the actual Creator runtime UI.
+
+The accepted Creator runtime is served through the Creator Server.
+
+Final UI evidence must use:
+
+HTTP Runtime
+
+for example:
+
+http://127.0.0.1:8765/
+
+file:// may be used only for temporary local debugging.
+
+file:// is NOT acceptable final Browser / Visual evidence.
+
+---
+
+# 21. Global UI Navigation Freeze
+
+Global navigation is:
+
+首页
+AI导演
+项目
+资产库
+创作中心
+作品
+
+Do not add:
+
+Series
+Episode
+Script
+Storyboard
+Timeline
+Release
+
+as new global top-level navigation.
+
+Those capabilities belong inside Project Workspace.
+
+---
+
+# 22. Project Workspace IA Freeze
+
+Project Workspace is organized by production lifecycle.
+
+Top-level sections:
+
+概览
+
+策划
+
+内容
+
+制作
+
+后期
+
+交付
+
+Detailed structure:
+
+策划
+- AI导演
+- 系列规划
+- IP圣经
+- 角色
+- 世界与连续性
+
+内容
+- 分集
+- 故事
+- 剧本
+- 一致性
+
+制作
+- 分镜
+- 镜头
+- 场景
+- 项目资产
+- 生成任务
+
+后期
+- 时间线
+- 预览
+- 质检
+- 审批
+
+交付
+- Master
+- 导出
+- 系列管理
+- 发布
+- 数据
+
+Future milestones activate these areas.
+
+Do not redesign this IA without Project Lead authorization.
+
+---
+
+# 23. UI Shell vs Real Capability
+
+Future capability UI Shells may exist before backend/domain capability.
+
+But UI must not fabricate facts.
+
+Allowed:
+
+- Empty State;
+- Capability State;
+- Editor Shell;
+- disabled action;
+- context explanation.
+
+Forbidden:
+
+- fake Project;
+- fake Bible;
+- fake CharacterState;
+- fake Storyboard;
+- fake Shot;
+- fake Asset;
+- fake Timeline;
+- fake Master;
+- fake analytics;
+- fake PASS status.
+
+Already accepted capabilities must remain REAL.
+
+Current real capabilities include:
+
+- AI Director;
+- Series / Episode;
+- Story Projection;
+- Script Studio.
+
+Never downgrade an accepted capability to:
+
+“即将上线”.
+
+---
+
+# 24. Chinese-First UI Rule
+
+User-facing UI is Chinese-first.
+
+Allowed exceptions include:
+
+AI Cinematic Studio
+WANLIGHT
+and necessary industry abbreviations such as:
+AI / QC / BGM / SFX / API
+
+Do not expose ordinary users to:
+
+schema names
+repository
+adapter
+port
+raw Ref
+provider exception names
+stack traces
+
+Engineering details belong in advanced diagnostics / Inspector only.
+
+---
+
+# 25. Persistence Rule
+
+Application depends on public repository / service boundaries.
+
+Application must not execute SQL directly.
+
+Local SQLite is:
+
+LOCAL DEVELOPMENT DURABLE ADAPTER
+
+It is not:
+
+PRODUCTION DATABASE
+
+Repository contracts must allow future production persistence
+such as PostgreSQL without rewriting domain/application contracts.
+
+Persistence implementations must support where relevant:
+
+- transactions;
+- rollback;
+- restart roundtrip;
+- repository contract tests;
+- version semantics;
+- integrity constraints.
+
+---
+
+# 26. Deletion / Lifecycle Safety
+
+Deletion must preserve production lineage.
+
+A front-end visual removal is not deletion.
+
+Deletion must pass through the authoritative application/V5 boundary.
+
+If an object already has protected downstream production facts,
+ordinary destructive deletion should be blocked or follow
+an explicitly accepted lifecycle policy.
+
+Examples:
+
+unproduced test object
+→ deletable where contract permits
+
+object with ScriptVersion / Assets / Master
+→ protect, archive, retire, or require explicit policy
+
+Never create orphan production facts.
+
+---
+
+# 27. Human Confirmation
+
+Human confirmation gates remain separate.
+
+Examples:
+
+Creative Confirmation
+Script Confirmation
+Consistency
+Rights
+Technical QC
+Final Approval
+Publication Eligibility
+
+Do not collapse all semantics into:
+
+approved = true
+
+---
+
+# 28. Integration Gate
+
+Every formally completed capability must report:
+
+UPSTREAM CONNECTION
+
+INPUT CONTRACT
+
+OUTPUT CONTRACT
+
+DOWNSTREAM CONNECTION
+
+REF / VERSION LINEAGE
+
+TRACEABILITY
+
+If any is missing:
+
+INTEGRATION PASS must not be reported.
+
+---
+
+# 29. Production Spine Integrity Gate
+
+Every milestone must prove that its real implementation
+connects to the current accepted Production Spine.
+
+Fixtures may support tests.
+
+Fixtures alone are insufficient for final acceptance.
+
+Where real upstream accepted data exists,
+the milestone must perform a real integration smoke using it.
+
+---
+
+# 30. Scope Control
+
+Do not expand scope simply because another feature looks useful.
 
 Do not implement future milestones early.
 
-Do not create additional governance documents unless explicitly requested.
+Do not create unnecessary governance documents.
 
-Do not create authorization/review/acceptance Markdown automatically.
+Do not turn implementation into an endless audit/document loop.
 
-Do not convert every implementation step into a governance exercise.
-
-Use the repository code, tests, AGENTS.md, CURRENT_MILESTONE.md, accepted commits, and current Project Lead instructions as the execution authority.
-
-If the task can be completed safely within the accepted milestone, implement it.
-
-If a genuine architecture decision is required, stop and report only the blocking decision.
+Use targeted design/audit only when required to resolve
+a real architecture or integration question.
 
 ---
 
-## Audit Rule
+# 31. Audit Rule
 
-Targeted asset/architecture audits are appropriate before major domain-boundary milestones when existing repository assets may materially affect implementation.
+Targeted repository audits are appropriate before major boundary work.
 
-Do not perform large repository audits for ordinary small feature changes.
+Typical audit-worthy areas include:
 
-Typical audit-worthy milestones include:
-
-- Series / Episode domain introduction;
-- IP Bible / Character Intelligence;
+- Project;
+- Series Planning;
+- IP Bible / Character;
 - Asset ownership;
-- V3 Render integration;
-- V4 orchestration.
+- V3 integration;
+- V4 orchestration;
+- enterprise boundaries.
 
-An audit must lead to implementation decisions and must not become an endless audit loop.
+An audit must lead directly to an implementation decision.
+
+It must not become a substitute for implementation.
 
 ---
 
-## Git Hard Gate
+# 32. Test Rule
 
-A feature is NOT complete until all required gates are true:
+Never delete or weaken existing tests merely to obtain PASS.
+
+Accepted previous milestone behavior must remain passing
+unless an explicitly accepted contract change requires a legitimate update.
+
+Testing should cover where applicable:
+
+- domain contracts;
+- public boundary contracts;
+- integration;
+- Ref / Version lineage;
+- persistence;
+- rollback / atomicity;
+- failure handling;
+- browser/API behavior;
+- provider boundaries;
+- security;
+- downstream bridges.
+
+A working UI alone is insufficient.
+
+Unit tests alone are insufficient.
+
+---
+
+# 33. Browser / Live Gate
+
+When browser behavior is part of a milestone,
+validate with a real browser through the real Creator HTTP Runtime.
+
+Preferred accepted methods include:
+
+- normal Chrome control;
+- Chrome Headless + DevTools CDP when the normal control channel is unavailable.
+
+Final Browser Gate must NOT use:
+
+- file://;
+- jsdom-only evidence;
+- static HTML parsing;
+- mock browser results.
+
+Where practical verify:
+
+Console errors = 0
+
+Page errors = 0
+
+Unexpected HTTP errors = 0
+
+Horizontal overflow = 0
+
+Broken UI = 0
+
+Do not fabricate screenshots.
+
+Do not reuse historical screenshots as new evidence.
+
+---
+
+# 34. Runtime Identity Gate
+
+For major runtime validation, report:
+
+RUNTIME PORT
+
+RUNTIME PID where available
+
+RUNTIME WORKSPACE
+
+RUNTIME BRANCH
+
+RUNTIME HEAD SHA
+
+STATIC ROOT
+
+The team must be able to identify exactly which code is serving:
+
+http://127.0.0.1:8765/
+
+---
+
+# 35. Canonical Workspace Rule
+
+Default canonical development and runtime workspace:
+
+D:\Codex使用\AI CINEMATIC STUDIO
+
+After Canonical Workspace Promotion is complete,
+normal serial milestones M4–M19 should use this workspace.
+
+Do NOT create a new worktree for every ordinary milestone.
+
+Temporary worktrees are exceptions for:
+
+- emergency hotfix;
+- true parallel development;
+- high-risk isolated experiments.
+
+A temporary worktree must eventually converge back
+to the canonical accepted Git history.
+
+---
+
+# 36. Git Hard Gate
+
+A feature / technical checkpoint is not complete until required gates are true.
+
+Typical hard gates:
 
 IMPLEMENTATION PASS
 
 INTEGRATION PASS
 
+PRODUCTION SPINE PASS
+
 REGRESSION TESTS PASS
 
-BROWSER / LIVE SMOKE PASS
+BROWSER / LIVE PASS
 
 PERSISTENCE PASS
-when persistence is part of the milestone
+when applicable
+
+ARCHITECTURE PASS
 
 SECRET SCAN PASS
 
@@ -547,18 +1160,20 @@ GITHUB PUSH PASS
 
 REMOTE SHA == LOCAL SHA
 
-Codex must perform commit and push.
+GIT STATUS CLEAN
+
+Codex performs commit and push.
 
 Do not ask the user to manually push GitHub.
 
-After every formally completed capability:
+After a formal checkpoint:
 
 1. create the tested commit;
-2. push the branch to GitHub;
-3. fetch the remote branch;
-4. read the local commit SHA;
-5. read the remote branch SHA;
-6. verify they are identical.
+2. push to GitHub;
+3. fetch remote;
+4. read local SHA;
+5. read remote SHA;
+6. verify equality.
 
 If:
 
@@ -566,22 +1181,21 @@ LOCAL SHA != REMOTE SHA
 
 then:
 
-FEATURE NOT COMPLETE
+CHECKPOINT NOT COMPLETE
 
 If GitHub is temporarily unavailable:
 
 GITHUB SYNC HOLD
-FEATURE NOT COMPLETE
 
-Preserve the tested local commit and retry GitHub synchronization later.
+Preserve the tested local commit.
 
-Do not rewrite correct code because of network connectivity problems.
+Do not rewrite correct code because of network connectivity.
 
-Never use force push unless explicitly authorized by the Project Lead.
+Never force push unless Project Lead explicitly authorizes it.
 
 ---
 
-## Secret Policy
+# 37. Secret Policy
 
 Never commit:
 
@@ -591,151 +1205,178 @@ Never commit:
 - passwords;
 - access tokens;
 - private keys;
-- service credentials;
-- sensitive provider responses;
-- raw secret-bearing debug logs.
+- provider credentials;
+- secret-bearing logs;
+- sensitive raw provider responses.
 
-Always run a secret scan before GitHub push.
+Frontend code must never contain Provider Secret.
 
-Frontend/browser code must never contain provider secrets.
-
-Provider errors shown to users must not expose:
-
-- secret values;
-- Authorization data;
-- raw provider response bodies;
-- stack traces;
-- internal credentials.
+Provider errors shown to users must not reveal secret information.
 
 ---
 
-## Browser / Live Gate
+# 38. Clean Workspace Rule
 
-When the milestone contains real browser behavior, validate it in a real browser.
+Before major milestone implementation:
 
-Where practical verify:
+- inspect current branch;
+- inspect HEAD;
+- inspect Git status;
+- compare against accepted base.
 
-- Console errors = 0
-- Page errors = 0
-- unexpected HTTP errors = 0
-- horizontal overflow = 0
-- broken UI = 0
+Do not allow unrelated historical files
+to become implicit runtime dependencies.
 
-Do not fabricate screenshots.
+Do not automatically delete user files.
 
-Do not reuse old screenshots as evidence for new implementation.
-
-If a specific browser-control runtime fails but the product itself is not failing, another existing local Chrome / headless / DevTools method may be used if it does not introduce unnecessary dependencies.
+Preserve important data before any destructive workspace operation.
 
 ---
 
-## Test Rule
+# 39. Current Execution Authority
 
-Do not delete or weaken existing tests to obtain PASS.
+CURRENT_MILESTONE.md defines the active execution scope.
 
-All accepted previous milestone tests must remain passing unless an explicitly approved contract change requires a legitimate update.
+Before implementation:
 
-New tests should cover:
-
-- domain contracts;
-- integration;
-- version lineage;
-- persistence boundaries;
-- rollback/failure behavior;
-- browser/API behavior;
-- security boundaries;
-- downstream bridge contracts.
-
-A locally working UI alone is not sufficient.
-
-A passing unit test suite alone is not sufficient.
-
----
-
-## Clean Worktree Rule
-
-For major new milestones, prefer starting from the accepted remote commit in a clean branch/worktree.
-
-Do not let unrelated historical untracked files become implicit runtime dependencies.
-
-Only add files relevant to the current milestone.
-
-Do not automatically clean or delete unrelated user files.
-
-After Canonical Workspace Promotion is accepted, the canonical workspace is the default workspace for normal serial milestone development and runtime.
-
-Temporary worktrees are exceptions for emergency hotfixes, true parallel development, or high-risk isolated experiments. Do not create a new worktree for every normal serial milestone.
-
----
-
-## Current Milestone Authority
-
-The current milestone is defined by:
-
-CURRENT_MILESTONE.md
-
-Before doing implementation work:
-
-1. read `AI_CINEMATIC_STUDIO_SYSTEM_MASTER_PLAN.md`;
-2. read AGENTS.md;
-3. read `AI_CINEMATIC_STUDIO_UI_MASTER_PLAN.md` when the task affects Creator UI;
+1. read System Master Plan;
+2. read UI Master Plan;
+3. read AGENTS.md;
 4. read CURRENT_MILESTONE.md;
-5. inspect current branch and HEAD;
-6. inspect Git status;
-7. compare repository state against the accepted base;
-8. continue only the explicitly authorized current execution task or milestone.
+5. inspect canonical workspace;
+6. inspect branch / HEAD;
+7. inspect Git status;
+8. verify accepted base;
+9. execute only authorized milestones.
 
-If AGENTS.md and CURRENT_MILESTONE.md conflict:
+If the files conflict:
 
-STOP and report the conflict.
+STOP.
 
-Do not guess which milestone should be active.
-
----
-
-## Milestone Transition Rule
-
-When the CURRENT milestone satisfies every required gate:
-
-Update CURRENT_MILESTONE.md status to:
-
-FEATURE ACCEPTED CANDIDATE
-AWAITING PROJECT LEAD ACCEPTANCE
-
-Then STOP.
-
-Do not mark the next milestone CURRENT.
-
-Do not begin the next milestone automatically.
-
-The Project Lead must explicitly accept the milestone and authorize the transition.
+Do not infer intent.
 
 ---
 
-## Stop Conditions
+# 40. Execution Modes
 
-Stop implementation and report the exact blocker if any of the following occur:
+CURRENT_MILESTONE.md may define one of two execution modes.
 
-- a new authoritative domain owner must be decided;
+## MANUAL
+
+Only the CURRENT milestone may be executed.
+
+After all gates:
+
+report candidate state
+
+then STOP.
+
+Do not enter the next milestone.
+
+## AUTO-SEQUENTIAL
+
+Automatic transition is allowed ONLY when
+CURRENT_MILESTONE.md explicitly contains:
+
+Execution Mode:
+AUTO-SEQUENTIAL
+
+and explicit:
+
+Project Lead Authorization
+
+for a defined execution wave.
+
+Example:
+
+M4 → M5 AUTO-PROGRESSION AUTHORIZED
+
+Only milestones explicitly listed in that wave
+may be automatically entered.
+
+No implicit extension is allowed.
+
+---
+
+# 41. Automatic Transition Hard Gate
+
+Under AUTO-SEQUENTIAL mode,
+Codex may enter the next authorized milestone ONLY IF:
+
+1. current milestone implementation is complete;
+2. all milestone gates PASS;
+3. real Production Spine integration PASS;
+4. Browser / Live Gate PASS when required;
+5. persistence PASS when required;
+6. architecture PASS;
+7. secret scan PASS;
+8. milestone has its own Git commit;
+9. GitHub push PASS;
+10. remote SHA == local SHA;
+11. Git status CLEAN;
+12. no Stop Condition exists;
+13. no destructive migration ambiguity exists;
+14. CURRENT_MILESTONE.md explicitly authorizes the transition.
+
+If any condition fails:
+
+STOP.
+
+Do not enter the next milestone.
+
+---
+
+# 42. Automatic Transition Does Not Equal Final Acceptance
+
+When an automatically transitioned milestone completes its gates,
+Codex may mark it:
+
+TECHNICAL GATES PASSED
+AUTO-TRANSITION CHECKPOINT COMPLETE
+
+This is not:
+
+FEATURE ACCEPTED
+
+Final acceptance remains Project Lead authority.
+
+At the end of the authorized execution wave:
+
+Codex must STOP.
+
+The next milestone outside the wave must not be entered.
+
+---
+
+# 43. Stop Conditions
+
+STOP and report the exact blocker if:
+
+- a new authoritative owner must be decided;
 - an accepted architecture contract would be violated;
-- a required credential is unavailable;
+- a required credential is unavailable for a mandatory live gate;
 - a rights/license decision is required;
-- a destructive migration requires approval;
-- an accepted production spine must change;
-- a new milestone must be entered;
+- a destructive migration is ambiguous;
+- Production Spine must change;
+- a milestone outside the authorized wave is required;
 - upstream/downstream integration cannot be defined;
-- local and remote Git history conflict unexpectedly;
-- a security risk cannot be resolved safely within current scope.
+- local/remote Git history conflicts unexpectedly;
+- Source-of-Truth documents conflict;
+- a security risk cannot be resolved safely;
+- accepted UI architecture would need major redesign;
+- data loss risk exists.
 
 Do not invent decisions to bypass these conditions.
 
 ---
 
-## Completion Report
+# 44. Milestone Completion Report
 
-Always report:
+Always report at minimum:
 
 CURRENT MILESTONE:
+
+EXECUTION MODE:
 
 BRANCH:
 
@@ -753,6 +1394,8 @@ DOWNSTREAM CONNECTION:
 
 REF / VERSION LINEAGE:
 
+PRODUCTION SPINE:
+
 INTEGRATION:
 
 PERSISTENCE:
@@ -761,6 +1404,8 @@ if applicable
 BROWSER / LIVE:
 
 TESTS:
+
+ARCHITECTURE:
 
 SECRET SCAN:
 
@@ -778,13 +1423,46 @@ GIT STATUS:
 
 REMAINING GAPS:
 
+NEXT AUTHORIZED MILESTONE:
+
 MILESTONE STATUS:
 
-Do not claim FEATURE ACCEPTED.
+Never claim final FEATURE ACCEPTED.
 
-Only the Project Lead may issue final FEATURE ACCEPTED status.
+Only Project Lead may issue final acceptance.
 
-Codex may report only:
+---
 
-FEATURE ACCEPTED CANDIDATE
-READY FOR PROJECT LEAD ACCEPTANCE
+# 45. Final Rule
+
+The project is governed by:
+
+Project First
+
+Production Spine First
+
+V2.3 Layer Ownership
+
+Clear Domain Authority
+
+Ref + Version + Lineage
+
+AI Generates Candidates
+
+Platform Owns Facts
+
+Human Controls Critical Gates
+
+Real Production Before Batch Scale
+
+One Creator UI
+
+One Canonical Workspace
+
+GitHub-Verified Accepted Baselines
+
+Do not optimize for the fastest isolated feature.
+
+Optimize for a connected, traceable, maintainable AI film production system.
+
+# End of AGENTS.md
