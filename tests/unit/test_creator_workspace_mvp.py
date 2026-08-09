@@ -42,52 +42,57 @@ class CreatorWorkspaceMvpTest(unittest.TestCase):
             "Frontend Skeleton V1.0",
         )
         expected_routes = [
-            "/creator/dashboard",
-            "/creator/projects",
-            "/creator/assets",
-            "/creator/creation",
-            "/creator/works",
-            "/creator/account",
+            "/creator",
             "/creator/ai-director",
-            "/creator/projects/:projectRef",
-            "/creator/projects/:projectRef/pipeline",
-            "/creator/projects/:projectRef/story",
-            "/creator/projects/:projectRef/script",
-            "/creator/projects/:projectRef/ip-bible",
-            "/creator/projects/:projectRef/character",
-            "/creator/projects/:projectRef/scene",
-            "/creator/projects/:projectRef/storyboard",
-            "/creator/projects/:projectRef/audio",
-            "/creator/projects/:projectRef/timeline",
-            "/creator/projects/:projectRef/preview",
-            "/creator/projects/:projectRef/approval",
-            "/creator/projects/:projectRef/export",
-            "/creator/projects/:projectRef/settings",
-            "/creator/creation/generation",
-            "/creator/creation/templates",
-            "/creator/creation/ip-studio",
-            "/creator/creation/memory",
-            "/creator/creation/workflow-presets",
-            "/creator/creation/analytics",
+            "/creator/projects",
+            "/creator/projects/new",
+            "/creator/assets",
+            "/creator/create",
+            "/creator/works",
+            "/creator/projects/:projectRef/overview",
+            "/creator/projects/:projectRef/planning/director",
+            "/creator/projects/:projectRef/planning/series",
+            "/creator/projects/:projectRef/planning/bible",
+            "/creator/projects/:projectRef/planning/characters",
+            "/creator/projects/:projectRef/planning/continuity",
+            "/creator/projects/:projectRef/episodes",
+            "/creator/projects/:projectRef/episodes/:episodeRef",
+            "/creator/projects/:projectRef/episodes/:episodeRef/story",
+            "/creator/projects/:projectRef/episodes/:episodeRef/script",
+            "/creator/projects/:projectRef/episodes/:episodeRef/consistency",
+            "/creator/projects/:projectRef/production/storyboard",
+            "/creator/projects/:projectRef/production/shots",
+            "/creator/projects/:projectRef/production/scenes",
+            "/creator/projects/:projectRef/production/assets",
+            "/creator/projects/:projectRef/production/jobs",
+            "/creator/projects/:projectRef/post/timeline",
+            "/creator/projects/:projectRef/post/preview",
+            "/creator/projects/:projectRef/post/qc",
+            "/creator/projects/:projectRef/post/approvals",
+            "/creator/projects/:projectRef/delivery/masters",
+            "/creator/projects/:projectRef/delivery/exports",
+            "/creator/projects/:projectRef/delivery/series",
+            "/creator/projects/:projectRef/delivery/release",
+            "/creator/projects/:projectRef/delivery/analytics",
         ]
         route_block = re.search(
             r"const canonicalRouteTemplates = Object\.freeze\(\[(.*?)\]\);",
             self.script,
             flags=re.DOTALL,
         ).group(1)
-        actual_routes = re.findall(r'"(/creator[^\"]+)"', route_block)
+        actual_routes = re.findall(r'"(/creator(?:/[^\"]*)?)"', route_block)
         self.assertEqual(actual_routes, expected_routes)
-        self.assertEqual(self.fixture["meta"]["canonicalRouteCount"], 27)
+        self.assertEqual(self.fixture["meta"]["canonicalRouteCount"], 32)
         self.assertNotIn(":id", route_block)
         self.assertIn(":projectRef", route_block)
 
     def test_shell_implements_exact_primary_navigation_order(self):
         expected_routes = [
-            '/creator/dashboard',
+            '/creator',
             '/creator/ai-director',
             '/creator/projects',
             '/creator/assets',
-            '/creator/creation',
+            '/creator/create',
             '/creator/works',
         ]
         primary_nav = re.search(
@@ -105,65 +110,60 @@ class CreatorWorkspaceMvpTest(unittest.TestCase):
 
     def test_creation_center_has_exact_six_planned_modules_and_routes(self):
         routes = (
-            "/creator/creation/generation",
-            "/creator/creation/templates",
-            "/creator/creation/ip-studio",
-            "/creator/creation/memory",
-            "/creator/creation/workflow-presets",
-            "/creator/creation/analytics",
+            "/creator/create/generation",
+            "/creator/create/templates",
+            "/creator/create/prompt-lab",
+            "/creator/create/audio",
+            "/creator/create/models",
+            "/creator/create/tools",
         )
         labels = (
-            "Generation Center",
-            "Template Library",
-            "IP Studio",
-            "AI Memory",
-            "Workflow Preset",
-            "Analytics",
+            "Generation",
+            "Templates",
+            "Prompt Lab",
+            "Audio Lab",
+            "Model Lab",
+            "Quick Tools",
         )
         self.assert_markers_in_order(self.script, routes)
         self.assert_markers_in_order(self.script, labels)
-        self.assertIn("让复杂创作变得更简单", self.script)
-        self.assertEqual(self.script.count('class="module-card"'), 1)
+        self.assertIn("探索创意能力，不越过生产门禁", self.script)
+        self.assertIn('class="creation-r1-grid"', self.script)
         self.assertIn("creationModules.map", self.script)
         self.assertIn("即将上线", self.script)
 
     def test_project_workspace_includes_script_studio_and_default_pipeline(self):
         keys = (
-            'key: "pipeline"',
+            'key: "overview"',
+            'key: "project-director"',
+            'key: "series-planning"',
+            'key: "bible"',
+            'key: "characters"',
+            'key: "continuity"',
+            'key: "episodes"',
             'key: "story"',
             'key: "script"',
-            'key: "ip-bible"',
-            'key: "character"',
-            'key: "scene"',
+            'key: "consistency"',
             'key: "storyboard"',
-            'key: "audio"',
+            'key: "shots"',
+            'key: "scenes"',
+            'key: "project-assets"',
+            'key: "jobs"',
             'key: "timeline"',
             'key: "preview"',
-            'key: "approval"',
-            'key: "export"',
-            'key: "settings"',
+            'key: "qc"',
+            'key: "approvals"',
+            'key: "masters"',
+            'key: "exports"',
+            'key: "series-delivery"',
+            'key: "release"',
+            'key: "analytics"',
         )
         self.assert_markers_in_order(self.script, keys)
-        self.assertIn("if (normalized === `/creator/projects/${projectRef}`)", self.script)
-        self.assertIn("redirect: `${projectBase}/pipeline`", self.script)
-        project_ref = self.fixture["project"]["projectRef"]
-        self.assertEqual(project_ref, "fixture-project-x2-e001")
-        self.assertEqual(
-            [stage["route"] for stage in self.fixture["pipeline"]],
-            [
-                f"/creator/projects/{project_ref}/pipeline",
-                f"/creator/projects/{project_ref}/story",
-                f"/creator/projects/{project_ref}/ip-bible",
-                f"/creator/projects/{project_ref}/character",
-                f"/creator/projects/{project_ref}/storyboard",
-                "/creator/assets",
-                f"/creator/projects/{project_ref}/audio",
-                f"/creator/projects/{project_ref}/timeline",
-                f"/creator/projects/{project_ref}/preview",
-                f"/creator/projects/{project_ref}/approval",
-                f"/creator/projects/{project_ref}/export",
-            ],
-        )
+        self.assertIn('const projectShellBase = "/creator/project-shell"', self.script)
+        self.assertIn('Project Context = NULL', self.script)
+        self.assertNotIn("fixture-project-x2-e001", f"{self.index}\n{self.script}")
+        self.assertNotIn("projectRef", self.fixture["referenceContext"])
 
     def test_pipeline_has_exact_eleven_stages_and_non_orchestration_boundary(self):
         stages = self.fixture["pipeline"]
@@ -235,7 +235,7 @@ class CreatorWorkspaceMvpTest(unittest.TestCase):
     def test_fixture_keys_are_explicitly_non_domain_keys(self):
         keys = [
             self.fixture["workspace"]["localKey"],
-            self.fixture["project"]["localKey"],
+            self.fixture["referenceContext"]["localKey"],
             self.fixture["character"]["localKey"],
             self.fixture["preview"]["localKey"],
             *[stage["localKey"] for stage in self.fixture["pipeline"]],
@@ -243,7 +243,7 @@ class CreatorWorkspaceMvpTest(unittest.TestCase):
             *[shot["localKey"] for shot in self.fixture["shots"]],
         ]
         self.assertTrue(all(key.startswith("fixture-") for key in keys))
-        self.assertIn('localKey: `local-project-${state.localDraftCounter}`', self.script)
+        self.assertNotIn('localKey: `local-project-${state.localDraftCounter}`', self.script)
 
     def test_episode_fixture_has_six_contiguous_shots_and_45_seconds(self):
         shots = self.fixture["shots"]
@@ -308,34 +308,21 @@ class CreatorWorkspaceMvpTest(unittest.TestCase):
         self.assertIn('id="candidate-video"', self.script)
 
     def test_export_page_and_actions_are_disabled(self):
-        self.assertIn(
-            '{ key: "export", label: "导出", english: "Export", status: "fixture" }',
-            self.script,
-        )
-        self.assertIn('eyebrow: "项目工作室 · 交付"', self.script)
-        self.assertIn('data-capability="export" disabled', self.script)
-        self.assertIn("导出不可用", self.script)
-        self.assertIn("当前不会生成文件、下载内容或执行发布", self.script)
-        self.assertIn("EXPORT ENGINE NOT IMPLEMENTED", self.script)
+        self.assertIn('key: "exports", label: "导出"', self.script)
+        self.assertIn('type: "export-shell", status: "disabled"', self.script)
+        self.assertIn('"export-shell": ["导出", "未来从已接受 Master 建立交付产物。"', self.script)
+        self.assertIn('route.status === "disabled"', self.script)
+        self.assertNotIn("download=", self.index)
 
     def test_sticky_bar_is_the_only_page_level_primary_action(self):
         self.assertIn('<footer class="sticky-action-bar"', self.index)
-        self.assertIn(
-            '<button class="button button-secondary compact" type="button" data-action="toggle-preview"',
-            self.script,
-        )
-        self.assertIn(
-            '<button class="button button-secondary export-button" type="button" data-capability="export" disabled>',
-            self.script,
-        )
         self.assertIn('function renderStickyBar(route)', self.script)
         whitelist = self.script.split("function shouldRenderStickyBar(route)", 1)[1].split(
             "function renderStickyBar(route)", 1
         )[0]
-        for route_type in ("dashboard", "ai-director", "pipeline", "storyboard", "preview", "export"):
+        for route_type in ("dashboard", "ai-director", "episode-project", "script-studio"):
             self.assertIn(f'"{route_type}"', whitelist)
-        self.assertIn('route.key === "approval"', whitelist)
-        for route_type in ("projects", "assets", "creation", "creation-preview", "works", "character"):
+        for route_type in ("projects", "assets", "creation", "creation-preview", "works", "project-overview"):
             self.assertNotIn(f'"{route_type}"', whitelist)
         self.assertIn('stickyActionBar.hidden = !visible', self.script)
         self.assertIn('classList.toggle("no-sticky-bar", !visible)', self.script)
@@ -416,14 +403,13 @@ class CreatorWorkspaceMvpTest(unittest.TestCase):
         ):
             self.assertIn(token, self.styles)
         for marker in (
-            "v2-hero",
-            "从一个想法，创造完整影片",
-            "project-cinema-card",
-            "studio-flow",
-            "candidate-preview-ribbon",
-            "候选预览",
-            "asset-category-strip",
-            "生成记录",
+            "enterprise-hero",
+            "把创意推进为可确认的制作事实",
+            "project-context-bar",
+            "enterprise-shell-page",
+            "workflow-action-bar",
+            "asset-r1-layout",
+            "Project Context = NULL",
         ):
             self.assertIn(marker, self.script)
         self.assertEqual(
@@ -431,7 +417,7 @@ class CreatorWorkspaceMvpTest(unittest.TestCase):
             "ACS-CREATOR-UI-V2-IMPLEMENTATION-001",
         )
         self.assertEqual(len(self.fixture["pipeline"]), 11)
-        self.assertEqual(self.fixture["meta"]["canonicalRouteCount"], 27)
+        self.assertEqual(self.fixture["meta"]["canonicalRouteCount"], 32)
         self.assertFalse(self.fixture["meta"]["domainFact"])
 
     def test_v2_presentation_metadata_is_explicit(self):
@@ -462,11 +448,11 @@ class CreatorWorkspaceMvpTest(unittest.TestCase):
             "function renderProjects", 1
         )[0]
         for marker in (
-            "v2-hero",
-            "从一个想法，创造完整影片",
-            "一站式影视创作工作台",
-            "project-cinema-card",
-            "creation-journey",
+            "enterprise-hero",
+            "PRODUCTION COMMAND CENTER",
+            "command-metrics",
+            "最近分集",
+            "真实存在的生产记录",
         ):
             self.assertIn(marker, dashboard_block)
         self.assertNotIn("统计仪表盘", dashboard_block)
@@ -483,7 +469,7 @@ class CreatorWorkspaceMvpTest(unittest.TestCase):
 
     def test_v2_ai_director_uses_three_column_studio_contract(self):
         director_block = self.script.split("function renderAiDirector()", 1)[1].split(
-            "function renderProjectDraftHandoff", 1
+            "function findPersistedEpisode", 1
         )[0]
         for marker in (
             "director-studio-grid",
@@ -558,13 +544,13 @@ class CreatorWorkspaceMvpTest(unittest.TestCase):
 
     def test_ai_director_route_is_a_fixture_renderer_not_a_placeholder(self):
         self.assertIn(
-            '{ key: "ai-director", path: "/creator/ai-director", label: "AI导演", english: "AI Director", status: "fixture", featureStatus: "development" }',
+            '{ key: "ai-director", path: "/creator/ai-director", label: "AI导演", english: "AI Director", status: "available" }',
             self.script,
         )
         self.assertIn('type: "ai-director"', self.script)
         self.assertIn('"ai-director": renderAiDirector', self.script)
         self.assertIn('function renderAiDirector()', self.script)
-        self.assertIn('aria-label="AI导演，开发中"', self.index)
+        self.assertIn('aria-label="AI导演"', self.index)
 
     def test_ai_director_creative_brief_has_all_local_fixture_fields(self):
         defaults = self.fixture["aiDirector"]["briefDefaults"]
@@ -647,7 +633,7 @@ class CreatorWorkspaceMvpTest(unittest.TestCase):
 
     def test_ai_director_polish_has_exact_chinese_brief_labels(self):
         director_block = self.script.split("function renderAiDirector()", 1)[1].split(
-            "function renderProjectDraftHandoff", 1
+            "function findPersistedEpisode", 1
         )[0]
         for label in (
             "主题",
@@ -684,10 +670,7 @@ class CreatorWorkspaceMvpTest(unittest.TestCase):
                     "function renderAiDirector", 1
                 )[0],
                 self.script.split("function renderAiDirector()", 1)[1].split(
-                    "function renderProjectDraftHandoff", 1
-                )[0],
-                self.script.split("function renderProjectDraftHandoff", 1)[1].split(
-                    "function renderCharacter", 1
+                    "function findPersistedEpisode", 1
                 )[0],
             )
         )
@@ -743,7 +726,7 @@ class CreatorWorkspaceMvpTest(unittest.TestCase):
         body_before_fixture = self.index.split(
             '<script type="application/json" id="creator-fixture">', 1
         )[0]
-        self.assertEqual(body_before_fixture.count("<strong>演示版本</strong>"), 1)
+        self.assertEqual(body_before_fixture.count("<strong>Internal Content Lab</strong>"), 1)
         self.assertEqual(body_before_fixture.count('class="global-demo-status fixture-banner"'), 1)
         self.assertNotIn('class="scope-card"', body_before_fixture)
         self.assertIn('class="sr-only page-fixture-contract">FIXTURE ONLY', self.script)
@@ -754,22 +737,22 @@ class CreatorWorkspaceMvpTest(unittest.TestCase):
         for marker in (
             "dashboard: renderDashboard",
             '"ai-director": renderAiDirector',
-            "pipeline: renderPipeline",
-            "assets: renderAssets",
-            "storyboard: renderStoryboard",
-            "preview: renderPreview",
-            "creation: renderCreationCenter",
-            "works: renderWorks",
+            "assets: renderAssetsR1",
+            "creation: renderCreationCenterR1",
+            "works: renderWorksR1",
+            '"project-overview": () => renderEnterpriseShellPage(resolved)',
+            '"storyboard-shell": () => renderEnterpriseShellPage(resolved)',
+            '"preview-shell": () => renderEnterpriseShellPage(resolved)',
         ):
             self.assertIn(marker, renderer_block)
         for route in (
-            "/creator/dashboard",
+            "/creator",
             "/creator/ai-director",
-            "/creator/projects/:projectRef/pipeline",
+            "/creator/projects/:projectRef/overview",
             "/creator/assets",
-            "/creator/projects/:projectRef/storyboard",
-            "/creator/projects/:projectRef/preview",
-            "/creator/creation",
+            "/creator/projects/:projectRef/production/storyboard",
+            "/creator/projects/:projectRef/post/preview",
+            "/creator/create",
             "/creator/works",
         ):
             self.assertIn(route, self.script)
@@ -786,7 +769,7 @@ class CreatorWorkspaceMvpTest(unittest.TestCase):
             '.inspector.is-open',
             'transform: translateX(105%)',
             'inspectorOpen: false',
-            'state.inspectorOpen = !compactInspectorQuery.matches && resolved.context === "project"',
+            'state.inspectorOpen = !compactInspectorQuery.matches && ["project-shell", "episode"].includes(resolved.context)',
             '.workbench.has-context-nav.inspector-closed',
         ):
             self.assertIn(marker, f"{self.index}\n{self.script}\n{self.styles}")
@@ -794,7 +777,7 @@ class CreatorWorkspaceMvpTest(unittest.TestCase):
 
     def test_v21_product_copy_preserves_fixture_and_export_boundaries(self):
         for marker in (
-            "晚灯 · 第 1 集",
+            "真实创作记录",
             "统一管理角色、场景、图片、视频和声音资产。",
             "让复杂创作变得更简单",
             "候选预览",
@@ -981,7 +964,8 @@ class CreatorWorkspaceMvpTest(unittest.TestCase):
             r'<nav class="primary-nav".*?</nav>', self.index, flags=re.DOTALL
         ).group(0)
         self.assertEqual(primary_nav.count('aria-label='), 7)
-        self.assertIn('aria-label="重置当前体验"', self.index)
+        self.assertIn('aria-label="项目创建步骤"', self.index)
+        self.assertIn('aria-label="版本、任务与活动"', self.index)
 
     def test_loading_and_error_states_do_not_claim_backend_progress(self):
         self.assertIn("function renderLoadingState(label)", self.script)
@@ -993,7 +977,7 @@ class CreatorWorkspaceMvpTest(unittest.TestCase):
         self.assertNotIn("progressPercent", self.script)
 
     def test_m3_script_studio_is_project_scoped_and_uses_same_origin_application_boundary(self):
-        self.assertIn('{ key: "script", label: "剧本", english: "Script Studio", status: "available" }', self.script)
+        self.assertIn('key: "script", label: "剧本"', self.script)
         self.assertIn('if (pageKey === "script") return { ...baseRoute, type: "script-studio" };', self.script)
         for endpoint in (
             'const scriptWorkspaceEndpoint = "/creator/internal/script-studio"',
@@ -1047,12 +1031,9 @@ class CreatorWorkspaceMvpTest(unittest.TestCase):
         self.assertIn("@media (max-width: 900px)", self.styles)
 
     def test_story_route_renders_read_only_confirmed_plan_projection(self):
-        self.assertIn(
-            '{ key: "story", label: "故事", english: "Story", status: "available" }',
-            self.script,
-        )
+        self.assertIn('key: "story", label: "故事"', self.script)
         self.assertIn('if (pageKey === "story") return { ...baseRoute, type: "story-view" };', self.script)
-        self.assertIn('if (projectPage.key === "story") return { ...route, type: "story-view" };', self.script)
+        self.assertIn('type: "story-shell"', self.script)
         self.assertIn('"story-view": () => renderStoryView(resolved)', self.script)
         self.assertIn('const storyViewSchemaVersion = "creator.story-view.v1"', self.script)
         for marker in (
@@ -1111,6 +1092,108 @@ class CreatorWorkspaceMvpTest(unittest.TestCase):
             ".story-lineage-card",
         ):
             self.assertIn(selector, self.styles)
+
+    def test_ui_r1_metadata_and_accepted_base_contract(self):
+        self.assertEqual(
+            self.fixture["meta"]["uiR1TaskId"],
+            "ACS-CREATOR-UI-R1-ENTERPRISE-REBASELINE-001",
+        )
+        self.assertEqual(
+            self.fixture["meta"]["uiR1Version"],
+            "Enterprise Dark Cinematic Visual Baseline",
+        )
+        self.assertEqual(self.fixture["meta"]["canonicalRouteCount"], 32)
+
+    def test_ui_r1_dark_token_values_are_final_cascade_authority(self):
+        required = (
+            "--acs-bg: #0f1318",
+            "--acs-sidebar: #161c23",
+            "--acs-surface: #1e252d",
+            "--acs-surface-deep: #11171d",
+            "--acs-surface-hover: #252e37",
+            "--acs-surface-selected: #193b39",
+            "--acs-border: #2c353f",
+            "--acs-border-strong: #3a4652",
+            "--acs-primary: #22d1b6",
+            "--acs-accent: #e8a868",
+            "--acs-text-primary: #f4f7fa",
+            "--acs-text-secondary: #cbd5e1",
+            "--acs-text-muted: #8894a3",
+            "--acs-danger: #e55959",
+            "--acs-success: #36d399",
+            "--acs-info: #5dade2",
+            "--acs-overlay: rgba(5, 8, 12, 0.72)",
+        )
+        for token in required:
+            self.assertIn(token, self.styles)
+        self.assertGreater(self.styles.index("UI-R1 — Enterprise"), self.styles.index("Creator UI V2"))
+
+    def test_ui_r1_primary_shell_and_footer_inventory(self):
+        primary = re.search(r'<nav class="primary-nav".*?</nav>', self.index, re.DOTALL).group(0)
+        self.assertEqual(re.findall(r'data-route="([^"]+)"', primary), [
+            "/creator", "/creator/ai-director", "/creator/projects",
+            "/creator/assets", "/creator/create", "/creator/works",
+        ])
+        for marker in ("Workspace", "Settings", "Help", "工作空间", "设置", "帮助", "任务", "通知"):
+            self.assertIn(marker, f"{self.index}\n{self.script}")
+        for forbidden in ("GPU", "Queue", "Worker", "Server", "Debug"):
+            self.assertNotIn(forbidden, self.index.split('<script type="application/json"', 1)[0])
+
+    def test_ui_r1_project_navigator_freezes_six_groups_and_twenty_five_pages(self):
+        nav_block = self.script.split("const projectNavigationGroups", 1)[1].split("const projectPages", 1)[0]
+        self.assert_markers_in_order(nav_block, ('label: "概览"', 'label: "策划"', 'label: "内容"', 'label: "制作"', 'label: "后期"', 'label: "交付"'))
+        self.assertEqual(nav_block.count("type:"), 25)
+        for marker in ("项目概览", "AI导演", "系列规划", "IP圣经", "角色", "世界与连续性", "分集", "故事", "剧本", "一致性", "分镜", "镜头", "场景", "项目资产", "生成任务", "时间线", "预览", "质检", "审批", "Master", "导出", "系列管理", "发布", "数据"):
+            self.assertIn(marker, nav_block)
+
+    def test_ui_r1_context_null_shell_does_not_invent_project_identity(self):
+        self.assertNotIn("projectRef", self.fixture["referenceContext"])
+        self.assertIn('const projectShellBase = "/creator/project-shell"', self.script)
+        self.assertIn('Project Context = NULL', self.script)
+        self.assertIn('不会生成 projectRef', self.script)
+        self.assertNotIn("fixture-project-x2-e001", f"{self.index}\n{self.script}")
+        self.assertIn('data-action="wizard-submit" disabled', self.index)
+
+    def test_ui_r1_dashboard_uses_real_series_episode_state_only(self):
+        block = self.script.split("function renderDashboard()", 1)[1].split("function renderProjects", 1)[0]
+        for marker in ("state.seriesRecords", "confirmedPlanBinding", "PRODUCTION COMMAND CENTER", "最近分集"):
+            self.assertIn(marker, block)
+        for forbidden in ("fixture.project", "fixture.character", "fixture.assets", "project-cinema-card"):
+            self.assertNotIn(forbidden, block)
+
+    def test_ui_r1_new_project_wizard_is_complete_but_submit_is_gated(self):
+        for marker in ("选择项目类型", "基本信息", "制作默认值", "检查配置", "projectType", "contentType", "episodeCount", "aspectRatio", "productionPreset"):
+            self.assertIn(marker, f"{self.index}\n{self.script}")
+        self.assertIn('创建项目（尚未启用）', self.index)
+        self.assertIn('Project Context 尚未启用 · 未创建任何项目', self.script)
+        self.assertNotIn("createCanonicalProject", self.script)
+
+    def test_ui_r1_future_pages_use_structured_shells_not_generic_coming_soon(self):
+        for renderer in ("renderShellCanvas", "renderEnterpriseShellPage", "renderProjectContextBar"):
+            self.assertIn(f"function {renderer}", self.script)
+        for kind in ("summary", "detail", "table", "board", "timeline", "player", "editor"):
+            self.assertIn(f'kind === "{kind}"', self.script)
+        shell_block = self.script.split("function renderEnterpriseShellPage", 1)[1].split("function renderAssetsR1", 1)[0]
+        self.assertNotIn("即将上线", shell_block)
+
+    def test_ui_r1_story_and_script_compatibility_routes_keep_episode_lineage(self):
+        for marker in (
+            'if (pageKey === "story") return { ...baseRoute, type: "story-view" };',
+            'if (pageKey === "script") return { ...baseRoute, type: "script-studio" };',
+            "episode.confirmedPlanBinding",
+            "sourcePlanRef: binding.sourcePlanRef",
+            'href="#${escapeHtml(route.projectBase)}/script"',
+        ):
+            self.assertIn(marker, self.script)
+        self.assertNotIn("StoryRepository", self.script)
+
+    def test_ui_r1_works_and_delivery_do_not_promote_reference_candidate(self):
+        block = self.script.split("function renderWorksR1()", 1)[1].split("function renderPlaceholder", 1)[0]
+        self.assertIn("还没有正式作品", block)
+        self.assertIn("内部参考 Candidate 不会出现在作品库", block)
+        self.assertNotIn("fixture.preview", block)
+        self.assertIn('type: "master-shell", status: "planned"', self.script)
+        self.assertIn('type: "export-shell", status: "disabled"', self.script)
 
 
 if __name__ == "__main__":

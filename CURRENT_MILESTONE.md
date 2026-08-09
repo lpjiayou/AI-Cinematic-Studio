@@ -2,7 +2,7 @@
 
 ## Milestone
 
-M3 — Script Studio
+UI-R1 — AI Cinematic Studio Enterprise UI Rebaseline
 
 ## Status
 
@@ -11,15 +11,33 @@ AWAITING PROJECT LEAD ACCEPTANCE
 
 ## Accepted Base
 
-f0fd38ab22a41e00bac3e1e39e9667625b62de15
+1cc768ee9db4b52a916c94ae6af7b95b811f1cb2
 
 ## Development Branch
 
-codex/creator-capability-phase3-script-studio
+codex/creator-ui-enterprise-rebaseline-v3
+
+## Execution Boundary
+
+M1 AI Director — ACCEPTED
+
+M2 Series + Episode Project — ACCEPTED
+
+M3 Script Studio — ACCEPTED
+
+M3-H Script Candidate Robustness Hotfix — ACCEPTED
+
+Story Projection Integration — ACCEPTED
+
+UI-R1 Enterprise UI Rebaseline — FEATURE ACCEPTED CANDIDATE / AWAITING PROJECT LEAD ACCEPTANCE
+
+M4 Series IP Bible + Character Intelligence — PAUSED / NOT STARTED
+
+UI-R1 may change only Application presentation, navigation shells and UI baseline documentation. It must preserve the accepted production spine, create no authoritative Project fact and stop for Project Lead acceptance.
 
 ---
 
-## Production Spine Position
+## Accepted M3 Contract Retained During UI-R1
 
 AI Director
 → Series

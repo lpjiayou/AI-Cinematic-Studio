@@ -14,6 +14,9 @@
   const inspectorContent = document.getElementById("inspector-content");
   const inspectorFab = document.querySelector(".inspector-fab");
   const stickyActionBar = document.getElementById("sticky-action-bar");
+  const bottomDrawer = document.getElementById("bottom-drawer");
+  const bottomDrawerTitle = document.getElementById("bottom-drawer-title");
+  const bottomDrawerContent = document.getElementById("bottom-drawer-content");
   const projectDialog = document.getElementById("project-dialog");
   const projectForm = document.getElementById("project-form");
   const toast = document.getElementById("toast");
@@ -35,12 +38,10 @@
   const scriptRewriteEndpoint = `${scriptWorkspaceEndpoint}/rewrite-scene`;
   const scriptConfirmEndpoint = `${scriptWorkspaceEndpoint}/confirm`;
   const storyboardBootstrapEndpoint = `${scriptWorkspaceEndpoint}/storyboard-bootstrap`;
-  const workspaceRef = fixture.project.workspaceRef;
-  const contentProfileRef = fixture.project.contentProfileRef;
-  const projectRef = fixture.project.projectRef;
-  const projectBase = `/creator/projects/${projectRef}`;
-  const displayProjectTitle = "晚灯 · 第 1 集";
-  const defaultRoute = "/creator/dashboard";
+  const workspaceRef = fixture.workspace.workspaceRef;
+  const contentProfileRef = fixture.workspace.contentProfileRef;
+  const projectShellBase = "/creator/project-shell";
+  const defaultRoute = "/creator";
   let toastTimer;
   let dialogReturnFocus = null;
   let inspectorReturnFocus = null;
@@ -56,67 +57,101 @@
   });
 
   const primaryRoutes = Object.freeze([
-    { key: "dashboard", path: "/creator/dashboard", label: "首页", english: "Dashboard", status: "fixture" },
-    { key: "ai-director", path: "/creator/ai-director", label: "AI导演", english: "AI Director", status: "fixture", featureStatus: "development" },
-    { key: "projects", path: "/creator/projects", label: "项目", english: "Projects", status: "fixture" },
-    { key: "assets", path: "/creator/assets", label: "资产库", english: "Asset Library", status: "fixture" },
-    { key: "creation", path: "/creator/creation", label: "创作中心", english: "Creation Center", status: "fixture" },
-    { key: "works", path: "/creator/works", label: "作品", english: "Works", status: "fixture" }
+    { key: "dashboard", path: "/creator", label: "首页", english: "Dashboard", status: "available" },
+    { key: "ai-director", path: "/creator/ai-director", label: "AI导演", english: "AI Director", status: "available" },
+    { key: "projects", path: "/creator/projects", label: "项目", english: "Projects", status: "available" },
+    { key: "assets", path: "/creator/assets", label: "资产库", english: "Asset Library", status: "available" },
+    { key: "creation", path: "/creator/create", label: "创作中心", english: "Creation Center", status: "planned" },
+    { key: "works", path: "/creator/works", label: "作品", english: "Works", status: "planned" }
   ]);
 
   const creationModules = Object.freeze([
-    { key: "generation", path: "/creator/creation/generation", label: "生成中心", english: "Generation Center", version: "v0.2", description: "未来用于把文字与视觉意图整理为创作素材；当前功能即将上线。" },
-    { key: "templates", path: "/creator/creation/templates", label: "模板库", english: "Template Library", version: "TBD", description: "未来模板浏览入口；当前没有模板执行能力。" },
-    { key: "ip-studio", path: "/creator/creation/ip-studio", label: "IP 工作室", english: "IP Studio", version: "v0.3", description: "未来用于跨项目管理角色与世界观；当前功能即将上线。" },
-    { key: "memory", path: "/creator/creation/memory", label: "AI 记忆", english: "AI Memory", version: "v0.3", description: "未来用于延续已确认的创作偏好；当前不会保存或检索记忆。" },
-    { key: "workflow-presets", path: "/creator/creation/workflow-presets", label: "工作流预设", english: "Workflow Preset", version: "TBD", description: "未来用于整理重复的人工创作步骤；当前功能即将上线。" },
-    { key: "analytics", path: "/creator/creation/analytics", label: "数据分析", english: "Analytics", version: "v1.0", description: "未来证据只读视图；当前没有真实统计或商业结论。" }
+    { key: "generation", path: "/creator/create/generation", label: "图片与视频", english: "Generation", version: "M10–M12", description: "需要真实 AssetRequirement 与生成能力后才能执行。" },
+    { key: "templates", path: "/creator/create/templates", label: "模板", english: "Templates", version: "Future", description: "尚未建立可执行模板合同。" },
+    { key: "prompt-lab", path: "/creator/create/prompt-lab", label: "Prompt Lab", english: "Prompt Lab", version: "Future", description: "实验内容不会自动成为正式生产事实。" },
+    { key: "audio", path: "/creator/create/audio", label: "声音实验", english: "Audio Lab", version: "M12", description: "需要正式声音生产能力后才能执行。" },
+    { key: "models", path: "/creator/create/models", label: "模型实验", english: "Model Lab", version: "Future", description: "当前不开放模型或 Provider 配置。" },
+    { key: "tools", path: "/creator/create/tools", label: "快速工具", english: "Quick Tools", version: "Future", description: "尚未建立可进入正式项目的工具合同。" }
   ]);
 
-  const projectPages = Object.freeze([
-    { key: "pipeline", label: "生产流程", english: "Production Pipeline", status: "fixture" },
-    { key: "story", label: "故事", english: "Story", status: "available" },
-    { key: "script", label: "剧本", english: "Script Studio", status: "available" },
-    { key: "ip-bible", label: "IP 圣经", english: "IP Bible", status: "planned" },
-    { key: "character", label: "角色", english: "Character", status: "fixture" },
-    { key: "scene", label: "场景", english: "Scene", status: "planned" },
-    { key: "storyboard", label: "分镜", english: "Storyboard", status: "fixture" },
-    { key: "audio", label: "音频", english: "Audio", status: "planned" },
-    { key: "timeline", label: "时间线", english: "Timeline", status: "planned" },
-    { key: "preview", label: "预览", english: "Preview", status: "fixture" },
-    { key: "approval", label: "审批", english: "Approval", status: "disabled" },
-    { key: "export", label: "导出", english: "Export", status: "fixture" },
-    { key: "settings", label: "设置", english: "Settings", status: "planned" }
-  ].map((page) => ({ ...page, path: `${projectBase}/${page.key}` })));
+  const projectNavigationGroups = Object.freeze([
+    { label: "概览", key: "overview", items: [
+      { key: "overview", label: "项目概览", suffix: "overview", type: "project-overview", status: "planned" }
+    ] },
+    { label: "策划", key: "planning", items: [
+      { key: "project-director", label: "AI导演", suffix: "planning/director", type: "project-director", status: "planned" },
+      { key: "series-planning", label: "系列规划", suffix: "planning/series", type: "series-planning", status: "planned" },
+      { key: "bible", label: "IP圣经", suffix: "planning/bible", type: "bible-shell", status: "planned" },
+      { key: "characters", label: "角色", suffix: "planning/characters", type: "character-shell", status: "planned" },
+      { key: "continuity", label: "世界与连续性", suffix: "planning/continuity", type: "continuity-shell", status: "planned" }
+    ] },
+    { label: "内容", key: "content", items: [
+      { key: "episodes", label: "分集", suffix: "episodes", type: "episode-list", status: "planned" },
+      { key: "episode-workspace", label: "分集工作台", suffix: "episodes/current", type: "episode-workspace", status: "planned" },
+      { key: "story", label: "故事", suffix: "episodes/current/story", type: "story-shell", status: "planned" },
+      { key: "script", label: "剧本", suffix: "episodes/current/script", type: "script-shell", status: "planned" },
+      { key: "consistency", label: "一致性", suffix: "episodes/current/consistency", type: "consistency-shell", status: "planned" }
+    ] },
+    { label: "制作", key: "production", items: [
+      { key: "storyboard", label: "分镜", suffix: "production/storyboard", type: "storyboard-shell", status: "planned" },
+      { key: "shots", label: "镜头", suffix: "production/shots", type: "shot-shell", status: "planned" },
+      { key: "scenes", label: "场景", suffix: "production/scenes", type: "scene-shell", status: "planned" },
+      { key: "project-assets", label: "项目资产", suffix: "production/assets", type: "project-assets-shell", status: "planned" },
+      { key: "jobs", label: "生成任务", suffix: "production/jobs", type: "jobs-shell", status: "planned" }
+    ] },
+    { label: "后期", key: "post", items: [
+      { key: "timeline", label: "时间线", suffix: "post/timeline", type: "timeline-shell", status: "planned" },
+      { key: "preview", label: "预览", suffix: "post/preview", type: "preview-shell", status: "planned" },
+      { key: "qc", label: "质检", suffix: "post/qc", type: "qc-shell", status: "planned" },
+      { key: "approvals", label: "审批", suffix: "post/approvals", type: "approval-shell", status: "disabled" }
+    ] },
+    { label: "交付", key: "delivery", items: [
+      { key: "masters", label: "Master", suffix: "delivery/masters", type: "master-shell", status: "planned" },
+      { key: "exports", label: "导出", suffix: "delivery/exports", type: "export-shell", status: "disabled" },
+      { key: "series-delivery", label: "系列管理", suffix: "delivery/series", type: "series-delivery-shell", status: "planned" },
+      { key: "release", label: "发布", suffix: "delivery/release", type: "release-shell", status: "planned" },
+      { key: "analytics", label: "数据", suffix: "delivery/analytics", type: "analytics-shell", status: "planned" }
+    ] }
+  ]);
+  const projectPages = Object.freeze(projectNavigationGroups.flatMap((group) => group.items).map((page) => ({
+    ...page,
+    group: projectNavigationGroups.find((candidate) => candidate.items.includes(page)).label,
+    path: `${projectShellBase}/${page.suffix}`
+  })));
 
   const canonicalRouteTemplates = Object.freeze([
-    "/creator/dashboard",
-    "/creator/projects",
-    "/creator/assets",
-    "/creator/creation",
-    "/creator/works",
-    "/creator/account",
+    "/creator",
     "/creator/ai-director",
-    "/creator/projects/:projectRef",
-    "/creator/projects/:projectRef/pipeline",
-    "/creator/projects/:projectRef/story",
-    "/creator/projects/:projectRef/script",
-    "/creator/projects/:projectRef/ip-bible",
-    "/creator/projects/:projectRef/character",
-    "/creator/projects/:projectRef/scene",
-    "/creator/projects/:projectRef/storyboard",
-    "/creator/projects/:projectRef/audio",
-    "/creator/projects/:projectRef/timeline",
-    "/creator/projects/:projectRef/preview",
-    "/creator/projects/:projectRef/approval",
-    "/creator/projects/:projectRef/export",
-    "/creator/projects/:projectRef/settings",
-    "/creator/creation/generation",
-    "/creator/creation/templates",
-    "/creator/creation/ip-studio",
-    "/creator/creation/memory",
-    "/creator/creation/workflow-presets",
-    "/creator/creation/analytics"
+    "/creator/projects",
+    "/creator/projects/new",
+    "/creator/assets",
+    "/creator/create",
+    "/creator/works",
+    "/creator/projects/:projectRef/overview",
+    "/creator/projects/:projectRef/planning/director",
+    "/creator/projects/:projectRef/planning/series",
+    "/creator/projects/:projectRef/planning/bible",
+    "/creator/projects/:projectRef/planning/characters",
+    "/creator/projects/:projectRef/planning/continuity",
+    "/creator/projects/:projectRef/episodes",
+    "/creator/projects/:projectRef/episodes/:episodeRef",
+    "/creator/projects/:projectRef/episodes/:episodeRef/story",
+    "/creator/projects/:projectRef/episodes/:episodeRef/script",
+    "/creator/projects/:projectRef/episodes/:episodeRef/consistency",
+    "/creator/projects/:projectRef/production/storyboard",
+    "/creator/projects/:projectRef/production/shots",
+    "/creator/projects/:projectRef/production/scenes",
+    "/creator/projects/:projectRef/production/assets",
+    "/creator/projects/:projectRef/production/jobs",
+    "/creator/projects/:projectRef/post/timeline",
+    "/creator/projects/:projectRef/post/preview",
+    "/creator/projects/:projectRef/post/qc",
+    "/creator/projects/:projectRef/post/approvals",
+    "/creator/projects/:projectRef/delivery/masters",
+    "/creator/projects/:projectRef/delivery/exports",
+    "/creator/projects/:projectRef/delivery/series",
+    "/creator/projects/:projectRef/delivery/release",
+    "/creator/projects/:projectRef/delivery/analytics"
   ]);
 
   if (canonicalRouteTemplates.length !== fixture.meta.canonicalRouteCount) {
@@ -129,15 +164,15 @@
     assetFilter: "all",
     selectedShotKey: fixture.shots[0].localKey,
     selectedPipelineKey: (fixture.pipeline.find((stage) => stage.label === "Preview") || fixture.pipeline[1]).localKey,
-    localProjectDrafts: [],
-    localDraftCounter: 0,
+    wizardStep: 1,
+    wizardValues: { projectType: "series", title: "", contentType: "", episodeCount: "", duration: "60", aspectRatio: "9:16", platform: "", contentProfile: "", language: "中文", visualDirection: "", productionPreset: "" },
+    bottomDrawerOpen: false,
     aiDirectorPhase: "input",
     aiDirectorBrief: { ...fixture.aiDirector.briefDefaults },
     aiDirectorPlan: null,
     aiDirectorPlanVersion: 0,
     aiDirectorConfirmed: false,
     aiDirectorError: null,
-    aiDirectorProjectDraft: null,
     confirmedCreativePlan: null,
     seriesRecords: [],
     seriesDataStatus: "idle",
@@ -224,7 +259,7 @@
       state.seriesDataStatus = "error";
       state.seriesEpisodeError = "暂时无法读取系列与集数，请稍后重试。";
     }
-    if (["/creator/projects", "/creator/ai-director"].includes(state.activePath) || state.activePath.startsWith("/creator/projects/")) {
+    if (["/creator", "/creator/projects", "/creator/ai-director"].includes(state.activePath) || state.activePath.startsWith("/creator/projects/")) {
       renderRoute(state.activePath);
     }
   }
@@ -409,49 +444,33 @@
   }
 
   function renderDashboard() {
-    const project = fixture.project;
+    const seriesCount = state.seriesRecords.length;
+    const episodes = state.seriesRecords.flatMap((series) => (series.episodes || []).map((episode) => ({ series, episode })));
+    const confirmedEpisodes = episodes.filter(({ episode }) => Boolean(episode.confirmedPlanBinding));
+    const scriptEpisodes = episodes.filter(({ episode }) => Boolean(episode.scriptRef || episode.confirmedScriptVersionRef));
+    const recent = episodes.slice(0, 3);
     return `
-      <section class="v2-hero" aria-labelledby="v2-hero-title">
-        <div class="v2-hero-copy">
-          <span class="v2-overline">AI Cinematic Studio</span>
-          <h2 id="v2-hero-title">从一个想法，创造完整影片</h2>
-          <p>AI 导演、角色、镜头、画面、声音和剪辑，在一个工作台里完成。</p>
-          <div class="v2-hero-actions">
-            <a class="button button-primary" href="#/creator/ai-director">开始创作</a>
-            <a class="button button-cinema" href="#/creator/ai-director">AI导演 <span aria-hidden="true">↗</span></a>
-          </div>
-          <div class="v2-journey-line" aria-label="完整创作流程"><span>创意</span><i></i><span>故事</span><i></i><span>角色</span><i></i><span>镜头</span><i></i><span>影片</span></div>
-        </div>
-        <div class="v2-hero-visual">
-          <img src="${escapeHtml(fixture.character.referenceImage)}" alt="晚灯角色视觉">
-          <div class="v2-hero-visual-caption"><span>正在创作</span><strong>${displayProjectTitle}</strong><small>${project.durationSeconds} 秒 · 情绪短片 · 竖屏</small></div>
-        </div>
+      <section class="enterprise-hero" aria-labelledby="enterprise-hero-title">
+        <div><span class="section-kicker">PRODUCTION COMMAND CENTER</span><h2 id="enterprise-hero-title">把创意推进为可确认的制作事实</h2><p>从导演方案、系列与分集，到故事和剧本版本。这里只汇总当前工作区真实存在的生产记录。</p></div>
+        <div class="enterprise-hero-actions"><a class="button button-primary" href="#/creator/ai-director">打开 AI导演</a><a class="button button-secondary" href="#/creator/projects">查看项目中心</a></div>
       </section>
-
-      <section class="v2-section" aria-labelledby="capability-title">
-        <div class="v2-section-heading"><div><span>创作能力</span><h2 id="capability-title">一站式影视创作工作台</h2></div><p>从灵感到候选影片，始终围绕作品推进。</p></div>
-        <div class="capability-showcase">
-          <a class="capability-card capability-card-featured" href="#/creator/ai-director"><span class="capability-icon">✦</span><div><small>创意入口</small><h3>AI导演</h3><p>把创意整理为故事与制作方案</p></div><b>进入</b></a>
-          <a class="capability-card" href="#${projectBase}/pipeline"><span class="capability-icon">◫</span><div><small>核心空间</small><h3>项目工作室</h3><p>管理完整影视生产流程</p></div><b>进入</b></a>
-          <a class="capability-card" href="#/creator/assets"><span class="capability-icon">◇</span><div><small>视觉资产</small><h3>资产中心</h3><p>统一管理角色、场景、画面和声音</p></div><b>进入</b></a>
-          <a class="capability-card is-upcoming" href="#/creator/creation"><span class="capability-icon">⌁</span><div><small>即将上线</small><h3>智能生成</h3><p>未来接入图像、视频和声音生成能力</p></div><b>了解</b></a>
-        </div>
+      <section class="command-metrics" aria-label="工作区摘要">
+        <article><span>系列</span><strong>${seriesCount}</strong><small>本地开发服务记录</small></article>
+        <article><span>分集</span><strong>${episodes.length}</strong><small>已建立 Episode identity</small></article>
+        <article><span>已确认方案</span><strong>${confirmedEpisodes.length}</strong><small>Confirmed CreativePlan binding</small></article>
+        <article><span>剧本工作区</span><strong>${scriptEpisodes.length}</strong><small>无数据时保持 0</small></article>
       </section>
-
-      <section class="v2-section recent-project-section" aria-labelledby="recent-title">
-        <div class="v2-section-heading"><div><span>最近项目</span><h2 id="recent-title">继续你的创作</h2></div><a class="text-link" href="#/creator/projects">查看全部项目 →</a></div>
-        <article class="project-cinema-card">
-          <div class="project-cinema-poster"><img src="${escapeHtml(fixture.character.referenceImage)}" alt="晚灯第 1 集项目封面"><span>可预览</span></div>
-          <div class="project-cinema-copy"><span>情绪短片 · 竖屏 9:16</span><h3>${displayProjectTitle}</h3><p>${escapeHtml(project.description)}</p><div class="project-cinema-meta"><span><small>时长</small><strong>45 秒</strong></span><span><small>当前阶段</small><strong>可预览</strong></span><span><small>版本</small><strong>候选 v1</strong></span></div><a class="button button-secondary" href="#${projectBase}/pipeline">继续制作</a></div>
-          <div class="project-cinema-frames">${fixture.assets.slice(1, 4).map((asset) => `<img src="${escapeHtml(asset.src)}" alt="${escapeHtml(asset.label)}">`).join("")}</div>
+      <section class="enterprise-grid enterprise-grid-wide">
+        <article class="enterprise-panel">
+          <header><div><span class="section-kicker">ACTIVE PRODUCTIONS</span><h3>最近分集</h3></div><a class="text-link" href="#/creator/projects">全部项目</a></header>
+          <div class="enterprise-list">${state.seriesDataStatus === "loading" || state.seriesDataStatus === "idle" ? renderLoadingState("正在读取真实系列与分集") : state.seriesDataStatus === "error" ? renderErrorState("暂时无法读取制作记录", "请确认 Creator Server 正在运行。") : recent.length ? recent.map(({ series, episode }) => `<a class="enterprise-list-row" href="#/creator/projects/${encodeURIComponent(episode.episodeRef)}"><span class="row-index">E${String(episode.episodeNumber).padStart(2, "0")}</span><span><strong>${escapeHtml(episode.title)}</strong><small>${escapeHtml(series.title)} · ${episode.confirmedPlanBinding ? `导演方案 v${escapeHtml(episode.sourcePlanVersion)}` : "等待确认导演方案"}</small></span><em>进入</em></a>`).join("") : renderEmptyState({ icon: "—", title: "还没有真实分集", description: "先在 AI导演确认方案，再创建系列与分集。", action: '<a class="button button-secondary" href="#/creator/ai-director">前往 AI导演</a>' })}</div>
         </article>
+        <aside class="enterprise-panel enterprise-rail">
+          <header><div><span class="section-kicker">CAPABILITY MAP</span><h3>生产能力</h3></div></header>
+          ${[["M1","AI导演","可用"],["M2","系列与分集","可用"],["M3","故事与剧本","可用"],["M4","角色与 IP","暂停"],["M5+","制作与交付","规划中"]].map(([milestone,label,status]) => `<div class="capability-row"><span>${milestone}</span><strong>${label}</strong><em>${status}</em></div>`).join("")}
+        </aside>
       </section>
-
-      <section class="v2-section creation-journey-section" aria-labelledby="journey-title">
-        <div class="v2-section-heading"><div><span>创作流程</span><h2 id="journey-title">让每一步都看得见</h2></div><p>沿着影片生产脉络，自然进入下一阶段。</p></div>
-        <ol class="creation-journey">${["故事", "角色", "分镜", "画面", "声音", "剪辑", "作品"].map((label, index) => `<li><span>${String(index + 1).padStart(2, "0")}</span><strong>${label}</strong>${index < 6 ? '<i aria-hidden="true">→</i>' : ""}</li>`).join("")}</ol>
-      </section>
-      ${fixtureNotice()}
+      ${seriesApplicationNotice()}
     `;
   }
 
@@ -484,48 +503,20 @@
               description: "在 AI导演中确认一个创意方案，然后创建系列与第一集。",
               action: '<a class="button button-secondary" href="#/creator/ai-director">前往 AI导演</a>'
             });
-    const localDrafts = state.localProjectDrafts.length
-      ? state.localProjectDrafts.map((draft) => `
-          <article class="project-row local-draft-row">
-            <span class="project-thumbnail local-thumbnail" aria-hidden="true">草</span>
-            <div class="project-row-copy"><span class="badge badge-fixture"><i></i>临时草稿</span><h3>${escapeHtml(draft.title)}</h3><p>${escapeHtml(draft.format)} · 仅当前会话有效</p></div>
-            <button class="button button-secondary" type="button" disabled>不会保存</button>
-          </article>
-        `).join("")
-      : renderEmptyState({
-          icon: "+",
-          title: "还没有新的项目草稿",
-          description: "你可以创建一个仅在当前会话有效的临时项目草稿，它不会保存到系统。",
-          action: '<button class="button button-secondary" type="button" data-action="open-project-dialog">创建项目草稿</button>'
-        });
-
     return `
       ${renderPageHeader({
         eyebrow: "项目中心",
         title: "项目",
-        description: "管理影片项目，并从最近的创作阶段继续工作。",
-        status: "fixture",
-        meta: '<button class="button button-secondary" type="button" data-action="open-project-dialog">＋ 创建项目草稿</button>'
+        description: "以真实 Series 与 Episode 记录组织当前创作；Project Context Foundation 尚未启用。",
+        status: "available",
+        meta: '<button class="button button-primary" type="button" data-action="open-project-dialog">新建项目</button>'
       })}
-      <section class="card project-list-panel persisted-series-panel" aria-labelledby="series-projects-title">
-        <div class="list-section-heading"><div><span class="section-kicker">系列与集数</span><h3 id="series-projects-title">Creator 项目</h3></div><button class="button button-text" type="button" data-action="reload-series">刷新</button></div>
-        <p class="series-boundary-copy">系列与集数由本地开发服务保存；它们不是 Canonical Project，也不会触发生成或生产任务。</p>
-        <div class="series-project-list">${persistedSeries}</div>
+      <section class="project-center-toolbar" aria-label="项目筛选">
+        <div class="segmented-control"><button class="is-active" type="button">全部</button><button type="button" disabled>进行中</button><button type="button" disabled>已归档</button></div>
+        <span>不创建虚构 Project；当前仅显示真实 Series / Episode。</span>
       </section>
-      <section class="card project-list-panel v2-project-list">
-        <div class="list-section-heading"><div><span class="section-kicker">最近项目</span><h3>继续制作</h3></div><span>1 个项目</span></div>
-        <article class="project-row fixture-project-row">
-          <img class="project-thumbnail" src="${escapeHtml(fixture.character.referenceImage)}" alt="晚灯项目封面">
-          <div class="project-row-copy">
-            <div class="status-cluster">${statusBadge("fixture")}${governanceBadge("LOCAL REVIEW CANDIDATE", "candidate")}</div>
-            <h3>${displayProjectTitle}</h3>
-            <p>45 秒情绪短片 · ${fixture.shots.length} 个镜头 · 当前阶段：可预览</p>
-          </div>
-          <a class="button button-secondary" href="#${projectBase}/pipeline">继续制作</a>
-        </article>
-        <div class="list-section-heading local-heading"><div><span class="section-kicker">临时草稿</span><h3>当前会话</h3></div><span>${state.localProjectDrafts.length} 项</span></div>
-        <div class="local-drafts">${localDrafts}</div>
-      </section>
+      <section class="enterprise-panel project-register" aria-labelledby="series-projects-title"><header><div><span class="section-kicker">SERIES / EPISODE REGISTER</span><h3 id="series-projects-title">真实创作记录</h3></div><button class="button button-text" type="button" data-action="reload-series">刷新</button></header><div class="series-project-list">${persistedSeries}</div></section>
+      <section class="enterprise-panel project-context-gate"><span class="gate-index">PROJECT</span><div><span class="section-kicker">FOUNDATION GATE</span><h3>Project Context 尚未建立</h3><p>新建项目向导可用于检查未来配置流程，但最终提交保持禁用，不会生成 projectRef。</p></div><button class="button button-secondary" type="button" data-action="open-project-dialog">查看新建流程</button></section>
       ${seriesApplicationNotice()}
     `;
   }
@@ -596,7 +587,7 @@
             <div class="asset-card-copy">
               <div class="asset-card-top"><span class="asset-kind">${asset.kind === "reference" ? "角色设定" : "关键画面"}</span><span class="asset-user-state">${escapeHtml(asset.version)}</span></div>
               <h4>${escapeHtml(asset.label)}</h4>
-              <p>使用项目：${displayProjectTitle}</p>
+              <p>来源：内部视觉参考 · 权利待确认</p>
             </div>
           </article>
         `).join("")}
@@ -964,35 +955,6 @@
     `;
   }
 
-  function renderProjectDraftHandoff(route) {
-    const draft = route.draft;
-    return `
-      ${renderPageHeader({
-        eyebrow: "项目草稿交接",
-        title: draft.title,
-        description: "AI导演已创建一个仅在当前会话中有效的临时项目草稿。",
-        status: "fixture",
-        meta: localizedStatusBadge("仅当前会话", "neutral")
-      })}
-      ${demoNotice("该 local-* 引用仅用于当前页面导航；刷新页面或重置会话后失效，不会保存到系统。")}
-      <section class="card draft-handoff-card" data-ai-director-state="handoff">
-        <div class="draft-handoff-mark" aria-hidden="true">↗</div>
-        <div class="draft-handoff-copy">
-          <span class="section-kicker">项目草稿</span>
-          <h3>项目草稿交接已建立</h3>
-        <p>已在当前会话建立临时草稿。它不会保存到系统，也不会创建真实项目、故事、角色或制作数据。</p>
-        </div>
-        <dl class="draft-handoff-meta">
-          <div><dt>本地草稿编号</dt><dd><code>${escapeHtml(draft.projectRef)}</code></dd></div>
-          <div><dt>来源</dt><dd>AI导演</dd></div>
-          <div><dt>保存状态</dt><dd>仅当前会话 · 不会保存</dd></div>
-          <div><dt>数据性质</dt><dd>非真实业务数据</dd></div>
-        </dl>
-        <div class="draft-handoff-actions"><a class="button button-secondary" href="#/creator/ai-director">返回AI导演</a><a class="button button-text" href="#${projectBase}/pipeline">打开晚灯项目</a></div>
-      </section>
-    `;
-  }
-
   function findPersistedEpisode(episodeRef) {
     for (const series of state.seriesRecords) {
       const episode = (series.episodes || []).find((item) => item.episodeRef === episodeRef);
@@ -1050,12 +1012,14 @@
   }
 
   function renderStoryView(route) {
+    const contextBar = renderProjectContextBar({ ...route, group: "内容" });
     const projection = buildStoryProjection(route);
     const persisted = route.persisted || {};
     const series = persisted.series;
     const episode = persisted.episode;
     if (!projection) {
       return `
+        ${contextBar}
         ${renderPageHeader({
           eyebrow: series && episode ? `${escapeHtml(series.title)} · 第 ${escapeHtml(episode.episodeNumber)} 集` : "项目工作室 · 故事",
           title: "故事",
@@ -1078,6 +1042,7 @@
       ? values.map((value) => `<li>${escapeHtml(value)}</li>`).join("")
       : `<li class="story-muted-item">${escapeHtml(emptyLabel)}</li>`;
     return `
+      ${contextBar}
       ${renderPageHeader({
         eyebrow: `${escapeHtml(projection.seriesTitle)} · 第 ${escapeHtml(projection.episodeNumber)} 集`,
         title: "故事",
@@ -1147,6 +1112,7 @@
     const sourcePlan = binding.sourcePlan || {};
     const storyDirection = sourcePlan.storyDirection || {};
     return `
+      ${renderProjectContextBar({ ...route, group: "内容" })}
       ${renderPageHeader({
         eyebrow: `${escapeHtml(series.title)} · 第 ${escapeHtml(episode.episodeNumber)} 集`,
         title: episode.title,
@@ -1252,14 +1218,15 @@
   }
 
   function renderScriptStudio(route) {
+    const contextBar = renderProjectContextBar({ ...route, group: "内容" });
     if (state.scriptWorkspaceStatus === "idle" || state.scriptWorkspaceStatus === "loading") {
-      return `${renderPageHeader({ eyebrow: "项目工作室 · 剧本", title: "剧本工作室", description: "正在读取本集剧本与版本历史。", status: "available" })}${renderLoadingState("正在读取剧本工作区")}`;
+      return `${contextBar}${renderPageHeader({ eyebrow: "项目工作室 · 剧本", title: "剧本工作室", description: "正在读取本集剧本与版本历史。", status: "available" })}${renderLoadingState("正在读取剧本工作区")}`;
     }
     if (state.scriptWorkspaceStatus === "error" || !state.scriptWorkspace) {
-      return `${renderPageHeader({ eyebrow: "项目工作室 · 剧本", title: "剧本工作室", description: "本集剧本暂时无法读取。", status: "available" })}${renderErrorState("剧本工作区暂时不可用", state.scriptError || "请稍后重试。")}`;
+      return `${contextBar}${renderPageHeader({ eyebrow: "项目工作室 · 剧本", title: "剧本工作室", description: "本集剧本暂时无法读取。", status: "available" })}${renderErrorState("剧本工作区暂时不可用", state.scriptError || "请稍后重试。")}`;
     }
     const workspace = state.scriptWorkspace;
-    if (!workspace.script) return renderScriptSource(route, workspace.bootstrap);
+    if (!workspace.script) return `${contextBar}${renderScriptSource(route, workspace.bootstrap)}`;
     const version = selectedScriptVersion();
     const scene = selectedScriptScene();
     const confirmedRef = workspace.script.confirmedScriptVersionRef;
@@ -1268,6 +1235,7 @@
     const phaseLabel = state.scriptPhase === "generating" ? "正在生成剧本…" : state.scriptPhase === "saving" ? "正在保存新版本…" : state.scriptPhase === "rewriting" ? "正在改写所选场景…" : state.scriptPhase === "confirming" ? "正在确认版本…" : "";
     const confirmed = Boolean(confirmedRef);
     return `
+      ${contextBar}
       ${renderPageHeader({
         eyebrow: `${route.persisted.series.title} · 第 ${route.persisted.episode.episodeNumber} 集 · 剧本`,
         title: version.title,
@@ -1495,6 +1463,85 @@
     `;
   }
 
+  function renderCreationCenterR1() {
+    return `${renderPageHeader({ eyebrow: "CREATIVE SANDBOX", title: "创作中心", description: "探索未来创意工具；实验内容不会自动进入正式项目。", status: "planned" })}<section class="creation-r1-hero"><div><span class="section-kicker">EXPERIMENTAL CAPABILITIES</span><h2>探索创意能力，不越过生产门禁</h2><p>所有模块都显示真实能力状态。未建立能力、输入合同或 Project Context 时，不会执行生成。</p></div><span class="creation-r1-seal">R1<br><small>DESIGN SHELL</small></span></section><section class="creation-r1-grid">${creationModules.map((module,index) => `<a href="#${escapeHtml(module.path)}"><span class="module-number">0${index+1}</span><div><small>${escapeHtml(module.english)}</small><h3>${escapeHtml(module.label)}</h3><p>${escapeHtml(module.description)}</p></div><em>${escapeHtml(module.version)}</em></a>`).join("")}</section>`;
+  }
+
+  function renderCreationPreviewR1(route) {
+    const copy = {
+      generation: ["图片与视频", "未来从已确认 AssetRequirement 发起受控生成。", ["输入合同","候选输出","人工接纳"]],
+      templates: ["模板", "未来浏览经过版本化和适用范围确认的模板。", ["类型筛选","结构预览","应用门禁"]],
+      "prompt-lab": ["Prompt Lab", "隔离实验创意表达，不自动写入正式生产事实。", ["实验输入","参数比较","结果审查"]],
+      audio: ["声音实验", "未来探索对白、环境声与音乐候选。", ["声音意图","候选试听","权利确认"]],
+      models: ["模型实验", "未来在受控环境比较模型能力；当前不开放 Provider。", ["能力目录","安全配置","评估证据"]],
+      tools: ["快速工具", "未来承载不改变权威数据的小型创作工具。", ["输入","本地处理","人工确认"]]
+    }[route.key];
+    return `${renderPageHeader({ eyebrow: "CREATION CENTER / PREVIEW", title: copy[0], description: copy[1], status: "planned" })}<section class="creation-tool-shell"><div class="tool-shell-canvas"><span class="section-kicker">WORKSPACE PREVIEW</span><h3>${escapeHtml(copy[0])}工作台</h3><p>能力尚未授权。此页面没有模型、Provider、任务队列或生成结果。</p><div class="tool-shell-input"><label>未来输入区域<textarea disabled placeholder="等待能力合同与正式输入"></textarea></label><button class="button button-primary" type="button" disabled>能力未启用</button></div></div><aside>${copy[2].map((item,index) => `<article><span>0${index+1}</span><strong>${escapeHtml(item)}</strong><small>尚未建立</small></article>`).join("")}</aside></section>`;
+  }
+
+  const enterprisePageCopy = Object.freeze({
+    "project-overview": ["项目概览", "项目级创意、内容、制作与交付状态的总览。", "项目", "summary"],
+    "project-director": ["项目 AI导演", "在 Project Context 内查看导演方案与人工确认关系。", "策划", "detail"],
+    "series-planning": ["系列规划", "组织系列方向、分集结构与内容目标。", "策划", "table"],
+    "bible-shell": ["IP圣经", "集中查看已确认的世界观、角色规则与来源版本。", "策划", "detail"],
+    "character-shell": ["角色工作台", "查看角色身份、版本、关系与绑定状态。", "策划", "board"],
+    "continuity-shell": ["世界与连续性", "检查跨集角色、世界设定与连续性约束。", "策划", "table"],
+    "episode-list": ["分集中心", "以 Series / Episode lineage 组织内容生产。", "内容", "table"],
+    "episode-workspace": ["分集工作台", "进入单一 Episode 上下文，承接已确认导演方案、故事与剧本 lineage。", "内容", "summary"],
+    "story-shell": ["故事", "查看同一 Episode 上已确认的故事投影。", "内容", "editor"],
+    "script-shell": ["剧本工作台", "管理不可变 ScriptVersion、人工确认与下游桥接。", "内容", "editor"],
+    "consistency-shell": ["一致性检查", "汇总故事、角色、场景与剧本之间的差异。", "内容", "table"],
+    "storyboard-shell": ["分镜工作台", "在正式 M4 输入就绪后组织 Scene 与 Shot 规划。", "制作", "board"],
+    "shot-shell": ["镜头工作台", "查看镜头身份、版本、状态与素材需求。", "制作", "board"],
+    "scene-shell": ["场景工作台", "组织正式场景对象与跨镜头复用关系。", "制作", "detail"],
+    "project-assets-shell": ["项目资产", "查看项目范围内已绑定资产及其版本来源。", "制作", "board"],
+    "jobs-shell": ["生成任务", "未来展示真实 Job 状态；当前不创建任务或队列。", "制作", "table"],
+    "timeline-shell": ["时间线", "未来组织已确认镜头、音频与版本的编辑时间线。", "后期", "timeline"],
+    "preview-shell": ["预览", "未来查看来自正式生产链的 PreviewCandidate。", "后期", "player"],
+    "qc-shell": ["质量检查", "未来汇总技术、内容与交付质量门禁。", "后期", "table"],
+    "approval-shell": ["审批", "未来记录可识别人类的审批决定与责任边界。", "后期", "detail"],
+    "master-shell": ["Master", "未来管理通过全部门禁的正式 Master 版本。", "交付", "player"],
+    "export-shell": ["导出", "未来从已接受 Master 建立交付产物。", "交付", "detail"],
+    "series-delivery-shell": ["系列管理", "未来汇总系列级交付与版本关系。", "交付", "table"],
+    "release-shell": ["发布", "未来管理已授权发布目的地与人工确认。", "交付", "detail"],
+    "analytics-shell": ["数据", "未来显示可追溯的真实运营与交付证据。", "交付", "table"]
+  });
+
+  function renderProjectContextBar(route) {
+    const fields = [
+      ["Project", "未建立"], ["Series", route.persisted ? route.persisted.series.title : "未选择"],
+      ["Episode", route.persisted ? `第 ${route.persisted.episode.episodeNumber} 集` : "未选择"],
+      ["Stage", route.group || "—"], ["Object", route.label || "—"], ["Version", "—"]
+    ];
+    return `<section class="project-context-bar" aria-label="项目上下文"><div class="context-gate"><span></span><strong>PROJECT CONTEXT</strong><small>${route.persisted ? "Episode compatibility mode" : "NULL · UI preview"}</small></div>${fields.map(([label,value]) => `<div><span>${escapeHtml(label)}</span><strong>${escapeHtml(value)}</strong></div>`).join("")}</section>`;
+  }
+
+  function renderShellCanvas(kind, title) {
+    const emptyCopy = "当前没有可用于此页面的正式数据。页面结构已就绪，但不会用演示内容替代生产事实。";
+    if (kind === "board") return `<div class="shell-board-empty"><span class="section-kicker">BOARD CANVAS</span><strong>暂无正式内容</strong><p>${emptyCopy}</p><small>取得 Project Context 与已接受上游对象后，此处才会显示真实卡片。</small></div>`;
+    if (kind === "timeline") return `<div class="shell-timeline"><div class="timeline-ruler">${["00:00","00:15","00:30","00:45","01:00"].map((item) => `<span>${item}</span>`).join("")}</div>${["画面","声音","字幕","标记"].map((item) => `<div class="timeline-lane"><strong>${item}</strong><span></span></div>`).join("")}</div>`;
+    if (kind === "player") return `<div class="shell-player"><div class="shell-player-screen"><span>尚无正式媒体</span><strong>${escapeHtml(title)}</strong><small>等待正式上游输出</small></div><div class="shell-player-controls"><button type="button" disabled>播放</button><span>00:00 / 00:00</span><i></i></div></div>`;
+    if (kind === "editor") return `<div class="shell-editor"><aside><span>结构</span>${["概览","第一部分","第二部分","第三部分"].map((item) => `<button type="button" disabled>${item}</button>`).join("")}</aside><article><span class="section-kicker">CONTENT CANVAS</span><h3>${escapeHtml(title)}</h3><p>${emptyCopy}</p><div class="editor-lines">${[1,2,3,4,5].map(() => "<span></span>").join("")}</div></article><aside><span>版本</span><strong>暂无版本</strong><small>等待正式来源</small></aside></div>`;
+    if (kind === "table") return `<div class="shell-table"><header><span>对象</span><span>状态</span><span>来源</span><span>版本</span></header><div class="shell-table-empty"><strong>暂无正式记录</strong><p>${emptyCopy}</p></div></div>`;
+    if (kind === "detail") return `<div class="shell-detail-grid"><article><span class="section-kicker">PRIMARY OBJECT</span><h3>等待 Project Context</h3><p>${emptyCopy}</p></article><aside>${["身份","来源","状态","版本"].map((item) => `<div><span>${item}</span><strong>未建立</strong></div>`).join("")}</aside></div>`;
+    if (kind === "summary") return `<div class="shell-summary-grid">${["创意","内容","制作","交付"].map((item,index) => `<article><span>0${index+1}</span><strong>${item}</strong><p>等待正式数据</p></article>`).join("")}</div>`;
+    return `<div class="shell-empty"><strong>${escapeHtml(title)}</strong><p>${emptyCopy}</p></div>`;
+  }
+
+  function renderEnterpriseShellPage(route) {
+    const [title, description, stage, kind] = enterprisePageCopy[route.type] || [route.label, "页面结构已就绪。", route.group || "项目", "summary"];
+    const disabled = route.status === "disabled";
+    return `${renderProjectContextBar(route)}${renderPageHeader({ eyebrow: `${stage} / ENTERPRISE WORKSPACE`, title, description, status: route.status, meta: localizedStatusBadge(disabled ? "受门禁限制" : "结构已就绪", disabled ? "neutral" : "planned") })}<section class="enterprise-shell-page" data-shell-kind="${escapeHtml(kind)}">${renderShellCanvas(kind, title)}</section><section class="workflow-action-bar"><div><span>当前页面</span><strong>${escapeHtml(title)}</strong><small>${route.persisted ? "使用现有 Episode lineage" : "Project Context = NULL"}</small></div><div><button class="button button-secondary" type="button" data-action="toggle-bottom-drawer">版本与活动</button><button class="button button-primary" type="button" disabled>${disabled ? "当前不可操作" : "等待上游能力"}</button></div></section>`;
+  }
+
+  function renderAssetsR1() {
+    return `${renderPageHeader({ eyebrow: "WORKSPACE LIBRARY", title: "资产库", description: "浏览当前工作区明确标记的内部参考媒体；不存在时保持空态。", status: "available", meta: localizedStatusBadge("内部参考", "neutral") })}<section class="asset-r1-layout"><aside class="asset-taxonomy"><span class="section-kicker">资产分类</span>${["全部","角色","场景","图片","视频","音频","模板"].map((item,index) => `<button type="button" ${index ? "disabled" : 'class="is-active"'}>${item}<span>${index ? "0" : fixture.assets.length}</span></button>`).join("")}</aside><div class="asset-r1-main"><header><div><h3>内部视觉参考</h3><p>这些媒体不是 Project Asset，也没有获得发布权利。</p></div>${governanceBadge("Rights HOLD", "hold")}</header>${renderAssetGrid(fixture.assets)}</div></section>${fixtureNotice()}`;
+  }
+
+  function renderWorksR1() {
+    return `${renderPageHeader({ eyebrow: "MASTERS / DELIVERIES", title: "作品", description: "只展示通过正式 Master 与交付门禁的作品。", status: "planned" })}<section class="works-r1-stage"><div class="works-r1-filter"><button class="is-active" type="button">全部</button><button type="button" disabled>制作中</button><button type="button" disabled>待交付</button><button type="button" disabled>已发布</button></div>${renderEmptyState({ icon: "—", title: "还没有正式作品", description: "内部参考 Candidate 不会出现在作品库。需要 Master、权利、审批与交付能力就绪后才会显示。" })}</section>`;
+  }
+
   function renderPlaceholder(route) {
     const isDisabled = route.status === "disabled";
     const parentRoute = route.context === "creation" ? "/creator/creation" : route.context === "project" ? `${route.projectBase || projectBase}/pipeline` : "/creator/dashboard";
@@ -1546,54 +1593,30 @@
 
   function resolveRoute(path) {
     const normalized = normalizePath(path);
-    if (normalized === `/creator/projects/${projectRef}`) {
-      return { redirect: `${projectBase}/pipeline` };
-    }
-
+    if (normalized === "/creator/dashboard") return { redirect: "/creator" };
+    if (normalized === "/creator/creation") return { redirect: "/creator/create" };
     const persistedProjectMatch = normalized.match(/^\/creator\/projects\/([^/]+)(?:\/([^/]+))?$/);
-    if (persistedProjectMatch && persistedProjectMatch[1] !== projectRef && !persistedProjectMatch[1].startsWith("local-")) {
+    if (persistedProjectMatch && !["new"].includes(persistedProjectMatch[1])) {
       const persisted = findPersistedEpisode(decodeURIComponent(persistedProjectMatch[1]));
       if (persisted) {
         const dynamicBase = `/creator/projects/${encodeURIComponent(persisted.episode.episodeRef)}`;
         const pageKey = persistedProjectMatch[2];
-        if (!pageKey) return { redirect: `${dynamicBase}/pipeline` };
-        const page = projectPages.find((item) => item.key === pageKey);
-        if (!page) return null;
+        if (!pageKey) return { redirect: `${dynamicBase}/story` };
+        if (!["pipeline", "story", "script"].includes(pageKey)) return null;
         const baseRoute = {
-          ...page,
+          key: pageKey,
+          label: pageKey === "pipeline" ? "分集概览" : pageKey === "story" ? "故事" : "剧本",
+          status: "available",
           path: normalized,
           projectBase: dynamicBase,
-          projectRef: persisted.episode.episodeRef,
+          episodeRef: persisted.episode.episodeRef,
           persisted,
-          context: "project",
-          breadcrumb: `${persisted.series.title} / 第 ${persisted.episode.episodeNumber} 集 / ${page.label}`
+          context: "episode",
+          breadcrumb: `${persisted.series.title} / 第 ${persisted.episode.episodeNumber} 集 / ${pageKey === "pipeline" ? "概览" : pageKey === "story" ? "故事" : "剧本"}`
         };
         if (pageKey === "pipeline") return { ...baseRoute, type: "episode-project" };
         if (pageKey === "story") return { ...baseRoute, type: "story-view" };
         if (pageKey === "script") return { ...baseRoute, type: "script-studio" };
-        return {
-          ...baseRoute,
-          type: "placeholder",
-          eyebrow: `Episode Project · ${page.label}`,
-          description: "此阶段仍沿用 Creator Workspace 页面边界；M2 只建立系列、集数与已确认方案的关系。"
-        };
-      }
-    }
-
-    const localProjectMatch = normalized.match(/^\/creator\/projects\/(local-[a-z0-9-]+)$/);
-    if (localProjectMatch) {
-      const draft = state.localProjectDrafts.find((item) => item.projectRef === localProjectMatch[1]);
-      if (draft) {
-        return {
-          type: "project-draft-handoff",
-          key: "project-draft-handoff",
-          path: normalized,
-          label: "项目草稿交接",
-          english: "Project Draft Mock Handoff",
-          status: "fixture",
-          breadcrumb: "AI导演 / 本地项目草稿",
-          draft
-        };
       }
     }
 
@@ -1614,6 +1637,10 @@
       };
     }
 
+    if (normalized === "/creator/projects/new") {
+      return { type: "project-wizard-page", key: "project-new", path: normalized, label: "新建项目", status: "planned", breadcrumb: "项目 / 新建项目" };
+    }
+
     if (normalized === "/creator/account") {
       return { type: "placeholder", key: "account", path: normalized, label: "账户", english: "Account", status: "planned", breadcrumb: "创作空间 / 账户", eyebrow: "个人空间", description: "创作者账户功能即将上线。" };
     }
@@ -1623,26 +1650,10 @@
       return { ...creation, type: "creation-preview", status: "planned", breadcrumb: `创作中心 / ${creation.label}`, eyebrow: "创作工具 · 即将上线", context: "creation" };
     }
 
-    if (normalized.startsWith(`${projectBase}/`)) {
+    if (normalized.startsWith(`${projectShellBase}/`)) {
       const projectPage = projectPages.find((page) => page.path === normalized);
       if (!projectPage) return null;
-      const route = { ...projectPage, breadcrumb: `${displayProjectTitle} / ${projectPage.label}`, context: "project" };
-      if (projectPage.key === "pipeline") return { ...route, type: "pipeline" };
-      if (projectPage.key === "story") return { ...route, type: "story-view" };
-      if (projectPage.key === "character") return { ...route, type: "character" };
-      if (projectPage.key === "storyboard") return { ...route, type: "storyboard" };
-      if (projectPage.key === "preview") return { ...route, type: "preview" };
-      if (projectPage.key === "export") return { ...route, type: "export" };
-
-      const descriptions = {
-        "ip-bible": "单项目世界观、角色规则与时间线的未来参考页面；当前功能即将上线。",
-        scene: "项目场景规划的未来入口；当前不会创建场景或生成画面。",
-        audio: "声音意图、来源与权利确认的未来入口；当前候选影片为静音版本。",
-        timeline: "影片节奏与镜头组织的未来入口；当前功能即将上线。",
-        approval: "该页面只展示人工确认要求；界面或技术检查不会自动完成批准。",
-        settings: "未来成员、权限、工作流配置与归档的占位；当前不实现任何设置或持久化。"
-      };
-      return { ...route, type: "placeholder", eyebrow: `项目工作室 · ${projectPage.label}`, description: descriptions[projectPage.key] };
+      return { ...projectPage, breadcrumb: `项目壳层 / ${projectPage.group} / ${projectPage.label}`, context: "project-shell" };
     }
 
     return null;
@@ -1659,9 +1670,25 @@
   }
 
   function renderContextNav(route) {
-    const items = route.context === "project"
-      ? projectPages.map((page) => ({ ...page, path: `${route.projectBase || projectBase}/${page.key}` }))
-      : route.context === "creation" ? creationModules.map((module) => ({ ...module, status: "planned" })) : [];
+    const episodeContext = route.context === "episode";
+    const groups = route.context === "project-shell" || episodeContext ? projectNavigationGroups : null;
+    const items = route.context === "creation" ? creationModules.map((module) => ({ ...module, status: "planned" })) : [];
+    if (groups) {
+      const itemPath = (item) => {
+        if (!episodeContext) return `${projectShellBase}/${item.suffix}`;
+        if (item.key === "episode-workspace") return `${route.projectBase}/pipeline`;
+        if (item.key === "story" || item.key === "script") return `${route.projectBase}/${item.key}`;
+        return `${projectShellBase}/${item.suffix}`;
+      };
+      const isCurrent = (item) => route.key === item.key || (episodeContext && route.key === "pipeline" && item.key === "episode-workspace");
+      const contextLabel = episodeContext
+        ? `${route.persisted.series.title} · 第 ${route.persisted.episode.episodeNumber} 集 · 尚无正式项目`
+        : "Project Context = NULL";
+      contextNavigation.hidden = false;
+      workbench.classList.add("has-context-nav");
+      contextNavigation.innerHTML = `<div class="context-nav-heading"><span>${episodeContext ? "EPISODE NAVIGATOR" : "PROJECT NAVIGATOR"}</span><strong>${escapeHtml(contextLabel)}</strong></div>${groups.map((group) => `<section class="context-nav-group"><span>${escapeHtml(group.label)}</span>${group.items.map((item) => `<a href="#${escapeHtml(itemPath(item))}" class="context-nav-item ${isCurrent(item) ? "is-active" : ""}" aria-current="${isCurrent(item) ? "page" : "false"}"><span>${escapeHtml(item.label)}</span>${statusBadge(item.status)}</a>`).join("")}</section>`).join("")}`;
+      return;
+    }
     if (!items.length) {
       contextNavigation.hidden = true;
       contextNavigation.innerHTML = "";
@@ -1669,8 +1696,8 @@
       return;
     }
 
-    const title = route.context === "project" ? "项目工作室" : "创作工具";
-    const subtitle = route.context === "project" ? (route.persisted ? `${route.persisted.series.title} · 第 ${route.persisted.episode.episodeNumber} 集` : displayProjectTitle) : "即将上线";
+    const title = "创作工具";
+    const subtitle = "实验区 · 不写入项目";
     contextNavigation.hidden = false;
     workbench.classList.add("has-context-nav");
     contextNavigation.innerHTML = `
@@ -1682,7 +1709,7 @@
   }
 
   function routeSupportsInspector(route) {
-    return Boolean(route && (route.context === "project" || ["assets", "character", "storyboard", "preview"].includes(route.type)));
+    return Boolean(route && (route.context === "project-shell" || route.context === "episode" || ["assets", "ai-director"].includes(route.type)));
   }
 
   function renderInspector(route) {
@@ -1702,8 +1729,6 @@
       detail = `<section class="inspector-section"><span class="inspector-label">当前阶段</span><strong>${escapeHtml(stageLabels[stage.label] || stage.label)}</strong><p>${pipelineStatus(stage.status)}</p><p>创作状态由用户确认，页面不会自动推进。</p></section>`;
     } else if (route && route.type === "ai-director") {
       detail = `<section class="inspector-section"><span class="inspector-label">能力状态</span>${localizedStatusBadge("开发中", "development")}<p>当前可体验创意规划流程。</p></section>`;
-    } else if (route && route.type === "project-draft-handoff") {
-      detail = `<section class="inspector-section"><span class="inspector-label">项目草稿</span><strong>${escapeHtml(route.draft.title)}</strong><p>仅当前会话有效 · 不会保存</p></section>`;
     } else if (route && route.type === "episode-project") {
       detail = `<section class="inspector-section"><span class="inspector-label">Episode Project</span><strong>${escapeHtml(route.persisted.episode.title)}</strong><p>${escapeHtml(route.persisted.series.title)} · 第 ${escapeHtml(route.persisted.episode.episodeNumber)} 集</p><p>来源：已确认导演方案 v${escapeHtml(route.persisted.episode.sourcePlanVersion)}</p></section>`;
     } else if (route && route.type === "story-view") {
@@ -1718,10 +1743,12 @@
       detail = version
         ? `<section class="inspector-section"><span class="inspector-label">剧本版本</span><strong>v${escapeHtml(version.versionNumber)} · ${escapeHtml(scriptChangeLabel(version.changeKind))}</strong><p>${escapeHtml(version.scenes.length)} 场 · ${escapeHtml(version.targetDurationSec)} 秒</p><p>${confirmed ? "已人工确认" : "等待人工确认"}</p></section>`
         : `<section class="inspector-section"><span class="inspector-label">剧本工作室</span><strong>尚未生成剧本</strong><p>输入来自本集已确认导演方案。</p></section>`;
-    } else if (route && (route.type === "character" || route.type === "assets")) {
+    } else if (route && route.type === "assets") {
       detail = `<section class="inspector-section"><span class="inspector-label">权利状态</span>${governanceBadge("HOLD", "hold")}<p>正式使用前需要完成人工确认。</p></section>`;
+    } else if (route && route.context === "project-shell") {
+      detail = `<section class="inspector-section"><span class="inspector-label">项目上下文</span><strong>尚未建立</strong><p>当前是 Enterprise UI shell 预览，不创建 projectRef 或业务事实。</p></section><section class="inspector-section"><span class="inspector-label">页面状态</span><strong>${escapeHtml(route.label)}</strong><p>${route.status === "disabled" ? "受人工或能力门禁限制" : "等待正式上游输入"}</p></section>`;
     } else {
-      detail = `<section class="inspector-section"><span class="inspector-label">当前项目</span><strong>${displayProjectTitle}</strong><p>情绪短片 · 45 秒 · 竖屏 9:16</p></section>`;
+      detail = `<section class="inspector-section"><span class="inspector-label">工作区</span><strong>Creator Enterprise</strong><p>当前页面没有独立业务对象。</p></section>`;
     }
     inspectorContent.innerHTML = `${base}${detail}`;
   }
@@ -1767,29 +1794,22 @@
     if (!route) return { label: "返回总览", target: defaultRoute, note: "未知路由 · 未创建任何事实" };
     const map = {
       dashboard: { label: "开始创作", target: "/creator/ai-director", note: "从一个想法开始新的影片方案" },
-      projects: { label: "创建项目草稿", action: "open-project-dialog", note: "仅当前会话有效 · 不会保存到系统" },
-      assets: { label: "查看晚灯角色", target: `${projectBase}/character`, note: "角色、场景与关键画面统一管理" },
+      projects: { label: "查看新建流程", action: "open-project-dialog", note: "最终提交保持禁用 · 不创建 projectRef" },
+      assets: { label: "返回首页", target: defaultRoute, note: "内部参考媒体 · 不形成 Project Asset" },
       creation: { label: "返回首页", target: defaultRoute, note: "六项智能工具正在准备中" },
       "ai-director": aiDirectorStickyConfig(),
-      "project-draft-handoff": { label: "打开晚灯项目", target: `${projectBase}/pipeline`, note: "项目草稿已建立 · 仅当前会话有效" },
       "episode-project": { label: "查看全部项目", target: "/creator/projects", note: "Series → Episode → 已确认 CreativePlan" },
-      "script-studio": scriptStudioStickyConfig(),
-      pipeline: { label: "进入角色", target: `${projectBase}/character`, note: "项目制作流程总览 · 状态由创作者确认" },
-      character: { label: "查看分镜", target: `${projectBase}/storyboard`, note: "晚灯角色 · 权利状态待确认" },
-      storyboard: { label: "查看影片预览", target: `${projectBase}/preview`, note: "六镜头分镜墙 · 继续审看影片节奏" },
-      preview: { label: "返回项目工作室", target: `${projectBase}/pipeline`, note: "候选预览 · 尚未正式导出" },
-      export: { label: "暂不可导出", disabled: true, capability: "export", note: "权利确认与导出能力尚未完成" }
+      "script-studio": scriptStudioStickyConfig()
     };
     if (map[route.type]) return map[route.type];
-    if (route.context === "creation") return { label: "返回创作中心", target: "/creator/creation", note: "功能即将上线" };
-    if (route.context === "project") return { label: "返回项目工作室", target: `${route.projectBase || projectBase}/pipeline`, note: "页面状态不会自动改变项目进度" };
+    if (route.context === "creation") return { label: "返回创作中心", target: "/creator/create", note: "实验能力不会写入正式项目" };
+    if (route.context === "project-shell") return { label: "返回项目中心", target: "/creator/projects", note: "Project Context = NULL · 页面不会推进生产状态" };
     return { label: "返回首页", target: defaultRoute, note: "功能即将上线" };
   }
 
   function shouldRenderStickyBar(route) {
     if (!route) return false;
-    if (["dashboard", "ai-director", "pipeline", "storyboard", "preview", "export", "episode-project", "script-studio"].includes(route.type)) return true;
-    return route.type === "placeholder" && route.key === "approval";
+    return ["dashboard", "ai-director", "episode-project", "script-studio"].includes(route.type);
   }
 
   function renderStickyBar(route) {
@@ -1818,8 +1838,8 @@
       const route = link.getAttribute("data-route");
       const active = route === "/creator/projects"
         ? path === route || path.startsWith("/creator/projects/")
-        : route === "/creator/creation"
-          ? path === route || path.startsWith("/creator/creation/")
+        : route === "/creator/create"
+          ? path === route || path.startsWith("/creator/create/")
           : path === route;
       link.classList.toggle("is-active", active);
       if (active) link.setAttribute("aria-current", "page");
@@ -1906,7 +1926,7 @@
 
   function renderRoute(path) {
     const normalized = normalizePath(path);
-    if ((normalized === "/creator/projects" || normalized === "/creator/ai-director" || normalized.startsWith("/creator/projects/")) && state.seriesDataStatus === "idle") {
+    if ((normalized === "/creator" || normalized === "/creator/projects" || normalized === "/creator/ai-director" || normalized.startsWith("/creator/projects/")) && state.seriesDataStatus === "idle") {
       loadSeriesData();
     }
     const route = resolveRoute(normalized);
@@ -1921,7 +1941,7 @@
     const resolved = route || { type: "not-found", path: normalized, label: "未知路由", status: "disabled", breadcrumb: "创作空间 / 页面未找到" };
     state.activeRoute = resolved;
     if (normalized !== previousPath) {
-      state.inspectorOpen = !compactInspectorQuery.matches && resolved.context === "project";
+      state.inspectorOpen = !compactInspectorQuery.matches && ["project-shell", "episode"].includes(resolved.context);
     }
     updateShellBoundaryCopy(resolved);
     pageTitle.textContent = resolved.label || resolved.english || "创作空间";
@@ -1933,20 +1953,40 @@
     const renderers = {
       dashboard: renderDashboard,
       projects: renderProjects,
-      pipeline: renderPipeline,
-      assets: renderAssets,
-      creation: renderCreationCenter,
-      "creation-preview": () => renderCreationPreview(resolved),
-      works: renderWorks,
+      assets: renderAssetsR1,
+      creation: renderCreationCenterR1,
+      "creation-preview": () => renderCreationPreviewR1(resolved),
+      works: renderWorksR1,
       "ai-director": renderAiDirector,
-      "project-draft-handoff": () => renderProjectDraftHandoff(resolved),
+      "project-wizard-page": () => `${renderPageHeader({ eyebrow: "PROJECT FOUNDATION", title: "新建项目", description: "配置未来 Project Context；最终提交仍由 Project Foundation 门禁控制。", status: "planned" })}<section class="enterprise-panel project-context-gate"><span class="gate-index">NEW</span><div><h3>配置流程可以检查，提交保持禁用</h3><p>不会创建 projectRef，不会写入 Project、Production 或 Render 事实。</p></div><button class="button button-primary" type="button" data-action="open-project-dialog">打开配置向导</button></section>`,
       "episode-project": () => renderEpisodeProject(resolved),
       "story-view": () => renderStoryView(resolved),
       "script-studio": () => renderScriptStudio(resolved),
-      character: renderCharacter,
-      storyboard: renderStoryboard,
-      preview: renderPreview,
-      export: renderExport,
+      "project-overview": () => renderEnterpriseShellPage(resolved),
+      "project-director": () => renderEnterpriseShellPage(resolved),
+      "series-planning": () => renderEnterpriseShellPage(resolved),
+      "bible-shell": () => renderEnterpriseShellPage(resolved),
+      "character-shell": () => renderEnterpriseShellPage(resolved),
+      "continuity-shell": () => renderEnterpriseShellPage(resolved),
+      "episode-list": () => renderEnterpriseShellPage(resolved),
+      "episode-workspace": () => renderEnterpriseShellPage(resolved),
+      "story-shell": () => renderEnterpriseShellPage(resolved),
+      "script-shell": () => renderEnterpriseShellPage(resolved),
+      "consistency-shell": () => renderEnterpriseShellPage(resolved),
+      "storyboard-shell": () => renderEnterpriseShellPage(resolved),
+      "shot-shell": () => renderEnterpriseShellPage(resolved),
+      "scene-shell": () => renderEnterpriseShellPage(resolved),
+      "project-assets-shell": () => renderEnterpriseShellPage(resolved),
+      "jobs-shell": () => renderEnterpriseShellPage(resolved),
+      "timeline-shell": () => renderEnterpriseShellPage(resolved),
+      "preview-shell": () => renderEnterpriseShellPage(resolved),
+      "qc-shell": () => renderEnterpriseShellPage(resolved),
+      "approval-shell": () => renderEnterpriseShellPage(resolved),
+      "master-shell": () => renderEnterpriseShellPage(resolved),
+      "export-shell": () => renderEnterpriseShellPage(resolved),
+      "series-delivery-shell": () => renderEnterpriseShellPage(resolved),
+      "release-shell": () => renderEnterpriseShellPage(resolved),
+      "analytics-shell": () => renderEnterpriseShellPage(resolved),
       placeholder: () => renderPlaceholder(resolved),
       "not-found": () => renderNotFound(normalized)
     };
@@ -1972,10 +2012,45 @@
     toastTimer = window.setTimeout(() => toast.classList.remove("is-visible"), 3200);
   }
 
+  function captureWizardValues() {
+    const formData = new FormData(projectForm);
+    Object.keys(state.wizardValues).forEach((key) => {
+      if (formData.has(key)) state.wizardValues[key] = String(formData.get(key) || "");
+    });
+  }
+
+  function wizardField(label, name, value, options = []) {
+    if (options.length) return `<label><span>${escapeHtml(label)}</span><select name="${escapeHtml(name)}">${options.map((option) => `<option value="${escapeHtml(option)}" ${option === value ? "selected" : ""}>${escapeHtml(option || "请选择")}</option>`).join("")}</select></label>`;
+    return `<label><span>${escapeHtml(label)}</span><input name="${escapeHtml(name)}" value="${escapeHtml(value)}" autocomplete="off"></label>`;
+  }
+
+  function renderProjectWizard() {
+    const values = state.wizardValues;
+    const panels = {
+      1: `<section class="wizard-step"><div><span class="section-kicker">STEP 01</span><h3>选择项目类型</h3><p>类型只影响未来工作区结构，不会在本任务中创建项目。</p></div><div class="wizard-choice-grid">${[["series","系列短片","多集连续内容"],["single","单片","独立影片"],["campaign","Campaign","品牌内容系列"]].map(([value,label,copy]) => `<label><input type="radio" name="projectType" value="${value}" ${values.projectType === value ? "checked" : ""}><span><strong>${label}</strong><small>${copy}</small></span></label>`).join("")}</div></section>`,
+      2: `<section class="wizard-step"><div><span class="section-kicker">STEP 02</span><h3>基本信息</h3><p>这些值仅停留在当前弹窗状态。</p></div><div class="wizard-form-grid">${wizardField("项目名称","title",values.title)}${wizardField("内容类型","contentType",values.contentType,["","剧情短片","系列内容","品牌内容"])}${wizardField("计划集数","episodeCount",values.episodeCount)}${wizardField("单集时长（秒）","duration",values.duration)}${wizardField("画幅","aspectRatio",values.aspectRatio,["9:16","16:9","1:1"])}${wizardField("目标平台","platform",values.platform,["","短视频平台","流媒体","内部审看"])}</div></section>`,
+      3: `<section class="wizard-step"><div><span class="section-kicker">STEP 03</span><h3>制作默认值</h3><p>正式默认值需要 Project Context Foundation 承担。</p></div><div class="wizard-form-grid">${wizardField("内容 Profile","contentProfile",values.contentProfile)}${wizardField("语言","language",values.language,["中文","英文","多语言"])}${wizardField("视觉方向","visualDirection",values.visualDirection)}${wizardField("生产预设","productionPreset",values.productionPreset,["","标准短片","高保真电影","快速审看"])}</div></section>`,
+      4: `<section class="wizard-step"><div><span class="section-kicker">STEP 04</span><h3>检查配置</h3><p>配置可以审查，但最终创建保持禁用。</p></div><dl class="wizard-review">${[["项目类型",values.projectType],["项目名称",values.title || "未填写"],["内容类型",values.contentType || "未选择"],["计划集数",values.episodeCount || "未填写"],["单集时长",`${values.duration || "—"} 秒`],["画幅",values.aspectRatio],["平台",values.platform || "未选择"],["语言",values.language],["视觉方向",values.visualDirection || "未填写"]].map(([label,value]) => `<div><dt>${escapeHtml(label)}</dt><dd>${escapeHtml(value)}</dd></div>`).join("")}</dl></section>`
+    };
+    document.getElementById("project-wizard-content").innerHTML = panels[state.wizardStep];
+    projectDialog.querySelectorAll("[data-wizard-step-indicator]").forEach((item) => item.classList.toggle("is-current", Number(item.dataset.wizardStepIndicator) === state.wizardStep));
+    const previous = projectDialog.querySelector('[data-action="wizard-previous"]');
+    const next = projectDialog.querySelector('[data-action="wizard-next"]');
+    const submit = projectDialog.querySelector('[data-action="wizard-submit"]');
+    previous.hidden = state.wizardStep === 1;
+    next.hidden = state.wizardStep === 4;
+    submit.hidden = state.wizardStep !== 4;
+  }
+
   function openProjectDialog(trigger) {
     dialogReturnFocus = trigger || document.activeElement;
+    state.wizardStep = 1;
+    renderProjectWizard();
     projectDialog.showModal();
-    window.requestAnimationFrame(() => projectForm.elements.title.focus());
+    window.requestAnimationFrame(() => {
+      const first = projectDialog.querySelector("input, select, button");
+      if (first) first.focus();
+    });
   }
 
   function closeProjectDialog() {
@@ -2112,32 +2187,6 @@
       showToast(state.aiDirectorError);
     }
     renderRoute("/creator/ai-director");
-  }
-
-  function buildAiDirectorProjectDraftInput(projectRefValue) {
-    if (!state.aiDirectorPlan || !state.aiDirectorConfirmed) return null;
-    const plan = state.aiDirectorPlan;
-    return {
-      schemaVersion: "creator.project-draft-input.v1",
-      localKey: projectRefValue,
-      projectRef: projectRefValue,
-      sourcePlanRef: `local-ai-director-plan-${state.aiDirectorPlanVersion}`,
-      sourcePlanSchemaVersion: plan.schemaVersion,
-      sourcePlanVersion: state.aiDirectorPlanVersion,
-      sourcePlan: plan,
-      persistence: "session-only",
-      domainFact: false,
-      story: {
-        creativeInterpretation: plan.creativeInterpretation,
-        direction: plan.storyDirection,
-        script: plan.scriptDraft
-      },
-      characters: plan.productionPlan.characters,
-      scenes: plan.productionPlan.scenes,
-      storyboard: plan.storyboardPlan,
-      visualStyle: plan.visualStyle,
-      productionPlan: plan.productionPlan
-    };
   }
 
   async function createSeriesEpisode(form) {
@@ -2344,15 +2393,14 @@
     state.assetFilter = "all";
     state.selectedShotKey = fixture.shots[0].localKey;
     state.selectedPipelineKey = (fixture.pipeline.find((stage) => stage.label === "Preview") || fixture.pipeline[1]).localKey;
-    state.localProjectDrafts = [];
-    state.localDraftCounter = 0;
+    state.wizardStep = 1;
+    state.wizardValues = { projectType: "series", title: "", contentType: "", episodeCount: "", duration: "60", aspectRatio: "9:16", platform: "", contentProfile: "", language: "中文", visualDirection: "", productionPreset: "" };
     state.aiDirectorPhase = "input";
     state.aiDirectorBrief = { ...fixture.aiDirector.briefDefaults };
     state.aiDirectorPlan = null;
     state.aiDirectorPlanVersion = 0;
     state.aiDirectorConfirmed = false;
     state.aiDirectorError = null;
-    state.aiDirectorProjectDraft = null;
     state.confirmedCreativePlan = null;
     state.seriesEpisodePhase = "idle";
     state.seriesEpisodeError = null;
@@ -2376,6 +2424,22 @@
     if (!action) return;
     if (action === "open-project-dialog") openProjectDialog(button);
     if (action === "close-project-dialog") closeProjectDialog();
+    if (action === "wizard-next") {
+      captureWizardValues();
+      state.wizardStep = Math.min(4, state.wizardStep + 1);
+      renderProjectWizard();
+    }
+    if (action === "wizard-previous") {
+      captureWizardValues();
+      state.wizardStep = Math.max(1, state.wizardStep - 1);
+      renderProjectWizard();
+    }
+    if (action === "toggle-bottom-drawer") {
+      state.bottomDrawerOpen = !state.bottomDrawerOpen;
+      bottomDrawer.hidden = !state.bottomDrawerOpen;
+      bottomDrawerTitle.textContent = "版本、任务与活动";
+      bottomDrawerContent.innerHTML = '<div class="drawer-empty"><strong>暂无正式活动</strong><p>这里不会显示虚构 Job、版本或生产日志。</p></div>';
+    }
     if (action === "toggle-sidebar-collapse") {
       if (mobileQuery.matches) closeMobileSidebar(true);
       else toggleSidebarCollapse();
@@ -2517,20 +2581,7 @@
 
   projectForm.addEventListener("submit", (event) => {
     event.preventDefault();
-    const formData = new FormData(projectForm);
-    const title = String(formData.get("title") || "").trim();
-    if (!title) return;
-    state.localDraftCounter += 1;
-    state.localProjectDrafts.unshift({
-      localKey: `local-project-${state.localDraftCounter}`,
-      title,
-      format: String(formData.get("format") || "竖屏短视频 · 9:16")
-    });
-    projectForm.reset();
-    projectDialog.close();
-    if (state.activePath !== "/creator/projects") navigate("/creator/projects");
-    else renderRoute(state.activePath);
-    showToast("临时草稿已加入当前会话 · 不会保存到系统");
+    showToast("Project Context 尚未启用 · 未创建任何项目");
   });
 
   projectDialog.addEventListener("close", () => {

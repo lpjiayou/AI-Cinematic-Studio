@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <meta name="theme-color" content="#f5f7fa">
+    <meta name="theme-color" content="#0f1318">
     <link rel="icon" href="data:,">
     <meta
       name="description"
@@ -18,11 +18,11 @@
     <div class="app-shell" id="app-shell">
       <aside class="sidebar" id="sidebar" aria-label="创作者工作区一级导航">
         <div class="brand-row">
-          <a class="brand-lockup" href="#/creator/dashboard" aria-label="AI Cinematic Studio 首页">
-            <span class="brand-mark" aria-hidden="true"><i></i></span>
+          <a class="brand-lockup" href="#/creator" aria-label="AI Cinematic Studio 首页">
+            <span class="brand-monogram" aria-hidden="true">ACS</span>
             <span class="brand-copy">
               <strong>AI CINEMATIC</strong>
-              <small>影视创作工作台</small>
+              <small>STUDIO</small>
             </span>
           </a>
           <button
@@ -37,40 +37,41 @@
         </div>
 
         <nav class="primary-nav" aria-label="一级导航">
-          <p class="nav-group-label">创作空间</p>
-          <a class="nav-item" href="#/creator/dashboard" data-route="/creator/dashboard" aria-label="首页">
-            <span class="nav-icon" aria-hidden="true">⌂</span>
-            <span class="nav-copy"><strong>首页</strong><small>创作驾驶舱</small></span>
+          <p class="nav-group-label">CREATOR WORKSPACE</p>
+          <a class="nav-item" href="#/creator" data-route="/creator" aria-label="首页">
+            <span class="nav-index" aria-hidden="true">01</span>
+            <span class="nav-copy"><strong>首页</strong><small>生产指挥中心</small></span>
           </a>
-          <a class="nav-item" href="#/creator/ai-director" data-route="/creator/ai-director" aria-label="AI导演，开发中">
-            <span class="nav-icon" aria-hidden="true">✦</span>
-            <span class="nav-copy"><strong>AI导演</strong><small>创意规划</small></span>
-            <span class="badge badge-development">开发中</span>
+          <a class="nav-item" href="#/creator/ai-director" data-route="/creator/ai-director" aria-label="AI导演">
+            <span class="nav-index" aria-hidden="true">02</span>
+            <span class="nav-copy"><strong>AI导演</strong><small>创意智能</small></span>
           </a>
           <a class="nav-item" href="#/creator/projects" data-route="/creator/projects" aria-label="项目">
-            <span class="nav-icon" aria-hidden="true">▦</span>
-            <span class="nav-copy"><strong>项目</strong><small>影视工作室</small></span>
+            <span class="nav-index" aria-hidden="true">03</span>
+            <span class="nav-copy"><strong>项目</strong><small>制作中心</small></span>
           </a>
           <a class="nav-item" href="#/creator/assets" data-route="/creator/assets" aria-label="资产库">
-            <span class="nav-icon" aria-hidden="true">◇</span>
-            <span class="nav-copy"><strong>资产库</strong><small>创作资产</small></span>
+            <span class="nav-index" aria-hidden="true">04</span>
+            <span class="nav-copy"><strong>资产库</strong><small>工作区资产</small></span>
           </a>
-          <a class="nav-item" href="#/creator/creation" data-route="/creator/creation" aria-label="创作中心">
-            <span class="nav-icon" aria-hidden="true">✣</span>
-            <span class="nav-copy"><strong>创作中心</strong><small>智能工具</small></span>
+          <a class="nav-item" href="#/creator/create" data-route="/creator/create" aria-label="创作中心">
+            <span class="nav-index" aria-hidden="true">05</span>
+            <span class="nav-copy"><strong>创作中心</strong><small>创意沙盒</small></span>
           </a>
           <a class="nav-item" href="#/creator/works" data-route="/creator/works" aria-label="作品">
-            <span class="nav-icon" aria-hidden="true">▤</span>
-            <span class="nav-copy"><strong>作品</strong><small>展示与交付</small></span>
+            <span class="nav-index" aria-hidden="true">06</span>
+            <span class="nav-copy"><strong>作品</strong><small>Master 与交付</small></span>
           </a>
         </nav>
 
         <div class="sidebar-spacer"></div>
 
-        <button class="reset-button" type="button" data-action="reset-fixture" aria-label="重置当前体验">
-          <span aria-hidden="true">↺</span>
-          <span class="reset-label">重置体验</span>
-        </button>
+        <nav class="sidebar-utility" aria-label="工作区与帮助">
+          <a href="#/creator/account" data-utility="Workspace"><span class="utility-index" aria-hidden="true">W</span><span>工作空间</span></a>
+          <button type="button" data-utility="Settings" disabled title="设置将在 Enterprise 阶段启用"><span class="utility-index" aria-hidden="true">S</span><span>设置</span></button>
+          <button type="button" data-utility="Help" disabled title="帮助中心尚未接入"><span class="utility-index" aria-hidden="true">?</span><span>帮助</span></button>
+        </nav>
+        <div class="sidebar-user" data-utility="User"><span class="account-avatar" aria-hidden="true">创</span><span><strong>创作者</strong><small>Internal Content Lab</small></span></div>
       </aside>
 
       <button
@@ -100,21 +101,22 @@
             </div>
           </div>
 
+          <div class="header-command" role="search">
+            <label><span class="sr-only">搜索或输入命令</span><input type="search" placeholder="搜索项目、分集、版本或输入命令" disabled></label>
+            <kbd>⌘ K</kbd>
+          </div>
           <div class="header-actions" aria-label="全局操作">
             <details class="global-demo-status fixture-banner">
-              <summary aria-label="查看演示版本说明"><span class="fixture-symbol" aria-hidden="true">演</span><strong>演示版本</strong></summary>
+              <summary aria-label="查看当前环境说明"><span class="fixture-symbol" aria-hidden="true">LAB</span><strong>Internal Content Lab</strong></summary>
               <div class="global-demo-popover">
                 <strong>内部体验环境</strong>
                 <p>演示媒体不是业务事实；系列与集数由本地开发服务管理，不会生成或发布。</p>
                 <span class="sr-only">FIXTURE MEDIA ONLY · SERIES AND EPISODE OWNER IS V5 CORE OS · LOCAL DEVELOPMENT DURABLE ADAPTER · NOT A CANONICAL PROJECT</span>
               </div>
             </details>
-            <button class="header-slot header-search" type="button" disabled title="搜索功能即将上线" aria-label="搜索，即将上线">
-              <span aria-hidden="true">⌕</span><span class="header-slot-label">搜索</span>
-            </button>
-            <button class="header-slot icon-only" type="button" disabled title="通知功能即将上线" aria-label="通知，即将上线">
-              <span aria-hidden="true">◌</span>
-            </button>
+            <button class="header-slot" type="button" disabled title="当前没有真实任务"><span>任务</span><small>0</small></button>
+            <button class="header-slot" type="button" disabled title="当前没有真实通知"><span>通知</span><small>0</small></button>
+            <button class="header-slot header-help" type="button" disabled title="帮助中心尚未接入"><span>帮助</span></button>
             <a class="account-entry" href="#/creator/account" title="个人空间即将上线" aria-label="创作者个人空间，即将上线">
               <span class="account-avatar" aria-hidden="true">创</span>
               <span class="account-copy"><strong>创作者</strong></span>
@@ -143,6 +145,11 @@
           </aside>
         </div>
 
+        <section class="bottom-drawer" id="bottom-drawer" aria-label="版本、任务与活动" hidden>
+          <header><strong id="bottom-drawer-title">版本与活动</strong><button type="button" class="button button-text" data-action="toggle-bottom-drawer">收起</button></header>
+          <div id="bottom-drawer-content"></div>
+        </section>
+
         <footer class="sticky-action-bar" id="sticky-action-bar" aria-label="当前页面操作"></footer>
       </div>
     </div>
@@ -158,33 +165,28 @@
       <span aria-hidden="true">i</span>
     </button>
 
-    <dialog class="modal" id="project-dialog" aria-labelledby="project-dialog-title">
+    <dialog class="modal project-wizard" id="project-dialog" aria-labelledby="project-dialog-title">
       <form method="dialog" id="project-form">
         <div class="modal-heading">
           <div>
-            <span class="eyebrow">临时项目草稿</span>
-            <h2 id="project-dialog-title">创建项目草稿</h2>
+            <span class="eyebrow">PROJECT CONTEXT FOUNDATION</span>
+            <h2 id="project-dialog-title">新建项目</h2>
           </div>
           <button class="icon-button" type="button" data-action="close-project-dialog" aria-label="关闭">×</button>
         </div>
-        <div class="boundary-callout">
-          <strong>仅当前会话有效</strong>
-          <p>这个临时草稿不会保存到系统，刷新页面后将自动清除。</p>
-        </div>
-        <label class="field-label">
-          项目名称
-            <input name="title" maxlength="48" required placeholder="例如：晚灯 · 第 2 集">
-        </label>
-        <label class="field-label">
-          内容格式
-          <select name="format">
-            <option value="竖屏短视频 · 9:16">竖屏短视频 · 9:16</option>
-            <option value="横屏概念片 · 16:9">横屏概念片 · 16:9</option>
-          </select>
-        </label>
+        <ol class="wizard-progress" aria-label="项目创建步骤">
+          <li class="is-current" data-wizard-step-indicator="1"><span>01</span>项目类型</li>
+          <li data-wizard-step-indicator="2"><span>02</span>基本信息</li>
+          <li data-wizard-step-indicator="3"><span>03</span>制作默认值</li>
+          <li data-wizard-step-indicator="4"><span>04</span>检查</li>
+        </ol>
+        <div class="boundary-callout"><strong>Project Context 尚未启用</strong><p>可以完整检查配置流程，但本任务不会创建 projectRef，也不会写入正式项目事实。</p></div>
+        <div id="project-wizard-content"></div>
         <div class="modal-actions">
-          <button class="button button-secondary" type="button" data-action="close-project-dialog">取消</button>
-          <button class="button button-primary" type="submit">加入当前会话</button>
+          <button class="button button-text" type="button" data-action="close-project-dialog">取消</button>
+          <button class="button button-secondary" type="button" data-action="wizard-previous" hidden>上一步</button>
+          <button class="button button-primary" type="button" data-action="wizard-next">下一步</button>
+          <button class="button button-primary" type="submit" data-action="wizard-submit" disabled hidden>创建项目（尚未启用）</button>
         </div>
       </form>
     </dialog>
@@ -204,9 +206,11 @@
           "v21PresentationVersion": "Creator UI V2.1 Product Polish",
           "v2CloseoutTaskId": "ACS-CREATOR-UI-V2-FINAL-CLOSEOUT-003",
           "v2CloseoutVersion": "Creator UI V2 Final Visual Closeout",
+          "uiR1TaskId": "ACS-CREATOR-UI-R1-ENTERPRISE-REBASELINE-001",
+          "uiR1Version": "Enterprise Dark Cinematic Visual Baseline",
           "capabilityTaskId": "ACS-CREATOR-AI-DIRECTOR-001",
           "capabilityVersion": "AI Director Real Intelligence Phase 1",
-          "canonicalRouteCount": 27,
+          "canonicalRouteCount": 32,
           "mode": "fixture-only",
           "classification": ["FIXTURE ONLY", "NOT A DOMAIN FACT"],
           "persistence": "session-only",
@@ -216,22 +220,21 @@
         },
         "workspace": {
           "localKey": "fixture-workspace-wanlight",
+          "workspaceRef": "fixture-workspace-wanlight",
+          "contentProfileRef": "fixture-content-profile-wanlight",
           "name": "Creator Workspace",
           "edition": "Internal Validation Product",
           "operatorLabel": "单一创作者 · Fixture 模式"
         },
-        "project": {
-          "localKey": "fixture-project-x2-e001",
-          "projectRef": "fixture-project-x2-e001",
-          "workspaceRef": "fixture-workspace-wanlight",
-          "contentProfileRef": "fixture-content-profile-wanlight",
-          "title": "晚灯 Episode001",
+        "referenceContext": {
+          "localKey": "fixture-reference-x2-e001",
+          "title": "晚灯 · 第 1 集",
           "workingTitle": "今晚先别证明自己",
-          "status": "Available - Fixture Only",
+          "status": "Internal visual reference",
           "format": "9:16 竖屏短视频",
           "durationSeconds": 45,
           "description": "一个关于疲惫、自我接纳与微小行动的夜间情绪短片。",
-          "domainNotice": "FIXTURE ONLY · NOT A DOMAIN FACT",
+          "domainNotice": "INTERNAL VISUAL REFERENCE · NOT A PROJECT FACT",
           "candidate": "X2_E001_Candidate_v1.mp4"
         },
         "aiDirector": {
@@ -264,17 +267,17 @@
           "rightsNotice": "Rights HOLD · 内部 Fixture 展示 · 不可发布"
         },
         "pipeline": [
-          {"localKey":"fixture-stage-idea","label":"Idea","status":"In Progress","source":"X2 Content Brief","blocker":"内容假设尚未形成可识别人类冻结","evidence":"Brief v0.1","route":"/creator/projects/fixture-project-x2-e001/pipeline","allowed":"查看 Brief 摘要","forbidden":"自动推进阶段"},
-          {"localKey":"fixture-stage-story","label":"Story","status":"In Progress","source":"Episode 001 definition","blocker":"Canonical creative review 未完成","evidence":"45 秒内容结构","route":"/creator/projects/fixture-project-x2-e001/story","allowed":"查看故事占位","forbidden":"生成或改写故事"},
-          {"localKey":"fixture-stage-ip-bible","label":"IP Bible","status":"In Progress","source":"WANLIGHT Bible v0.1","blocker":"Human acceptance 与 Rights 未完成","evidence":"角色规则草稿","route":"/creator/projects/fixture-project-x2-e001/ip-bible","allowed":"查看参考状态","forbidden":"设为 canonical truth"},
-          {"localKey":"fixture-stage-character","label":"Character","status":"Blocked","source":"Reference + F01–F06","blocker":"Rights / independent review HOLD","evidence":"X2-C01 Reference v0.1","route":"/creator/projects/fixture-project-x2-e001/character","allowed":"浏览 Fixture 资产","forbidden":"批准或发布角色"},
-          {"localKey":"fixture-stage-storyboard","label":"Storyboard","status":"In Progress","source":"Six-shot storyboard","blocker":"Canonical acceptance 未完成","evidence":"F01–F06 / 0–45s","route":"/creator/projects/fixture-project-x2-e001/storyboard","allowed":"浏览镜头与字幕","forbidden":"创建 Domain Shot"},
+          {"localKey":"fixture-stage-idea","label":"Idea","status":"In Progress","source":"X2 Content Brief","blocker":"内容假设尚未形成可识别人类冻结","evidence":"Brief v0.1","route":"/creator/project-shell/overview","allowed":"查看 Brief 摘要","forbidden":"自动推进阶段"},
+          {"localKey":"fixture-stage-story","label":"Story","status":"In Progress","source":"Episode 001 definition","blocker":"Canonical creative review 未完成","evidence":"45 秒内容结构","route":"/creator/project-shell/episodes","allowed":"查看内容结构","forbidden":"生成或改写故事"},
+          {"localKey":"fixture-stage-ip-bible","label":"IP Bible","status":"In Progress","source":"WANLIGHT Bible v0.1","blocker":"Human acceptance 与 Rights 未完成","evidence":"角色规则草稿","route":"/creator/project-shell/planning/bible","allowed":"查看参考状态","forbidden":"设为 canonical truth"},
+          {"localKey":"fixture-stage-character","label":"Character","status":"Blocked","source":"Reference + F01–F06","blocker":"Rights / independent review HOLD","evidence":"X2-C01 Reference v0.1","route":"/creator/project-shell/planning/characters","allowed":"浏览内部参考资产","forbidden":"批准或发布角色"},
+          {"localKey":"fixture-stage-storyboard","label":"Storyboard","status":"In Progress","source":"Six-shot visual reference","blocker":"Storyboard Domain 尚未建立","evidence":"F01–F06 / 0–45s","route":"/creator/project-shell/production/storyboard","allowed":"审查工作台结构","forbidden":"创建 Storyboard 或 Shot 事实"},
           {"localKey":"fixture-stage-assets","label":"Assets","status":"Blocked","source":"Local Fixture files","blocker":"Rights remains HOLD","evidence":"1 Reference + 6 frames","route":"/creator/assets","allowed":"查看来源与版本","forbidden":"上传、写入或清权"},
-          {"localKey":"fixture-stage-audio","label":"Audio","status":"Planned","source":"Candidate is silent","blocker":"No Audio capability","evidence":"0 audio streams","route":"/creator/projects/fixture-project-x2-e001/audio","allowed":"查看 Planned 状态","forbidden":"生成或混音"},
-          {"localKey":"fixture-stage-timeline","label":"Timeline","status":"In Progress","source":"Manual assembly timing","blocker":"No Timeline Domain","evidence":"6 segments / 45s","route":"/creator/projects/fixture-project-x2-e001/timeline","allowed":"查看时间摘要","forbidden":"渲染或执行"},
-          {"localKey":"fixture-stage-preview","label":"Preview","status":"Complete — Technical only","source":"Local Candidate v1","blocker":"Human/Rights/Platform remain HOLD","evidence":"Technical decode PASS","route":"/creator/projects/fixture-project-x2-e001/preview","allowed":"播放本地 Candidate","forbidden":"解释为正式成片"},
-          {"localKey":"fixture-stage-approval","label":"Approval","status":"Blocked","source":"No accepted human decision","blocker":"Human authority missing","evidence":"Binding result NONE","route":"/creator/projects/fixture-project-x2-e001/approval","allowed":"查看阻塞","forbidden":"AI 自动批准"},
-          {"localKey":"fixture-stage-export","label":"Export","status":"Blocked","source":"No Export Engine","blocker":"Rights/Approval/Render unavailable","evidence":"Candidate only","route":"/creator/projects/fixture-project-x2-e001/export","allowed":"查看资格说明","forbidden":"导出、下载或发布"}
+          {"localKey":"fixture-stage-audio","label":"Audio","status":"Planned","source":"Candidate is silent","blocker":"No Audio capability","evidence":"0 audio streams","route":"/creator/project-shell/production/assets","allowed":"查看能力状态","forbidden":"生成或混音"},
+          {"localKey":"fixture-stage-timeline","label":"Timeline","status":"Planned","source":"Manual assembly timing","blocker":"No Timeline Domain","evidence":"6 segments / 45s","route":"/creator/project-shell/post/timeline","allowed":"审查编辑器结构","forbidden":"创建 Timeline 或渲染"},
+          {"localKey":"fixture-stage-preview","label":"Preview","status":"Complete — Technical only","source":"Local Candidate v1","blocker":"Human/Rights/Platform remain HOLD","evidence":"Technical decode PASS","route":"/creator/project-shell/post/preview","allowed":"播放本地参考 Candidate","forbidden":"解释为正式 PreviewCandidate 或成片"},
+          {"localKey":"fixture-stage-approval","label":"Approval","status":"Blocked","source":"No accepted human decision","blocker":"Human authority missing","evidence":"Binding result NONE","route":"/creator/project-shell/post/approvals","allowed":"查看阻塞","forbidden":"AI 自动批准"},
+          {"localKey":"fixture-stage-export","label":"Export","status":"Blocked","source":"No Export Engine","blocker":"Rights/Approval/Render unavailable","evidence":"Candidate only","route":"/creator/project-shell/delivery/exports","allowed":"查看资格说明","forbidden":"导出、下载或发布"}
         ],
         "assets": [
           {"localKey":"fixture-asset-reference","kind":"reference","label":"晚灯角色设定表","version":"v0.1","status":"Fixture reference","src":"./assets/fixture/x2/character/wanlight-reference-v0.1.png","usedBy":"Character / Project","rights":"HOLD"},
