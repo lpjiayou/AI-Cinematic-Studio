@@ -1,0 +1,94 @@
+{
+  "task": "M3 — Script Studio",
+  "milestoneStatus": "candidate-under-validation",
+  "browser": {
+    "product": "Google Chrome",
+    "version": "151.0.7922.108",
+    "controlMethod": "headless-new-cdp",
+    "viewport": {
+      "width": 1366,
+      "height": 768,
+      "deviceScaleFactor": 1
+    }
+  },
+  "liveGate": {
+    "providerCallPath": "Application -> V4 TextGenerationPort -> configured provider",
+    "scriptGeneration": "pass",
+    "sceneRewrite": "pass",
+    "providerNameVisibleInBrowser": false,
+    "rawProviderResponseStored": false
+  },
+  "productionChain": {
+    "inputSchema": "creator.script-studio.bootstrap-input.v1",
+    "scriptVersionSchema": "creator.script-studio.script-version.v1",
+    "storyboardCandidateSchema": "creator.storyboard.bootstrap-input.v1",
+    "versionHistoryCount": 3,
+    "humanConfirmation": "pass",
+    "refreshPersistence": "pass",
+    "serverRestartPersistence": "pass",
+    "storyboardProductionAuthorized": false,
+    "nextGate": "m4-ip-character-binding-required"
+  },
+  "browserVerification": {
+    "generatingStateObserved": true,
+    "manualEditCreatedNewVersion": true,
+    "sceneRewriteCreatedNewVersion": true,
+    "nonTargetScenesPreserved": true,
+    "confirmedVersionPersisted": true,
+    "consoleErrors": 0,
+    "pageErrors": 0,
+    "unexpectedHttpErrors": 0,
+    "horizontalOverflowPixels": 0
+  },
+  "screenshots": [
+    {
+      "file": "ACS-CREATOR-M3-001-script-empty.png",
+      "route": "/creator/projects/:episodeRef/script",
+      "state": "source-context-empty",
+      "sha256": "1BAE7976CA700FFA25B15CD3C568A9A0C69AC7E5068AFA7A8B85328E5955ABDF"
+    },
+    {
+      "file": "ACS-CREATOR-M3-002-script-v1.png",
+      "route": "/creator/projects/:episodeRef/script",
+      "state": "script-v1",
+      "sha256": "188A85B7C92AC2AF5E62606548F26FE5583B6306F47E0CA822A75880DC94A708"
+    },
+    {
+      "file": "ACS-CREATOR-M3-003-script-v2.png",
+      "route": "/creator/projects/:episodeRef/script",
+      "state": "manual-edit-v2",
+      "sha256": "0F949B5153C8EA8CE03FA11DE4B0EAFEF2AA4D6D295D2A60F1F9087E1847DB66"
+    },
+    {
+      "file": "ACS-CREATOR-M3-004-script-v3.png",
+      "route": "/creator/projects/:episodeRef/script",
+      "state": "scene-rewrite-v3",
+      "sha256": "F2EAC74AD6C4EB391FC88B697D3FB2DA489DD82CBF78A5F622E5CD5240C364E2"
+    },
+    {
+      "file": "ACS-CREATOR-M3-005-script-confirmed.png",
+      "route": "/creator/projects/:episodeRef/script",
+      "state": "human-confirmed-and-storyboard-candidate-ready",
+      "sha256": "02B0E41209B1FC51AF6744C64A8E08AD0528695860E998D322ECE902A572B74C"
+    },
+    {
+      "file": "ACS-CREATOR-M3-006-script-refresh.png",
+      "route": "/creator/projects/:episodeRef/script",
+      "state": "refresh-persistence",
+      "sha256": "38453103DE00CD73579718234DA0F327654669D9224253700F8A181BA84C0F21"
+    },
+    {
+      "file": "ACS-CREATOR-M3-007-script-server-restart.png",
+      "route": "/creator/projects/:episodeRef/script",
+      "state": "server-restart-persistence",
+      "sha256": "38453103DE00CD73579718234DA0F327654669D9224253700F8A181BA84C0F21"
+    }
+  ],
+  "tests": {
+    "unit": 203,
+    "contract": 45,
+    "integration": 22,
+    "total": 270,
+    "result": "pass"
+  }
+}

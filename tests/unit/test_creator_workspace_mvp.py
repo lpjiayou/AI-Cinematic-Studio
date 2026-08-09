@@ -52,6 +52,7 @@ class CreatorWorkspaceMvpTest(unittest.TestCase):
             "/creator/projects/:projectRef",
             "/creator/projects/:projectRef/pipeline",
             "/creator/projects/:projectRef/story",
+            "/creator/projects/:projectRef/script",
             "/creator/projects/:projectRef/ip-bible",
             "/creator/projects/:projectRef/character",
             "/creator/projects/:projectRef/scene",
@@ -76,7 +77,7 @@ class CreatorWorkspaceMvpTest(unittest.TestCase):
         ).group(1)
         actual_routes = re.findall(r'"(/creator[^\"]+)"', route_block)
         self.assertEqual(actual_routes, expected_routes)
-        self.assertEqual(self.fixture["meta"]["canonicalRouteCount"], 26)
+        self.assertEqual(self.fixture["meta"]["canonicalRouteCount"], 27)
         self.assertNotIn(":id", route_block)
         self.assertIn(":projectRef", route_block)
 
@@ -126,10 +127,11 @@ class CreatorWorkspaceMvpTest(unittest.TestCase):
         self.assertIn("creationModules.map", self.script)
         self.assertIn("即将上线", self.script)
 
-    def test_project_workspace_has_exact_twelve_pages_and_default_pipeline(self):
+    def test_project_workspace_includes_script_studio_and_default_pipeline(self):
         keys = (
             'key: "pipeline"',
             'key: "story"',
+            'key: "script"',
             'key: "ip-bible"',
             'key: "character"',
             'key: "scene"',
@@ -429,7 +431,7 @@ class CreatorWorkspaceMvpTest(unittest.TestCase):
             "ACS-CREATOR-UI-V2-IMPLEMENTATION-001",
         )
         self.assertEqual(len(self.fixture["pipeline"]), 11)
-        self.assertEqual(self.fixture["meta"]["canonicalRouteCount"], 26)
+        self.assertEqual(self.fixture["meta"]["canonicalRouteCount"], 27)
         self.assertFalse(self.fixture["meta"]["domainFact"])
 
     def test_v2_presentation_metadata_is_explicit(self):
@@ -989,6 +991,60 @@ class CreatorWorkspaceMvpTest(unittest.TestCase):
         self.assertIn('id="preview-error" hidden', self.script)
         self.assertIn('role="alert"', self.script)
         self.assertNotIn("progressPercent", self.script)
+
+    def test_m3_script_studio_is_project_scoped_and_uses_same_origin_application_boundary(self):
+        self.assertIn('{ key: "script", label: "剧本", english: "Script Studio", status: "available" }', self.script)
+        self.assertIn('if (pageKey === "script") return { ...baseRoute, type: "script-studio" };', self.script)
+        for endpoint in (
+            'const scriptWorkspaceEndpoint = "/creator/internal/script-studio"',
+            '`${scriptWorkspaceEndpoint}/generate`',
+            '`${scriptWorkspaceEndpoint}/manual-version`',
+            '`${scriptWorkspaceEndpoint}/rewrite-scene`',
+            '`${scriptWorkspaceEndpoint}/confirm`',
+            '`${scriptWorkspaceEndpoint}/storyboard-bootstrap`',
+        ):
+            self.assertIn(endpoint, self.script)
+        self.assertNotIn("deepseek.com", self.script.lower())
+        self.assertNotIn("PROVIDER_API_KEY", self.script)
+
+    def test_m3_script_studio_renders_source_editor_version_and_confirmation_states(self):
+        for marker in (
+            'data-script-state="${generating ? "generating" : state.scriptError ? "error" : "empty"}"',
+            'state.scriptPhase === "generating"',
+            'id="script-edit-form"',
+            'id="script-rewrite-form"',
+            'data-action="generate-script"',
+            'data-action="select-script-version"',
+            'data-action="select-script-scene"',
+            'data-action="confirm-script-version"',
+            "生成正式剧本",
+            "保存为新版本",
+            "改写当前场景",
+            "版本历史",
+            "等待人工确认",
+        ):
+            self.assertIn(marker, self.script)
+        self.assertIn("保存会创建新的不可变 ScriptVersion", self.script)
+
+    def test_m3_script_studio_preserves_human_and_downstream_gates(self):
+        self.assertIn("生成成功不代表人工确认", self.script)
+        self.assertIn("确认只更新引用，不会改写任何历史版本", self.script)
+        self.assertIn("草稿版本不会开放分镜输入", self.script)
+        self.assertIn("仍需 M4 角色与 IP 绑定，不会开始分镜生产", self.script)
+        self.assertNotIn("开始分镜生产</button>", self.script)
+
+    def test_m3_script_studio_styles_are_capability_scoped_and_responsive(self):
+        for selector in (
+            ".script-source-layout",
+            ".script-studio-layout",
+            ".script-scenes-panel",
+            ".script-editor-panel",
+            ".script-versions-panel",
+            ".script-rewrite-form",
+            ".storyboard-bridge-card",
+        ):
+            self.assertIn(selector, self.styles)
+        self.assertIn("@media (max-width: 900px)", self.styles)
 
 
 if __name__ == "__main__":

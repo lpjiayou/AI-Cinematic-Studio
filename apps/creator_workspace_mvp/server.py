@@ -18,11 +18,22 @@ from apps.creator_workspace_mvp.ai_director import (
     PlanValidationError,
     validate_plan,
 )
+from apps.creator_workspace_mvp.script_studio import (
+    ScriptCandidateValidationError,
+    ScriptGenerationError,
+    ScriptStudioApplicationService,
+)
 from services.v5_core_os.series_episode import (
     SeriesEpisodePublicBoundary,
     SeriesEpisodePublicError,
-    create_in_memory_boundary,
-    create_local_development_boundary_from_environment,
+    create_in_memory_boundary as create_in_memory_series_boundary,
+    create_local_development_boundary_from_environment as create_local_series_boundary_from_environment,
+)
+from services.v5_core_os.script_studio import (
+    ScriptStudioPublicBoundary,
+    ScriptStudioPublicError,
+    create_in_memory_boundary as create_in_memory_script_boundary,
+    create_local_development_boundary_from_environment as create_local_script_boundary_from_environment,
 )
 from services.v4_platform import (
     ProviderConfigurationError,
@@ -36,7 +47,13 @@ AI_DIRECTOR_ENDPOINT = "/creator/internal/ai-director/plan"
 SERIES_ENDPOINT = "/creator/internal/series"
 CONFIRM_PLAN_ENDPOINT = "/creator/internal/creative-plans/confirm"
 EPISODES_ENDPOINT = "/creator/internal/episodes"
-MAX_REQUEST_BYTES = 64_000
+SCRIPT_WORKSPACE_ENDPOINT = "/creator/internal/script-studio"
+SCRIPT_GENERATE_ENDPOINT = f"{SCRIPT_WORKSPACE_ENDPOINT}/generate"
+SCRIPT_MANUAL_VERSION_ENDPOINT = f"{SCRIPT_WORKSPACE_ENDPOINT}/manual-version"
+SCRIPT_REWRITE_ENDPOINT = f"{SCRIPT_WORKSPACE_ENDPOINT}/rewrite-scene"
+SCRIPT_CONFIRM_ENDPOINT = f"{SCRIPT_WORKSPACE_ENDPOINT}/confirm"
+STORYBOARD_BOOTSTRAP_ENDPOINT = f"{SCRIPT_WORKSPACE_ENDPOINT}/storyboard-bootstrap"
+MAX_REQUEST_BYTES = 512_000
 
 
 class _UnconfiguredTextProvider:
@@ -52,15 +69,28 @@ class CreatorRequestHandler(SimpleHTTPRequestHandler):
         *args: Any,
         ai_director_service: AiDirectorService,
         series_episode_boundary: SeriesEpisodePublicBoundary,
+        script_studio_service: ScriptStudioApplicationService,
+        script_studio_boundary: ScriptStudioPublicBoundary,
         **kwargs: Any,
     ) -> None:
         self.ai_director_service = ai_director_service
         self.series_episode_boundary = series_episode_boundary
+        self.script_studio_service = script_studio_service
+        self.script_studio_boundary = script_studio_boundary
         super().__init__(*args, **kwargs)
 
     def do_POST(self) -> None:
         path = urlsplit(self.path).path
-        if path not in {AI_DIRECTOR_ENDPOINT, SERIES_ENDPOINT, CONFIRM_PLAN_ENDPOINT, EPISODES_ENDPOINT}:
+        if path not in {
+            AI_DIRECTOR_ENDPOINT,
+            SERIES_ENDPOINT,
+            CONFIRM_PLAN_ENDPOINT,
+            EPISODES_ENDPOINT,
+            SCRIPT_GENERATE_ENDPOINT,
+            SCRIPT_MANUAL_VERSION_ENDPOINT,
+            SCRIPT_REWRITE_ENDPOINT,
+            SCRIPT_CONFIRM_ENDPOINT,
+        }:
             self._send_json(404, {"ok": False, "error": {"code": "not_found"}})
             return
         if self.headers.get_content_type() != "application/json":
@@ -80,6 +110,9 @@ class CreatorRequestHandler(SimpleHTTPRequestHandler):
             return
         if not isinstance(payload, dict):
             self._send_application_error(400, "invalid_request")
+            return
+        if path.startswith(SCRIPT_WORKSPACE_ENDPOINT):
+            self._handle_script_post(path, payload)
             return
         if path != AI_DIRECTOR_ENDPOINT:
             self._handle_creator_post(path, payload)
@@ -122,7 +155,34 @@ class CreatorRequestHandler(SimpleHTTPRequestHandler):
         query = parse_qs(parsed.query)
         workspace_ref = query.get("workspaceRef", [""])[0]
         series_ref = query.get("seriesRef", [""])[0]
+        episode_ref = query.get("episodeRef", [""])[0]
         try:
+            if path == SCRIPT_WORKSPACE_ENDPOINT:
+                self._send_json(
+                    200,
+                    {
+                        "ok": True,
+                        "workspace": self.script_studio_boundary.get_workspace(
+                            workspace_ref,
+                            series_ref,
+                            episode_ref,
+                        ),
+                    },
+                )
+                return
+            if path == STORYBOARD_BOOTSTRAP_ENDPOINT:
+                self._send_json(
+                    200,
+                    {
+                        "ok": True,
+                        "bootstrap": self.script_studio_boundary.build_storyboard_bootstrap(
+                            workspace_ref,
+                            series_ref,
+                            episode_ref,
+                        ),
+                    },
+                )
+                return
             if path == SERIES_ENDPOINT:
                 self._send_json(200, {"ok": True, "series": self.series_episode_boundary.list_series(workspace_ref)})
                 return
@@ -144,7 +204,100 @@ class CreatorRequestHandler(SimpleHTTPRequestHandler):
         except SeriesEpisodePublicError as exc:
             self._send_series_episode_error(exc)
             return
+        except ScriptStudioPublicError as exc:
+            self._send_script_studio_error(exc)
+            return
         super().do_GET()
+
+    def _handle_script_post(self, path: str, payload: MappingLike) -> None:
+        try:
+            if path == SCRIPT_GENERATE_ENDPOINT:
+                scope = self._script_scope(payload)
+                bootstrap = self.series_episode_boundary.build_script_studio_bootstrap(
+                    scope["workspaceRef"],
+                    scope["seriesRef"],
+                    scope["episodeRef"],
+                )
+                content = self.script_studio_service.generate(bootstrap)
+                result = self.script_studio_boundary.create_version(
+                    {**scope, "changeKind": "ai-generation", "content": content}
+                )
+            elif path == SCRIPT_MANUAL_VERSION_ENDPOINT:
+                result = self.script_studio_boundary.create_version(
+                    {
+                        **self._script_scope(payload),
+                        "scriptRef": payload.get("scriptRef"),
+                        "baseScriptVersionRef": payload.get("baseScriptVersionRef"),
+                        "changeKind": "manual-edit",
+                        "content": payload.get("content"),
+                    }
+                )
+            elif path == SCRIPT_REWRITE_ENDPOINT:
+                scope = self._script_scope(payload)
+                workspace = self.script_studio_boundary.get_workspace(
+                    scope["workspaceRef"], scope["seriesRef"], scope["episodeRef"]
+                )
+                script_ref = payload.get("scriptRef")
+                base_ref = payload.get("baseScriptVersionRef")
+                version = next(
+                    (
+                        item
+                        for item in workspace["versions"]
+                        if item["scriptVersionRef"] == base_ref
+                    ),
+                    None,
+                )
+                if workspace["script"] is None or workspace["script"]["scriptRef"] != script_ref or version is None:
+                    raise ScriptStudioPublicError("not_found", 404)
+                content = self.script_studio_service.rewrite_scene(
+                    bootstrap=workspace["bootstrap"],
+                    current_version=version,
+                    script_scene_ref=str(payload.get("scriptSceneRef") or ""),
+                    instruction=str(payload.get("instruction") or ""),
+                )
+                result = self.script_studio_boundary.create_version(
+                    {
+                        **scope,
+                        "scriptRef": script_ref,
+                        "baseScriptVersionRef": base_ref,
+                        "changeKind": "ai-scene-rewrite",
+                        "content": content,
+                    }
+                )
+            else:
+                result = self.script_studio_boundary.confirm_version(
+                    {
+                        **self._script_scope(payload),
+                        "scriptRef": payload.get("scriptRef"),
+                        "scriptVersionRef": payload.get("scriptVersionRef"),
+                        "humanConfirmed": payload.get("humanConfirmed"),
+                    }
+                )
+        except ScriptGenerationError as exc:
+            self._log_script_provider_error(exc)
+            self._send_script_product_error(200, exc.code)
+            return
+        except ScriptCandidateValidationError:
+            self._send_application_error(400, "invalid_script_candidate")
+            return
+        except ScriptStudioPublicError as exc:
+            self._send_script_studio_error(exc)
+            return
+        except SeriesEpisodePublicError as exc:
+            self._send_series_episode_error(exc)
+            return
+        except Exception:
+            self._send_application_error(500, "application_error")
+            return
+        self._send_json(201, {"ok": True, **result})
+
+    @staticmethod
+    def _script_scope(payload: MappingLike) -> MappingLike:
+        return {
+            "workspaceRef": payload.get("workspaceRef"),
+            "seriesRef": payload.get("seriesRef"),
+            "episodeRef": payload.get("episodeRef"),
+        }
 
     def _handle_creator_post(self, path: str, payload: MappingLike) -> None:
         try:
@@ -184,6 +337,9 @@ class CreatorRequestHandler(SimpleHTTPRequestHandler):
     def _send_series_episode_error(self, exc: SeriesEpisodePublicError) -> None:
         self._send_application_error(exc.status, exc.code)
 
+    def _send_script_studio_error(self, exc: ScriptStudioPublicError) -> None:
+        self._send_application_error(exc.status, exc.code)
+
     def _send_application_error(self, status: int, code: str) -> None:
         messages = {
             "invalid_request": "请检查输入后重试。",
@@ -192,6 +348,9 @@ class CreatorRequestHandler(SimpleHTTPRequestHandler):
             "creative_plan_not_confirmed": "请先完成人工确认。",
             "scope_mismatch": "当前工作区与内容引用不匹配。",
             "invalid_creative_plan": "创意方案未通过校验。",
+            "invalid_script_candidate": "剧本候选内容未通过校验。",
+            "version_conflict": "剧本版本已更新，请刷新后重试。",
+            "script_not_confirmed": "请先确认一个剧本版本。",
             "application_error": "暂时无法完成操作，请稍后重试。",
         }
         self._send_json(status, {"ok": False, "error": {"code": code, "message": messages.get(code, messages["application_error"])}})
@@ -208,11 +367,35 @@ class CreatorRequestHandler(SimpleHTTPRequestHandler):
             },
         )
 
+    def _send_script_product_error(self, status: int, code: str) -> None:
+        self._send_json(
+            status,
+            {
+                "ok": False,
+                "error": {
+                    "code": code,
+                    "message": "剧本暂时无法生成，请稍后重试。",
+                },
+            },
+        )
+
     @staticmethod
     def _log_provider_error(exc: PlanGenerationError) -> None:
         status = exc.provider_status if exc.provider_status is not None else "none"
         print(
             "AI_DIRECTOR_PROVIDER_ERROR "
+            f"category={exc.diagnostic_category} "
+            f"status={status} "
+            f"exception={exc.exception_name}",
+            file=sys.stderr,
+            flush=True,
+        )
+
+    @staticmethod
+    def _log_script_provider_error(exc: ScriptGenerationError) -> None:
+        status = exc.provider_status if exc.provider_status is not None else "none"
+        print(
+            "SCRIPT_STUDIO_PROVIDER_ERROR "
             f"category={exc.diagnostic_category} "
             f"status={status} "
             f"exception={exc.exception_name}",
@@ -246,12 +429,17 @@ def create_server(
     service: AiDirectorService,
     static_directory: Path | None = None,
     series_episode_boundary: SeriesEpisodePublicBoundary | None = None,
+    script_studio_service: ScriptStudioApplicationService | None = None,
+    script_studio_boundary: ScriptStudioPublicBoundary | None = None,
 ) -> ThreadingHTTPServer:
     directory = (static_directory or default_static_directory()).resolve()
+    series_boundary = series_episode_boundary or create_in_memory_series_boundary()
     handler = partial(
         CreatorRequestHandler,
         ai_director_service=service,
-        series_episode_boundary=series_episode_boundary or create_in_memory_boundary(),
+        series_episode_boundary=series_boundary,
+        script_studio_service=script_studio_service or ScriptStudioApplicationService(_UnconfiguredTextProvider()),
+        script_studio_boundary=script_studio_boundary or create_in_memory_script_boundary(series_boundary),
         directory=str(directory),
     )
     server = ThreadingHTTPServer(address, handler)
@@ -268,14 +456,26 @@ def service_from_environment() -> AiDirectorService:
 
 
 def series_episode_boundary_from_environment() -> SeriesEpisodePublicBoundary:
-    return create_local_development_boundary_from_environment()
+    return create_local_series_boundary_from_environment()
+
+
+def capability_services_from_environment() -> tuple[AiDirectorService, ScriptStudioApplicationService]:
+    try:
+        provider: TextProvider = create_text_provider_from_environment()
+    except ProviderConfigurationError:
+        provider = _UnconfiguredTextProvider()
+    return AiDirectorService(provider), ScriptStudioApplicationService(provider)
 
 
 def main() -> None:
+    series_boundary = series_episode_boundary_from_environment()
+    ai_director_service, script_service = capability_services_from_environment()
     server = create_server(
         ("127.0.0.1", 8765),
-        service_from_environment(),
-        series_episode_boundary=series_episode_boundary_from_environment(),
+        ai_director_service,
+        series_episode_boundary=series_boundary,
+        script_studio_service=script_service,
+        script_studio_boundary=create_local_script_boundary_from_environment(series_boundary),
     )
     print("Creator Workspace available at http://127.0.0.1:8765")
     try:
