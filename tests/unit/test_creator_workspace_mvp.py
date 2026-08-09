@@ -1,0 +1,993 @@
+import json
+import re
+import unittest
+from pathlib import Path
+
+
+REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
+APP_ROOT = REPOSITORY_ROOT / "apps" / "creator-workspace-mvp"
+INDEX_PATH = APP_ROOT / "index.html"
+STYLES_PATH = APP_ROOT / "styles.css"
+SCRIPT_PATH = APP_ROOT / "app.js"
+
+
+class CreatorWorkspaceMvpTest(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.index = INDEX_PATH.read_text(encoding="utf-8")
+        cls.styles = STYLES_PATH.read_text(encoding="utf-8")
+        cls.script = SCRIPT_PATH.read_text(encoding="utf-8")
+        match = re.search(
+            r'<script type="application/json" id="creator-fixture">\s*(.*?)\s*</script>',
+            cls.index,
+            flags=re.DOTALL,
+        )
+        if match is None:
+            raise AssertionError("Embedded Creator Workspace fixture was not found")
+        cls.fixture = json.loads(match.group(1))
+
+    def assert_markers_in_order(self, text, markers):
+        positions = [text.index(marker) for marker in markers]
+        self.assertEqual(positions, sorted(positions), markers)
+
+    def test_static_application_files_exist(self):
+        self.assertTrue(INDEX_PATH.is_file())
+        self.assertTrue(STYLES_PATH.is_file())
+        self.assertTrue(SCRIPT_PATH.is_file())
+
+    def test_shell_002_metadata_and_exact_canonical_route_contract(self):
+        self.assertEqual(self.fixture["meta"]["taskId"], "ACS-CREATOR-SHELL-002")
+        self.assertEqual(
+            self.fixture["meta"]["implementationVersion"],
+            "Frontend Skeleton V1.0",
+        )
+        expected_routes = [
+            "/creator/dashboard",
+            "/creator/projects",
+            "/creator/assets",
+            "/creator/creation",
+            "/creator/works",
+            "/creator/account",
+            "/creator/ai-director",
+            "/creator/projects/:projectRef",
+            "/creator/projects/:projectRef/pipeline",
+            "/creator/projects/:projectRef/story",
+            "/creator/projects/:projectRef/ip-bible",
+            "/creator/projects/:projectRef/character",
+            "/creator/projects/:projectRef/scene",
+            "/creator/projects/:projectRef/storyboard",
+            "/creator/projects/:projectRef/audio",
+            "/creator/projects/:projectRef/timeline",
+            "/creator/projects/:projectRef/preview",
+            "/creator/projects/:projectRef/approval",
+            "/creator/projects/:projectRef/export",
+            "/creator/projects/:projectRef/settings",
+            "/creator/creation/generation",
+            "/creator/creation/templates",
+            "/creator/creation/ip-studio",
+            "/creator/creation/memory",
+            "/creator/creation/workflow-presets",
+            "/creator/creation/analytics",
+        ]
+        route_block = re.search(
+            r"const canonicalRouteTemplates = Object\.freeze\(\[(.*?)\]\);",
+            self.script,
+            flags=re.DOTALL,
+        ).group(1)
+        actual_routes = re.findall(r'"(/creator[^\"]+)"', route_block)
+        self.assertEqual(actual_routes, expected_routes)
+        self.assertEqual(self.fixture["meta"]["canonicalRouteCount"], 26)
+        self.assertNotIn(":id", route_block)
+        self.assertIn(":projectRef", route_block)
+
+    def test_shell_implements_exact_primary_navigation_order(self):
+        expected_routes = [
+            '/creator/dashboard',
+            '/creator/ai-director',
+            '/creator/projects',
+            '/creator/assets',
+            '/creator/creation',
+            '/creator/works',
+        ]
+        primary_nav = re.search(
+            r'<nav class="primary-nav".*?</nav>', self.index, flags=re.DOTALL
+        ).group(0)
+        self.assertEqual(
+            re.findall(r'data-route="([^"]+)"', primary_nav), expected_routes
+        )
+        self.assert_markers_in_order(
+            primary_nav,
+            ("首页", "AI导演", "项目", "资产库", "创作中心", "作品"),
+        )
+        for forbidden in ("账户", "通知", "搜索", "任务"):
+            self.assertNotIn(forbidden, primary_nav)
+
+    def test_creation_center_has_exact_six_planned_modules_and_routes(self):
+        routes = (
+            "/creator/creation/generation",
+            "/creator/creation/templates",
+            "/creator/creation/ip-studio",
+            "/creator/creation/memory",
+            "/creator/creation/workflow-presets",
+            "/creator/creation/analytics",
+        )
+        labels = (
+            "Generation Center",
+            "Template Library",
+            "IP Studio",
+            "AI Memory",
+            "Workflow Preset",
+            "Analytics",
+        )
+        self.assert_markers_in_order(self.script, routes)
+        self.assert_markers_in_order(self.script, labels)
+        self.assertIn("让复杂创作变得更简单", self.script)
+        self.assertEqual(self.script.count('class="module-card"'), 1)
+        self.assertIn("creationModules.map", self.script)
+        self.assertIn("即将上线", self.script)
+
+    def test_project_workspace_has_exact_twelve_pages_and_default_pipeline(self):
+        keys = (
+            'key: "pipeline"',
+            'key: "story"',
+            'key: "ip-bible"',
+            'key: "character"',
+            'key: "scene"',
+            'key: "storyboard"',
+            'key: "audio"',
+            'key: "timeline"',
+            'key: "preview"',
+            'key: "approval"',
+            'key: "export"',
+            'key: "settings"',
+        )
+        self.assert_markers_in_order(self.script, keys)
+        self.assertIn("if (normalized === `/creator/projects/${projectRef}`)", self.script)
+        self.assertIn("redirect: `${projectBase}/pipeline`", self.script)
+        project_ref = self.fixture["project"]["projectRef"]
+        self.assertEqual(project_ref, "fixture-project-x2-e001")
+        self.assertEqual(
+            [stage["route"] for stage in self.fixture["pipeline"]],
+            [
+                f"/creator/projects/{project_ref}/pipeline",
+                f"/creator/projects/{project_ref}/story",
+                f"/creator/projects/{project_ref}/ip-bible",
+                f"/creator/projects/{project_ref}/character",
+                f"/creator/projects/{project_ref}/storyboard",
+                "/creator/assets",
+                f"/creator/projects/{project_ref}/audio",
+                f"/creator/projects/{project_ref}/timeline",
+                f"/creator/projects/{project_ref}/preview",
+                f"/creator/projects/{project_ref}/approval",
+                f"/creator/projects/{project_ref}/export",
+            ],
+        )
+
+    def test_pipeline_has_exact_eleven_stages_and_non_orchestration_boundary(self):
+        stages = self.fixture["pipeline"]
+        self.assertEqual(
+            [stage["label"] for stage in stages],
+            [
+                "Idea",
+                "Story",
+                "IP Bible",
+                "Character",
+                "Storyboard",
+                "Assets",
+                "Audio",
+                "Timeline",
+                "Preview",
+                "Approval",
+                "Export",
+            ],
+        )
+        required_fields = {
+            "localKey",
+            "label",
+            "status",
+            "source",
+            "blocker",
+            "evidence",
+            "route",
+            "allowed",
+            "forbidden",
+        }
+        self.assertTrue(all(required_fields <= set(stage) for stage in stages))
+        self.assertIn("PIPELINE VIEW / NO ORCHESTRATION", self.script)
+        self.assertIn("页面不会自动推进", self.script)
+        self.assertNotIn('data-action="advance-pipeline-stage"', self.script)
+
+    def test_feature_states_and_navigation_badges_are_separated(self):
+        state_block = re.search(
+            r"const featureStates = Object\.freeze\(\{(.*?)\}\);",
+            self.script,
+            flags=re.DOTALL,
+        ).group(1)
+        self.assert_markers_in_order(
+            state_block,
+            ('available:', 'fixture:', 'development:', 'planned:', 'disabled:'),
+        )
+        self.assertIn('label: "Available"', state_block)
+        self.assertIn('label: "Available - Fixture Only"', state_block)
+        self.assertIn('label: "In Development"', state_block)
+        self.assertIn('label: "Planned"', state_block)
+        self.assertIn('label: "Disabled"', state_block)
+        self.assertIn('available: { label: "Available", badge: ""', state_block)
+        for badge in ("Fixture Only", "In Development", "Planned", "Disabled"):
+            self.assertIn(badge, state_block)
+        self.assertIn("governance-badge", self.script)
+
+    def test_fixture_boundary_is_persistent_and_machine_readable(self):
+        self.assertIn("FIXTURE ONLY", self.index)
+        self.assertIn("NOT A DOMAIN FACT", self.index)
+        self.assertIn("V5 NOT CONNECTED", self.script)
+        self.assertEqual(
+            self.fixture["meta"]["classification"],
+            ["FIXTURE ONLY", "NOT A DOMAIN FACT"],
+        )
+        self.assertEqual(self.fixture["meta"]["mode"], "fixture-only")
+        self.assertEqual(self.fixture["meta"]["persistence"], "session-only")
+        self.assertEqual(self.fixture["meta"]["v5Connection"], "not-connected")
+        self.assertFalse(self.fixture["meta"]["domainFact"])
+
+    def test_fixture_keys_are_explicitly_non_domain_keys(self):
+        keys = [
+            self.fixture["workspace"]["localKey"],
+            self.fixture["project"]["localKey"],
+            self.fixture["character"]["localKey"],
+            self.fixture["preview"]["localKey"],
+            *[stage["localKey"] for stage in self.fixture["pipeline"]],
+            *[asset["localKey"] for asset in self.fixture["assets"]],
+            *[shot["localKey"] for shot in self.fixture["shots"]],
+        ]
+        self.assertTrue(all(key.startswith("fixture-") for key in keys))
+        self.assertIn('localKey: `local-project-${state.localDraftCounter}`', self.script)
+
+    def test_episode_fixture_has_six_contiguous_shots_and_45_seconds(self):
+        shots = self.fixture["shots"]
+        self.assertEqual(len(shots), 6)
+        self.assertEqual(
+            [shot["code"] for shot in shots],
+            ["F01", "F02", "F03", "F04", "F05", "F06"],
+        )
+        self.assertEqual(sum(shot["duration"] for shot in shots), 45)
+        self.assertEqual(shots[0]["start"], 0)
+        self.assertEqual(shots[-1]["end"], 45)
+        for index, shot in enumerate(shots):
+            self.assertEqual(shot["end"] - shot["start"], shot["duration"])
+            if index:
+                self.assertEqual(shots[index - 1]["end"], shot["start"])
+        self.assertEqual(shots[-1]["secondaryCaptionWindow"], "42.0–45.0s")
+        self.assertEqual(
+            shots[-1]["secondaryCaption"],
+            "虚构角色 · 情绪内容不替代专业支持",
+        )
+
+    def test_asset_library_has_exact_tabs_and_planned_generation_history(self):
+        tabs = (
+            '["basic", "基础信息"]',
+            '["versions", "版本"]',
+            '["usage", "使用记录"]',
+            '["rights", "权利"]',
+            '["history", "生成记录"]',
+        )
+        self.assert_markers_in_order(self.script, tabs)
+        self.assertIn("生成记录 · 即将上线", self.script)
+        self.assertIn("当前没有可展示记录", self.script)
+        self.assertNotIn("Prompt 001", self.script)
+
+    def test_media_fixture_paths_resolve_to_current_local_evidence(self):
+        relative_sources = [
+            self.fixture["character"]["referenceImage"],
+            self.fixture["preview"]["src"],
+            self.fixture["preview"]["poster"],
+            *[asset["src"] for asset in self.fixture["assets"]],
+            *[shot["image"] for shot in self.fixture["shots"]],
+        ]
+        missing = [
+            source
+            for source in relative_sources
+            if not (APP_ROOT / source).resolve().is_file()
+        ]
+        self.assertEqual(missing, [])
+
+    def test_preview_is_bound_to_verified_local_candidate(self):
+        preview = self.fixture["preview"]
+        self.assertEqual(preview["duration"], "45.0 秒")
+        self.assertEqual(preview["dimensions"], "1080 × 1920")
+        self.assertEqual(preview["frameRate"], "30 fps")
+        self.assertEqual(preview["audio"], "无音轨")
+        self.assertEqual(
+            preview["sha256"],
+            "102A8CFCAAAE9D86D70A2E5BC7C0D03738B6FB6FE71BC734EE1DFD97FFE74D47",
+        )
+        self.assertIn("候选预览", self.script)
+        self.assertIn("尚未正式导出", self.script)
+        self.assertIn('id="candidate-video"', self.script)
+
+    def test_export_page_and_actions_are_disabled(self):
+        self.assertIn(
+            '{ key: "export", label: "导出", english: "Export", status: "fixture" }',
+            self.script,
+        )
+        self.assertIn('eyebrow: "项目工作室 · 交付"', self.script)
+        self.assertIn('data-capability="export" disabled', self.script)
+        self.assertIn("导出不可用", self.script)
+        self.assertIn("当前不会生成文件、下载内容或执行发布", self.script)
+        self.assertIn("EXPORT ENGINE NOT IMPLEMENTED", self.script)
+
+    def test_sticky_bar_is_the_only_page_level_primary_action(self):
+        self.assertIn('<footer class="sticky-action-bar"', self.index)
+        self.assertIn(
+            '<button class="button button-secondary compact" type="button" data-action="toggle-preview"',
+            self.script,
+        )
+        self.assertIn(
+            '<button class="button button-secondary export-button" type="button" data-capability="export" disabled>',
+            self.script,
+        )
+        self.assertIn('function renderStickyBar(route)', self.script)
+        whitelist = self.script.split("function shouldRenderStickyBar(route)", 1)[1].split(
+            "function renderStickyBar(route)", 1
+        )[0]
+        for route_type in ("dashboard", "ai-director", "pipeline", "storyboard", "preview", "export"):
+            self.assertIn(f'"{route_type}"', whitelist)
+        self.assertIn('route.key === "approval"', whitelist)
+        for route_type in ("projects", "assets", "creation", "creation-preview", "works", "character"):
+            self.assertNotIn(f'"{route_type}"', whitelist)
+        self.assertIn('stickyActionBar.hidden = !visible', self.script)
+        self.assertIn('classList.toggle("no-sticky-bar", !visible)', self.script)
+
+    def test_app_shell_exposes_required_regions_and_components(self):
+        shell_markers = (
+            'class="sidebar"',
+            'class="global-header"',
+            'id="context-navigation"',
+            'id="app-content"',
+            'class="inspector"',
+            'class="sticky-action-bar"',
+        )
+        for marker in shell_markers:
+            self.assertIn(marker, self.index)
+        component_markers = (
+            ".button",
+            ".card",
+            ".badge",
+            ".modal",
+            ".inspector",
+            ".toast",
+            ".empty-state",
+            ".loading-state",
+            ".error-state",
+            ".phone-frame",
+            ".sticky-action-bar",
+            ".button-text",
+            ".button-danger",
+            ".button-spinner",
+        )
+        for marker in component_markers:
+            self.assertIn(marker, self.styles)
+
+    def test_design_tokens_include_required_semantic_and_lifecycle_groups(self):
+        for token in (
+            "--color-brand: #165dff",
+            "--color-page: #f5f7fa",
+            "--color-surface: #ffffff",
+            "--color-text: #1d2129",
+            "--color-border: #e5e6eb",
+            "--radius-control: 8px",
+            "--radius-card: 12px",
+            "--creator-lifecycle-candidate",
+            "--creator-lifecycle-preview",
+            "--creator-lifecycle-approved",
+            "--creator-lifecycle-export",
+            "--creator-governance-rights-blocked",
+            "--font-sans",
+            "--type-title-size",
+            "--type-body-size",
+            "--type-caption-size",
+            "--creator-feature-available",
+            "--creator-feature-fixture-only",
+            "--creator-feature-in-development",
+            "--creator-feature-planned",
+            "--creator-feature-disabled",
+        ):
+            self.assertIn(token, self.styles)
+
+    def test_ui_polish_presentation_contract_is_explicit_and_non_authoritative(self):
+        self.assertEqual(
+            self.fixture["meta"]["presentationTaskId"],
+            "ACS-CREATOR-UI-POLISH-001",
+        )
+        self.assertEqual(
+            self.fixture["meta"]["presentationVersion"],
+            "High Fidelity UI Presentation V1.0",
+        )
+        for token in (
+            "--color-background",
+            "--color-canvas",
+            "--color-panel",
+            "--type-display-size",
+            "--type-section-size",
+            "--radius-panel",
+            "--creator-lifecycle-fixture-only",
+        ):
+            self.assertIn(token, self.styles)
+        for marker in (
+            "v2-hero",
+            "从一个想法，创造完整影片",
+            "project-cinema-card",
+            "studio-flow",
+            "candidate-preview-ribbon",
+            "候选预览",
+            "asset-category-strip",
+            "生成记录",
+        ):
+            self.assertIn(marker, self.script)
+        self.assertEqual(
+            self.fixture["meta"]["v2PresentationTaskId"],
+            "ACS-CREATOR-UI-V2-IMPLEMENTATION-001",
+        )
+        self.assertEqual(len(self.fixture["pipeline"]), 11)
+        self.assertEqual(self.fixture["meta"]["canonicalRouteCount"], 26)
+        self.assertFalse(self.fixture["meta"]["domainFact"])
+
+    def test_v2_presentation_metadata_is_explicit(self):
+        self.assertEqual(
+            self.fixture["meta"]["v2PresentationTaskId"],
+            "ACS-CREATOR-UI-V2-IMPLEMENTATION-001",
+        )
+        self.assertEqual(
+            self.fixture["meta"]["v2PresentationVersion"],
+            "Creator UI V2.0 High Fidelity Presentation",
+        )
+        self.assertFalse(self.fixture["meta"]["domainFact"])
+
+    def test_v2_primary_navigation_uses_chinese_product_labels(self):
+        primary_nav = re.search(
+            r'<nav class="primary-nav".*?</nav>', self.index, flags=re.DOTALL
+        ).group(0)
+        self.assert_markers_in_order(
+            primary_nav,
+            ("首页", "AI导演", "项目", "资产库", "创作中心", "作品"),
+        )
+        for forbidden in ("Dashboard", "Projects", "Asset Library", "Works"):
+            self.assertNotIn(forbidden, primary_nav)
+        self.assertLessEqual(primary_nav.count('<span class="badge'), 1)
+
+    def test_v2_dashboard_is_a_creation_cockpit(self):
+        dashboard_block = self.script.split("function renderDashboard()", 1)[1].split(
+            "function renderProjects", 1
+        )[0]
+        for marker in (
+            "v2-hero",
+            "从一个想法，创造完整影片",
+            "一站式影视创作工作台",
+            "project-cinema-card",
+            "creation-journey",
+        ):
+            self.assertIn(marker, dashboard_block)
+        self.assertNotIn("统计仪表盘", dashboard_block)
+
+    def test_v2_asset_library_uses_chinese_visual_categories(self):
+        asset_block = self.script.split("function renderAssets()", 1)[1].split(
+            "function renderCreationCenter", 1
+        )[0]
+        for label in ("角色", "场景", "图片", "视频", "音频", "模板"):
+            self.assertIn(f'"{label}"', asset_block)
+        for label in ("基础信息", "版本", "使用记录", "权利", "生成记录"):
+            self.assertIn(f'"{label}"', asset_block)
+        self.assertIn("asset-feature-card", asset_block)
+
+    def test_v2_ai_director_uses_three_column_studio_contract(self):
+        director_block = self.script.split("function renderAiDirector()", 1)[1].split(
+            "function renderProjectDraftHandoff", 1
+        )[0]
+        for marker in (
+            "director-studio-grid",
+            "director-brief-panel",
+            "director-canvas-panel",
+            "renderDirectorPlanning()",
+        ):
+            self.assertIn(marker, director_block)
+        self.assertNotIn("chat", director_block.lower())
+
+    def test_v2_preview_keeps_candidate_and_export_status_separate(self):
+        preview_block = self.script.split("function renderPreview()", 1)[1].split(
+            "function renderWorks", 1
+        )[0]
+        self.assertIn("candidate-preview-ribbon", preview_block)
+        self.assertIn("候选预览", preview_block)
+        self.assertIn("尚未正式导出", preview_block)
+        self.assertIn('id="candidate-video"', preview_block)
+        self.assertNotIn("正式成片", preview_block)
+
+    def test_v2_engineering_boundary_is_machine_readable_but_not_static_visual_copy(self):
+        static_shell = re.sub(
+            r'<script type="application/json".*?</script>',
+            "",
+            self.index,
+            flags=re.DOTALL,
+        )
+        static_shell = re.sub(
+            r'<span class="sr-only">.*?</span>',
+            "",
+            static_shell,
+            flags=re.DOTALL,
+        )
+        for forbidden in (
+            "FIXTURE ONLY",
+            "NOT A DOMAIN FACT",
+            "V5 NOT CONNECTED",
+            "SESSION ONLY",
+            "ASSET LIBRARY",
+            "Generation History",
+            "Rights HOLD",
+            "Inspector",
+            "Dashboard",
+            "Projects",
+            "Works",
+        ):
+            self.assertIsNone(
+                re.search(rf"\b{re.escape(forbidden)}\b", static_shell),
+                forbidden,
+            )
+        self.assertIn("FIXTURE ONLY", self.index)
+        self.assertIn("NOT A DOMAIN FACT", self.index)
+
+    def test_ai_director_fixture_metadata_and_status_contract(self):
+        self.assertEqual(
+            self.fixture["meta"]["capabilityTaskId"],
+            "ACS-CREATOR-AI-DIRECTOR-001",
+        )
+        self.assertEqual(
+            self.fixture["meta"]["capabilityVersion"],
+            "AI Director Fixture Workspace V0.1",
+        )
+        director = self.fixture["aiDirector"]
+        self.assertEqual(director["route"], "/creator/ai-director")
+        self.assertEqual(director["featureStatus"], "In Development")
+        self.assertEqual(director["pageStatus"], "Available - Fixture Only")
+        self.assertEqual(
+            director["classification"],
+            ["FIXTURE ONLY", "NOT A DOMAIN FACT", "NO AI MODEL CONNECTED"],
+        )
+        self.assertEqual(director["persistence"], "session-only")
+
+    def test_ai_director_route_is_a_fixture_renderer_not_a_placeholder(self):
+        self.assertIn(
+            '{ key: "ai-director", path: "/creator/ai-director", label: "AI导演", english: "AI Director", status: "fixture", featureStatus: "development" }',
+            self.script,
+        )
+        self.assertIn('type: "ai-director"', self.script)
+        self.assertIn('"ai-director": renderAiDirector', self.script)
+        self.assertIn('function renderAiDirector()', self.script)
+        self.assertIn('aria-label="AI导演，开发中"', self.index)
+
+    def test_ai_director_creative_brief_has_all_local_fixture_fields(self):
+        defaults = self.fixture["aiDirector"]["briefDefaults"]
+        self.assertEqual(
+            defaults,
+            {
+                "topic": "孤独与陪伴",
+                "theme": "情感短片",
+                "audience": "短视频用户",
+                "duration": "30秒",
+                "platform": "短视频平台",
+                "style": "电影感",
+                "character": "晚灯 WANLIGHT",
+            },
+        )
+        for field in defaults:
+            self.assertIn(f'["{field}",', self.script)
+            self.assertIn(f'name="${{escapeHtml(key)}}"', self.script)
+        self.assertIn('id="ai-director-form"', self.script)
+        self.assertIn("此操作不会调用模型", self.script)
+        self.assertIn("NO AI MODEL CONNECTED", self.index)
+
+    def test_ai_director_canvas_uses_fixed_fixture_outputs(self):
+        output = self.fixture["aiDirector"]["output"]
+        self.assertEqual(output["storyDirection"], "温暖治愈系陪伴故事。")
+        self.assertEqual(output["scriptDraft"], "三幕式短片结构示例。")
+        self.assertEqual(output["storyboardDraft"], "五镜头视觉规划示例。")
+        self.assertEqual(
+            output["productionPlan"],
+            {"character": "晚灯", "scene": "夜晚空间", "assets": "角色、背景、字幕"},
+        )
+        for marker in (
+            "故事方向",
+            "剧本草案",
+            "分镜规划",
+            "视觉风格",
+            "制作规划",
+        ):
+            self.assertIn(marker, self.script)
+
+    def test_ai_director_project_draft_handoff_is_session_only(self):
+        for marker in (
+            'const projectRefValue = "local-project-wanlight-001"',
+            'localKey: projectRefValue',
+            'projectRef: projectRefValue',
+            'persistence: "session-only"',
+            'domainFact: false',
+            'navigate(`/creator/projects/${draft.projectRef}`)',
+            'type: "project-draft-handoff"',
+            "项目草稿交接已建立",
+            "仅当前会话 · 不会保存",
+        ):
+            self.assertIn(marker, self.script)
+        self.assertNotIn("createProjectEntity(", self.script)
+
+    def test_ai_director_has_no_ai_api_or_persistence_implementation(self):
+        combined = f"{self.index}\n{self.script}"
+        forbidden = (
+            "OpenAI",
+            "DeepSeek",
+            "modelRouter",
+            "promptBackend",
+            "fetch(",
+            "XMLHttpRequest",
+            "localStorage",
+            "sessionStorage",
+            "/api/",
+        )
+        for marker in forbidden:
+            self.assertNotIn(marker, combined)
+        self.assertIn("NO AI MODEL CONNECTED", combined)
+        self.assertIn("此操作不会调用模型", self.script)
+
+    def test_ai_director_polish_has_chinese_header_and_statuses(self):
+        for marker in (
+            "AI导演",
+            "从创意输入到导演方案与制作规划，在一个工作台里完成",
+            "开发中",
+            "演示版本",
+        ):
+            self.assertIn(marker, f"{self.index}\n{self.script}")
+
+    def test_ai_director_polish_has_exact_chinese_brief_labels(self):
+        director_block = self.script.split("function renderAiDirector()", 1)[1].split(
+            "function renderProjectDraftHandoff", 1
+        )[0]
+        for label in (
+            "主题",
+            "类型",
+            "目标用户",
+            "视频时长",
+            "发布平台",
+            "视觉风格",
+            "角色设定",
+        ):
+            self.assertIn(f'"{label}"', director_block)
+        self.assertIn("生成创意方案", director_block)
+        self.assertIn("此操作不会调用模型", director_block)
+
+    def test_ai_director_polish_has_four_product_cards_without_repeated_demo_labels(self):
+        canvas_block = self.script.split("function renderDirectorCanvas()", 1)[1].split(
+            "function renderAiDirector", 1
+        )[0]
+        self.assertEqual(canvas_block.count('class="director-output-card'), 4)
+        self.assertEqual(canvas_block.count('class="director-card-labels"'), 0)
+        for marker in (
+            "故事方向",
+            "剧本草案",
+            "分镜规划",
+            "视觉风格",
+        ):
+            self.assertIn(marker, canvas_block)
+        self.assertIn("制作规划", self.script)
+
+    def test_ai_director_polish_hides_english_boundary_statuses_from_user_views(self):
+        visible_director_blocks = "\n".join(
+            (
+                self.script.split("function renderDirectorCanvas()", 1)[1].split(
+                    "function renderAiDirector", 1
+                )[0],
+                self.script.split("function renderAiDirector()", 1)[1].split(
+                    "function renderProjectDraftHandoff", 1
+                )[0],
+                self.script.split("function renderProjectDraftHandoff", 1)[1].split(
+                    "function renderCharacter", 1
+                )[0],
+            )
+        )
+        for marker in (
+            "Fixture Only",
+            "NOT A DOMAIN FACT",
+            "NO AI MODEL CONNECTED",
+            "SESSION ONLY",
+        ):
+            self.assertNotIn(marker, visible_director_blocks)
+
+    def test_ai_director_polish_feedback_remains_local_and_non_authoritative(self):
+        for marker in (
+            "创意方案已展示 · 当前内容不会保存",
+            "项目草稿已建立 · 仅当前会话有效",
+            'const projectRefValue = "local-project-wanlight-001"',
+            'persistence: "session-only"',
+            'domainFact: false',
+        ):
+            self.assertIn(marker, self.script)
+        for prohibited_claim in (
+            "AI已生成",
+            "生成完成",
+            "正式方案",
+            "生产计划完成",
+        ):
+            self.assertNotIn(prohibited_claim, self.script)
+
+    def test_ai_director_presentation_components_are_styled(self):
+        for marker in (
+            ".director-status-rail",
+            ".director-workspace",
+            ".director-brief-form",
+            ".director-canvas-panel",
+            ".director-output-grid",
+            ".director-handoff-callout",
+            ".draft-handoff-card",
+        ):
+            self.assertIn(marker, self.styles)
+        self.assertIn('@media (max-width: 760px)', self.styles)
+
+    def test_v21_product_polish_metadata_is_explicit_and_bounded(self):
+        meta = self.fixture["meta"]
+        self.assertEqual(meta["v21PolishTaskId"], "ACS-CREATOR-UI-V2-POLISH-002")
+        self.assertEqual(meta["v21PresentationVersion"], "Creator UI V2.1 Product Polish")
+        self.assertEqual(meta["v2CloseoutTaskId"], "ACS-CREATOR-UI-V2-FINAL-CLOSEOUT-003")
+        self.assertEqual(meta["v2CloseoutVersion"], "Creator UI V2 Final Visual Closeout")
+        self.assertEqual(meta["mode"], "fixture-only")
+        self.assertFalse(meta["domainFact"])
+        self.assertEqual(meta["v5Connection"], "not-connected")
+
+    def test_v21_has_one_primary_demo_status_entry_without_sidebar_noise(self):
+        body_before_fixture = self.index.split(
+            '<script type="application/json" id="creator-fixture">', 1
+        )[0]
+        self.assertEqual(body_before_fixture.count("<strong>演示版本</strong>"), 1)
+        self.assertEqual(body_before_fixture.count('class="global-demo-status fixture-banner"'), 1)
+        self.assertNotIn('class="scope-card"', body_before_fixture)
+        self.assertIn('class="sr-only page-fixture-contract">FIXTURE ONLY', self.script)
+        self.assertIn("if (statusKey === \"fixture\") return '<span class=\"sr-only\">", self.script)
+
+    def test_v21_eight_review_surfaces_have_dedicated_renderers(self):
+        renderer_block = self.script.split("const renderers = {", 1)[1].split("};", 1)[0]
+        for marker in (
+            "dashboard: renderDashboard",
+            '"ai-director": renderAiDirector',
+            "pipeline: renderPipeline",
+            "assets: renderAssets",
+            "storyboard: renderStoryboard",
+            "preview: renderPreview",
+            "creation: renderCreationCenter",
+            "works: renderWorks",
+        ):
+            self.assertIn(marker, renderer_block)
+        for route in (
+            "/creator/dashboard",
+            "/creator/ai-director",
+            "/creator/projects/:projectRef/pipeline",
+            "/creator/assets",
+            "/creator/projects/:projectRef/storyboard",
+            "/creator/projects/:projectRef/preview",
+            "/creator/creation",
+            "/creator/works",
+        ):
+            self.assertIn(route, self.script)
+
+    def test_v21_inspector_is_collapsible_and_compact_width_uses_drawer(self):
+        for marker in (
+            'class="inspector-fab"',
+            'class="button button-secondary inspector-toggle-label"',
+            "function applyInspectorState()",
+            'button.textContent = label',
+            'inspector.setAttribute("aria-hidden", String(!open))',
+            'window.matchMedia("(max-width: 1439px)")',
+            '@media (max-width: 1439px)',
+            '.inspector.is-open',
+            'transform: translateX(105%)',
+            'inspectorOpen: false',
+            'state.inspectorOpen = !compactInspectorQuery.matches && resolved.context === "project"',
+            '.workbench.has-context-nav.inspector-closed',
+        ):
+            self.assertIn(marker, f"{self.index}\n{self.script}\n{self.styles}")
+        self.assertIn("grid-template-columns: var(--context-width) minmax(0, 1fr);", self.styles)
+
+    def test_v21_product_copy_preserves_fixture_and_export_boundaries(self):
+        for marker in (
+            "晚灯 · 第 1 集",
+            "统一管理角色、场景、图片、视频和声音资产。",
+            "让复杂创作变得更简单",
+            "候选预览",
+            "尚未正式导出",
+            "制作中",
+            "可预览",
+            "完成作品",
+            "当前不会生成文件、下载内容或执行发布",
+        ):
+            self.assertIn(marker, self.script)
+        for marker in (
+            "AI已生成",
+            "生成完成",
+            "正式方案",
+            "生产计划完成",
+        ):
+            self.assertNotIn(marker, self.script)
+
+    def test_closeout_removes_human_authority_engineering_label_from_visible_ui(self):
+        self.assertNotIn("HUMAN AUTHORITY REQUIRED", self.script)
+        self.assertIn('localizedStatusBadge("需要人工确认", "neutral")', self.script)
+        self.assertIn("该页面用于展示人工确认要求。界面和技术检查不会自动完成批准。", self.script)
+        self.assertIn("等待人工确认", self.script)
+
+    def test_closeout_keeps_engineering_boundaries_out_of_default_visual_layer(self):
+        self.assertIn('class="sr-only page-fixture-contract">FIXTURE ONLY', self.script)
+        self.assertIn('class="sr-only">EXPORT ENGINE NOT IMPLEMENTED', self.script)
+        self.assertIn('document.title = `${resolved.label || "创作空间"} · AI Cinematic Studio`', self.script)
+        self.assertNotIn("· Creator Workspace`", self.script)
+
+    def test_closeout_generation_center_is_a_product_preview_not_generic_placeholder(self):
+        self.assertIn('type: "creation-preview"', self.script)
+        for marker in (
+            "把文字、参考画面和创作意图转化为可使用的影视素材。",
+            "图片生成",
+            "视频生成",
+            "声音生成",
+            "描述你想创建的画面……",
+            'id="generation-preview-input" disabled',
+        ):
+            self.assertIn(marker, self.script)
+
+    def test_closeout_template_library_has_six_non_executable_previews(self):
+        block = self.script.split('if (route.key === "templates")', 1)[1].split(
+            'if (route.key === "ip-studio")', 1
+        )[0]
+        for marker in (
+            "情绪短片",
+            "角色独白",
+            "商品电影广告",
+            "奇幻叙事",
+            "人物预告片",
+            "竖屏剧情片",
+            "即将上线",
+        ):
+            self.assertIn(marker, block)
+        self.assertIn("template-preview-grid", block)
+
+    def test_closeout_ip_studio_uses_only_existing_wanlight_fixture_structure(self):
+        block = self.script.split('if (route.key === "ip-studio")', 1)[1].split(
+            'if (route.key === "memory")', 1
+        )[0]
+        for marker in (
+            "IP工作室",
+            "晚灯",
+            "陪伴型夜灯角色",
+            "夜晚书桌 / 安静陪伴",
+            "深蓝兜帽 / 暖色灯面 / 月牙标识",
+            "人物关系",
+            "时间线",
+        ):
+            self.assertIn(marker, block)
+
+    def test_closeout_workflow_preview_has_six_stages_and_no_engine_actions(self):
+        block = self.script.split('if (route.key === "workflow-presets")', 1)[1].split(
+            'const charts =', 1
+        )[0]
+        for marker in ("创意", "角色", "分镜", "画面", "声音", "预览"):
+            self.assertIn(marker, block)
+        self.assertIn("情绪短片流程", block)
+        self.assertIn("角色故事流程", block)
+        self.assertEqual(block.count('type="button" disabled'), 2)
+        self.assertNotIn("startWorkflow", block)
+
+    def test_closeout_analytics_is_an_honest_empty_state_without_fake_metrics(self):
+        block = self.script.split('const charts = ["作品表现趋势"', 1)[1].split(
+            "function renderDirectorBriefField", 1
+        )[0]
+        self.assertIn("暂无真实数据", block)
+        self.assertIn("当前没有可展示的真实运营数据", block)
+        for marker in ("播放量", "GMV", "收入", "转化率", "粉丝增长"):
+            self.assertNotIn(marker, block)
+
+    def test_closeout_ai_director_empty_state_previews_four_outputs_without_loading(self):
+        block = self.script.split('if (state.aiDirectorPhase === "input")', 1)[1].split(
+            "const output = fixture.aiDirector.output", 1
+        )[0]
+        self.assertIn("导演方案将在这里生成", block)
+        self.assertIn("完成左侧创意输入后", block)
+        for marker in ("故事方向", "剧本草案", "分镜规划", "视觉风格"):
+            self.assertIn(marker, block)
+        self.assertIn("director-preview-tiles", block)
+        self.assertNotIn("renderLoadingState", block)
+
+    def test_closeout_localizes_pipeline_evidence_instead_of_rendering_raw_fixture_text(self):
+        block = self.script.split("function renderPipeline()", 1)[1].split(
+            "function renderAssetGrid", 1
+        )[0]
+        self.assertIn("const evidenceLabels =", block)
+        self.assertIn("evidenceLabels[selected.label]", block)
+        self.assertNotIn("selected.evidence", block)
+
+    def test_closeout_localizes_asset_usage_instead_of_rendering_raw_fixture_text(self):
+        block = self.script.split("function assetTabContent()", 1)[1].split(
+            "function renderAssets", 1
+        )[0]
+        self.assertIn("const usageLabel =", block)
+        self.assertIn("usageLabel(asset)", block)
+        self.assertNotIn("asset.usedBy", block)
+
+    def test_closeout_inspector_controls_only_render_on_supported_routes(self):
+        self.assertIn("function routeSupportsInspector(route)", self.script)
+        self.assertIn("const showInspectorControl = routeSupportsInspector(route)", self.script)
+        self.assertIn("inspectorFab.hidden = open || !supported", self.script)
+        self.assertIn("compactInspectorQuery.matches && state.inspectorOpen", self.script)
+
+    def test_application_has_no_network_persistence_or_lower_layer_imports(self):
+        combined = f"{self.index}\n{self.script}"
+        forbidden = (
+            "fetch(",
+            "XMLHttpRequest",
+            "WebSocket",
+            "EventSource",
+            "sendBeacon",
+            "localStorage",
+            "sessionStorage",
+            "indexedDB",
+            "services/v5_core_os",
+            "/api/",
+            "V3.5 Audio Core",
+            "Final Composition",
+        )
+        for marker in forbidden:
+            self.assertNotIn(marker, combined)
+
+    def test_page_has_no_remote_runtime_dependencies(self):
+        remote_references = re.findall(r'(?:src|href)="https?://', self.index)
+        self.assertEqual(remote_references, [])
+        self.assertNotIn("import(", self.script)
+        self.assertNotIn("require(", self.script)
+
+    def test_accessibility_and_responsive_contract_markers_exist(self):
+        for marker in (
+            'class="skip-link"',
+            'aria-live="polite"',
+            'aria-label="上下文导航"',
+            'aria-label="详情"',
+            'aria-labelledby="project-dialog-title"',
+            "prefers-reduced-motion",
+            ":focus-visible",
+        ):
+            self.assertIn(marker, f"{self.index}\n{self.styles}")
+        self.assertIn('projectDialog.addEventListener("close"', self.script)
+        self.assertIn('event.key === "Escape"', self.script)
+        self.assertIn('aria-controls="asset-detail-panel"', self.script)
+        self.assertIn('aria-labelledby="asset-tab-${escapeHtml(state.assetTab)}"', self.script)
+        for key in ("ArrowLeft", "ArrowRight", "Home", "End"):
+            self.assertIn(f'"{key}"', self.script)
+        self.assertIn("sidebar.inert = mobile && !open", self.script)
+        self.assertIn("inspector.inert = !open", self.script)
+        self.assertIn(
+            'window.matchMedia("(max-width: 1439px)")', self.script
+        )
+        self.assertIn("state.mobileSidebarOpen && event.key === \"Tab\"", self.script)
+        self.assertNotIn(
+            ".sidebar-collapsed .brand-copy,\n.sidebar-collapsed .sidebar-collapse-button,",
+            self.styles,
+        )
+        primary_nav = re.search(
+            r'<nav class="primary-nav".*?</nav>', self.index, flags=re.DOTALL
+        ).group(0)
+        self.assertEqual(primary_nav.count('aria-label='), 7)
+        self.assertIn('aria-label="重置当前体验"', self.index)
+
+    def test_loading_and_error_states_do_not_claim_backend_progress(self):
+        self.assertIn("function renderLoadingState(label)", self.script)
+        self.assertIn("function renderErrorState(title, description)", self.script)
+        self.assertIn("function renderButtonLoading(label)", self.script)
+        self.assertIn('aria-busy="true"', self.script)
+        self.assertIn('id="preview-error" hidden', self.script)
+        self.assertIn('role="alert"', self.script)
+        self.assertNotIn("progressPercent", self.script)
+
+
+if __name__ == "__main__":
+    unittest.main()
