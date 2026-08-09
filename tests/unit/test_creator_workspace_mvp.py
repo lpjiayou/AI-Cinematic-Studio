@@ -783,7 +783,7 @@ class CreatorWorkspaceMvpTest(unittest.TestCase):
 
     def test_v21_product_copy_preserves_fixture_and_export_boundaries(self):
         for marker in (
-            "真实创作记录",
+            "正式项目记录",
             "统一管理角色、场景、图片、视频和声音资产。",
             "让复杂创作变得更简单",
             "候选预览",
@@ -1087,7 +1087,7 @@ class CreatorWorkspaceMvpTest(unittest.TestCase):
         story_renderer = self.script.split("function renderStoryView(route)", 1)[1].split(
             "function renderEpisodeProject(route)", 1
         )[0]
-        self.assertIn('href="#${escapeHtml(route.projectBase)}/script"', story_renderer)
+        self.assertIn('href="#${escapeHtml(route.episodeBase || productionContextBase(route.persisted))}/script"', story_renderer)
         self.assertIn("继续使用同一单集", story_renderer)
         self.assertNotIn("URLSearchParams", story_renderer)
         for selector in (
@@ -1154,22 +1154,27 @@ class CreatorWorkspaceMvpTest(unittest.TestCase):
         for marker in ("项目概览", "AI导演", "系列规划", "IP圣经", "角色", "世界与连续性", "分集", "故事", "剧本", "一致性", "分镜", "镜头", "场景", "项目资产", "生成任务", "时间线", "预览", "质检", "审批", "成片", "导出", "系列管理", "发布", "数据"):
             self.assertIn(marker, nav_block)
 
-    def test_ui_r1_pre_project_context_resolves_real_series_and_episode_without_project_identity(self):
+    def test_m4_project_context_resolves_real_project_series_and_episode_identity(self):
         self.assertNotIn("projectRef", self.fixture["referenceContext"])
         self.assertIn('const projectShellBase = "/creator/project-shell"', self.script)
         for marker in (
+            'const projectsEndpoint = "/creator/internal/projects"',
+            "projectRecords",
+            "findProject",
+            "projectForSeries",
+            "projectProductionContext",
             "selectedSeriesRef",
             "selectedEpisodeRef",
             "resolveSelectedProductionContext",
             "rememberProductionContext",
             "renderEpisodeSelector",
-            "尚未建立项目上下文",
+            "正式项目",
         ):
             self.assertIn(marker, self.script)
         self.assertNotIn('Project Context = NULL', self.script)
         self.assertNotIn('不会生成 projectRef', self.script)
         self.assertNotIn("fixture-project-x2-e001", f"{self.index}\n{self.script}")
-        self.assertIn('data-action="wizard-submit" disabled', self.index)
+        self.assertIn('data-action="wizard-submit" hidden', self.index)
 
     def test_ui_r1_dashboard_uses_real_series_episode_state_only(self):
         block = self.script.split("function renderDashboard()", 1)[1].split("function renderProjects", 1)[0]
@@ -1178,11 +1183,14 @@ class CreatorWorkspaceMvpTest(unittest.TestCase):
         for forbidden in ("fixture.project", "fixture.character", "fixture.assets", "project-cinema-card"):
             self.assertNotIn(forbidden, block)
 
-    def test_ui_r1_new_project_wizard_is_complete_but_submit_is_gated(self):
-        for marker in ("选择项目类型", "基本信息", "制作默认值", "检查配置", "projectType", "contentType", "episodeCount", "aspectRatio", "productionPreset"):
+    def test_m4_new_project_wizard_creates_through_same_origin_project_boundary(self):
+        for marker in ("选择项目类型", "基本信息", "制作默认值", "检查并创建", "projectType", "seriesRef", "contentType", "episodeCount", "aspectRatio", "productionPreset"):
             self.assertIn(marker, f"{self.index}\n{self.script}")
-        self.assertIn('创建项目（尚未启用）', self.index)
-        self.assertIn('正式项目能力尚未启用 · 未创建任何项目', self.script)
+        self.assertIn('>创建项目</button>', self.index)
+        self.assertIn("async function createProjectFromWizard()", self.script)
+        self.assertIn("requestApplicationJson(projectsEndpoint", self.script)
+        self.assertIn("contentProfileRef,", self.script)
+        self.assertIn("seriesRef: values.seriesRef", self.script)
         self.assertNotIn("createCanonicalProject", self.script)
 
     def test_ui_r1_future_pages_use_structured_shells_not_generic_coming_soon(self):
@@ -1199,7 +1207,9 @@ class CreatorWorkspaceMvpTest(unittest.TestCase):
             'if (pageKey === "script") return { ...baseRoute, type: "script-studio" };',
             "episode.confirmedPlanBinding",
             "sourcePlanRef: binding.sourcePlanRef",
-            'href="#${escapeHtml(route.projectBase)}/script"',
+            'href="#${escapeHtml(route.episodeBase || productionContextBase(route.persisted))}/script"',
+            'const canonicalProjectMatch = normalized.match',
+            'projectProductionContext(project, decodeURIComponent(episodeMatch[1]))',
         ):
             self.assertIn(marker, self.script)
         self.assertNotIn("StoryRepository", self.script)

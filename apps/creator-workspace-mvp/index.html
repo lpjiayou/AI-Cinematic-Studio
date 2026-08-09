@@ -169,7 +169,7 @@
       <form method="dialog" id="project-form">
         <div class="modal-heading">
           <div>
-            <span class="eyebrow">项目能力准备</span>
+            <span class="eyebrow">项目生产上下文</span>
             <h2 id="project-dialog-title">新建项目</h2>
           </div>
           <button class="icon-button" type="button" data-action="close-project-dialog" aria-label="关闭">×</button>
@@ -180,13 +180,13 @@
           <li data-wizard-step-indicator="3"><span>03</span>制作默认值</li>
           <li data-wizard-step-indicator="4"><span>04</span>检查</li>
         </ol>
-        <div class="boundary-callout"><strong>正式项目能力尚未启用</strong><p>可以完整检查配置流程，最终提交保持禁用，不会建立正式项目记录。</p></div>
+        <div class="boundary-callout"><strong>通过 V5 Project 公共边界创建</strong><p>项目将显式关联既有系列；不会复制或改写系列、单集、故事与剧本身份。</p></div>
         <div id="project-wizard-content"></div>
         <div class="modal-actions">
           <button class="button button-text" type="button" data-action="close-project-dialog">取消</button>
           <button class="button button-secondary" type="button" data-action="wizard-previous" hidden>上一步</button>
           <button class="button button-primary" type="button" data-action="wizard-next">下一步</button>
-          <button class="button button-primary" type="submit" data-action="wizard-submit" disabled hidden>创建项目（尚未启用）</button>
+          <button class="button button-primary" type="submit" data-action="wizard-submit" hidden>创建项目</button>
         </div>
       </form>
     </dialog>

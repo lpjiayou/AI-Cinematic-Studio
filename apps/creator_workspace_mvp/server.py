@@ -29,6 +29,12 @@ from services.v5_core_os.series_episode import (
     create_in_memory_boundary as create_in_memory_series_boundary,
     create_local_development_boundary_from_environment as create_local_series_boundary_from_environment,
 )
+from services.v5_core_os.project_engine import (
+    ProjectPublicBoundary,
+    ProjectPublicError,
+    create_in_memory_boundary as create_in_memory_project_boundary,
+    create_local_development_boundary_from_environment as create_local_project_boundary_from_environment,
+)
 from services.v5_core_os.script_studio import (
     ScriptStudioPublicBoundary,
     ScriptStudioPublicError,
@@ -45,6 +51,8 @@ from services.v4_platform import (
 
 AI_DIRECTOR_ENDPOINT = "/creator/internal/ai-director/plan"
 SERIES_ENDPOINT = "/creator/internal/series"
+PROJECTS_ENDPOINT = "/creator/internal/projects"
+PROJECT_CONTEXT_ENDPOINT = "/creator/internal/project-context"
 CONFIRM_PLAN_ENDPOINT = "/creator/internal/creative-plans/confirm"
 EPISODES_ENDPOINT = "/creator/internal/episodes"
 SCRIPT_WORKSPACE_ENDPOINT = "/creator/internal/script-studio"
@@ -69,12 +77,14 @@ class CreatorRequestHandler(SimpleHTTPRequestHandler):
         *args: Any,
         ai_director_service: AiDirectorService,
         series_episode_boundary: SeriesEpisodePublicBoundary,
+        project_boundary: ProjectPublicBoundary,
         script_studio_service: ScriptStudioApplicationService,
         script_studio_boundary: ScriptStudioPublicBoundary,
         **kwargs: Any,
     ) -> None:
         self.ai_director_service = ai_director_service
         self.series_episode_boundary = series_episode_boundary
+        self.project_boundary = project_boundary
         self.script_studio_service = script_studio_service
         self.script_studio_boundary = script_studio_boundary
         super().__init__(*args, **kwargs)
@@ -84,6 +94,7 @@ class CreatorRequestHandler(SimpleHTTPRequestHandler):
         if path not in {
             AI_DIRECTOR_ENDPOINT,
             SERIES_ENDPOINT,
+            PROJECTS_ENDPOINT,
             CONFIRM_PLAN_ENDPOINT,
             EPISODES_ENDPOINT,
             SCRIPT_GENERATE_ENDPOINT,
@@ -181,6 +192,9 @@ class CreatorRequestHandler(SimpleHTTPRequestHandler):
                 if not target_series_ref or "/" in target_series_ref:
                     self._send_application_error(404, "not_found")
                     return
+                if self.project_boundary.get_project_for_series(workspace_ref, target_series_ref) is not None:
+                    self._send_application_error(409, "dependent_project_exists")
+                    return
                 series = self.series_episode_boundary.get_series(workspace_ref, target_series_ref)
                 for episode in series.get("episodes", []):
                     if self._episode_has_script(workspace_ref, target_series_ref, episode["episodeRef"]):
@@ -194,6 +208,9 @@ class CreatorRequestHandler(SimpleHTTPRequestHandler):
             return
         except ScriptStudioPublicError as exc:
             self._send_script_studio_error(exc)
+            return
+        except ProjectPublicError as exc:
+            self._send_project_error(exc)
             return
         except Exception:
             self._send_application_error(500, "application_error")
@@ -242,6 +259,38 @@ class CreatorRequestHandler(SimpleHTTPRequestHandler):
                     },
                 )
                 return
+            if path == PROJECTS_ENDPOINT:
+                self._send_json(
+                    200,
+                    {"ok": True, "projects": self.project_boundary.list_projects(workspace_ref)},
+                )
+                return
+            if path.startswith(f"{PROJECTS_ENDPOINT}/"):
+                project_ref = unquote(path[len(PROJECTS_ENDPOINT) + 1 :])
+                if project_ref and "/" not in project_ref:
+                    self._send_json(
+                        200,
+                        {
+                            "ok": True,
+                            "project": self.project_boundary.get_project(workspace_ref, project_ref),
+                        },
+                    )
+                    return
+            if path == PROJECT_CONTEXT_ENDPOINT:
+                project_ref = query.get("projectRef", [""])[0]
+                self._send_json(
+                    200,
+                    {
+                        "ok": True,
+                        "context": self.project_boundary.build_context(
+                            workspace_ref,
+                            project_ref,
+                            series_ref or None,
+                            episode_ref or None,
+                        ),
+                    },
+                )
+                return
             if path == SERIES_ENDPOINT:
                 self._send_json(200, {"ok": True, "series": self.series_episode_boundary.list_series(workspace_ref)})
                 return
@@ -265,6 +314,9 @@ class CreatorRequestHandler(SimpleHTTPRequestHandler):
             return
         except ScriptStudioPublicError as exc:
             self._send_script_studio_error(exc)
+            return
+        except ProjectPublicError as exc:
+            self._send_project_error(exc)
             return
         super().do_GET()
 
@@ -363,6 +415,9 @@ class CreatorRequestHandler(SimpleHTTPRequestHandler):
             if path == SERIES_ENDPOINT:
                 result_key = "series"
                 result = self.series_episode_boundary.create_series(payload)
+            elif path == PROJECTS_ENDPOINT:
+                result_key = "project"
+                result = self.project_boundary.create_project(payload)
             elif path == CONFIRM_PLAN_ENDPOINT:
                 result_key = "confirmedPlan"
                 brief_value = payload.get("brief")
@@ -385,6 +440,9 @@ class CreatorRequestHandler(SimpleHTTPRequestHandler):
         except SeriesEpisodePublicError as exc:
             self._send_series_episode_error(exc)
             return
+        except ProjectPublicError as exc:
+            self._send_project_error(exc)
+            return
         except (BriefValidationError, PlanValidationError):
             self._send_application_error(400, "invalid_creative_plan")
             return
@@ -397,6 +455,9 @@ class CreatorRequestHandler(SimpleHTTPRequestHandler):
         self._send_application_error(exc.status, exc.code)
 
     def _send_script_studio_error(self, exc: ScriptStudioPublicError) -> None:
+        self._send_application_error(exc.status, exc.code)
+
+    def _send_project_error(self, exc: ProjectPublicError) -> None:
         self._send_application_error(exc.status, exc.code)
 
     def _send_application_error(self, status: int, code: str) -> None:
@@ -489,15 +550,18 @@ def create_server(
     service: AiDirectorService,
     static_directory: Path | None = None,
     series_episode_boundary: SeriesEpisodePublicBoundary | None = None,
+    project_boundary: ProjectPublicBoundary | None = None,
     script_studio_service: ScriptStudioApplicationService | None = None,
     script_studio_boundary: ScriptStudioPublicBoundary | None = None,
 ) -> ThreadingHTTPServer:
     directory = (static_directory or default_static_directory()).resolve()
     series_boundary = series_episode_boundary or create_in_memory_series_boundary()
+    projects = project_boundary or create_in_memory_project_boundary(series_boundary)
     handler = partial(
         CreatorRequestHandler,
         ai_director_service=service,
         series_episode_boundary=series_boundary,
+        project_boundary=projects,
         script_studio_service=script_studio_service or ScriptStudioApplicationService(_UnconfiguredTextProvider()),
         script_studio_boundary=script_studio_boundary or create_in_memory_script_boundary(series_boundary),
         directory=str(directory),
@@ -529,11 +593,13 @@ def capability_services_from_environment() -> tuple[AiDirectorService, ScriptStu
 
 def main() -> None:
     series_boundary = series_episode_boundary_from_environment()
+    project_boundary = create_local_project_boundary_from_environment(series_boundary)
     ai_director_service, script_service = capability_services_from_environment()
     server = create_server(
         ("127.0.0.1", 8765),
         ai_director_service,
         series_episode_boundary=series_boundary,
+        project_boundary=project_boundary,
         script_studio_service=script_service,
         script_studio_boundary=create_local_script_boundary_from_environment(series_boundary),
     )
