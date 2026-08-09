@@ -1,3 +1,5 @@
+from contextlib import redirect_stderr
+import io
 import json
 from pathlib import Path
 import sqlite3
@@ -7,9 +9,12 @@ import unittest
 from apps.creator_workspace_mvp.script_studio import (
     SCENE_REWRITE_SCHEMA_VERSION,
     SCRIPT_CANDIDATE_SCHEMA_VERSION,
+    SCRIPT_DURATION_MAX_RATIO,
+    SCRIPT_DURATION_MIN_RATIO,
     ScriptCandidateValidationError,
     ScriptGenerationError,
     ScriptStudioApplicationService,
+    _generation_messages,
     validate_script_candidate,
 )
 from services.v4_platform import FakeTextProvider, ProviderTimeoutError
@@ -259,9 +264,155 @@ class ScriptStudioApplicationTests(unittest.TestCase):
         self.assertIn("creator.script-studio.script-candidate.v1", provider.requests[0].messages[1].content)
 
     def test_generation_failure_does_not_return_partial_candidate(self):
-        provider = FakeTextProvider([json.dumps({"schemaVersion": SCRIPT_CANDIDATE_SCHEMA_VERSION})])
+        invalid = json.dumps({"schemaVersion": SCRIPT_CANDIDATE_SCHEMA_VERSION})
+        provider = FakeTextProvider([invalid, invalid])
         with self.assertRaises(ScriptGenerationError):
             ScriptStudioApplicationService(provider).generate(self.bootstrap)
+        self.assertEqual(len(provider.requests), 2)
+
+    def test_sanitized_regression_normalizes_only_missing_optional_arrays(self):
+        candidate = script_candidate()
+        for scene in candidate["scenes"]:
+            for field in ("dialogue", "narration", "subtitleText", "continuityNotes", "productionNotes"):
+                scene.pop(field)
+        provider = FakeTextProvider([json.dumps(candidate, ensure_ascii=False)])
+        result = ScriptStudioApplicationService(provider).generate(self.bootstrap)
+        self.assertEqual(len(provider.requests), 1)
+        for scene in result["scenes"]:
+            self.assertEqual(scene["dialogue"], [])
+            self.assertEqual(scene["narration"], [])
+            self.assertEqual(scene["subtitleText"], [])
+            self.assertEqual(scene["continuityNotes"], [])
+            self.assertEqual(scene["productionNotes"], [])
+
+    def test_exact_live_failure_missing_schema_version_is_repaired(self):
+        invalid = script_candidate()
+        invalid.pop("schemaVersion")
+        provider = FakeTextProvider([
+            json.dumps(invalid, ensure_ascii=False),
+            json.dumps(script_candidate(), ensure_ascii=False),
+        ])
+        result = ScriptStudioApplicationService(provider).generate(self.bootstrap)
+        self.assertEqual(result["title"], script_candidate()["title"])
+        self.assertEqual(len(provider.requests), 2)
+        repair_prompt = json.loads(provider.requests[1].messages[1].content)
+        self.assertIn(
+            {"field": "schemaVersion", "rule": "required_field"},
+            repair_prompt["validationIssues"],
+        )
+
+    def test_prompt_and_validator_contract_are_aligned(self):
+        messages = _generation_messages(self.bootstrap)
+        prompt = json.loads(messages[1].content)
+        contract = prompt["requiredContract"]
+        output = contract["outputObject"]
+        self.assertEqual(
+            set(output),
+            {"schemaVersion", "title", "logline", "synopsis", "targetDurationSec", "scenes"},
+        )
+        scene_fields = set(output["scenes"][0])
+        required = set(contract["rules"]["requiredSceneFields"])
+        optional = set(contract["rules"]["optionalSceneArraysDefaultToEmpty"])
+        self.assertEqual(scene_fields, required | optional)
+        self.assertEqual(
+            contract["rules"]["systemOwnedFieldsMustNotAppear"],
+            ["scriptRef", "scriptVersionRef", "scriptSceneRef"],
+        )
+        self.assertEqual(contract["rules"]["duration"]["sceneDurationTotalMin"], 30 * SCRIPT_DURATION_MIN_RATIO)
+        self.assertEqual(contract["rules"]["duration"]["sceneDurationTotalMax"], 30 * SCRIPT_DURATION_MAX_RATIO)
+
+    def test_generation_uses_exactly_one_controlled_repair(self):
+        invalid = script_candidate()
+        invalid["scenes"][0].pop("action")
+        provider = FakeTextProvider([
+            json.dumps(invalid, ensure_ascii=False),
+            json.dumps(script_candidate(), ensure_ascii=False),
+        ])
+        result = ScriptStudioApplicationService(provider).generate(self.bootstrap)
+        self.assertEqual(result["title"], script_candidate()["title"])
+        self.assertEqual(len(provider.requests), 2)
+        repair_prompt = json.loads(provider.requests[1].messages[1].content)
+        self.assertEqual(repair_prompt["task"], "Repair the Script Studio candidate once. Return a complete corrected JSON object only.")
+        self.assertIn(
+            {"field": "scenes[0].action", "rule": "required_field"},
+            repair_prompt["validationIssues"],
+        )
+
+    def test_repair_failure_stops_after_two_provider_calls_and_exposes_only_diagnostics(self):
+        invalid = script_candidate()
+        invalid["scenes"][0].pop("scenePurpose")
+        raw = json.dumps(invalid, ensure_ascii=False)
+        provider = FakeTextProvider([raw, raw])
+        with self.assertRaises(ScriptGenerationError) as context:
+            ScriptStudioApplicationService(provider).generate(self.bootstrap)
+        self.assertEqual(len(provider.requests), 2)
+        self.assertEqual(context.exception.code, "invalid_provider_output")
+        self.assertTrue(all(len(item) == 4 for item in context.exception.validation_issues))
+        self.assertNotIn(raw, str(context.exception))
+
+    def test_schema_diagnostics_never_log_provider_content(self):
+        invalid = script_candidate()
+        invalid.pop("schemaVersion")
+        invalid["title"] = "sensitive-provider-content-marker"
+        raw = json.dumps(invalid, ensure_ascii=False)
+        provider = FakeTextProvider([raw, raw])
+        stream = io.StringIO()
+        with redirect_stderr(stream):
+            with self.assertRaises(ScriptGenerationError):
+                ScriptStudioApplicationService(provider).generate(self.bootstrap)
+        diagnostic = stream.getvalue()
+        self.assertIn("SCRIPT_STUDIO_SCHEMA_ERROR", diagnostic)
+        self.assertIn("field=schemaVersion", diagnostic)
+        self.assertIn("rule=required_field", diagnostic)
+        self.assertNotIn("sensitive-provider-content-marker", diagnostic)
+
+    def test_provider_cannot_supply_system_owned_scene_reference(self):
+        invalid = script_candidate()
+        invalid["scenes"][0]["scriptSceneRef"] = "provider-invented-ref"
+        provider = FakeTextProvider([
+            json.dumps(invalid, ensure_ascii=False),
+            json.dumps(script_candidate(), ensure_ascii=False),
+        ])
+        result = ScriptStudioApplicationService(provider).generate(self.bootstrap)
+        self.assertNotIn("scriptSceneRef", result["scenes"][0])
+        repair_prompt = json.loads(provider.requests[1].messages[1].content)
+        self.assertIn(
+            {"field": "scenes[0].scriptSceneRef", "rule": "unsupported_field"},
+            repair_prompt["validationIssues"],
+        )
+
+    def test_duration_tolerance_accepts_realistic_edges_and_rejects_outside(self):
+        for total in (29, 31, 30.5, 24, 36):
+            with self.subTest(total=total):
+                candidate = script_candidate()
+                candidate["scenes"][0]["estimatedDurationSec"] = total / 2
+                candidate["scenes"][1]["estimatedDurationSec"] = total / 2
+                result = validate_script_candidate(candidate, self.bootstrap)
+                self.assertEqual(sum(item["estimatedDurationSec"] for item in result["scenes"]), total)
+        for total in (23.99, 36.01):
+            with self.subTest(total=total):
+                candidate = script_candidate()
+                candidate["scenes"][0]["estimatedDurationSec"] = total / 2
+                candidate["scenes"][1]["estimatedDurationSec"] = total / 2
+                with self.assertRaises(ScriptCandidateValidationError) as context:
+                    validate_script_candidate(candidate, self.bootstrap)
+                self.assertIn(
+                    "scenes[].estimatedDurationSec: duration_total_out_of_tolerance",
+                    context.exception.errors,
+                )
+
+    def test_malformed_json_is_repaired_once_then_rejected(self):
+        provider = FakeTextProvider(["not-json", "still-not-json"])
+        with self.assertRaises(ScriptGenerationError) as context:
+            ScriptStudioApplicationService(provider).generate(self.bootstrap)
+        self.assertEqual(len(provider.requests), 2)
+        self.assertEqual(
+            context.exception.validation_issues,
+            (
+                ("initial", "$", "invalid_json", "provider_schema_error"),
+                ("repair", "$", "invalid_json", "provider_schema_error"),
+            ),
+        )
 
     def test_provider_timeout_is_mapped_without_secret_or_raw_response(self):
         provider = FakeTextProvider([ProviderTimeoutError("secret body")])

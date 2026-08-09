@@ -156,6 +156,20 @@ class ScriptStudioHttpIntegrationTests(unittest.TestCase):
         self.assertEqual(len(workspace["versions"]), 1)
         self.assertEqual(workspace["versions"][0]["sourcePlanRef"], self.episode["sourcePlanRef"])
 
+    def test_http_generation_repairs_missing_schema_version_once_before_persisting(self):
+        invalid = script_candidate()
+        invalid.pop("schemaVersion")
+        self.provider._outcomes = [
+            json.dumps(invalid, ensure_ascii=False),
+            json.dumps(script_candidate(), ensure_ascii=False),
+        ]
+        generated = self.generate()
+        self.assertEqual(len(self.provider.requests), 2)
+        self.assertEqual(generated["scriptVersion"]["schemaVersion"], "creator.script-studio.script-version.v1")
+        self.assertTrue(
+            all(item["scriptSceneRef"].startswith("script-scene-") for item in generated["scriptVersion"]["scenes"])
+        )
+
     def test_storyboard_http_rejects_draft(self):
         self.generate()
         with self.assertRaises(error.HTTPError) as context:
