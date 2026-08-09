@@ -149,6 +149,65 @@ class CreatorRequestHandler(SimpleHTTPRequestHandler):
             },
         )
 
+    def do_DELETE(self) -> None:
+        parsed = urlsplit(self.path)
+        path = parsed.path
+        query = parse_qs(parsed.query)
+        workspace_ref = query.get("workspaceRef", [""])[0]
+        series_ref = query.get("seriesRef", [""])[0]
+        try:
+            if path.startswith(f"{EPISODES_ENDPOINT}/"):
+                episode_ref = unquote(path[len(EPISODES_ENDPOINT) + 1 :])
+                if not episode_ref or "/" in episode_ref:
+                    self._send_application_error(404, "not_found")
+                    return
+                episode = self.series_episode_boundary.get_episode(
+                    workspace_ref,
+                    series_ref,
+                    episode_ref,
+                )
+                if self._episode_has_script(workspace_ref, series_ref, episode_ref):
+                    self._send_application_error(409, "dependent_script_exists")
+                    return
+                result = self.series_episode_boundary.delete_episode(
+                    workspace_ref,
+                    series_ref,
+                    episode["episodeRef"],
+                )
+                self._send_json(200, {"ok": True, "deletion": result})
+                return
+            if path.startswith(f"{SERIES_ENDPOINT}/"):
+                target_series_ref = unquote(path[len(SERIES_ENDPOINT) + 1 :])
+                if not target_series_ref or "/" in target_series_ref:
+                    self._send_application_error(404, "not_found")
+                    return
+                series = self.series_episode_boundary.get_series(workspace_ref, target_series_ref)
+                for episode in series.get("episodes", []):
+                    if self._episode_has_script(workspace_ref, target_series_ref, episode["episodeRef"]):
+                        self._send_application_error(409, "dependent_script_exists")
+                        return
+                result = self.series_episode_boundary.delete_series(workspace_ref, target_series_ref)
+                self._send_json(200, {"ok": True, "deletion": result})
+                return
+        except SeriesEpisodePublicError as exc:
+            self._send_series_episode_error(exc)
+            return
+        except ScriptStudioPublicError as exc:
+            self._send_script_studio_error(exc)
+            return
+        except Exception:
+            self._send_application_error(500, "application_error")
+            return
+        self._send_application_error(404, "not_found")
+
+    def _episode_has_script(self, workspace_ref: str, series_ref: str, episode_ref: str) -> bool:
+        workspace = self.script_studio_boundary.get_workspace(
+            workspace_ref,
+            series_ref,
+            episode_ref,
+        )
+        return workspace.get("script") is not None
+
     def do_GET(self) -> None:
         parsed = urlsplit(self.path)
         path = parsed.path
@@ -351,6 +410,7 @@ class CreatorRequestHandler(SimpleHTTPRequestHandler):
             "invalid_script_candidate": "剧本候选内容未通过校验。",
             "version_conflict": "剧本版本已更新，请刷新后重试。",
             "script_not_confirmed": "请先确认一个剧本版本。",
+            "dependent_script_exists": "该内容已有剧本版本，为保护制作链路暂不能删除。",
             "application_error": "暂时无法完成操作，请稍后重试。",
         }
         self._send_json(status, {"ok": False, "error": {"code": code, "message": messages.get(code, messages["application_error"])}})

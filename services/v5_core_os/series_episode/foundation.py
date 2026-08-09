@@ -202,6 +202,17 @@ class SeriesEpisodeRepository(Protocol):
         series_ref: str,
         episode_ref: str,
     ) -> ConfirmedCreativePlanBinding | None: ...
+    def delete_episode(
+        self,
+        workspace_ref: str,
+        series_ref: str,
+        episode_ref: str,
+    ) -> EpisodeRecord: ...
+    def delete_series(
+        self,
+        workspace_ref: str,
+        series_ref: str,
+    ) -> tuple[SeriesRecord, list[EpisodeRecord]]: ...
 
 
 class InMemorySeriesEpisodeAdapter:
@@ -297,6 +308,43 @@ class InMemorySeriesEpisodeAdapter:
         episode_ref: str,
     ) -> ConfirmedCreativePlanBinding | None:
         return self._bindings.get((workspace_ref, series_ref, episode_ref))
+
+    def delete_episode(
+        self,
+        workspace_ref: str,
+        series_ref: str,
+        episode_ref: str,
+    ) -> EpisodeRecord:
+        key = (workspace_ref, series_ref, episode_ref)
+        with self._lock:
+            record = self._episodes.get(key)
+            if record is None:
+                raise RecordNotFoundError("episode was not found")
+            self._bindings.pop(key, None)
+            del self._episodes[key]
+            return record
+
+    def delete_series(
+        self,
+        workspace_ref: str,
+        series_ref: str,
+    ) -> tuple[SeriesRecord, list[EpisodeRecord]]:
+        series_key = (workspace_ref, series_ref)
+        with self._lock:
+            record = self._series.get(series_key)
+            if record is None:
+                raise RecordNotFoundError("series was not found")
+            episodes = [
+                item
+                for item in self._episodes.values()
+                if item.workspaceRef == workspace_ref and item.seriesRef == series_ref
+            ]
+            for episode in episodes:
+                key = (workspace_ref, series_ref, episode.episodeRef)
+                self._bindings.pop(key, None)
+                self._episodes.pop(key, None)
+            del self._series[series_key]
+            return record, sorted(episodes, key=lambda item: item.episodeNumber)
 
 
 class SqliteSeriesEpisodeAdapter:
@@ -588,6 +636,59 @@ class SqliteSeriesEpisodeAdapter:
             ).fetchone()
         return self._binding(row) if row else None
 
+    def delete_episode(
+        self,
+        workspace_ref: str,
+        series_ref: str,
+        episode_ref: str,
+    ) -> EpisodeRecord:
+        with self._lock, self._session() as connection:
+            row = connection.execute(
+                "SELECT * FROM v5_episode_projects WHERE workspace_ref = ? AND series_ref = ? AND episode_ref = ?",
+                (workspace_ref, series_ref, episode_ref),
+            ).fetchone()
+            if row is None:
+                raise RecordNotFoundError("episode was not found")
+            connection.execute(
+                "DELETE FROM v5_episode_plan_bindings WHERE workspace_ref = ? AND series_ref = ? AND episode_ref = ?",
+                (workspace_ref, series_ref, episode_ref),
+            )
+            connection.execute(
+                "DELETE FROM v5_episode_projects WHERE workspace_ref = ? AND series_ref = ? AND episode_ref = ?",
+                (workspace_ref, series_ref, episode_ref),
+            )
+        return self._episode(row)
+
+    def delete_series(
+        self,
+        workspace_ref: str,
+        series_ref: str,
+    ) -> tuple[SeriesRecord, list[EpisodeRecord]]:
+        with self._lock, self._session() as connection:
+            series_row = connection.execute(
+                "SELECT * FROM v5_series WHERE workspace_ref = ? AND series_ref = ?",
+                (workspace_ref, series_ref),
+            ).fetchone()
+            if series_row is None:
+                raise RecordNotFoundError("series was not found")
+            episode_rows = connection.execute(
+                "SELECT * FROM v5_episode_projects WHERE workspace_ref = ? AND series_ref = ? ORDER BY episode_number",
+                (workspace_ref, series_ref),
+            ).fetchall()
+            connection.execute(
+                "DELETE FROM v5_episode_plan_bindings WHERE workspace_ref = ? AND series_ref = ?",
+                (workspace_ref, series_ref),
+            )
+            connection.execute(
+                "DELETE FROM v5_episode_projects WHERE workspace_ref = ? AND series_ref = ?",
+                (workspace_ref, series_ref),
+            )
+            connection.execute(
+                "DELETE FROM v5_series WHERE workspace_ref = ? AND series_ref = ?",
+                (workspace_ref, series_ref),
+            )
+        return self._series(series_row), [self._episode(row) for row in episode_rows]
+
 
 class SeriesEpisodeService:
     """V5 owner for Series, Episode, and immutable confirmed-plan bindings."""
@@ -815,6 +916,33 @@ class SeriesEpisodeService:
             raise UnconfirmedPlanError("confirmed creative plan binding was not found")
         result["confirmedPlanBinding"] = self._binding_mapping(binding)
         return result
+
+    def delete_episode(self, workspace_ref: str, series_ref: str, episode_ref: str) -> dict[str, Any]:
+        workspace = _required_ref(workspace_ref, "workspaceRef")
+        series = _required_ref(series_ref, "seriesRef")
+        episode = _required_ref(episode_ref, "episodeRef")
+        deleted = self.repository.delete_episode(workspace, series, episode)
+        return {
+            "schemaVersion": "v5.series-episode.deletion.v1",
+            "kind": "episode",
+            "workspaceRef": workspace,
+            "seriesRef": series,
+            "episodeRef": deleted.episodeRef,
+            "deletedEpisodeCount": 1,
+        }
+
+    def delete_series(self, workspace_ref: str, series_ref: str) -> dict[str, Any]:
+        workspace = _required_ref(workspace_ref, "workspaceRef")
+        series = _required_ref(series_ref, "seriesRef")
+        deleted, episodes = self.repository.delete_series(workspace, series)
+        return {
+            "schemaVersion": "v5.series-episode.deletion.v1",
+            "kind": "series",
+            "workspaceRef": workspace,
+            "seriesRef": deleted.seriesRef,
+            "deletedEpisodeRefs": [item.episodeRef for item in episodes],
+            "deletedEpisodeCount": len(episodes),
+        }
 
     def build_script_studio_bootstrap(
         self,

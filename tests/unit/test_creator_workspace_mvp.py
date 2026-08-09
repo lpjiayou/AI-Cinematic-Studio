@@ -118,19 +118,21 @@ class CreatorWorkspaceMvpTest(unittest.TestCase):
             "/creator/create/tools",
         )
         labels = (
-            "Generation",
-            "Templates",
-            "Prompt Lab",
-            "Audio Lab",
-            "Model Lab",
-            "Quick Tools",
+            "图片与视频",
+            "模板",
+            "提示词实验",
+            "声音实验",
+            "创意实验",
+            "快捷工具",
         )
-        self.assert_markers_in_order(self.script, routes)
-        self.assert_markers_in_order(self.script, labels)
-        self.assertIn("探索创意能力，不越过生产门禁", self.script)
+        creation_block = self.script.split("const creationModules", 1)[1].split("]);", 1)[0]
+        self.assert_markers_in_order(creation_block, routes)
+        self.assert_markers_in_order(creation_block, labels)
+        self.assertIn("探索创意能力，不越过制作门禁", self.script)
         self.assertIn('class="creation-r1-grid"', self.script)
         self.assertIn("creationModules.map", self.script)
-        self.assertIn("即将上线", self.script)
+        self.assertIn("尚未启用", self.script)
+        self.assertNotIn("即将上线", self.script)
 
     def test_project_workspace_includes_script_studio_and_default_pipeline(self):
         keys = (
@@ -161,7 +163,9 @@ class CreatorWorkspaceMvpTest(unittest.TestCase):
         )
         self.assert_markers_in_order(self.script, keys)
         self.assertIn('const projectShellBase = "/creator/project-shell"', self.script)
-        self.assertIn('Project Context = NULL', self.script)
+        self.assertIn("resolveSelectedProductionContext", self.script)
+        self.assertIn("renderEpisodeSelector", self.script)
+        self.assertNotIn('Project Context = NULL', self.script)
         self.assertNotIn("fixture-project-x2-e001", f"{self.index}\n{self.script}")
         self.assertNotIn("projectRef", self.fixture["referenceContext"])
 
@@ -222,7 +226,8 @@ class CreatorWorkspaceMvpTest(unittest.TestCase):
     def test_fixture_boundary_is_persistent_and_machine_readable(self):
         self.assertIn("FIXTURE ONLY", self.index)
         self.assertIn("NOT A DOMAIN FACT", self.index)
-        self.assertIn("V5 NOT CONNECTED", self.script)
+        self.assertIn('v5Connection": "not-connected"', self.index)
+        self.assertNotIn("V5 NOT CONNECTED", self.index.split('<script type="application/json"', 1)[0])
         self.assertEqual(
             self.fixture["meta"]["classification"],
             ["FIXTURE ONLY", "NOT A DOMAIN FACT"],
@@ -274,7 +279,7 @@ class CreatorWorkspaceMvpTest(unittest.TestCase):
             '["history", "生成记录"]',
         )
         self.assert_markers_in_order(self.script, tabs)
-        self.assertIn("生成记录 · 即将上线", self.script)
+        self.assertIn("生成记录 · 尚未启用", self.script)
         self.assertIn("当前没有可展示记录", self.script)
         self.assertNotIn("Prompt 001", self.script)
 
@@ -310,7 +315,7 @@ class CreatorWorkspaceMvpTest(unittest.TestCase):
     def test_export_page_and_actions_are_disabled(self):
         self.assertIn('key: "exports", label: "导出"', self.script)
         self.assertIn('type: "export-shell", status: "disabled"', self.script)
-        self.assertIn('"export-shell": ["导出", "未来从已接受 Master 建立交付产物。"', self.script)
+        self.assertIn('"export-shell": ["导出", "未来从已接受成片建立交付产物。"', self.script)
         self.assertIn('route.status === "disabled"', self.script)
         self.assertNotIn("download=", self.index)
 
@@ -404,12 +409,12 @@ class CreatorWorkspaceMvpTest(unittest.TestCase):
             self.assertIn(token, self.styles)
         for marker in (
             "enterprise-hero",
-            "把创意推进为可确认的制作事实",
+            "把创意推进为可确认的制作成果",
             "project-context-bar",
             "enterprise-shell-page",
             "workflow-action-bar",
             "asset-r1-layout",
-            "Project Context = NULL",
+            "尚未建立项目上下文",
         ):
             self.assertIn(marker, self.script)
         self.assertEqual(
@@ -449,10 +454,10 @@ class CreatorWorkspaceMvpTest(unittest.TestCase):
         )[0]
         for marker in (
             "enterprise-hero",
-            "PRODUCTION COMMAND CENTER",
+            "制作指挥中心",
             "command-metrics",
             "最近分集",
-            "真实存在的生产记录",
+            "真实存在的制作记录",
         ):
             self.assertIn(marker, dashboard_block)
         self.assertNotIn("统计仪表盘", dashboard_block)
@@ -595,8 +600,8 @@ class CreatorWorkspaceMvpTest(unittest.TestCase):
             "creativePlanRef: state.confirmedCreativePlan.creativePlanRef",
             'navigate(`/creator/projects/${encodeURIComponent(episodePayload.episode.episodeRef)}`)',
             'type: "episode-project"',
-            "SERIES AND EPISODE DOMAIN OWNER IS V5 CORE OS",
-            "NOT A CANONICAL PROJECT",
+            "系列与单集来自正式应用边界",
+            "当前不是正式项目，也不会创建制作任务",
         ):
             self.assertIn(marker, f"{self.index}\n{self.script}")
         self.assertNotIn("createProjectEntity(", self.script)
@@ -687,8 +692,8 @@ class CreatorWorkspaceMvpTest(unittest.TestCase):
             "候选导演方案已生成 · 请完成人工确认",
             "导演方案已完成人工确认",
             "系列与集数已创建",
-            "不是 Canonical Project",
-            "不会触发生成任务",
+            "不建立正式项目",
+            "不会建立正式项目或启动制作任务",
         ):
             self.assertIn(marker, self.script)
         for prohibited_claim in (
@@ -726,10 +731,11 @@ class CreatorWorkspaceMvpTest(unittest.TestCase):
         body_before_fixture = self.index.split(
             '<script type="application/json" id="creator-fixture">', 1
         )[0]
-        self.assertEqual(body_before_fixture.count("<strong>Internal Content Lab</strong>"), 1)
+        self.assertEqual(body_before_fixture.count("<strong>内部内容实验室</strong>"), 1)
+        self.assertNotIn("Internal Content Lab", body_before_fixture)
         self.assertEqual(body_before_fixture.count('class="global-demo-status fixture-banner"'), 1)
         self.assertNotIn('class="scope-card"', body_before_fixture)
-        self.assertIn('class="sr-only page-fixture-contract">FIXTURE ONLY', self.script)
+        self.assertIn('class="sr-only page-fixture-contract">演示数据', self.script)
         self.assertIn("if (statusKey === \"fixture\") return '<span class=\"sr-only\">", self.script)
 
     def test_v21_eight_review_surfaces_have_dedicated_renderers(self):
@@ -803,8 +809,8 @@ class CreatorWorkspaceMvpTest(unittest.TestCase):
         self.assertIn("等待人工确认", self.script)
 
     def test_closeout_keeps_engineering_boundaries_out_of_default_visual_layer(self):
-        self.assertIn('class="sr-only page-fixture-contract">FIXTURE ONLY', self.script)
-        self.assertIn('class="sr-only">EXPORT ENGINE NOT IMPLEMENTED', self.script)
+        self.assertIn('class="sr-only page-fixture-contract">演示数据', self.script)
+        self.assertIn('class="sr-only">导出能力尚未实现', self.script)
         self.assertIn('document.title = `${resolved.label || "创作空间"} · AI Cinematic Studio`', self.script)
         self.assertNotIn("· Creator Workspace`", self.script)
 
@@ -831,7 +837,7 @@ class CreatorWorkspaceMvpTest(unittest.TestCase):
             "奇幻叙事",
             "人物预告片",
             "竖屏剧情片",
-            "即将上线",
+            "尚未启用",
         ):
             self.assertIn(marker, block)
         self.assertIn("template-preview-grid", block)
@@ -1008,13 +1014,13 @@ class CreatorWorkspaceMvpTest(unittest.TestCase):
             "等待人工确认",
         ):
             self.assertIn(marker, self.script)
-        self.assertIn("保存会创建新的不可变 ScriptVersion", self.script)
+        self.assertIn("保存会创建新的不可变剧本版本", self.script)
 
     def test_m3_script_studio_preserves_human_and_downstream_gates(self):
         self.assertIn("生成成功不代表人工确认", self.script)
         self.assertIn("确认只更新引用，不会改写任何历史版本", self.script)
         self.assertIn("草稿版本不会开放分镜输入", self.script)
-        self.assertIn("仍需 M4 角色与 IP 绑定，不会开始分镜生产", self.script)
+        self.assertIn("仍需角色与 IP 能力完成绑定，不会开始分镜生产", self.script)
         self.assertNotIn("开始分镜生产</button>", self.script)
 
     def test_m3_script_studio_styles_are_capability_scoped_and_responsive(self):
@@ -1082,7 +1088,7 @@ class CreatorWorkspaceMvpTest(unittest.TestCase):
             "function renderEpisodeProject(route)", 1
         )[0]
         self.assertIn('href="#${escapeHtml(route.projectBase)}/script"', story_renderer)
-        self.assertIn("继续使用同一 Episode", story_renderer)
+        self.assertIn("继续使用同一单集", story_renderer)
         self.assertNotIn("URLSearchParams", story_renderer)
         for selector in (
             ".story-view",
@@ -1134,8 +1140,10 @@ class CreatorWorkspaceMvpTest(unittest.TestCase):
             "/creator", "/creator/ai-director", "/creator/projects",
             "/creator/assets", "/creator/create", "/creator/works",
         ])
-        for marker in ("Workspace", "Settings", "Help", "工作空间", "设置", "帮助", "任务", "通知"):
+        for marker in ("工作空间", "设置", "帮助", "任务", "通知", "内部内容实验室"):
             self.assertIn(marker, f"{self.index}\n{self.script}")
+        for forbidden_visible in ("Internal Content Lab", ">Workspace<", ">Settings<", ">Help<"):
+            self.assertNotIn(forbidden_visible, self.index.split('<script type="application/json"', 1)[0])
         for forbidden in ("GPU", "Queue", "Worker", "Server", "Debug"):
             self.assertNotIn(forbidden, self.index.split('<script type="application/json"', 1)[0])
 
@@ -1143,20 +1151,29 @@ class CreatorWorkspaceMvpTest(unittest.TestCase):
         nav_block = self.script.split("const projectNavigationGroups", 1)[1].split("const projectPages", 1)[0]
         self.assert_markers_in_order(nav_block, ('label: "概览"', 'label: "策划"', 'label: "内容"', 'label: "制作"', 'label: "后期"', 'label: "交付"'))
         self.assertEqual(nav_block.count("type:"), 25)
-        for marker in ("项目概览", "AI导演", "系列规划", "IP圣经", "角色", "世界与连续性", "分集", "故事", "剧本", "一致性", "分镜", "镜头", "场景", "项目资产", "生成任务", "时间线", "预览", "质检", "审批", "Master", "导出", "系列管理", "发布", "数据"):
+        for marker in ("项目概览", "AI导演", "系列规划", "IP圣经", "角色", "世界与连续性", "分集", "故事", "剧本", "一致性", "分镜", "镜头", "场景", "项目资产", "生成任务", "时间线", "预览", "质检", "审批", "成片", "导出", "系列管理", "发布", "数据"):
             self.assertIn(marker, nav_block)
 
-    def test_ui_r1_context_null_shell_does_not_invent_project_identity(self):
+    def test_ui_r1_pre_project_context_resolves_real_series_and_episode_without_project_identity(self):
         self.assertNotIn("projectRef", self.fixture["referenceContext"])
         self.assertIn('const projectShellBase = "/creator/project-shell"', self.script)
-        self.assertIn('Project Context = NULL', self.script)
-        self.assertIn('不会生成 projectRef', self.script)
+        for marker in (
+            "selectedSeriesRef",
+            "selectedEpisodeRef",
+            "resolveSelectedProductionContext",
+            "rememberProductionContext",
+            "renderEpisodeSelector",
+            "尚未建立项目上下文",
+        ):
+            self.assertIn(marker, self.script)
+        self.assertNotIn('Project Context = NULL', self.script)
+        self.assertNotIn('不会生成 projectRef', self.script)
         self.assertNotIn("fixture-project-x2-e001", f"{self.index}\n{self.script}")
         self.assertIn('data-action="wizard-submit" disabled', self.index)
 
     def test_ui_r1_dashboard_uses_real_series_episode_state_only(self):
         block = self.script.split("function renderDashboard()", 1)[1].split("function renderProjects", 1)[0]
-        for marker in ("state.seriesRecords", "confirmedPlanBinding", "PRODUCTION COMMAND CENTER", "最近分集"):
+        for marker in ("state.seriesRecords", "confirmedPlanBinding", "制作指挥中心", "最近分集"):
             self.assertIn(marker, block)
         for forbidden in ("fixture.project", "fixture.character", "fixture.assets", "project-cinema-card"):
             self.assertNotIn(forbidden, block)
@@ -1165,7 +1182,7 @@ class CreatorWorkspaceMvpTest(unittest.TestCase):
         for marker in ("选择项目类型", "基本信息", "制作默认值", "检查配置", "projectType", "contentType", "episodeCount", "aspectRatio", "productionPreset"):
             self.assertIn(marker, f"{self.index}\n{self.script}")
         self.assertIn('创建项目（尚未启用）', self.index)
-        self.assertIn('Project Context 尚未启用 · 未创建任何项目', self.script)
+        self.assertIn('正式项目能力尚未启用 · 未创建任何项目', self.script)
         self.assertNotIn("createCanonicalProject", self.script)
 
     def test_ui_r1_future_pages_use_structured_shells_not_generic_coming_soon(self):
@@ -1190,10 +1207,233 @@ class CreatorWorkspaceMvpTest(unittest.TestCase):
     def test_ui_r1_works_and_delivery_do_not_promote_reference_candidate(self):
         block = self.script.split("function renderWorksR1()", 1)[1].split("function renderPlaceholder", 1)[0]
         self.assertIn("还没有正式作品", block)
-        self.assertIn("内部参考 Candidate 不会出现在作品库", block)
+        self.assertIn("内部参考候选片不会出现在作品库", block)
         self.assertNotIn("fixture.preview", block)
         self.assertIn('type: "master-shell", status: "planned"', self.script)
         self.assertIn('type: "export-shell", status: "disabled"', self.script)
+
+    def test_ui_r1_correction_sidebar_collapse_changes_real_layout_width(self):
+        correction = self.styles.split(
+            "/* UI-R1 product integration correction: terminal layout and form authority. */",
+            1,
+        )[1]
+        for marker in (
+            "--sidebar-width: 240px",
+            "--sidebar-collapsed-width: 72px",
+            ".app-shell.sidebar-collapsed",
+            "grid-template-columns: var(--sidebar-collapsed-width) minmax(0, 1fr)",
+            ".app-shell.sidebar-collapsed .sidebar",
+            "width: var(--sidebar-collapsed-width)",
+            "display: none",
+        ):
+            self.assertIn(marker, f"{self.styles}\n{correction}")
+        self.assertNotIn("visibility: hidden", correction)
+        self.assertIn('classList.toggle("sidebar-collapsed", state.sidebarCollapsed)', self.script)
+        self.assertIn('state.sidebarCollapsed = !state.sidebarCollapsed', self.script)
+
+    def test_ui_r1_correction_dark_form_and_autofill_rules_are_terminal(self):
+        correction = self.styles.split(
+            "/* UI-R1 product integration correction: terminal layout and form authority. */",
+            1,
+        )[1]
+        for marker in (
+            "color-scheme: dark",
+            "background-color: var(--acs-surface-deep)",
+            "color: var(--acs-text-primary)",
+            "border-color: var(--acs-primary)",
+            "box-shadow: 0 0 0 3px var(--acs-primary-soft)",
+            "body input:-webkit-autofill",
+            "-webkit-text-fill-color: var(--acs-text-primary)",
+            "-webkit-box-shadow: 0 0 0 1000px var(--acs-surface-deep) inset",
+        ):
+            self.assertIn(marker, correction)
+        self.assertNotIn("background: white", correction.lower())
+        self.assertNotIn("background-color: white", correction.lower())
+
+    def test_ui_r1_correction_visible_shell_copy_is_chinese_first(self):
+        static_shell = self.index.split('<script type="application/json"', 1)[0]
+        context_renderer = self.script.split("function renderProjectContextBar(route)", 1)[1].split(
+            "function renderEpisodeSelector", 1
+        )[0]
+        for marker in ("项目", "系列", "单集", "阶段", "当前对象", "版本", "尚未建立"):
+            self.assertIn(marker, context_renderer)
+        for forbidden in (
+            "PROJECT NAVIGATOR",
+            "PROJECT CONTEXT",
+            "ENTERPRISE WORKSPACE",
+            "CONTENT CANVAS",
+            "FOUNDATION GATE",
+            "Project Context = NULL",
+            "No Project Context",
+            "Internal Content Lab",
+        ):
+            self.assertNotIn(forbidden, f"{static_shell}\n{context_renderer}")
+        self.assertNotIn("即将上线", f"{static_shell}\n{self.script}")
+
+    def test_ui_r1_correction_project_shell_resolves_actual_episode_or_selector(self):
+        route_block = self.script.split("function resolveRoute(path)", 1)[1].split(
+            "function renderNotFound", 1
+        )[0]
+        for marker in (
+            "resolveSelectedProductionContext()",
+            'if (selected) return { redirect: `${productionContextBase(selected)}/${targetPage}` };',
+            'type: "episode-selector"',
+            "targetPage",
+            "rememberProductionContext(persisted)",
+        ):
+            self.assertIn(marker, route_block)
+        self.assertNotIn("fixture-project", route_block)
+        self.assertNotIn('episodeRef: "current"', route_block)
+
+    def test_ui_r1_correction_real_story_route_has_one_projection_authority(self):
+        renderer_map = self.script.split("const renderers = {", 1)[1].split("};", 1)[0]
+        projection = self.script.split("function buildStoryProjection(route)", 1)[1].split(
+            "function renderStoryView(route)", 1
+        )[0]
+        self.assertEqual(renderer_map.count('"story-view": () => renderStoryView(resolved)'), 1)
+        self.assertIn("episode.confirmedPlanBinding", self.script)
+        self.assertIn("const sourcePlan = binding && binding.sourcePlan", projection)
+        self.assertIn('schemaVersion: storyViewSchemaVersion', projection)
+        for forbidden in ("StoryRepository", "fixture.", "fetch(", "DeepSeek"):
+            self.assertNotIn(forbidden, projection)
+
+    def test_ui_r1_correction_real_script_route_has_one_studio_authority(self):
+        renderer_map = self.script.split("const renderers = {", 1)[1].split("};", 1)[0]
+        route_block = self.script.split("function resolveRoute(path)", 1)[1].split(
+            "function renderNotFound", 1
+        )[0]
+        self.assertEqual(renderer_map.count('"script-studio": () => renderScriptStudio(resolved)'), 1)
+        self.assertIn('if (pageKey === "script") return { ...baseRoute, type: "script-studio" };', route_block)
+        self.assertIn('requestApplicationJson(`${scriptWorkspaceEndpoint}?${scriptQuery(scope)}`)', self.script)
+        self.assertNotIn("ScriptRepository", self.script)
+        self.assertNotIn('type: "script-shell-placeholder"', self.script)
+
+    def test_ui_r1_correction_context_bar_uses_real_lineage_and_versions(self):
+        context_renderer = self.script.split("function renderProjectContextBar(route)", 1)[1].split(
+            "function renderEpisodeSelector", 1
+        )[0]
+        for marker in (
+            "const persisted = route.persisted",
+            "persisted.series.title",
+            "persisted.episode.episodeNumber",
+            "来源方案 v${episode.sourcePlanVersion}",
+            "selectedScriptVersion()",
+            "scriptVersion.versionNumber",
+        ):
+            self.assertIn(marker, context_renderer)
+        self.assertNotIn("fixture.project", context_renderer)
+        self.assertNotIn("Project Context = NULL", context_renderer)
+        self.assertNotIn("projectRef", context_renderer)
+
+    def test_ui_r1_selected_cards_keep_dark_enterprise_surfaces(self):
+        correction = self.styles.split(
+            "/* Creator Enterprise selectable state correction */",
+            1,
+        )[1]
+        for token in (
+            "--acs-surface-deep: #11171d",
+            "--acs-surface-hover: #252e37",
+            "--acs-surface-selected: #193b39",
+            "--acs-border: #2c353f",
+            "--acs-border-strong: #3a4652",
+            "--acs-primary: #22d1b6",
+            "--acs-text-primary: #f4f7fa",
+            "--acs-text-secondary: #cbd5e1",
+            "--acs-primary-soft: rgba(34, 209, 182, 0.12)",
+        ):
+            self.assertIn(token, self.styles.lower())
+        for selector in (
+            ".director-output-card.is-selected",
+            ".studio-flow-node.is-current",
+            ".pipeline-stage.is-selected",
+            ".v2-timeline-rail .timeline-segment.is-selected",
+            ".v2-shot-grid .shot-card.is-selected",
+            "body .script-scene-item.is-selected",
+            "body .script-version-item.is-selected",
+            ".tab.is-active",
+            ".segment.is-active",
+            ".segmented-control button.is-active",
+            ".works-filter button.is-active",
+            ".works-r1-filter button.is-active",
+            ".asset-taxonomy button.is-active",
+            ".nav-item.is-active",
+            ".context-nav-item.is-active",
+        ):
+            self.assertIn(selector, correction)
+        for declaration in (
+            "background: var(--acs-surface-deep)",
+            "background: var(--acs-surface-hover)",
+            "background: var(--acs-surface-selected)",
+            "border-color: var(--acs-primary)",
+            "color: var(--acs-text-primary)",
+            "color: var(--acs-text-secondary)",
+            "rgba(34, 209, 182, 0.12)",
+        ):
+            self.assertIn(declaration, correction)
+        for forbidden in ("background: white", "background: #fff", "#ffffff", "#edf7f5"):
+            self.assertNotIn(forbidden, correction.lower())
+
+    def test_ui_r1_ai_director_plan_status_has_three_clear_dark_states(self):
+        block = self.script.split("function renderDirectorCanvas()", 1)[1].split(
+            "function renderDirectorPlanning", 1
+        )[0]
+        for marker in (
+            "director-plan-state-idle",
+            "等待生成",
+            "尚无候选方案",
+            "director-plan-state-generating",
+            "生成中",
+            "director-plan-state-candidate",
+            "待确认",
+            "候选方案",
+            "director-plan-state-confirmed",
+            "已确认",
+            "当前会话",
+        ):
+            self.assertIn(marker, block)
+        self.assertNotIn("已确认（当前会话）", block)
+        closeout_css = self.styles.split("/* UI-R1 closeout: confirmed plan status", 1)[1]
+        self.assertIn("background: var(--acs-primary-soft)", closeout_css)
+        self.assertIn("color: var(--acs-text-primary)", closeout_css)
+        self.assertIn("color: var(--acs-text-secondary)", closeout_css)
+        self.assertNotIn("background: white", closeout_css.lower())
+
+    def test_ui_r1_projects_expose_confirmed_real_delete_controls(self):
+        project_block = self.script.split("function renderProjects()", 1)[1].split(
+            "function pipelineStatus", 1
+        )[0]
+        for marker in (
+            'data-action="delete-series"',
+            'data-action="delete-episode"',
+            "删除系列",
+            "删除单集",
+            "episode-project-link",
+        ):
+            self.assertIn(marker, project_block)
+        static_shell = self.index.split('<script type="application/json"', 1)[0]
+        for marker in (
+            'id="delete-dialog"',
+            "确认删除？",
+            "删除后不可恢复",
+            'data-action="confirm-deletion"',
+        ):
+            self.assertIn(marker, static_shell)
+
+    def test_ui_r1_delete_flow_calls_application_endpoint_then_reloads(self):
+        block = self.script.split("async function confirmDeletion()", 1)[1].split(
+            "function toggleSidebarCollapse", 1
+        )[0]
+        for marker in (
+            'method: "DELETE"',
+            "seriesEndpoint",
+            "episodesEndpoint",
+            "withWorkspace(endpoint)",
+            "withEpisodeScope(endpoint, target.seriesRef)",
+            "await loadSeriesData({ force: true })",
+            "删除失败，请稍后重试。",
+        ):
+            self.assertIn(marker, block)
+        self.assertNotIn("state.seriesRecords.filter", block)
 
 
 if __name__ == "__main__":

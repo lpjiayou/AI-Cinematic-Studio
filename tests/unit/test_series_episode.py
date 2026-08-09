@@ -241,6 +241,46 @@ class SeriesEpisodeServiceTests(unittest.TestCase):
         with self.assertRaises(RecordNotFoundError):
             self.service.get_episode(WORKSPACE, "series-missing", "episode-missing")
 
+    def test_delete_episode_removes_record_and_immutable_binding_only(self):
+        series = self.create_series()
+        plan = self.confirm_plan()
+        first = self.create_episode(series, plan, episodeNumber=1)
+        second = self.create_episode(series, plan, episodeNumber=2, title="Episode 002")
+        result = self.service.delete_episode(WORKSPACE, series["seriesRef"], first["episodeRef"])
+        self.assertEqual(result["kind"], "episode")
+        self.assertEqual(result["deletedEpisodeCount"], 1)
+        self.assertIsNone(self.adapter.get_episode(WORKSPACE, series["seriesRef"], first["episodeRef"]))
+        self.assertIsNone(self.adapter.get_plan_binding(WORKSPACE, series["seriesRef"], first["episodeRef"]))
+        self.assertIsNotNone(self.adapter.get_episode(WORKSPACE, series["seriesRef"], second["episodeRef"]))
+        self.assertIsNotNone(self.adapter.get_confirmed_plan(WORKSPACE, plan["creativePlanRef"]))
+
+    def test_delete_missing_episode_returns_not_found(self):
+        series = self.create_series()
+        with self.assertRaises(RecordNotFoundError):
+            self.service.delete_episode(WORKSPACE, series["seriesRef"], "episode-missing")
+
+    def test_delete_series_cascades_only_its_episodes_and_bindings(self):
+        first_series = self.create_series(title="Delete me")
+        plan = self.confirm_plan()
+        first = self.create_episode(first_series, plan, episodeNumber=1)
+        second = self.create_episode(first_series, plan, episodeNumber=2, title="Episode 002")
+        kept_series = self.create_series(title="Keep me")
+        kept = self.create_episode(kept_series, plan, episodeNumber=1)
+        result = self.service.delete_series(WORKSPACE, first_series["seriesRef"])
+        self.assertEqual(result["kind"], "series")
+        self.assertEqual(result["deletedEpisodeCount"], 2)
+        self.assertEqual(set(result["deletedEpisodeRefs"]), {first["episodeRef"], second["episodeRef"]})
+        self.assertIsNone(self.adapter.get_series(WORKSPACE, first_series["seriesRef"]))
+        self.assertEqual(self.adapter.list_episodes(WORKSPACE, first_series["seriesRef"]), [])
+        self.assertIsNotNone(self.adapter.get_series(WORKSPACE, kept_series["seriesRef"]))
+        self.assertIsNotNone(self.adapter.get_episode(WORKSPACE, kept_series["seriesRef"], kept["episodeRef"]))
+
+    def test_delete_empty_series_succeeds(self):
+        series = self.create_series(title="Empty")
+        result = self.service.delete_series(WORKSPACE, series["seriesRef"])
+        self.assertEqual(result["deletedEpisodeCount"], 0)
+        self.assertEqual(self.service.list_series(WORKSPACE), [])
+
     def test_results_are_json_serializable(self):
         episode = self.create_episode()
         json.dumps(episode, ensure_ascii=False)
@@ -319,6 +359,22 @@ class SqliteSeriesEpisodeAdapterTests(unittest.TestCase):
         self.complete_chain()
         restarted = SqliteSeriesEpisodeAdapter(self.database_path)
         self.assertEqual(len(restarted.list_series(WORKSPACE)), 1)
+
+    def test_episode_deletion_survives_adapter_restart(self):
+        series, _, episode = self.complete_chain()
+        self.service.delete_episode(WORKSPACE, series["seriesRef"], episode["episodeRef"])
+        restarted = SeriesEpisodeService(SqliteSeriesEpisodeAdapter(self.database_path))
+        with self.assertRaises(RecordNotFoundError):
+            restarted.get_episode(WORKSPACE, series["seriesRef"], episode["episodeRef"])
+        self.assertEqual(restarted.get_series(WORKSPACE, series["seriesRef"])["episodes"], [])
+
+    def test_series_cascade_deletion_survives_adapter_restart(self):
+        series, _, _ = self.complete_chain()
+        self.service.delete_series(WORKSPACE, series["seriesRef"])
+        restarted = SeriesEpisodeService(SqliteSeriesEpisodeAdapter(self.database_path))
+        with self.assertRaises(RecordNotFoundError):
+            restarted.get_series(WORKSPACE, series["seriesRef"])
+        self.assertEqual(restarted.list_series(WORKSPACE), [])
 
 
 if __name__ == "__main__":

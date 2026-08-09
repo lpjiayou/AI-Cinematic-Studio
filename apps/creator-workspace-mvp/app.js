@@ -19,6 +19,12 @@
   const bottomDrawerContent = document.getElementById("bottom-drawer-content");
   const projectDialog = document.getElementById("project-dialog");
   const projectForm = document.getElementById("project-form");
+  const deleteDialog = document.getElementById("delete-dialog");
+  const deleteDialogTitle = document.getElementById("delete-dialog-title");
+  const deleteDialogSubject = document.getElementById("delete-dialog-subject");
+  const deleteDialogDescription = document.getElementById("delete-dialog-description");
+  const deleteDialogError = document.getElementById("delete-dialog-error");
+  const deleteDialogConfirm = document.getElementById("delete-dialog-confirm");
   const toast = document.getElementById("toast");
   const fixtureBanner = document.querySelector(".fixture-banner");
   const defaultFixtureBannerMarkup = fixtureBanner ? fixtureBanner.innerHTML : "";
@@ -44,6 +50,7 @@
   const defaultRoute = "/creator";
   let toastTimer;
   let dialogReturnFocus = null;
+  let deleteDialogReturnFocus = null;
   let inspectorReturnFocus = null;
   const mobileQuery = window.matchMedia("(max-width: 900px)");
   const compactInspectorQuery = window.matchMedia("(max-width: 1439px)");
@@ -66,12 +73,12 @@
   ]);
 
   const creationModules = Object.freeze([
-    { key: "generation", path: "/creator/create/generation", label: "图片与视频", english: "Generation", version: "M10–M12", description: "需要真实 AssetRequirement 与生成能力后才能执行。" },
-    { key: "templates", path: "/creator/create/templates", label: "模板", english: "Templates", version: "Future", description: "尚未建立可执行模板合同。" },
-    { key: "prompt-lab", path: "/creator/create/prompt-lab", label: "Prompt Lab", english: "Prompt Lab", version: "Future", description: "实验内容不会自动成为正式生产事实。" },
-    { key: "audio", path: "/creator/create/audio", label: "声音实验", english: "Audio Lab", version: "M12", description: "需要正式声音生产能力后才能执行。" },
-    { key: "models", path: "/creator/create/models", label: "模型实验", english: "Model Lab", version: "Future", description: "当前不开放模型或 Provider 配置。" },
-    { key: "tools", path: "/creator/create/tools", label: "快速工具", english: "Quick Tools", version: "Future", description: "尚未建立可进入正式项目的工具合同。" }
+    { key: "generation", path: "/creator/create/generation", label: "图片与视频", english: "Generation", version: "后续阶段", description: "需要真实资产需求与生成能力后才能执行。" },
+    { key: "templates", path: "/creator/create/templates", label: "模板", english: "Templates", version: "待规划", description: "尚未建立可执行的模板能力。" },
+    { key: "prompt-lab", path: "/creator/create/prompt-lab", label: "提示词实验", english: "Prompt Lab", version: "待规划", description: "实验内容不会自动成为正式制作记录。" },
+    { key: "audio", path: "/creator/create/audio", label: "声音实验", english: "Audio Lab", version: "后续阶段", description: "需要正式声音制作能力后才能执行。" },
+    { key: "models", path: "/creator/create/models", label: "创意实验", english: "Model Lab", version: "待规划", description: "当前不开放底层能力配置。" },
+    { key: "tools", path: "/creator/create/tools", label: "快捷工具", english: "Quick Tools", version: "待规划", description: "尚未建立可进入正式项目的工具能力。" }
   ]);
 
   const projectNavigationGroups = Object.freeze([
@@ -106,7 +113,7 @@
       { key: "approvals", label: "审批", suffix: "post/approvals", type: "approval-shell", status: "disabled" }
     ] },
     { label: "交付", key: "delivery", items: [
-      { key: "masters", label: "Master", suffix: "delivery/masters", type: "master-shell", status: "planned" },
+      { key: "masters", label: "成片", suffix: "delivery/masters", type: "master-shell", status: "planned" },
       { key: "exports", label: "导出", suffix: "delivery/exports", type: "export-shell", status: "disabled" },
       { key: "series-delivery", label: "系列管理", suffix: "delivery/series", type: "series-delivery-shell", status: "planned" },
       { key: "release", label: "发布", suffix: "delivery/release", type: "release-shell", status: "planned" },
@@ -176,9 +183,13 @@
     confirmedCreativePlan: null,
     seriesRecords: [],
     seriesDataStatus: "idle",
+    selectedSeriesRef: null,
+    selectedEpisodeRef: null,
     seriesEpisodePhase: "idle",
     seriesEpisodeError: null,
     createdEpisode: null,
+    pendingDeletion: null,
+    deletionPhase: "idle",
     scriptWorkspaceStatus: "idle",
     scriptWorkspaceScope: "",
     scriptWorkspace: null,
@@ -255,11 +266,12 @@
         }))
       })));
       state.seriesDataStatus = "ready";
+      resolveSelectedProductionContext();
     } catch (error) {
       state.seriesDataStatus = "error";
       state.seriesEpisodeError = "暂时无法读取系列与集数，请稍后重试。";
     }
-    if (["/creator", "/creator/projects", "/creator/ai-director"].includes(state.activePath) || state.activePath.startsWith("/creator/projects/")) {
+    if (["/creator", "/creator/projects", "/creator/ai-director"].includes(state.activePath) || state.activePath.startsWith("/creator/projects/") || state.activePath.startsWith(`${projectShellBase}/`)) {
       renderRoute(state.activePath);
     }
   }
@@ -338,15 +350,15 @@
   function statusBadge(statusKey, additionalClass = "") {
     const status = featureStates[statusKey] || featureStates.planned;
     if (!status.badge) return "";
-    if (statusKey === "fixture") return '<span class="sr-only">FIXTURE ONLY</span>';
-    const labels = { fixture: "演示版本", development: "开发中", planned: "即将上线", disabled: "暂不可用" };
+    if (statusKey === "fixture") return '<span class="sr-only">演示版本</span>';
+    const labels = { fixture: "演示版本", development: "开发中", planned: "尚未启用", disabled: "暂不可用" };
     return `<span class="badge badge-${status.tone} ${additionalClass}"><i aria-hidden="true"></i>${escapeHtml(labels[statusKey] || status.badge)}</span>`;
   }
 
   function pageStatus(statusKey) {
     const status = featureStates[statusKey] || featureStates.planned;
-    if (statusKey === "fixture") return '<span class="sr-only">AVAILABLE - FIXTURE ONLY</span>';
-    const labels = { available: "可用", fixture: "演示版本", development: "开发中", planned: "即将上线", disabled: "暂不可用" };
+    if (statusKey === "fixture") return '<span class="sr-only">可用，演示版本</span>';
+    const labels = { available: "可用", fixture: "演示版本", development: "开发中", planned: "尚未启用", disabled: "暂不可用" };
     return `<span class="page-status page-status-${status.tone}"><i aria-hidden="true"></i>${escapeHtml(labels[statusKey] || status.label)}</span>`;
   }
 
@@ -376,11 +388,11 @@
   }
 
   function fixtureNotice() {
-    return '<span class="sr-only page-fixture-contract">FIXTURE ONLY · NOT A DOMAIN FACT · SESSION ONLY</span>';
+    return '<span class="sr-only page-fixture-contract">演示数据，不代表正式业务记录，仅用于当前会话。</span>';
   }
 
   function seriesApplicationNotice() {
-    return '<span class="sr-only series-application-contract">SERIES AND EPISODE DOMAIN OWNER IS V5 CORE OS · LOCAL DEVELOPMENT DURABLE ADAPTER · NOT A CANONICAL PROJECT · NO PRODUCTION JOB</span>';
+    return '<span class="sr-only series-application-contract">系列与单集来自正式应用边界；当前不是正式项目，也不会创建制作任务。</span>';
   }
 
   function candidatePlanNotice() {
@@ -388,7 +400,7 @@
   }
 
   function demoNotice(copy) {
-    return `<span class="sr-only director-demo-notice">${escapeHtml(copy)} · FIXTURE ONLY · NOT A DOMAIN FACT</span>`;
+    return `<span class="sr-only director-demo-notice">${escapeHtml(copy)} · 演示数据，不代表正式业务记录。</span>`;
   }
 
   function renderPageHeader({ eyebrow, title, description, status = "fixture", pageStatusLabel = "", meta = "" }) {
@@ -451,23 +463,23 @@
     const recent = episodes.slice(0, 3);
     return `
       <section class="enterprise-hero" aria-labelledby="enterprise-hero-title">
-        <div><span class="section-kicker">PRODUCTION COMMAND CENTER</span><h2 id="enterprise-hero-title">把创意推进为可确认的制作事实</h2><p>从导演方案、系列与分集，到故事和剧本版本。这里只汇总当前工作区真实存在的生产记录。</p></div>
+        <div><span class="section-kicker">制作指挥中心</span><h2 id="enterprise-hero-title">把创意推进为可确认的制作成果</h2><p>从导演方案、系列与分集，到故事和剧本版本。这里只汇总当前工作区真实存在的制作记录。</p></div>
         <div class="enterprise-hero-actions"><a class="button button-primary" href="#/creator/ai-director">打开 AI导演</a><a class="button button-secondary" href="#/creator/projects">查看项目中心</a></div>
       </section>
       <section class="command-metrics" aria-label="工作区摘要">
         <article><span>系列</span><strong>${seriesCount}</strong><small>本地开发服务记录</small></article>
-        <article><span>分集</span><strong>${episodes.length}</strong><small>已建立 Episode identity</small></article>
-        <article><span>已确认方案</span><strong>${confirmedEpisodes.length}</strong><small>Confirmed CreativePlan binding</small></article>
+        <article><span>分集</span><strong>${episodes.length}</strong><small>已建立单集记录</small></article>
+        <article><span>已确认方案</span><strong>${confirmedEpisodes.length}</strong><small>已绑定导演方案</small></article>
         <article><span>剧本工作区</span><strong>${scriptEpisodes.length}</strong><small>无数据时保持 0</small></article>
       </section>
       <section class="enterprise-grid enterprise-grid-wide">
         <article class="enterprise-panel">
-          <header><div><span class="section-kicker">ACTIVE PRODUCTIONS</span><h3>最近分集</h3></div><a class="text-link" href="#/creator/projects">全部项目</a></header>
-          <div class="enterprise-list">${state.seriesDataStatus === "loading" || state.seriesDataStatus === "idle" ? renderLoadingState("正在读取真实系列与分集") : state.seriesDataStatus === "error" ? renderErrorState("暂时无法读取制作记录", "请确认 Creator Server 正在运行。") : recent.length ? recent.map(({ series, episode }) => `<a class="enterprise-list-row" href="#/creator/projects/${encodeURIComponent(episode.episodeRef)}"><span class="row-index">E${String(episode.episodeNumber).padStart(2, "0")}</span><span><strong>${escapeHtml(episode.title)}</strong><small>${escapeHtml(series.title)} · ${episode.confirmedPlanBinding ? `导演方案 v${escapeHtml(episode.sourcePlanVersion)}` : "等待确认导演方案"}</small></span><em>进入</em></a>`).join("") : renderEmptyState({ icon: "—", title: "还没有真实分集", description: "先在 AI导演确认方案，再创建系列与分集。", action: '<a class="button button-secondary" href="#/creator/ai-director">前往 AI导演</a>' })}</div>
+          <header><div><span class="section-kicker">当前制作</span><h3>最近分集</h3></div><a class="text-link" href="#/creator/projects">全部项目</a></header>
+          <div class="enterprise-list">${state.seriesDataStatus === "loading" || state.seriesDataStatus === "idle" ? renderLoadingState("正在读取真实系列与分集") : state.seriesDataStatus === "error" ? renderErrorState("暂时无法读取制作记录", "请确认本地应用服务正在运行。") : recent.length ? recent.map(({ series, episode }) => `<a class="enterprise-list-row" href="#/creator/projects/${encodeURIComponent(episode.episodeRef)}"><span class="row-index">第${String(episode.episodeNumber).padStart(2, "0")}集</span><span><strong>${escapeHtml(episode.title)}</strong><small>${escapeHtml(series.title)} · ${episode.confirmedPlanBinding ? `导演方案 v${escapeHtml(episode.sourcePlanVersion)}` : "等待确认导演方案"}</small></span><em>进入</em></a>`).join("") : renderEmptyState({ icon: "—", title: "还没有真实分集", description: "先在 AI导演确认方案，再创建系列与分集。", action: '<a class="button button-secondary" href="#/creator/ai-director">前往 AI导演</a>' })}</div>
         </article>
         <aside class="enterprise-panel enterprise-rail">
-          <header><div><span class="section-kicker">CAPABILITY MAP</span><h3>生产能力</h3></div></header>
-          ${[["M1","AI导演","可用"],["M2","系列与分集","可用"],["M3","故事与剧本","可用"],["M4","角色与 IP","暂停"],["M5+","制作与交付","规划中"]].map(([milestone,label,status]) => `<div class="capability-row"><span>${milestone}</span><strong>${label}</strong><em>${status}</em></div>`).join("")}
+          <header><div><span class="section-kicker">能力进度</span><h3>制作能力</h3></div></header>
+          ${[["01","AI导演","可用"],["02","系列与分集","可用"],["03","故事与剧本","可用"],["04","角色与 IP","暂停"],["05","制作与交付","规划中"]].map(([sequence,label,status]) => `<div class="capability-row"><span>${sequence}</span><strong>${label}</strong><em>${status}</em></div>`).join("")}
         </aside>
       </section>
       ${seriesApplicationNotice()}
@@ -484,15 +496,21 @@
               <article class="series-project-card">
                 <header>
                   <div><span class="section-kicker">系列</span><h3>${escapeHtml(series.title)}</h3><p>${escapeHtml(series.description || "持续创作中的影片系列")}</p></div>
-                  <span class="badge badge-available"><i></i>${escapeHtml(series.status === "active" ? "创作中" : series.status)}</span>
+                  <div class="series-card-actions">
+                    <span class="badge badge-available"><i></i>${escapeHtml(series.status === "active" ? "创作中" : series.status)}</span>
+                    <button class="button button-danger-subtle" type="button" data-action="delete-series" data-series-ref="${escapeHtml(series.seriesRef)}" data-series-title="${escapeHtml(series.title)}" data-episode-count="${(series.episodes || []).length}">删除系列</button>
+                  </div>
                 </header>
                 <div class="series-episode-list">
                   ${(series.episodes || []).length ? series.episodes.map((episode) => `
-                    <a class="episode-project-row" href="#/creator/projects/${encodeURIComponent(episode.episodeRef)}">
-                      <span class="episode-number">E${String(episode.episodeNumber).padStart(2, "0")}</span>
-                      <span><strong>${escapeHtml(episode.title)}</strong><small>来源：已确认的 AI导演方案 v${escapeHtml(episode.sourcePlanVersion)}</small></span>
-                      <em>打开项目 →</em>
-                    </a>
+                    <article class="episode-project-row">
+                      <a class="episode-project-link" href="#/creator/projects/${encodeURIComponent(episode.episodeRef)}">
+                        <span class="episode-number">E${String(episode.episodeNumber).padStart(2, "0")}</span>
+                        <span><strong>${escapeHtml(episode.title)}</strong><small>来源：已确认的 AI导演方案 v${escapeHtml(episode.sourcePlanVersion)}</small></span>
+                        <em>打开项目 →</em>
+                      </a>
+                      <button class="button button-danger-subtle episode-delete-action" type="button" data-action="delete-episode" data-series-ref="${escapeHtml(series.seriesRef)}" data-series-title="${escapeHtml(series.title)}" data-episode-ref="${escapeHtml(episode.episodeRef)}" data-episode-title="${escapeHtml(episode.title)}">删除单集</button>
+                    </article>
                   `).join("") : '<div class="series-empty">还没有集数。请在 AI导演确认方案后创建第一集。</div>'}
                 </div>
               </article>
@@ -507,16 +525,16 @@
       ${renderPageHeader({
         eyebrow: "项目中心",
         title: "项目",
-        description: "以真实 Series 与 Episode 记录组织当前创作；Project Context Foundation 尚未启用。",
+        description: "以真实系列与单集记录组织当前创作；正式项目管理能力尚未启用。",
         status: "available",
         meta: '<button class="button button-primary" type="button" data-action="open-project-dialog">新建项目</button>'
       })}
       <section class="project-center-toolbar" aria-label="项目筛选">
         <div class="segmented-control"><button class="is-active" type="button">全部</button><button type="button" disabled>进行中</button><button type="button" disabled>已归档</button></div>
-        <span>不创建虚构 Project；当前仅显示真实 Series / Episode。</span>
+        <span>不创建虚构项目；当前仅显示真实系列与单集。</span>
       </section>
-      <section class="enterprise-panel project-register" aria-labelledby="series-projects-title"><header><div><span class="section-kicker">SERIES / EPISODE REGISTER</span><h3 id="series-projects-title">真实创作记录</h3></div><button class="button button-text" type="button" data-action="reload-series">刷新</button></header><div class="series-project-list">${persistedSeries}</div></section>
-      <section class="enterprise-panel project-context-gate"><span class="gate-index">PROJECT</span><div><span class="section-kicker">FOUNDATION GATE</span><h3>Project Context 尚未建立</h3><p>新建项目向导可用于检查未来配置流程，但最终提交保持禁用，不会生成 projectRef。</p></div><button class="button button-secondary" type="button" data-action="open-project-dialog">查看新建流程</button></section>
+      <section class="enterprise-panel project-register" aria-labelledby="series-projects-title"><header><div><span class="section-kicker">系列与单集</span><h3 id="series-projects-title">真实创作记录</h3></div><button class="button button-text" type="button" data-action="reload-series">刷新</button></header><div class="series-project-list">${persistedSeries}</div></section>
+      <section class="enterprise-panel project-context-gate"><span class="gate-index">项目</span><div><span class="section-kicker">项目能力准备</span><h3>正式项目上下文尚未建立</h3><p>新建项目向导可用于检查未来配置流程，但最终提交保持禁用，不会建立正式项目记录。</p></div><button class="button button-secondary" type="button" data-action="open-project-dialog">查看新建流程</button></section>
       ${seriesApplicationNotice()}
     `;
   }
@@ -528,7 +546,7 @@
     if (normalized.startsWith("planned")) tone = "planned";
     if (normalized.startsWith("complete")) tone = "complete";
     if (normalized.startsWith("not started")) tone = "idle";
-    const label = normalized.startsWith("blocked") ? "阻塞" : normalized.startsWith("planned") ? "即将上线" : normalized.startsWith("complete") ? "完成" : normalized.startsWith("not started") ? "准备中" : "制作中";
+    const label = normalized.startsWith("blocked") ? "阻塞" : normalized.startsWith("planned") ? "尚未启用" : normalized.startsWith("complete") ? "完成" : normalized.startsWith("not started") ? "准备中" : "制作中";
     return `<span class="pipeline-status pipeline-${tone}"><i aria-hidden="true"></i>${label}</span>`;
   }
 
@@ -622,7 +640,7 @@
     if (state.assetTab === "history") {
       return renderEmptyState({
         icon: "⏱",
-        title: "生成记录 · 即将上线",
+        title: "生成记录 · 尚未启用",
         description: "未来将在这里查看资产的生成来源、时间和版本；当前没有可展示记录。"
       });
     }
@@ -656,7 +674,7 @@
         meta: '<label class="asset-search"><span aria-hidden="true">⌕</span><input type="search" placeholder="搜索资产" aria-label="搜索资产" disabled></label>'
       })}
       <section class="asset-category-strip v2-asset-categories" aria-label="资产分类">
-        ${[["角色","◉"],["场景","▱"],["图片","◇"],["视频","▶"],["音频","♪"],["模板","▦"]].map(([label, icon], index) => `<button type="button" class="asset-category ${index === 0 ? "is-fixture" : ""}" disabled><i aria-hidden="true">${icon}</i><strong>${label}</strong><small>${index === 0 ? "1 项" : index < 4 ? "浏览" : "即将上线"}</small></button>`).join("")}
+        ${[["角色","◉"],["场景","▱"],["图片","◇"],["视频","▶"],["音频","♪"],["模板","▦"]].map(([label, icon], index) => `<button type="button" class="asset-category ${index === 0 ? "is-fixture" : ""}" disabled><i aria-hidden="true">${icon}</i><strong>${label}</strong><small>${index === 0 ? "1 项" : index < 4 ? "浏览" : "尚未启用"}</small></button>`).join("")}
       </section>
       <section class="asset-feature-card">
         <div class="asset-feature-visual"><img src="${escapeHtml(fixture.character.referenceImage)}" alt="晚灯角色资产"><span>角色资产</span></div>
@@ -664,7 +682,7 @@
       </section>
       <section class="card asset-detail-shell v2-asset-detail">
         <div class="tabs" role="tablist" aria-label="资产详情">
-          ${tabs.map(([key, label]) => `<button class="tab ${state.assetTab === key ? "is-active" : ""}" id="asset-tab-${key}" type="button" role="tab" aria-selected="${state.assetTab === key}" aria-controls="asset-detail-panel" tabindex="${state.assetTab === key ? "0" : "-1"}" data-action="select-asset-tab" data-tab="${key}">${escapeHtml(label)}${key === "history" ? '<span class="badge badge-planned"><i></i>即将上线</span>' : ""}</button>`).join("")}
+          ${tabs.map(([key, label]) => `<button class="tab ${state.assetTab === key ? "is-active" : ""}" id="asset-tab-${key}" type="button" role="tab" aria-selected="${state.assetTab === key}" aria-controls="asset-detail-panel" tabindex="${state.assetTab === key ? "0" : "-1"}" data-action="select-asset-tab" data-tab="${key}">${escapeHtml(label)}${key === "history" ? '<span class="badge badge-planned"><i></i>尚未启用</span>' : ""}</button>`).join("")}
         </div>
         <div class="tab-panel" id="asset-detail-panel" role="tabpanel" aria-labelledby="asset-tab-${escapeHtml(state.assetTab)}" tabindex="0">${assetTabContent()}</div>
       </section>
@@ -702,7 +720,7 @@
         ${creationModules.map((module, index) => `
           <a class="module-card" href="#${escapeHtml(module.path)}">
             <span class="module-icon" aria-hidden="true">${modules[index][2]}</span>
-            <div class="module-card-heading"><span class="module-status">即将上线</span><span>${String(index + 1).padStart(2, "0")}</span></div>
+            <div class="module-card-heading"><span class="module-status">尚未启用</span><span>${String(index + 1).padStart(2, "0")}</span></div>
             <h3>${modules[index][0]}</h3>
             <p>${modules[index][1]}</p>
             <span class="module-link">了解功能 <span aria-hidden="true">→</span></span>
@@ -731,10 +749,10 @@
         ${commonHeader("生成中心", "把文字、参考画面和创作意图转化为可使用的影视素材。", "未来创作工作台")}
         <section class="creation-preview-hero generation-preview-hero">
           <div><span class="section-kicker">创作入口</span><h2>从创作意图开始</h2><p>整理画面目标与参考方向，在功能开放后进入对应的创作模块。</p></div>
-          <div class="generation-input-preview" aria-label="未来输入区域预览"><label for="generation-preview-input">描述你想创建的画面……</label><textarea id="generation-preview-input" disabled placeholder="描述画面、氛围与镜头意图"></textarea><button class="button button-primary" type="button" disabled>即将上线</button></div>
+          <div class="generation-input-preview" aria-label="未来输入区域预览"><label for="generation-preview-input">描述你想创建的画面……</label><textarea id="generation-preview-input" disabled placeholder="描述画面、氛围与镜头意图"></textarea><button class="button button-primary" type="button" disabled>尚未启用</button></div>
         </section>
         <section class="creation-preview-grid creation-tool-grid" aria-label="生成能力预览">
-          ${modules.map(([icon, title, description]) => `<article class="creation-preview-card"><span class="creation-preview-icon" aria-hidden="true">${icon}</span><span class="preview-status">即将上线</span><h3>${title}</h3><p>${description}</p><button class="button button-text" type="button" disabled>暂不可用</button></article>`).join("")}
+          ${modules.map(([icon, title, description]) => `<article class="creation-preview-card"><span class="creation-preview-icon" aria-hidden="true">${icon}</span><span class="preview-status">尚未启用</span><h3>${title}</h3><p>${description}</p><button class="button button-text" type="button" disabled>暂不可用</button></article>`).join("")}
         </section>
         ${fixtureNotice()}
       `;
@@ -752,7 +770,7 @@
       return `
         ${commonHeader("模板库", "从成熟的影片结构出发，快速理解不同内容类型的创作方式。", "影片结构预览")}
         <section class="template-preview-grid" aria-label="模板预览">
-          ${templates.map(([title, purpose, meta, image], index) => `<article class="template-preview-card"><div class="template-preview-cover template-cover-${index + 1}">${image ? `<img src="${escapeHtml(image)}" alt="${escapeHtml(title)}视觉示例">` : ""}<span>即将上线</span></div><div><h3>${title}</h3><p>${purpose}</p><small>${meta}</small></div></article>`).join("")}
+          ${templates.map(([title, purpose, meta, image], index) => `<article class="template-preview-card"><div class="template-preview-cover template-cover-${index + 1}">${image ? `<img src="${escapeHtml(image)}" alt="${escapeHtml(title)}视觉示例">` : ""}<span>尚未启用</span></div><div><h3>${title}</h3><p>${purpose}</p><small>${meta}</small></div></article>`).join("")}
         </section>
         ${fixtureNotice()}
       `;
@@ -768,7 +786,7 @@
       return `
         ${commonHeader("IP工作室", "整理跨项目可复用的角色、世界观与创作规则。", "IP 结构预览")}
         <section class="ip-preview-hero"><div class="ip-preview-visual"><img src="${escapeHtml(fixture.character.referenceImage)}" alt="晚灯角色设定"><span>晚灯 <small>WANLIGHT</small></span></div><div class="ip-preview-copy"><span class="section-kicker">演示 IP</span><h2>晚灯</h2><p>陪伴型夜灯角色，以深蓝兜帽、暖色灯面和月牙标识建立稳定识别。</p><dl><div><dt>世界观</dt><dd>夜晚书桌 / 安静陪伴</dd></div><div><dt>角色规则</dt><dd>深蓝兜帽 / 暖色灯面 / 月牙标识</dd></div></dl></div></section>
-        <section class="ip-preview-modules" aria-label="IP 管理结构预览">${modules.map(([title, value, description]) => `<article><span>${title}</span><strong>${value}</strong><p>${description}</p><small>即将上线</small></article>`).join("")}</section>
+        <section class="ip-preview-modules" aria-label="IP 管理结构预览">${modules.map(([title, value, description]) => `<article><span>${title}</span><strong>${value}</strong><p>${description}</p><small>尚未启用</small></article>`).join("")}</section>
         ${fixtureNotice()}
       `;
     }
@@ -782,7 +800,7 @@
       ];
       return `
         ${commonHeader("创作记忆", "未来用于帮助不同镜头保持角色、视觉和创作规则的一致性。", "一致性工具预览")}
-        <section class="memory-preview-shell"><div class="memory-preview-intro"><span aria-hidden="true">◌</span><div><h2>让作品记住已经确认的选择</h2><p>当前不会记录或学习用户行为；这里只展示未来的信息组织方式。</p></div></div><div class="memory-preview-grid">${memories.map(([title, description], index) => `<article><span>${String(index + 1).padStart(2, "0")}</span><h3>${title}</h3><p>${description}</p><small>即将上线</small></article>`).join("")}</div></section>
+        <section class="memory-preview-shell"><div class="memory-preview-intro"><span aria-hidden="true">◌</span><div><h2>让作品记住已经确认的选择</h2><p>当前不会记录或学习用户行为；这里只展示未来的信息组织方式。</p></div></div><div class="memory-preview-grid">${memories.map(([title, description], index) => `<article><span>${String(index + 1).padStart(2, "0")}</span><h3>${title}</h3><p>${description}</p><small>尚未启用</small></article>`).join("")}</div></section>
         ${fixtureNotice()}
       `;
     }
@@ -791,7 +809,7 @@
       const stages = ["创意", "角色", "分镜", "画面", "声音", "预览"];
       return `
         ${commonHeader("工作流预设", "预览不同影片类型的创作路径，不执行任务或自动推进阶段。", "电影生产路径预览")}
-        <section class="workflow-preview-shell"><ol class="workflow-preview-flow">${stages.map((stage, index) => `<li><span>${String(index + 1).padStart(2, "0")}</span><strong>${stage}</strong>${index < stages.length - 1 ? '<i aria-hidden="true">→</i>' : ""}</li>`).join("")}</ol><div class="workflow-preset-grid"><article><span>情绪短片流程</span><h3>从情绪主题到候选预览</h3><p>适合角色陪伴、内心独白与短篇情绪表达。</p><button class="button button-secondary" type="button" disabled>即将上线</button></article><article><span>角色故事流程</span><h3>围绕角色建立连续叙事</h3><p>适合角色设定、场景关系与分镜连续性规划。</p><button class="button button-secondary" type="button" disabled>即将上线</button></article></div></section>
+        <section class="workflow-preview-shell"><ol class="workflow-preview-flow">${stages.map((stage, index) => `<li><span>${String(index + 1).padStart(2, "0")}</span><strong>${stage}</strong>${index < stages.length - 1 ? '<i aria-hidden="true">→</i>' : ""}</li>`).join("")}</ol><div class="workflow-preset-grid"><article><span>情绪短片流程</span><h3>从情绪主题到候选预览</h3><p>适合角色陪伴、内心独白与短篇情绪表达。</p><button class="button button-secondary" type="button" disabled>尚未启用</button></article><article><span>角色故事流程</span><h3>围绕角色建立连续叙事</h3><p>适合角色设定、场景关系与分镜连续性规划。</p><button class="button button-secondary" type="button" disabled>尚未启用</button></article></div></section>
         ${fixtureNotice()}
       `;
     }
@@ -799,7 +817,7 @@
     const charts = ["作品表现趋势", "制作效率", "内容表现"];
     return `
       ${commonHeader("数据分析", "当作品产生真实运营数据后，可在这里查看表现趋势。", "数据产品预览")}
-      <section class="analytics-empty-grid" aria-label="数据分析空状态">${charts.map((title, index) => `<article><div class="analytics-empty-heading"><h3>${title}</h3><span>即将上线</span></div><div class="analytics-empty-chart chart-${index + 1}" aria-hidden="true"><i></i><i></i><i></i><i></i></div><strong>暂无真实数据</strong><p>当前没有可展示的真实运营数据。</p></article>`).join("")}</section>
+      <section class="analytics-empty-grid" aria-label="数据分析空状态">${charts.map((title, index) => `<article><div class="analytics-empty-heading"><h3>${title}</h3><span>尚未启用</span></div><div class="analytics-empty-chart chart-${index + 1}" aria-hidden="true"><i></i><i></i><i></i><i></i></div><strong>暂无真实数据</strong><p>当前没有可展示的真实运营数据。</p></article>`).join("")}</section>
       ${fixtureNotice()}
     `;
   }
@@ -825,6 +843,7 @@
     if (state.aiDirectorPhase === "input") {
       return `
         <div class="director-canvas-empty" data-ai-director-state="input">
+          <div class="director-plan-state director-plan-state-idle" role="status"><i aria-hidden="true"></i><span><strong>等待生成</strong><small>尚无候选方案</small></span></div>
           <div class="director-empty-intro"><span class="director-empty-mark" aria-hidden="true">✦</span><h3>导演方案将在这里生成</h3><p>完成左侧创意输入后，可以查看故事方向、剧本草案、分镜规划和视觉风格。</p></div>
           <div class="director-preview-tiles" aria-label="导演方案内容预览">${["故事方向", "剧本草案", "分镜规划", "视觉风格"].map((label, index) => `<span><i>${String(index + 1).padStart(2, "0")}</i><strong>${label}</strong></span>`).join("")}</div>
         </div>
@@ -836,6 +855,7 @@
         <div class="director-loading-state" data-ai-director-state="generating" role="status" aria-live="polite">
           <span class="loading-spinner" aria-hidden="true"></span>
           <div><h3>正在整理导演方案…</h3><p>正在根据创意简报组织故事、镜头与视觉方向。</p></div>
+          <div class="director-plan-state director-plan-state-generating"><i aria-hidden="true"></i><span><strong>生成中</strong><small>正在校验候选方案</small></span></div>
         </div>
       `;
     }
@@ -855,15 +875,16 @@
     const script = plan.scriptDraft;
     const storyboard = plan.storyboardPlan;
     const visual = plan.visualStyle;
-    const statusLabel = state.aiDirectorConfirmed ? "已确认（当前会话）" : "待确认";
-    const statusTone = state.aiDirectorConfirmed ? "success" : "warning";
+    const planState = state.aiDirectorConfirmed
+      ? '<div class="director-plan-state director-plan-state-confirmed"><i aria-hidden="true"></i><span><strong>已确认</strong><small>当前会话</small></span></div>'
+      : '<div class="director-plan-state director-plan-state-candidate"><i aria-hidden="true"></i><span><strong>待确认</strong><small>候选方案</small></span></div>';
     const storyboardDuration = storyboard.reduce((sum, shot) => sum + Number(shot.durationSec || 0), 0);
     return `
       <div class="director-result" data-ai-director-state="${state.aiDirectorConfirmed ? "confirmed" : "result"}">
         <div class="director-result-banner" role="status">
           <span aria-hidden="true">✦</span>
-          <div><strong>候选导演方案已准备</strong><p>版本 ${state.aiDirectorPlanVersion} · ${statusLabel}</p></div>
-          ${localizedStatusBadge(statusLabel, statusTone)}
+          <div><strong>候选导演方案已准备</strong><p>版本 ${state.aiDirectorPlanVersion}</p></div>
+          ${planState}
         </div>
         ${state.aiDirectorPhase === "error" ? '<p class="director-retained-plan" role="alert">重新生成暂时失败，已确认方案仍保留在当前会话。</p>' : ""}
         <div class="director-output-grid">
@@ -887,7 +908,7 @@
     const seriesOptions = state.seriesRecords.map((series) => `<option value="${escapeHtml(series.seriesRef)}">${escapeHtml(series.title)}</option>`).join("");
     const handoff = state.aiDirectorConfirmed ? `
       <form id="series-episode-form" class="series-episode-form">
-        <div class="series-handoff-heading"><span class="section-kicker">项目交接</span><strong>创建系列与集数</strong><p>把已确认方案关联到一个稳定的系列和 Episode Project。</p></div>
+        <div class="series-handoff-heading"><span class="section-kicker">项目交接</span><strong>创建系列与集数</strong><p>把已确认方案关联到一个稳定的系列与单集制作记录。</p></div>
         <label class="field-label">系列
           <select name="seriesRef" data-action="select-series-mode" ${canCreateEpisode ? "" : "disabled"}>
             <option value="__new__">新建系列</option>${seriesOptions}
@@ -897,12 +918,12 @@
           <label class="field-label">系列名称<input name="seriesTitle" maxlength="80" value="晚灯" required></label>
           <label class="field-label">计划集数<input name="plannedEpisodeCount" type="number" min="1" max="10000" value="12" required></label>
         </div>
-        <label class="field-label">本集标题<input name="episodeTitle" maxlength="120" value="${escapeHtml(state.aiDirectorPlan.storyDirection.title || "Episode 001")}" required></label>
+        <label class="field-label">本集标题<input name="episodeTitle" maxlength="120" value="${escapeHtml(state.aiDirectorPlan.storyDirection.title || "第1集")}" required></label>
         <label class="field-label">集数<input name="episodeNumber" type="number" min="1" max="100000" value="1" required></label>
         ${state.seriesEpisodeError ? `<p class="form-error" role="alert">${escapeHtml(state.seriesEpisodeError)}</p>` : ""}
-        <div class="director-plan-action">${state.seriesEpisodePhase === "creating" ? renderButtonLoading("正在创建…") : `<button class="button button-secondary" type="submit" ${canCreateEpisode ? "" : "disabled"}>创建 Episode Project</button>`}<p>仅使用本地开发持久化；不是 Canonical Project，不会触发生成任务。</p></div>
+        <div class="director-plan-action">${state.seriesEpisodePhase === "creating" ? renderButtonLoading("正在创建…") : `<button class="button button-secondary" type="submit" ${canCreateEpisode ? "" : "disabled"}>创建单集制作记录</button>`}<p>保存后可在当前工作区继续查看；不会建立正式项目或启动制作任务。</p></div>
       </form>
-    ` : '<div class="director-plan-action"><button class="button button-primary" type="button" disabled>创建 Episode Project</button><p>人工确认并保存当前创意方案后，才可创建系列与集数。</p></div>';
+    ` : '<div class="director-plan-action"><button class="button button-primary" type="button" disabled>创建单集制作记录</button><p>人工确认并保存当前创意方案后，才可创建系列与集数。</p></div>';
     return `
       <section class="director-planning-panel" aria-labelledby="director-planning-title">
         <div class="card-heading"><div><span class="section-kicker">制作规划</span><h3 id="director-planning-title">把方案带入项目</h3></div></div>
@@ -961,6 +982,32 @@
       if (episode) return { series, episode };
     }
     return null;
+  }
+
+  function productionContexts() {
+    return state.seriesRecords.flatMap((series) => (series.episodes || []).map((episode) => ({ series, episode })));
+  }
+
+  function rememberProductionContext(persisted) {
+    if (!persisted || !persisted.series || !persisted.episode) return null;
+    state.selectedSeriesRef = persisted.series.seriesRef;
+    state.selectedEpisodeRef = persisted.episode.episodeRef;
+    return persisted;
+  }
+
+  function resolveSelectedProductionContext() {
+    if (state.selectedEpisodeRef) {
+      const selected = findPersistedEpisode(state.selectedEpisodeRef);
+      if (selected && (!state.selectedSeriesRef || selected.series.seriesRef === state.selectedSeriesRef)) return selected;
+      state.selectedSeriesRef = null;
+      state.selectedEpisodeRef = null;
+    }
+    const contexts = productionContexts();
+    return contexts.length === 1 ? rememberProductionContext(contexts[0]) : null;
+  }
+
+  function productionContextBase(persisted) {
+    return persisted ? `/creator/projects/${encodeURIComponent(persisted.episode.episodeRef)}` : "";
   }
 
   const storyViewSchemaVersion = "creator.story-view.v1";
@@ -1075,7 +1122,7 @@
           <div class="card-heading"><div><span class="section-kicker">叙事推进</span><h3>关键剧情节点</h3></div></div>
           <ol class="story-beat-list">
             ${projection.keyBeats.length
-              ? projection.keyBeats.map((beat, index) => `<li><span>Beat ${index + 1}</span><p>${escapeHtml(beat)}</p></li>`).join("")
+              ? projection.keyBeats.map((beat, index) => `<li><span>节点 ${index + 1}</span><p>${escapeHtml(beat)}</p></li>`).join("")
               : '<li class="story-muted-item">当前方案未提供关键剧情节点。</li>'}
           </ol>
           <div class="story-structure"><span>叙事结构</span><strong>${escapeHtml(projection.narrativeStructure || "按关键剧情节点推进")}</strong></div>
@@ -1093,14 +1140,19 @@
 
         <article class="card story-lineage-card">
           <div><span class="section-kicker">来源追溯</span><h3>已确认导演方案 v${escapeHtml(projection.sourcePlanVersion)}</h3></div>
-          <dl>
-            <div><dt>Series Ref</dt><dd><code>${escapeHtml(projection.seriesRef)}</code></dd></div>
-            <div><dt>Episode Ref</dt><dd><code>${escapeHtml(projection.episodeRef)}</code></dd></div>
-            <div><dt>Source Plan Ref</dt><dd><code>${escapeHtml(projection.sourcePlanRef)}</code></dd></div>
-            <div><dt>Source Schema</dt><dd><code>${escapeHtml(projection.sourcePlanSchemaVersion)}</code></dd></div>
+          <dl class="story-product-lineage">
+            <div><dt>系列</dt><dd>${escapeHtml(projection.seriesTitle)}</dd></div>
+            <div><dt>单集</dt><dd>第 ${escapeHtml(projection.episodeNumber)} 集</dd></div>
+            <div><dt>来源版本</dt><dd>导演方案 v${escapeHtml(projection.sourcePlanVersion)}</dd></div>
           </dl>
+          <details class="advanced-lineage"><summary>高级溯源</summary><dl>
+            <div><dt>系列引用</dt><dd><code>${escapeHtml(projection.seriesRef)}</code></dd></div>
+            <div><dt>单集引用</dt><dd><code>${escapeHtml(projection.episodeRef)}</code></dd></div>
+            <div><dt>来源方案引用</dt><dd><code>${escapeHtml(projection.sourcePlanRef)}</code></dd></div>
+            <div><dt>来源结构</dt><dd><code>${escapeHtml(projection.sourcePlanSchemaVersion)}</code></dd></div>
+          </dl></details>
           <a class="button button-primary" href="#${escapeHtml(route.projectBase)}/script">进入剧本工作台</a>
-          <p>继续使用同一 Episode；导航不会复制故事文本，也不会创建新的故事事实。</p>
+          <p>继续使用同一单集；导航不会复制故事文本，也不会创建新的故事事实。</p>
         </article>
       </section>
     `;
@@ -1116,7 +1168,7 @@
       ${renderPageHeader({
         eyebrow: `${escapeHtml(series.title)} · 第 ${escapeHtml(episode.episodeNumber)} 集`,
         title: episode.title,
-        description: "该 Episode Project 已关联到一个经人工确认的 AI导演 CreativePlan。",
+        description: "该单集已关联到一个经人工确认的 AI导演方案。",
         status: "available",
         meta: localizedStatusBadge("项目草稿", "neutral")
       })}
@@ -1127,24 +1179,24 @@
             <div><dt>所属系列</dt><dd>${escapeHtml(series.title)}</dd></div>
             <div><dt>集数</dt><dd>第 ${escapeHtml(episode.episodeNumber)} 集</dd></div>
             <div><dt>方案版本</dt><dd>v${escapeHtml(episode.sourcePlanVersion)}</dd></div>
-            <div><dt>来源能力</dt><dd>AI导演 CreativePlan</dd></div>
+            <div><dt>来源能力</dt><dd>AI导演方案</dd></div>
             <div><dt>项目状态</dt><dd>${episode.status === "draft" ? "草稿" : escapeHtml(episode.status)}</dd></div>
           </dl>
         </article>
         <article class="card episode-boundary-card">
-          <span class="section-kicker">边界</span>
-          <h3>Episode Project</h3>
-          <p>当前对象可在刷新和本地服务重启后继续读取，但不是 Canonical Project，不会创建 Production Job。</p>
-          <ul><li>CreativePlan 来源关系已保留</li><li>Series 父子关系已保留</li><li>脚本工作室输入仅作为下一阶段桥接合同</li></ul>
+          <span class="section-kicker">单集状态</span>
+          <h3>单集制作记录</h3>
+          <p>当前单集可在刷新和本地服务重启后继续读取；正式项目管理能力尚未启用。</p>
+          <ul><li>导演方案来源关系已保留</li><li>系列与单集关系已保留</li><li>剧本工作台继续使用同一单集上下文</li></ul>
         </article>
         <article class="card episode-source-plan-card">
-          <div class="card-heading"><div><span class="section-kicker">来源 CreativePlan</span><h3>${escapeHtml(storyDirection.title || "已确认导演方案")}</h3></div>${localizedStatusBadge("不可变绑定", "available")}</div>
+          <div class="card-heading"><div><span class="section-kicker">来源导演方案</span><h3>${escapeHtml(storyDirection.title || "已确认导演方案")}</h3></div>${localizedStatusBadge("不可变绑定", "available")}</div>
           <p>${escapeHtml(storyDirection.synopsis || "来源方案已保存，可供下一阶段读取。")}</p>
           <dl class="episode-source-list">
-            <div><dt>来源方案</dt><dd>${escapeHtml(binding.sourcePlanRef || episode.sourcePlanRef)}</dd></div>
-            <div><dt>Schema</dt><dd>${escapeHtml(binding.sourcePlanSchemaVersion || episode.sourcePlanSchemaVersion)}</dd></div>
+            <div><dt>来源方案</dt><dd>已确认导演方案 v${escapeHtml(String(binding.sourcePlanVersion || 1))}</dd></div>
+            <div><dt>来源结构</dt><dd>导演方案 v1</dd></div>
             <div><dt>版本</dt><dd>v${escapeHtml(binding.sourcePlanVersion || episode.sourcePlanVersion)}</dd></div>
-            <div><dt>Canonical Project</dt><dd>${episode.canonicalProjectRef ? "已绑定" : "未绑定"}</dd></div>
+            <div><dt>正式项目</dt><dd>${episode.canonicalProjectRef ? "已关联" : "尚未建立"}</dd></div>
           </dl>
         </article>
       </section>
@@ -1207,7 +1259,7 @@
         </article>
         <article class="card script-start-card">
           <span class="script-start-mark" aria-hidden="true">文</span>
-          <span class="section-kicker">Script Studio</span>
+          <span class="section-kicker">剧本工作台</span>
           <h3>生成第一个不可变剧本版本</h3>
           <p>生成结果会先经过本地结构与时长校验，并以待确认版本保存。生成成功不代表人工确认。</p>
           ${state.scriptError ? renderErrorState("剧本生成未完成", state.scriptError) : ""}
@@ -1252,7 +1304,7 @@
             <button type="button" class="script-scene-item ${scene && scene.scriptSceneRef === item.scriptSceneRef ? "is-selected" : ""}" data-action="select-script-scene" data-scene-ref="${escapeHtml(item.scriptSceneRef)}" aria-pressed="${scene && scene.scriptSceneRef === item.scriptSceneRef}">
               <span>${String(item.sceneNumber).padStart(2, "0")}</span><strong>${escapeHtml(item.heading)}</strong><small>${escapeHtml(item.estimatedDurationSec)} 秒</small>
             </button>`).join("")}</div>
-          <div class="script-source-mini"><span>来源</span><strong>已确认导演方案 v${escapeHtml(version.sourcePlanVersion)}</strong><small>${escapeHtml(version.sourcePlanRef)}</small></div>
+          <div class="script-source-mini"><span>来源</span><strong>已确认导演方案 v${escapeHtml(version.sourcePlanVersion)}</strong><small>与当前单集保持一致</small></div>
         </aside>
         <main class="card script-editor-panel">
           <form id="script-edit-form">
@@ -1271,7 +1323,7 @@
               <label><span>旁白 <small>每行一条</small></span><textarea name="narration" rows="4">${escapeHtml(scriptLines(scene.narration))}</textarea></label>
               <label><span>字幕意图 <small>每行一条，不含精确时间码</small></span><textarea name="subtitleText" rows="4">${escapeHtml(scriptLines(scene.subtitleText))}</textarea></label>
             </div>
-            <div class="script-editor-actions"><span>保存会创建新的不可变 ScriptVersion。</span><button class="button button-secondary" type="submit" ${state.scriptPhase !== "idle" ? "disabled" : ""}>保存为新版本</button></div>
+            <div class="script-editor-actions"><span>保存会创建新的不可变剧本版本。</span><button class="button button-secondary" type="submit" ${state.scriptPhase !== "idle" ? "disabled" : ""}>保存为新版本</button></div>
           </form>
           <form id="script-rewrite-form" class="script-rewrite-form">
             <div><span class="section-kicker">局部改写</span><h4>只改写当前场景</h4><p>其他场景与本集已确认导演方案约束保持不变。</p></div>
@@ -1293,8 +1345,8 @@
           </section>
           <section class="storyboard-bridge-card">
             <span class="section-kicker">下游桥接</span><strong>${state.storyboardBootstrap ? "分镜输入已就绪" : "等待剧本确认"}</strong>
-            <p>${state.storyboardBootstrap ? "已生成可追溯输入；仍需 M4 角色与 IP 绑定，不会开始分镜生产。" : "草稿版本不会开放分镜输入。"}</p>
-            ${state.storyboardBootstrap ? `<code>${escapeHtml(state.storyboardBootstrap.schemaVersion)}</code>` : ""}
+            <p>${state.storyboardBootstrap ? "已生成可追溯输入；仍需角色与 IP 能力完成绑定，不会开始分镜生产。" : "草稿版本不会开放分镜输入。"}</p>
+            ${state.storyboardBootstrap ? '<small>来源与版本关系已保留</small>' : ""}
           </section>
         </aside>
       </section>
@@ -1308,14 +1360,14 @@
         title: "晚灯 WANLIGHT",
         description: "管理角色身份、视觉设定、版本与项目使用情况。",
         status: "fixture",
-        meta: governanceBadge("Rights HOLD", "hold")
+        meta: governanceBadge("权利待确认", "hold")
       })}
       <section class="character-grid v2-character-grid">
         <article class="reference-card">
           <div class="reference-image"><img src="${escapeHtml(fixture.character.referenceImage)}" alt="晚灯角色设定表"></div>
           <div class="reference-copy">
             <span class="section-kicker">角色身份</span>
-            <div class="status-cluster">${statusBadge("fixture")}${governanceBadge("Rights HOLD", "hold")}</div>
+            <div class="status-cluster">${statusBadge("fixture")}${governanceBadge("权利待确认", "hold")}</div>
             <h3>${escapeHtml(fixture.character.name)} <small>${escapeHtml(fixture.character.romanizedName)}</small></h3>
             <p>陪伴型夜灯角色 · 角色设定 v0.1 · 使用项目 ${displayProjectTitle}</p>
           </div>
@@ -1410,8 +1462,8 @@
           <div class="preview-info-body"><p>45 秒情绪短片 · 当前为候选预览</p>
           <div class="preview-facts"><span><small>时长</small><strong>45 秒</strong></span><span><small>画幅</small><strong>9:16</strong></span><span><small>声音</small><strong>无音轨</strong></span><span><small>版本</small><strong>v1</strong></span></div>
           <section><span class="inspector-label">版本</span><strong>候选版本 v1</strong><p>可在当前工作区播放和审看。</p></section>
-          <section><span class="inspector-label">权利状态</span>${governanceBadge("Rights HOLD", "hold")}<p>正式导出前需要完成人工确认。</p></section>
-          <section><span class="inspector-label">反馈</span><p>评论功能即将上线。当前不会保存反馈。</p></section>
+          <section><span class="inspector-label">权利状态</span>${governanceBadge("权利待确认", "hold")}<p>正式导出前需要完成人工确认。</p></section>
+          <section><span class="inspector-label">反馈</span><p>评论功能尚未启用。当前不会保存反馈。</p></section>
           <details class="preview-technical-details"><summary>查看技术信息</summary><p>${escapeHtml(preview.dimensions)} · ${escapeHtml(preview.frameRate)} · ${escapeHtml(preview.codec)}</p><code>${escapeHtml(preview.sha256)}</code></details>
           </div>
         </details>
@@ -1458,72 +1510,95 @@
         </div>
         <button class="button button-secondary export-button" type="button" data-capability="export" disabled>导出不可用</button>
         <small>当前不会生成文件、下载内容或执行发布。</small>
-        <span class="sr-only">EXPORT ENGINE NOT IMPLEMENTED · RENDER NOT AUTHORIZED · DOWNLOAD DISABLED</span>
+        <span class="sr-only">导出能力尚未实现，渲染与下载均不可用。</span>
       </section>
     `;
   }
 
   function renderCreationCenterR1() {
-    return `${renderPageHeader({ eyebrow: "CREATIVE SANDBOX", title: "创作中心", description: "探索未来创意工具；实验内容不会自动进入正式项目。", status: "planned" })}<section class="creation-r1-hero"><div><span class="section-kicker">EXPERIMENTAL CAPABILITIES</span><h2>探索创意能力，不越过生产门禁</h2><p>所有模块都显示真实能力状态。未建立能力、输入合同或 Project Context 时，不会执行生成。</p></div><span class="creation-r1-seal">R1<br><small>DESIGN SHELL</small></span></section><section class="creation-r1-grid">${creationModules.map((module,index) => `<a href="#${escapeHtml(module.path)}"><span class="module-number">0${index+1}</span><div><small>${escapeHtml(module.english)}</small><h3>${escapeHtml(module.label)}</h3><p>${escapeHtml(module.description)}</p></div><em>${escapeHtml(module.version)}</em></a>`).join("")}</section>`;
+    return `${renderPageHeader({ eyebrow: "创意实验区", title: "创作中心", description: "探索未来创意工具；实验内容不会自动进入正式项目。", status: "planned" })}<section class="creation-r1-hero"><div><span class="section-kicker">创意能力预览</span><h2>探索创意能力，不越过制作门禁</h2><p>所有模块都显示真实能力状态。未建立能力、输入合同或正式项目上下文时，不会执行生成。</p></div><span class="creation-r1-seal">R1<br><small>页面预览</small></span></section><section class="creation-r1-grid">${creationModules.map((module,index) => `<a href="#${escapeHtml(module.path)}"><span class="module-number">0${index+1}</span><div><small>创作工具</small><h3>${escapeHtml(module.label)}</h3><p>${escapeHtml(module.description)}</p></div><em>${escapeHtml(module.version)}</em></a>`).join("")}</section>`;
   }
 
   function renderCreationPreviewR1(route) {
     const copy = {
-      generation: ["图片与视频", "未来从已确认 AssetRequirement 发起受控生成。", ["输入合同","候选输出","人工接纳"]],
+      generation: ["图片与视频", "未来从已确认资产需求发起受控生成。", ["输入合同","候选输出","人工接纳"]],
       templates: ["模板", "未来浏览经过版本化和适用范围确认的模板。", ["类型筛选","结构预览","应用门禁"]],
-      "prompt-lab": ["Prompt Lab", "隔离实验创意表达，不自动写入正式生产事实。", ["实验输入","参数比较","结果审查"]],
+      "prompt-lab": ["提示词实验", "隔离实验创意表达，不自动写入正式制作记录。", ["实验输入","参数比较","结果审查"]],
       audio: ["声音实验", "未来探索对白、环境声与音乐候选。", ["声音意图","候选试听","权利确认"]],
-      models: ["模型实验", "未来在受控环境比较模型能力；当前不开放 Provider。", ["能力目录","安全配置","评估证据"]],
-      tools: ["快速工具", "未来承载不改变权威数据的小型创作工具。", ["输入","本地处理","人工确认"]]
+      models: ["创意实验", "未来在受控环境比较创意能力；当前不开放底层配置。", ["能力目录","安全配置","评估证据"]],
+      tools: ["快捷工具", "未来承载不改变权威数据的小型创作工具。", ["输入","本地处理","人工确认"]]
     }[route.key];
-    return `${renderPageHeader({ eyebrow: "CREATION CENTER / PREVIEW", title: copy[0], description: copy[1], status: "planned" })}<section class="creation-tool-shell"><div class="tool-shell-canvas"><span class="section-kicker">WORKSPACE PREVIEW</span><h3>${escapeHtml(copy[0])}工作台</h3><p>能力尚未授权。此页面没有模型、Provider、任务队列或生成结果。</p><div class="tool-shell-input"><label>未来输入区域<textarea disabled placeholder="等待能力合同与正式输入"></textarea></label><button class="button button-primary" type="button" disabled>能力未启用</button></div></div><aside>${copy[2].map((item,index) => `<article><span>0${index+1}</span><strong>${escapeHtml(item)}</strong><small>尚未建立</small></article>`).join("")}</aside></section>`;
+    return `${renderPageHeader({ eyebrow: "创作中心 · 功能预览", title: copy[0], description: copy[1], status: "planned" })}<section class="creation-tool-shell"><div class="tool-shell-canvas"><span class="section-kicker">工作区预览</span><h3>${escapeHtml(copy[0])}工作台</h3><p>能力尚未授权。此页面没有实际生成、后台任务或生成结果。</p><div class="tool-shell-input"><label>未来输入区域<textarea disabled placeholder="等待能力合同与正式输入"></textarea></label><button class="button button-primary" type="button" disabled>能力未启用</button></div></div><aside>${copy[2].map((item,index) => `<article><span>0${index+1}</span><strong>${escapeHtml(item)}</strong><small>尚未建立</small></article>`).join("")}</aside></section>`;
   }
 
   const enterprisePageCopy = Object.freeze({
     "project-overview": ["项目概览", "项目级创意、内容、制作与交付状态的总览。", "项目", "summary"],
-    "project-director": ["项目 AI导演", "在 Project Context 内查看导演方案与人工确认关系。", "策划", "detail"],
+    "project-director": ["项目 AI导演", "在正式项目上下文内查看导演方案与人工确认关系。", "策划", "detail"],
     "series-planning": ["系列规划", "组织系列方向、分集结构与内容目标。", "策划", "table"],
     "bible-shell": ["IP圣经", "集中查看已确认的世界观、角色规则与来源版本。", "策划", "detail"],
     "character-shell": ["角色工作台", "查看角色身份、版本、关系与绑定状态。", "策划", "board"],
     "continuity-shell": ["世界与连续性", "检查跨集角色、世界设定与连续性约束。", "策划", "table"],
-    "episode-list": ["分集中心", "以 Series / Episode lineage 组织内容生产。", "内容", "table"],
-    "episode-workspace": ["分集工作台", "进入单一 Episode 上下文，承接已确认导演方案、故事与剧本 lineage。", "内容", "summary"],
-    "story-shell": ["故事", "查看同一 Episode 上已确认的故事投影。", "内容", "editor"],
-    "script-shell": ["剧本工作台", "管理不可变 ScriptVersion、人工确认与下游桥接。", "内容", "editor"],
+    "episode-list": ["分集中心", "按系列与单集的来源关系组织内容制作。", "内容", "table"],
+    "episode-workspace": ["分集工作台", "进入单一单集上下文，承接已确认导演方案、故事与剧本来源关系。", "内容", "summary"],
+    "story-shell": ["故事", "查看同一单集上已确认的故事投影。", "内容", "editor"],
+    "script-shell": ["剧本工作台", "管理不可变剧本版本、人工确认与下游衔接。", "内容", "editor"],
     "consistency-shell": ["一致性检查", "汇总故事、角色、场景与剧本之间的差异。", "内容", "table"],
-    "storyboard-shell": ["分镜工作台", "在正式 M4 输入就绪后组织 Scene 与 Shot 规划。", "制作", "board"],
+    "storyboard-shell": ["分镜工作台", "等待角色与设定输入就绪后，再组织场景与镜头规划。", "制作", "board"],
     "shot-shell": ["镜头工作台", "查看镜头身份、版本、状态与素材需求。", "制作", "board"],
     "scene-shell": ["场景工作台", "组织正式场景对象与跨镜头复用关系。", "制作", "detail"],
     "project-assets-shell": ["项目资产", "查看项目范围内已绑定资产及其版本来源。", "制作", "board"],
-    "jobs-shell": ["生成任务", "未来展示真实 Job 状态；当前不创建任务或队列。", "制作", "table"],
+    "jobs-shell": ["生成任务", "未来展示真实任务状态；当前不创建任务或队列。", "制作", "table"],
     "timeline-shell": ["时间线", "未来组织已确认镜头、音频与版本的编辑时间线。", "后期", "timeline"],
-    "preview-shell": ["预览", "未来查看来自正式生产链的 PreviewCandidate。", "后期", "player"],
+    "preview-shell": ["预览", "未来查看来自正式制作链的候选预览。", "后期", "player"],
     "qc-shell": ["质量检查", "未来汇总技术、内容与交付质量门禁。", "后期", "table"],
     "approval-shell": ["审批", "未来记录可识别人类的审批决定与责任边界。", "后期", "detail"],
-    "master-shell": ["Master", "未来管理通过全部门禁的正式 Master 版本。", "交付", "player"],
-    "export-shell": ["导出", "未来从已接受 Master 建立交付产物。", "交付", "detail"],
+    "master-shell": ["成片", "未来管理通过全部门禁的正式成片版本。", "交付", "player"],
+    "export-shell": ["导出", "未来从已接受成片建立交付产物。", "交付", "detail"],
     "series-delivery-shell": ["系列管理", "未来汇总系列级交付与版本关系。", "交付", "table"],
     "release-shell": ["发布", "未来管理已授权发布目的地与人工确认。", "交付", "detail"],
     "analytics-shell": ["数据", "未来显示可追溯的真实运营与交付证据。", "交付", "table"]
   });
 
   function renderProjectContextBar(route) {
+    const persisted = route.persisted;
+    const episode = persisted && persisted.episode;
+    let version = "—";
+    if (route.type === "story-view" && episode && episode.sourcePlanVersion) version = `来源方案 v${episode.sourcePlanVersion}`;
+    if (route.type === "script-studio") {
+      const scriptVersion = selectedScriptVersion();
+      version = scriptVersion ? `v${scriptVersion.versionNumber}` : "待生成";
+    } else if (route.type === "episode-project" && episode && episode.sourcePlanVersion) {
+      version = `来源方案 v${episode.sourcePlanVersion}`;
+    }
     const fields = [
-      ["Project", "未建立"], ["Series", route.persisted ? route.persisted.series.title : "未选择"],
-      ["Episode", route.persisted ? `第 ${route.persisted.episode.episodeNumber} 集` : "未选择"],
-      ["Stage", route.group || "—"], ["Object", route.label || "—"], ["Version", "—"]
+      ["项目", "尚未建立"], ["系列", persisted ? persisted.series.title : "尚未选择"],
+      ["单集", persisted ? `第 ${persisted.episode.episodeNumber} 集` : "尚未选择"],
+      ["阶段", route.group || "—"], ["当前对象", route.label || "—"], ["版本", version]
     ];
-    return `<section class="project-context-bar" aria-label="项目上下文"><div class="context-gate"><span></span><strong>PROJECT CONTEXT</strong><small>${route.persisted ? "Episode compatibility mode" : "NULL · UI preview"}</small></div>${fields.map(([label,value]) => `<div><span>${escapeHtml(label)}</span><strong>${escapeHtml(value)}</strong></div>`).join("")}</section>`;
+    return `<section class="project-context-bar" aria-label="制作上下文"><div class="context-gate"><span></span><strong>制作上下文</strong><small>${persisted ? "当前单集" : "尚未选择单集"}</small></div>${fields.map(([label,value]) => `<div><span>${escapeHtml(label)}</span><strong>${escapeHtml(value)}</strong></div>`).join("")}</section>`;
+  }
+
+  function renderEpisodeSelector(route) {
+    const target = route.targetPage === "script" ? "script" : route.targetPage === "pipeline" ? "pipeline" : "story";
+    const targetLabel = target === "script" ? "剧本" : target === "pipeline" ? "分集概览" : "故事";
+    const contexts = productionContexts();
+    return `
+      ${renderProjectContextBar(route)}
+      ${renderPageHeader({ eyebrow: "制作上下文", title: `选择单集后查看${targetLabel}`, description: "请选择一个真实存在的系列与单集；当前选择只用于页面导航，不会创建项目记录。", status: "available" })}
+      <section class="enterprise-panel episode-selector" data-episode-selector="true">
+        ${contexts.length ? `<div class="enterprise-list">${contexts.map(({ series, episode }) => `<a class="enterprise-list-row" href="#${productionContextBase({ series, episode })}/${target}" data-series-ref="${escapeHtml(series.seriesRef)}" data-episode-ref="${escapeHtml(episode.episodeRef)}"><span class="row-index">E${String(episode.episodeNumber).padStart(2, "0")}</span><span><strong>${escapeHtml(episode.title)}</strong><small>${escapeHtml(series.title)} · ${episode.confirmedPlanBinding ? "已有确认方案" : "等待确认方案"}</small></span><em>选择</em></a>`).join("")}</div>` : renderEmptyState({ icon: "—", title: "还没有可选择的单集", description: "请先在 AI导演确认创意方案并建立系列与单集。", action: '<a class="button button-secondary" href="#/creator/ai-director">前往 AI导演</a>' })}
+      </section>
+    `;
   }
 
   function renderShellCanvas(kind, title) {
     const emptyCopy = "当前没有可用于此页面的正式数据。页面结构已就绪，但不会用演示内容替代生产事实。";
-    if (kind === "board") return `<div class="shell-board-empty"><span class="section-kicker">BOARD CANVAS</span><strong>暂无正式内容</strong><p>${emptyCopy}</p><small>取得 Project Context 与已接受上游对象后，此处才会显示真实卡片。</small></div>`;
+    if (kind === "board") return `<div class="shell-board-empty"><span class="section-kicker">内容画板</span><strong>暂无正式内容</strong><p>${emptyCopy}</p><small>取得正式项目上下文与已接受上游对象后，此处才会显示真实卡片。</small></div>`;
     if (kind === "timeline") return `<div class="shell-timeline"><div class="timeline-ruler">${["00:00","00:15","00:30","00:45","01:00"].map((item) => `<span>${item}</span>`).join("")}</div>${["画面","声音","字幕","标记"].map((item) => `<div class="timeline-lane"><strong>${item}</strong><span></span></div>`).join("")}</div>`;
     if (kind === "player") return `<div class="shell-player"><div class="shell-player-screen"><span>尚无正式媒体</span><strong>${escapeHtml(title)}</strong><small>等待正式上游输出</small></div><div class="shell-player-controls"><button type="button" disabled>播放</button><span>00:00 / 00:00</span><i></i></div></div>`;
-    if (kind === "editor") return `<div class="shell-editor"><aside><span>结构</span>${["概览","第一部分","第二部分","第三部分"].map((item) => `<button type="button" disabled>${item}</button>`).join("")}</aside><article><span class="section-kicker">CONTENT CANVAS</span><h3>${escapeHtml(title)}</h3><p>${emptyCopy}</p><div class="editor-lines">${[1,2,3,4,5].map(() => "<span></span>").join("")}</div></article><aside><span>版本</span><strong>暂无版本</strong><small>等待正式来源</small></aside></div>`;
+    if (kind === "editor") return `<div class="shell-editor"><aside><span>结构</span>${["概览","第一部分","第二部分","第三部分"].map((item) => `<button type="button" disabled>${item}</button>`).join("")}</aside><article><span class="section-kicker">内容工作区</span><h3>${escapeHtml(title)}</h3><p>${emptyCopy}</p><div class="editor-lines">${[1,2,3,4,5].map(() => "<span></span>").join("")}</div></article><aside><span>版本</span><strong>暂无版本</strong><small>等待正式来源</small></aside></div>`;
     if (kind === "table") return `<div class="shell-table"><header><span>对象</span><span>状态</span><span>来源</span><span>版本</span></header><div class="shell-table-empty"><strong>暂无正式记录</strong><p>${emptyCopy}</p></div></div>`;
-    if (kind === "detail") return `<div class="shell-detail-grid"><article><span class="section-kicker">PRIMARY OBJECT</span><h3>等待 Project Context</h3><p>${emptyCopy}</p></article><aside>${["身份","来源","状态","版本"].map((item) => `<div><span>${item}</span><strong>未建立</strong></div>`).join("")}</aside></div>`;
+    if (kind === "detail") return `<div class="shell-detail-grid"><article><span class="section-kicker">当前内容</span><h3>等待正式项目上下文</h3><p>${emptyCopy}</p></article><aside>${["身份","来源","状态","版本"].map((item) => `<div><span>${item}</span><strong>未建立</strong></div>`).join("")}</aside></div>`;
     if (kind === "summary") return `<div class="shell-summary-grid">${["创意","内容","制作","交付"].map((item,index) => `<article><span>0${index+1}</span><strong>${item}</strong><p>等待正式数据</p></article>`).join("")}</div>`;
     return `<div class="shell-empty"><strong>${escapeHtml(title)}</strong><p>${emptyCopy}</p></div>`;
   }
@@ -1531,21 +1606,21 @@
   function renderEnterpriseShellPage(route) {
     const [title, description, stage, kind] = enterprisePageCopy[route.type] || [route.label, "页面结构已就绪。", route.group || "项目", "summary"];
     const disabled = route.status === "disabled";
-    return `${renderProjectContextBar(route)}${renderPageHeader({ eyebrow: `${stage} / ENTERPRISE WORKSPACE`, title, description, status: route.status, meta: localizedStatusBadge(disabled ? "受门禁限制" : "结构已就绪", disabled ? "neutral" : "planned") })}<section class="enterprise-shell-page" data-shell-kind="${escapeHtml(kind)}">${renderShellCanvas(kind, title)}</section><section class="workflow-action-bar"><div><span>当前页面</span><strong>${escapeHtml(title)}</strong><small>${route.persisted ? "使用现有 Episode lineage" : "Project Context = NULL"}</small></div><div><button class="button button-secondary" type="button" data-action="toggle-bottom-drawer">版本与活动</button><button class="button button-primary" type="button" disabled>${disabled ? "当前不可操作" : "等待上游能力"}</button></div></section>`;
+    return `${renderProjectContextBar(route)}${renderPageHeader({ eyebrow: `${stage} · 制作工作区`, title, description, status: route.status, meta: localizedStatusBadge(disabled ? "受门禁限制" : "结构已就绪", disabled ? "neutral" : "planned") })}<section class="enterprise-shell-page" data-shell-kind="${escapeHtml(kind)}">${renderShellCanvas(kind, title)}</section><section class="workflow-action-bar"><div><span>当前页面</span><strong>${escapeHtml(title)}</strong><small>${route.persisted ? "使用当前单集的真实来源关系" : "尚未建立项目上下文"}</small></div><div><button class="button button-secondary" type="button" data-action="toggle-bottom-drawer">版本与活动</button><button class="button button-primary" type="button" disabled>${disabled ? "当前不可操作" : "等待上游能力"}</button></div></section>`;
   }
 
   function renderAssetsR1() {
-    return `${renderPageHeader({ eyebrow: "WORKSPACE LIBRARY", title: "资产库", description: "浏览当前工作区明确标记的内部参考媒体；不存在时保持空态。", status: "available", meta: localizedStatusBadge("内部参考", "neutral") })}<section class="asset-r1-layout"><aside class="asset-taxonomy"><span class="section-kicker">资产分类</span>${["全部","角色","场景","图片","视频","音频","模板"].map((item,index) => `<button type="button" ${index ? "disabled" : 'class="is-active"'}>${item}<span>${index ? "0" : fixture.assets.length}</span></button>`).join("")}</aside><div class="asset-r1-main"><header><div><h3>内部视觉参考</h3><p>这些媒体不是 Project Asset，也没有获得发布权利。</p></div>${governanceBadge("Rights HOLD", "hold")}</header>${renderAssetGrid(fixture.assets)}</div></section>${fixtureNotice()}`;
+    return `${renderPageHeader({ eyebrow: "工作区资产", title: "资产库", description: "浏览当前工作区明确标记的内部参考媒体；不存在时保持空态。", status: "available", meta: localizedStatusBadge("内部参考", "neutral") })}<section class="asset-r1-layout"><aside class="asset-taxonomy"><span class="section-kicker">资产分类</span>${["全部","角色","场景","图片","视频","音频","模板"].map((item,index) => `<button type="button" ${index ? "disabled" : 'class="is-active"'}>${item}<span>${index ? "0" : fixture.assets.length}</span></button>`).join("")}</aside><div class="asset-r1-main"><header><div><h3>内部视觉参考</h3><p>这些媒体不是正式项目资产，也没有获得发布权利。</p></div>${governanceBadge("权利待确认", "hold")}</header>${renderAssetGrid(fixture.assets)}</div></section>${fixtureNotice()}`;
   }
 
   function renderWorksR1() {
-    return `${renderPageHeader({ eyebrow: "MASTERS / DELIVERIES", title: "作品", description: "只展示通过正式 Master 与交付门禁的作品。", status: "planned" })}<section class="works-r1-stage"><div class="works-r1-filter"><button class="is-active" type="button">全部</button><button type="button" disabled>制作中</button><button type="button" disabled>待交付</button><button type="button" disabled>已发布</button></div>${renderEmptyState({ icon: "—", title: "还没有正式作品", description: "内部参考 Candidate 不会出现在作品库。需要 Master、权利、审批与交付能力就绪后才会显示。" })}</section>`;
+    return `${renderPageHeader({ eyebrow: "成片与交付", title: "作品", description: "只展示通过正式成片与交付门禁的作品。", status: "planned" })}<section class="works-r1-stage"><div class="works-r1-filter"><button class="is-active" type="button">全部</button><button type="button" disabled>制作中</button><button type="button" disabled>待交付</button><button type="button" disabled>已发布</button></div>${renderEmptyState({ icon: "—", title: "还没有正式作品", description: "内部参考候选片不会出现在作品库。需要成片、权利、审批与交付能力就绪后才会显示。" })}</section>`;
   }
 
   function renderPlaceholder(route) {
     const isDisabled = route.status === "disabled";
     const parentRoute = route.context === "creation" ? "/creator/creation" : route.context === "project" ? `${route.projectBase || projectBase}/pipeline` : "/creator/dashboard";
-    const statusText = isDisabled ? "暂不可用" : "即将上线";
+    const statusText = isDisabled ? "暂不可用" : "尚未启用";
     const title = route.label;
     const description = route.description || "当前只建立页面位置、状态与责任边界，不实现未来能力。";
     if (route.key === "approval") {
@@ -1573,7 +1648,7 @@
         status: route.status,
         meta: route.status === "disabled" ? localizedStatusBadge("需要人工确认", "neutral") : ""
       })}
-      ${route.context === "project" ? fixtureNotice("项目占位页不创建、保存或推进 Project / Production / IP / Audio / Timeline 事实。") : ""}
+      ${route.context === "project" ? fixtureNotice("项目占位页不会创建、保存或推进正式项目、制作、IP、声音或时间线记录。") : ""}
       <section class="card placeholder-card">
         ${renderEmptyState({
           icon: isDisabled ? "×" : "·",
@@ -1582,10 +1657,10 @@
           action: `<a class="button button-secondary" href="#${parentRoute}">${route.context === "creation" ? "返回创作中心" : route.context === "project" ? "返回生产流程" : "返回总览"}</a>`
         })}
         <div class="placeholder-boundaries">
-          <span><small>当前状态</small><strong>${isDisabled ? "暂不可用" : "即将上线"}</strong></span>
+          <span><small>当前状态</small><strong>${isDisabled ? "暂不可用" : "尚未启用"}</strong></span>
           <span><small>功能内容</small><strong>暂无内容</strong></span>
-          <span><small>开放时间</small><strong>敬请期待</strong></span>
-          <span class="sr-only">${featureStates[route.status].label} · NONE / FIXTURE LABEL ONLY · NOT IMPLEMENTED</span>
+          <span><small>下一步</small><strong>完成页面所列前置条件</strong></span>
+          <span class="sr-only">当前功能尚未实现，仅显示页面位置与状态。</span>
         </div>
       </section>
     `;
@@ -1599,6 +1674,7 @@
     if (persistedProjectMatch && !["new"].includes(persistedProjectMatch[1])) {
       const persisted = findPersistedEpisode(decodeURIComponent(persistedProjectMatch[1]));
       if (persisted) {
+        rememberProductionContext(persisted);
         const dynamicBase = `/creator/projects/${encodeURIComponent(persisted.episode.episodeRef)}`;
         const pageKey = persistedProjectMatch[2];
         if (!pageKey) return { redirect: `${dynamicBase}/story` };
@@ -1642,18 +1718,36 @@
     }
 
     if (normalized === "/creator/account") {
-      return { type: "placeholder", key: "account", path: normalized, label: "账户", english: "Account", status: "planned", breadcrumb: "创作空间 / 账户", eyebrow: "个人空间", description: "创作者账户功能即将上线。" };
+      return { type: "placeholder", key: "account", path: normalized, label: "账户", english: "Account", status: "planned", breadcrumb: "创作空间 / 账户", eyebrow: "个人空间", description: "创作者账户功能尚未启用。" };
     }
 
     const creation = creationModules.find((module) => module.path === normalized);
     if (creation) {
-      return { ...creation, type: "creation-preview", status: "planned", breadcrumb: `创作中心 / ${creation.label}`, eyebrow: "创作工具 · 即将上线", context: "creation" };
+      return { ...creation, type: "creation-preview", status: "planned", breadcrumb: `创作中心 / ${creation.label}`, eyebrow: "创作工具 · 尚未启用", context: "creation" };
     }
 
     if (normalized.startsWith(`${projectShellBase}/`)) {
       const projectPage = projectPages.find((page) => page.path === normalized);
       if (!projectPage) return null;
-      return { ...projectPage, breadcrumb: `项目壳层 / ${projectPage.group} / ${projectPage.label}`, context: "project-shell" };
+      const selected = resolveSelectedProductionContext();
+      const targetPage = projectPage.key === "episode-workspace" ? "pipeline" : projectPage.key;
+      if (["pipeline", "story", "script"].includes(targetPage)) {
+        if (selected) return { redirect: `${productionContextBase(selected)}/${targetPage}` };
+        return {
+          ...projectPage,
+          type: "episode-selector",
+          targetPage,
+          breadcrumb: `制作上下文 / ${projectPage.label}`,
+          context: "project-shell"
+        };
+      }
+      return {
+        ...projectPage,
+        persisted: selected,
+        projectBase: productionContextBase(selected),
+        breadcrumb: `制作工作区 / ${projectPage.group} / ${projectPage.label}`,
+        context: "project-shell"
+      };
     }
 
     return null;
@@ -1664,29 +1758,38 @@
       ${renderPageHeader({ eyebrow: "页面未找到", title: "找不到这个页面", description: "该页面地址不存在或尚未开放。", status: "disabled" })}
       <section class="card placeholder-card">
         ${renderEmptyState({ icon: "?", title: "页面不可用", description: `当前地址 ${path} 暂时无法访问。`, action: '<a class="button button-secondary" href="#/creator/dashboard">返回首页</a>' })}
-        <span class="sr-only">ROUTE NOT FOUND · NOT A DOMAIN FACT</span>
+        <span class="sr-only">页面地址不存在，不代表正式业务状态。</span>
       </section>
     `;
   }
 
   function renderContextNav(route) {
     const episodeContext = route.context === "episode";
+    const productionContext = route.persisted || resolveSelectedProductionContext();
     const groups = route.context === "project-shell" || episodeContext ? projectNavigationGroups : null;
     const items = route.context === "creation" ? creationModules.map((module) => ({ ...module, status: "planned" })) : [];
     if (groups) {
       const itemPath = (item) => {
-        if (!episodeContext) return `${projectShellBase}/${item.suffix}`;
-        if (item.key === "episode-workspace") return `${route.projectBase}/pipeline`;
-        if (item.key === "story" || item.key === "script") return `${route.projectBase}/${item.key}`;
+        if (!productionContext) return `${projectShellBase}/${item.suffix}`;
+        const base = route.projectBase || productionContextBase(productionContext);
+        if (item.key === "episode-workspace") return `${base}/pipeline`;
+        if (item.key === "story" || item.key === "script") return `${base}/${item.key}`;
         return `${projectShellBase}/${item.suffix}`;
       };
       const isCurrent = (item) => route.key === item.key || (episodeContext && route.key === "pipeline" && item.key === "episode-workspace");
-      const contextLabel = episodeContext
-        ? `${route.persisted.series.title} · 第 ${route.persisted.episode.episodeNumber} 集 · 尚无正式项目`
-        : "Project Context = NULL";
+      const contextLabel = productionContext
+        ? `${productionContext.series.title} · 第 ${productionContext.episode.episodeNumber} 集 · 尚无正式项目`
+        : "尚未选择单集";
+      const capabilityBadge = (item) => {
+        if (!productionContext || !["story", "script"].includes(item.key)) return statusBadge(item.status);
+        if (item.key === "story") return productionContext.episode.confirmedPlanBinding ? localizedStatusBadge("已就绪", "available") : localizedStatusBadge("待确认方案", "neutral");
+        if (productionContext.episode.confirmedScriptVersionRef) return localizedStatusBadge("已确认", "available");
+        if (productionContext.episode.scriptRef) return localizedStatusBadge("编辑中", "development");
+        return localizedStatusBadge("待生成", "neutral");
+      };
       contextNavigation.hidden = false;
       workbench.classList.add("has-context-nav");
-      contextNavigation.innerHTML = `<div class="context-nav-heading"><span>${episodeContext ? "EPISODE NAVIGATOR" : "PROJECT NAVIGATOR"}</span><strong>${escapeHtml(contextLabel)}</strong></div>${groups.map((group) => `<section class="context-nav-group"><span>${escapeHtml(group.label)}</span>${group.items.map((item) => `<a href="#${escapeHtml(itemPath(item))}" class="context-nav-item ${isCurrent(item) ? "is-active" : ""}" aria-current="${isCurrent(item) ? "page" : "false"}"><span>${escapeHtml(item.label)}</span>${statusBadge(item.status)}</a>`).join("")}</section>`).join("")}`;
+      contextNavigation.innerHTML = `<div class="context-nav-heading"><span>项目导航</span><strong>${escapeHtml(contextLabel)}</strong></div>${groups.map((group) => `<section class="context-nav-group"><span>${escapeHtml(group.label)}</span>${group.items.map((item) => `<a href="#${escapeHtml(itemPath(item))}" class="context-nav-item ${isCurrent(item) ? "is-active" : ""}" aria-current="${isCurrent(item) ? "page" : "false"}"><span>${escapeHtml(item.label)}</span>${capabilityBadge(item)}</a>`).join("")}</section>`).join("")}`;
       return;
     }
     if (!items.length) {
@@ -1715,7 +1818,7 @@
   function renderInspector(route) {
     inspectorTitle.textContent = route ? route.label || route.english || "当前页面" : "未知路由";
     const shot = selectedShot();
-    const base = '<span class="sr-only">FIXTURE ONLY · NOT A DOMAIN FACT · V5 NOT CONNECTED · SESSION ONLY</span>';
+    const base = '<span class="sr-only">演示数据，不代表正式业务记录，仅用于当前会话。</span>';
     let detail = "";
     if (route && route.type === "storyboard") {
       const shotStatusLabel = shot.status === "Review required" ? "待确认" : "可用";
@@ -1730,11 +1833,11 @@
     } else if (route && route.type === "ai-director") {
       detail = `<section class="inspector-section"><span class="inspector-label">能力状态</span>${localizedStatusBadge("开发中", "development")}<p>当前可体验创意规划流程。</p></section>`;
     } else if (route && route.type === "episode-project") {
-      detail = `<section class="inspector-section"><span class="inspector-label">Episode Project</span><strong>${escapeHtml(route.persisted.episode.title)}</strong><p>${escapeHtml(route.persisted.series.title)} · 第 ${escapeHtml(route.persisted.episode.episodeNumber)} 集</p><p>来源：已确认导演方案 v${escapeHtml(route.persisted.episode.sourcePlanVersion)}</p></section>`;
+      detail = `<section class="inspector-section"><span class="inspector-label">单集制作</span><strong>${escapeHtml(route.persisted.episode.title)}</strong><p>${escapeHtml(route.persisted.series.title)} · 第 ${escapeHtml(route.persisted.episode.episodeNumber)} 集</p><p>来源：已确认导演方案 v${escapeHtml(route.persisted.episode.sourcePlanVersion)}</p></section>`;
     } else if (route && route.type === "story-view") {
       const projection = buildStoryProjection(route);
       detail = projection
-        ? `<section class="inspector-section"><span class="inspector-label">故事来源</span><strong>已确认导演方案 v${escapeHtml(projection.sourcePlanVersion)}</strong><p>${escapeHtml(projection.seriesTitle)} · 第 ${escapeHtml(projection.episodeNumber)} 集</p><p><code>${escapeHtml(projection.sourcePlanRef)}</code></p></section>`
+        ? `<section class="inspector-section"><span class="inspector-label">故事来源</span><strong>已确认导演方案 v${escapeHtml(projection.sourcePlanVersion)}</strong><p>${escapeHtml(projection.seriesTitle)} · 第 ${escapeHtml(projection.episodeNumber)} 集</p><p>高级溯源可在故事页按需查看。</p></section>`
         : `<section class="inspector-section"><span class="inspector-label">故事来源</span><strong>尚未确认故事方案</strong><p>请先前往 AI导演确认本集方案。</p></section>`;
     } else if (route && route.type === "script-studio") {
       const version = selectedScriptVersion();
@@ -1746,9 +1849,9 @@
     } else if (route && route.type === "assets") {
       detail = `<section class="inspector-section"><span class="inspector-label">权利状态</span>${governanceBadge("HOLD", "hold")}<p>正式使用前需要完成人工确认。</p></section>`;
     } else if (route && route.context === "project-shell") {
-      detail = `<section class="inspector-section"><span class="inspector-label">项目上下文</span><strong>尚未建立</strong><p>当前是 Enterprise UI shell 预览，不创建 projectRef 或业务事实。</p></section><section class="inspector-section"><span class="inspector-label">页面状态</span><strong>${escapeHtml(route.label)}</strong><p>${route.status === "disabled" ? "受人工或能力门禁限制" : "等待正式上游输入"}</p></section>`;
+      detail = `<section class="inspector-section"><span class="inspector-label">项目上下文</span><strong>尚未建立</strong><p>正式项目能力启用后，当前系列与单集将归入统一项目管理。</p></section><section class="inspector-section"><span class="inspector-label">页面状态</span><strong>${escapeHtml(route.label)}</strong><p>${route.status === "disabled" ? "受人工或能力门禁限制" : "等待正式上游输入"}</p></section>`;
     } else {
-      detail = `<section class="inspector-section"><span class="inspector-label">工作区</span><strong>Creator Enterprise</strong><p>当前页面没有独立业务对象。</p></section>`;
+      detail = `<section class="inspector-section"><span class="inspector-label">工作区</span><strong>创作者工作区</strong><p>当前页面没有独立业务对象。</p></section>`;
     }
     inspectorContent.innerHTML = `${base}${detail}`;
   }
@@ -1761,7 +1864,7 @@
       return { label: "正在创建系列与集数…", disabled: true, note: "本地开发服务正在保存关联" };
     }
     if (state.aiDirectorConfirmed) {
-      return { label: "创建 Episode Project", action: "submit-series-episode", note: "关联到稳定系列 · 不创建 Canonical Project" };
+      return { label: "创建单集制作记录", action: "submit-series-episode", note: "关联到稳定系列 · 不建立正式项目" };
     }
     if (state.aiDirectorPlan) {
       return { label: "确认导演方案", action: "confirm-ai-director-plan", note: "人工确认后才能创建系列与集数" };
@@ -1794,17 +1897,17 @@
     if (!route) return { label: "返回总览", target: defaultRoute, note: "未知路由 · 未创建任何事实" };
     const map = {
       dashboard: { label: "开始创作", target: "/creator/ai-director", note: "从一个想法开始新的影片方案" },
-      projects: { label: "查看新建流程", action: "open-project-dialog", note: "最终提交保持禁用 · 不创建 projectRef" },
-      assets: { label: "返回首页", target: defaultRoute, note: "内部参考媒体 · 不形成 Project Asset" },
+      projects: { label: "查看新建流程", action: "open-project-dialog", note: "最终提交保持禁用 · 不建立正式项目" },
+      assets: { label: "返回首页", target: defaultRoute, note: "内部参考媒体 · 不形成正式项目资产" },
       creation: { label: "返回首页", target: defaultRoute, note: "六项智能工具正在准备中" },
       "ai-director": aiDirectorStickyConfig(),
-      "episode-project": { label: "查看全部项目", target: "/creator/projects", note: "Series → Episode → 已确认 CreativePlan" },
+      "episode-project": { label: "查看全部项目", target: "/creator/projects", note: "系列 → 单集 → 已确认导演方案" },
       "script-studio": scriptStudioStickyConfig()
     };
     if (map[route.type]) return map[route.type];
     if (route.context === "creation") return { label: "返回创作中心", target: "/creator/create", note: "实验能力不会写入正式项目" };
-    if (route.context === "project-shell") return { label: "返回项目中心", target: "/creator/projects", note: "Project Context = NULL · 页面不会推进生产状态" };
-    return { label: "返回首页", target: defaultRoute, note: "功能即将上线" };
+    if (route.context === "project-shell") return { label: "返回项目中心", target: "/creator/projects", note: "尚未建立正式项目 · 页面不会推进制作状态" };
+    return { label: "返回首页", target: defaultRoute, note: "功能尚未启用" };
   }
 
   function shouldRenderStickyBar(route) {
@@ -1828,7 +1931,7 @@
         : `<a class="button button-primary" href="#${escapeHtml(config.target)}">${escapeHtml(config.label)}</a>`;
     const showInspectorControl = routeSupportsInspector(route);
     stickyActionBar.innerHTML = `
-      <div class="sticky-status"><div><strong>${escapeHtml(route && route.label ? route.label : "当前页面")}</strong><p>${escapeHtml(config.note)}</p><span class="sr-only">FIXTURE ONLY · NOT SAVED</span></div></div>
+      <div class="sticky-status"><div><strong>${escapeHtml(route && route.label ? route.label : "当前页面")}</strong><p>${escapeHtml(config.note)}</p><span class="sr-only">演示内容，不会自动保存为正式记录。</span></div></div>
       <div class="sticky-actions">${showInspectorControl ? '<button class="button button-secondary inspector-toggle-label" type="button" data-action="toggle-inspector">展开详情</button>' : ""}${primary}</div>
     `;
   }
@@ -1926,7 +2029,7 @@
 
   function renderRoute(path) {
     const normalized = normalizePath(path);
-    if ((normalized === "/creator" || normalized === "/creator/projects" || normalized === "/creator/ai-director" || normalized.startsWith("/creator/projects/")) && state.seriesDataStatus === "idle") {
+    if ((normalized === "/creator" || normalized === "/creator/projects" || normalized === "/creator/ai-director" || normalized.startsWith("/creator/projects/") || normalized.startsWith(`${projectShellBase}/`)) && state.seriesDataStatus === "idle") {
       loadSeriesData();
     }
     const route = resolveRoute(normalized);
@@ -1958,8 +2061,9 @@
       "creation-preview": () => renderCreationPreviewR1(resolved),
       works: renderWorksR1,
       "ai-director": renderAiDirector,
-      "project-wizard-page": () => `${renderPageHeader({ eyebrow: "PROJECT FOUNDATION", title: "新建项目", description: "配置未来 Project Context；最终提交仍由 Project Foundation 门禁控制。", status: "planned" })}<section class="enterprise-panel project-context-gate"><span class="gate-index">NEW</span><div><h3>配置流程可以检查，提交保持禁用</h3><p>不会创建 projectRef，不会写入 Project、Production 或 Render 事实。</p></div><button class="button button-primary" type="button" data-action="open-project-dialog">打开配置向导</button></section>`,
+      "project-wizard-page": () => `${renderPageHeader({ eyebrow: "项目能力准备", title: "新建项目", description: "配置未来项目上下文；最终提交仍受项目能力门禁控制。", status: "planned" })}<section class="enterprise-panel project-context-gate"><span class="gate-index">新建</span><div><h3>配置流程可以检查，提交保持禁用</h3><p>不会建立正式项目、制作或渲染记录。</p></div><button class="button button-primary" type="button" data-action="open-project-dialog">打开配置向导</button></section>`,
       "episode-project": () => renderEpisodeProject(resolved),
+      "episode-selector": () => renderEpisodeSelector(resolved),
       "story-view": () => renderStoryView(resolved),
       "script-studio": () => renderScriptStudio(resolved),
       "project-overview": () => renderEnterpriseShellPage(resolved),
@@ -2029,7 +2133,7 @@
     const panels = {
       1: `<section class="wizard-step"><div><span class="section-kicker">STEP 01</span><h3>选择项目类型</h3><p>类型只影响未来工作区结构，不会在本任务中创建项目。</p></div><div class="wizard-choice-grid">${[["series","系列短片","多集连续内容"],["single","单片","独立影片"],["campaign","Campaign","品牌内容系列"]].map(([value,label,copy]) => `<label><input type="radio" name="projectType" value="${value}" ${values.projectType === value ? "checked" : ""}><span><strong>${label}</strong><small>${copy}</small></span></label>`).join("")}</div></section>`,
       2: `<section class="wizard-step"><div><span class="section-kicker">STEP 02</span><h3>基本信息</h3><p>这些值仅停留在当前弹窗状态。</p></div><div class="wizard-form-grid">${wizardField("项目名称","title",values.title)}${wizardField("内容类型","contentType",values.contentType,["","剧情短片","系列内容","品牌内容"])}${wizardField("计划集数","episodeCount",values.episodeCount)}${wizardField("单集时长（秒）","duration",values.duration)}${wizardField("画幅","aspectRatio",values.aspectRatio,["9:16","16:9","1:1"])}${wizardField("目标平台","platform",values.platform,["","短视频平台","流媒体","内部审看"])}</div></section>`,
-      3: `<section class="wizard-step"><div><span class="section-kicker">STEP 03</span><h3>制作默认值</h3><p>正式默认值需要 Project Context Foundation 承担。</p></div><div class="wizard-form-grid">${wizardField("内容 Profile","contentProfile",values.contentProfile)}${wizardField("语言","language",values.language,["中文","英文","多语言"])}${wizardField("视觉方向","visualDirection",values.visualDirection)}${wizardField("生产预设","productionPreset",values.productionPreset,["","标准短片","高保真电影","快速审看"])}</div></section>`,
+      3: `<section class="wizard-step"><div><span class="section-kicker">第 03 步</span><h3>制作默认值</h3><p>正式默认值需要由项目管理能力承担。</p></div><div class="wizard-form-grid">${wizardField("内容配置","contentProfile",values.contentProfile)}${wizardField("语言","language",values.language,["中文","英文","多语言"])}${wizardField("视觉方向","visualDirection",values.visualDirection)}${wizardField("制作预设","productionPreset",values.productionPreset,["","标准短片","高保真电影","快速审看"])}</div></section>`,
       4: `<section class="wizard-step"><div><span class="section-kicker">STEP 04</span><h3>检查配置</h3><p>配置可以审查，但最终创建保持禁用。</p></div><dl class="wizard-review">${[["项目类型",values.projectType],["项目名称",values.title || "未填写"],["内容类型",values.contentType || "未选择"],["计划集数",values.episodeCount || "未填写"],["单集时长",`${values.duration || "—"} 秒`],["画幅",values.aspectRatio],["平台",values.platform || "未选择"],["语言",values.language],["视觉方向",values.visualDirection || "未填写"]].map(([label,value]) => `<div><dt>${escapeHtml(label)}</dt><dd>${escapeHtml(value)}</dd></div>`).join("")}</dl></section>`
     };
     document.getElementById("project-wizard-content").innerHTML = panels[state.wizardStep];
@@ -2055,6 +2159,82 @@
 
   function closeProjectDialog() {
     if (projectDialog.open) projectDialog.close();
+  }
+
+  function openDeleteDialog(trigger, kind) {
+    const isSeries = kind === "series";
+    const episodeCount = Number(trigger.dataset.episodeCount || 0);
+    state.pendingDeletion = {
+      kind,
+      seriesRef: trigger.dataset.seriesRef || "",
+      seriesTitle: trigger.dataset.seriesTitle || "",
+      episodeRef: trigger.dataset.episodeRef || "",
+      episodeTitle: trigger.dataset.episodeTitle || "",
+      episodeCount
+    };
+    state.deletionPhase = "confirming";
+    deleteDialogReturnFocus = trigger;
+    deleteDialogTitle.textContent = isSeries ? "确认删除系列？" : "确认删除单集？";
+    deleteDialogSubject.textContent = isSeries
+      ? `删除系列「${state.pendingDeletion.seriesTitle}」`
+      : `删除单集「${state.pendingDeletion.episodeTitle}」`;
+    deleteDialogDescription.textContent = isSeries && episodeCount
+      ? `删除后不可恢复，并将同时删除该系列下 ${episodeCount} 条单集记录。已有剧本版本时系统会阻止删除。`
+      : "删除后不可恢复。已有剧本版本时系统会阻止删除，以保护现有制作链路。";
+    deleteDialogError.hidden = true;
+    deleteDialogError.textContent = "";
+    deleteDialogConfirm.disabled = false;
+    deleteDialogConfirm.removeAttribute("aria-busy");
+    deleteDialogConfirm.textContent = isSeries ? "删除系列" : "删除单集";
+    deleteDialog.showModal();
+    window.requestAnimationFrame(() => {
+      const cancel = deleteDialog.querySelector('[data-action="close-delete-dialog"]');
+      if (cancel) cancel.focus();
+    });
+  }
+
+  function closeDeleteDialog() {
+    if (state.deletionPhase === "deleting") return;
+    if (deleteDialog.open) deleteDialog.close();
+  }
+
+  async function confirmDeletion() {
+    const target = state.pendingDeletion;
+    if (!target || state.deletionPhase === "deleting") return;
+    state.deletionPhase = "deleting";
+    deleteDialogError.hidden = true;
+    deleteDialogConfirm.disabled = true;
+    deleteDialogConfirm.setAttribute("aria-busy", "true");
+    deleteDialogConfirm.innerHTML = '<span class="button-spinner" aria-hidden="true"></span><span>正在删除…</span>';
+    const isSeries = target.kind === "series";
+    const endpoint = isSeries
+      ? `${seriesEndpoint}/${encodeURIComponent(target.seriesRef)}`
+      : `${episodesEndpoint}/${encodeURIComponent(target.episodeRef)}`;
+    const requestPath = isSeries
+      ? withWorkspace(endpoint)
+      : withEpisodeScope(endpoint, target.seriesRef);
+    try {
+      await requestApplicationJson(requestPath, { method: "DELETE" });
+      if (isSeries && state.selectedSeriesRef === target.seriesRef) {
+        state.selectedSeriesRef = null;
+        state.selectedEpisodeRef = null;
+      } else if (!isSeries && state.selectedEpisodeRef === target.episodeRef) {
+        state.selectedEpisodeRef = null;
+      }
+      state.pendingDeletion = null;
+      state.deletionPhase = "idle";
+      deleteDialog.close();
+      await loadSeriesData({ force: true });
+      renderRoute("/creator/projects");
+      showToast(isSeries ? "系列及其单集已删除" : "单集已删除");
+    } catch (error) {
+      state.deletionPhase = "error";
+      deleteDialogError.textContent = error && error.message ? error.message : "删除失败，请稍后重试。";
+      deleteDialogError.hidden = false;
+      deleteDialogConfirm.disabled = false;
+      deleteDialogConfirm.removeAttribute("aria-busy");
+      deleteDialogConfirm.textContent = isSeries ? "重试删除系列" : "重试删除单集";
+    }
   }
 
   function toggleSidebarCollapse() {
@@ -2219,7 +2399,7 @@
           episodeNumber: Number(formData.get("episodeNumber") || 1),
           seasonNumber: 1,
           volumeNumber: 1,
-          title: String(formData.get("episodeTitle") || "Episode 001").trim()
+          title: String(formData.get("episodeTitle") || "第1集").trim()
         })
       });
       state.createdEpisode = episodePayload.episode;
@@ -2424,6 +2604,10 @@
     if (!action) return;
     if (action === "open-project-dialog") openProjectDialog(button);
     if (action === "close-project-dialog") closeProjectDialog();
+    if (action === "delete-episode") openDeleteDialog(button, "episode");
+    if (action === "delete-series") openDeleteDialog(button, "series");
+    if (action === "close-delete-dialog") closeDeleteDialog();
+    if (action === "confirm-deletion") confirmDeletion();
     if (action === "wizard-next") {
       captureWizardValues();
       state.wizardStep = Math.min(4, state.wizardStep + 1);
@@ -2438,7 +2622,7 @@
       state.bottomDrawerOpen = !state.bottomDrawerOpen;
       bottomDrawer.hidden = !state.bottomDrawerOpen;
       bottomDrawerTitle.textContent = "版本、任务与活动";
-      bottomDrawerContent.innerHTML = '<div class="drawer-empty"><strong>暂无正式活动</strong><p>这里不会显示虚构 Job、版本或生产日志。</p></div>';
+      bottomDrawerContent.innerHTML = '<div class="drawer-empty"><strong>暂无正式活动</strong><p>这里不会显示虚构的后台任务、版本或制作日志。</p></div>';
     }
     if (action === "toggle-sidebar-collapse") {
       if (mobileQuery.matches) closeMobileSidebar(true);
@@ -2581,7 +2765,7 @@
 
   projectForm.addEventListener("submit", (event) => {
     event.preventDefault();
-    showToast("Project Context 尚未启用 · 未创建任何项目");
+    showToast("正式项目能力尚未启用 · 未创建任何项目");
   });
 
   projectDialog.addEventListener("close", () => {
@@ -2592,6 +2776,23 @@
   projectDialog.addEventListener("cancel", () => {
     window.requestAnimationFrame(() => {
       if (dialogReturnFocus && typeof dialogReturnFocus.focus === "function") dialogReturnFocus.focus();
+    });
+  });
+
+  deleteDialog.addEventListener("close", () => {
+    state.pendingDeletion = null;
+    state.deletionPhase = "idle";
+    if (deleteDialogReturnFocus && document.contains(deleteDialogReturnFocus)) deleteDialogReturnFocus.focus();
+    deleteDialogReturnFocus = null;
+  });
+
+  deleteDialog.addEventListener("cancel", (event) => {
+    if (state.deletionPhase === "deleting") {
+      event.preventDefault();
+      return;
+    }
+    window.requestAnimationFrame(() => {
+      if (deleteDialogReturnFocus && document.contains(deleteDialogReturnFocus)) deleteDialogReturnFocus.focus();
     });
   });
 
