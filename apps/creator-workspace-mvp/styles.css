@@ -4510,6 +4510,110 @@ body .director-preview-tiles i {
   }
 }
 
+/* AI Director Phase 1 interaction states; existing V2 layout remains unchanged. */
+.badge-success {
+  color: var(--color-success);
+  border-color: color-mix(in srgb, var(--color-success) 24%, var(--color-border));
+  background: var(--color-success-soft);
+}
+
+.badge-warning {
+  color: var(--color-warning);
+  border-color: color-mix(in srgb, var(--color-warning) 24%, var(--color-border));
+  background: var(--color-warning-soft);
+}
+
+.director-loading-state,
+.director-error-state {
+  min-height: 260px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-4);
+  padding: var(--space-8);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
+  background: var(--color-surface-muted);
+  text-align: left;
+}
+
+.director-loading-state h3,
+.director-error-state h3 {
+  margin: 0 0 var(--space-2);
+}
+
+.director-loading-state p,
+.director-error-state p {
+  margin: 0 0 var(--space-4);
+  color: var(--color-text-secondary);
+}
+
+.director-loading-state .loading-spinner {
+  width: 34px;
+  height: 34px;
+  flex: 0 0 auto;
+  border: 3px solid var(--color-border);
+  border-top-color: var(--color-brand);
+  border-radius: 50%;
+  animation: director-spin 0.9s linear infinite;
+}
+
+@keyframes director-spin {
+  to { transform: rotate(360deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .director-loading-state .loading-spinner { animation: none; }
+}
+
+.director-error-state > span {
+  width: 38px;
+  height: 38px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  color: var(--color-danger);
+  background: var(--color-danger-soft);
+  font-weight: 700;
+}
+
+.director-output-card strong {
+  display: block;
+  margin-bottom: var(--space-2);
+  color: var(--color-text);
+}
+
+.director-output-card ul {
+  margin: var(--space-2) 0 0;
+  padding-left: var(--space-6);
+  color: var(--color-text-secondary);
+}
+
+.director-output-card li + li {
+  margin-top: var(--space-1);
+}
+
+.director-output-card p b {
+  display: block;
+  margin-bottom: 2px;
+  color: var(--color-text);
+}
+
+.director-result-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-top: var(--space-4);
+}
+
+.director-retained-plan {
+  margin: 0 0 var(--space-3);
+  padding: var(--space-3);
+  border-radius: var(--radius-control);
+  color: var(--color-warning);
+  background: var(--color-warning-soft);
+}
+
 @media (max-width: 1180px) {
   .creation-preview-grid,
   .template-preview-grid,
