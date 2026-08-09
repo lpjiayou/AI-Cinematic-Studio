@@ -25,6 +25,7 @@
   }
 
   const fixture = JSON.parse(fixtureElement.textContent);
+  const aiDirectorEndpoint = "/creator/internal/ai-director/plan";
   const projectRef = fixture.project.projectRef;
   const projectBase = `/creator/projects/${projectRef}`;
   const displayProjectTitle = "晚灯 · 第 1 集";
@@ -119,6 +120,10 @@
     localDraftCounter: 0,
     aiDirectorPhase: "input",
     aiDirectorBrief: { ...fixture.aiDirector.briefDefaults },
+    aiDirectorPlan: null,
+    aiDirectorPlanVersion: 0,
+    aiDirectorConfirmed: false,
+    aiDirectorError: null,
     aiDirectorProjectDraft: null,
     previewState: "paused",
     previewMuted: true,
@@ -204,6 +209,10 @@
 
   function fixtureNotice() {
     return '<span class="sr-only page-fixture-contract">FIXTURE ONLY · NOT A DOMAIN FACT · SESSION ONLY</span>';
+  }
+
+  function candidatePlanNotice() {
+    return '<span class="sr-only candidate-plan-contract">候选创意方案 · 人工确认前不会进入后续流程 · 仅当前会话有效</span>';
   }
 
   function demoNotice(copy) {
@@ -634,7 +643,7 @@
     `;
   }
 
-  function renderDirectorBriefField(key, label, helper) {
+  function renderDirectorBriefField(key, label, helper, required = true) {
     return `
       <label class="director-field" for="director-${escapeHtml(key)}">
         <span>${escapeHtml(label)}</span>
@@ -644,7 +653,7 @@
           type="text"
           value="${escapeHtml(state.aiDirectorBrief[key] || "")}"
           autocomplete="off"
-          required
+          ${required ? "required" : ""}
         >
         <small>${escapeHtml(helper)}</small>
       </label>
@@ -661,37 +670,71 @@
       `;
     }
 
-    const output = fixture.aiDirector.output;
+    if (state.aiDirectorPhase === "generating") {
+      return `
+        <div class="director-loading-state" data-ai-director-state="generating" role="status" aria-live="polite">
+          <span class="loading-spinner" aria-hidden="true"></span>
+          <div><h3>正在整理导演方案…</h3><p>正在根据创意简报组织故事、镜头与视觉方向。</p></div>
+        </div>
+      `;
+    }
+
+    if (state.aiDirectorPhase === "error" && !state.aiDirectorPlan) {
+      return `
+        <div class="director-error-state" data-ai-director-state="error" role="alert">
+          <span aria-hidden="true">!</span>
+          <div><h3>导演方案暂时无法生成</h3><p>请稍后重试。创意输入仍保留在当前页面。</p><button class="button button-secondary" type="button" data-action="regenerate-ai-director">重新生成</button></div>
+        </div>
+      `;
+    }
+
+    const plan = state.aiDirectorPlan;
+    if (!plan) return "";
+    const story = plan.storyDirection;
+    const script = plan.scriptDraft;
+    const storyboard = plan.storyboardPlan;
+    const visual = plan.visualStyle;
+    const statusLabel = state.aiDirectorConfirmed ? "已确认（当前会话）" : "待确认";
+    const statusTone = state.aiDirectorConfirmed ? "success" : "warning";
+    const storyboardDuration = storyboard.reduce((sum, shot) => sum + Number(shot.durationSec || 0), 0);
     return `
-      <div class="director-result" data-ai-director-state="result">
+      <div class="director-result" data-ai-director-state="${state.aiDirectorConfirmed ? "confirmed" : "result"}">
         <div class="director-result-banner" role="status">
           <span aria-hidden="true">✦</span>
-          <div><strong>导演方案已准备</strong><p>可以继续检查故事、镜头和视觉方向。</p></div>
+          <div><strong>候选导演方案已准备</strong><p>版本 ${state.aiDirectorPlanVersion} · ${statusLabel}</p></div>
+          ${localizedStatusBadge(statusLabel, statusTone)}
         </div>
+        ${state.aiDirectorPhase === "error" ? '<p class="director-retained-plan" role="alert">重新生成暂时失败，已确认方案仍保留在当前会话。</p>' : ""}
         <div class="director-output-grid">
-          <article class="director-output-card is-selected"><span>01</span><h3>故事方向</h3><p>${escapeHtml(output.storyDirection)}</p></article>
-          <article class="director-output-card"><span>02</span><h3>剧本草案</h3><p>${escapeHtml(output.scriptDraft)}</p></article>
-          <article class="director-output-card"><span>03</span><h3>分镜规划</h3><p>${escapeHtml(output.storyboardDraft)}</p></article>
-          <article class="director-output-card"><span>04</span><h3>视觉风格</h3><p>${escapeHtml(state.aiDirectorBrief.style)} · 深夜低照度 · 暖色视觉锚点</p></article>
+          <article class="director-output-card is-selected"><span>01</span><h3>故事方向</h3><strong>${escapeHtml(story.title)}</strong><p>${escapeHtml(story.synopsis)}</p><ul>${story.keyBeats.map((item) => `<li>${escapeHtml(item)}</li>`).join("")}</ul></article>
+          <article class="director-output-card"><span>02</span><h3>剧本草案</h3><p><b>开场</b>${escapeHtml(script.opening)}</p><p><b>发展</b>${escapeHtml(script.development)}</p><p><b>高潮</b>${escapeHtml(script.climax)}</p><p><b>结尾</b>${escapeHtml(script.ending)}</p></article>
+          <article class="director-output-card"><span>03</span><h3>分镜规划</h3><strong>${storyboard.length} 个镜头 · ${storyboardDuration} 秒</strong><ul>${storyboard.map((shot) => `<li>镜头 ${escapeHtml(shot.shotNo)} · ${escapeHtml(shot.shotSize)} · ${escapeHtml(shot.visualDescription)}</li>`).join("")}</ul></article>
+          <article class="director-output-card"><span>04</span><h3>视觉风格</h3><p><b>光线</b>${escapeHtml(visual.lighting)}</p><p><b>色彩</b>${escapeHtml(visual.palette)}</p><p><b>构图</b>${escapeHtml(visual.composition)}</p><p><b>氛围</b>${escapeHtml(visual.atmosphere)}</p></article>
+        </div>
+        <div class="director-result-actions">
+          <button class="button button-secondary" type="button" data-action="confirm-ai-director-plan" ${state.aiDirectorConfirmed ? "disabled" : ""}>${state.aiDirectorConfirmed ? "当前会话已确认" : "确认导演方案"}</button>
+          <button class="button button-text" type="button" data-action="regenerate-ai-director">重新生成</button>
         </div>
       </div>
     `;
   }
 
   function renderDirectorPlanning() {
-    const output = fixture.aiDirector.output;
+    const production = state.aiDirectorPlan && state.aiDirectorPlan.productionPlan;
+    const canCreateDraft = Boolean(production && state.aiDirectorConfirmed && state.aiDirectorPhase !== "generating");
+    const listValue = (items, fallback) => Array.isArray(items) && items.length ? items.map(escapeHtml).join("、") : fallback;
     return `
       <section class="director-planning-panel" aria-labelledby="director-planning-title">
         <div class="card-heading"><div><span class="section-kicker">制作规划</span><h3 id="director-planning-title">把方案带入项目</h3></div></div>
         <div class="director-plan-cover"><img src="${escapeHtml(fixture.assets[2].src)}" alt="晚灯制作规划视觉"><span>晚灯 · 情绪短片</span></div>
         <dl class="director-plan-list">
-          <div><dt>镜头数量</dt><dd>5 个镜头</dd></div>
-          <div><dt>角色需求</dt><dd>${escapeHtml(output.productionPlan.character)}</dd></div>
-          <div><dt>场景需求</dt><dd>${escapeHtml(output.productionPlan.scene)}</dd></div>
-          <div><dt>资产需求</dt><dd>${escapeHtml(output.productionPlan.assets)}</dd></div>
-          <div><dt>声音需求</dt><dd>环境氛围 · 即将上线</dd></div>
+          <div><dt>镜头数量</dt><dd>${production ? `${escapeHtml(production.shotCount)} 个镜头` : "待生成"}</dd></div>
+          <div><dt>角色需求</dt><dd>${production ? listValue(production.characters, "无") : "待生成"}</dd></div>
+          <div><dt>场景需求</dt><dd>${production ? listValue(production.scenes, "无") : "待生成"}</dd></div>
+          <div><dt>资产需求</dt><dd>${production ? listValue(production.visualAssets, "无") : "待生成"}</dd></div>
+          <div><dt>声音需求</dt><dd>${production ? listValue(production.audioNeeds, "无") : "待生成"}</dd></div>
         </dl>
-        <div class="director-plan-action"><button class="button button-primary" type="button" data-action="create-ai-director-project-draft" ${state.aiDirectorPhase === "input" ? "disabled" : ""}>创建项目草稿</button><p>仅当前会话有效，不会保存到系统。</p></div>
+        <div class="director-plan-action"><button class="button button-primary" type="button" data-action="create-ai-director-project-draft" ${canCreateDraft ? "" : "disabled"}>创建项目草稿</button><p>${state.aiDirectorConfirmed ? "仅当前会话有效，不会保存到系统。" : "确认导演方案后才可创建当前会话草稿。"}</p></div>
       </section>
     `;
   }
@@ -704,7 +747,7 @@
       ["duration", "视频时长", "示例：30秒"],
       ["platform", "发布平台", "示例：短视频平台"],
       ["style", "视觉风格", "示例：电影感"],
-      ["character", "角色设定", "示例：晚灯 WANLIGHT"]
+      ["character", "角色设定", "可选 · 示例：晚灯 WANLIGHT"]
     ];
     return `
       ${renderPageHeader({
@@ -718,8 +761,8 @@
           <div class="card-heading"><div><span class="section-kicker">你的创意</span><h3>创意输入</h3></div></div>
           <p class="director-panel-intro">描述你想创作的影片，让导演方案拥有清晰方向。</p>
           <form id="ai-director-form" class="director-brief-form">
-            ${fields.map(([key, label, helper]) => renderDirectorBriefField(key, label, helper)).join("")}
-            <div class="director-form-footer"><span>此操作不会调用模型</span><button class="button button-primary" type="submit">生成创意方案</button></div>
+            ${fields.map(([key, label, helper]) => renderDirectorBriefField(key, label, helper, key !== "character")).join("")}
+            <div class="director-form-footer"><span>通过安全服务整理方案，结果需人工确认。</span><button class="button button-primary" type="submit" ${state.aiDirectorPhase === "generating" ? "disabled" : ""}>${state.aiDirectorPhase === "generating" ? "正在整理…" : "生成创意方案"}</button></div>
           </form>
         </section>
         <section class="director-canvas-panel" aria-labelledby="director-canvas-title">
@@ -728,7 +771,7 @@
         </section>
         ${renderDirectorPlanning()}
       </div>
-      ${fixtureNotice()}
+      ${candidatePlanNotice()}
     `;
   }
 
@@ -1108,6 +1151,22 @@
     inspectorContent.innerHTML = `${base}${detail}`;
   }
 
+  function aiDirectorStickyConfig() {
+    if (state.aiDirectorPhase === "generating") {
+      return { label: "正在整理导演方案…", disabled: true, note: "不会显示虚假进度" };
+    }
+    if (state.aiDirectorConfirmed) {
+      return { label: "创建项目草稿", action: "create-ai-director-project-draft", note: "仅当前会话有效，不会保存到系统" };
+    }
+    if (state.aiDirectorPlan) {
+      return { label: "确认导演方案", action: "confirm-ai-director-plan", note: "人工确认后才能创建项目草稿" };
+    }
+    if (state.aiDirectorPhase === "error") {
+      return { label: "重新生成", action: "regenerate-ai-director", note: "创意输入仍保留在当前页面" };
+    }
+    return { label: "生成创意方案", action: "run-ai-director", note: "整理故事、镜头与视觉方向" };
+  }
+
   function stickyConfig(route) {
     if (!route) return { label: "返回总览", target: defaultRoute, note: "未知路由 · 未创建任何事实" };
     const map = {
@@ -1115,9 +1174,7 @@
       projects: { label: "创建项目草稿", action: "open-project-dialog", note: "仅当前会话有效 · 不会保存到系统" },
       assets: { label: "查看晚灯角色", target: `${projectBase}/character`, note: "角色、场景与关键画面统一管理" },
       creation: { label: "返回首页", target: defaultRoute, note: "六项智能工具正在准备中" },
-      "ai-director": state.aiDirectorPhase === "input"
-        ? { label: "生成创意方案", action: "run-ai-director-fixture", note: "整理故事、镜头与视觉方向" }
-        : { label: "创建项目草稿", action: "create-ai-director-project-draft", note: "仅当前会话有效，不会保存到系统" },
+      "ai-director": aiDirectorStickyConfig(),
       "project-draft-handoff": { label: "打开晚灯项目", target: `${projectBase}/pipeline`, note: "项目草稿已建立 · 仅当前会话有效" },
       pipeline: { label: "进入角色", target: `${projectBase}/character`, note: "项目制作流程总览 · 状态由创作者确认" },
       character: { label: "查看分镜", target: `${projectBase}/storyboard`, note: "晚灯角色 · 权利状态待确认" },
@@ -1342,33 +1399,122 @@
     }
   }
 
-  function runAiDirectorFixture() {
+  function isCandidatePlan(plan) {
+    return Boolean(
+      plan &&
+      plan.schemaVersion === "creator.ai-director.plan.v1" &&
+      plan.creativeInterpretation &&
+      plan.storyDirection &&
+      plan.scriptDraft &&
+      Array.isArray(plan.storyboardPlan) &&
+      plan.visualStyle &&
+      plan.productionPlan &&
+      plan.productionPlan.shotCount === plan.storyboardPlan.length
+    );
+  }
+
+  function readAiDirectorBrief() {
     const form = document.getElementById("ai-director-form");
-    if (!form || !form.reportValidity()) return;
+    if (!form) return null;
+    const durationInput = form.elements.duration;
+    if (durationInput) {
+      const durationMatch = String(durationInput.value || "").trim().match(/^(\d+(?:\.\d+)?)\s*(?:s|sec|seconds?|秒)?$/i);
+      const durationSeconds = durationMatch ? Number(durationMatch[1]) : 0;
+      durationInput.setCustomValidity(durationSeconds > 0 && durationSeconds <= 3600 ? "" : "请输入 1–3600 秒的合理时长");
+    }
+    if (!form.reportValidity()) return null;
     const formData = new FormData(form);
-    state.aiDirectorBrief = Object.fromEntries(
+    return Object.fromEntries(
       Object.keys(fixture.aiDirector.briefDefaults).map((key) => [key, String(formData.get(key) || "").trim()])
     );
-    state.aiDirectorPhase = "result";
+  }
+
+  async function runAiDirector() {
+    if (state.aiDirectorPhase === "generating") return;
+    const brief = readAiDirectorBrief();
+    if (!brief) return;
+    const previousPlan = state.aiDirectorPlan;
+    const previousConfirmed = state.aiDirectorConfirmed;
+    state.aiDirectorBrief = brief;
+    state.aiDirectorPhase = "generating";
+    state.aiDirectorError = null;
     renderRoute("/creator/ai-director");
-    window.requestAnimationFrame(() => {
-      const canvas = document.getElementById("director-canvas-title");
-      if (canvas) canvas.focus({ preventScroll: true });
-    });
-    showToast("创意方案已展示 · 当前内容不会保存");
+    const abortController = new AbortController();
+    const timeout = window.setTimeout(() => abortController.abort(), 45_000);
+    try {
+      const response = await fetch(aiDirectorEndpoint, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "Accept": "application/json" },
+        body: JSON.stringify({ brief }),
+        signal: abortController.signal
+      });
+      const payload = await response.json();
+      if (!response.ok || !payload.ok || !isCandidatePlan(payload.plan)) throw new Error("candidate-plan-unavailable");
+      state.aiDirectorPlan = payload.plan;
+      state.aiDirectorPlanVersion += 1;
+      state.aiDirectorConfirmed = false;
+      state.aiDirectorPhase = "result";
+      showToast("候选导演方案已生成 · 请完成人工确认");
+    } catch (error) {
+      state.aiDirectorPlan = previousPlan;
+      state.aiDirectorConfirmed = previousConfirmed;
+      state.aiDirectorPhase = "error";
+      state.aiDirectorError = "导演方案暂时无法生成，请稍后重试。";
+      showToast("导演方案暂时无法生成，请稍后重试。");
+    } finally {
+      window.clearTimeout(timeout);
+      renderRoute("/creator/ai-director");
+      window.requestAnimationFrame(() => {
+        const canvas = document.getElementById("director-canvas-title");
+        if (canvas) canvas.focus({ preventScroll: true });
+      });
+    }
+  }
+
+  function confirmAiDirectorPlan() {
+    if (!state.aiDirectorPlan || state.aiDirectorPhase === "generating") return;
+    state.aiDirectorConfirmed = true;
+    state.aiDirectorPhase = "confirmed";
+    state.aiDirectorError = null;
+    renderRoute("/creator/ai-director");
+    showToast("导演方案已确认 · 仅当前会话有效");
+  }
+
+  function buildAiDirectorProjectDraftInput(projectRefValue) {
+    if (!state.aiDirectorPlan || !state.aiDirectorConfirmed) return null;
+    const plan = state.aiDirectorPlan;
+    return {
+      schemaVersion: "creator.project-draft-input.v1",
+      localKey: projectRefValue,
+      projectRef: projectRefValue,
+      sourcePlanRef: `local-ai-director-plan-${state.aiDirectorPlanVersion}`,
+      sourcePlanSchemaVersion: plan.schemaVersion,
+      sourcePlanVersion: state.aiDirectorPlanVersion,
+      sourcePlan: plan,
+      persistence: "session-only",
+      domainFact: false,
+      story: {
+        creativeInterpretation: plan.creativeInterpretation,
+        direction: plan.storyDirection,
+        script: plan.scriptDraft
+      },
+      characters: plan.productionPlan.characters,
+      scenes: plan.productionPlan.scenes,
+      storyboard: plan.storyboardPlan,
+      visualStyle: plan.visualStyle,
+      productionPlan: plan.productionPlan
+    };
   }
 
   function createAiDirectorProjectDraft() {
-    if (state.aiDirectorPhase === "input") return;
     const projectRefValue = "local-project-wanlight-001";
+    const draftInput = buildAiDirectorProjectDraftInput(projectRefValue);
+    if (!draftInput) return;
     const draft = {
-      localKey: projectRefValue,
-      projectRef: projectRefValue,
+      ...draftInput,
       title: `${state.aiDirectorBrief.topic} · 项目草稿`,
       format: `${state.aiDirectorBrief.duration} · ${state.aiDirectorBrief.platform}`,
-      source: "AI Director Fixture UI",
-      persistence: "session-only",
-      domainFact: false
+      source: "AI Director candidate creative plan"
     };
     const existingIndex = state.localProjectDrafts.findIndex((item) => item.projectRef === projectRefValue);
     if (existingIndex >= 0) state.localProjectDrafts.splice(existingIndex, 1, draft);
@@ -1388,6 +1534,10 @@
     state.localDraftCounter = 0;
     state.aiDirectorPhase = "input";
     state.aiDirectorBrief = { ...fixture.aiDirector.briefDefaults };
+    state.aiDirectorPlan = null;
+    state.aiDirectorPlanVersion = 0;
+    state.aiDirectorConfirmed = false;
+    state.aiDirectorError = null;
     state.aiDirectorProjectDraft = null;
     state.previewState = "paused";
     state.previewMuted = true;
@@ -1430,7 +1580,9 @@
       });
     }
     if (action === "reset-fixture") resetFixture();
-    if (action === "run-ai-director-fixture") runAiDirectorFixture();
+    if (action === "run-ai-director") runAiDirector();
+    if (action === "regenerate-ai-director") runAiDirector();
+    if (action === "confirm-ai-director-plan") confirmAiDirectorPlan();
     if (action === "create-ai-director-project-draft") createAiDirectorProjectDraft();
     if (action === "select-asset-tab") {
       state.assetTab = button.dataset.tab;
@@ -1480,7 +1632,7 @@
   document.addEventListener("submit", (event) => {
     if (event.target.id !== "ai-director-form") return;
     event.preventDefault();
-    runAiDirectorFixture();
+    runAiDirector();
   });
 
   document.addEventListener("keydown", (event) => {

@@ -542,15 +542,15 @@ class CreatorWorkspaceMvpTest(unittest.TestCase):
         )
         self.assertEqual(
             self.fixture["meta"]["capabilityVersion"],
-            "AI Director Fixture Workspace V0.1",
+            "AI Director Real Intelligence Phase 1",
         )
         director = self.fixture["aiDirector"]
         self.assertEqual(director["route"], "/creator/ai-director")
         self.assertEqual(director["featureStatus"], "In Development")
-        self.assertEqual(director["pageStatus"], "Available - Fixture Only")
+        self.assertEqual(director["pageStatus"], "Available")
         self.assertEqual(
             director["classification"],
-            ["FIXTURE ONLY", "NOT A DOMAIN FACT", "NO AI MODEL CONNECTED"],
+            ["CANDIDATE CREATIVE PLAN", "HUMAN CONFIRMATION REQUIRED", "SESSION ONLY"],
         )
         self.assertEqual(director["persistence"], "session-only")
 
@@ -582,18 +582,13 @@ class CreatorWorkspaceMvpTest(unittest.TestCase):
             self.assertIn(f'["{field}",', self.script)
             self.assertIn(f'name="${{escapeHtml(key)}}"', self.script)
         self.assertIn('id="ai-director-form"', self.script)
-        self.assertIn("此操作不会调用模型", self.script)
-        self.assertIn("NO AI MODEL CONNECTED", self.index)
+        self.assertIn("通过安全服务整理方案，结果需人工确认", self.script)
+        self.assertNotIn("NO AI MODEL CONNECTED", self.index)
 
-    def test_ai_director_canvas_uses_fixed_fixture_outputs(self):
-        output = self.fixture["aiDirector"]["output"]
-        self.assertEqual(output["storyDirection"], "温暖治愈系陪伴故事。")
-        self.assertEqual(output["scriptDraft"], "三幕式短片结构示例。")
-        self.assertEqual(output["storyboardDraft"], "五镜头视觉规划示例。")
-        self.assertEqual(
-            output["productionPlan"],
-            {"character": "晚灯", "scene": "夜晚空间", "assets": "角色、背景、字幕"},
-        )
+    def test_ai_director_canvas_uses_validated_candidate_plan(self):
+        self.assertNotIn("output", self.fixture["aiDirector"])
+        self.assertIn("state.aiDirectorPlan", self.script)
+        self.assertIn('plan.schemaVersion === "creator.ai-director.plan.v1"', self.script)
         for marker in (
             "故事方向",
             "剧本草案",
@@ -625,7 +620,6 @@ class CreatorWorkspaceMvpTest(unittest.TestCase):
             "DeepSeek",
             "modelRouter",
             "promptBackend",
-            "fetch(",
             "XMLHttpRequest",
             "localStorage",
             "sessionStorage",
@@ -633,8 +627,10 @@ class CreatorWorkspaceMvpTest(unittest.TestCase):
         )
         for marker in forbidden:
             self.assertNotIn(marker, combined)
-        self.assertIn("NO AI MODEL CONNECTED", combined)
-        self.assertIn("此操作不会调用模型", self.script)
+        self.assertEqual(self.script.count("fetch("), 1)
+        self.assertIn('const aiDirectorEndpoint = "/creator/internal/ai-director/plan"', self.script)
+        self.assertNotIn("api.deepseek.com", combined)
+        self.assertNotIn("PROVIDER_API_KEY", combined)
 
     def test_ai_director_polish_has_chinese_header_and_statuses(self):
         for marker in (
@@ -660,7 +656,7 @@ class CreatorWorkspaceMvpTest(unittest.TestCase):
         ):
             self.assertIn(f'"{label}"', director_block)
         self.assertIn("生成创意方案", director_block)
-        self.assertIn("此操作不会调用模型", director_block)
+        self.assertIn("通过安全服务整理方案，结果需人工确认", director_block)
 
     def test_ai_director_polish_has_four_product_cards_without_repeated_demo_labels(self):
         canvas_block = self.script.split("function renderDirectorCanvas()", 1)[1].split(
@@ -701,7 +697,8 @@ class CreatorWorkspaceMvpTest(unittest.TestCase):
 
     def test_ai_director_polish_feedback_remains_local_and_non_authoritative(self):
         for marker in (
-            "创意方案已展示 · 当前内容不会保存",
+            "候选导演方案已生成 · 请完成人工确认",
+            "导演方案已确认 · 仅当前会话有效",
             "项目草稿已建立 · 仅当前会话有效",
             'const projectRefValue = "local-project-wanlight-001"',
             'persistence: "session-only"',
@@ -890,7 +887,7 @@ class CreatorWorkspaceMvpTest(unittest.TestCase):
 
     def test_closeout_ai_director_empty_state_previews_four_outputs_without_loading(self):
         block = self.script.split('if (state.aiDirectorPhase === "input")', 1)[1].split(
-            "const output = fixture.aiDirector.output", 1
+            'if (state.aiDirectorPhase === "generating")', 1
         )[0]
         self.assertIn("导演方案将在这里生成", block)
         self.assertIn("完成左侧创意输入后", block)
@@ -924,7 +921,6 @@ class CreatorWorkspaceMvpTest(unittest.TestCase):
     def test_application_has_no_network_persistence_or_lower_layer_imports(self):
         combined = f"{self.index}\n{self.script}"
         forbidden = (
-            "fetch(",
             "XMLHttpRequest",
             "WebSocket",
             "EventSource",
@@ -939,6 +935,10 @@ class CreatorWorkspaceMvpTest(unittest.TestCase):
         )
         for marker in forbidden:
             self.assertNotIn(marker, combined)
+        self.assertEqual(self.script.count("fetch("), 1)
+        self.assertIn('fetch(aiDirectorEndpoint, {', self.script)
+        self.assertIn('const aiDirectorEndpoint = "/creator/internal/ai-director/plan"', self.script)
+        self.assertNotIn("https://", self.script)
 
     def test_page_has_no_remote_runtime_dependencies(self):
         remote_references = re.findall(r'(?:src|href)="https?://', self.index)
