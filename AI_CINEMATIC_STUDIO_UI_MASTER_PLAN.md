@@ -2,14 +2,19 @@
 
 > Document: `AI_CINEMATIC_STUDIO_UI_MASTER_PLAN.md`
 >
-> Status: `UI MASTER BASELINE / UI-R1 FEATURE ACCEPTED CANDIDATE`
+> Status: `UI MASTER BASELINE / UI-R1 FEATURE ACCEPTED`
 >
 > Version: `v1.1`
 >
-> Date: `2026-08-09`
+> Date: `2026-08-10`
 >
 > System Accepted Base:
 > `1cc768ee9db4b52a916c94ae6af7b95b811f1cb2`
+>
+> UI-R1 Accepted SHA:
+> `c9536fc0c745d0bf9e9c3eb543f4ab6c0566798a`
+>
+> Revision: Enterprise Dark Cinematic Visual Baseline integrated after UI-R1 acceptance.
 >
 > Scope:
 > AI Cinematic Studio Creator / Project Workspace / Production Editors /
@@ -97,16 +102,35 @@ UI 相关决策按照：
 
 # 3. Creator Enterprise Dark Cinematic Visual Baseline
 
-UI-R1 冻结候选：
+Revision note:
+
+Enterprise Dark Cinematic Visual Baseline integrated after UI-R1 acceptance.
+
+UI-R1 接受记录：
 
 - Task: `ACS-CREATOR-UI-R1-ENTERPRISE-REBASELINE-001`；
-- Base: `1cc768ee9db4b52a916c94ae6af7b95b811f1cb2`；
-- Status: `FEATURE ACCEPTED CANDIDATE / AWAITING PROJECT LEAD ACCEPTANCE`；
+- System Accepted Base: `1cc768ee9db4b52a916c94ae6af7b95b811f1cb2`；
+- UI-R1 Accepted SHA: `c9536fc0c745d0bf9e9c3eb543f4ab6c0566798a`；
+- Status: `FEATURE ACCEPTED`；
 - M4: `PAUSED / NOT STARTED`。
 
-Project Lead 接受 UI-R1 后，Enterprise Dark Cinematic Workstation 取代此前偏浅色的 Creator UI V2 视觉基线。Light Mode 若未来需要，必须作为独立主题能力处理。
+Enterprise Dark Cinematic Workstation 是当前唯一 Creator Visual Baseline，取代此前“管理页面偏明亮、专业编辑工作区偏深色”的双重视觉方向。Light Mode 若未来需要，必须作为独立主题能力处理，不得形成第二套 Creator UI。
 
-视觉原则：
+原 Creator UI V2 的长期产品原则继续保留：
+
+- 中文优先；
+- Professional SaaS；
+- Enterprise Production Software；
+- Industrial / Cinematic；
+- 清晰层级；
+- 充足留白；
+- 低噪音；
+- Cyan / Blue-Green 核心强调体系；
+- 减少装饰性渐变；
+- 控制卡片数量；
+- 强调状态、数据、版本和生产对象。
+
+冻结视觉原则：
 
 - Professional AI Film Production Platform；
 - Enterprise Cinematic Workstation；
@@ -142,6 +166,15 @@ Project Lead 接受 UI-R1 后，Enterprise Dark Cinematic Workstation 取代此�
 --acs-success-soft: rgba(54, 211, 153, 0.12);
 ```
 
+Dark Form System：
+
+- Input、Select、Textarea、Segmented Option 和 selectable Card 使用深色 Surface；
+- Normal 使用 `--acs-surface-deep` + `--acs-border`；
+- Hover 使用 `--acs-surface-hover` + `--acs-border-strong`；
+- Selected 使用 `--acs-surface-selected` + `--acs-primary`；
+- Focus / Selected ring 仅允许使用克制的 `--acs-primary-soft`；
+- Selected 状态禁止回退到白色或浅色 Surface。
+
 冻结 Global Shell：
 
 - Global Sidebar: `240px → 72px` collapse；
@@ -161,7 +194,21 @@ Project Lead 接受 UI-R1 后，Enterprise Dark Cinematic Workstation 取代此�
 - Editor Framework 固定支持 Script、Bible、Storyboard、Shot、Timeline；
 - Inspector 只展示当前对象、状态、版本、来源和影响；
 - Bottom Drawer 承载 Version、Job、Activity；
+- 专业 Editor 使用统一暗色工作区、对象导航、主编辑区、Inspector、Version / Job / Activity Drawer 和 Workflow Action Bar；
 - M4–M19 原则上只激活既有壳层，不再重做全局 IA、Project Shell 或 Editor 框架。
+
+运行时与验收规则：
+
+- ONE CREATOR UI；
+- Creator UI 修改必须进入真实 Creator Server Runtime，不得长期保留平行静态产品入口；
+- 最终 UI 证据必须来自 HTTP Runtime；
+- `file://` 仅可用于临时视觉检查，不得作为最终 Browser、Live、Integration 或视觉验收证据；
+- UI Shell 不得虚构尚未存在的 Domain fact、Ref、Version、Lineage、Job 或生产状态；
+- 已接受的 M1 / M2 / M3 能力必须在当前 Shell 中保持真实，不得退化为静态 Demo 或“即将上线”。
+
+UI-R1 接受后，后续重点继续是稳定 Information Architecture、点亮真实能力和提升工作流效率，而不是无业务原因的整体换肤。
+
+---
 
 # 4. UI 三层结构
 
@@ -639,7 +686,7 @@ Series Project 长期规划：
 ├── 系列规划
 ├── IP圣经
 ├── 角色
-└── 世界 / 连续性
+└── 世界与连续性
 
 ---
 
@@ -1434,7 +1481,7 @@ M16 后再扩展成完整 Batch Job Center。
 后期
 ├── 时间线
 ├── 预览
-├── QC
+├── 质检
 └── 审批
 
 ---
@@ -1584,7 +1631,7 @@ UI 必须能够：
 交付
 ├── Master
 ├── 导出
-├── Series管理
+├── 系列管理
 ├── 发布
 └── 数据
 
@@ -2377,7 +2424,7 @@ Episode Plan
 
 策划 → 角色
 
-策划 → 世界 / 连续性
+策划 → 世界与连续性
 
 ---
 
@@ -2499,7 +2546,7 @@ Batch Production Dashboard。
 
 点亮：
 
-Series管理
+系列管理
 
 Export
 
@@ -2636,14 +2683,13 @@ PROJECT WORKSPACE
 │   ├── 系列规划
 │   ├── IP圣经
 │   ├── 角色
-│   └── 世界 / 连续性
+│   └── 世界与连续性
 │
 ├── 内容
-│   ├── 分集列表
-│   └── Episode Workspace
-│       ├── 故事
-│       ├── 剧本
-│       └── 一致性
+│   ├── 分集
+│   ├── 故事
+│   ├── 剧本
+│   └── 一致性
 │
 ├── 制作
 │   ├── 分镜
@@ -2655,13 +2701,13 @@ PROJECT WORKSPACE
 ├── 后期
 │   ├── 时间线
 │   ├── 预览
-│   ├── QC
+│   ├── 质检
 │   └── 审批
 │
 └── 交付
     ├── Master
     ├── 导出
-    ├── Series管理
+    ├── 系列管理
     ├── 发布
     └── 数据
 

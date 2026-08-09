@@ -22,6 +22,28 @@ When the current milestone reaches all required gates, stop and wait for Project
 
 ---
 
+## Control Document Startup Rule
+
+Before any AI Cinematic Studio execution work:
+
+1. read `AI_CINEMATIC_STUDIO_SYSTEM_MASTER_PLAN.md`;
+2. read `AGENTS.md`;
+3. read `CURRENT_MILESTONE.md`;
+4. inspect the current branch, HEAD, accepted base, and Git status.
+
+Before any Creator UI work, also read `AI_CINEMATIC_STUDIO_UI_MASTER_PLAN.md`.
+
+These files have distinct responsibilities:
+
+- System Master Plan: whole-system architecture and roadmap;
+- UI Master Plan: enterprise UX, information architecture, and visual architecture;
+- AGENTS.md: long-term Codex execution constitution;
+- CURRENT_MILESTONE.md: current execution state only.
+
+Do not use recent conversation context to silently override a higher-authority control document.
+
+---
+
 ## Production Spine
 
 The fixed long-term production spine is:
@@ -139,27 +161,49 @@ M3-H Script Candidate Robustness Hotfix — ACCEPTED
 
 Story Projection Integration — ACCEPTED
 
-UI-R1 Enterprise UI Rebaseline — FEATURE ACCEPTED CANDIDATE / AWAITING PROJECT LEAD ACCEPTANCE
+UI-R1 Enterprise UI Rebaseline — FEATURE ACCEPTED
 
-M4 Series IP Bible + Character Intelligence — PAUSED / NOT STARTED
+UI-R1 Accepted SHA — `c9536fc0c745d0bf9e9c3eb543f4ab6c0566798a`
 
-M5 Storyboard + Shot
+Canonical Workspace Promotion — IN PROGRESS
 
-M6 Asset Intelligence + Image Generation
+M4 Project Context Foundation — PAUSED / NOT STARTED
 
-M7 Audio + Video Production
+M5 Series Planning + Series Director — NOT STARTED
 
-M8 Timeline + V3 Render
+M6 Series IP Bible + Character Intelligence — NOT STARTED
 
-M9 V4 Batch Production
+M7 Narrative Closed Loop — NOT STARTED
 
-M10 Series Release & Management
+M8 Storyboard + Creative Shot Domain — NOT STARTED
 
-M11 Performance Feedback
+M9 Asset Requirement + Asset Intelligence — NOT STARTED
 
-No capability milestone is CURRENT while UI-R1 awaits Project Lead acceptance.
+M10 Image Generation — NOT STARTED
 
-UI-R1 is presentation-only and must preserve the accepted M1/M2/M3 production spine. It must not create a Project Domain or enter M4.
+M11 Video Production — NOT STARTED
+
+M12 Audio Production — NOT STARTED
+
+M13 V3 Timeline + Composition + Render — NOT STARTED
+
+M14 Preview / QC / Approval / Local Regeneration — NOT STARTED
+
+M15 Episode Master + Works — NOT STARTED
+
+M16 V4 Batch Production Orchestration — NOT STARTED
+
+M17 Series Release & Management — NOT STARTED
+
+M18 Performance Feedback — NOT STARTED
+
+M19 Commercial SaaS / Enterprise Hardening — NOT STARTED
+
+No capability milestone is CURRENT during Canonical Workspace Promotion.
+
+M4 and M5 are not authorized to execute.
+
+The accepted UI-R1 presentation baseline must preserve the accepted M1/M2/M3 production spine and must not create a second Domain authority.
 
 Do not automatically enter the next milestone.
 
@@ -291,7 +335,7 @@ Do not create a second DeepSeek/provider stack if an accepted V4 provider bounda
 
 ## UI Rule
 
-Creator UI V2 is the stable visual baseline.
+The accepted UI-R1 Enterprise Dark Cinematic Creator UI is the stable visual baseline.
 
 UI may evolve when required by real capability integration.
 
@@ -315,6 +359,16 @@ Do not repeatedly redesign:
 unless explicitly authorized by the Project Lead.
 
 UI refinement should follow capability development rather than replace it.
+
+There must be ONE CREATOR UI.
+
+Creator UI changes must modify the actual Creator Server runtime UI. Do not create or preserve a parallel static product shell as a normal product entry.
+
+Final UI evidence must use the Creator HTTP Runtime. A `file://` page may be used only for temporary local inspection and is never final Browser, Live, Integration, or visual acceptance evidence.
+
+The UI Shell may project accepted facts and presentation state, but it must not fabricate future Domain facts, identifiers, versions, lineage, permissions, jobs, or production status.
+
+Capabilities already accepted in M1, M2, M3, M3-H, and Story Projection remain real capabilities when presented in a new shell. Do not replace them with mock implementations or “coming soon” placeholders.
 
 ---
 
@@ -608,6 +662,10 @@ Only add files relevant to the current milestone.
 
 Do not automatically clean or delete unrelated user files.
 
+After Canonical Workspace Promotion is accepted, the canonical workspace is the default workspace for normal serial milestone development and runtime.
+
+Temporary worktrees are exceptions for emergency hotfixes, true parallel development, or high-risk isolated experiments. Do not create a new worktree for every normal serial milestone.
+
 ---
 
 ## Current Milestone Authority
@@ -618,12 +676,14 @@ CURRENT_MILESTONE.md
 
 Before doing implementation work:
 
-1. read AGENTS.md;
-2. read CURRENT_MILESTONE.md;
-3. inspect current branch and HEAD;
-4. inspect Git status;
-5. compare repository state against the accepted base;
-6. continue only the CURRENT milestone.
+1. read `AI_CINEMATIC_STUDIO_SYSTEM_MASTER_PLAN.md`;
+2. read AGENTS.md;
+3. read `AI_CINEMATIC_STUDIO_UI_MASTER_PLAN.md` when the task affects Creator UI;
+4. read CURRENT_MILESTONE.md;
+5. inspect current branch and HEAD;
+6. inspect Git status;
+7. compare repository state against the accepted base;
+8. continue only the explicitly authorized current execution task or milestone.
 
 If AGENTS.md and CURRENT_MILESTONE.md conflict:
 
