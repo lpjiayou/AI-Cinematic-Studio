@@ -10697,3 +10697,210 @@ body .script-editor-panel {
     grid-template-columns: minmax(0, 1fr);
   }
 }
+
+/* UI-R2A Professional Workspace Layout Freeze
+   Project navigation yields to production content and remains presentation-only. */
+.workbench.project-nav-drawer,
+.workbench.project-nav-drawer.inspector-closed {
+  grid-template-columns: minmax(0, 1fr) var(--inspector-width);
+}
+
+.workbench.project-nav-drawer.inspector-closed {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.workbench.project-nav-drawer .context-navigation {
+  grid-column: auto;
+  grid-row: auto;
+}
+
+.workbench.project-nav-drawer .project-nav-toggle {
+  display: inline-flex;
+}
+
+#app-content {
+  scroll-padding-top: 24px;
+}
+
+.view-header,
+.project-context-bar,
+.project-stage-navigation {
+  scroll-margin-top: calc(var(--header-height) + 16px);
+}
+
+.project-context-bar {
+  margin: -24px -24px 0;
+  border-bottom: 0;
+}
+
+.project-stage-navigation {
+  display: grid;
+  gap: 8px;
+  margin: 0 -24px 20px;
+  padding: 9px 14px 10px;
+  overflow: hidden;
+  border-top: 1px solid var(--acs-border);
+  border-bottom: 1px solid var(--acs-border);
+  background: color-mix(in srgb, var(--acs-surface-deep) 92%, var(--acs-bg));
+}
+
+.project-stage-tabs,
+.project-local-navigation {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  overflow-x: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--acs-border-strong) transparent;
+}
+
+.project-stage-tabs {
+  gap: 4px;
+}
+
+.project-stage-tab,
+.project-local-nav-item {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  min-height: 32px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  color: var(--acs-text-muted);
+  text-decoration: none;
+  white-space: nowrap;
+  writing-mode: horizontal-tb;
+}
+
+.project-stage-tab {
+  min-width: 72px;
+  padding: 0 15px;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.project-stage-tab:hover,
+.project-local-nav-item:hover {
+  border-color: var(--acs-border);
+  background: var(--acs-surface-hover);
+  color: var(--acs-text-primary);
+}
+
+.project-stage-tab.is-active {
+  border-color: rgba(34, 209, 182, .34);
+  background: var(--acs-surface-selected);
+  color: var(--acs-primary);
+  box-shadow: inset 0 -2px var(--acs-primary);
+}
+
+.project-local-navigation {
+  gap: 2px;
+  min-height: 34px;
+  padding-top: 7px;
+  border-top: 1px solid var(--acs-border);
+}
+
+.project-local-nav-item {
+  min-height: 28px;
+  padding: 0 11px;
+  font-size: 11px;
+}
+
+.project-local-nav-item.is-active {
+  border-color: var(--acs-border-strong);
+  background: var(--acs-surface);
+  color: var(--acs-text-primary);
+}
+
+.project-editor-stage-context {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  gap: 9px;
+  min-height: 34px;
+  padding-top: 7px;
+  overflow: hidden;
+  border-top: 1px solid var(--acs-border);
+}
+
+.project-editor-stage-context span {
+  flex: 0 0 auto;
+  color: var(--acs-primary);
+  font-size: 10px;
+  letter-spacing: .08em;
+}
+
+.project-editor-stage-context strong {
+  flex: 0 0 auto;
+  color: var(--acs-text-primary);
+  font-size: 12px;
+}
+
+.project-editor-stage-context small {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--acs-text-muted);
+  font-size: 10px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.inspector-advanced-lineage details {
+  min-width: 0;
+}
+
+.inspector-advanced-lineage summary {
+  cursor: pointer;
+  color: var(--acs-text-secondary);
+  font-weight: 700;
+}
+
+.inspector-advanced-lineage dl {
+  display: grid;
+  gap: 9px;
+  margin: 12px 0 0;
+}
+
+.inspector-advanced-lineage dl div {
+  min-width: 0;
+}
+
+.inspector-advanced-lineage dt {
+  color: var(--acs-text-muted);
+  font-size: 10px;
+}
+
+.inspector-advanced-lineage dd {
+  min-width: 0;
+  margin: 3px 0 0;
+}
+
+.inspector-advanced-lineage code {
+  display: block;
+  overflow: hidden;
+  color: var(--acs-text-secondary);
+  font-size: 10px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@media (max-width: 900px) {
+  .project-context-bar {
+    margin: -18px -14px 0;
+  }
+
+  .project-stage-navigation {
+    margin: 0 -14px 16px;
+    padding-inline: 12px;
+  }
+
+  .project-stage-tab {
+    min-width: 64px;
+    padding-inline: 12px;
+  }
+
+  .project-editor-stage-context small {
+    display: none;
+  }
+}
