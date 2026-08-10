@@ -1445,6 +1445,77 @@ class CreatorWorkspaceMvpTest(unittest.TestCase):
             self.assertIn(marker, block)
         self.assertNotIn("state.seriesRecords.filter", block)
 
+    def test_m5_activates_existing_project_director_and_series_planning_routes(self):
+        navigation = self.script.split("const projectNavigationGroups", 1)[1].split(
+            "const projectPages", 1
+        )[0]
+        self.assertIn('suffix: "planning/director", type: "project-director", status: "available"', navigation)
+        self.assertIn('suffix: "planning/series", type: "series-planning", status: "available"', navigation)
+        renderer_map = self.script.split("const renderers = {", 1)[1].split("};", 1)[0]
+        self.assertIn('"project-director": () => renderProjectSeriesDirector(resolved)', renderer_map)
+        self.assertIn('"series-planning": () => renderSeriesPlanning(resolved)', renderer_map)
+        self.assertNotIn('"series-planning": () => renderEnterpriseShellPage(resolved)', renderer_map)
+
+    def test_m5_browser_uses_project_scoped_same_origin_series_planning_contract(self):
+        for marker in (
+            'const seriesPlanningEndpoint = "/creator/internal/series-planning"',
+            "seriesPlanningGenerateEndpoint",
+            "seriesPlanningConfirmEndpoint",
+            "seriesPlanningManualVersionEndpoint",
+            "seriesPlanningConfirmVersionEndpoint",
+            "seriesPlanningM6BootstrapEndpoint",
+            "workspaceRef",
+            "projectRef: route.project.projectRef",
+            "seriesRef: route.project.seriesRefs[0]",
+        ):
+            self.assertIn(marker, self.script)
+        self.assertNotIn("api.deepseek.com", self.script)
+        self.assertNotIn("Bearer ", self.script)
+
+    def test_m5_series_planning_visibly_separates_planned_and_created_episodes(self):
+        renderer = self.script.split("function renderSeriesPlanning(route)", 1)[1].split(
+            "const enterprisePageCopy", 1
+        )[0]
+        for marker in (
+            "计划分集",
+            "已创建单集",
+            "计划分集不会自动创建生产单集",
+            "episodePlanItemRef",
+            "seriesPlanRef",
+            "seriesPlanVersionRef",
+            "Arc Navigator",
+            "Version History",
+        ):
+            self.assertIn(marker, renderer)
+        self.assertNotIn("episodeRef: item.episodePlanItemRef", renderer)
+
+    def test_m5_series_director_requires_candidate_validation_and_human_confirmation(self):
+        candidate = self.script.split("function renderSeriesDirectorCandidate", 1)[1].split(
+            "function renderProjectSeriesDirector", 1
+        )[0]
+        flow = self.script.split("async function generateSeriesPlanCandidate", 1)[1].split(
+            "function resetFixture", 1
+        )[0]
+        self.assertIn("等待人工确认", candidate)
+        self.assertIn('data-action="confirm-series-plan"', candidate)
+        self.assertIn("humanConfirmed: true", flow)
+        self.assertIn("seriesPlanningConfirmEndpoint", flow)
+        self.assertIn("seriesPlanningConfirmVersionEndpoint", flow)
+
+    def test_m5_series_plan_styles_preserve_enterprise_shell_and_dense_table(self):
+        css = self.styles.split("/* M5 — Series Planning + Series Director activation */", 1)[1]
+        for marker in (
+            ".series-director-layout",
+            ".series-plan-board",
+            ".series-plan-table",
+            ".series-version-history",
+            "grid-template-columns: 68px minmax(240px, 1.35fr)",
+            "var(--acs-surface-deep)",
+            "var(--acs-primary)",
+            "@media (max-width: 1439px)",
+        ):
+            self.assertIn(marker, css)
+
 
 if __name__ == "__main__":
     unittest.main()
