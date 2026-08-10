@@ -46,6 +46,12 @@
   const scriptRewriteEndpoint = `${scriptWorkspaceEndpoint}/rewrite-scene`;
   const scriptConfirmEndpoint = `${scriptWorkspaceEndpoint}/confirm`;
   const storyboardBootstrapEndpoint = `${scriptWorkspaceEndpoint}/storyboard-bootstrap`;
+  const seriesPlanningEndpoint = "/creator/internal/series-planning";
+  const seriesPlanningGenerateEndpoint = `${seriesPlanningEndpoint}/generate`;
+  const seriesPlanningConfirmEndpoint = `${seriesPlanningEndpoint}/confirm`;
+  const seriesPlanningManualVersionEndpoint = `${seriesPlanningEndpoint}/manual-version`;
+  const seriesPlanningConfirmVersionEndpoint = `${seriesPlanningEndpoint}/confirm-version`;
+  const seriesPlanningM6BootstrapEndpoint = `${seriesPlanningEndpoint}/m6-bootstrap`;
   const workspaceRef = fixture.workspace.workspaceRef;
   const contentProfileRef = fixture.workspace.contentProfileRef;
   const projectShellBase = "/creator/project-shell";
@@ -88,8 +94,8 @@
       { key: "overview", label: "项目概览", suffix: "overview", type: "project-overview", status: "planned" }
     ] },
     { label: "策划", key: "planning", items: [
-      { key: "project-director", label: "AI导演", suffix: "planning/director", type: "project-director", status: "planned" },
-      { key: "series-planning", label: "系列规划", suffix: "planning/series", type: "series-planning", status: "planned" },
+      { key: "project-director", label: "AI导演", suffix: "planning/director", type: "project-director", status: "available" },
+      { key: "series-planning", label: "系列规划", suffix: "planning/series", type: "series-planning", status: "available" },
       { key: "bible", label: "IP圣经", suffix: "planning/bible", type: "bible-shell", status: "planned" },
       { key: "characters", label: "角色", suffix: "planning/characters", type: "character-shell", status: "planned" },
       { key: "continuity", label: "世界与连续性", suffix: "planning/continuity", type: "continuity-shell", status: "planned" }
@@ -204,6 +210,14 @@
     scriptPhase: "idle",
     scriptError: null,
     storyboardBootstrap: null,
+    seriesPlanningStatus: "idle",
+    seriesPlanningScope: "",
+    seriesPlanningWorkspace: null,
+    seriesPlanningCandidate: null,
+    seriesPlanningPhase: "idle",
+    seriesPlanningError: null,
+    seriesPlanningInput: "围绕系列核心主题，规划完整的叙事弧、角色成长、分集目标与连续性线索。",
+    selectedSeriesPlanVersionRef: null,
     previewState: "paused",
     previewMuted: true,
     sidebarCollapsed: false,
@@ -297,6 +311,49 @@
     if (state.activePath === "/creator" || state.activePath.startsWith("/creator/projects")) {
       renderRoute(state.activePath);
     }
+  }
+
+  function seriesPlanningScopeFromRoute(route = state.activeRoute) {
+    if (!route || !route.project || !(route.project.seriesRefs || []).length) return null;
+    return {
+      workspaceRef,
+      projectRef: route.project.projectRef,
+      seriesRef: route.project.seriesRefs[0]
+    };
+  }
+
+  function seriesPlanningScopeKey(scope) {
+    return scope ? `${scope.workspaceRef}/${scope.projectRef}/${scope.seriesRef}` : "";
+  }
+
+  function seriesPlanningQuery(scope) {
+    return `workspaceRef=${encodeURIComponent(scope.workspaceRef)}&projectRef=${encodeURIComponent(scope.projectRef)}&seriesRef=${encodeURIComponent(scope.seriesRef)}`;
+  }
+
+  async function loadSeriesPlanningWorkspace(route = state.activeRoute, { force = false } = {}) {
+    const scope = seriesPlanningScopeFromRoute(route);
+    if (!scope) return;
+    const scopeKey = seriesPlanningScopeKey(scope);
+    if (state.seriesPlanningStatus === "loading") return;
+    if (!force && state.seriesPlanningStatus === "ready" && state.seriesPlanningScope === scopeKey) return;
+    state.seriesPlanningStatus = "loading";
+    state.seriesPlanningError = null;
+    if (state.activeRoute && ["project-director", "series-planning"].includes(state.activeRoute.type)) renderRoute(state.activePath);
+    try {
+      const payload = await requestApplicationJson(`${seriesPlanningEndpoint}?${seriesPlanningQuery(scope)}`);
+      state.seriesPlanningScope = scopeKey;
+      state.seriesPlanningWorkspace = payload.workspace;
+      const plan = payload.workspace.plan;
+      const versions = payload.workspace.versions || [];
+      state.selectedSeriesPlanVersionRef = plan && plan.currentSeriesPlanVersionRef
+        ? plan.currentSeriesPlanVersionRef
+        : versions.length ? versions[versions.length - 1].seriesPlanVersionRef : null;
+      state.seriesPlanningStatus = "ready";
+    } catch (error) {
+      state.seriesPlanningStatus = "error";
+      state.seriesPlanningError = error && error.message ? error.message : "系列规划暂时无法读取。";
+    }
+    if (state.activeRoute && ["project-director", "series-planning"].includes(state.activeRoute.type)) renderRoute(state.activePath);
   }
 
   function scriptScopeFromRoute(route = state.activeRoute) {
@@ -1581,6 +1638,105 @@
     return `${renderPageHeader({ eyebrow: "创作中心 · 功能预览", title: copy[0], description: copy[1], status: "planned" })}<section class="creation-tool-shell"><div class="tool-shell-canvas"><span class="section-kicker">工作区预览</span><h3>${escapeHtml(copy[0])}工作台</h3><p>能力尚未授权。此页面没有实际生成、后台任务或生成结果。</p><div class="tool-shell-input"><label>未来输入区域<textarea disabled placeholder="等待能力合同与正式输入"></textarea></label><button class="button button-primary" type="button" disabled>能力未启用</button></div></div><aside>${copy[2].map((item,index) => `<article><span>0${index+1}</span><strong>${escapeHtml(item)}</strong><small>尚未建立</small></article>`).join("")}</aside></section>`;
   }
 
+  function selectedSeriesPlanVersion() {
+    const workspace = state.seriesPlanningWorkspace;
+    const versions = workspace && Array.isArray(workspace.versions) ? workspace.versions : [];
+    return versions.find((item) => item.seriesPlanVersionRef === state.selectedSeriesPlanVersionRef)
+      || (versions.length ? versions[versions.length - 1] : null);
+  }
+
+  function seriesPlanningLoading(route, title) {
+    return `${renderProjectContextBar(route)}${renderPageHeader({ eyebrow: "策划 · 系列规划", title, description: "正在读取项目与系列规划上下文。", status: "available" })}${renderLoadingState("正在读取系列规划")}`;
+  }
+
+  function renderSeriesDirectorCandidate(candidate) {
+    const arcs = candidate.mainArcs || [];
+    const items = candidate.episodePlanItems || [];
+    return `
+      <section class="series-director-candidate" data-series-plan-candidate="true">
+        <header><div><span class="section-kicker">候选系列方案</span><h3>${escapeHtml(candidate.seriesConcept)}</h3></div>${localizedStatusBadge("等待人工确认", "development")}</header>
+        <div class="series-candidate-summary">
+          <article><span>故事前提</span><p>${escapeHtml(candidate.premise)}</p></article>
+          <article><span>系列 Logline</span><p>${escapeHtml(candidate.logline)}</p></article>
+          <article><span>主叙事方向</span><p>${escapeHtml(candidate.mainNarrativeDirection)}</p></article>
+        </div>
+        <div class="series-candidate-metrics"><span><strong>${arcs.length}</strong> 条主弧线</span><span><strong>${items.length}</strong> 个计划分集</span><span><strong>${(candidate.characterArcIntents || []).length}</strong> 条角色成长意图</span></div>
+        <div class="series-candidate-arcs">${arcs.map((arc) => `<article><small>ARC ${escapeHtml(arc.arcNumber)} · EP${String(arc.episodeStart).padStart(2, "0")}–EP${String(arc.episodeEnd).padStart(2, "0")}</small><strong>${escapeHtml(arc.title)}</strong><p>${escapeHtml(arc.objective)}</p></article>`).join("")}</div>
+        <div class="series-candidate-actions"><button class="button button-primary" type="button" data-action="confirm-series-plan">确认并建立系列规划 v1</button><button class="button button-text" type="button" data-action="regenerate-series-plan">重新生成候选</button><p>人工确认后才会由 V5 建立不可变规划版本；不会批量创建单集。</p></div>
+      </section>`;
+  }
+
+  function renderProjectSeriesDirector(route) {
+    if (state.seriesPlanningStatus === "idle" || state.seriesPlanningStatus === "loading") return seriesPlanningLoading(route, "项目 AI导演");
+    if (state.seriesPlanningStatus === "error" || !state.seriesPlanningWorkspace) {
+      return `${renderProjectContextBar(route)}${renderPageHeader({ eyebrow: "策划 · AI导演", title: "项目 AI导演", description: "基于真实项目与系列上下文组织系列规划候选。", status: "available" })}${renderErrorState("系列导演暂时不可用", state.seriesPlanningError || "请稍后重试。")}`;
+    }
+    const workspace = state.seriesPlanningWorkspace;
+    const context = workspace.context;
+    const plan = workspace.plan;
+    const series = context.series;
+    const project = context.project;
+    const generating = state.seriesPlanningPhase === "generating";
+    const existing = plan ? selectedSeriesPlanVersion() : null;
+    return `
+      ${renderProjectContextBar(route)}
+      ${renderPageHeader({ eyebrow: `${escapeHtml(project.title)} · 系列策划`, title: "项目 AI导演", description: "使用真实项目上下文生成系列规划候选，并在人工确认后交给 V5 保存。", status: "available", meta: localizedStatusBadge(plan ? "已有确认规划" : "等待规划", plan ? "available" : "neutral") })}
+      <section class="series-director-layout" data-series-director="true">
+        <article class="enterprise-panel series-director-context">
+          <header><div><span class="section-kicker">项目上下文</span><h3>${escapeHtml(project.title)}</h3></div>${localizedStatusBadge("正式项目", "available")}</header>
+          <dl><div><dt>系列</dt><dd>${escapeHtml(series.title)}</dd></div><div><dt>计划集数</dt><dd>${escapeHtml(project.plannedEpisodeCount)}</dd></div><div><dt>已创建单集</dt><dd>${escapeHtml((series.episodes || []).length)}</dd></div><div><dt>目标平台</dt><dd>${escapeHtml(project.targetPlatform || "尚未设置")}</dd></div></dl>
+          <p>计划分集是规划事实，不是生产单集；系统不会按计划集数批量创建 Episode。</p>
+        </article>
+        <article class="enterprise-panel series-director-input">
+          <header><div><span class="section-kicker">Series Director</span><h3>系列创意输入</h3></div></header>
+          ${plan ? `<div class="series-existing-plan"><strong>系列规划已经建立</strong><p>当前确认版本为 v${escapeHtml(existing ? existing.versionNumber : "—")}。如需查看弧线、计划分集与版本历史，请进入系列规划。</p><a class="button button-secondary" href="#${escapeHtml(route.projectBase)}/planning/series">查看系列规划</a></div>` : `
+            <form id="series-director-form">
+              <label>规划目标<textarea name="creativeInput" required maxlength="4000">${escapeHtml(state.seriesPlanningInput)}</textarea><small>输入与项目上下文会发送到既有 V4 文本生成端口；Provider 只返回候选内容。</small></label>
+              ${state.seriesPlanningError ? `<p class="form-error" role="alert">${escapeHtml(state.seriesPlanningError)}</p>` : ""}
+              <button class="button button-primary" type="submit" ${generating ? "disabled" : ""}>${generating ? "正在生成系列方案…" : "生成系列规划候选"}</button>
+            </form>`}
+        </article>
+      </section>
+      ${state.seriesPlanningCandidate ? renderSeriesDirectorCandidate(state.seriesPlanningCandidate) : ""}`;
+  }
+
+  function seriesPlanVersionContent(version) {
+    const keys = ["seriesConcept", "premise", "logline", "mainNarrativeDirection", "mainArcs", "subArcs", "characterArcIntents", "episodePlanItems", "narrativeRhythm", "worldIntent", "continuityIntent", "foreshadowingContext", "productionAssumptions"];
+    return Object.fromEntries(keys.map((key) => [key, JSON.parse(JSON.stringify(version[key]))]));
+  }
+
+  function renderSeriesPlanning(route) {
+    if (state.seriesPlanningStatus === "idle" || state.seriesPlanningStatus === "loading") return seriesPlanningLoading(route, "系列规划");
+    if (state.seriesPlanningStatus === "error" || !state.seriesPlanningWorkspace) {
+      return `${renderProjectContextBar(route)}${renderPageHeader({ eyebrow: "策划 · 系列规划", title: "系列规划", description: "查看系列弧线、计划分集与版本历史。", status: "available" })}${renderErrorState("系列规划暂时无法读取", state.seriesPlanningError || "请稍后重试。")}`;
+    }
+    const workspace = state.seriesPlanningWorkspace;
+    const context = workspace.context;
+    const plan = workspace.plan;
+    if (!plan) {
+      return `${renderProjectContextBar(route)}${renderPageHeader({ eyebrow: `${escapeHtml(context.project.title)} · 系列策划`, title: "系列规划", description: "规划尚未建立；请先在项目 AI导演生成候选并完成人工确认。", status: "available" })}<section class="enterprise-panel series-plan-empty">${renderEmptyState({ icon: "策", title: "尚未建立系列规划", description: "系列规划必须来自真实项目上下文，经候选校验与人工确认后才会成为权威版本。", action: `<a class="button button-primary" href="#${escapeHtml(route.projectBase)}/planning/director">前往项目 AI导演</a>` })}</section>`;
+    }
+    const version = selectedSeriesPlanVersion();
+    const confirmed = plan.confirmedSeriesPlanVersionRef === version.seriesPlanVersionRef;
+    const createdEpisodes = (context.series.episodes || []).length;
+    return `
+      ${renderProjectContextBar(route)}
+      ${renderPageHeader({ eyebrow: `${escapeHtml(context.project.title)} · 系列策划`, title: "系列规划", description: "在同一项目与系列身份上查看弧线、计划分集、来源与不可变版本。", status: "available", meta: localizedStatusBadge(confirmed ? `已确认 v${version.versionNumber}` : `当前 v${version.versionNumber} · 待确认`, confirmed ? "available" : "development") })}
+      <section class="series-plan-overview" data-series-plan-schema="${escapeHtml(plan.schemaVersion)}" data-series-plan-ref="${escapeHtml(plan.seriesPlanRef)}" data-series-plan-version-ref="${escapeHtml(version.seriesPlanVersionRef)}">
+        <article class="enterprise-panel series-plan-hero"><span class="section-kicker">系列生产规划</span><h2>${escapeHtml(version.seriesConcept)}</h2><p>${escapeHtml(version.logline)}</p><div class="series-plan-kpis"><span><strong>${escapeHtml(version.mainArcs.length)}</strong>主弧线</span><span><strong>${escapeHtml(version.episodePlanItems.length)}</strong>计划分集</span><span><strong>${escapeHtml(createdEpisodes)}</strong>已创建单集</span><span><strong>v${escapeHtml(version.versionNumber)}</strong>当前版本</span></div><small>计划分集不会自动创建生产单集。</small></article>
+        <article class="enterprise-panel series-plan-source"><header><div><span class="section-kicker">来源与身份</span><h3>Project → Series → Series Plan</h3></div></header><dl><div><dt>项目</dt><dd>${escapeHtml(context.project.title)}</dd></div><div><dt>系列</dt><dd>${escapeHtml(context.series.title)}</dd></div><div><dt>规划状态</dt><dd>${confirmed ? "已人工确认" : "等待人工确认"}</dd></div><div><dt>当前版本</dt><dd>v${escapeHtml(version.versionNumber)}</dd></div></dl><details><summary>高级溯源</summary><code>${escapeHtml(context.projectRef)}</code><code>${escapeHtml(context.seriesRef)}</code><code>${escapeHtml(plan.seriesPlanRef)}</code><code>${escapeHtml(version.seriesPlanVersionRef)}</code></details></article>
+      </section>
+      <section class="enterprise-panel series-arc-navigator"><header><div><span class="section-kicker">Arc Navigator</span><h3>主叙事弧线</h3></div><span>${escapeHtml(version.mainNarrativeDirection)}</span></header><div>${version.mainArcs.map((arc) => `<article><small>ARC ${escapeHtml(arc.arcNumber)}</small><strong>${escapeHtml(arc.title)}</strong><span>EP${String(arc.episodeStart).padStart(2, "0")}–EP${String(arc.episodeEnd).padStart(2, "0")}</span><p>${escapeHtml(arc.objective)}</p><em>${escapeHtml(arc.turningPoint)}</em></article>`).join("")}</div></section>
+      <section class="series-plan-board">
+        <article class="enterprise-panel series-episode-plan"><header><div><span class="section-kicker">Episode Plan</span><h3>计划分集</h3></div><span>${escapeHtml(version.episodePlanItems.length)} 项规划事实</span></header><div class="series-plan-table" role="table" aria-label="计划分集"><div class="series-plan-table-head" role="row"><span>集次</span><span>标题与 Logline</span><span>叙事弧</span><span>连续性 / 伏笔</span></div>${version.episodePlanItems.map((item) => `<div class="series-plan-table-row" role="row" data-episode-plan-item-ref="${escapeHtml(item.episodePlanItemRef)}"><span>E${String(item.episodeNumber).padStart(2, "0")}</span><span><strong>${escapeHtml(item.title)}</strong><small>${escapeHtml(item.logline)}</small></span><span>ARC ${escapeHtml(item.arcNumber)}<small>${escapeHtml(item.narrativePurpose)}</small></span><span><small>${escapeHtml((item.continuityNotes || []).join(" · ") || "—")}</small><small>${escapeHtml((item.foreshadowing || []).join(" · ") || "—")}</small></span></div>`).join("")}</div></article>
+        <aside class="series-plan-aside"><article class="enterprise-panel"><span class="section-kicker">角色成长意图</span>${version.characterArcIntents.map((item) => `<section><strong>${escapeHtml(item.roleLabel)}</strong><p>${escapeHtml(item.startingState)} → ${escapeHtml(item.destination)}</p><small>${escapeHtml(item.developmentIntent)}</small></section>`).join("")}</article><article class="enterprise-panel"><span class="section-kicker">世界与连续性</span><p>${escapeHtml(version.worldIntent)}</p><ul>${(version.continuityIntent || []).map((item) => `<li>${escapeHtml(item)}</li>`).join("")}</ul><ul>${(version.foreshadowingContext || []).map((item) => `<li>${escapeHtml(item)}</li>`).join("")}</ul></article></aside>
+      </section>
+      <section class="series-version-layout">
+        <article class="enterprise-panel series-version-history"><header><div><span class="section-kicker">Version History</span><h3>不可变版本</h3></div></header>${workspace.versions.map((item) => `<button type="button" data-action="select-series-plan-version" data-version-ref="${escapeHtml(item.seriesPlanVersionRef)}" class="${item.seriesPlanVersionRef === version.seriesPlanVersionRef ? "is-selected" : ""}"><span>v${escapeHtml(item.versionNumber)}</span><strong>${item.changeKind === "ai-candidate-confirmed" ? "AI 候选确认" : "人工修订"}</strong><small>${item.seriesPlanVersionRef === plan.confirmedSeriesPlanVersionRef ? "已确认" : "历史版本"}</small></button>`).join("")}</article>
+        <article class="enterprise-panel series-revision-panel"><header><div><span class="section-kicker">版本操作</span><h3>${confirmed ? "建立人工修订" : "确认当前版本"}</h3></div></header>${confirmed ? `<form id="series-plan-revision-form"><label>故事前提<textarea name="premise" required maxlength="1200">${escapeHtml(version.premise)}</textarea></label><button class="button button-secondary" type="submit" ${state.seriesPlanningPhase !== "idle" ? "disabled" : ""}>保存为新版本</button><p>新版本不会覆盖历史版本，保存后仍需人工确认。</p></form>` : `<p>${escapeHtml(version.premise)}</p><button class="button button-primary" type="button" data-action="confirm-series-plan-version" ${state.seriesPlanningPhase !== "idle" ? "disabled" : ""}>确认当前规划版本</button>`}${state.seriesPlanningError ? `<p class="form-error" role="alert">${escapeHtml(state.seriesPlanningError)}</p>` : ""}</article>
+      </section>`;
+  }
+
   const enterprisePageCopy = Object.freeze({
     "project-overview": ["项目概览", "项目级创意、内容、制作与交付状态的总览。", "项目", "summary"],
     "project-director": ["项目 AI导演", "在正式项目上下文内查看导演方案与人工确认关系。", "策划", "detail"],
@@ -1644,6 +1800,9 @@
     if (route.type === "script-studio") {
       const scriptVersion = selectedScriptVersion();
       version = scriptVersion ? `v${scriptVersion.versionNumber}` : "待生成";
+    } else if (["project-director", "series-planning"].includes(route.type)) {
+      const planVersion = selectedSeriesPlanVersion();
+      version = planVersion ? `规划 v${planVersion.versionNumber}` : "待规划";
     } else if (route.type === "episode-project" && episode && episode.sourcePlanVersion) {
       version = `来源方案 v${episode.sourcePlanVersion}`;
     }
@@ -2018,6 +2177,13 @@
       detail = version
         ? `<section class="inspector-section"><span class="inspector-label">剧本版本</span><strong>v${escapeHtml(version.versionNumber)} · ${escapeHtml(scriptChangeLabel(version.changeKind))}</strong><p>${escapeHtml(version.scenes.length)} 场 · ${escapeHtml(version.targetDurationSec)} 秒</p><p>${confirmed ? "已人工确认" : "等待人工确认"}</p></section>`
         : `<section class="inspector-section"><span class="inspector-label">剧本工作室</span><strong>尚未生成剧本</strong><p>输入来自本集已确认导演方案。</p></section>`;
+    } else if (route && ["project-director", "series-planning"].includes(route.type)) {
+      const workspace = state.seriesPlanningWorkspace;
+      const plan = workspace && workspace.plan;
+      const version = selectedSeriesPlanVersion();
+      detail = plan && version
+        ? `<section class="inspector-section"><span class="inspector-label">系列规划</span><strong>v${escapeHtml(version.versionNumber)} · ${plan.confirmedSeriesPlanVersionRef === version.seriesPlanVersionRef ? "已确认" : "等待确认"}</strong><p>${escapeHtml(version.episodePlanItems.length)} 个计划分集 · ${(workspace.context.series.episodes || []).length} 个已创建单集</p><p>计划身份由 V5 管理，页面不会批量创建 Episode。</p></section>`
+        : `<section class="inspector-section"><span class="inspector-label">系列规划</span><strong>尚未建立权威规划</strong><p>请在真实项目上下文中生成候选并完成人工确认。</p></section>`;
     } else if (route && route.type === "assets") {
       detail = `<section class="inspector-section"><span class="inspector-label">权利状态</span>${governanceBadge("HOLD", "hold")}<p>正式使用前需要完成人工确认。</p></section>`;
     } else if (route && route.context === "project-shell") {
@@ -2246,8 +2412,8 @@
       "story-view": () => renderStoryView(resolved),
       "script-studio": () => renderScriptStudio(resolved),
       "project-overview": () => renderEnterpriseShellPage(resolved),
-      "project-director": () => renderEnterpriseShellPage(resolved),
-      "series-planning": () => renderEnterpriseShellPage(resolved),
+      "project-director": () => renderProjectSeriesDirector(resolved),
+      "series-planning": () => renderSeriesPlanning(resolved),
       "bible-shell": () => renderEnterpriseShellPage(resolved),
       "character-shell": () => renderEnterpriseShellPage(resolved),
       "continuity-shell": () => renderEnterpriseShellPage(resolved),
@@ -2284,6 +2450,12 @@
       const nextScope = scriptScopeKey(scriptScopeFromRoute(resolved));
       if (state.scriptWorkspaceStatus === "idle" || state.scriptWorkspaceScope !== nextScope) {
         loadScriptWorkspace(resolved);
+      }
+    }
+    if (["project-director", "series-planning"].includes(resolved.type)) {
+      const nextScope = seriesPlanningScopeKey(seriesPlanningScopeFromRoute(resolved));
+      if (state.seriesPlanningStatus === "idle" || state.seriesPlanningScope !== nextScope) {
+        loadSeriesPlanningWorkspace(resolved);
       }
     }
   }
@@ -2805,6 +2977,117 @@
     }
   }
 
+  async function generateSeriesPlanCandidate() {
+    const route = state.activeRoute;
+    const scope = seriesPlanningScopeFromRoute(route);
+    if (!scope || state.seriesPlanningPhase === "generating") return;
+    const form = document.getElementById("series-director-form");
+    const value = form ? String(new FormData(form).get("creativeInput") || "").trim() : state.seriesPlanningInput;
+    if (!value) return;
+    state.seriesPlanningInput = value;
+    state.seriesPlanningPhase = "generating";
+    state.seriesPlanningError = null;
+    renderRoute(state.activePath);
+    try {
+      const payload = await requestApplicationJson(seriesPlanningGenerateEndpoint, {
+        method: "POST",
+        body: JSON.stringify({ ...scope, creativeInput: value })
+      });
+      state.seriesPlanningCandidate = payload.candidate;
+      state.seriesPlanningPhase = "candidate";
+      showToast("系列规划候选已生成 · 请完成人工确认");
+    } catch (error) {
+      state.seriesPlanningPhase = "idle";
+      state.seriesPlanningError = error && error.message ? error.message : "系列规划候选暂时无法生成。";
+      showToast(state.seriesPlanningError);
+    }
+    renderRoute(state.activePath);
+  }
+
+  async function confirmSeriesPlanCandidate() {
+    const scope = seriesPlanningScopeFromRoute(state.activeRoute);
+    if (!scope || !state.seriesPlanningCandidate || state.seriesPlanningPhase === "confirming") return;
+    state.seriesPlanningPhase = "confirming";
+    state.seriesPlanningError = null;
+    renderRoute(state.activePath);
+    try {
+      await requestApplicationJson(seriesPlanningConfirmEndpoint, {
+        method: "POST",
+        body: JSON.stringify({ ...scope, humanConfirmed: true, candidate: state.seriesPlanningCandidate })
+      });
+      state.seriesPlanningCandidate = null;
+      state.seriesPlanningPhase = "idle";
+      await loadSeriesPlanningWorkspace(state.activeRoute, { force: true });
+      showToast("系列规划 v1 已人工确认");
+      navigate(`${state.activeRoute.projectBase}/planning/series`);
+    } catch (error) {
+      state.seriesPlanningPhase = "candidate";
+      state.seriesPlanningError = error && error.message ? error.message : "系列规划暂时无法确认。";
+      renderRoute(state.activePath);
+    }
+  }
+
+  async function createManualSeriesPlanVersion(form) {
+    const scope = seriesPlanningScopeFromRoute(state.activeRoute);
+    const workspace = state.seriesPlanningWorkspace;
+    const version = selectedSeriesPlanVersion();
+    if (!scope || !workspace || !workspace.plan || !version || state.seriesPlanningPhase !== "idle") return;
+    const premise = String(new FormData(form).get("premise") || "").trim();
+    if (!premise) return;
+    const contentValue = seriesPlanVersionContent(version);
+    contentValue.premise = premise;
+    state.seriesPlanningPhase = "saving";
+    state.seriesPlanningError = null;
+    renderRoute(state.activePath);
+    try {
+      const payload = await requestApplicationJson(seriesPlanningManualVersionEndpoint, {
+        method: "POST",
+        body: JSON.stringify({
+          ...scope,
+          seriesPlanRef: workspace.plan.seriesPlanRef,
+          expectedPlanVersion: workspace.plan.version,
+          content: contentValue
+        })
+      });
+      state.seriesPlanningPhase = "idle";
+      state.selectedSeriesPlanVersionRef = payload.version.seriesPlanVersionRef;
+      await loadSeriesPlanningWorkspace(state.activeRoute, { force: true });
+      showToast(`系列规划 v${payload.version.versionNumber} 已保存 · 等待人工确认`);
+    } catch (error) {
+      state.seriesPlanningPhase = "idle";
+      state.seriesPlanningError = error && error.message ? error.message : "系列规划版本暂时无法保存。";
+      renderRoute(state.activePath);
+    }
+  }
+
+  async function confirmCurrentSeriesPlanVersion() {
+    const workspace = state.seriesPlanningWorkspace;
+    const version = selectedSeriesPlanVersion();
+    if (!workspace || !workspace.plan || !version || state.seriesPlanningPhase !== "idle") return;
+    state.seriesPlanningPhase = "confirming";
+    state.seriesPlanningError = null;
+    renderRoute(state.activePath);
+    try {
+      await requestApplicationJson(seriesPlanningConfirmVersionEndpoint, {
+        method: "POST",
+        body: JSON.stringify({
+          workspaceRef,
+          seriesPlanRef: workspace.plan.seriesPlanRef,
+          seriesPlanVersionRef: version.seriesPlanVersionRef,
+          expectedPlanVersion: workspace.plan.version,
+          humanConfirmed: true
+        })
+      });
+      state.seriesPlanningPhase = "idle";
+      await loadSeriesPlanningWorkspace(state.activeRoute, { force: true });
+      showToast(`系列规划 v${version.versionNumber} 已人工确认`);
+    } catch (error) {
+      state.seriesPlanningPhase = "idle";
+      state.seriesPlanningError = error && error.message ? error.message : "当前规划版本暂时无法确认。";
+      renderRoute(state.activePath);
+    }
+  }
+
   function resetFixture() {
     state.assetTab = "basic";
     state.assetFilter = "all";
@@ -2904,6 +3187,14 @@
     }
     if (action === "generate-script") generateScript();
     if (action === "confirm-script-version") confirmScriptVersion();
+    if (action === "regenerate-series-plan") generateSeriesPlanCandidate();
+    if (action === "confirm-series-plan") confirmSeriesPlanCandidate();
+    if (action === "confirm-series-plan-version") confirmCurrentSeriesPlanVersion();
+    if (action === "select-series-plan-version") {
+      state.selectedSeriesPlanVersionRef = button.dataset.versionRef;
+      state.seriesPlanningError = null;
+      rerenderAndRestoreFocus(`[data-action="select-series-plan-version"][data-version-ref="${state.selectedSeriesPlanVersionRef}"]`);
+    }
     if (action === "select-script-version") {
       state.selectedScriptVersionRef = button.dataset.versionRef;
       const version = selectedScriptVersion();
@@ -2977,6 +3268,14 @@
     if (event.target.id === "script-rewrite-form") {
       event.preventDefault();
       rewriteScriptScene(event.target);
+    }
+    if (event.target.id === "series-director-form") {
+      event.preventDefault();
+      generateSeriesPlanCandidate();
+    }
+    if (event.target.id === "series-plan-revision-form") {
+      event.preventDefault();
+      createManualSeriesPlanVersion(event.target);
     }
   });
 
