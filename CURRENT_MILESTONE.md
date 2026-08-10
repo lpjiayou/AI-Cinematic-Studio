@@ -1,736 +1,609 @@
-# AI Cinematic Studio — Current Execution Wave
+# AI Cinematic Studio — Current Execution State
 
-> Document: `CURRENT_MILESTONE.md`
+> Document: CURRENT_MILESTONE.md
 >
-> Status: `EXECUTION WAVE ACTIVE`
+> Execution Mode: MANUAL
 >
-> Execution Wave: `Wave 1`
+> Current Task: UI-R2 — Professional Workspace Layout Optimization
 >
-> Scope: `M4 → M5`
+> Task Type: CROSS-CUTTING UI BASELINE OPTIMIZATION
 >
-> Execution Mode: `AUTO-SEQUENTIAL`
->
-> Project Lead Authorization:
-> `M4 → M5 AUTO-PROGRESSION AUTHORIZED`
->
-> M6 Authorization:
-> `NOT AUTHORIZED`
+> M6 Authorization: NOT AUTHORIZED
 
 ---
 
-# 0. Canonical Execution Baseline
-
-## Canonical Workspace Promotion
-
-Status:
-
-`PASS`
+# 0. Canonical Baseline
 
 Canonical Workspace:
 
-`D:\Codex使用\AI CINEMATIC STUDIO`
+D:\Codex使用\AI CINEMATIC STUDIO
 
-Promotion / Control-Baseline SHA:
+Accepted Base:
 
-`59946b6bb67f30a7f978b447850cbd83e8e1d1a6`
+8c3e4271662e1e02e963618ade3c29d6e9f91e89
 
-Promotion Remote Verification:
+Accepted Milestones:
 
-`LOCAL SHA == REMOTE SHA — PASS`
+M1 — AI Director Core — ACCEPTED
 
-Canonical Runtime:
+M2 — Series + Episode Foundation — ACCEPTED
 
-`http://127.0.0.1:8765/`
+M3 — Script Studio — ACCEPTED
 
-Canonical Workspace Rule:
+M3-H — Script Candidate Robustness — ACCEPTED
 
-Normal serial development for M4–M19 must use:
+Story Projection — ACCEPTED
 
-`D:\Codex使用\AI CINEMATIC STUDIO`
+UI-R1 — Enterprise Cinematic UI — ACCEPTED
 
-Do not create a new normal milestone worktree for M4 or M5.
+M4 — Project Context Foundation — ACCEPTED
 
-Temporary worktrees are allowed only for:
+M5 — Series Planning + Series Director — ACCEPTED
 
-- emergency hotfix;
-- true parallel development;
-- high-risk isolated experiment.
+M6 — Series IP Bible + Character Intelligence — NOT STARTED
 
 ---
 
-# 1. Wave Authorization Checkpoint
+# 1. Current Task
 
-This file is the Project Lead approved execution authorization
-for Wave 1.
-
-Before any M4 implementation begins, Codex must ensure that the
-approved current versions of:
-
-- `AI_CINEMATIC_STUDIO_SYSTEM_MASTER_PLAN.md`
-- `AI_CINEMATIC_STUDIO_UI_MASTER_PLAN.md`
-- `AGENTS.md`
-- `CURRENT_MILESTONE.md`
-
-are tracked in Git and remotely verified.
-
-If replacing this file created a Git working-tree modification,
-Codex is authorized to create ONE docs-only authorization checkpoint
-before M4 implementation.
-
-Allowed commit message:
-
-`docs(project): authorize execution wave m4 m5`
-
-This checkpoint may contain ONLY approved project-control-document
-changes.
-
-After the checkpoint:
-
-- push GitHub;
-- fetch remote;
-- verify local SHA == remote SHA;
-- verify Git status CLEAN.
-
-The resulting Remote-Verified HEAD becomes:
-
-`WAVE_1_BASE_SHA`
-
-and therefore:
-
-`M4_BASE_SHA`
-
-Do not begin M4 from a dirty working tree.
-
-If no control-document change exists because the approved version is
-already tracked and Remote Verified:
-
-`WAVE_1_BASE_SHA = current Remote-Verified Canonical HEAD`
-
-Record the exact SHA before implementation.
-
----
-
-# 2. Mandatory Startup Read Order
-
-Before implementation Codex MUST read, in this order:
-
-1. `AI_CINEMATIC_STUDIO_SYSTEM_MASTER_PLAN.md`
-2. `AI_CINEMATIC_STUDIO_UI_MASTER_PLAN.md`
-3. `AGENTS.md`
-4. `CURRENT_MILESTONE.md`
-
-Then inspect:
-
-- canonical workspace;
-- current branch;
-- HEAD;
-- Git status;
-- remote tracking state;
-- accepted baseline;
-- Creator runtime identity;
-- existing V5 Project-related code and public boundaries.
-
-If any Source-of-Truth conflict exists:
-
-`STOP`
-
-Do not infer which source should win.
-
----
-
-# 3. Accepted Historical Capabilities
-
-The following are already accepted.
-
-They MUST NOT be rebuilt.
-
-## M1 — AI Director Core
+UI-R2 — Professional Workspace Layout Optimization
 
 Status:
 
-`FEATURE ACCEPTED`
+CURRENT
 
-## M2 — Series + Episode Foundation
+Purpose:
 
-Status:
+Optimize workspace space allocation across the existing Enterprise Creator UI
+before M6 begins.
 
-`FEATURE ACCEPTED`
+UI-R2 is NOT a new Domain milestone.
 
-## M3 — Script Studio
+UI-R2 must not change:
 
-Status:
-
-`FEATURE ACCEPTED`
-
-## M3-H — Script Candidate Robustness
-
-Status:
-
-`FEATURE ACCEPTED`
-
-## Story Projection Integration
-
-Status:
-
-`ACCEPTED`
-
-## UI-R1 — Enterprise Cinematic UI Rebaseline
-
-Status:
-
-`FEATURE ACCEPTED`
-
-Accepted UI-R1 Code SHA:
-
-`c9536fc0c745d0bf9e9c3eb543f4ab6c0566798a`
-
-Canonical control baseline after promotion:
-
-`59946b6bb67f30a7f978b447850cbd83e8e1d1a6`
-
-Existing real production chain:
-
-AI Director
-→ Confirmed CreativePlan
-→ Series
-→ Episode
-→ Story Projection
-→ Script Studio
-→ ScriptVersion
-
-M4 and M5 must extend this chain.
-
-They must not replace it.
+- V2.3 architecture;
+- Production Spine;
+- Domain ownership;
+- Project / Series / Episode contracts;
+- M4 Project model;
+- M5 Series Planning model;
+- Provider architecture;
+- persistence authority;
+- Global information architecture;
+- Enterprise Dark Cinematic visual baseline.
 
 ---
 
-# 4. Execution Wave 1
+# 2. Core Objective
 
-Authorized sequence:
+Prioritize the real production workspace over permanent navigation chrome.
 
-M4 — Project Context Foundation
-↓
-M4 Technical Checkpoint
-↓
-M5 — Series Planning + Series Director
-↓
-Wave Stop
-↓
-Project Lead Review
+Space priority:
 
-M6 is outside this execution wave.
+Production Content
+>
+Object Navigator
+>
+Inspector
+>
+Project Navigator
+>
+Global Navigator
 
-Codex MUST NOT enter M6.
+The user must receive maximum usable working space for:
 
----
-
-# 5. M4 — Project Context Foundation
-
-Status:
-
-`CURRENT`
-
-Base:
-
-`M4_BASE_SHA = WAVE_1_BASE_SHA`
-
-Preferred Branch:
-
-`codex/creator-capability-phase4-project-context`
-
-Workspace:
-
-`D:\Codex使用\AI CINEMATIC STUDIO`
-
-Do not create:
-
-`AI CINEMATIC STUDIO-m4`
-
-unless a genuine isolation Stop Condition requires it.
+- Script;
+- IP Bible;
+- Character;
+- Storyboard;
+- Shot;
+- Timeline.
 
 ---
 
-# 6. M4 Purpose
+# 3. Layout Modes
 
-M4 establishes Project as the authoritative production root.
+UI-R2 establishes five reusable workspace modes.
 
-Target hierarchy:
+## L1 — Management
 
-Workspace
-→ Content Profile
-→ Project
-→ Series
-→ Episode
-→ Story
-→ Script
-
-M4 does NOT rebuild:
-
-- AI Director;
-- Series;
-- Episode;
-- Story Projection;
-- Script Studio.
-
-M4 adds the missing Project production context above the accepted
-Series / Episode chain.
-
----
-
-# 7. M4 Product Semantics
-
-Project answers:
-
-`What production are we making?`
-
-Series answers:
-
-`What series narrative / production context does it belong to?`
-
-Episode answers:
-
-`What concrete production unit are we producing?`
-
-For Series projects:
-
-Workspace
-→ Content Profile
-→ Project
-→ Series
-→ Episode
-
-Rules:
-
-- Project != Series
-- Project != Episode
-- Series != Episode
-- Episode != Canonical Project
-- `episodeRef != projectRef`
-- Browser must not fabricate `projectRef`
-
-M4 must not create ambiguous identity shortcuts.
-
----
-
-# 8. M4 Existing Project-Domain Convergence Gate
-
-Before creating any new Project implementation:
-
-inspect all existing V5 Project-related code, contracts, repositories,
-adapters and services.
-
-Goal:
-
-reuse / extend / converge on ONE authoritative V5 Project boundary.
-
-Do not create:
-
-- a second Project Domain;
-- a Creator-owned Project authority;
-- a Browser-only Project;
-- a second persistence truth.
-
-If an existing Project concept has incompatible semantics
-and authoritative ownership cannot be resolved safely:
-
-`STOP`
-
-Report the exact architecture conflict.
-
-Do not silently create another Project model.
-
----
-
-# 9. M4 Content Profile Scope
-
-M4 does NOT implement a complete Content Profile Intelligence system.
-
-Where accepted existing flows already provide a stable:
-
-`contentProfileRef`
-
-M4 may consume and preserve it as Project context.
-
-Target relationship:
-
-workspaceRef
-→ contentProfileRef
-→ projectRef
-
-Do not overbuild Content Profile during M4.
-
----
-
-# 10. M4 Core Domain Scope
-
-M4 establishes at minimum:
-
-- authoritative V5 Project boundary;
-- stable `projectRef`;
-- Project type;
-- minimal Project lifecycle foundation;
-- workspace relationship;
-- Content Profile reference relationship;
-- Project → Series relationship;
-- Series → Episode context resolution;
-- Project create command;
-- Project read/query contract;
-- Project list/query;
-- Project context projection;
-- existing Series/Episode compatibility strategy;
-- Project-aware Story navigation;
-- Project-aware Script navigation.
-
-All authoritative writes go through accepted V5 public boundaries.
-
----
-
-# 11. M4 Existing Identity Preservation
-
-M4 must preserve existing accepted identities and facts:
-
-- `seriesRef`
-- `episodeRef`
-- `ConfirmedCreativePlanBinding`
-- `sourcePlanRef`
-- `sourcePlanVersion`
-- Story lineage
-- `scriptRef`
-- `scriptVersionRef`
-- `confirmedScriptVersionRef`
-
-Existing accepted facts must not be rewritten merely because
-Project Context is introduced.
-
-No name-based authority.
-
-No copied-text authority.
-
-No copied-JSON authority.
-
----
-
-# 12. M4 Existing Data Compatibility
-
-Existing accepted Series / Episode data must not be discarded.
-
-If an existing Series requires attachment to a Project:
-
-use an explicit deterministic compatibility strategy.
-
-Requirements:
-
-- preserve `seriesRef`;
-- preserve `episodeRef`;
-- preserve CreativePlan lineage;
-- preserve Script lineage;
-- no Browser-generated IDs;
-- no name-based matching as authoritative identity;
-- no silent destructive migration;
-- no orphan Series;
-- no orphan Episode.
-
-If destructive migration semantics are ambiguous:
-
-`STOP`
-
-Do not proceed to M5.
-
----
-
-# 13. M4 Input Contract
-
-M4 must explicitly define the accepted Project input boundaries.
-
-At minimum:
-
-Project Create Input
-
-Project Query Input
-
-Project → Series association input
-
-Episode Project Context resolution input
-
-Relevant upstream references may include:
-
-- `workspaceRef`
-- `contentProfileRef`
-- existing `seriesRef`
-- existing `episodeRef`
-
-depending on the operation.
-
-UI input is not authoritative until accepted by the Application/V5
-boundary.
-
----
-
-# 14. M4 Output Contract
-
-M4 must produce stable Project-context outputs.
-
-Required core lineage:
-
-workspaceRef
-→ contentProfileRef
-→ projectRef
-→ seriesRef
-→ episodeRef
-
-Existing production lineage must continue:
-
-projectRef
-→ seriesRef
-→ episodeRef
-→ sourcePlanRef
-→ Story Projection
-→ scriptRef
-→ scriptVersionRef
-
-Downstream M5 must consume real:
-
-`projectRef`
+Global Sidebar 240px
 +
-`seriesRef`
+Main Workspace
 
-not copied Project names.
+Used by:
+
+- 首页
+- 项目
+- 资产库
+- 作品
+
+Inspector appears only when required.
 
 ---
 
-# 15. M4 Project Creation Flow
+## L2 — Project Reading / Management
 
-The accepted UI-R1 New Project Wizard becomes functional.
+Global Sidebar 72px
++
+Project Navigator about 220px
++
+Main Workspace
++
+Optional Inspector about 300px
 
-For a Series Project:
+Used by:
 
-User Input
-↓
-Application Command
-↓
-V5 Project
-↓
-projectRef
-↓
-Series association / creation through accepted V5 boundary
-↓
-Project Workspace
+- 项目概览
+- 系列规划
+- 分集
+- 故事
 
-Do not auto-create all planned Episodes.
+---
+
+## L3 — Professional Editor
+
+Global Sidebar 72px
++
+Object Navigator about 200–220px
++
+Main Editor
++
+Inspector about 320px
++
+Optional Bottom Drawer
+
+Used by:
+
+- Script Studio
+- IP Bible
+- Character Intelligence
+
+Project Navigator becomes collapsible / drawer-based.
+
+---
+
+## L4 — Visual Canvas
+
+Global Sidebar 72px
++
+Object Navigator about 180–220px
++
+Canvas
++
+Inspector about 320px
+
+Used by:
+
+- Storyboard
+- Shot
+- Scene
+
+Project Navigator must not permanently consume another column.
+
+---
+
+## L5 — Timeline
+
+Global Sidebar 72px
++
+Media / Track Navigator about 200px
++
+Preview + Timeline Workspace
++
+Inspector about 300px
+
+Timeline receives the highest horizontal workspace priority.
+
+---
+
+# 4. AI Director Layout
+
+Move the permanent left-side Creative Input form
+into a top Creative Parameter area.
+
+Default state:
+
+compact parameter summary.
+
+Display:
+
+- 主题
+- 类型
+- 目标用户
+- 时长
+- 发布平台
+- 视觉风格
+- 角色设定
+
+Actions:
+
+- 编辑参数
+- 重新生成
+
+Expanded state:
+
+2–3 column parameter grid.
+
+The Director Result Workspace must receive the released horizontal space.
+
+Do not change AI Director Domain behavior.
+
+Do not change M1 Provider flow.
+
+---
+
+# 5. Global Sidebar Behavior
+
+Global management pages:
+
+default width about 240px.
+
+Inside Project Workspace / Professional Editor:
+
+default collapsed width about 72px.
+
+User may expand/collapse manually.
+
+Collapse is presentation state only.
+
+It must not become a Domain fact.
+
+No empty-width fake collapse is allowed.
+
+---
+
+# 6. Project Navigator
+
+Project Navigator target width:
+
+about 220px.
+
+Use collapsible groups:
+
+概览
+
+策划
+- AI导演
+- 系列规划
+- IP圣经
+- 角色
+- 世界与连续性
+
+内容
+- 分集
+- 故事
+- 剧本
+- 一致性
+
+制作
+- 分镜
+- 镜头
+- 场景
+- 项目资产
+- 生成任务
+
+后期
+- 时间线
+- 预览
+- 质检
+- 审批
+
+交付
+- Master
+- 导出
+- 系列管理
+- 发布
+- 数据
+
+Current group may remain expanded.
+
+Other groups may collapse.
+
+Avoid one permanently long scrolling menu.
+
+“分集工作台” must not become a duplicate permanent navigation concept.
+
+Episode Workspace may remain as the Episode overview route.
+
+Maintain route compatibility.
+
+---
+
+# 7. Compact Context Bar
+
+Replace the current database-like multi-cell context header
+with a compact production context bar.
+
+Target height:
+
+about 48–52px.
 
 Example:
 
-plannedEpisodeCount = 100
+晚灯系列制作 › 晚灯 › 第1集 › 剧本
 
-means:
+v3 · 已确认
 
-planning intent
+Detailed Refs / Lineage belong in Inspector.
 
-not:
+Context Bar must still use real:
 
-100 Episode records.
+- projectRef
+- seriesRef
+- episodeRef
+- object/version context
 
-M4 must not create:
-
-- 100 Episodes;
-- 100 Scripts;
-- 100 jobs;
-- Batch orchestration.
+internally.
 
 ---
 
-# 16. M4 UI Activation
+# 8. Inspector Rules
 
-Use the already accepted Enterprise UI-R1 shell.
+Inspector must be collapsible.
 
-Do NOT redesign:
+Management pages:
 
-- Global Navigation;
-- Project Workspace IA;
-- visual language;
-- Editor Shell;
-- Inspector pattern;
-- Workflow Action Bar.
+hidden by default unless an object is selected.
 
-Activate real UI capability for:
+Reading pages:
 
-Global:
-- 项目
-- 新建项目
+optional.
 
-Project Workspace:
-- 项目概览
-- Project Context Bar
+Professional Editors:
 
-Existing accepted:
-- AI导演
-- Series / Episode
-- 故事
-- 剧本
+visible when space allows.
 
-must remain real.
+At smaller widths:
+
+collapsed by default.
+
+Suggested widths:
+
+300–320px.
+
+Inspector must not leave a large empty permanent column
+when it contains little information.
 
 ---
 
-# 17. M4 Context Bar Gate
+# 9. Story Layout
 
-Inside a real Project the Enterprise UI must display real context:
+Story becomes a reading-first workspace.
 
-项目
-→ Project
+Main Story Canvas receives priority.
 
-系列
-→ Series
+Inspector contains:
 
-单集
-→ Episode
-
-阶段
-→ current production stage
-
-当前对象
-→ current production object
-
-版本
-→ applicable real version
-
-The Context Bar must use real Refs internally.
-
-No fake Project.
-
-No browser-generated Project.
-
----
-
-# 18. M4 Production Spine Gate
-
-A real browser flow must prove:
-
-Create Project
-→ Series
-→ Episode
-→ Story
-→ Script
-
-and preserve:
-
-projectRef
-→ seriesRef
-→ episodeRef
-→ sourcePlanRef
-→ scriptRef
-→ scriptVersionRef
-
-Fixtures may support tests.
-
-Fixtures alone are NOT sufficient for the final M4 integration gate.
-
----
-
-# 19. M4 Persistence / Atomicity Gate
-
-M4 must survive:
-
-- Browser refresh;
-- Creator Server restart;
-- Project query roundtrip;
-- Project → Series relationship;
-- Series → Episode relationship;
-- Story lineage;
-- Script lineage.
-
-Where an operation writes multiple authoritative facts,
-transaction / rollback semantics must be explicit.
-
-Failed Project/Series association must not create partial orphan state.
-
----
-
-# 20. M4 Lifecycle / Deletion Safety
-
-Project lifecycle behavior must respect existing production lineage.
-
-Do not allow ordinary deletion to destroy downstream protected facts.
-
-If Project contains protected:
-
-- Episode;
-- ScriptVersion;
-- Asset;
-- future Master;
-
-follow accepted lifecycle protection.
-
-Do not create orphan production facts.
-
----
-
-# 21. M4 Regression Gate
-
-M4 must preserve accepted behavior for:
-
-## M1
-
-- AI Director
-- DeepSeek path
-- candidate validation
-- Human Confirmation
-
-## M2
-
-- Series
+- 来源
+- 版本
 - Episode
-- parent-child identity
-- ConfirmedCreativePlanBinding
-- persistence
+- CreativePlan
+- Lineage
 
-## Story
+Story remains the existing accepted Story Projection.
 
-- real Story Projection
-- same Episode lineage
-- Provider calls = 0
+Provider calls remain 0.
 
-## M3
-
-- Script Generate
-- controlled repair
-- ScriptVersion
-- manual edit
-- scene rewrite
-- confirmation
-- version history
-- persistence
-- deletion protection
-
-No accepted capability may be downgraded to a placeholder.
+No new Story authority.
 
 ---
 
-# 22. M4 Browser / Runtime Gate
+# 10. Script Studio Layout
 
-Final M4 Browser Gate must use:
+Script Studio becomes a real Professional Editor layout.
 
-Creator HTTP Runtime
+Global Sidebar:
+72px
 
-Expected:
+Scene Navigator:
+about 220px
 
-`http://127.0.0.1:8765/`
+Script Editor:
+flex
 
-Runtime must report:
+Inspector:
+about 320px
 
-- Runtime Workspace
-- Runtime Branch
-- Runtime HEAD
-- Static Root
+Bottom Drawer:
+AI / Version / Jobs / Activity
 
-Browser method may use:
+Project Navigator must not permanently occupy an additional full column.
 
-- normal Chrome control;
-- Chrome Headless + DevTools CDP.
+Preserve all real M3 behaviors:
 
-Do NOT use `file://` as final evidence.
+- Generate
+- Validate
+- Controlled Repair
+- Manual Edit
+- Scene Rewrite
+- Immutable Versions
+- Confirmation
+- Persistence
 
-Where applicable:
+---
+
+# 11. Storyboard / Shot / Scene Reservation
+
+Storyboard and Shot must already receive their long-term canvas layout.
+
+Storyboard:
+
+Scene / Shot Navigator
++
+Storyboard Canvas
++
+Inspector
+
+Shot:
+
+Shot Navigator
++
+Preview / Canvas
++
+Inspector
+
+Scene:
+
+Scene Navigator
++
+Scene Workspace
++
+Inspector
+
+Do not implement M8 Domain.
+
+Only optimize the existing shell layout.
+
+---
+
+# 12. Timeline Reservation
+
+Timeline must receive maximum horizontal priority.
+
+Project Navigator should not remain permanently visible
+inside Timeline editing mode.
+
+Layout:
+
+Media / Track Navigator
++
+Preview Monitor
++
+Timeline
++
+Inspector
+
+Reserve tracks for future:
+
+- Video
+- Dialogue
+- Ambience
+- BGM
+- SFX
+- Subtitle
+
+Do not implement M13 Render capability.
+
+---
+
+# 13. Creation Center Responsive Fix
+
+Fix the current card layout where Chinese text is compressed
+into near-vertical character wrapping.
+
+Recommended responsive behavior:
+
+large desktop:
+3 columns when card width remains usable
+
+medium desktop:
+2 columns
+
+narrow desktop:
+1 column
+
+Use a minimum useful card width.
+
+Do not force 3 columns when content becomes unreadable.
+
+Ensure normal Chinese text flow.
+
+---
+
+# 14. Pages To Preserve
+
+The following current management layouts are generally accepted
+and should not be unnecessarily redesigned:
+
+- 首页
+- 项目列表
+- 全局资产库
+- 作品
+
+Only shared shell/responsive corrections are allowed.
+
+---
+
+# 15. UI Architecture Hard Rule
+
+UI-R2 must reuse:
+
+- current Enterprise Dark Cinematic visual baseline;
+- current Global Navigation;
+- current Project IA;
+- current routes where possible;
+- one Creator UI;
+- current Creator HTTP Runtime.
+
+Do not create another frontend.
+
+Do not perform framework migration.
+
+Do not create a second static UI.
+
+---
+
+# 16. Responsive Gate
+
+Verify at minimum:
+
+1920×1080
+
+1600×900
+
+1366×768
+
+1280×800
+
+1024 width
+
+Requirements:
+
+- no horizontal overflow;
+- no broken text wrapping;
+- no unusably narrow main editor;
+- navigator and inspector collapse correctly;
+- current object remains visible;
+- primary actions remain reachable.
+
+---
+
+# 17. Real Capability Regression
+
+Must preserve real:
+
+M1 AI Director
+
+M2 Series / Episode
+
+M3 Script Studio
+
+Story Projection
+
+M4 Project Context
+
+M5 Series Planning / Series Director
+
+No accepted capability may become a shell or placeholder.
+
+---
+
+# 18. Browser Gate
+
+Use real:
+
+http://127.0.0.1:8765/
+
+Accepted browser methods:
+
+Chrome
+or
+Chrome Headless + DevTools CDP
+
+Do not use file:// as final evidence.
+
+Verify:
 
 Console errors = 0
 
@@ -742,63 +615,76 @@ Horizontal overflow = 0
 
 ---
 
-# 23. M4 Required Gates
+# 19. Key Visual Evidence
 
-ALL must PASS before M5 may start:
+Provide HTTP Runtime evidence for:
 
-IMPLEMENTATION
+1. AI Director compact parameter mode
+2. AI Director expanded parameter mode
+3. Project Overview
+4. Story
+5. Script Studio
+6. Series Planning
+7. Storyboard shell
+8. Shot shell
+9. Timeline shell
+10. Creation Center
+11. Asset Library
+12. Works
 
-UPSTREAM CONNECTION
+---
 
-INPUT CONTRACT
+# 20. Required Gates
 
-OUTPUT CONTRACT
+UI LAYOUT IMPLEMENTATION PASS
 
-DOWNSTREAM CONNECTION
+AI DIRECTOR SPACE OPTIMIZATION PASS
 
-REF / VERSION LINEAGE
+GLOBAL SIDEBAR PASS
 
-PRODUCTION SPINE
+PROJECT NAVIGATOR PASS
 
-INTEGRATION
+CONTEXT BAR PASS
 
-V5 OWNERSHIP
+INSPECTOR PASS
 
-PROJECT DOMAIN CONVERGENCE
+STORY PASS
 
-PROJECT IDENTITY
+SCRIPT EDITOR PASS
 
-CONTENT PROFILE RELATIONSHIP
+STORYBOARD RESERVATION PASS
 
-PERSISTENCE
+SHOT RESERVATION PASS
 
-ATOMICITY / ROLLBACK
+TIMELINE RESERVATION PASS
 
-MIGRATION / COMPATIBILITY
+CREATION CENTER RESPONSIVE PASS
 
-LIFECYCLE / DELETION SAFETY
+M1 REGRESSION PASS
 
-M1 REGRESSION
+M2 REGRESSION PASS
 
-M2 REGRESSION
+M3 REGRESSION PASS
 
-STORY REGRESSION
+STORY REGRESSION PASS
 
-M3 REGRESSION
+M4 REGRESSION PASS
 
-BROWSER / LIVE
+M5 REGRESSION PASS
 
-RESPONSIVE
+BROWSER PASS
 
-ARCHITECTURE
+RESPONSIVE PASS
 
-SECRET SCAN
+ARCHITECTURE PASS
 
-git diff --check
+SECRET SCAN PASS
 
-GIT COMMIT
+git diff --check PASS
 
-GITHUB PUSH
+GIT COMMIT PASS
+
+GITHUB PUSH PASS
 
 REMOTE SHA == LOCAL SHA
 
@@ -806,888 +692,111 @@ GIT STATUS CLEAN
 
 ---
 
-# 24. M4 Git Checkpoint
+# 21. Git Checkpoint
 
-M4 must have its own independent Git checkpoint.
+Suggested branch:
 
-Suggested commit:
+codex/creator-ui-r2-workspace-layout
 
-`feat(creator): establish project production context`
+Suggested implementation commit:
 
-After M4 passes every gate:
+feat(creator): optimize professional workspace layouts
 
-record:
-
-`M4_FINAL_SHA`
-
-Push M4 branch to GitHub.
-
-Fetch remote.
-
-Verify:
-
-`LOCAL SHA == REMOTE SHA`
-
-Verify:
-
-`git status CLEAN`
-
-Do not combine M4 and M5 in one commit.
+UI-R2 must have a Remote-Verified checkpoint.
 
 ---
 
-# 25. Automatic M4 → M5 Transition
+# 22. Stop Rule
 
-Project Lead explicitly pre-authorizes:
+After all UI-R2 gates PASS:
 
-`M4 → M5`
+report:
 
-only if every M4 Required Gate passes.
-
-If all M4 gates PASS:
-
-treat M4 execution state as:
-
-`TECHNICAL GATES PASSED`
-`AUTO-TRANSITION CHECKPOINT COMPLETE`
-
-This does NOT mean:
-
-`FEATURE ACCEPTED`
-
-Final Feature Acceptance remains Project Lead authority.
-
-Then treat:
-
-M5 Status:
-
-`CURRENT`
-
-M5 Base:
-
-`M4_FINAL_SHA`
-
-Continue automatically.
-
-IMPORTANT:
-
-Do NOT modify `CURRENT_MILESTONE.md` merely to record the M4 → M5
-automatic transition.
-
-The transition state is execution state and belongs in:
-
-- Codex runtime execution context;
-- M4 technical checkpoint;
-- final Wave report.
-
-The worktree MUST remain CLEAN at the M4 → M5 boundary.
-
-If ANY M4 gate fails:
-
-`STOP`
-
-Do not enter M5.
-
----
-
-# 26. M5 — Series Planning + Series Director
-
-Initial Status:
-
-`QUEUED / AUTO-NEXT`
-
-Automatic Status after successful M4 transition:
-
-`CURRENT`
-
-Base:
-
-`M5_BASE_SHA = M4_FINAL_SHA`
-
-Preferred Branch:
-
-`codex/creator-capability-phase5-series-planning`
-
-Workspace:
-
-`D:\Codex使用\AI CINEMATIC STUDIO`
-
-After M4:
-
-create / switch to M5 branch from the exact Remote-Verified
-`M4_FINAL_SHA`.
-
-Do not create a separate `-m5` worktree for normal serial development.
-
----
-
-# 27. M5 Purpose
-
-M5 turns a real Project / Series concept into an authoritative,
-versioned Series Production Plan.
-
-Example:
-
-Project:
-穿越大唐
-
-Series:
-穿越大唐
-
-Planned Episodes:
-100
-
-ARC 1
-EP01–20
-求生
-
-ARC 2
-EP21–50
-建立势力
-
-ARC 3
-EP51–80
-权力冲突
-
-ARC 4
-EP81–100
-最终选择
-
-M5 creates planning facts.
-
-M5 does NOT create:
-
-- 100 production Episodes;
-- 100 Scripts;
-- 100 Storyboards;
-- 100 GPU jobs;
-- Batch production.
-
----
-
-# 28. M5 Upstream
-
-Authoritative upstream:
-
-- `workspaceRef`
-- `contentProfileRef`
-- `projectRef`
-- `seriesRef`
-- Project creative context
-- existing AI Director capability where applicable
-
-M5 must consume real M4 Project Context.
-
-No name-based Project lookup as authoritative integration.
-
----
-
-# 29. M5 Series Planning Ownership
-
-Authoritative Series Planning belongs to:
-
-`V5 Core OS`
-
-Creator Application:
-
-orchestrates command / query.
-
-V4:
-
-executes AI generation.
-
-Provider:
-
-generates candidate content.
-
-Browser:
-
-presentation / interaction only.
-
-Do not create a Creator-owned Series Plan authority.
-
----
-
-# 30. M5 Series Planning Identity
-
-Required direction:
-
-projectRef
-→ seriesRef
-→ seriesPlanRef
-→ seriesPlanVersionRef
-
-Episode Plan Items are planning facts.
-
-They must have deterministic/stable identity within the accepted
-Series Plan contract.
-
-They must NOT reuse:
-
-`episodeRef`
-
-unless an actual Episode has been created.
-
-A planned Episode is not the same thing as a production Episode.
-
----
-
-# 31. M5 Minimal Series Plan Contract
-
-Series Plan must support enough structure for real downstream production.
-
-At minimum:
-
-- Series concept;
-- premise / logline;
-- main narrative direction;
-- main arcs;
-- sub-arcs;
-- Character Arc Intent;
-- Episode Plan Items;
-- narrative rhythm;
-- world intent;
-- continuity intent;
-- foreshadowing-compatible planning context;
-- production assumptions.
-
-Do not overbuild a full industrial writers-room platform in M5.
-
-Build the minimum authoritative plan required by M6 and future Episodes.
-
----
-
-# 32. M5 Series Director
-
-AI Director gains Project / Series context mode.
-
-Expected flow:
-
-Project Context
-+
-Series Context
-+
-Creative Input
-↓
-V4 TextGenerationPort
-↓
-Text Provider
-↓
-Series Plan Candidate
-↓
-Local Schema Validation
-↓
-Optional Controlled Repair
-↓
-Human Confirmation
-↓
-SeriesPlanVersion
-
-Provider remains replaceable.
-
-Provider must not own:
-
-- projectRef;
-- seriesRef;
-- seriesPlanRef;
-- seriesPlanVersionRef;
-- Episode identity;
-- Character identity;
-- approval state.
-
----
-
-# 33. M5 Candidate / Repair Rule
-
-Provider output is candidate output.
-
-Pattern:
-
-Generate
-→ Validate
-→ at most controlled repair when required
-→ Validate
-→ Human Confirmation
-
-No infinite retry.
-
-Malformed candidate:
-
-must not become authoritative `SeriesPlanVersion`.
-
-System-owned structural identity must be created locally.
-
----
-
-# 34. M5 Planned Episode vs Created Episode
-
-This distinction is a hard gate.
-
-## Episode Plan Item
-
-Planning fact.
-
-Represents:
-
-what a future Episode should contain.
-
-## Episode
-
-Production Domain Object.
-
-Represents:
-
-an actual production unit.
-
-Therefore:
-
-plannedEpisodeCount = 100
-
-may result in:
-
-100 Episode Plan Items
-
-but must NOT automatically create:
-
-100 Episode records.
-
-UI must visibly distinguish:
-
-`计划分集`
-
-from:
-
-`已创建单集`
-
----
-
-# 35. M5 Series Planning UI Activation
-
-Activate existing accepted UI-R1 areas:
-
-策划
-→ AI导演
-→ 系列规划
-
-Use existing Enterprise Shell.
-
-Do NOT redesign:
-
-- Global Navigation;
-- Project Workspace IA;
-- Inspector architecture;
-- visual baseline.
-
-Expected patterns:
-
-- Arc Navigator;
-- Series Planning Board;
-- Episode Plan Table;
-- Inspector;
-- Version History;
-- Source / Lineage;
-- Workflow Next Action.
-
-Large Series should use:
-
-Dense Table / List
-
-not:
-
-100 giant cards.
-
----
-
-# 36. M5 Versioning
-
-Series Plan uses immutable versions.
-
-Example:
-
-SeriesPlan v1
-→ AI candidate confirmed
-
-SeriesPlan v2
-→ manual revision
-
-SeriesPlan v3
-→ later controlled revision
-
-Historical versions remain immutable.
-
-Current confirmed plan is represented by an explicit
-confirmed/current version reference.
-
-Do not overwrite previous plan versions.
-
----
-
-# 37. M5 Production Spine Gate
-
-Must prove:
-
-Project
-→ Series
-→ SeriesPlanVersion
-→ Episode Plan Item
-
-and for a real created Episode:
-
-Project
-→ Series
-→ SeriesPlanVersion
-→ Episode
-→ Story
-→ Script
-
-M5 must strengthen the accepted production chain.
-
-It must not create a separate planning island.
-
----
-
-# 38. M5 M6 Downstream Bridge
-
-M5 must expose a deterministic downstream input contract
-for:
-
-M6 — Series IP Bible + Character Intelligence.
-
-Target bridge must preserve:
-
-- `projectRef`
-- `seriesRef`
-- `seriesPlanRef`
-- `seriesPlanVersionRef`
-- main arcs
-- Episode plan
-- Character Arc Intent
-- world intent
-- continuity intent
-- foreshadowing-compatible planning context
-
-Deterministic projection Provider calls:
-
-`0`
-
-M6 must not need:
-
-- copied UI text;
-- duplicated random JSON;
-- display-name lookup.
-
-The M6 bridge may be prepared and tested.
-
-M6 implementation must NOT begin.
-
----
-
-# 39. M5 Persistence / Atomicity
-
-Must survive:
-
-- Browser refresh;
-- Creator Server restart;
-- Series Plan version history;
-- confirmed/current SeriesPlan version reference;
-- Project relationship;
-- Series relationship;
-- Episode Plan Items;
-- existing Episode production lineage.
-
-Failed writes must not create partial authoritative state.
-
----
-
-# 40. M5 Regression Gate
-
-M5 must preserve:
-
-## M4
-
-Project Context
-
-Project → Series
-
-Series → Episode
-
-## M1
-
-AI Director
-
-## M2
-
-Series / Episode
-
-## Story
-
-Story Projection
-
-## M3
-
-Script Studio
-
-No accepted real capability may become a placeholder.
-
----
-
-# 41. M5 Browser / Live Gate
-
-Real browser flow must demonstrate:
-
-Project
-→ Series
-→ Series Planning
-→ Series Director Candidate
-→ Validation
-→ Human Confirmation
-→ SeriesPlanVersion
-
-Then prove existing production context remains connected.
-
-If M5 requires real provider generation,
-the mandatory live provider gate must be real.
-
-Do not report a historical provider call as the new M5 Live Gate.
-
-If required Provider credential is unavailable:
-
-`STOP`
-
-Do not fake PASS.
-
----
-
-# 42. M5 Required Gates
-
-ALL must PASS before Wave 1 may complete:
-
-SERIES PLAN DOMAIN
-
-V5 OWNERSHIP
-
-PROJECT / SERIES LINEAGE
-
-SERIES PLAN IDENTITY
-
-AI SERIES DIRECTOR
-
-V4 PROVIDER BOUNDARY
-
-SCHEMA VALIDATION
-
-CONTROLLED FAILURE HANDLING
-
-VERSIONING
-
-HUMAN CONFIRMATION
-
-PLANNED VS CREATED EPISODE SEPARATION
-
-M6 DOWNSTREAM BRIDGE
-
-M4 REGRESSION
-
-M1 REGRESSION
-
-M2 REGRESSION
-
-STORY REGRESSION
-
-M3 REGRESSION
-
-PERSISTENCE
-
-ATOMICITY / ROLLBACK
-
-PRODUCTION SPINE
-
-BROWSER / LIVE
-
-RESPONSIVE
-
-ARCHITECTURE
-
-SECRET SCAN
-
-git diff --check
-
-GIT COMMIT
-
-GITHUB PUSH
-
-REMOTE SHA == LOCAL SHA
-
-GIT STATUS CLEAN
-
----
-
-# 43. M5 Git Checkpoint
-
-M5 must have its own independent Git checkpoint.
-
-Suggested commit:
-
-`feat(creator): add series planning and series director`
-
-After every M5 gate passes:
-
-record:
-
-`M5_FINAL_SHA`
-
-Push M5 branch to GitHub.
-
-Fetch remote.
-
-Verify:
-
-`LOCAL SHA == REMOTE SHA`
-
-Verify:
-
-`git status CLEAN`
-
----
-
-# 44. Execution Wave Stop Rule
-
-After M5 all gates PASS:
-
-report M5 execution state as:
-
-`FEATURE ACCEPTED CANDIDATE`
-`AWAITING PROJECT LEAD ACCEPTANCE`
-
-report M4 execution state as:
-
-`TECHNICAL GATES PASSED`
-`AUTO-TRANSITION CHECKPOINT COMPLETE`
-
-Do NOT enter M6.
-
-Do NOT implement:
-
-- Series IP Bible;
-- Character Intelligence;
-- Narrative Closed Loop;
-- Storyboard.
-
-Do NOT modify `CURRENT_MILESTONE.md` merely to record the final
-Wave status unless explicitly instructed by the Project Lead.
+UI-R2
+FEATURE ACCEPTED CANDIDATE
+AWAITING PROJECT LEAD ACCEPTANCE
 
 STOP.
 
-Project Lead reviews M4 + M5 together.
+Do NOT enter M6.
+
+M6 remains:
+
+NOT STARTED
+
+until Project Lead final acceptance.
 
 ---
 
-# 45. Global Stop Conditions
+# 23. Final Report
 
-Immediately STOP if any of the following occurs:
+UI-R2 BASE SHA:
 
-- Source-of-Truth documents conflict;
-- Canonical Workspace is not clean before milestone implementation;
-- accepted V2.3 dependency direction would be violated;
-- Project authoritative ownership is ambiguous;
-- duplicate Project Domain would be created;
-- Series ownership changes unexpectedly;
-- destructive migration semantics are ambiguous;
-- existing Series / Episode identity cannot be preserved safely;
-- M1 / M2 / Story / M3 production lineage would break;
-- required Provider credential is unavailable for a mandatory Live Gate;
-- GitHub push fails at a milestone checkpoint;
-- remote SHA != local SHA;
-- Browser Gate fails because of a real product defect;
-- security issue cannot be safely resolved inside scope;
-- data-loss risk appears;
-- accepted Enterprise UI architecture would require major redesign;
-- M6 implementation would be required to make M5 pass.
+BRANCH:
 
-Do not bypass a Stop Condition to keep automation moving.
+GLOBAL SIDEBAR:
 
----
+PROJECT NAVIGATOR:
 
-# 46. Execution Branch Rule
+CONTEXT BAR:
 
-Wave 1 uses one Canonical Workspace but separate milestone branches.
+AI DIRECTOR:
 
-Expected:
+STORY:
 
-Wave Base
-↓
-M4 Branch
-↓
-M4_FINAL_SHA
-↓
-M5 Branch created from M4_FINAL_SHA
-↓
-M5_FINAL_SHA
+SCRIPT STUDIO:
 
-Do not create a new filesystem worktree for ordinary M4/M5 execution.
+SERIES PLANNING:
 
-Do not combine M4 and M5 into one branch checkpoint without preserving
-the independent M4 Remote-Verified commit.
+STORYBOARD SHELL:
 
----
+SHOT SHELL:
 
-# 47. Git / Runtime Clean Boundary
+TIMELINE SHELL:
 
-At each milestone transition:
+CREATION CENTER:
 
-Git status must be:
+INSPECTOR:
 
-`CLEAN`
-
-Remote SHA must equal:
-
-Local SHA
-
-Creator runtime validation must report:
-
-- Runtime Workspace
-- Runtime Branch
-- Runtime HEAD
-- HTTP URL
-
-Do not run M5 against stale M4 runtime code.
-
----
-
-# 48. Final Wave Report
-
-After M5 completes, output:
-
-EXECUTION MODE:
-
-CANONICAL WORKSPACE:
-
-WAVE_1_BASE_SHA:
-
-CANONICAL START SHA:
-
-
-M4 BASE SHA:
-
-M4 BRANCH:
-
-M4 FINAL SHA:
-
-M4 IMPLEMENTATION:
-
-M4 PROJECT DOMAIN:
-
-M4 DOMAIN CONVERGENCE:
-
-M4 V5 OWNERSHIP:
-
-M4 CONTENT PROFILE RELATIONSHIP:
-
-M4 PROJECT → SERIES:
-
-M4 SERIES → EPISODE:
-
-M4 MIGRATION / COMPATIBILITY:
-
-M4 STORY:
-
-M4 SCRIPT:
-
-M4 PRODUCTION SPINE:
-
-M4 PERSISTENCE:
-
-M4 ATOMICITY:
-
-M4 TESTS:
-
-M4 BROWSER / LIVE:
-
-M4 RESPONSIVE:
-
-M4 ARCHITECTURE:
-
-M4 SECRET SCAN:
-
-M4 DIFF CHECK:
-
-M4 PUSH:
-
-M4 REMOTE SHA:
-
-M4 LOCAL == REMOTE:
-
-M4 GIT STATUS:
-
-
-M5 BASE SHA:
-
-M5 BRANCH:
-
-M5 FINAL SHA:
-
-M5 SERIES PLAN:
-
-M5 SERIES PLAN IDENTITY:
-
-M5 SERIES DIRECTOR:
-
-M5 PROVIDER BOUNDARY:
-
-M5 SCHEMA VALIDATION:
-
-M5 REPAIR:
-
-M5 HUMAN CONFIRMATION:
-
-M5 PLAN VERSIONING:
-
-M5 PLANNED VS CREATED EPISODE:
-
-M5 M6 BRIDGE:
-
-M5 PRODUCTION SPINE:
-
-M5 PERSISTENCE:
-
-M5 ATOMICITY:
-
-M5 TESTS:
-
-M5 BROWSER / LIVE:
-
-M5 RESPONSIVE:
-
-M5 ARCHITECTURE:
-
-M5 SECRET SCAN:
-
-M5 DIFF CHECK:
-
-M5 PUSH:
-
-M5 REMOTE SHA:
-
-M5 LOCAL == REMOTE:
-
-M5 GIT STATUS:
-
+RESPONSIVE:
 
 M1 REGRESSION:
 
 M2 REGRESSION:
 
-STORY REGRESSION:
-
 M3 REGRESSION:
 
+STORY REGRESSION:
+
+M4 REGRESSION:
+
+M5 REGRESSION:
+
+TESTS:
+
+BROWSER:
+
+ARCHITECTURE:
+
+SECRET SCAN:
+
+DIFF CHECK:
+
+COMMIT SHA:
+
+PUSH:
+
+REMOTE SHA:
+
+LOCAL == REMOTE:
+
+GIT STATUS:
 
 M6 ENTERED:
 
 NO
 
-
-EXECUTION WAVE 1 STATUS:
+UI-R2 STATUS:
 
 FEATURE ACCEPTED CANDIDATE
 /
