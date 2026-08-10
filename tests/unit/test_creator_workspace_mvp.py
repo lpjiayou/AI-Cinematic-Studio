@@ -1536,7 +1536,7 @@ class CreatorWorkspaceMvpTest(unittest.TestCase):
         self.assertIn('.app-shell[data-layout-mode="management"]', self.styles)
         self.assertIn('--sidebar-collapsed-width: 72px', self.styles)
 
-    def test_ui_r2_project_navigator_is_grouped_collapsible_and_drawer_capable(self):
+    def test_ui_r2a_project_navigator_is_grouped_and_drawer_only(self):
         block = self.script.split("function renderContextNav(route)", 1)[1].split(
             "function routeSupportsInspector", 1
         )[0]
@@ -1545,7 +1545,8 @@ class CreatorWorkspaceMvpTest(unittest.TestCase):
             'data-action="toggle-project-navigator"',
             'context-nav-group-items',
             'contextNavigation.classList.toggle("is-drawer-mode", drawerMode)',
-            'workbench.classList.toggle("has-context-nav", !drawerMode)',
+            'const drawerMode = true',
+            'workbench.classList.toggle("project-nav-drawer", drawerMode)',
         ):
             self.assertIn(marker, block)
         css = self.styles.split("/* UI-R2 Professional Workspace Layout Optimization", 1)[1]
@@ -1553,6 +1554,74 @@ class CreatorWorkspaceMvpTest(unittest.TestCase):
         self.assertIn(".context-navigation.is-drawer-mode.is-open", css)
         self.assertIn('route.context === "creation" && route.type === "creation-preview"', block)
         self.assertIn("grid-column: auto", css)
+        self.assertNotIn('workbench.classList.toggle("has-context-nav", !drawerMode)', block)
+
+    def test_ui_r2a_top_stage_and_local_navigation_match_frozen_project_ia(self):
+        groups = self.script.split("const projectNavigationGroups", 1)[1].split(
+            "const projectPages", 1
+        )[0]
+        for label in ("概览", "策划", "内容", "制作", "后期", "交付"):
+            self.assertIn(f'label: "{label}"', groups)
+        for label in (
+            "AI导演", "系列规划", "IP圣经", "角色", "世界与连续性",
+            "分集", "故事", "剧本", "一致性",
+            "分镜", "镜头", "场景", "项目资产", "生成任务",
+            "时间线", "预览", "质检", "审批",
+            "系列管理", "发布", "数据",
+        ):
+            self.assertIn(f'label: "{label}"', groups)
+        renderer = self.script.split("function renderProjectStageNavigation(route)", 1)[1].split(
+            "function renderProjectContextBar", 1
+        )[0]
+        for marker in (
+            "project-stage-navigation",
+            "project-stage-tabs",
+            "project-local-navigation",
+            "project-editor-stage-context",
+            'item.key !== "episode-workspace"',
+            '["editor", "canvas", "timeline"]',
+        ):
+            self.assertIn(marker, renderer)
+        css = self.styles.split("/* UI-R2A Professional Workspace Layout Freeze", 1)[1]
+        self.assertIn(".project-stage-tab.is-active", css)
+        self.assertIn(".project-local-nav-item.is-active", css)
+        self.assertIn("overflow-x: auto", css)
+        self.assertIn("writing-mode: horizontal-tb", css)
+
+    def test_ui_r2a_project_list_hides_raw_identity_strings_from_main_canvas(self):
+        block = self.script.split("function renderProjects()", 1)[1].split(
+            "function pipelineStatus", 1
+        )[0]
+        self.assertIn("projectTypeLabel(project.projectType)", block)
+        self.assertIn("项目上下文", block)
+        self.assertIn("制作状态", block)
+        self.assertNotIn('<dd>${escapeHtml(project.contentProfileRef)}</dd>', block)
+        self.assertNotIn('<small>${escapeHtml(series.seriesRef)}</small>', block)
+        self.assertNotIn("Project Context", block)
+
+    def test_ui_r2a_moves_story_and_project_lineage_to_inspector(self):
+        story = self.script.split("function renderStoryView(route)", 1)[1].split(
+            "function renderEpisodeProject", 1
+        )[0]
+        inspector = self.script.split("function renderInspector(route)", 1)[1].split(
+            "function aiDirectorStickyConfig", 1
+        )[0]
+        self.assertIn("完整来源引用已收纳在右侧详情", story)
+        self.assertNotIn('<code>${escapeHtml(projection.sourcePlanRef)}</code>', story)
+        self.assertIn("inspector-advanced-lineage", inspector)
+        self.assertIn('<code>${escapeHtml(projection.sourcePlanRef)}</code>', inspector)
+        self.assertIn('<code>${escapeHtml(route.project.projectRef)}</code>', inspector)
+
+    def test_ui_r2a_global_header_offset_and_context_chrome_are_terminal_guards(self):
+        css = self.styles.split("/* UI-R2A Professional Workspace Layout Freeze", 1)[1]
+        for marker in (
+            "scroll-padding-top: 24px",
+            "scroll-margin-top: calc(var(--header-height) + 16px)",
+            "margin: -24px -24px 0",
+            "margin: 0 -24px 20px",
+            "@media (max-width: 900px)",
+        ):
+            self.assertIn(marker, css)
 
     def test_ui_r2_context_bar_is_compact_and_keeps_real_lineage_values(self):
         block = self.script.split("function renderProjectContextBar(route)", 1)[1].split(

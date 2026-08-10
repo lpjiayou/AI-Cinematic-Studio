@@ -136,6 +136,42 @@
     path: `${projectShellBase}/${page.suffix}`
   })));
 
+  const projectTypeLabels = Object.freeze({
+    series: "系列项目",
+    standalone: "单条视频",
+    product: "商品视频",
+    brand: "品牌影片"
+  });
+
+  function projectTypeLabel(value) {
+    return projectTypeLabels[value] || "影视项目";
+  }
+
+  function projectNavigationPath(route, item, productionContext = route.persisted || resolveSelectedProductionContext()) {
+    const project = route.project || (productionContext && productionContext.project);
+    if (project) {
+      const base = route.projectBase || `/creator/projects/${encodeURIComponent(project.projectRef)}`;
+      if (item.key === "overview") return `${base}/overview`;
+      if (item.key === "episodes") return `${base}/episodes`;
+      if (item.key === "episode-workspace") return productionContext && productionContext.episode ? `${base}/episodes/${encodeURIComponent(productionContext.episode.episodeRef)}` : `${base}/episodes`;
+      if (item.key === "story" || item.key === "script") return productionContext && productionContext.episode ? `${base}/episodes/${encodeURIComponent(productionContext.episode.episodeRef)}/${item.key}` : `${base}/episodes`;
+      return `${base}/${item.suffix}`;
+    }
+    if (!productionContext) return `${projectShellBase}/${item.suffix}`;
+    const base = route.projectBase || productionContextBase(productionContext);
+    if (item.key === "episode-workspace") return `${base}/pipeline`;
+    if (item.key === "story" || item.key === "script") return `${base}/${item.key}`;
+    return `${projectShellBase}/${item.suffix}`;
+  }
+
+  function projectNavigationState(route) {
+    const isCurrent = (item) => route.key === item.key || (route.context === "episode" && route.key === "pipeline" && item.key === "episode-workspace");
+    const currentGroup = projectNavigationGroups.find((group) => group.items.some(isCurrent))
+      || projectNavigationGroups.find((group) => group.label === route.group)
+      || projectNavigationGroups[0];
+    return { currentGroup, isCurrent };
+  }
+
   const canonicalRouteTemplates = Object.freeze([
     "/creator",
     "/creator/ai-director",
@@ -627,11 +663,11 @@
       return `
         <article class="series-project-card project-record-card" data-project-ref="${escapeHtml(project.projectRef)}">
           <header>
-            <div><span class="section-kicker">正式项目 · ${escapeHtml(project.projectType === "series" ? "系列制作" : project.projectType)}</span><h3>${escapeHtml(project.title)}</h3><p>${escapeHtml(project.description || "统一承载系列、单集与内容制作上下文")}</p></div>
+            <div><span class="section-kicker">正式项目 · ${escapeHtml(projectTypeLabel(project.projectType))}</span><h3>${escapeHtml(project.title)}</h3><p>${escapeHtml(project.description || "统一承载系列、单集与内容制作上下文")}</p></div>
             <div class="series-card-actions"><span class="badge badge-available"><i></i>${project.status === "active" ? "创作中" : "已归档"}</span><a class="button button-secondary" href="#/creator/projects/${encodeURIComponent(project.projectRef)}">打开项目</a></div>
           </header>
-          <dl class="project-record-meta"><div><dt>项目类型</dt><dd>${escapeHtml(project.projectType)}</dd></div><div><dt>内容配置</dt><dd>${escapeHtml(project.contentProfileRef)}</dd></div><div><dt>目标平台</dt><dd>${escapeHtml(project.targetPlatform || "未设置")}</dd></div><div><dt>计划集数</dt><dd>${escapeHtml(project.plannedEpisodeCount)}</dd></div></dl>
-          ${series ? `<div class="project-series-heading"><span>关联系列</span><strong>${escapeHtml(series.title)}</strong><small>${escapeHtml(series.seriesRef)}</small></div><div class="series-episode-list">${renderEpisodeRows(project, series)}</div>` : renderErrorState("关联系列暂时无法读取", "项目记录已保留，请刷新后重试。")}
+          <dl class="project-record-meta"><div><dt>项目类型</dt><dd>${escapeHtml(projectTypeLabel(project.projectType))}</dd></div><div><dt>制作状态</dt><dd>${escapeHtml(project.status === "active" ? "创作中" : "已归档")}</dd></div><div><dt>目标平台</dt><dd>${escapeHtml(project.targetPlatform || "未设置")}</dd></div><div><dt>计划集数</dt><dd>${escapeHtml(project.plannedEpisodeCount)}</dd></div></dl>
+          ${series ? `<div class="project-series-heading"><span>关联系列</span><strong>${escapeHtml(series.title)}</strong><small>${(series.episodes || []).length} 个已创建单集</small></div><div class="series-episode-list">${renderEpisodeRows(project, series)}</div>` : renderErrorState("关联系列暂时无法读取", "项目记录已保留，请刷新后重试。")}
         </article>
       `;
     }).join("");
@@ -651,7 +687,7 @@
     return `
       ${renderPageHeader({ eyebrow: "项目中心", title: "项目", description: "以稳定项目身份组织系列、单集、故事与剧本制作上下文。", status: "available", meta: '<button class="button button-primary" type="button" data-action="open-project-dialog">新建项目</button>' })}
       <section class="project-center-toolbar" aria-label="项目筛选"><div class="segmented-control"><button class="is-active" type="button">全部</button><button type="button" disabled>进行中</button><button type="button" disabled>已归档</button></div><span>${state.projectRecords.length} 个项目 · ${state.seriesRecords.length} 个系列</span></section>
-      <section class="enterprise-panel project-register" aria-labelledby="project-records-title"><header><div><span class="section-kicker">Project Context</span><h3 id="project-records-title">正式项目记录</h3></div><button class="button button-text" type="button" data-action="reload-projects">刷新</button></header><div class="series-project-list">${records}</div></section>
+      <section class="enterprise-panel project-register" aria-labelledby="project-records-title"><header><div><span class="section-kicker">项目上下文</span><h3 id="project-records-title">正式项目记录</h3></div><button class="button button-text" type="button" data-action="reload-projects">刷新</button></header><div class="series-project-list">${records}</div></section>
       ${unassignedCards ? `<section class="enterprise-panel project-register compatibility-register"><header><div><span class="section-kicker">兼容性队列</span><h3>尚未关联项目的既有系列</h3><p>不会自动迁移或按名称匹配；由用户显式建立关系。</p></div></header><div class="series-project-list">${unassignedCards}</div></section>` : ""}
     `;
   }
@@ -1306,13 +1342,7 @@
             <div><dt>单集</dt><dd>第 ${escapeHtml(projection.episodeNumber)} 集</dd></div>
             <div><dt>来源版本</dt><dd>导演方案 v${escapeHtml(projection.sourcePlanVersion)}</dd></div>
           </dl>
-          <details class="advanced-lineage"><summary>高级溯源</summary><dl>
-            ${projection.projectRef ? `<div><dt>项目引用</dt><dd><code>${escapeHtml(projection.projectRef)}</code></dd></div>` : ""}
-            <div><dt>系列引用</dt><dd><code>${escapeHtml(projection.seriesRef)}</code></dd></div>
-            <div><dt>单集引用</dt><dd><code>${escapeHtml(projection.episodeRef)}</code></dd></div>
-            <div><dt>来源方案引用</dt><dd><code>${escapeHtml(projection.sourcePlanRef)}</code></dd></div>
-            <div><dt>来源结构</dt><dd><code>${escapeHtml(projection.sourcePlanSchemaVersion)}</code></dd></div>
-          </dl></details>
+          <p>完整来源引用已收纳在右侧详情的“高级溯源”中。</p>
           <a class="button button-primary" href="#${escapeHtml(route.episodeBase || productionContextBase(route.persisted))}/script">进入剧本工作台</a>
           <p>继续使用同一单集；导航不会复制故事文本，也不会创建新的故事事实。</p>
         </article>
@@ -1829,10 +1859,10 @@
       ${renderProjectContextBar(route)}
       ${renderPageHeader({ eyebrow: "项目工作室", title: project.title, description: project.description || "统一承载系列、单集与制作来源关系。", status: "available", meta: localizedStatusBadge(project.status === "active" ? "创作中" : "已归档", project.status === "active" ? "available" : "neutral") })}
       <section class="project-overview-grid">
-        <article class="enterprise-panel project-overview-hero"><span class="section-kicker">项目概览</span><h2>${escapeHtml(project.title)}</h2><p>${escapeHtml(project.description || "正式项目生产上下文")}</p><dl class="project-record-meta"><div><dt>项目类型</dt><dd>${escapeHtml(project.projectType)}</dd></div><div><dt>画幅</dt><dd>${escapeHtml(project.aspectRatio)}</dd></div><div><dt>单集目标</dt><dd>${escapeHtml(project.defaultDurationSec)} 秒</dd></div><div><dt>计划集数</dt><dd>${escapeHtml(project.plannedEpisodeCount)}</dd></div></dl></article>
-        <article class="enterprise-panel"><header><div><span class="section-kicker">生产关系</span><h3>系列与单集</h3></div><a class="text-link" href="#${route.projectBase}/episodes">查看分集</a></header>${series ? `<div class="project-lineage-summary"><div><span>系列</span><strong>${escapeHtml(series.title)}</strong><small>${escapeHtml(series.seriesRef)}</small></div><div><span>已创建单集</span><strong>${episodes.length}</strong><small>不会按计划集数批量创建</small></div></div>` : renderErrorState("关联系列暂时无法读取", "项目身份已保留，请刷新后重试。")}</article>
+        <article class="enterprise-panel project-overview-hero"><span class="section-kicker">项目概览</span><h2>${escapeHtml(project.title)}</h2><p>${escapeHtml(project.description || "正式项目生产上下文")}</p><dl class="project-record-meta"><div><dt>项目类型</dt><dd>${escapeHtml(projectTypeLabel(project.projectType))}</dd></div><div><dt>画幅</dt><dd>${escapeHtml(project.aspectRatio)}</dd></div><div><dt>单集目标</dt><dd>${escapeHtml(project.defaultDurationSec)} 秒</dd></div><div><dt>计划集数</dt><dd>${escapeHtml(project.plannedEpisodeCount)}</dd></div></dl></article>
+        <article class="enterprise-panel"><header><div><span class="section-kicker">生产关系</span><h3>系列与单集</h3></div><a class="text-link" href="#${route.projectBase}/episodes">查看分集</a></header>${series ? `<div class="project-lineage-summary"><div><span>系列</span><strong>${escapeHtml(series.title)}</strong><small>${episodes.length} 个已创建单集</small></div><div><span>制作方式</span><strong>按需创建单集</strong><small>不会按计划集数批量创建</small></div></div>` : renderErrorState("关联系列暂时无法读取", "项目身份已保留，请刷新后重试。")}</article>
       </section>
-      <section class="enterprise-panel project-production-spine"><header><div><span class="section-kicker">Production Spine</span><h3>真实制作链</h3></div></header><div class="project-spine-steps">${["项目","系列","单集","故事","剧本"].map((label, index) => `<span class="${index < 3 || episodes.length ? "is-ready" : ""}"><i>${index + 1}</i><strong>${label}</strong></span>`).join("")}</div></section>
+      <section class="enterprise-panel project-production-spine"><header><div><span class="section-kicker">制作主链</span><h3>真实制作链</h3></div></header><div class="project-spine-steps">${["项目","系列","单集","故事","剧本"].map((label, index) => `<span class="${index < 3 || episodes.length ? "is-ready" : ""}"><i>${index + 1}</i><strong>${label}</strong></span>`).join("")}</div></section>
     `;
   }
 
@@ -1845,6 +1875,28 @@
       ${renderPageHeader({ eyebrow: "项目工作室 · 内容", title: "分集", description: "查看当前项目关联系列中的真实单集记录。", status: "available" })}
       <section class="enterprise-panel"><header><div><span class="section-kicker">${series ? escapeHtml(series.title) : "关联系列"}</span><h3>已创建单集</h3></div><span>${episodes.length} 集</span></header>${episodes.length ? `<div class="enterprise-list">${episodes.map((episode) => `<a class="enterprise-list-row" href="#${route.projectBase}/episodes/${encodeURIComponent(episode.episodeRef)}"><span class="row-index">E${String(episode.episodeNumber).padStart(2, "0")}</span><span><strong>${escapeHtml(episode.title)}</strong><small>来源方案 v${escapeHtml(episode.sourcePlanVersion)} · ${escapeHtml(episode.status)}</small></span><em>进入制作</em></a>`).join("")}</div>` : renderEmptyState({ icon: "—", title: "尚未创建单集", description: "计划集数只是制作意图，不会自动创建单集记录。" })}</section>
     `;
+  }
+
+  function renderProjectStageNavigation(route) {
+    const productionContext = route.persisted || resolveSelectedProductionContext();
+    const { currentGroup, isCurrent } = projectNavigationState(route);
+    const professionalMode = ["editor", "canvas", "timeline"].includes(workspaceLayoutMode(route));
+    const localItems = currentGroup.items.filter((item) => item.key !== "episode-workspace");
+    const stageLinks = projectNavigationGroups.map((group) => {
+      const target = group.items.find((item) => item.key !== "episode-workspace") || group.items[0];
+      const active = group.key === currentGroup.key;
+      return `<a href="#${escapeHtml(projectNavigationPath(route, target, productionContext))}" class="project-stage-tab ${active ? "is-active" : ""}" aria-current="${active ? "page" : "false"}" data-stage-key="${escapeHtml(group.key)}">${escapeHtml(group.label)}</a>`;
+    }).join("");
+    const localLinks = localItems.map((item) => {
+      const active = isCurrent(item) || (route.key === "pipeline" && item.key === "episodes");
+      return `<a href="#${escapeHtml(projectNavigationPath(route, item, productionContext))}" class="project-local-nav-item ${active ? "is-active" : ""}" aria-current="${active ? "page" : "false"}">${escapeHtml(item.label)}</a>`;
+    }).join("");
+    return `<section class="project-stage-navigation ${professionalMode ? "is-editor-mode" : ""}" aria-label="项目阶段导航" data-current-stage="${escapeHtml(currentGroup.key)}">
+      <nav class="project-stage-tabs" aria-label="项目阶段">${stageLinks}</nav>
+      ${professionalMode
+        ? `<div class="project-editor-stage-context"><span>${escapeHtml(currentGroup.label)}</span><strong>${escapeHtml(route.label || "专业工作区")}</strong><small>当前优先显示对象导航；完整项目导航可从上方按钮临时打开。</small></div>`
+        : `<nav class="project-local-navigation" aria-label="${escapeHtml(currentGroup.label)}阶段页面">${localLinks}</nav>`}
+    </section>`;
   }
 
   function renderProjectContextBar(route) {
@@ -1879,7 +1931,7 @@
       <nav class="project-context-path" aria-label="当前项目路径">${pathItems.map((item, index) => `<span${index === pathItems.length - 1 ? ' aria-current="page"' : ""}>${escapeHtml(item)}</span>`).join('<i aria-hidden="true">›</i>')}</nav>
       <div class="project-context-version"><span>版本</span><strong>${escapeHtml(version)}</strong></div>
       <div class="project-context-status">${status}</div>
-    </section>`;
+    </section>${renderProjectStageNavigation(route)}`;
   }
 
   function renderEpisodeSelector(route) {
@@ -2167,23 +2219,7 @@
       ? creationModules.map((module) => ({ ...module, status: "planned" }))
       : [];
     if (groups) {
-      const itemPath = (item) => {
-        const project = route.project || (productionContext && productionContext.project);
-        if (project) {
-          const base = route.projectBase || `/creator/projects/${encodeURIComponent(project.projectRef)}`;
-          if (item.key === "overview") return `${base}/overview`;
-          if (item.key === "episodes") return `${base}/episodes`;
-          if (item.key === "episode-workspace") return productionContext && productionContext.episode ? `${base}/episodes/${encodeURIComponent(productionContext.episode.episodeRef)}` : `${base}/episodes`;
-          if (item.key === "story" || item.key === "script") return productionContext && productionContext.episode ? `${base}/episodes/${encodeURIComponent(productionContext.episode.episodeRef)}/${item.key}` : `${base}/episodes`;
-          return `${base}/${item.suffix}`;
-        }
-        if (!productionContext) return `${projectShellBase}/${item.suffix}`;
-        const base = route.projectBase || productionContextBase(productionContext);
-        if (item.key === "episode-workspace") return `${base}/pipeline`;
-        if (item.key === "story" || item.key === "script") return `${base}/${item.key}`;
-        return `${projectShellBase}/${item.suffix}`;
-      };
-      const isCurrent = (item) => route.key === item.key || (episodeContext && route.key === "pipeline" && item.key === "episode-workspace");
+      const { currentGroup, isCurrent } = projectNavigationState(route);
       const contextLabel = route.project
         ? `${route.project.title}${productionContext && productionContext.episode ? ` · 第 ${productionContext.episode.episodeNumber} 集` : ""}`
         : productionContext
@@ -2196,21 +2232,21 @@
         if (productionContext.episode.scriptRef) return localizedStatusBadge("编辑中", "development");
         return localizedStatusBadge("待生成", "neutral");
       };
-      const drawerMode = ["editor", "canvas", "timeline"].includes(state.workspaceLayoutMode) || compactProjectNavQuery.matches;
-      const currentGroupKey = (groups.find((group) => group.items.some(isCurrent)) || {}).key;
+      const drawerMode = true;
+      const currentGroupKey = currentGroup.key;
       const groupExpanded = (group) => group.key === currentGroupKey || state.expandedProjectNavGroups.includes(group.key);
       contextNavigation.hidden = false;
       contextNavigation.classList.toggle("is-drawer-mode", drawerMode);
       contextNavigation.classList.toggle("is-open", drawerMode && state.projectNavigatorOpen);
       contextNavigation.inert = drawerMode && !state.projectNavigatorOpen;
       contextNavigation.setAttribute("aria-hidden", String(drawerMode && !state.projectNavigatorOpen));
-      workbench.classList.toggle("has-context-nav", !drawerMode);
+      workbench.classList.remove("has-context-nav");
       workbench.classList.toggle("project-nav-drawer", drawerMode);
       contextNavigation.innerHTML = `<div class="context-nav-heading"><span>项目导航</span><strong>${escapeHtml(contextLabel)}</strong>${drawerMode ? '<button class="icon-button" type="button" data-action="toggle-project-navigator" aria-label="关闭项目导航">×</button>' : ""}</div>${groups.map((group) => {
         const expanded = groupExpanded(group);
         return `<section class="context-nav-group ${expanded ? "is-expanded" : ""}">
           <button class="context-nav-group-toggle" type="button" data-action="toggle-project-nav-group" data-group-key="${escapeHtml(group.key)}" aria-expanded="${expanded}"><span>${escapeHtml(group.label)}</span><i aria-hidden="true">⌄</i></button>
-          <div class="context-nav-group-items" ${expanded ? "" : "hidden"}>${group.items.map((item) => `<a href="#${escapeHtml(itemPath(item))}" class="context-nav-item ${isCurrent(item) ? "is-active" : ""}" aria-current="${isCurrent(item) ? "page" : "false"}"><span>${escapeHtml(item.label)}</span>${capabilityBadge(item)}</a>`).join("")}</div>
+          <div class="context-nav-group-items" ${expanded ? "" : "hidden"}>${group.items.map((item) => `<a href="#${escapeHtml(projectNavigationPath(route, item, productionContext))}" class="context-nav-item ${isCurrent(item) ? "is-active" : ""}" aria-current="${isCurrent(item) ? "page" : "false"}"><span>${escapeHtml(item.label)}</span>${capabilityBadge(item)}</a>`).join("")}</div>
         </section>`;
       }).join("")}`;
       return;
@@ -2268,7 +2304,7 @@
     } else if (route && route.type === "story-view") {
       const projection = buildStoryProjection(route);
       detail = projection
-        ? `<section class="inspector-section"><span class="inspector-label">故事来源</span><strong>已确认导演方案 v${escapeHtml(projection.sourcePlanVersion)}</strong><p>${escapeHtml(projection.seriesTitle)} · 第 ${escapeHtml(projection.episodeNumber)} 集</p><p>高级溯源可在故事页按需查看。</p></section>`
+        ? `<section class="inspector-section"><span class="inspector-label">故事来源</span><strong>已确认导演方案 v${escapeHtml(projection.sourcePlanVersion)}</strong><p>${escapeHtml(projection.seriesTitle)} · 第 ${escapeHtml(projection.episodeNumber)} 集</p></section><section class="inspector-section inspector-advanced-lineage"><details><summary>高级溯源</summary><dl>${projection.projectRef ? `<div><dt>项目引用</dt><dd><code>${escapeHtml(projection.projectRef)}</code></dd></div>` : ""}<div><dt>系列引用</dt><dd><code>${escapeHtml(projection.seriesRef)}</code></dd></div><div><dt>单集引用</dt><dd><code>${escapeHtml(projection.episodeRef)}</code></dd></div><div><dt>来源方案引用</dt><dd><code>${escapeHtml(projection.sourcePlanRef)}</code></dd></div><div><dt>来源结构</dt><dd><code>${escapeHtml(projection.sourcePlanSchemaVersion)}</code></dd></div></dl></details></section>`
         : `<section class="inspector-section"><span class="inspector-label">故事来源</span><strong>尚未确认故事方案</strong><p>请先前往 AI导演确认本集方案。</p></section>`;
     } else if (route && route.type === "script-studio") {
       const version = selectedScriptVersion();
@@ -2288,7 +2324,7 @@
       detail = `<section class="inspector-section"><span class="inspector-label">权利状态</span>${governanceBadge("HOLD", "hold")}<p>正式使用前需要完成人工确认。</p></section>`;
     } else if (route && route.context === "project-shell") {
       detail = route.project
-        ? `<section class="inspector-section"><span class="inspector-label">项目上下文</span><strong>${escapeHtml(route.project.title)}</strong><p>${escapeHtml(route.project.projectType)} · ${escapeHtml(route.project.status === "active" ? "创作中" : "已归档")}</p><p>v${escapeHtml(route.project.version)} · ${escapeHtml(route.project.seriesRefs.length)} 个关联系列</p></section><section class="inspector-section"><span class="inspector-label">页面状态</span><strong>${escapeHtml(route.label)}</strong><p>${route.status === "disabled" ? "受人工或能力门禁限制" : "使用正式项目身份"}</p></section>`
+        ? `<section class="inspector-section"><span class="inspector-label">项目上下文</span><strong>${escapeHtml(route.project.title)}</strong><p>${escapeHtml(projectTypeLabel(route.project.projectType))} · ${escapeHtml(route.project.status === "active" ? "创作中" : "已归档")}</p><p>v${escapeHtml(route.project.version)} · ${escapeHtml(route.project.seriesRefs.length)} 个关联系列</p></section><section class="inspector-section"><span class="inspector-label">页面状态</span><strong>${escapeHtml(route.label)}</strong><p>${route.status === "disabled" ? "受人工或能力门禁限制" : "使用正式项目身份"}</p></section><section class="inspector-section inspector-advanced-lineage"><details><summary>高级溯源</summary><dl><div><dt>项目引用</dt><dd><code>${escapeHtml(route.project.projectRef)}</code></dd></div><div><dt>内容配置引用</dt><dd><code>${escapeHtml(route.project.contentProfileRef)}</code></dd></div>${(route.project.seriesRefs || []).map((ref) => `<div><dt>系列引用</dt><dd><code>${escapeHtml(ref)}</code></dd></div>`).join("")}</dl></details></section>`
         : `<section class="inspector-section"><span class="inspector-label">项目上下文</span><strong>尚未建立</strong><p>当前为既有单集兼容入口，可从项目中心显式建立关系。</p></section>`;
     } else {
       detail = `<section class="inspector-section"><span class="inspector-label">工作区</span><strong>创作者工作区</strong><p>当前页面没有独立业务对象。</p></section>`;
