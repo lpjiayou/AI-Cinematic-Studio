@@ -5,6 +5,7 @@
   const content = document.getElementById("app-content");
   const pageTitle = document.getElementById("page-title");
   const pageBreadcrumb = document.getElementById("page-breadcrumb");
+  const appShell = document.getElementById("app-shell");
   const sidebar = document.getElementById("sidebar");
   const sidebarBackdrop = document.getElementById("sidebar-backdrop");
   const workbench = document.getElementById("workbench");
@@ -62,6 +63,7 @@
   let inspectorReturnFocus = null;
   const mobileQuery = window.matchMedia("(max-width: 900px)");
   const compactInspectorQuery = window.matchMedia("(max-width: 1439px)");
+  const compactProjectNavQuery = window.matchMedia("(max-width: 1199px)");
 
   const featureStates = Object.freeze({
     available: { label: "Available", badge: "", tone: "available" },
@@ -223,6 +225,10 @@
     sidebarCollapsed: false,
     mobileSidebarOpen: false,
     inspectorOpen: false,
+    aiDirectorParametersExpanded: false,
+    projectNavigatorOpen: false,
+    expandedProjectNavGroups: [],
+    workspaceLayoutMode: "management",
     activeRoute: null
   };
 
@@ -293,6 +299,41 @@
     }
     if (["/creator", "/creator/projects", "/creator/ai-director"].includes(state.activePath) || state.activePath.startsWith("/creator/projects/") || state.activePath.startsWith(`${projectShellBase}/`)) {
       renderRoute(state.activePath);
+    }
+  }
+
+  function workspaceLayoutMode(route) {
+    if (!route) return "management";
+    if (["script-studio", "bible-shell", "character-shell", "continuity-shell"].includes(route.type)) return "editor";
+    if (["storyboard-shell", "shot-shell", "scene-shell"].includes(route.type)) return "canvas";
+    if (route.type === "timeline-shell") return "timeline";
+    if (route.context === "project-shell" || route.context === "episode") return "reading";
+    return "management";
+  }
+
+  function defaultInspectorOpen(route) {
+    const mode = workspaceLayoutMode(route);
+    if (!routeSupportsInspector(route) || compactInspectorQuery.matches) return false;
+    if (mode === "management") return false;
+    if (mode === "timeline") return window.innerWidth >= 1920;
+    return true;
+  }
+
+  function applyWorkspaceLayout(route, pathChanged) {
+    const mode = workspaceLayoutMode(route);
+    const modeChanged = mode !== state.workspaceLayoutMode;
+    state.workspaceLayoutMode = mode;
+    workbench.dataset.layoutMode = mode;
+    appShell.dataset.layoutMode = mode;
+    if (pathChanged || modeChanged) {
+      state.projectNavigatorOpen = false;
+      if (!mobileQuery.matches) state.sidebarCollapsed = mode !== "management";
+    }
+    appShell.classList.toggle("sidebar-collapsed", state.sidebarCollapsed);
+    const collapseButton = document.querySelector('[data-action="toggle-sidebar-collapse"]');
+    if (collapseButton) {
+      collapseButton.setAttribute("aria-expanded", String(!state.sidebarCollapsed));
+      collapseButton.setAttribute("aria-label", state.sidebarCollapsed ? "展开一级导航" : "折叠一级导航");
     }
   }
 
@@ -1026,6 +1067,12 @@
       ["style", "视觉风格", "示例：电影感"],
       ["character", "角色设定", "可选 · 示例：晚灯 WANLIGHT"]
     ];
+    const briefSummary = fields.map(([key, label]) => `
+      <div class="director-parameter-summary-item">
+        <span>${escapeHtml(label)}</span>
+        <strong>${escapeHtml(state.aiDirectorBrief[key] || "尚未填写")}</strong>
+      </div>
+    `).join("");
     return `
       ${renderPageHeader({
         eyebrow: "创意入口",
@@ -1033,20 +1080,28 @@
         description: "从创意输入到导演方案与制作规划，在一个工作台里完成。",
         status: "development"
       })}
-      <div class="director-workspace director-studio-grid">
-        <section class="director-brief-panel">
-          <div class="card-heading"><div><span class="section-kicker">你的创意</span><h3>创意输入</h3></div></div>
-          <p class="director-panel-intro">描述你想创作的影片，让导演方案拥有清晰方向。</p>
-          <form id="ai-director-form" class="director-brief-form">
+      <div class="director-workspace director-studio-grid" data-parameters-expanded="${state.aiDirectorParametersExpanded}">
+        <section class="director-parameter-panel director-brief-panel">
+          <div class="director-parameter-heading">
+            <div><span class="section-kicker">创意参数</span><h3>本次导演方案输入</h3><p>默认收起以扩大方案工作区；展开后可编辑全部创意参数。</p></div>
+            <div class="director-parameter-actions">
+              <button class="button button-secondary" type="button" data-action="toggle-ai-director-parameters" aria-expanded="${state.aiDirectorParametersExpanded}">${state.aiDirectorParametersExpanded ? "收起参数" : "编辑参数"}</button>
+              ${state.aiDirectorPlan ? `<button class="button button-text" type="button" data-action="regenerate-ai-director" ${state.aiDirectorPhase === "generating" ? "disabled" : ""}>重新生成</button>` : ""}
+            </div>
+          </div>
+          <div class="director-parameter-summary" aria-label="当前创意参数">${briefSummary}</div>
+          <form id="ai-director-form" class="director-brief-form director-parameter-form" ${state.aiDirectorParametersExpanded ? "" : "hidden"}>
             ${fields.map(([key, label, helper]) => renderDirectorBriefField(key, label, helper, key !== "character")).join("")}
             <div class="director-form-footer"><span>通过安全服务整理方案，结果需人工确认。</span><button class="button button-primary" type="submit" ${state.aiDirectorPhase === "generating" ? "disabled" : ""}>${state.aiDirectorPhase === "generating" ? "正在整理…" : "生成创意方案"}</button></div>
           </form>
         </section>
-        <section class="director-canvas-panel" aria-labelledby="director-canvas-title">
-          <div class="card-heading"><div><span class="section-kicker">创作方案</span><h3 id="director-canvas-title" tabindex="-1">导演方案</h3></div></div>
-          ${renderDirectorCanvas()}
-        </section>
-        ${renderDirectorPlanning()}
+        <div class="director-result-workspace">
+          <section class="director-canvas-panel" aria-labelledby="director-canvas-title">
+            <div class="card-heading"><div><span class="section-kicker">创作方案</span><h3 id="director-canvas-title" tabindex="-1">导演方案</h3></div></div>
+            ${renderDirectorCanvas()}
+          </section>
+          ${renderDirectorPlanning()}
+        </div>
       </div>
       ${candidatePlanNotice()}
     `;
@@ -1807,12 +1862,24 @@
       version = `来源方案 v${episode.sourcePlanVersion}`;
     }
     const project = route.project || (persisted && persisted.project) || (persisted && projectForSeries(persisted.series.seriesRef));
-    const fields = [
-      ["项目", project ? project.title : "尚未建立"], ["系列", persisted ? persisted.series.title : project && project.seriesRefs.length ? (findSeries(project.seriesRefs[0]) || {}).title || "读取中" : "尚未选择"],
-      ["单集", persisted ? `第 ${persisted.episode.episodeNumber} 集` : "尚未选择"],
-      ["阶段", route.group || "—"], ["当前对象", route.label || "—"], ["版本", version]
-    ];
-    return `<section class="project-context-bar" aria-label="制作上下文"><div class="context-gate"><span></span><strong>制作上下文</strong><small>${project ? "正式项目" : persisted ? "兼容单集" : "尚未选择项目"}</small></div>${fields.map(([label,value]) => `<div><span>${escapeHtml(label)}</span><strong>${escapeHtml(value)}</strong></div>`).join("")}</section>`;
+    const series = persisted ? persisted.series : project && project.seriesRefs.length ? findSeries(project.seriesRefs[0]) : null;
+    const pathItems = [
+      project ? project.title : "尚未建立项目",
+      series ? series.title : null,
+      episode ? `第 ${episode.episodeNumber} 集` : null,
+      route.label || route.group || "项目工作区"
+    ].filter((item, index, items) => item && items.indexOf(item) === index);
+    const status = route.type === "script-studio" && selectedScriptVersion()
+      ? localizedStatusBadge(state.scriptWorkspace && state.scriptWorkspace.script && state.scriptWorkspace.script.confirmedScriptVersionRef === selectedScriptVersion().scriptVersionRef ? "已确认" : "编辑中", state.scriptWorkspace && state.scriptWorkspace.script && state.scriptWorkspace.script.confirmedScriptVersionRef === selectedScriptVersion().scriptVersionRef ? "available" : "development")
+      : route.status === "disabled"
+        ? localizedStatusBadge("受门禁限制", "neutral")
+        : localizedStatusBadge("工作区已就绪", "available");
+    return `<section class="project-context-bar" aria-label="制作上下文">
+      <button class="project-nav-toggle" type="button" data-action="toggle-project-navigator" aria-controls="context-navigation" aria-expanded="${state.projectNavigatorOpen}"><span aria-hidden="true">☷</span><strong>项目导航</strong></button>
+      <nav class="project-context-path" aria-label="当前项目路径">${pathItems.map((item, index) => `<span${index === pathItems.length - 1 ? ' aria-current="page"' : ""}>${escapeHtml(item)}</span>`).join('<i aria-hidden="true">›</i>')}</nav>
+      <div class="project-context-version"><span>版本</span><strong>${escapeHtml(version)}</strong></div>
+      <div class="project-context-status">${status}</div>
+    </section>`;
   }
 
   function renderEpisodeSelector(route) {
@@ -1828,12 +1895,21 @@
     `;
   }
 
-  function renderShellCanvas(kind, title) {
+  function renderShellCanvas(kind, title, route) {
     const emptyCopy = "当前没有可用于此页面的正式数据。页面结构已就绪，但不会用演示内容替代生产事实。";
-    if (kind === "board") return `<div class="shell-board-empty"><span class="section-kicker">内容画板</span><strong>暂无正式内容</strong><p>${emptyCopy}</p><small>取得正式项目上下文与已接受上游对象后，此处才会显示真实卡片。</small></div>`;
-    if (kind === "timeline") return `<div class="shell-timeline"><div class="timeline-ruler">${["00:00","00:15","00:30","00:45","01:00"].map((item) => `<span>${item}</span>`).join("")}</div>${["画面","声音","字幕","标记"].map((item) => `<div class="timeline-lane"><strong>${item}</strong><span></span></div>`).join("")}</div>`;
+    if (kind === "board") {
+      const objectLabel = route && route.type === "shot-shell" ? "镜头" : route && route.type === "scene-shell" ? "场景" : "分镜";
+      return `<div class="shell-visual-workspace">
+        <aside class="shell-object-navigator" aria-label="${objectLabel}对象导航"><span class="section-kicker">对象导航</span><strong>${objectLabel}列表</strong><div class="shell-object-empty"><span>—</span><p>暂无正式${objectLabel}对象</p></div></aside>
+        <main class="shell-canvas-stage"><div class="shell-board-empty"><span class="section-kicker">视觉画布</span><strong>暂无正式内容</strong><p>${emptyCopy}</p><small>取得正式项目上下文与已接受上游对象后，此处才会显示真实卡片。</small></div></main>
+      </div>`;
+    }
+    if (kind === "timeline") return `<div class="shell-timeline-workspace">
+      <aside class="shell-track-navigator" aria-label="轨道导航"><span class="section-kicker">轨道</span>${["画面","对白","环境声","音乐","音效","字幕"].map((item) => `<span>${item}<small>待建立</small></span>`).join("")}</aside>
+      <main class="shell-timeline"><div class="timeline-ruler">${["00:00","00:15","00:30","00:45","01:00"].map((item) => `<span>${item}</span>`).join("")}</div>${["画面","对白","环境声","音乐","音效","字幕"].map((item) => `<div class="timeline-lane"><strong>${item}</strong><span></span></div>`).join("")}</main>
+    </div>`;
     if (kind === "player") return `<div class="shell-player"><div class="shell-player-screen"><span>尚无正式媒体</span><strong>${escapeHtml(title)}</strong><small>等待正式上游输出</small></div><div class="shell-player-controls"><button type="button" disabled>播放</button><span>00:00 / 00:00</span><i></i></div></div>`;
-    if (kind === "editor") return `<div class="shell-editor"><aside><span>结构</span>${["概览","第一部分","第二部分","第三部分"].map((item) => `<button type="button" disabled>${item}</button>`).join("")}</aside><article><span class="section-kicker">内容工作区</span><h3>${escapeHtml(title)}</h3><p>${emptyCopy}</p><div class="editor-lines">${[1,2,3,4,5].map(() => "<span></span>").join("")}</div></article><aside><span>版本</span><strong>暂无版本</strong><small>等待正式来源</small></aside></div>`;
+    if (kind === "editor") return `<div class="shell-editor"><aside class="shell-object-navigator"><span>对象导航</span>${["概览","结构","内容"].map((item) => `<button type="button" disabled>${item}</button>`).join("")}</aside><article><span class="section-kicker">专业编辑区</span><h3>${escapeHtml(title)}</h3><p>${emptyCopy}</p><div class="editor-lines">${[1,2,3,4,5].map(() => "<span></span>").join("")}</div></article></div>`;
     if (kind === "table") return `<div class="shell-table"><header><span>对象</span><span>状态</span><span>来源</span><span>版本</span></header><div class="shell-table-empty"><strong>暂无正式记录</strong><p>${emptyCopy}</p></div></div>`;
     if (kind === "detail") return `<div class="shell-detail-grid"><article><span class="section-kicker">当前内容</span><h3>等待正式项目上下文</h3><p>${emptyCopy}</p></article><aside>${["身份","来源","状态","版本"].map((item) => `<div><span>${item}</span><strong>未建立</strong></div>`).join("")}</aside></div>`;
     if (kind === "summary") return `<div class="shell-summary-grid">${["创意","内容","制作","交付"].map((item,index) => `<article><span>0${index+1}</span><strong>${item}</strong><p>等待正式数据</p></article>`).join("")}</div>`;
@@ -1843,7 +1919,7 @@
   function renderEnterpriseShellPage(route) {
     const [title, description, stage, kind] = enterprisePageCopy[route.type] || [route.label, "页面结构已就绪。", route.group || "项目", "summary"];
     const disabled = route.status === "disabled";
-    return `${renderProjectContextBar(route)}${renderPageHeader({ eyebrow: `${stage} · 制作工作区`, title, description, status: route.status, meta: localizedStatusBadge(disabled ? "受门禁限制" : "结构已就绪", disabled ? "neutral" : "planned") })}<section class="enterprise-shell-page" data-shell-kind="${escapeHtml(kind)}">${renderShellCanvas(kind, title)}</section><section class="workflow-action-bar"><div><span>当前页面</span><strong>${escapeHtml(title)}</strong><small>${route.persisted ? "使用当前单集的真实来源关系" : "尚未建立项目上下文"}</small></div><div><button class="button button-secondary" type="button" data-action="toggle-bottom-drawer">版本与活动</button><button class="button button-primary" type="button" disabled>${disabled ? "当前不可操作" : "等待上游能力"}</button></div></section>`;
+    return `${renderProjectContextBar(route)}${renderPageHeader({ eyebrow: `${stage} · 制作工作区`, title, description, status: route.status, meta: localizedStatusBadge(disabled ? "受门禁限制" : "结构已就绪", disabled ? "neutral" : "planned") })}<section class="enterprise-shell-page" data-shell-kind="${escapeHtml(kind)}">${renderShellCanvas(kind, title, route)}</section><section class="workflow-action-bar"><div><span>当前页面</span><strong>${escapeHtml(title)}</strong><small>${route.persisted ? "使用当前单集的真实来源关系" : "尚未建立项目上下文"}</small></div><div><button class="button button-secondary" type="button" data-action="toggle-bottom-drawer">版本与活动</button><button class="button button-primary" type="button" disabled>${disabled ? "当前不可操作" : "等待上游能力"}</button></div></section>`;
   }
 
   function renderAssetsR1() {
@@ -2087,7 +2163,9 @@
     const episodeContext = route.context === "episode";
     const productionContext = route.persisted || resolveSelectedProductionContext();
     const groups = route.context === "project-shell" || episodeContext ? projectNavigationGroups : null;
-    const items = route.context === "creation" ? creationModules.map((module) => ({ ...module, status: "planned" })) : [];
+    const items = route.context === "creation" && route.type === "creation-preview"
+      ? creationModules.map((module) => ({ ...module, status: "planned" }))
+      : [];
     if (groups) {
       const itemPath = (item) => {
         const project = route.project || (productionContext && productionContext.project);
@@ -2118,22 +2196,44 @@
         if (productionContext.episode.scriptRef) return localizedStatusBadge("编辑中", "development");
         return localizedStatusBadge("待生成", "neutral");
       };
+      const drawerMode = ["editor", "canvas", "timeline"].includes(state.workspaceLayoutMode) || compactProjectNavQuery.matches;
+      const currentGroupKey = (groups.find((group) => group.items.some(isCurrent)) || {}).key;
+      const groupExpanded = (group) => group.key === currentGroupKey || state.expandedProjectNavGroups.includes(group.key);
       contextNavigation.hidden = false;
-      workbench.classList.add("has-context-nav");
-      contextNavigation.innerHTML = `<div class="context-nav-heading"><span>项目导航</span><strong>${escapeHtml(contextLabel)}</strong></div>${groups.map((group) => `<section class="context-nav-group"><span>${escapeHtml(group.label)}</span>${group.items.map((item) => `<a href="#${escapeHtml(itemPath(item))}" class="context-nav-item ${isCurrent(item) ? "is-active" : ""}" aria-current="${isCurrent(item) ? "page" : "false"}"><span>${escapeHtml(item.label)}</span>${capabilityBadge(item)}</a>`).join("")}</section>`).join("")}`;
+      contextNavigation.classList.toggle("is-drawer-mode", drawerMode);
+      contextNavigation.classList.toggle("is-open", drawerMode && state.projectNavigatorOpen);
+      contextNavigation.inert = drawerMode && !state.projectNavigatorOpen;
+      contextNavigation.setAttribute("aria-hidden", String(drawerMode && !state.projectNavigatorOpen));
+      workbench.classList.toggle("has-context-nav", !drawerMode);
+      workbench.classList.toggle("project-nav-drawer", drawerMode);
+      contextNavigation.innerHTML = `<div class="context-nav-heading"><span>项目导航</span><strong>${escapeHtml(contextLabel)}</strong>${drawerMode ? '<button class="icon-button" type="button" data-action="toggle-project-navigator" aria-label="关闭项目导航">×</button>' : ""}</div>${groups.map((group) => {
+        const expanded = groupExpanded(group);
+        return `<section class="context-nav-group ${expanded ? "is-expanded" : ""}">
+          <button class="context-nav-group-toggle" type="button" data-action="toggle-project-nav-group" data-group-key="${escapeHtml(group.key)}" aria-expanded="${expanded}"><span>${escapeHtml(group.label)}</span><i aria-hidden="true">⌄</i></button>
+          <div class="context-nav-group-items" ${expanded ? "" : "hidden"}>${group.items.map((item) => `<a href="#${escapeHtml(itemPath(item))}" class="context-nav-item ${isCurrent(item) ? "is-active" : ""}" aria-current="${isCurrent(item) ? "page" : "false"}"><span>${escapeHtml(item.label)}</span>${capabilityBadge(item)}</a>`).join("")}</div>
+        </section>`;
+      }).join("")}`;
       return;
     }
     if (!items.length) {
       contextNavigation.hidden = true;
+      contextNavigation.inert = true;
+      contextNavigation.setAttribute("aria-hidden", "true");
+      contextNavigation.classList.remove("is-drawer-mode", "is-open");
       contextNavigation.innerHTML = "";
       workbench.classList.remove("has-context-nav");
+      workbench.classList.remove("project-nav-drawer");
       return;
     }
 
     const title = "创作工具";
     const subtitle = "实验区 · 不写入项目";
     contextNavigation.hidden = false;
+    contextNavigation.inert = false;
+    contextNavigation.setAttribute("aria-hidden", "false");
+    contextNavigation.classList.remove("is-drawer-mode", "is-open");
     workbench.classList.add("has-context-nav");
+    workbench.classList.remove("project-nav-drawer");
     contextNavigation.innerHTML = `
       <div class="context-nav-heading"><span>${escapeHtml(title)}</span><strong>${escapeHtml(subtitle)}</strong></div>
       <div class="context-nav-list">
@@ -2143,7 +2243,7 @@
   }
 
   function routeSupportsInspector(route) {
-    return Boolean(route && (route.context === "project-shell" || route.context === "episode" || ["assets", "ai-director"].includes(route.type)));
+    return Boolean(route && (route.context === "project-shell" || route.context === "episode"));
   }
 
   function renderInspector(route) {
@@ -2386,8 +2486,9 @@
     state.activePath = normalized;
     const resolved = route || { type: "not-found", path: normalized, label: "未知路由", status: "disabled", breadcrumb: "创作空间 / 页面未找到" };
     state.activeRoute = resolved;
+    applyWorkspaceLayout(resolved, normalized !== previousPath);
     if (normalized !== previousPath) {
-      state.inspectorOpen = !compactInspectorQuery.matches && ["project-shell", "episode"].includes(resolved.context);
+      state.inspectorOpen = defaultInspectorOpen(resolved);
     }
     updateShellBoundaryCopy(resolved);
     pageTitle.textContent = resolved.label || resolved.english || "创作空间";
@@ -2696,6 +2797,15 @@
       const durationSeconds = durationMatch ? Number(durationMatch[1]) : 0;
       durationInput.setCustomValidity(durationSeconds > 0 && durationSeconds <= 3600 ? "" : "请输入 1–3600 秒的合理时长");
     }
+    if (!form.checkValidity() && form.hidden) {
+      state.aiDirectorParametersExpanded = true;
+      renderRoute(state.activePath);
+      window.requestAnimationFrame(() => {
+        const invalid = document.querySelector("#ai-director-form :invalid");
+        if (invalid) invalid.focus({ preventScroll: true });
+      });
+      return null;
+    }
     if (!form.reportValidity()) return null;
     const formData = new FormData(form);
     return Object.fromEntries(
@@ -2977,6 +3087,15 @@
     }
   }
 
+  function captureAiDirectorBriefDraft() {
+    const form = document.getElementById("ai-director-form");
+    if (!form) return;
+    const formData = new FormData(form);
+    Object.keys(fixture.aiDirector.briefDefaults).forEach((key) => {
+      if (formData.has(key)) state.aiDirectorBrief[key] = String(formData.get(key) || "").trim();
+    });
+  }
+
   async function generateSeriesPlanCandidate() {
     const route = state.activeRoute;
     const scope = seriesPlanningScopeFromRoute(route);
@@ -3185,6 +3304,38 @@
       loadSeriesData({ force: true });
       loadProjectData({ force: true });
     }
+    if (action === "toggle-ai-director-parameters") {
+      captureAiDirectorBriefDraft();
+      state.aiDirectorParametersExpanded = !state.aiDirectorParametersExpanded;
+      renderRoute(state.activePath);
+      window.requestAnimationFrame(() => {
+        const trigger = document.querySelector('[data-action="toggle-ai-director-parameters"]');
+        if (trigger) trigger.focus({ preventScroll: true });
+      });
+    }
+    if (action === "toggle-project-navigator") {
+      state.projectNavigatorOpen = !state.projectNavigatorOpen;
+      renderRoute(state.activePath);
+      window.requestAnimationFrame(() => {
+        const target = state.projectNavigatorOpen
+          ? contextNavigation.querySelector("a[href]") || contextNavigation.querySelector("button")
+          : document.querySelector('.project-nav-toggle[data-action="toggle-project-navigator"]');
+        if (target) target.focus({ preventScroll: true });
+      });
+    }
+    if (action === "toggle-project-nav-group") {
+      const key = button.dataset.groupKey;
+      if (key) {
+        state.expandedProjectNavGroups = state.expandedProjectNavGroups.includes(key)
+          ? state.expandedProjectNavGroups.filter((item) => item !== key)
+          : [...state.expandedProjectNavGroups, key];
+        renderContextNav(state.activeRoute);
+        window.requestAnimationFrame(() => {
+          const trigger = contextNavigation.querySelector(`[data-action="toggle-project-nav-group"][data-group-key="${key}"]`);
+          if (trigger) trigger.focus({ preventScroll: true });
+        });
+      }
+    }
     if (action === "generate-script") generateScript();
     if (action === "confirm-script-version") confirmScriptVersion();
     if (action === "regenerate-series-plan") generateSeriesPlanCandidate();
@@ -3249,7 +3400,14 @@
     const actionButton = event.target.closest("[data-action]");
     if (actionButton && !actionButton.disabled) handleAction(actionButton);
     const routeLink = event.target.closest('a[href^="#/creator/"]');
-    if (routeLink) closeMobileSidebar();
+    if (routeLink) {
+      state.projectNavigatorOpen = false;
+      closeMobileSidebar();
+    }
+  });
+
+  document.addEventListener("input", (event) => {
+    if (event.target.closest("#ai-director-form")) captureAiDirectorBriefDraft();
   });
 
   document.addEventListener("submit", (event) => {
@@ -3347,6 +3505,13 @@
   window.addEventListener("keydown", (event) => {
     if (event.key === "Escape" && state.mobileSidebarOpen) {
       closeMobileSidebar(true);
+    } else if (event.key === "Escape" && state.projectNavigatorOpen) {
+      state.projectNavigatorOpen = false;
+      renderRoute(state.activePath);
+      window.requestAnimationFrame(() => {
+        const trigger = document.querySelector('.project-nav-toggle[data-action="toggle-project-navigator"]');
+        if (trigger) trigger.focus({ preventScroll: true });
+      });
     } else if (event.key === "Escape" && compactInspectorQuery.matches && state.inspectorOpen) {
       state.inspectorOpen = false;
       applyInspectorState();
@@ -3360,19 +3525,27 @@
     state.mobileSidebarOpen = false;
     if (event.matches) {
       state.sidebarCollapsed = false;
-      document.getElementById("app-shell").classList.remove("sidebar-collapsed");
+      appShell.classList.remove("sidebar-collapsed");
       state.inspectorOpen = false;
+    } else {
+      state.sidebarCollapsed = state.workspaceLayoutMode !== "management";
+      appShell.classList.toggle("sidebar-collapsed", state.sidebarCollapsed);
+      state.inspectorOpen = defaultInspectorOpen(state.activeRoute);
     }
-    else state.inspectorOpen = !compactInspectorQuery.matches;
     applySidebarAccessibility();
     applyInspectorState();
   });
 
   compactInspectorQuery.addEventListener("change", (event) => {
     if (!mobileQuery.matches) {
-      state.inspectorOpen = !event.matches;
+      state.inspectorOpen = defaultInspectorOpen(state.activeRoute);
       applyInspectorState();
     }
+  });
+
+  compactProjectNavQuery.addEventListener("change", () => {
+    state.projectNavigatorOpen = false;
+    if (state.activeRoute) renderRoute(state.activePath);
   });
 
   window.CreatorWorkspaceSkeleton = Object.freeze({

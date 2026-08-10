@@ -9518,6 +9518,588 @@ body .script-version-item.is-selected small {
   }
 }
 
+/* UI-R2 Professional Workspace Layout Optimization
+   Presentation-only layout modes. Runtime routes and capability contracts remain unchanged. */
+:root {
+  --ui-r2-project-nav-width: 220px;
+  --ui-r2-object-nav-width: 210px;
+  --ui-r2-inspector-width: 312px;
+  --ui-r2-context-height: 52px;
+}
+
+.app-shell[data-layout-mode="management"] {
+  --sidebar-width: 240px;
+}
+
+.app-shell[data-layout-mode="reading"],
+.app-shell[data-layout-mode="editor"],
+.app-shell[data-layout-mode="canvas"],
+.app-shell[data-layout-mode="timeline"] {
+  --inspector-width: var(--ui-r2-inspector-width);
+}
+
+.workbench {
+  position: relative;
+  min-width: 0;
+}
+
+.workbench.has-context-nav {
+  grid-template-columns: var(--ui-r2-project-nav-width) minmax(0, 1fr) var(--inspector-width);
+}
+
+.workbench.has-context-nav.inspector-closed {
+  grid-template-columns: var(--ui-r2-project-nav-width) minmax(0, 1fr);
+}
+
+.workbench:not(.has-context-nav):not(.inspector-closed) {
+  grid-template-columns: minmax(0, 1fr) var(--inspector-width);
+}
+
+.workbench:not(.has-context-nav).inspector-closed {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.context-navigation {
+  width: var(--ui-r2-project-nav-width);
+  grid-column: auto;
+  grid-row: auto;
+}
+
+.context-nav-heading {
+  position: relative;
+  display: grid;
+  gap: 5px;
+}
+
+.context-nav-heading > .icon-button {
+  position: absolute;
+  top: -3px;
+  right: 0;
+}
+
+.context-nav-group {
+  gap: 4px;
+  padding: 5px 0;
+}
+
+.context-nav-group-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  min-height: 32px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--acs-text-muted);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: .08em;
+  text-align: left;
+}
+
+.context-nav-group-toggle:hover,
+.context-nav-group.is-expanded .context-nav-group-toggle {
+  background: var(--acs-surface-hover);
+  color: var(--acs-text-secondary);
+}
+
+.context-nav-group-toggle i {
+  font-style: normal;
+  transition: transform 160ms ease;
+}
+
+.context-nav-group.is-expanded .context-nav-group-toggle i {
+  transform: rotate(180deg);
+}
+
+.context-nav-group-items {
+  display: grid;
+  gap: 2px;
+}
+
+.context-navigation.is-drawer-mode {
+  position: absolute;
+  z-index: 35;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: min(86vw, 320px);
+  border-right-color: var(--acs-border-strong);
+  box-shadow: 20px 0 48px rgba(0, 0, 0, .38);
+  transform: translateX(-105%);
+  transition: transform 180ms ease;
+}
+
+.context-navigation.is-drawer-mode.is-open {
+  transform: translateX(0);
+}
+
+.project-context-bar {
+  display: flex;
+  align-items: center;
+  box-sizing: border-box;
+  height: var(--ui-r2-context-height);
+  min-height: var(--ui-r2-context-height);
+  margin: -24px -24px 18px;
+  padding: 0 14px;
+  overflow: hidden;
+  border-bottom: 1px solid var(--acs-border);
+  background: var(--acs-surface-deep);
+}
+
+.project-context-bar > * {
+  min-width: 0;
+}
+
+.project-nav-toggle {
+  display: none;
+  align-items: center;
+  gap: 8px;
+  min-height: 32px;
+  margin-right: 12px;
+  padding: 0 10px;
+  border: 1px solid var(--acs-border);
+  border-radius: 6px;
+  background: var(--acs-surface);
+  color: var(--acs-text-secondary);
+}
+
+.workbench.project-nav-drawer .project-nav-toggle {
+  display: inline-flex;
+}
+
+.project-context-path {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  flex: 1 1 auto;
+  gap: 8px;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.project-context-path span {
+  display: block;
+  max-width: 210px;
+  overflow: hidden;
+  color: var(--acs-text-muted);
+  font-size: 12px;
+  letter-spacing: 0;
+  text-overflow: ellipsis;
+}
+
+.project-context-path span[aria-current="page"] {
+  color: var(--acs-text-primary);
+  font-weight: 700;
+}
+
+.project-context-path i {
+  color: var(--acs-border-strong);
+  font-style: normal;
+}
+
+.project-context-version {
+  display: grid;
+  flex: 0 0 auto;
+  gap: 1px;
+  margin-left: 16px;
+  padding-left: 16px;
+  border-left: 1px solid var(--acs-border);
+}
+
+.project-context-version span {
+  color: var(--acs-text-muted);
+  font-size: 9px;
+  letter-spacing: .08em;
+}
+
+.project-context-version strong {
+  max-width: 150px;
+  overflow: hidden;
+  color: var(--acs-text-secondary);
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.project-context-status {
+  flex: 0 0 auto;
+  margin-left: 12px;
+}
+
+/* AI Director: compact top parameters, wide result workspace. */
+.director-studio-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 12px;
+}
+
+.director-parameter-panel {
+  padding: 16px 18px;
+}
+
+.director-parameter-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+}
+
+.director-parameter-heading h3,
+.director-parameter-heading p {
+  margin: 0;
+}
+
+.director-parameter-heading p {
+  margin-top: 4px;
+  color: var(--acs-text-muted);
+  font-size: 12px;
+}
+
+.director-parameter-actions {
+  display: flex;
+  flex: 0 0 auto;
+  gap: 8px;
+}
+
+.director-parameter-summary {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 1px;
+  margin-top: 14px;
+  overflow: hidden;
+  border: 1px solid var(--acs-border);
+  border-radius: 8px;
+  background: var(--acs-border);
+}
+
+.director-parameter-summary-item {
+  display: grid;
+  min-width: 0;
+  gap: 4px;
+  padding: 10px 12px;
+  background: var(--acs-surface-deep);
+}
+
+.director-parameter-summary-item span {
+  color: var(--acs-text-muted);
+  font-size: 10px;
+}
+
+.director-parameter-summary-item strong {
+  overflow: hidden;
+  color: var(--acs-text-primary);
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.director-parameter-form {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--acs-border);
+}
+
+.director-parameter-form[hidden] {
+  display: none;
+}
+
+.director-parameter-form .director-form-footer {
+  grid-column: 1 / -1;
+}
+
+.director-result-workspace {
+  display: grid;
+  grid-template-columns: minmax(0, 1.55fr) minmax(320px, .65fr);
+  gap: 12px;
+  min-width: 0;
+}
+
+.director-result-workspace > * {
+  min-width: 0;
+}
+
+/* L2 reading surfaces keep the canvas dominant. */
+.story-view {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(280px, 340px);
+  grid-template-areas:
+    "overview context"
+    "beats context"
+    "lineage lineage";
+  gap: 14px;
+}
+
+.story-overview-card { grid-area: overview; }
+.story-beats-card { grid-area: beats; }
+.story-context-card { grid-area: context; }
+.story-lineage-card { grid-area: lineage; }
+
+/* L3 editor: object navigator + flexible editor + version inspector. */
+body .script-studio-layout {
+  display: grid;
+  grid-template-columns: minmax(190px, 220px) minmax(460px, 1fr) minmax(280px, 320px);
+  gap: 12px;
+  align-items: start;
+}
+
+body .script-scenes-panel,
+body .script-versions-panel {
+  position: sticky;
+  top: 0;
+  max-height: calc(100vh - var(--header-height) - var(--ui-r2-context-height) - 48px);
+  overflow-y: auto;
+}
+
+body .script-editor-panel {
+  min-width: 0;
+}
+
+/* L3/L4/L5 structural shells reserve professional workspace geometry only. */
+.shell-editor {
+  grid-template-columns: var(--ui-r2-object-nav-width) minmax(0, 1fr);
+}
+
+.shell-visual-workspace,
+.shell-timeline-workspace {
+  display: grid;
+  grid-template-columns: var(--ui-r2-object-nav-width) minmax(0, 1fr);
+  min-height: 430px;
+  overflow: hidden;
+  border: 1px solid var(--acs-border);
+  border-radius: 8px;
+  background: var(--acs-surface);
+}
+
+.shell-object-navigator,
+.shell-track-navigator {
+  display: grid;
+  align-content: start;
+  gap: 8px;
+  min-width: 0;
+  padding: 16px;
+  border-right: 1px solid var(--acs-border);
+  background: var(--acs-surface-deep);
+}
+
+.shell-object-navigator > strong {
+  color: var(--acs-text-primary);
+}
+
+.shell-object-empty {
+  display: grid;
+  place-items: center;
+  min-height: 180px;
+  padding: 18px;
+  border: 1px dashed var(--acs-border-strong);
+  border-radius: 7px;
+  color: var(--acs-text-muted);
+  text-align: center;
+}
+
+.shell-object-empty span {
+  color: var(--acs-primary);
+}
+
+.shell-canvas-stage {
+  min-width: 0;
+  background: var(--acs-media-stage);
+}
+
+.shell-track-navigator > span:not(.section-kicker) {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-height: 38px;
+  padding: 0 10px;
+  border: 1px solid var(--acs-border);
+  border-radius: 6px;
+  color: var(--acs-text-secondary);
+  background: var(--acs-surface);
+}
+
+.shell-track-navigator small {
+  color: var(--acs-text-muted);
+  font-size: 9px;
+}
+
+.shell-timeline-workspace .shell-timeline {
+  min-width: 0;
+  border: 0;
+  border-radius: 0;
+}
+
+/* Creation Center: predictable Chinese horizontal flow at every width. */
+.creation-r1-grid {
+  grid-template-columns: repeat(3, minmax(240px, 1fr));
+}
+
+.creation-r1-grid a,
+.creation-r1-grid a > div,
+.creation-r1-grid h3,
+.creation-r1-grid p,
+.creation-r1-grid em {
+  min-width: 0;
+  writing-mode: horizontal-tb;
+  word-break: normal;
+  overflow-wrap: break-word;
+  white-space: normal;
+}
+
+.creation-r1-grid h3 {
+  line-height: 1.35;
+}
+
+.creation-r1-grid .module-number {
+  position: static;
+  grid-column: 1;
+  grid-row: 1;
+}
+
+.creation-r1-grid a > div {
+  grid-column: 2;
+  grid-row: 1;
+}
+
+.creation-r1-grid em {
+  grid-column: 2;
+  grid-row: 2;
+}
+
+@media (max-width: 1599px) {
+  .director-parameter-summary {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  .director-result-workspace {
+    grid-template-columns: minmax(0, 1.35fr) minmax(300px, .65fr);
+  }
+
+  body .script-studio-layout {
+    grid-template-columns: minmax(190px, 210px) minmax(420px, 1fr) minmax(260px, 290px);
+  }
+}
+
+@media (max-width: 1439px) {
+  .director-result-workspace {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .director-parameter-form {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  body .script-studio-layout {
+    grid-template-columns: minmax(190px, 220px) minmax(0, 1fr);
+  }
+
+  body .script-versions-panel {
+    position: static;
+    grid-column: 1 / -1;
+    max-height: none;
+  }
+
+  .creation-r1-grid {
+    grid-template-columns: repeat(2, minmax(240px, 1fr));
+  }
+}
+
+@media (max-width: 1023px) {
+  :root {
+    --ui-r2-object-nav-width: 190px;
+  }
+
+  .director-parameter-summary {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .story-view {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas: "overview" "beats" "context" "lineage";
+  }
+
+  .shell-visual-workspace,
+  .shell-timeline-workspace {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .shell-object-navigator,
+  .shell-track-navigator {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    border-right: 0;
+    border-bottom: 1px solid var(--acs-border);
+  }
+
+  .shell-object-navigator > .section-kicker,
+  .shell-object-navigator > strong,
+  .shell-object-navigator > .shell-object-empty,
+  .shell-track-navigator > .section-kicker {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (max-width: 900px) {
+  .project-context-bar {
+    height: auto;
+    min-height: auto;
+    margin: -18px -14px 16px;
+    padding: 9px 12px;
+  }
+
+  .project-context-version,
+  .project-context-status {
+    display: none;
+  }
+
+  .project-context-path span {
+    max-width: 150px;
+  }
+
+  .director-parameter-heading,
+  .workflow-action-bar {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .director-parameter-actions {
+    width: 100%;
+  }
+
+  .director-parameter-actions .button {
+    flex: 1;
+  }
+
+  body .script-studio-layout,
+  .shell-editor {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  body .script-scenes-panel,
+  body .script-versions-panel {
+    position: static;
+    max-height: none;
+  }
+}
+
+@media (max-width: 680px) {
+  .director-parameter-summary,
+  .director-parameter-form,
+  .creation-r1-grid,
+  .shell-object-navigator,
+  .shell-track-navigator {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .creation-r1-grid a {
+    grid-template-columns: 32px minmax(0, 1fr);
+  }
+}
+
 /* M5 — Series Planning + Series Director activation */
 .series-director-layout,
 .series-plan-overview,
@@ -10095,6 +10677,23 @@ body .script-version-item.is-selected small {
   }
 
   .project-series-heading {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* UI-R2 terminal responsive guards — kept last to win over historical milestone styles. */
+@media (max-width: 1799px) {
+  .workbench[data-layout-mode="reading"] .series-plan-board {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .workbench[data-layout-mode="reading"] .series-plan-aside {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 1023px) {
+  .workbench[data-layout-mode="reading"] .series-plan-aside {
     grid-template-columns: minmax(0, 1fr);
   }
 }

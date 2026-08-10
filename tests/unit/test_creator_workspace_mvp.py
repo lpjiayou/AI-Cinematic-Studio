@@ -775,7 +775,7 @@ class CreatorWorkspaceMvpTest(unittest.TestCase):
             '.inspector.is-open',
             'transform: translateX(105%)',
             'inspectorOpen: false',
-            'state.inspectorOpen = !compactInspectorQuery.matches && ["project-shell", "episode"].includes(resolved.context)',
+            'state.inspectorOpen = defaultInspectorOpen(resolved)',
             '.workbench.has-context-nav.inspector-closed',
         ):
             self.assertIn(marker, f"{self.index}\n{self.script}\n{self.styles}")
@@ -1265,7 +1265,7 @@ class CreatorWorkspaceMvpTest(unittest.TestCase):
         context_renderer = self.script.split("function renderProjectContextBar(route)", 1)[1].split(
             "function renderEpisodeSelector", 1
         )[0]
-        for marker in ("项目", "系列", "单集", "阶段", "当前对象", "版本", "尚未建立"):
+        for marker in ("项目导航", "当前项目路径", "route.label", "route.group", "版本", "尚未建立项目"):
             self.assertIn(marker, context_renderer)
         for forbidden in (
             "PROJECT NAVIGATOR",
@@ -1324,8 +1324,9 @@ class CreatorWorkspaceMvpTest(unittest.TestCase):
         )[0]
         for marker in (
             "const persisted = route.persisted",
-            "persisted.series.title",
-            "persisted.episode.episodeNumber",
+            "const series = persisted ? persisted.series",
+            "series ? series.title",
+            "episode.episodeNumber",
             "来源方案 v${episode.sourcePlanVersion}",
             "selectedScriptVersion()",
             "scriptVersion.versionNumber",
@@ -1513,6 +1514,116 @@ class CreatorWorkspaceMvpTest(unittest.TestCase):
             "var(--acs-surface-deep)",
             "var(--acs-primary)",
             "@media (max-width: 1439px)",
+        ):
+            self.assertIn(marker, css)
+
+    def test_ui_r2_defines_five_presentation_layout_modes_without_route_changes(self):
+        block = self.script.split("function workspaceLayoutMode(route)", 1)[1].split(
+            "function defaultInspectorOpen", 1
+        )[0]
+        for marker in ('return "management"', 'return "reading"', 'return "editor"', 'return "canvas"', 'return "timeline"'):
+            self.assertIn(marker, block)
+        self.assertIn('workbench.dataset.layoutMode = mode', self.script)
+        self.assertIn('appShell.dataset.layoutMode = mode', self.script)
+        self.assertNotIn("location.pathname =", block)
+
+    def test_ui_r2_project_and_editor_routes_default_to_compact_global_sidebar(self):
+        block = self.script.split("function applyWorkspaceLayout(route, pathChanged)", 1)[1].split(
+            "async function requestApplicationJson", 1
+        )[0]
+        self.assertIn('state.sidebarCollapsed = mode !== "management"', block)
+        self.assertIn('appShell.classList.toggle("sidebar-collapsed", state.sidebarCollapsed)', block)
+        self.assertIn('.app-shell[data-layout-mode="management"]', self.styles)
+        self.assertIn('--sidebar-collapsed-width: 72px', self.styles)
+
+    def test_ui_r2_project_navigator_is_grouped_collapsible_and_drawer_capable(self):
+        block = self.script.split("function renderContextNav(route)", 1)[1].split(
+            "function routeSupportsInspector", 1
+        )[0]
+        for marker in (
+            'data-action="toggle-project-nav-group"',
+            'data-action="toggle-project-navigator"',
+            'context-nav-group-items',
+            'contextNavigation.classList.toggle("is-drawer-mode", drawerMode)',
+            'workbench.classList.toggle("has-context-nav", !drawerMode)',
+        ):
+            self.assertIn(marker, block)
+        css = self.styles.split("/* UI-R2 Professional Workspace Layout Optimization", 1)[1]
+        self.assertIn("--ui-r2-project-nav-width: 220px", css)
+        self.assertIn(".context-navigation.is-drawer-mode.is-open", css)
+        self.assertIn('route.context === "creation" && route.type === "creation-preview"', block)
+        self.assertIn("grid-column: auto", css)
+
+    def test_ui_r2_context_bar_is_compact_and_keeps_real_lineage_values(self):
+        block = self.script.split("function renderProjectContextBar(route)", 1)[1].split(
+            "function renderEpisodeSelector", 1
+        )[0]
+        for marker in (
+            'class="project-context-path"',
+            "project ? project.title",
+            "series ? series.title",
+            "episode.episodeNumber",
+            "sourcePlanVersion",
+            'class="project-context-version"',
+        ):
+            self.assertIn(marker, block)
+        css = self.styles.split("/* UI-R2 Professional Workspace Layout Optimization", 1)[1]
+        self.assertIn("--ui-r2-context-height: 52px", css)
+        self.assertIn("height: var(--ui-r2-context-height)", css)
+        self.assertIn("box-sizing: border-box", css)
+        self.assertNotIn("grid-template-columns: 200px repeat(6", css)
+
+    def test_ui_r2_ai_director_uses_compact_parameter_summary_and_expanded_grid(self):
+        block = self.script.split("function renderAiDirector()", 1)[1].split(
+            "function findPersistedEpisode", 1
+        )[0]
+        for marker in (
+            "director-parameter-summary",
+            "director-parameter-form",
+            'data-action="toggle-ai-director-parameters"',
+            "director-result-workspace",
+            "编辑参数",
+            "重新生成",
+        ):
+            self.assertIn(marker, block)
+        self.assertIn("aiDirectorParametersExpanded: false", self.script)
+        self.assertIn("captureAiDirectorBriefDraft", self.script)
+
+    def test_ui_r2_script_workspace_prioritizes_scene_editor_and_version_surfaces(self):
+        css = self.styles.split("/* UI-R2 Professional Workspace Layout Optimization", 1)[1]
+        self.assertIn("grid-template-columns: minmax(190px, 220px) minmax(460px, 1fr) minmax(280px, 320px)", css)
+        for marker in ("script-scenes-panel", "script-editor-panel", "script-versions-panel"):
+            self.assertIn(marker, self.script)
+        self.assertIn('["script-studio", "bible-shell", "character-shell", "continuity-shell"]', self.script)
+
+    def test_ui_r2_visual_and_timeline_shells_reserve_object_and_track_space(self):
+        block = self.script.split("function renderShellCanvas(kind, title, route)", 1)[1].split(
+            "function renderEnterpriseShellPage", 1
+        )[0]
+        for marker in (
+            "shell-visual-workspace",
+            "shell-object-navigator",
+            "shell-canvas-stage",
+            "shell-timeline-workspace",
+            "shell-track-navigator",
+            '["画面","对白","环境声","音乐","音效","字幕"]',
+        ):
+            self.assertIn(marker, block)
+        self.assertIn('["storyboard-shell", "shot-shell", "scene-shell"]', self.script)
+        self.assertIn('route.type === "timeline-shell"', self.script)
+
+    def test_ui_r2_creation_center_prevents_vertical_chinese_wrapping(self):
+        css = self.styles.split("/* UI-R2 Professional Workspace Layout Optimization", 1)[1]
+        for marker in (
+            "grid-template-columns: repeat(3, minmax(240px, 1fr))",
+            "writing-mode: horizontal-tb",
+            "word-break: normal",
+            "white-space: normal",
+            ".creation-r1-grid .module-number",
+            "position: static",
+            "grid-row: 1",
+            "@media (max-width: 1439px)",
+            "@media (max-width: 680px)",
         ):
             self.assertIn(marker, css)
 
