@@ -4,11 +4,13 @@
 >
 > Execution Mode: MANUAL
 >
-> Current Task: UI-R2 — Professional Workspace Layout Optimization
+> Current Task: UI-R2A — Professional Workspace Layout Freeze
 >
 > Task Type: CROSS-CUTTING UI BASELINE OPTIMIZATION
 >
 > M6 Authorization: NOT AUTHORIZED
+>
+> M7 Authorization: NOT AUTHORIZED
 
 ---
 
@@ -20,7 +22,7 @@ D:\Codex使用\AI CINEMATIC STUDIO
 
 Accepted Base:
 
-8c3e4271662e1e02e963618ade3c29d6e9f91e89
+d57b53730facf072d9301ebe9e515eca0f3209c5
 
 Accepted Milestones:
 
@@ -40,13 +42,17 @@ M4 — Project Context Foundation — ACCEPTED
 
 M5 — Series Planning + Series Director — ACCEPTED
 
+UI-R2 — Professional Workspace Layout Optimization — ACCEPTED
+
 M6 — Series IP Bible + Character Intelligence — NOT STARTED
+
+M7 — Continuity Validation — NOT STARTED
 
 ---
 
 # 1. Current Task
 
-UI-R2 — Professional Workspace Layout Optimization
+UI-R2A — Professional Workspace Layout Freeze
 
 Status:
 
@@ -54,12 +60,12 @@ CURRENT
 
 Purpose:
 
-Optimize workspace space allocation across the existing Enterprise Creator UI
-before M6 begins.
+Finalize the professional workspace layout on the accepted UI-R2 baseline
+before M6 or M7 begins.
 
-UI-R2 is NOT a new Domain milestone.
+UI-R2A is a layout amendment, not a new Domain milestone.
 
-UI-R2 must not change:
+UI-R2A must not change:
 
 - V2.3 architecture;
 - Production Spine;
@@ -86,7 +92,7 @@ Object Navigator
 >
 Inspector
 >
-Project Navigator
+Project Stage Navigation
 >
 Global Navigator
 
@@ -103,7 +109,7 @@ The user must receive maximum usable working space for:
 
 # 3. Layout Modes
 
-UI-R2 establishes five reusable workspace modes.
+UI-R2A finalizes the five reusable workspace modes established by UI-R2.
 
 ## L1 — Management
 
@@ -126,11 +132,12 @@ Inspector appears only when required.
 
 Global Sidebar 72px
 +
-Project Navigator about 220px
-+
 Main Workspace
 +
 Optional Inspector about 300px
+
+Project navigation uses compact top Stage Navigation and contextual local navigation.
+It must not consume a permanent second left column.
 
 Used by:
 
@@ -159,7 +166,8 @@ Used by:
 - IP Bible
 - Character Intelligence
 
-Project Navigator becomes collapsible / drawer-based.
+Project navigation is available through breadcrumb, top Stage Navigation,
+contextual local navigation, or a temporary drawer.
 
 ---
 
@@ -253,15 +261,15 @@ No empty-width fake collapse is allowed.
 
 ---
 
-# 6. Project Navigator
+# 6. Project Stage Navigation
 
-Project Navigator target width:
+The permanent full-height Project second sidebar is removed.
 
-about 220px.
+Project navigation is presented as compact top Stage Navigation:
 
-Use collapsible groups:
+概览 · 策划 · 内容 · 制作 · 后期 · 交付
 
-概览
+The selected stage exposes compact local sub-navigation:
 
 策划
 - AI导演
@@ -296,11 +304,12 @@ Use collapsible groups:
 - 发布
 - 数据
 
-Current group may remain expanded.
+Local navigation may use horizontal tabs, compact segmented navigation,
+or a small contextual menu. It must not recreate a permanent 220px sidebar.
 
-Other groups may collapse.
-
-Avoid one permanently long scrolling menu.
+Professional editors yield this navigation to their Object Navigator.
+Project navigation remains accessible through breadcrumb, stage menu,
+contextual button, or temporary drawer.
 
 “分集工作台” must not become a duplicate permanent navigation concept.
 
@@ -696,23 +705,23 @@ GIT STATUS CLEAN
 
 Suggested branch:
 
-codex/creator-ui-r2-workspace-layout
+codex/creator-ui-r2a-layout-freeze
 
 Suggested implementation commit:
 
-feat(creator): optimize professional workspace layouts
+feat(creator): freeze professional workspace layout
 
-UI-R2 must have a Remote-Verified checkpoint.
+UI-R2A must have a Remote-Verified checkpoint.
 
 ---
 
 # 22. Stop Rule
 
-After all UI-R2 gates PASS:
+After all UI-R2A gates PASS:
 
 report:
 
-UI-R2
+UI-R2A
 FEATURE ACCEPTED CANDIDATE
 AWAITING PROJECT LEAD ACCEPTANCE
 
@@ -720,23 +729,33 @@ STOP.
 
 Do NOT enter M6.
 
+Do NOT enter M7.
+
 M6 remains:
 
 NOT STARTED
 
 until Project Lead final acceptance.
 
+M7 remains:
+
+NOT STARTED / NOT AUTHORIZED
+
 ---
 
 # 23. Final Report
 
-UI-R2 BASE SHA:
+UI-R2A BASE SHA:
 
 BRANCH:
 
 GLOBAL SIDEBAR:
 
 PROJECT NAVIGATOR:
+
+PROJECT STAGE NAVIGATION:
+
+LOCAL SUB-NAVIGATION:
 
 CONTEXT BAR:
 
@@ -796,7 +815,11 @@ M6 ENTERED:
 
 NO
 
-UI-R2 STATUS:
+M7 ENTERED:
+
+NO
+
+UI-R2A STATUS:
 
 FEATURE ACCEPTED CANDIDATE
 /
