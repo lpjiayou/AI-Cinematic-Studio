@@ -4,9 +4,9 @@
 >
 > Execution Mode: MANUAL
 >
-> Current Task: `PRE-M6-RB1.1 — Source-of-Truth Rebaseline`
+> Current Task: `PRE-M6-RB1.2 — Legacy UI Decommission`
 >
-> Current Work Package: `Source-of-Truth Rebaseline Contract Closure / R2 revision before independent re-verify`
+> Current Work Package: `Authorized Legacy UI classification and decommission / implementation not started`
 >
 > M6 Authorization: `NOT AUTHORIZED`
 >
@@ -27,6 +27,14 @@ Pre-Rebaseline Accepted HEAD:
 Pre-Rebaseline Branch:
 
 `codex/creator-ui-r2a-layout-freeze`
+
+RB1.1 Accepted Checkpoint:
+
+`00793953e71711ab95724353d97d3a913be2b853`
+
+RB1.1 Local / Remote Verification:
+
+`PASS`
 
 Accepted milestones and integration checkpoints:
 
@@ -52,25 +60,26 @@ decommissioned. It is no longer the active work package and does not authorize M
 
 Current stage:
 
-`PRE-M6-RB1.1`
+`PRE-M6-RB1.2`
 
 Title:
 
-Source-of-Truth Rebaseline
+Legacy UI Decommission
 
 Status:
 
-`CURRENT / R2 REVISION BEFORE INDEPENDENT RE-VERIFY`
+`AUTHORIZED / NOT STARTED`
 
 Purpose:
 
-1. record that RV1 returned `BLOCKED` on P1-RV1-001 and P1-RV1-002;
-2. execute only the M5 status synchronization and ADR central-risk semantic
-   reconciliation required by R2, with a new independent read-only re-verify pending;
-3. make the separate Commercial Frontend the sole customer-facing UI source only
-   after ADR-0001 acceptance and a remote-verified checkpoint;
-4. preserve Core Creator Server, Application and production authority;
-5. protect Legacy UI until separately authorized RB1.2 classification and removal;
+1. record `PRE-M6-RB1.1` as `CLOSED` at remote-verified checkpoint
+   `00793953e71711ab95724353d97d3a913be2b853`;
+2. execute only the authorized RB1.2 classification and safe removal of the Legacy
+   Core customer UI while preserving Creator Server, Application and production
+   authority;
+3. keep the separate Commercial Frontend as the sole customer-facing UI source;
+4. require independent RB1.2 review before closure or checkpoint authorization;
+5. keep RB1.3 unauthorized until a later explicit Project Lead decision;
 6. require the RB1.3 code-first Core audit and Architecture Review before M6-P1.
 
 ---
@@ -79,8 +88,8 @@ Purpose:
 
 ONE CREATOR UI remains mandatory.
 
-Subject to later ADR-0001 acceptance and a remote-verified rebaseline checkpoint, the
-proposed interpretation is:
+ADR-0001 is `Accepted`, and the RB1.1 governance baseline is remote-verified at
+`00793953e71711ab95724353d97d3a913be2b853`. The current interpretation is:
 
 ONE CREATOR UI
 =
@@ -147,22 +156,16 @@ Forbidden:
 
 ---
 
-# 3. Current Documentation-Only Work Package
+# 3. Current Authorized RB1.2 Work Package
 
-The current work package may modify only these seven authority files:
+RB1.2 may remove only files and connections proven to be Legacy UI-only, update
+invalidated UI-specific tests, add targeted no-UI Core contract tests, and minimally
+update related architecture documentation and this execution record.
 
-- `AGENTS.md`;
-- `AI_CINEMATIC_STUDIO_SYSTEM_MASTER_PLAN.md`;
-- `AI_CINEMATIC_STUDIO_UI_MASTER_PLAN.md`;
-- `CURRENT_MILESTONE.md`;
-- `architecture/system-context.md`;
-- `architecture/system-overview.md`;
-- `governance/ADR-0001-separate-commercial-experience-layer-from-core-creator-runtime.md`.
-
-Runtime, application, domain, test, migration, asset and separate Frontend repository
-changes are prohibited in this work package.
-
-This work package must stop at a PRE-COMMIT review. It does not commit or push.
+Public API contracts, Application use-case semantics, Domain rules, Persistence schema
+and migrations, runtime/API responsibilities, and the separate Frontend repository are
+outside scope. RB1.2 implementation results stop at `IMPLEMENTED / REVIEW PENDING` and
+must not be staged, committed or pushed by this work package.
 
 ---
 
@@ -170,8 +173,9 @@ This work package must stop at a PRE-COMMIT review. It does not commit or push.
 
 `apps/creator-workspace-mvp` is a controlled `DECOMMISSION CANDIDATE`.
 
-Actual customer UI removal requires separate `PRE-M6-RB1.2` authorization. This
-work package does not delete, move or modify any file in that directory.
+This milestone is the explicit `PRE-M6-RB1.2` authorization. It permits removal only
+after repository dependencies prove a target to be UI-only; runtime/API/application
+responsibilities in the same directory remain protected.
 
 Authorized for later removal only when proven UI-only:
 
@@ -254,7 +258,9 @@ Strict order:
 → `M6 Preconditions`
 → `M6-P1`
 
-The current stage is only the `PRE-M6-RB1.1` contract-closure revision. No step may be
+`PRE-M6-RB1.1` is `CLOSED`; its checkpoint and Local/Remote verification are `PASS` at
+`00793953e71711ab95724353d97d3a913be2b853`. The current stage is only the authorized
+`PRE-M6-RB1.2` implementation. RB1.3 remains `NOT AUTHORIZED`; no later step may be
 silently skipped or inferred complete.
 
 ---
@@ -286,38 +292,36 @@ This document does not authorize M6 or M7 implementation.
 Legacy Phase 0 governance drift is `OPEN / DEFERRED TO PRE-M6-RB1.3`. It is not
 silently changed by this seven-file work package.
 
+`P3-RV1-003` remains `OPEN` as non-blocking EOL audit debt.
+
 ---
 
 # 8. Current Work Package Gates
 
-- RV1 RESULT: BLOCKED / P1-RV1-001 AND P1-RV1-002
-- M5 STATUS SYNCHRONIZATION: R2 REVISION EXECUTED / INDEPENDENT RE-VERIFY PENDING
-- ADR CENTRAL-RISK SEMANTIC RECONCILIATION: R2 REVISION EXECUTED / INDEPENDENT RE-VERIFY PENDING
-- AUTHORITY HIERARCHY: UNCHANGED / INDEPENDENT RE-VERIFY PENDING
-- SYSTEM MASTER PLAN: UNCHANGED BY R2 / INDEPENDENT RE-VERIFY PENDING
-- AGENTS RULES: UNCHANGED BY R2 / INDEPENDENT RE-VERIFY PENDING
-- ACTIVE ARCHITECTURE BASELINE RECONCILIATION: PENDING INDEPENDENT RE-VERIFY
-- ADR STATUS: PROPOSED / NOT ACCEPTED
-- ACTIVE AUTHORITY CONTRADICTION SCAN: PENDING INDEPENDENT RE-VERIFY
-- DOCUMENT-ONLY SCOPE: R2 LOCAL VALIDATION EXECUTED / INDEPENDENT RE-VERIFY PENDING
-- RUNTIME CODE CHANGED: NO
-- TEST CODE CHANGED: NO
-- `git diff --check`: R2 LOCAL VALIDATION EXECUTED / INDEPENDENT RE-VERIFY PENDING
-- INDEPENDENT READ-ONLY RE-VERIFY: PENDING
+- PRE-M6-RB1.1: `CLOSED`
+- RB1.1 CHECKPOINT: `00793953e71711ab95724353d97d3a913be2b853`
+- RB1.1 LOCAL / REMOTE VERIFICATION: `PASS`
+- ADR-0001 STATUS: `Accepted`
+- PRE-M6-RB1.2: `AUTHORIZED / NOT STARTED`
+- PRE-M6-RB1.3: `NOT AUTHORIZED`
+- P3-RV1-003: `OPEN / NON-BLOCKING EOL AUDIT DEBT`
+- M6: `NOT STARTED / NOT AUTHORIZED`
+- M7: `NOT STARTED / NOT AUTHORIZED`
+- RUNTIME CODE CHANGED: NO, before RB1.2 implementation
+- TEST CODE CHANGED: NO, before RB1.2 implementation
 
-No Git commit, push or tag is permitted in the current work package.
+RB1.2 implementation results must not be staged, committed, pushed or tagged before
+independent review and separate checkpoint authorization.
 
 ---
 
 # 9. Stop Rule
 
-After the PRE-COMMIT report:
+After the RB1.2 implementation report:
 
 STOP.
 
-Wait for Project Lead source-of-truth rebaseline review.
-
-Do not decommission UI code yet.
+Wait for independent RB1.2 review and Project Lead decision.
 
 Do not begin the full Core audit yet.
 
@@ -325,7 +329,7 @@ Do not enter M6 or M7.
 
 ---
 
-# 10. Required PRE-COMMIT Report
+# 10. Required RB1.2 Implementation Report
 
 BRANCH:
 
@@ -351,17 +355,25 @@ BROWSER_GATE_REPLACEMENT:
 
 CROSS_REPO_CONTRACT:
 
-CURRENT_MILESTONE:
+RB1_1_CLOSURE:
+
+RB1_1_CHECKPOINT:
+
+RB1_2_STATUS:
 
 M6_STATUS:
 
-CONTRADICTION_SCAN:
+LEGACY_UI_SCOPE:
+
+CORE_RUNTIME_GATE:
+
+FRONTEND_EXCLUSION:
 
 RUNTIME_CODE_CHANGED:
 
 FINAL:
 
-`R2 REVISION EXECUTED / INDEPENDENT READ-ONLY RE-VERIFY PENDING`
+`RB1.2 IMPLEMENTED / REVIEW PENDING`
 
 or
 
