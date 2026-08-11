@@ -1,5 +1,4 @@
 import json
-from pathlib import Path
 import threading
 import unittest
 from urllib import error, parse, request
@@ -20,8 +19,6 @@ from services.v5_core_os.series_planning import create_in_memory_boundary as cre
 from tests.unit.test_series_planning_m5 import valid_candidate
 
 
-ROOT = Path(__file__).resolve().parents[2]
-APP_ROOT = ROOT / "apps" / "creator-workspace-mvp"
 WORKSPACE = "workspace-m5-http"
 PROFILE = "content-profile-m5-http"
 
@@ -49,7 +46,6 @@ class CreatorSeriesPlanningHttpTests(unittest.TestCase):
         self.server = create_server(
             ("127.0.0.1", 0),
             AiDirectorService(FakeTextProvider([])),
-            APP_ROOT,
             series_episode_boundary=self.series_boundary,
             project_boundary=self.project_boundary,
             series_director_service=SeriesDirectorApplicationService(self.provider),
@@ -142,12 +138,6 @@ class CreatorSeriesPlanningHttpTests(unittest.TestCase):
         else:
             self.fail("wrong scope unexpectedly generated")
         self.assertEqual(len(self.provider.requests), 0)
-
-    def test_static_creator_runtime_remains_available(self):
-        with request.urlopen(f"{self.base_url}/index.html", timeout=5) as response:
-            self.assertEqual(response.status, 200)
-            self.assertIn(b'id="app-shell"', response.read())
-
 
 if __name__ == "__main__":
     unittest.main()

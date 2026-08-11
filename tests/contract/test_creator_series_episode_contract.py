@@ -27,7 +27,6 @@ from tests.unit.test_ai_director_phase1 import valid_brief, valid_plan
 
 ROOT = Path(__file__).resolve().parents[2]
 APP_PACKAGE = ROOT / "apps" / "creator_workspace_mvp"
-APP_SCRIPT = ROOT / "apps" / "creator-workspace-mvp" / "app.js"
 SERVER = APP_PACKAGE / "server.py"
 WORKSPACE = "workspace-contract"
 PROFILE = "content-profile-contract"
@@ -271,20 +270,7 @@ class CreatorSeriesEpisodeArchitectureContractTests(unittest.TestCase):
 
     def test_content_profile_is_not_implemented_as_application_account_api(self):
         server_source = SERVER.read_text(encoding="utf-8")
-        script = APP_SCRIPT.read_text(encoding="utf-8")
         self.assertNotIn("content-profiles", server_source)
-        self.assertNotIn("contentProfilesEndpoint", script)
-
-    def test_ui_episode_request_does_not_manufacture_canonical_project_ref(self):
-        script = APP_SCRIPT.read_text(encoding="utf-8")
-        request_block = script.split("requestApplicationJson(episodesEndpoint", 1)[1].split("state.createdEpisode", 1)[0]
-        self.assertNotIn("canonicalProjectRef", request_block)
-        self.assertIn("seriesRef: seriesRefValue", request_block)
-
-    def test_browser_does_not_persist_series_episode_state(self):
-        script = APP_SCRIPT.read_text(encoding="utf-8")
-        for forbidden in ("localStorage", "sessionStorage", "indexedDB", "sqlite3", "CREATE TABLE"):
-            self.assertNotIn(forbidden, script)
 
     def test_public_boundary_hides_repository_and_adapter_errors(self):
         source = inspect.getsource(public_package.SeriesEpisodePublicBoundary)

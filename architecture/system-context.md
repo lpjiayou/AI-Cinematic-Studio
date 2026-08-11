@@ -4,13 +4,13 @@
 
 本文档给出 AI Cinematic Studio V2.3 Core 架构基线的最高层上下文，只描述 Application Layer、V5 Core OS、V4 Platform、V3 Render Core、Compute 与 Foundation 之间的边界关系。它不定义业务模块、数据模型、接口内容、部署拓扑、技术栈或实现方式。
 
-`ADR-0001 / Proposed` 在该六层 Core 链之外提出独立 Experience Layer。该提案只有在后续取得所需审批并形成 remote-verified 重基线后才生效；当前不构成已接受架构事实或实现授权。
+`ADR-0001 / Accepted` 在该六层 Core 链之外确立独立 Experience Layer。该决定已由 remote-verified 的 PRE-M6-RB1.1 治理基线纳入 Core 架构事实；它不授权改变 V2.3 六层依赖方向。
 
-拟议的唯一跨仓链为：
+唯一跨仓链为：
 
 `Commercial Frontend → Frontend Experience Adapter → Creator Public HTTP/API → Creator Application → V5 → V4 → V3 → Compute/Foundation`
 
-Frontend Experience Adapter 属于 Frontend，且只能消费 Creator Public HTTP/API。Frontend 不得直接访问 Creator Application、Domain、SQL、Persistence、Provider、private V5、GPU、Worker 或 ComfyUI；两个仓库不共享客户 UI 源码。该提案不新增 V5/V4/V3 层级，也不改变下述六层相邻依赖方向。
+Frontend Experience Adapter 属于 Frontend，且只能消费 Creator Public HTTP/API。Frontend 不得直接访问 Creator Application、Domain、SQL、Persistence、Provider、private V5、GPU、Worker 或 ComfyUI；两个仓库不共享客户 UI 源码。该边界不新增 V5/V4/V3 层级，也不改变下述六层相邻依赖方向。
 
 本文使用的是系统逻辑层视图；`apps/`、`services/`、`packages/` 等是仓库工程边界。除非后续获批文档明确规定，不得将二者自动等同或据此移动、创建模块。
 
@@ -35,7 +35,7 @@ Frontend Experience Adapter 属于 Frontend，且只能消费 Creator Public HTT
 
 “直接允许依赖”只说明方向具备被评审的资格，不等同于批准任何具体依赖、契约或实现。
 
-在 ADR-0001 后续接受的条件下，Commercial Frontend 不是 Core Application Layer 的源码子模块。禁止 Frontend 导入 Core 源码、直接调用 Application/Domain/SQL/Persistence/Provider、访问 private V5 Adapter、GPU、Worker 或 ComfyUI，或绕过 Creator Public HTTP/API。Core 不重新建立客户 Commercial UI。
+根据已接受的 ADR-0001，Commercial Frontend 不是 Core Application Layer 的源码子模块。禁止 Frontend 导入 Core 源码、直接调用 Application/Domain/SQL/Persistence/Provider、访问 private V5 Adapter、GPU、Worker 或 ComfyUI，或绕过 Creator Public HTTP/API。Core 不承载或重新建立客户 Commercial UI；Core Creator Server 仅保留公开 HTTP/API 与 Application 运行职责。
 
 ## 4. 上下文边界原则
 
