@@ -1,16 +1,16 @@
 # AI Cinematic Studio — Current Execution State
 
-> Document: CURRENT_MILESTONE.md
+> Document: `CURRENT_MILESTONE.md`
 >
 > Execution Mode: MANUAL
 >
-> Current Task: UI-R2A — Professional Workspace Layout Freeze
+> Current Task: `PRE-M6-RB1.1 — Source-of-Truth Rebaseline`
 >
-> Task Type: CROSS-CUTTING UI BASELINE OPTIMIZATION
+> Current Work Package: `Source-of-Truth Rebaseline Contract Closure / R2 revision before independent re-verify`
 >
-> M6 Authorization: NOT AUTHORIZED
+> M6 Authorization: `NOT AUTHORIZED`
 >
-> M7 Authorization: NOT AUTHORIZED
+> M7 Authorization: `NOT AUTHORIZED`
 
 ---
 
@@ -18,813 +18,353 @@
 
 Canonical Workspace:
 
-D:\Codex使用\AI CINEMATIC STUDIO
+`D:\Codex使用\AI CINEMATIC STUDIO`
 
-Accepted Base:
+Pre-Rebaseline Accepted HEAD:
 
-d57b53730facf072d9301ebe9e515eca0f3209c5
+`602a78fe68fc5c69ecc31d9436ee166f5dff8a64`
 
-Accepted Milestones:
+Pre-Rebaseline Branch:
 
-M1 — AI Director Core — ACCEPTED
+`codex/creator-ui-r2a-layout-freeze`
 
-M2 — Series + Episode Foundation — ACCEPTED
+Accepted milestones and integration checkpoints:
 
-M3 — Script Studio — ACCEPTED
+- M1 — AI Director Core — ACCEPTED
+- M2 — Series + Episode Foundation — ACCEPTED
+- M3 — Script Studio — ACCEPTED
+- M3-H — Script Candidate Robustness — ACCEPTED
+- Story Projection — ACCEPTED
+- UI-R1 — Enterprise Cinematic UI — ACCEPTED HISTORY
+- M4 — Project Context Foundation — ACCEPTED
+- M5 — Series Planning + Series Director — ACCEPTED
+- UI-R2 — Professional Workspace Layout Optimization — ACCEPTED HISTORY
+- UI-R2A — Product acceptance status — NO SEPARATE ACCEPTANCE EVIDENCE / CANDIDATE
+- UI-R2A — Remote verification status — PASS AT `602a78fe68fc5c69ecc31d9436ee166f5dff8a64`
+- UI-R2A — Active architecture status — SUPERSEDED AS CURRENT TASK
 
-M3-H — Script Candidate Robustness — ACCEPTED
-
-Story Projection — ACCEPTED
-
-UI-R1 — Enterprise Cinematic UI — ACCEPTED
-
-M4 — Project Context Foundation — ACCEPTED
-
-M5 — Series Planning + Series Director — ACCEPTED
-
-UI-R2 — Professional Workspace Layout Optimization — ACCEPTED
-
-M6 — Series IP Bible + Character Intelligence — NOT STARTED
-
-M7 — Continuity Validation — NOT STARTED
+UI-R2A remains historical implementation evidence until the legacy Core browser UI is
+decommissioned. It is no longer the active work package and does not authorize M6.
 
 ---
 
-# 1. Current Task
+# 1. Current Control Stage
 
-UI-R2A — Professional Workspace Layout Freeze
+Current stage:
+
+`PRE-M6-RB1.1`
+
+Title:
+
+Source-of-Truth Rebaseline
 
 Status:
 
-CURRENT
+`CURRENT / R2 REVISION BEFORE INDEPENDENT RE-VERIFY`
 
 Purpose:
 
-Finalize the professional workspace layout on the accepted UI-R2 baseline
-before M6 or M7 begins.
-
-UI-R2A is a layout amendment, not a new Domain milestone.
-
-UI-R2A must not change:
-
-- V2.3 architecture;
-- Production Spine;
-- Domain ownership;
-- Project / Series / Episode contracts;
-- M4 Project model;
-- M5 Series Planning model;
-- Provider architecture;
-- persistence authority;
-- Global information architecture;
-- Enterprise Dark Cinematic visual baseline.
+1. record that RV1 returned `BLOCKED` on P1-RV1-001 and P1-RV1-002;
+2. execute only the M5 status synchronization and ADR central-risk semantic
+   reconciliation required by R2, with a new independent read-only re-verify pending;
+3. make the separate Commercial Frontend the sole customer-facing UI source only
+   after ADR-0001 acceptance and a remote-verified checkpoint;
+4. preserve Core Creator Server, Application and production authority;
+5. protect Legacy UI until separately authorized RB1.2 classification and removal;
+6. require the RB1.3 code-first Core audit and Architecture Review before M6-P1.
 
 ---
 
-# 2. Core Objective
+# 2. Proposed Responsibility Contract
 
-Prioritize the real production workspace over permanent navigation chrome.
+ONE CREATOR UI remains mandatory.
 
-Space priority:
+Subject to later ADR-0001 acceptance and a remote-verified rebaseline checkpoint, the
+proposed interpretation is:
 
-Production Content
->
-Object Navigator
->
-Inspector
->
-Project Stage Navigation
->
-Global Navigator
+ONE CREATOR UI
+=
+the customer-facing Commercial Frontend in the separate
+`AI-Cinematic-Studio-Frontend` repository.
 
-The user must receive maximum usable working space for:
+Core repository responsibility:
 
-- Script;
-- IP Bible;
-- Character;
-- Storyboard;
-- Shot;
-- Timeline.
+- Creator Server Runtime;
+- Creator Public HTTP/API;
+- Creator Application commands, queries, DTOs and services;
+- authorization and tenant/workspace enforcement;
+- Domain and V5 Core OS;
+- V4 Platform;
+- V3 Render Core;
+- Compute/Foundation integration;
+- persistence, migrations and infrastructure;
+- backend/application/domain/contract/integration tests.
 
----
+Frontend repository responsibility:
 
-# 3. Layout Modes
+- customer-facing Commercial SaaS pages and routes;
+- experience adapters;
+- frontend state and presentation;
+- responsive/accessibility/visual behavior;
+- customer workflow browser validation.
 
-UI-R2A finalizes the five reusable workspace modes established by UI-R2.
+Proposed cross-repository dependency chain:
 
-## L1 — Management
+```text
+Commercial Frontend
+↓
+Frontend Experience Adapter
+↓
+Creator Public HTTP/API
+↓
+Creator Application
+↓
+V5
+↓
+V4
+↓
+V3
+↓
+Compute/Foundation
+```
 
-Global Sidebar 240px
-+
-Main Workspace
+Canonical form:
+`Commercial Frontend → Frontend Experience Adapter → Creator Public HTTP/API → Creator Application → V5 → V4 → V3 → Compute/Foundation`
 
-Used by:
+The Frontend Experience Adapter belongs to the Frontend repository and may consume
+only Creator Public HTTP/API. The two repositories do not share customer UI source.
 
-- 首页
-- 项目
-- 资产库
-- 作品
+Forbidden:
 
-Inspector appears only when required.
-
----
-
-## L2 — Project Reading / Management
-
-Global Sidebar 72px
-+
-Main Workspace
-+
-Optional Inspector about 300px
-
-Project navigation uses compact top Stage Navigation and contextual local navigation.
-It must not consume a permanent second left column.
-
-Used by:
-
-- 项目概览
-- 系列规划
-- 分集
-- 故事
-
----
-
-## L3 — Professional Editor
-
-Global Sidebar 72px
-+
-Object Navigator about 200–220px
-+
-Main Editor
-+
-Inspector about 320px
-+
-Optional Bottom Drawer
-
-Used by:
-
-- Script Studio
-- IP Bible
-- Character Intelligence
-
-Project navigation is available through breadcrumb, top Stage Navigation,
-contextual local navigation, or a temporary drawer.
+- Frontend → Core source imports;
+- Frontend → Creator Application direct calls;
+- Frontend → Domain direct calls;
+- Frontend → SQL, Persistence or persistence adapters;
+- Frontend → Provider;
+- Frontend → private V5 adapters;
+- Frontend → GPU, Worker or ComfyUI;
+- Core → second customer-facing Commercial SaaS UI.
 
 ---
 
-## L4 — Visual Canvas
+# 3. Current Documentation-Only Work Package
 
-Global Sidebar 72px
-+
-Object Navigator about 180–220px
-+
-Canvas
-+
-Inspector about 320px
+The current work package may modify only these seven authority files:
 
-Used by:
+- `AGENTS.md`;
+- `AI_CINEMATIC_STUDIO_SYSTEM_MASTER_PLAN.md`;
+- `AI_CINEMATIC_STUDIO_UI_MASTER_PLAN.md`;
+- `CURRENT_MILESTONE.md`;
+- `architecture/system-context.md`;
+- `architecture/system-overview.md`;
+- `governance/ADR-0001-separate-commercial-experience-layer-from-core-creator-runtime.md`.
 
-- Storyboard
-- Shot
-- Scene
+Runtime, application, domain, test, migration, asset and separate Frontend repository
+changes are prohibited in this work package.
 
-Project Navigator must not permanently consume another column.
-
----
-
-## L5 — Timeline
-
-Global Sidebar 72px
-+
-Media / Track Navigator about 200px
-+
-Preview + Timeline Workspace
-+
-Inspector about 300px
-
-Timeline receives the highest horizontal workspace priority.
+This work package must stop at a PRE-COMMIT review. It does not commit or push.
 
 ---
 
-# 4. AI Director Layout
+# 4. Legacy Core Creator UI Status
 
-Move the permanent left-side Creative Input form
-into a top Creative Parameter area.
+`apps/creator-workspace-mvp` is a controlled `DECOMMISSION CANDIDATE`.
 
-Default state:
+Actual customer UI removal requires separate `PRE-M6-RB1.2` authorization. This
+work package does not delete, move or modify any file in that directory.
 
-compact parameter summary.
+Authorized for later removal only when proven UI-only:
 
-Display:
+- customer-facing pages and routes;
+- dashboard/workspace presentation;
+- page components and page-only CSS;
+- page-only visual evidence/assets;
+- UI-only browser tests;
+- presentation-only client state.
 
-- 主题
-- 类型
-- 目标用户
-- 时长
-- 发布平台
-- 视觉风格
-- 角色设定
+Must be preserved:
 
-Actions:
+- Creator Server Runtime;
+- HTTP/API handlers;
+- Application services;
+- commands, queries and public DTO/contracts;
+- auth and tenant/workspace enforcement;
+- Domain, V5/V4/V3, ports and adapters;
+- persistence and migrations;
+- backend/application/domain tests.
 
-- 编辑参数
-- 重新生成
-
-Expanded state:
-
-2–3 column parameter grid.
-
-The Director Result Workspace must receive the released horizontal space.
-
-Do not change AI Director Domain behavior.
-
-Do not change M1 Provider flow.
+Mixed UI/server files are `AMBIGUOUS_SHARED_FILE` until classified. Whole-directory
+deletion is not authorized.
 
 ---
 
-# 5. Global Sidebar Behavior
+# 5. Replacement Gate Model
 
-Global management pages:
+## Gate A — Frontend Experience Gate
 
-default width about 240px.
+Owner: separate Frontend repository.
 
-Inside Project Workspace / Professional Editor:
+Covers frontend tests, build, browser QA, responsive behavior, accessibility, visual
+quality and customer workflows.
 
-default collapsed width about 72px.
+## Gate B — Core HTTP Runtime Gate
 
-User may expand/collapse manually.
+Owner: Core repository.
 
-Collapse is presentation state only.
+Covers Creator Server startup, public HTTP/API contracts, Application commands and
+queries, authorization, tenant/workspace, persistence, idempotency, application
+integration and error contracts.
 
-It must not become a Domain fact.
+## Gate C — Cross-Repo Integration Gate
 
-No empty-width fake collapse is allowed.
+Future gate validating:
 
----
+```text
+Commercial Frontend
+↓
+Frontend Experience Adapter
+↓
+Creator Public HTTP/API
+↓
+Creator Application
+↓
+V5
+↓
+V4
+↓
+V3
+↓
+Compute/Foundation
+```
 
-# 6. Project Stage Navigation
-
-The permanent full-height Project second sidebar is removed.
-
-Project navigation is presented as compact top Stage Navigation:
-
-概览 · 策划 · 内容 · 制作 · 后期 · 交付
-
-The selected stage exposes compact local sub-navigation:
-
-策划
-- AI导演
-- 系列规划
-- IP圣经
-- 角色
-- 世界与连续性
-
-内容
-- 分集
-- 故事
-- 剧本
-- 一致性
-
-制作
-- 分镜
-- 镜头
-- 场景
-- 项目资产
-- 生成任务
-
-后期
-- 时间线
-- 预览
-- 质检
-- 审批
-
-交付
-- Master
-- 导出
-- 系列管理
-- 发布
-- 数据
-
-Local navigation may use horizontal tabs, compact segmented navigation,
-or a small contextual menu. It must not recreate a permanent 220px sidebar.
-
-Professional editors yield this navigation to their Object Navigator.
-Project navigation remains accessible through breadcrumb, stage menu,
-contextual button, or temporary drawer.
-
-“分集工作台” must not become a duplicate permanent navigation concept.
-
-Episode Workspace may remain as the Episode overview route.
-
-Maintain route compatibility.
+The Frontend Experience Adapter belongs to Frontend and may consume only Creator
+Public HTTP/API. Gate C must validate public contracts rather than shared source
+imports. Gate C is not implemented by this documentation work package.
 
 ---
 
-# 7. Compact Context Bar
+# 6. PRE-M6 Route
 
-Replace the current database-like multi-cell context header
-with a compact production context bar.
+Strict order:
 
-Target height:
+`PRE-M6-RB1.1 Source-of-Truth Rebaseline`
+→ `PRE-M6-RB1.2 Legacy UI Decommission`
+→ `PRE-M6-RB1.3 Full Core Current-State Audit`
+→ `Architecture Review`
+→ `M6 Preconditions`
+→ `M6-P1`
 
-about 48–52px.
-
-Example:
-
-晚灯系列制作 › 晚灯 › 第1集 › 剧本
-
-v3 · 已确认
-
-Detailed Refs / Lineage belong in Inspector.
-
-Context Bar must still use real:
-
-- projectRef
-- seriesRef
-- episodeRef
-- object/version context
-
-internally.
+The current stage is only the `PRE-M6-RB1.1` contract-closure revision. No step may be
+silently skipped or inferred complete.
 
 ---
 
-# 8. Inspector Rules
+# 7. M6 Entry Conditions
 
-Inspector must be collapsible.
+M6 remains `NOT STARTED / NOT AUTHORIZED`.
 
-Management pages:
+M6 Character Intelligence must include at least background, motivation, belief,
+conflict, goal, personality, behavior rules, dialogue rules, forbidden behavior,
+visual identity rules, `CharacterState`, `RelationshipContext`, timeline and
+continuity.
 
-hidden by default unless an object is selected.
+`M6 ≠ V5 Identity Lock`. M6 does not implement M7, GPU Render, ComfyUI, Worker or
+cross-repository UI.
 
-Reading pages:
+M6 cannot begin until all are true:
 
-optional.
+1. authoritative responsibility rebaseline accepted and remote-verified;
+2. legacy Core customer UI decommission completed safely;
+3. Gate B passes after decommission;
+4. full Core current-state audit completed;
+5. Project Lead architecture review completed;
+6. M6 prerequisites explicitly accepted;
+7. M6-P1 explicitly authorized in a later `CURRENT_MILESTONE.md` revision.
 
-Professional Editors:
+This document does not authorize M6 or M7 implementation.
 
-visible when space allows.
-
-At smaller widths:
-
-collapsed by default.
-
-Suggested widths:
-
-300–320px.
-
-Inspector must not leave a large empty permanent column
-when it contains little information.
-
----
-
-# 9. Story Layout
-
-Story becomes a reading-first workspace.
-
-Main Story Canvas receives priority.
-
-Inspector contains:
-
-- 来源
-- 版本
-- Episode
-- CreativePlan
-- Lineage
-
-Story remains the existing accepted Story Projection.
-
-Provider calls remain 0.
-
-No new Story authority.
+Legacy Phase 0 governance drift is `OPEN / DEFERRED TO PRE-M6-RB1.3`. It is not
+silently changed by this seven-file work package.
 
 ---
 
-# 10. Script Studio Layout
+# 8. Current Work Package Gates
 
-Script Studio becomes a real Professional Editor layout.
+- RV1 RESULT: BLOCKED / P1-RV1-001 AND P1-RV1-002
+- M5 STATUS SYNCHRONIZATION: R2 REVISION EXECUTED / INDEPENDENT RE-VERIFY PENDING
+- ADR CENTRAL-RISK SEMANTIC RECONCILIATION: R2 REVISION EXECUTED / INDEPENDENT RE-VERIFY PENDING
+- AUTHORITY HIERARCHY: UNCHANGED / INDEPENDENT RE-VERIFY PENDING
+- SYSTEM MASTER PLAN: UNCHANGED BY R2 / INDEPENDENT RE-VERIFY PENDING
+- AGENTS RULES: UNCHANGED BY R2 / INDEPENDENT RE-VERIFY PENDING
+- ACTIVE ARCHITECTURE BASELINE RECONCILIATION: PENDING INDEPENDENT RE-VERIFY
+- ADR STATUS: PROPOSED / NOT ACCEPTED
+- ACTIVE AUTHORITY CONTRADICTION SCAN: PENDING INDEPENDENT RE-VERIFY
+- DOCUMENT-ONLY SCOPE: R2 LOCAL VALIDATION EXECUTED / INDEPENDENT RE-VERIFY PENDING
+- RUNTIME CODE CHANGED: NO
+- TEST CODE CHANGED: NO
+- `git diff --check`: R2 LOCAL VALIDATION EXECUTED / INDEPENDENT RE-VERIFY PENDING
+- INDEPENDENT READ-ONLY RE-VERIFY: PENDING
 
-Global Sidebar:
-72px
-
-Scene Navigator:
-about 220px
-
-Script Editor:
-flex
-
-Inspector:
-about 320px
-
-Bottom Drawer:
-AI / Version / Jobs / Activity
-
-Project Navigator must not permanently occupy an additional full column.
-
-Preserve all real M3 behaviors:
-
-- Generate
-- Validate
-- Controlled Repair
-- Manual Edit
-- Scene Rewrite
-- Immutable Versions
-- Confirmation
-- Persistence
+No Git commit, push or tag is permitted in the current work package.
 
 ---
 
-# 11. Storyboard / Shot / Scene Reservation
+# 9. Stop Rule
 
-Storyboard and Shot must already receive their long-term canvas layout.
-
-Storyboard:
-
-Scene / Shot Navigator
-+
-Storyboard Canvas
-+
-Inspector
-
-Shot:
-
-Shot Navigator
-+
-Preview / Canvas
-+
-Inspector
-
-Scene:
-
-Scene Navigator
-+
-Scene Workspace
-+
-Inspector
-
-Do not implement M8 Domain.
-
-Only optimize the existing shell layout.
-
----
-
-# 12. Timeline Reservation
-
-Timeline must receive maximum horizontal priority.
-
-Project Navigator should not remain permanently visible
-inside Timeline editing mode.
-
-Layout:
-
-Media / Track Navigator
-+
-Preview Monitor
-+
-Timeline
-+
-Inspector
-
-Reserve tracks for future:
-
-- Video
-- Dialogue
-- Ambience
-- BGM
-- SFX
-- Subtitle
-
-Do not implement M13 Render capability.
-
----
-
-# 13. Creation Center Responsive Fix
-
-Fix the current card layout where Chinese text is compressed
-into near-vertical character wrapping.
-
-Recommended responsive behavior:
-
-large desktop:
-3 columns when card width remains usable
-
-medium desktop:
-2 columns
-
-narrow desktop:
-1 column
-
-Use a minimum useful card width.
-
-Do not force 3 columns when content becomes unreadable.
-
-Ensure normal Chinese text flow.
-
----
-
-# 14. Pages To Preserve
-
-The following current management layouts are generally accepted
-and should not be unnecessarily redesigned:
-
-- 首页
-- 项目列表
-- 全局资产库
-- 作品
-
-Only shared shell/responsive corrections are allowed.
-
----
-
-# 15. UI Architecture Hard Rule
-
-UI-R2 must reuse:
-
-- current Enterprise Dark Cinematic visual baseline;
-- current Global Navigation;
-- current Project IA;
-- current routes where possible;
-- one Creator UI;
-- current Creator HTTP Runtime.
-
-Do not create another frontend.
-
-Do not perform framework migration.
-
-Do not create a second static UI.
-
----
-
-# 16. Responsive Gate
-
-Verify at minimum:
-
-1920×1080
-
-1600×900
-
-1366×768
-
-1280×800
-
-1024 width
-
-Requirements:
-
-- no horizontal overflow;
-- no broken text wrapping;
-- no unusably narrow main editor;
-- navigator and inspector collapse correctly;
-- current object remains visible;
-- primary actions remain reachable.
-
----
-
-# 17. Real Capability Regression
-
-Must preserve real:
-
-M1 AI Director
-
-M2 Series / Episode
-
-M3 Script Studio
-
-Story Projection
-
-M4 Project Context
-
-M5 Series Planning / Series Director
-
-No accepted capability may become a shell or placeholder.
-
----
-
-# 18. Browser Gate
-
-Use real:
-
-http://127.0.0.1:8765/
-
-Accepted browser methods:
-
-Chrome
-or
-Chrome Headless + DevTools CDP
-
-Do not use file:// as final evidence.
-
-Verify:
-
-Console errors = 0
-
-Page errors = 0
-
-Unexpected HTTP errors = 0
-
-Horizontal overflow = 0
-
----
-
-# 19. Key Visual Evidence
-
-Provide HTTP Runtime evidence for:
-
-1. AI Director compact parameter mode
-2. AI Director expanded parameter mode
-3. Project Overview
-4. Story
-5. Script Studio
-6. Series Planning
-7. Storyboard shell
-8. Shot shell
-9. Timeline shell
-10. Creation Center
-11. Asset Library
-12. Works
-
----
-
-# 20. Required Gates
-
-UI LAYOUT IMPLEMENTATION PASS
-
-AI DIRECTOR SPACE OPTIMIZATION PASS
-
-GLOBAL SIDEBAR PASS
-
-PROJECT NAVIGATOR PASS
-
-CONTEXT BAR PASS
-
-INSPECTOR PASS
-
-STORY PASS
-
-SCRIPT EDITOR PASS
-
-STORYBOARD RESERVATION PASS
-
-SHOT RESERVATION PASS
-
-TIMELINE RESERVATION PASS
-
-CREATION CENTER RESPONSIVE PASS
-
-M1 REGRESSION PASS
-
-M2 REGRESSION PASS
-
-M3 REGRESSION PASS
-
-STORY REGRESSION PASS
-
-M4 REGRESSION PASS
-
-M5 REGRESSION PASS
-
-BROWSER PASS
-
-RESPONSIVE PASS
-
-ARCHITECTURE PASS
-
-SECRET SCAN PASS
-
-git diff --check PASS
-
-GIT COMMIT PASS
-
-GITHUB PUSH PASS
-
-REMOTE SHA == LOCAL SHA
-
-GIT STATUS CLEAN
-
----
-
-# 21. Git Checkpoint
-
-Suggested branch:
-
-codex/creator-ui-r2a-layout-freeze
-
-Suggested implementation commit:
-
-feat(creator): freeze professional workspace layout
-
-UI-R2A must have a Remote-Verified checkpoint.
-
----
-
-# 22. Stop Rule
-
-After all UI-R2A gates PASS:
-
-report:
-
-UI-R2A
-FEATURE ACCEPTED CANDIDATE
-AWAITING PROJECT LEAD ACCEPTANCE
+After the PRE-COMMIT report:
 
 STOP.
 
-Do NOT enter M6.
+Wait for Project Lead source-of-truth rebaseline review.
 
-Do NOT enter M7.
+Do not decommission UI code yet.
 
-M6 remains:
+Do not begin the full Core audit yet.
 
-NOT STARTED
-
-until Project Lead final acceptance.
-
-M7 remains:
-
-NOT STARTED / NOT AUTHORIZED
+Do not enter M6 or M7.
 
 ---
 
-# 23. Final Report
-
-UI-R2A BASE SHA:
+# 10. Required PRE-COMMIT Report
 
 BRANCH:
 
-GLOBAL SIDEBAR:
+HEAD:
 
-PROJECT NAVIGATOR:
+AUTHORITY_FILES_CHANGED:
 
-PROJECT STAGE NAVIGATION:
+ADR:
 
-LOCAL SUB-NAVIGATION:
+OLD_ONE_CREATOR_UI_RULE:
 
-CONTEXT BAR:
+NEW_ONE_CREATOR_UI_RULE:
 
-AI DIRECTOR:
+CORE_REPOSITORY_ROLE:
 
-STORY:
+FRONTEND_REPOSITORY_ROLE:
 
-SCRIPT STUDIO:
+CREATOR_SERVER_ROLE:
 
-SERIES PLANNING:
+LEGACY_UI_STATUS:
 
-STORYBOARD SHELL:
+BROWSER_GATE_REPLACEMENT:
 
-SHOT SHELL:
+CROSS_REPO_CONTRACT:
 
-TIMELINE SHELL:
+CURRENT_MILESTONE:
 
-CREATION CENTER:
+M6_STATUS:
 
-INSPECTOR:
+CONTRADICTION_SCAN:
 
-RESPONSIVE:
+RUNTIME_CODE_CHANGED:
 
-M1 REGRESSION:
+FINAL:
 
-M2 REGRESSION:
+`R2 REVISION EXECUTED / INDEPENDENT READ-ONLY RE-VERIFY PENDING`
 
-M3 REGRESSION:
+or
 
-STORY REGRESSION:
-
-M4 REGRESSION:
-
-M5 REGRESSION:
-
-TESTS:
-
-BROWSER:
-
-ARCHITECTURE:
-
-SECRET SCAN:
-
-DIFF CHECK:
-
-COMMIT SHA:
-
-PUSH:
-
-REMOTE SHA:
-
-LOCAL == REMOTE:
-
-GIT STATUS:
-
-M6 ENTERED:
-
-NO
-
-M7 ENTERED:
-
-NO
-
-UI-R2A STATUS:
-
-FEATURE ACCEPTED CANDIDATE
-/
-AWAITING PROJECT LEAD ACCEPTANCE
-
-STOP.
+`BLOCKED`
 
 # End of CURRENT_MILESTONE.md

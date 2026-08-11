@@ -2,19 +2,19 @@
 
 > Document: `AI_CINEMATIC_STUDIO_UI_MASTER_PLAN.md`
 >
-> Status: `UI MASTER BASELINE / UI-R1 FEATURE ACCEPTED`
+> Status: `UI MASTER PRE-COMMIT CANDIDATE / UI-R1 FEATURE ACCEPTED HISTORY / SUBJECT TO ADR-0001 ACCEPTANCE`
 >
-> Version: `v1.1`
+> Version: `v1.2`
 >
-> Date: `2026-08-10`
+> Date: `2026-08-11`
 >
-> System Accepted Base:
+> UI-R1 Historical System Base:
 > `1cc768ee9db4b52a916c94ae6af7b95b811f1cb2`
 >
 > UI-R1 Accepted SHA:
 > `c9536fc0c745d0bf9e9c3eb543f4ab6c0566798a`
 >
-> Revision: Enterprise Dark Cinematic Visual Baseline integrated after UI-R1 acceptance.
+> Revision: Proposed Commercial Experience Layer separation under `ADR-0001 / Proposed`.
 >
 > Scope:
 > AI Cinematic Studio Creator / Project Workspace / Production Editors /
@@ -23,6 +23,21 @@
 ---
 
 # 0. UI 总目标
+
+## 0.1 UI Source-of-Truth Repository
+
+`PRE-M6-RB1.1` 当前只提出一项条件性目标：ADR-0001 后续获得正式接受并形成
+remote-verified 重基线后，AI Cinematic Studio 继续只有一个客户产品 UI，且
+其源码真源是独立仓库 `AI-Cinematic-Studio-Frontend`，不是 Core 仓库。
+
+本文件继续定义跨仓库的产品体验、信息架构、视觉与交互基线。该条件性提案
+保留 Core 对 Creator Server Runtime、Creator Public HTTP/API、Creator
+Application 和 V5/V4/V3 等下层能力的责任，并拟议让 Core 不再承载第二套
+Commercial SaaS 客户页面。
+
+该提案要求 Frontend Experience Adapter 只通过公开 Creator HTTP/API 消费
+Core；禁止 Frontend 直接导入 Core 源码、访问 Creator Application、Domain、
+SQL、Persistence、Provider、private V5 Adapter、GPU、Worker 或 ComfyUI。
 
 AI Cinematic Studio UI 不得演化成：
 
@@ -86,17 +101,51 @@ UI 不拥有正式生产事实。
 
 UI 相关决策按照：
 
-1. AI_CINEMATIC_STUDIO_SYSTEM_MASTER_PLAN.md
-2. AI_CINEMATIC_STUDIO_UI_MASTER_PLAN.md
-3. AGENTS.md
-4. Accepted Git Baseline
-5. CURRENT_MILESTONE.md
-6. Repository Reality
-7. Current Conversation
+1. 适用的 `AGENTS.override.md`
+2. 最近层级的嵌套 `AGENTS.md`
+3. 根目录 `AGENTS.md`
+4. Accepted ADR 与强制治理规则
+5. `AI_CINEMATIC_STUDIO_SYSTEM_MASTER_PLAN.md`
+6. `AI_CINEMATIC_STUDIO_UI_MASTER_PLAN.md`，仅在 UI、UX、Frontend 范围内生效
+7. `CURRENT_MILESTONE.md`，仅控制当前任务、门禁和执行状态
+8. Accepted/remote-verified Git evidence，仅证明实现事实，不得自行改变架构
+9. Historical、superseded、archived evidence
 
 执行。
 
 聊天中的临时 UI 想法不能直接改变产品结构。
+
+PRE-M6 严格路线为：
+
+`PRE-M6-RB1.1 Source-of-Truth Rebaseline`
+→ `PRE-M6-RB1.2 Legacy UI Decommission`
+→ `PRE-M6-RB1.3 Full Core Current-State Audit`
+→ `Architecture Review`
+→ `M6 Preconditions`
+→ `M6-P1`
+
+当前只处于 `PRE-M6-RB1.1` 修订阶段。
+
+---
+
+## 2.1 Current Milestone Status Synchronization
+
+以下是当前治理状态，不是 UI-R1 接受时点的 historical snapshot：
+
+- M4 — Project Context Foundation：`ACCEPTED`；implementation evidence：
+  `4ec5de7273076d3b4f66272b6a4f0e3eecd89073`；
+- M5 — Series Planning + Series Director：`ACCEPTED`；implementation evidence：
+  `8c3e4271662e1e02e963618ade3c29d6e9f91e89`；
+- M4/M5 Accepted 状态的既有控制证据：
+  `55813b26be76a3476820dd1f638ac2f4561da448`；
+- Future Milestone 从 M6 开始；
+- M6 — Series IP Bible + Character Intelligence：
+  `NOT STARTED / NOT AUTHORIZED`。
+
+Milestone acceptance、implementation evidence、remote verification、UI/Product
+acceptance 和 current task status 是不同语义。M4/M5 的 Accepted 状态不表示
+ADR-0001 已接受、Architecture Review 已通过、Legacy UI 已获准删除、跨仓集成
+已经完成或 M6 已开始。
 
 ---
 
@@ -112,7 +161,15 @@ UI-R1 接受记录：
 - System Accepted Base: `1cc768ee9db4b52a916c94ae6af7b95b811f1cb2`；
 - UI-R1 Accepted SHA: `c9536fc0c745d0bf9e9c3eb543f4ab6c0566798a`；
 - Status: `FEATURE ACCEPTED`；
-- M4: `PAUSED / NOT STARTED`。
+- M4 at the historical UI-R1 acceptance point: `PAUSED / NOT STARTED`；当前状态：
+  `ACCEPTED`。
+
+UI-R2A 状态分层：
+
+- Product acceptance status：`NO SEPARATE ACCEPTANCE EVIDENCE / CANDIDATE`；
+- Remote verification status：`PASS`，pre-rebaseline HEAD
+  `602a78fe68fc5c69ecc31d9436ee166f5dff8a64`；
+- Active architecture status：`SUPERSEDED AS CURRENT TASK`。
 
 Enterprise Dark Cinematic Workstation 是当前唯一 Creator Visual Baseline，取代此前“管理页面偏明亮、专业编辑工作区偏深色”的双重视觉方向。Light Mode 若未来需要，必须作为独立主题能力处理，不得形成第二套 Creator UI。
 
@@ -197,14 +254,38 @@ Dark Form System：
 - 专业 Editor 使用统一暗色工作区、对象导航、主编辑区、Inspector、Version / Job / Activity Drawer 和 Workflow Action Bar；
 - M4–M19 原则上只激活既有壳层，不再重做全局 IA、Project Shell 或 Editor 框架。
 
-运行时与验收规则：
+拟议运行时与验收规则如下，须在 ADR-0001 后续接受并形成 remote-verified
+重基线后才生效：
 
-- ONE CREATOR UI；
-- Creator UI 修改必须进入真实 Creator Server Runtime，不得长期保留平行静态产品入口；
-- 最终 UI 证据必须来自 HTTP Runtime；
+- ONE CREATOR UI = 独立 `AI-Cinematic-Studio-Frontend` 仓库中的客户体验层；
+- Frontend Experience Adapter 属于 Frontend，且只能通过 Creator Public
+  HTTP/API 连接真实 Creator Server Runtime；
+- UI 源码不需要且不得继续以第二套商业产品形式保存在 Core 仓库；
+- Frontend 最终 UI 证据必须来自其真实 HTTP Runtime；
 - `file://` 仅可用于临时视觉检查，不得作为最终 Browser、Live、Integration 或视觉验收证据；
 - UI Shell 不得虚构尚未存在的 Domain fact、Ref、Version、Lineage、Job 或生产状态；
 - 已接受的 M1 / M2 / M3 能力必须在当前 Shell 中保持真实，不得退化为静态 Demo 或“即将上线”。
+
+完整跨仓依赖链为：
+
+`Commercial Frontend → Frontend Experience Adapter → Creator Public HTTP/API → Creator Application → V5 → V4 → V3 → Compute/Foundation`
+
+Frontend 不得直接访问 Creator Application、Domain、SQL、Persistence、Provider、
+private V5、GPU、Worker 或 ComfyUI。Core 不重新建立客户 Commercial UI；两个
+仓库不共享客户 UI 源码。
+
+验收门禁拆分为：
+
+- Gate A — Frontend Experience Gate：由独立 Frontend 仓库负责 build、browser、responsive、accessibility、visual 与客户流程；
+- Gate B — Core HTTP Runtime Gate：由 Core 负责 Creator Server、公开 API、Application、授权、租户/Workspace、持久化、幂等、集成与错误合同；
+- Gate C — Cross-Repo Integration Gate：未来验证
+  `Commercial Frontend → Frontend Experience Adapter → Creator Public HTTP/API → Creator Application → V5 → V4 → V3 → Compute/Foundation`；
+  当前未实现，不允许共享源码集成。
+
+Core 中 `apps/creator-workspace-mvp` 的历史浏览器 UI 在本候选中继续标记为
+`DECOMMISSION CANDIDATE`，不是新的 UI 真源。其 server/API/Application 混合
+责任必须逐文件分类并保留；混合文件保持 `AMBIGUOUS_SHARED_FILE`。禁止盲目
+删除整个目录，实际退出只能在 `PRE-M6-RB1.2` 获得单独授权后执行。
 
 UI-R1 接受后，后续重点继续是稳定 Information Architecture、点亮真实能力和提升工作流效率，而不是无业务原因的整体换肤。
 
@@ -836,9 +917,32 @@ Stale
 
 角色页面不是普通“角色卡片库”。
 
+M6 Character Intelligence 的规范范围至少包含：background、motivation、belief、
+conflict、goal、personality、behavior rules、dialogue rules、forbidden behavior、
+visual identity rules、`CharacterState`、`RelationshipContext`、timeline and
+continuity。
+
 必须支持：
 
 Character Identity
+
+Background
+
+Motivation
+
+Belief
+
+Conflict
+
+Goal
+
+Personality
+
+Behavior Rules
+
+Dialogue Rules
+
+Forbidden Behavior
 
 Character State
 
@@ -848,9 +952,18 @@ Relationship
 
 Visual Identity
 
+Visual Identity Rules
+
 Voice Identity
 
 Continuity
+
+`RelationshipContext`
+
+Timeline and Continuity
+
+M6 边界：`M6 ≠ V5 Identity Lock`。M6 不实现 M7、GPU Render、ComfyUI、
+Worker 或跨仓 UI；M6 当前仍为 `NOT STARTED / NOT AUTHORIZED`。
 
 示意：
 
@@ -2181,6 +2294,9 @@ Project
 
 长期路由原则：
 
+以下客户路由由独立 Frontend 仓库实现，并通过公开 Creator HTTP/API 获取
+权威状态。路由字符串不是 Core API 路径、Domain identity 或跨仓库源码合同。
+
 /creator
 
 /creator/ai-director
@@ -2281,6 +2397,10 @@ Project Workspace IA。
 
 Redirect / Compatibility Route。
 
+本节现指独立 Frontend 仓库内的客户路由迁移。Core 中历史 Creator Browser
+Route 不再是客户产品入口；仅当 Creator Server/API 兼容性确有需要时保留
+服务端 HTTP 行为，且不得借兼容名义维持第二套客户 UI。
+
 ---
 
 # 64. Desktop Strategy
@@ -2334,7 +2454,12 @@ Edge
 
 任何正式 UI Milestone：
 
-必须真实 Browser Gate。
+必须在独立 Frontend 仓库执行 Gate A — Frontend Experience Gate，并使用
+真实 HTTP Runtime。涉及真实 Core 能力的客户流程还必须执行 Gate C —
+Cross-Repo Integration Gate。
+
+Core 仓库执行 Gate B — Core HTTP Runtime Gate；该 Gate 验证公开 API 和
+Application 行为，不以客户 UI 视觉截图作为 Core 完成证据。
 
 ---
 
@@ -2381,6 +2506,9 @@ No accidental destructive action
 ---
 
 # 68. M4–M19 UI Activation Map
+
+本章是独立 Frontend 仓库的 Experience activation map。Core Milestone 负责
+提供相应公开合同和真实能力，不在 Core 仓库内重新实现这些客户页面。
 
 ## M4 — Project Context Foundation
 
@@ -2757,6 +2885,12 @@ Enterprise Management ≠ Creative Workspace
 Milestones Activate UI
 
 Milestones Do Not Redesign UI
+
+One Commercial Frontend Repository
+
+Public HTTP/API Integration Only
+
+No Second Customer UI in Core
 
 ---
 
