@@ -4,9 +4,9 @@
 >
 > Execution Mode: MANUAL
 >
-> Current Task: `PRE-M6-RB1.2 — Legacy UI Decommission`
+> Current Task: `PRE-M6-RB1.3 — Core Full Audit`
 >
-> Current Work Package: `Authorized Legacy UI classification and decommission / implementation not started`
+> Current Work Package: `RB1.2 checkpoint authorized / RB1.3 authorized but not started`
 >
 > M6 Authorization: `NOT AUTHORIZED`
 >
@@ -51,8 +51,8 @@ Accepted milestones and integration checkpoints:
 - UI-R2A — Remote verification status — PASS AT `602a78fe68fc5c69ecc31d9436ee166f5dff8a64`
 - UI-R2A — Active architecture status — SUPERSEDED AS CURRENT TASK
 
-UI-R2A remains historical implementation evidence until the legacy Core browser UI is
-decommissioned. It is no longer the active work package and does not authorize M6.
+UI-R2A remains historical implementation evidence after the legacy Core browser UI
+decommission. It is no longer an active Core work package and does not authorize M6.
 
 ---
 
@@ -60,11 +60,11 @@ decommissioned. It is no longer the active work package and does not authorize M
 
 Current stage:
 
-`PRE-M6-RB1.2`
+`PRE-M6-RB1.3`
 
 Title:
 
-Legacy UI Decommission
+Core Full Audit
 
 Status:
 
@@ -72,15 +72,14 @@ Status:
 
 Purpose:
 
-1. record `PRE-M6-RB1.1` as `CLOSED` at remote-verified checkpoint
+1. preserve `PRE-M6-RB1.1` as `CLOSED` at remote-verified checkpoint
    `00793953e71711ab95724353d97d3a913be2b853`;
-2. execute only the authorized RB1.2 classification and safe removal of the Legacy
-   Core customer UI while preserving Creator Server, Application and production
-   authority;
-3. keep the separate Commercial Frontend as the sole customer-facing UI source;
-4. require independent RB1.2 review before closure or checkpoint authorization;
-5. keep RB1.3 unauthorized until a later explicit Project Lead decision;
-6. require the RB1.3 code-first Core audit and Architecture Review before M6-P1.
+2. record the independent RB1.2 review as `ACCEPTED` and its checkpoint as
+   `AUTHORIZED`;
+3. close RB1.2 when the authorized checkpoint commit becomes remote-verified;
+4. authorize RB1.3 as the next task without beginning it in the RB1.2 checkpoint task;
+5. require the RB1.3 code-first Core audit and Architecture Review before M6-P1;
+6. keep M6 and M7 not started and not authorized.
 
 ---
 
@@ -171,13 +170,14 @@ must not be staged, committed or pushed by this work package.
 
 # 4. Legacy Core Creator UI Status
 
-`apps/creator-workspace-mvp` is a controlled `DECOMMISSION CANDIDATE`.
+`apps/creator-workspace-mvp` is `DECOMMISSIONED / REVIEW PENDING`.
 
-This milestone is the explicit `PRE-M6-RB1.2` authorization. It permits removal only
-after repository dependencies prove a target to be UI-only; runtime/API/application
-responsibilities in the same directory remain protected.
+Repository dependency analysis classified all 98 tracked files under the hyphenated
+`apps/creator-workspace-mvp` path as customer UI-only. They were removed without
+removing the underscore package `apps/creator_workspace_mvp`, which continues to own
+Creator Server public HTTP/API and Application runtime responsibilities.
 
-Authorized for later removal only when proven UI-only:
+Removed after UI-only classification:
 
 - customer-facing pages and routes;
 - dashboard/workspace presentation;
@@ -259,9 +259,9 @@ Strict order:
 → `M6-P1`
 
 `PRE-M6-RB1.1` is `CLOSED`; its checkpoint and Local/Remote verification are `PASS` at
-`00793953e71711ab95724353d97d3a913be2b853`. The current stage is only the authorized
-`PRE-M6-RB1.2` implementation. RB1.3 remains `NOT AUTHORIZED`; no later step may be
-silently skipped or inferred complete.
+`00793953e71711ab95724353d97d3a913be2b853`. RB1.2 is independently accepted and closes
+when this authorized checkpoint becomes remote-verified. RB1.3 is the next authorized
+task but remains `NOT STARTED`; no later step may be silently skipped or inferred complete.
 
 ---
 
@@ -302,81 +302,44 @@ silently changed by this seven-file work package.
 - RB1.1 CHECKPOINT: `00793953e71711ab95724353d97d3a913be2b853`
 - RB1.1 LOCAL / REMOTE VERIFICATION: `PASS`
 - ADR-0001 STATUS: `Accepted`
-- PRE-M6-RB1.2: `AUTHORIZED / NOT STARTED`
-- PRE-M6-RB1.3: `NOT AUTHORIZED`
+- PRE-M6-RB1.2 INDEPENDENT REVIEW: `ACCEPTED`
+- RB1.2 CHECKPOINT: `AUTHORIZED / THIS COMMIT`
+- PRE-M6-RB1.2: `CLOSED WITH REMOTE-VERIFIED CHECKPOINT`
+- PRE-M6-RB1.3: `AUTHORIZED / NOT STARTED`
 - P3-RV1-003: `OPEN / NON-BLOCKING EOL AUDIT DEBT`
 - M6: `NOT STARTED / NOT AUTHORIZED`
 - M7: `NOT STARTED / NOT AUTHORIZED`
-- RUNTIME CODE CHANGED: NO, before RB1.2 implementation
-- TEST CODE CHANGED: NO, before RB1.2 implementation
+- RUNTIME CODE CHANGED: YES, static customer UI mounting removed only
+- TEST CODE CHANGED: YES, UI-only tests removed and no-UI Core contract added
 
-RB1.2 implementation results must not be staged, committed, pushed or tagged before
-independent review and separate checkpoint authorization.
+RB1.3 execution must not begin within the RB1.2 checkpoint task.
 
 ---
 
 # 9. Stop Rule
 
-After the RB1.2 implementation report:
+After the RB1.2 checkpoint is remote-verified:
 
 STOP.
 
-Wait for independent RB1.2 review and Project Lead decision.
+Report the checkpoint and wait for execution of the separately authorized RB1.3 task.
 
-Do not begin the full Core audit yet.
+Do not begin the full Core audit within this checkpoint task.
 
 Do not enter M6 or M7.
 
 ---
 
-# 10. Required RB1.2 Implementation Report
+# 10. Next Authorized Task
 
-BRANCH:
+`PRE-M6-RB1.3 — Core Full Audit`
 
-HEAD:
+Status:
 
-AUTHORITY_FILES_CHANGED:
+`AUTHORIZED / NOT STARTED`
 
-ADR:
-
-OLD_ONE_CREATOR_UI_RULE:
-
-NEW_ONE_CREATOR_UI_RULE:
-
-CORE_REPOSITORY_ROLE:
-
-FRONTEND_REPOSITORY_ROLE:
-
-CREATOR_SERVER_ROLE:
-
-LEGACY_UI_STATUS:
-
-BROWSER_GATE_REPLACEMENT:
-
-CROSS_REPO_CONTRACT:
-
-RB1_1_CLOSURE:
-
-RB1_1_CHECKPOINT:
-
-RB1_2_STATUS:
-
-M6_STATUS:
-
-LEGACY_UI_SCOPE:
-
-CORE_RUNTIME_GATE:
-
-FRONTEND_EXCLUSION:
-
-RUNTIME_CODE_CHANGED:
-
-FINAL:
-
-`RB1.2 IMPLEMENTED / REVIEW PENDING`
-
-or
-
-`BLOCKED`
+RB1.3 must perform the code-first Core current-state audit and complete its required
+Architecture Review before any M6 precondition or implementation authorization can be
+considered. This checkpoint does not begin RB1.3, M6 or M7.
 
 # End of CURRENT_MILESTONE.md

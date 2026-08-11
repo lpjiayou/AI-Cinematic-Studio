@@ -1,6 +1,5 @@
 import json
 import os
-from pathlib import Path
 from io import StringIO
 import threading
 import unittest
@@ -35,10 +34,6 @@ from services.v4_platform import (
     TextMessage,
     create_text_provider_from_environment,
 )
-
-
-REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
-APP_ROOT = REPOSITORY_ROOT / "apps" / "creator-workspace-mvp"
 
 
 def valid_brief():
@@ -363,7 +358,7 @@ class TextProviderAdapterTests(unittest.TestCase):
 
 class CreatorAiDirectorEndpointTests(unittest.TestCase):
     def _serve(self, provider):
-        server = create_server(("127.0.0.1", 0), AiDirectorService(provider), APP_ROOT)
+        server = create_server(("127.0.0.1", 0), AiDirectorService(provider))
         thread = threading.Thread(target=server.serve_forever, daemon=True)
         thread.start()
         self.addCleanup(server.server_close)
@@ -424,19 +419,6 @@ class CreatorAiDirectorEndpointTests(unittest.TestCase):
         self.assertEqual(payload["error"]["code"], "unsupported_media_type")
         self.assertEqual(provider.requests, [])
 
-    def test_get_static_assets_uses_creator_handler(self):
-        base_url = self._serve(FakeTextProvider([]))
-        with request.urlopen(f"{base_url}/app.js", timeout=5) as response:
-            body = response.read().decode("utf-8")
-        self.assertEqual(response.status, 200)
-        self.assertTrue(response.headers["Server"].startswith("CreatorWorkspace/1.0"))
-        self.assertIn('aiDirectorEndpoint = "/creator/internal/ai-director/plan"', body)
-
-    def test_frontend_and_server_endpoint_paths_match_exactly(self):
-        script = (APP_ROOT / "app.js").read_text(encoding="utf-8")
-        self.assertEqual(AI_DIRECTOR_ENDPOINT, "/creator/internal/ai-director/plan")
-        self.assertIn(f'aiDirectorEndpoint = "{AI_DIRECTOR_ENDPOINT}"', script)
-
     def test_endpoint_rejects_invalid_brief_without_provider_call(self):
         provider = FakeTextProvider([json.dumps(valid_plan())])
         base_url = self._serve(provider)
@@ -478,87 +460,6 @@ class CreatorAiDirectorEndpointTests(unittest.TestCase):
         self.assertNotIn("Authorization", diagnostic.getvalue())
         self.assertNotIn("test-only-secret", diagnostic.getvalue())
         self.assertNotIn("provider request failed", body)
-
-
-class AiDirectorFrontendContractTests(unittest.TestCase):
-    @classmethod
-    def setUpClass(cls):
-        cls.index = (APP_ROOT / "index.html").read_text(encoding="utf-8")
-        cls.script = (APP_ROOT / "app.js").read_text(encoding="utf-8")
-
-    def test_loading_error_and_success_states_are_present(self):
-        self.assertIn('data-ai-director-state="generating"', self.script)
-        self.assertIn("正在整理导演方案…", self.script)
-        self.assertIn('data-ai-director-state="error"', self.script)
-        self.assertIn("导演方案暂时无法生成，请稍后重试", self.script)
-        self.assertIn('data-ai-director-state="${state.aiDirectorConfirmed ? "confirmed" : "result"}"', self.script)
-
-    def test_four_director_regions_and_production_plan_are_dynamic(self):
-        for marker in ("故事方向", "剧本草案", "分镜规划", "视觉风格", "镜头数量", "角色需求", "场景需求", "资产需求", "声音需求"):
-            self.assertIn(marker, self.script)
-        self.assertIn("plan.storyDirection", self.script)
-        self.assertIn("plan.storyboardPlan", self.script)
-        self.assertIn("state.aiDirectorPlan.productionPlan", self.script)
-
-    def test_human_confirmation_gate_controls_episode_project_creation(self):
-        self.assertIn('data-action="confirm-ai-director-plan"', self.script)
-        self.assertIn(
-            'if (!state.confirmedCreativePlan || state.seriesEpisodePhase === "creating") return',
-            self.script,
-        )
-        self.assertIn("人工确认并保存当前创意方案后，才可创建系列与集数", self.script)
-        self.assertIn("state.confirmedCreativePlan", self.script)
-        self.assertIn("creativePlanRef: state.confirmedCreativePlan.creativePlanRef", self.script)
-        self.assertIn("director-plan-state-confirmed", self.script)
-        self.assertIn("<strong>已确认</strong><small>当前会话</small>", self.script)
-        self.assertNotIn("已确认（当前会话）", self.script)
-
-    def test_confirmed_plan_is_structurally_bound_to_episode_creation(self):
-        self.assertNotIn("function buildAiDirectorProjectDraftInput", self.script)
-        self.assertNotIn('schemaVersion: "creator.project-draft-input.v1"', self.script)
-        self.assertIn("function createSeriesEpisode(form)", self.script)
-        self.assertIn("creativePlanRef: state.confirmedCreativePlan.creativePlanRef", self.script)
-        self.assertIn("workspaceRef", self.script)
-        self.assertIn("seriesRef: seriesRefValue", self.script)
-        self.assertIn("episodeNumber:", self.script)
-        self.assertIn("seasonNumber: 1", self.script)
-        self.assertIn("volumeNumber: 1", self.script)
-        self.assertIn("episodePayload.episode.episodeRef", self.script)
-
-    def test_regenerate_is_explicit_and_preserves_confirmed_plan_on_error(self):
-        self.assertIn('data-action="regenerate-ai-director"', self.script)
-        self.assertIn("const previousPlan = state.aiDirectorPlan", self.script)
-        self.assertIn("state.aiDirectorPlan = previousPlan", self.script)
-        self.assertIn("已确认方案仍保留在当前会话", self.script)
-
-    def test_frontend_contains_no_secret_or_external_provider_host(self):
-        combined = f"{self.index}\n{self.script}"
-        for marker in ("PROVIDER_API_KEY", "Authorization", "api.deepseek.com", "DeepSeek", "sk-"):
-            self.assertNotIn(marker, combined)
-        self.assertEqual(self.script.count("fetch("), 1)
-        self.assertIn('requestApplicationJson(aiDirectorEndpoint, {', self.script)
-        self.assertIn('aiDirectorEndpoint = "/creator/internal/ai-director/plan"', self.script)
-
-    def test_session_state_has_no_browser_or_database_persistence(self):
-        for marker in ("localStorage", "sessionStorage", "indexedDB", "database"):
-            self.assertNotIn(marker, self.script)
-        self.assertIn("aiDirectorPlanVersion", self.script)
-        self.assertIn("confirmedCreativePlan: null", self.script)
-        self.assertIn('confirmCreativePlanEndpoint = "/creator/internal/creative-plans/confirm"', self.script)
-        self.assertNotIn("aiDirectorProjectDraft", self.script)
-
-    def test_existing_routes_preview_and_export_semantics_remain(self):
-        self.assertIn('"/creator/projects/:projectRef/post/preview"', self.script)
-        self.assertIn('"/creator/projects/:projectRef/delivery/exports"', self.script)
-        self.assertIn("候选预览", self.script)
-        self.assertIn('data-capability="export" disabled', self.script)
-
-    def test_no_silent_fixture_fallback_plan_remains(self):
-        fixture = json.loads(
-            self.index.split('id="creator-fixture">', 1)[1].split("</script>", 1)[0]
-        )
-        self.assertNotIn("output", fixture["aiDirector"])
-        self.assertNotIn("runAiDirectorFixture", self.script)
 
 
 if __name__ == "__main__":

@@ -27,8 +27,6 @@ from services.v5_core_os.script_studio import create_in_memory_boundary as creat
 from tests.unit.test_ai_director_phase1 import valid_brief, valid_plan
 
 
-ROOT = Path(__file__).resolve().parents[2]
-APP_ROOT = ROOT / "apps" / "creator-workspace-mvp"
 WORKSPACE = "workspace-project-http"
 PROFILE = "content-profile-project-http"
 
@@ -40,7 +38,6 @@ class CreatorProjectHttpTests(unittest.TestCase):
         self.server = create_server(
             ("127.0.0.1", 0),
             AiDirectorService(FakeTextProvider([])),
-            APP_ROOT,
             series_episode_boundary=self.series_boundary,
             project_boundary=self.project_boundary,
             script_studio_boundary=create_script_boundary(self.series_boundary),
@@ -188,12 +185,6 @@ class CreatorProjectHttpTests(unittest.TestCase):
             self.assertEqual(payload["error"]["code"], "dependent_project_exists")
         else:
             self.fail("linked Series delete unexpectedly succeeded")
-
-    def test_static_assets_continue_to_be_served(self):
-        with request.urlopen(f"{self.base_url}/app.js", timeout=5) as response:
-            self.assertEqual(response.status, 200)
-            self.assertIn(b"/creator/projects", response.read())
-
 
 class CreatorProjectRestartTests(unittest.TestCase):
     def test_shared_local_database_preserves_project_series_relationship(self):

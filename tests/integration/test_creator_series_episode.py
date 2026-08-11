@@ -24,8 +24,6 @@ from services.v5_core_os.script_studio import create_in_memory_boundary as creat
 from tests.unit.test_script_studio_m3 import script_candidate
 
 
-ROOT = Path(__file__).resolve().parents[2]
-APP_ROOT = ROOT / "apps" / "creator-workspace-mvp"
 WORKSPACE = "workspace-http"
 PROFILE = "content-profile-http"
 
@@ -39,7 +37,6 @@ class CreatorSeriesEpisodeHttpTests(unittest.TestCase):
         self.server = create_server(
             ("127.0.0.1", 0),
             AiDirectorService(self.provider),
-            APP_ROOT,
             series_episode_boundary=self.boundary,
             script_studio_boundary=self.script_boundary,
         )
@@ -296,7 +293,7 @@ class CreatorSeriesEpisodeHttpTests(unittest.TestCase):
             self.create_episode(series, plan, canonicalProjectRef="ui-project-id")
         self.assertEqual(context.exception.code, 400)
 
-    def test_malformed_json_is_structured_and_static_get_still_works(self):
+    def test_malformed_json_is_structured(self):
         bad = request.Request(
             f"{self.base_url}{SERIES_ENDPOINT}",
             data=b"{bad",
@@ -306,8 +303,6 @@ class CreatorSeriesEpisodeHttpTests(unittest.TestCase):
         with self.assertRaises(error.HTTPError) as context:
             request.urlopen(bad, timeout=5)
         self.assertEqual(json.loads(context.exception.read().decode("utf-8"))["error"]["code"], "invalid_request")
-        with request.urlopen(f"{self.base_url}/app.js", timeout=5) as response:
-            self.assertEqual(response.status, 200)
 
     def test_responses_hide_provider_secret_and_storage_details(self):
         series = self.create_series()

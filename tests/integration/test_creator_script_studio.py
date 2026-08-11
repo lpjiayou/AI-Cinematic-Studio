@@ -177,11 +177,6 @@ class ScriptStudioHttpIntegrationTests(unittest.TestCase):
         payload = self.payload(context.exception)
         self.assertEqual((context.exception.code, payload["error"]["code"]), (409, "script_not_confirmed"))
 
-    def test_static_get_still_serves_creator_application(self):
-        with self.get("/") as response:
-            self.assertEqual(response.status, 200)
-            self.assertIn(b"Creator", response.read())
-
     def test_provider_failure_leaves_no_empty_script_version_and_hides_secret(self):
         self.provider._outcomes = [ProviderTimeoutError("secret-provider-body")]
         with self.post(SCRIPT_GENERATE_ENDPOINT, self.scope) as response:

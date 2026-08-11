@@ -1,11 +1,10 @@
-"""Same-origin Creator Workspace server and AI Director application endpoint."""
+"""Creator Core public HTTP/API server."""
 
 from __future__ import annotations
 
 from functools import partial
-from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import json
-from pathlib import Path
 import sys
 from typing import Any
 from urllib.parse import parse_qs, unquote, urlsplit
@@ -86,8 +85,8 @@ class _UnconfiguredTextProvider:
         raise ProviderConfigurationError("provider credential is required")
 
 
-class CreatorRequestHandler(SimpleHTTPRequestHandler):
-    server_version = "CreatorWorkspace/1.0"
+class CreatorRequestHandler(BaseHTTPRequestHandler):
+    server_version = "CreatorCore/1.0"
 
     def __init__(
         self,
@@ -373,7 +372,7 @@ class CreatorRequestHandler(SimpleHTTPRequestHandler):
         except SeriesPlanningPublicError as exc:
             self._send_series_planning_error(exc)
             return
-        super().do_GET()
+        self._send_application_error(404, "not_found")
 
     def _handle_series_planning_post(self, path: str, payload: MappingLike) -> None:
         try:
@@ -686,14 +685,9 @@ class CreatorRequestHandler(SimpleHTTPRequestHandler):
 MappingLike = dict[str, Any]
 
 
-def default_static_directory() -> Path:
-    return Path(__file__).resolve().parents[1] / "creator-workspace-mvp"
-
-
 def create_server(
     address: tuple[str, int],
     service: AiDirectorService,
-    static_directory: Path | None = None,
     series_episode_boundary: SeriesEpisodePublicBoundary | None = None,
     project_boundary: ProjectPublicBoundary | None = None,
     series_director_service: SeriesDirectorApplicationService | None = None,
@@ -701,7 +695,6 @@ def create_server(
     script_studio_service: ScriptStudioApplicationService | None = None,
     script_studio_boundary: ScriptStudioPublicBoundary | None = None,
 ) -> ThreadingHTTPServer:
-    directory = (static_directory or default_static_directory()).resolve()
     series_boundary = series_episode_boundary or create_in_memory_series_boundary()
     projects = project_boundary or create_in_memory_project_boundary(series_boundary)
     planning = series_planning_boundary or create_in_memory_series_planning_boundary(projects)
@@ -714,7 +707,6 @@ def create_server(
         series_planning_boundary=planning,
         script_studio_service=script_studio_service or ScriptStudioApplicationService(_UnconfiguredTextProvider()),
         script_studio_boundary=script_studio_boundary or create_in_memory_script_boundary(series_boundary),
-        directory=str(directory),
     )
     server = ThreadingHTTPServer(address, handler)
     server.daemon_threads = True
@@ -756,7 +748,7 @@ def main() -> None:
         script_studio_service=script_service,
         script_studio_boundary=create_local_script_boundary_from_environment(series_boundary),
     )
-    print("Creator Workspace available at http://127.0.0.1:8765")
+    print("Creator Core API available at http://127.0.0.1:8765")
     try:
         server.serve_forever()
     except KeyboardInterrupt:

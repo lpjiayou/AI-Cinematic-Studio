@@ -10,7 +10,6 @@ from tests.unit.test_series_planning_m5 import WORKSPACE, confirm, create_contex
 ROOT = Path(__file__).resolve().parents[2]
 SERVER = ROOT / "apps" / "creator_workspace_mvp" / "server.py"
 APPLICATION = ROOT / "apps" / "creator_workspace_mvp" / "series_director.py"
-BROWSER = ROOT / "apps" / "creator-workspace-mvp" / "app.js"
 
 
 class CreatorSeriesPlanningContractTests(unittest.TestCase):
@@ -66,15 +65,6 @@ class CreatorSeriesPlanningContractTests(unittest.TestCase):
         )
         self.assertNotIn("services.v4_platform", v5_sources)
         self.assertNotIn("DeepSeek", v5_sources)
-
-    def test_browser_uses_same_origin_application_endpoint_without_provider_authority(self):
-        browser = BROWSER.read_text(encoding="utf-8")
-        self.assertIn('const seriesPlanningEndpoint = "/creator/internal/series-planning"', browser)
-        self.assertIn("seriesPlanningGenerateEndpoint", browser)
-        self.assertIn("seriesPlanningConfirmEndpoint", browser)
-        self.assertNotIn("api.deepseek.com", browser)
-        self.assertNotIn("Authorization", browser)
-        self.assertNotIn("episodeRef: item.episodePlanItemRef", browser)
 
     def test_provider_failure_contract_exposes_only_safe_schema_diagnostics(self):
         server = SERVER.read_text(encoding="utf-8")

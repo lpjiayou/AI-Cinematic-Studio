@@ -19,7 +19,7 @@ Phase 0 只固化以下事实：
 
 | 逻辑层 | 物理位置 | 主要作用 |
 | --- | --- | --- |
-| 交付层 | `apps/` | 继续承载 Core Creator Server、公开 HTTP/API 运行入口及获批的非客户技术工具；若 ADR-0001 后续获得正式接受，则不承载 Commercial SaaS 客户体验层 |
+| 交付层 | `apps/` | 继续承载 Core Creator Server、公开 HTTP/API 运行入口及获批的非客户技术工具；根据已接受的 ADR-0001，不承载 Commercial SaaS 客户体验层 |
 | 服务层 | `services/` | 承载未来获批的独立运行或部署单元 |
 | 复用层 | `packages/` | 承载经过验证的共享契约与通用能力 |
 | 平台层 | `infrastructure/` | 承载环境、构建、部署和平台资源声明 |
@@ -29,9 +29,9 @@ Phase 0 只固化以下事实：
 
 生产资产只能从明确的上层入口依赖稳定的下层公开能力。治理和架构文档约束生产资产，但不得作为运行时依赖。测试可以依赖被测资产，生产资产不得依赖测试。
 
-`ADR-0001 / Proposed` 条件性提出：客户 Commercial Frontend 位于独立 `AI-Cinematic-Studio-Frontend` 仓库，Core 通过公开 Creator HTTP/API 提供 Application 能力，并且不通过 `apps/` 维护第二套客户 UI。该表述在 ADR 获得所需审批和 remote-verified 重基线前不构成已生效架构规则。
+`ADR-0001 / Accepted` 确立：客户 Commercial Frontend 位于独立 `AI-Cinematic-Studio-Frontend` 仓库，Core 通过公开 Creator HTTP/API 提供 Application 能力，并且不通过 `apps/` 维护第二套客户 UI。该规则已由 remote-verified 的 PRE-M6-RB1.1 治理基线生效。
 
-拟议的唯一跨仓链为：
+唯一跨仓链为：
 
 `Commercial Frontend → Frontend Experience Adapter → Creator Public HTTP/API → Creator Application → V5 → V4 → V3 → Compute/Foundation`
 
