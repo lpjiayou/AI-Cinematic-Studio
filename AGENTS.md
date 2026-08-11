@@ -62,30 +62,18 @@ or an explicitly defined technical checkpoint state.
 
 # 2. Source-of-Truth Hierarchy
 
-Before any major implementation work, Codex MUST read:
+Before any work, Codex MUST discover and read every applicable instruction source.
+The following authority order is frozen verbatim for this repository:
 
-1. AI_CINEMATIC_STUDIO_SYSTEM_MASTER_PLAN.md
-2. AI_CINEMATIC_STUDIO_UI_MASTER_PLAN.md
-3. AGENTS.md
-4. CURRENT_MILESTONE.md
-5. accepted Git / GitHub baseline
-6. current repository reality
-
-Authority order:
-
-SYSTEM MASTER PLAN
-↓
-UI MASTER PLAN
-↓
-AGENTS.md
-↓
-CURRENT_MILESTONE.md
-↓
-Accepted Git Baseline
-↓
-Repository Reality
-↓
-Temporary task instructions
+1. 适用的 `AGENTS.override.md`
+2. 最近层级的嵌套 `AGENTS.md`
+3. 根目录 `AGENTS.md`
+4. Accepted ADR 与强制治理规则
+5. `AI_CINEMATIC_STUDIO_SYSTEM_MASTER_PLAN.md`
+6. `AI_CINEMATIC_STUDIO_UI_MASTER_PLAN.md`，仅在 UI、UX、Frontend 范围内生效
+7. `CURRENT_MILESTONE.md`，仅控制当前任务、门禁和执行状态
+8. Accepted/remote-verified Git evidence，仅证明实现事实，不得自行改变架构
+9. Historical、superseded、archived evidence
 
 Temporary conversation instructions must not silently override
 higher-level project baselines.
@@ -324,11 +312,13 @@ ACCEPTED
 UI-R1 — Enterprise Cinematic UI Rebaseline
 ACCEPTED
 
-Future roadmap:
-
 M4 — Project Context Foundation
+ACCEPTED
 
 M5 — Series Planning + Series Director
+ACCEPTED
+
+Future roadmap begins with M6:
 
 M6 — Series IP Bible + Character Intelligence
 
@@ -360,6 +350,40 @@ M19 — Commercial SaaS / Enterprise Hardening
 
 The roadmap may only be changed by the Project Lead
 through an explicit system-level rebaseline.
+
+The proposed PRE-M6 route is fixed as:
+
+`PRE-M6-RB1.1 Source-of-Truth Rebaseline`
+→ `PRE-M6-RB1.2 Legacy UI Decommission`
+→ `PRE-M6-RB1.3 Full Core Current-State Audit`
+→ `Architecture Review`
+→ `M6 Preconditions`
+→ `M6-P1`
+
+The current work is limited to the `PRE-M6-RB1.1` revision and review stage.
+No later stage is implied or authorized.
+
+M6 Character Intelligence must cover at least:
+
+- background;
+- motivation;
+- belief;
+- conflict;
+- goal;
+- personality;
+- behavior rules;
+- dialogue rules;
+- forbidden behavior;
+- visual identity rules;
+- `CharacterState`;
+- `RelationshipContext`;
+- timeline and continuity.
+
+`M6 ≠ V5 Identity Lock`. M6 does not implement M7, GPU Render, ComfyUI,
+Worker execution or cross-repository UI. M6 remains `NOT STARTED / NOT AUTHORIZED`.
+
+Legacy Phase 0 governance drift is `OPEN / DEFERRED TO PRE-M6-RB1.3`.
+This acknowledgement does not silently amend those governance files.
 
 ---
 
@@ -685,11 +709,20 @@ A stale validation must not authorize downstream readiness.
 
 # 19. UI Architecture Authority
 
-UI implementation MUST follow:
+Customer-facing UI implementation MUST follow:
 
 AI_CINEMATIC_STUDIO_UI_MASTER_PLAN.md
 
 The Enterprise Cinematic UI baseline is accepted.
+
+The PRE-M6-RB1.1 proposal, subject to ADR-0001 acceptance, places the
+customer-facing Commercial SaaS experience layer in the separate
+`AI-Cinematic-Studio-Frontend` repository.
+
+Under that conditional proposal, this Core repository continues to own the
+Creator Server Runtime, public HTTP/API boundaries, Creator Application
+orchestration and lower platform layers, while not owning the customer-facing
+Commercial SaaS UI source.
 
 Do not redesign the entire product during ordinary capability work.
 
@@ -702,6 +735,14 @@ not invent new global structure.
 
 There is ONE Creator product UI.
 
+If ADR-0001 is later accepted and the rebaseline becomes a remote-verified
+checkpoint, this means:
+
+ONE CREATOR UI
+=
+the customer-facing Commercial Frontend in the separate
+`AI-Cinematic-Studio-Frontend` repository.
+
 Do not create:
 
 Legacy UI
@@ -710,21 +751,46 @@ New UI
 
 as two parallel products.
 
-All UI changes must modify the actual Creator runtime UI.
+Core agents MUST NOT implement or recreate customer-facing Commercial SaaS
+pages in this repository.
 
-The accepted Creator runtime is served through the Creator Server.
+The Core repository may contain:
 
-Final UI evidence must use:
+- Creator Server Runtime and public HTTP/API handlers;
+- Creator Application commands, queries, DTOs and services;
+- technical non-product utilities required to operate or diagnose Core.
 
-HTTP Runtime
+It must not contain a second Commercial SaaS experience layer.
 
-for example:
+The only proposed cross-repository dependency chain is:
 
-http://127.0.0.1:8765/
+`Commercial Frontend → Frontend Experience Adapter → Creator Public HTTP/API → Creator Application → V5 → V4 → V3 → Compute/Foundation`
 
-file:// may be used only for temporary local debugging.
+The Frontend Experience Adapter belongs to the Frontend repository and may
+consume only Creator Public HTTP/API. The Frontend must not import Core source,
+access Creator Application, Domain, SQL or persistence directly, call providers,
+or connect to private V5, worker, GPU or ComfyUI adapters. The repositories do
+not share customer UI source code.
 
-file:// is NOT acceptable final Browser / Visual evidence.
+The historical browser UI under `apps/creator-workspace-mvp` remains a controlled
+`DECOMMISSION CANDIDATE`. Do not delete the whole directory blindly. Every file
+must be classified; mixed files remain `AMBIGUOUS_SHARED_FILE`. Preserve
+Server/API/Application/Domain/Persistence/Test responsibilities. Actual removal
+requires separate `PRE-M6-RB1.2` authorization and may remove only files proven
+UI-only.
+
+Final customer UI evidence belongs to the Frontend Experience Gate in the
+separate Frontend repository and must use its real HTTP runtime.
+
+Core HTTP runtime evidence validates APIs and application behavior, not
+customer-facing visual parity.
+
+The current local Core HTTP runtime may continue to use endpoints such as
+`http://127.0.0.1:8765/` during the controlled migration.
+
+`file://` may be used only for temporary local debugging.
+
+`file://` is NOT acceptable final Browser / Visual evidence.
 
 ---
 
@@ -751,6 +817,10 @@ Release
 as new global top-level navigation.
 
 Those capabilities belong inside Project Workspace.
+
+This navigation remains a product/experience contract for the separate
+Frontend repository. Core must expose stable public contracts for it and must
+not recreate the navigation as a second customer UI.
 
 ---
 
@@ -1052,22 +1122,44 @@ Unit tests alone are insufficient.
 
 # 33. Browser / Live Gate
 
-When browser behavior is part of a milestone,
-validate with a real browser through the real Creator HTTP Runtime.
+Subject to ADR-0001 acceptance and the remote-verified rebaseline checkpoint,
+validation is proposed to split into three gates:
+
+GATE A — FRONTEND EXPERIENCE GATE
+
+Owned by the separate Frontend repository. It covers frontend tests, build,
+browser QA, responsive behavior, accessibility, visual quality and customer
+workflows.
+
+GATE B — CORE HTTP RUNTIME GATE
+
+Owned by this Core repository. It covers Creator Server startup, public
+HTTP/API contracts, Creator Application commands and queries, authorization,
+tenant/workspace enforcement, persistence, idempotency, integration and error
+contracts.
+
+GATE C — CROSS-REPO INTEGRATION GATE
+
+Validates the deployed/served Commercial Frontend against the real Creator
+public HTTP/API boundary. It must validate public contracts and must never use
+shared source imports.
+
+When browser behavior is part of Gate A or Gate C, validate with a real
+browser through a real HTTP runtime.
 
 Preferred accepted methods include:
 
 - normal Chrome control;
 - Chrome Headless + DevTools CDP when the normal control channel is unavailable.
 
-Final Browser Gate must NOT use:
+Final Frontend/Cross-repository Browser Gates must NOT use:
 
 - file://;
 - jsdom-only evidence;
 - static HTML parsing;
 - mock browser results.
 
-Where practical verify:
+Where practical Gate A / Gate C verify:
 
 Console errors = 0
 
@@ -1087,7 +1179,7 @@ Do not reuse historical screenshots as new evidence.
 
 # 34. Runtime Identity Gate
 
-For major runtime validation, report:
+For major Core HTTP runtime validation, report:
 
 RUNTIME PORT
 
@@ -1099,11 +1191,11 @@ RUNTIME BRANCH
 
 RUNTIME HEAD SHA
 
-STATIC ROOT
+PUBLIC API ROOT / SERVER MODULE
 
-The team must be able to identify exactly which code is serving:
-
-http://127.0.0.1:8765/
+The team must be able to identify exactly which Core workspace and commit is
+serving the Creator public HTTP/API runtime. A customer-facing static root is
+not required in Core after legacy UI decommission.
 
 ---
 
@@ -1114,7 +1206,7 @@ Default canonical development and runtime workspace:
 D:\Codex使用\AI CINEMATIC STUDIO
 
 After Canonical Workspace Promotion is complete,
-normal serial milestones M4–M19 should use this workspace.
+remaining serial milestones M6–M19 should use this workspace.
 
 Do NOT create a new worktree for every ordinary milestone.
 
@@ -1456,6 +1548,8 @@ Human Controls Critical Gates
 Real Production Before Batch Scale
 
 One Creator UI
+
+Separate Commercial Experience Layer
 
 One Canonical Workspace
 

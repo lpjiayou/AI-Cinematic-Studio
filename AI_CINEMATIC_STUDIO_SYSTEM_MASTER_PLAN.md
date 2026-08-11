@@ -2,11 +2,15 @@
 
 > Document: `AI_CINEMATIC_STUDIO_SYSTEM_MASTER_PLAN.md`
 >
-> Status: `SYSTEM MASTER BASELINE`
+> Status: `SYSTEM MASTER PRE-COMMIT CANDIDATE / SUBJECT TO ADR-0001 ACCEPTANCE`
 >
-> Version: `v1.0`
+> Version: `v1.1`
 >
-> Date: `2026-08-09`
+> Date: `2026-08-11`
+>
+> Revision: `PRE-M6-RB1.1 — Source-of-Truth Rebaseline proposal`
+>
+> Architecture Proposal: `ADR-0001 — Separate Commercial Experience Layer from Core Creator Runtime / Proposed`
 >
 > Scope: AI Cinematic Studio 全系统产品、Domain、生产链、技术分层、研发顺序与验收基线
 >
@@ -20,12 +24,15 @@ AI Cinematic Studio 后续研发不得再主要依赖最近聊天上下文决定
 
 项目执行权威顺序固定为：
 
-1. `AI_CINEMATIC_STUDIO_SYSTEM_MASTER_PLAN.md`
-2. `AGENTS.md`
-3. 已接受的 Git / GitHub Baseline
-4. `CURRENT_MILESTONE.md`
-5. 当前仓库真实代码与测试
-6. 当前对话中的临时讨论
+1. 适用的 `AGENTS.override.md`
+2. 最近层级的嵌套 `AGENTS.md`
+3. 根目录 `AGENTS.md`
+4. Accepted ADR 与强制治理规则
+5. `AI_CINEMATIC_STUDIO_SYSTEM_MASTER_PLAN.md`
+6. `AI_CINEMATIC_STUDIO_UI_MASTER_PLAN.md`，仅在 UI、UX、Frontend 范围内生效
+7. `CURRENT_MILESTONE.md`，仅控制当前任务、门禁和执行状态
+8. Accepted/remote-verified Git evidence，仅证明实现事实，不得自行改变架构
+9. Historical、superseded、archived evidence
 
 如果低层级信息与高层级规划冲突：
 
@@ -261,6 +268,14 @@ Internal Lab 和 Commercial SaaS：
 不共享业务数据。
 
 资源池必须可隔离。
+
+`PRE-M6-RB1.1` 当前仅提出：在 ADR-0001 后续获得正式接受并形成
+remote-verified 重基线后，Commercial SaaS 的客户体验层由独立仓库
+`AI-Cinematic-Studio-Frontend` 承载，Core 仓库不再作为客户页面源码真源。
+
+两个业务入口仍共享 Core 的 Creator Public HTTP/API、Creator Application、
+V5/V4/V3 与基础能力，但 Frontend 不得通过源码导入、私有 Adapter、SQL、
+Provider、GPU Worker 或 ComfyUI 绕过公开边界。
 
 ---
 
@@ -1656,6 +1671,11 @@ UI 状态必须与真实能力状态一致。
 
 Creator UI V2 是稳定视觉母版。
 
+本节定义拟议的跨仓库产品体验合同，不表示该合同已生效。在 ADR-0001 后续
+获得正式接受并形成 remote-verified 重基线后，该 UI 才由独立
+`AI-Cinematic-Studio-Frontend` 仓库承载，Core 只提供稳定的 Creator Public
+HTTP/API 与 Application 合同。
+
 全局一级导航继续保持：
 
 ```text
@@ -1745,9 +1765,15 @@ IP圣经
 
 # 33. Architecture Layers
 
-整体依赖方向：
+拟议的跨仓库依赖方向如下；其生效取决于 ADR-0001 后续接受：
 
 ```text
+Commercial Frontend
+↓
+Frontend Experience Adapter
+↓
+Creator Public HTTP/API
+↓
 Creator Application
 ↓
 V5 Core OS
@@ -1756,10 +1782,16 @@ V4 Platform
 ↓
 V3 Render Core
 ↓
-Compute
-↓
-Foundation
+Compute/Foundation
 ```
+
+规范形式：`Commercial Frontend → Frontend Experience Adapter → Creator Public HTTP/API → Creator Application → V5 → V4 → V3 → Compute/Foundation`
+
+Experience Layer 位于 V2.3 Core 六层链之外，不属于 V5、V4 或 V3，也不改变
+Core 内部既有相邻依赖方向。Frontend Experience Adapter 属于 Frontend，且
+只能消费 Creator Public HTTP/API。Frontend 不得直接访问 Creator Application、
+Domain、SQL、Persistence、Provider、private V5、GPU、Worker 或 ComfyUI；两个
+仓库不共享客户 UI 源码。该提案禁止 Core 重新建立第二套客户体验层。
 
 ---
 
@@ -1767,12 +1799,16 @@ Foundation
 
 负责：
 
-- UI；
-- user interaction；
+- public HTTP/API boundary；
 - commands；
 - queries；
-- presentation；
-- application orchestration。
+- public DTO / error contract；
+- application orchestration；
+- authorization、tenant/workspace 与 idempotency enforcement（按能力适用）。
+
+客户 UI、浏览器交互、响应式、可访问性与视觉呈现属于独立 Frontend
+Experience Layer。Core 中只允许 Creator Server Runtime、API/Application
+实现和必要的非产品技术工具，不允许继续承载第二套 Commercial SaaS UI。
 
 不负责 authoritative production facts。
 
@@ -2100,6 +2136,10 @@ Content Profile / Project 的真实用例。
 
 除 Project Lead 明确修改 Master Plan 外，不因临时对话改变。
 
+本章 M1–M5 的 `Status` 与当前已接受里程碑清单同步；各 Milestone 的业务描述
+继续保留历史范围和证据语义。当前任务、门禁和执行状态只由
+`CURRENT_MILESTONE.md` 控制。
+
 ---
 
 ## M1 — AI Director Core
@@ -2169,7 +2209,7 @@ Accepted Commit:
 
 Status:
 
-`CURRENT UNTIL ACCEPTED`
+`ACCEPTED`
 
 目标：
 
@@ -2182,9 +2222,9 @@ Status:
 
 Hotfix Accepted SHA：
 
-`PENDING`
+`cc39a0b2e13c98a2e946ba8166764873a4be277d`
 
-Hotfix 通过后：
+Hotfix accepted baseline effect：
 
 未来所有新 Milestone 必须基于新的 Hotfix SHA。
 
@@ -2194,7 +2234,7 @@ Hotfix 通过后：
 
 Status:
 
-`NOT STARTED`
+`ACCEPTED`
 
 目标：
 
@@ -2230,7 +2270,7 @@ M4 不实现 Series Director / IP Bible。
 
 Status:
 
-`NOT STARTED`
+`ACCEPTED`
 
 完成：
 
@@ -2250,20 +2290,31 @@ Status:
 
 Status:
 
-`NOT STARTED`
+`NOT STARTED / NOT AUTHORIZED`
 
-完成：
+目标范围：
 
 - SeriesBible；
 - immutable BibleVersion；
-- Character identity；
-- CharacterState；
+- Character identity，包括 background、motivation、belief、conflict、goal 和
+  personality；
+- behavior rules、dialogue rules 和 forbidden behavior；
+- visual identity rules；
+- `CharacterState`；
+- `RelationshipContext`；
 - episode applicability；
 - relationships；
-- timeline；
-- continuity；
+- timeline and continuity；
 - forbidden rules；
 - style constraints。
+
+明确非目标：
+
+- `M6 ≠ V5 Identity Lock`；
+- M6 不实现 M7；
+- M6 不实现 GPU Render、ComfyUI 或 Worker；
+- M6 不实现跨仓 UI；
+- M6 当前仍为 `NOT STARTED / NOT AUTHORIZED`。
 
 ---
 
@@ -2688,6 +2739,15 @@ Creator UI V2：
 
 UI 必须持续反映真实系统能力。
 
+本 PRE-M6-RB1.1 候选提出：只有 ADR-0001 后续获得正式接受并形成
+remote-verified 重基线后，所有客户 UI 演进才在独立
+`AI-Cinematic-Studio-Frontend` 仓库进行，并通过 Frontend Experience Adapter
+仅消费 Creator Public HTTP/API。Core 不得以调试便利、兼容路由或 Milestone
+激活为理由重新创建 Commercial SaaS 页面。Core 中历史 Creator Browser UI
+继续作为 `DECOMMISSION CANDIDATE`，只能在 RB1.2 独立授权下受控退出；混合
+UI/Server 文件保持 `AMBIGUOUS_SHARED_FILE`，必须先分类并保留
+Server/API/Application/Domain/Persistence/Test 责任。
+
 ---
 
 # 57. Anti-Patterns
@@ -2885,7 +2945,7 @@ STOP。
 
 # 62. Current System State
 
-截至本 Master Plan v1.0：
+截至 `PRE-M6-RB1.1`：
 
 ```text
 M1 AI Director
@@ -2898,24 +2958,49 @@ M3 Script Studio
 ACCEPTED
 
 M3-H Script Candidate Robustness Hotfix
-CURRENT / PENDING ACCEPTANCE
+ACCEPTED
+
+Story Projection
+ACCEPTED
+
+UI-R1 / UI-R2
+PRODUCT ACCEPTANCE: ACCEPTED HISTORY
+
+UI-R2A
+PRODUCT ACCEPTANCE STATUS: NO SEPARATE ACCEPTANCE EVIDENCE / CANDIDATE
+REMOTE VERIFICATION STATUS: PASS AT PRE-REBASELINE HEAD 602a78fe68fc5c69ecc31d9436ee166f5dff8a64
+ACTIVE ARCHITECTURE STATUS: SUPERSEDED AS CURRENT TASK
 
 M4 Project Context Foundation
-NOT STARTED
+ACCEPTED
 
-M5+
+M5 Series Planning + Series Director
+ACCEPTED
+
+PRE-M6-RB1.1 Source-of-Truth Rebaseline
+CURRENT / REVISION BEFORE INDEPENDENT RE-VERIFY
+
+M6 Series IP Bible + Character Intelligence
+NOT STARTED / NOT AUTHORIZED
+
+M7+
 NOT STARTED
 ```
 
-在 M3-H 完成以前：
+M6 不得在权威重基线、Legacy Core 客户 UI 退役、Core Runtime Gate、完整
+Core 当前态审计、Project Lead 架构评审和 M6-P1 独立授权完成前启动。
 
-不得正式进入新的 M4。
+严格路线为：
 
-M3-H 完成并 Push GitHub、Remote SHA 验证、Project Lead接受以后：
+`PRE-M6-RB1.1 Source-of-Truth Rebaseline`
+→ `PRE-M6-RB1.2 Legacy UI Decommission`
+→ `PRE-M6-RB1.3 Full Core Current-State Audit`
+→ `Architecture Review`
+→ `M6 Preconditions`
+→ `M6-P1`
 
-其 SHA 成为：
-
-新的系统 Accepted Base。
+当前只处于 `PRE-M6-RB1.1` 修订阶段。Legacy Phase 0 治理漂移登记为
+`OPEN / DEFERRED TO PRE-M6-RB1.3`；本次不静默修改七文件范围之外的治理资产。
 
 ---
 
