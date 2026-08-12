@@ -360,28 +360,35 @@ The PRE-M6 route is fixed as:
 → `M6 Preconditions`
 → `M6-P1`
 
-The current phase is `PRE-M6 RB1.3 Remediation`.
+The current phase is `M6 Series Intelligence / P0 Governance + P1 InMemory`.
 
 Current governance state:
 
-- PRE-M6-RB1.3: `EXECUTED / REJECTED / REMEDIATION IN PROGRESS`;
+- PRE-M6-RB1.3-R2-P1: `ACCEPTED`;
+- PRE-M6-RB1.3-R2-P2: `OWNER ACCEPTED / COMPLETE / REMOTE-VERIFIED AT
+  0aa14b4e426a3d968ec314029d60a47ea30cbc4d`;
+- PRE-M6-RB1.3: `REMEDIATION COMPLETE / FORMALLY CLOSED BY PROJECT LEAD OWNER REVIEW`;
 - PRE-M6-RB1.3-IR1: `COMPLETED`;
 - Full Core Audit Report v1.2: `INDEPENDENTLY ACCEPTED`;
 - PRE-M6-RB1.3-R1-RV1: `INDEPENDENTLY ACCEPTED`;
 - RB13-F001: `R1 IMPLEMENTED / INDEPENDENTLY ACCEPTED / CLOSED`;
-- RB13-F002: `HIGH / CONFIRMED / BLOCKING / R2 AUTHORIZED / NOT STARTED`;
-- next authorized task: `PRE-M6-RB1.3-R2`;
+- RB13-F002: `REMEDIATED / CLOSED IN CURRENT TESTED CORE BASELINE`;
+- Architecture Review: `SATISFIED FOR BOUNDED M6-P0/P1 ONLY`;
+- M6 Preconditions: `SATISFIED FOR BOUNDED INMEMORY M6-P0/P1 ONLY`;
+- next authorized task: `ACS-M6-P0-P1`;
 - legacy repository capability provenance: `MEDIUM / OPEN / NON-BLOCKING`,
   Owner Gate `P3-RV1-003`;
-- RB1.3 Closeout: `NOT AUTHORIZED`;
-- Architecture Review: `PENDING`;
-- M6: `NOT STARTED / NOT AUTHORIZED`;
+- M6: `NOT STARTED / P0-P1 AUTHORIZED / P2+ NOT AUTHORIZED`;
+- M7-M19: `NOT STARTED / NOT AUTHORIZED`;
+- Formal 8765 Deployment: `NOT PERFORMED / NOT AUTHORIZED`;
+- Frontend: `FROZEN / UNTOUCHED`;
 - Production Ready: `NO`.
 
 Legacy repository implementation must not be counted as current Core production
-capability. RB13-F001 is closed after independent R1-RV1 acceptance. RB13-F002
-is not fixed; R2 is authorized as the next task but remains not started. No later
-step is authorized by the R1 checkpoint.
+capability. RB13-F001 and RB13-F002 are closed in the accepted current tested Core
+baseline. M6-P0/P1 authorization is bounded and does not authorize M6-P2+, M7-M19,
+formal database deployment or Frontend work. Exact active task scope remains governed
+by `CURRENT_MILESTONE.md`.
 
 The M6 gate order is:
 
@@ -393,6 +400,10 @@ The M6 gate order is:
 6. Architecture Review passes;
 7. all M6 Preconditions are satisfied;
 8. the Project Lead separately authorizes M6-P1.
+
+All eight gates are satisfied only for the bounded M6-P0/P1 scope recorded by the
+Project Lead on `2026-08-13`. This does not establish a general Architecture Review,
+Production Ready status, formal database deployment, or authorization for M6-P2+.
 
 M6 Character Intelligence must cover at least:
 
@@ -411,7 +422,8 @@ M6 Character Intelligence must cover at least:
 - timeline and continuity.
 
 `M6 ≠ V5 Identity Lock`. M6 does not implement M7, GPU Render, ComfyUI,
-Worker execution or cross-repository UI. M6 remains `NOT STARTED / NOT AUTHORIZED`.
+Worker execution or cross-repository UI. M6 remains
+`NOT STARTED / P0-P1 AUTHORIZED / P2+ NOT AUTHORIZED`.
 
 Legacy Phase 0 provenance debt remains `OPEN / NON-BLOCKING` under Owner Gate
 `P3-RV1-003`. This acknowledgement does not silently close the debt or import
