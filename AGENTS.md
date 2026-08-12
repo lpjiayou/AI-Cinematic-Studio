@@ -351,7 +351,7 @@ M19 — Commercial SaaS / Enterprise Hardening
 The roadmap may only be changed by the Project Lead
 through an explicit system-level rebaseline.
 
-The proposed PRE-M6 route is fixed as:
+The PRE-M6 route is fixed as:
 
 `PRE-M6-RB1.1 Source-of-Truth Rebaseline`
 → `PRE-M6-RB1.2 Legacy UI Decommission`
@@ -360,8 +360,39 @@ The proposed PRE-M6 route is fixed as:
 → `M6 Preconditions`
 → `M6-P1`
 
-The current work is limited to the `PRE-M6-RB1.1` revision and review stage.
-No later stage is implied or authorized.
+The current phase is `PRE-M6 RB1.3 Remediation`.
+
+Current governance state:
+
+- PRE-M6-RB1.3: `EXECUTED / REJECTED / REMEDIATION IN PROGRESS`;
+- PRE-M6-RB1.3-IR1: `COMPLETED`;
+- Full Core Audit Report v1.2: `INDEPENDENTLY ACCEPTED`;
+- PRE-M6-RB1.3-R1-RV1: `INDEPENDENTLY ACCEPTED`;
+- RB13-F001: `R1 IMPLEMENTED / INDEPENDENTLY ACCEPTED / CLOSED`;
+- RB13-F002: `HIGH / CONFIRMED / BLOCKING / R2 AUTHORIZED / NOT STARTED`;
+- next authorized task: `PRE-M6-RB1.3-R2`;
+- legacy repository capability provenance: `MEDIUM / OPEN / NON-BLOCKING`,
+  Owner Gate `P3-RV1-003`;
+- RB1.3 Closeout: `NOT AUTHORIZED`;
+- Architecture Review: `PENDING`;
+- M6: `NOT STARTED / NOT AUTHORIZED`;
+- Production Ready: `NO`.
+
+Legacy repository implementation must not be counted as current Core production
+capability. RB13-F001 is closed after independent R1-RV1 acceptance. RB13-F002
+is not fixed; R2 is authorized as the next task but remains not started. No later
+step is authorized by the R1 checkpoint.
+
+The M6 gate order is:
+
+1. R1 implementation completes and passes independent review;
+2. R2 deletion lifecycle remediation completes;
+3. InMemory/SQLite consistency, concurrency and TOCTOU validation pass;
+4. the RB1.3 full regression passes;
+5. RB1.3 is formally closed;
+6. Architecture Review passes;
+7. all M6 Preconditions are satisfied;
+8. the Project Lead separately authorizes M6-P1.
 
 M6 Character Intelligence must cover at least:
 
@@ -382,8 +413,9 @@ M6 Character Intelligence must cover at least:
 `M6 ≠ V5 Identity Lock`. M6 does not implement M7, GPU Render, ComfyUI,
 Worker execution or cross-repository UI. M6 remains `NOT STARTED / NOT AUTHORIZED`.
 
-Legacy Phase 0 governance drift is `OPEN / DEFERRED TO PRE-M6-RB1.3`.
-This acknowledgement does not silently amend those governance files.
+Legacy Phase 0 provenance debt remains `OPEN / NON-BLOCKING` under Owner Gate
+`P3-RV1-003`. This acknowledgement does not silently close the debt or import
+old-repository capabilities into current Core.
 
 ---
 
@@ -715,11 +747,11 @@ AI_CINEMATIC_STUDIO_UI_MASTER_PLAN.md
 
 The Enterprise Cinematic UI baseline is accepted.
 
-The PRE-M6-RB1.1 proposal, subject to ADR-0001 acceptance, places the
+Accepted ADR-0001 and the remote-verified PRE-M6-RB1.1 baseline place the
 customer-facing Commercial SaaS experience layer in the separate
 `AI-Cinematic-Studio-Frontend` repository.
 
-Under that conditional proposal, this Core repository continues to own the
+This Core repository continues to own the
 Creator Server Runtime, public HTTP/API boundaries, Creator Application
 orchestration and lower platform layers, while not owning the customer-facing
 Commercial SaaS UI source.
@@ -735,8 +767,7 @@ not invent new global structure.
 
 There is ONE Creator product UI.
 
-If ADR-0001 is later accepted and the rebaseline becomes a remote-verified
-checkpoint, this means:
+ADR-0001 is accepted and PRE-M6-RB1.1 is a remote-verified checkpoint. This means:
 
 ONE CREATOR UI
 =
@@ -762,7 +793,7 @@ The Core repository may contain:
 
 It must not contain a second Commercial SaaS experience layer.
 
-The only proposed cross-repository dependency chain is:
+The accepted cross-repository dependency chain is:
 
 `Commercial Frontend → Frontend Experience Adapter → Creator Public HTTP/API → Creator Application → V5 → V4 → V3 → Compute/Foundation`
 
@@ -772,12 +803,10 @@ access Creator Application, Domain, SQL or persistence directly, call providers,
 or connect to private V5, worker, GPU or ComfyUI adapters. The repositories do
 not share customer UI source code.
 
-The historical browser UI under `apps/creator-workspace-mvp` remains a controlled
-`DECOMMISSION CANDIDATE`. Do not delete the whole directory blindly. Every file
-must be classified; mixed files remain `AMBIGUOUS_SHARED_FILE`. Preserve
-Server/API/Application/Domain/Persistence/Test responsibilities. Actual removal
-requires separate `PRE-M6-RB1.2` authorization and may remove only files proven
-UI-only.
+The historical browser UI under `apps/creator-workspace-mvp` was classified and
+decommissioned through the remote-verified PRE-M6-RB1.2 checkpoint. Core retains
+Server/API/Application/Domain/Persistence/Test responsibilities and must not
+recreate a customer-facing Commercial SaaS UI.
 
 Final customer UI evidence belongs to the Frontend Experience Gate in the
 separate Frontend repository and must use its real HTTP runtime.
@@ -1122,8 +1151,8 @@ Unit tests alone are insufficient.
 
 # 33. Browser / Live Gate
 
-Subject to ADR-0001 acceptance and the remote-verified rebaseline checkpoint,
-validation is proposed to split into three gates:
+Accepted ADR-0001 and the remote-verified rebaseline split validation into three
+gates:
 
 GATE A — FRONTEND EXPERIENCE GATE
 

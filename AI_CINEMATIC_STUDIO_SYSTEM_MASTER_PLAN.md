@@ -2,15 +2,15 @@
 
 > Document: `AI_CINEMATIC_STUDIO_SYSTEM_MASTER_PLAN.md`
 >
-> Status: `SYSTEM MASTER PRE-COMMIT CANDIDATE / SUBJECT TO ADR-0001 ACCEPTANCE`
+> Status: `SYSTEM MASTER GOVERNANCE BASELINE / ADR-0001 ACCEPTED / PRE-M6-RB1.3 REMEDIATION`
 >
 > Version: `v1.1`
 >
 > Date: `2026-08-11`
 >
-> Revision: `PRE-M6-RB1.1 — Source-of-Truth Rebaseline proposal`
+> Revision: `PRE-M6-RB1.3-R1 — Governance Source-of-Truth Synchronization`
 >
-> Architecture Proposal: `ADR-0001 — Separate Commercial Experience Layer from Core Creator Runtime / Proposed`
+> Architecture Decision: `ADR-0001 — Separate Commercial Experience Layer from Core Creator Runtime / Accepted`
 >
 > Scope: AI Cinematic Studio 全系统产品、Domain、生产链、技术分层、研发顺序与验收基线
 >
@@ -269,8 +269,8 @@ Internal Lab 和 Commercial SaaS：
 
 资源池必须可隔离。
 
-`PRE-M6-RB1.1` 当前仅提出：在 ADR-0001 后续获得正式接受并形成
-remote-verified 重基线后，Commercial SaaS 的客户体验层由独立仓库
+ADR-0001 已接受，PRE-M6-RB1.1 已形成 remote-verified 重基线。
+Commercial SaaS 的客户体验层由独立仓库
 `AI-Cinematic-Studio-Frontend` 承载，Core 仓库不再作为客户页面源码真源。
 
 两个业务入口仍共享 Core 的 Creator Public HTTP/API、Creator Application、
@@ -2739,14 +2739,13 @@ Creator UI V2：
 
 UI 必须持续反映真实系统能力。
 
-本 PRE-M6-RB1.1 候选提出：只有 ADR-0001 后续获得正式接受并形成
-remote-verified 重基线后，所有客户 UI 演进才在独立
+ADR-0001 已接受且 PRE-M6-RB1.1 已形成 remote-verified 重基线。所有客户
+UI 演进在独立
 `AI-Cinematic-Studio-Frontend` 仓库进行，并通过 Frontend Experience Adapter
 仅消费 Creator Public HTTP/API。Core 不得以调试便利、兼容路由或 Milestone
 激活为理由重新创建 Commercial SaaS 页面。Core 中历史 Creator Browser UI
-继续作为 `DECOMMISSION CANDIDATE`，只能在 RB1.2 独立授权下受控退出；混合
-UI/Server 文件保持 `AMBIGUOUS_SHARED_FILE`，必须先分类并保留
-Server/API/Application/Domain/Persistence/Test 责任。
+已在 PRE-M6-RB1.2 完成受控退役；Server/API/Application/Domain/Persistence/Test
+责任继续保留在 Core。
 
 ---
 
@@ -2945,7 +2944,7 @@ STOP。
 
 # 62. Current System State
 
-截至 `PRE-M6-RB1.1`：
+截至 `PRE-M6-RB1.3-R1`：
 
 ```text
 M1 AI Director
@@ -2978,29 +2977,69 @@ M5 Series Planning + Series Director
 ACCEPTED
 
 PRE-M6-RB1.1 Source-of-Truth Rebaseline
-CURRENT / REVISION BEFORE INDEPENDENT RE-VERIFY
+CLOSED / REMOTE-VERIFIED
+
+PRE-M6-RB1.2 Legacy UI Decommission
+CLOSED / REMOTE-VERIFIED
+
+PRE-M6-RB1.3 Full Core Current-State Audit
+EXECUTED / REJECTED / REMEDIATION IN PROGRESS
+
+PRE-M6-RB1.3-IR1 Independent Audit Review
+COMPLETED
+
+Full Core Audit Report v1.2
+INDEPENDENTLY ACCEPTED
+
+PRE-M6-RB1.3-R1-RV1
+INDEPENDENTLY ACCEPTED
+
+RB13-F001 Governance Source-of-Truth Drift
+R1 IMPLEMENTED / INDEPENDENTLY ACCEPTED / CLOSED
+
+RB13-F002 Deletion Lifecycle Integrity
+HIGH / CONFIRMED / BLOCKING / R2 AUTHORIZED / NOT STARTED
+
+Next Authorized Task
+PRE-M6-RB1.3-R2
+
+Legacy repository capability provenance
+MEDIUM / OPEN / NON-BLOCKING / OWNER GATE P3-RV1-003
 
 M6 Series IP Bible + Character Intelligence
 NOT STARTED / NOT AUTHORIZED
 
 M7+
 NOT STARTED
+
+RB1.3 Closeout
+NOT AUTHORIZED
+
+Architecture Review
+PENDING
+
+Production Ready
+NO
 ```
 
-M6 不得在权威重基线、Legacy Core 客户 UI 退役、Core Runtime Gate、完整
-Core 当前态审计、Project Lead 架构评审和 M6-P1 独立授权完成前启动。
+旧仓库中的实现不得计入当前 Core 生产能力。`P3-RV1-003` 继续拥有该来源
+审计债务；该债务为非阻塞项，不得被错误升级为当前 Core 能力。
 
-严格路线为：
+M6 门禁顺序统一为：
 
-`PRE-M6-RB1.1 Source-of-Truth Rebaseline`
-→ `PRE-M6-RB1.2 Legacy UI Decommission`
-→ `PRE-M6-RB1.3 Full Core Current-State Audit`
-→ `Architecture Review`
-→ `M6 Preconditions`
-→ `M6-P1`
+1. R1 实施完成并通过独立复核；
+2. R2 删除生命周期修复完成；
+3. InMemory/SQLite 一致性、并发及 TOCTOU 验证通过；
+4. RB1.3 全量回归通过；
+5. RB1.3 正式关闭；
+6. Architecture Review 通过；
+7. M6 Preconditions 全部满足；
+8. Project Lead 单独授权 M6-P1。
 
-当前只处于 `PRE-M6-RB1.1` 修订阶段。Legacy Phase 0 治理漂移登记为
-`OPEN / DEFERRED TO PRE-M6-RB1.3`；本次不静默修改七文件范围之外的治理资产。
+当前阶段是 `PRE-M6 RB1.3 Remediation`。R1-RV1 已独立接受，RB13-F001 已
+关闭。RB13-F002 尚未修复；R2 是下一授权任务，但保持 `AUTHORIZED / NOT
+STARTED`。RB1.3 Closeout 未授权，Architecture Review 仍为 `PENDING`，M6
+仍为 `NOT STARTED / NOT AUTHORIZED`。
 
 ---
 
