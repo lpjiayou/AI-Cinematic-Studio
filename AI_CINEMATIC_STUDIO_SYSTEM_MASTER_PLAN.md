@@ -2,13 +2,13 @@
 
 > Document: `AI_CINEMATIC_STUDIO_SYSTEM_MASTER_PLAN.md`
 >
-> Status: `SYSTEM MASTER GOVERNANCE BASELINE / ADR-0001 + ADR-0002 ACCEPTED / PRE-M6-RB1.3 REMEDIATION`
+> Status: `SYSTEM MASTER GOVERNANCE BASELINE / PRE-M6-RB1.3 CLOSED / BOUNDED M6-P0-P1 AUTHORIZED`
 >
 > Version: `v1.1`
 >
-> Date: `2026-08-11`
+> Date: `2026-08-13`
 >
-> Revision: `PRE-M6-RB1.3-R2-P2 — SQLite Lifecycle Integrity Implementation`
+> Revision: `PRE-M6-RB1.3-CLOSEOUT-G1 — Governance Source-of-Truth Synchronization`
 >
 > Architecture Decision: `ADR-0001 — Separate Commercial Experience Layer from Core Creator Runtime / Accepted`
 >
@@ -2314,7 +2314,7 @@ Status:
 - M6 不实现 M7；
 - M6 不实现 GPU Render、ComfyUI 或 Worker；
 - M6 不实现跨仓 UI；
-- M6 当前仍为 `NOT STARTED / NOT AUTHORIZED`。
+- M6 当前仍为 `NOT STARTED / P0-P1 AUTHORIZED / P2+ NOT AUTHORIZED`。
 
 ---
 
@@ -2983,7 +2983,7 @@ PRE-M6-RB1.2 Legacy UI Decommission
 CLOSED / REMOTE-VERIFIED
 
 PRE-M6-RB1.3 Full Core Current-State Audit
-EXECUTED / REJECTED / REMEDIATION IN PROGRESS
+REMEDIATION COMPLETE / FORMALLY CLOSED BY PROJECT LEAD OWNER REVIEW
 
 PRE-M6-RB1.3-IR1 Independent Audit Review
 COMPLETED
@@ -2998,31 +2998,40 @@ RB13-F001 Governance Source-of-Truth Drift
 R1 IMPLEMENTED / INDEPENDENTLY ACCEPTED / CLOSED
 
 RB13-F002 Deletion Lifecycle Integrity
-HIGH / CONFIRMED / BLOCKING / R2-P2 IMPLEMENTED / PENDING OWNER REVIEW
+REMEDIATED / CLOSED IN CURRENT TESTED CORE BASELINE
 
 Current Task
-PRE-M6-RB1.3-R2-P2
+ACS-M6-P0-P1 — SERIES INTELLIGENCE INMEMORY BASELINE
 
 ADR-0002 V5 Lifecycle Integrity Boundary
 ACCEPTED FOR BOUNDED R2 IMPLEMENTATION
 
 R2-P2 SQLite Lifecycle Integrity
-IMPLEMENTED / PENDING OWNER REVIEW
+OWNER ACCEPTED / COMPLETE / REMOTE-VERIFIED AT 0aa14b4e426a3d968ec314029d60a47ea30cbc4d
 
 Legacy repository capability provenance
 MEDIUM / OPEN / NON-BLOCKING / OWNER GATE P3-RV1-003
 
 M6 Series IP Bible + Character Intelligence
+NOT STARTED / P0-P1 AUTHORIZED / P2-P4 NOT AUTHORIZED
+
+M7-M19
 NOT STARTED / NOT AUTHORIZED
 
-M7+
-NOT STARTED
-
 RB1.3 Closeout
-NOT AUTHORIZED
+FORMALLY CLOSED BY PROJECT LEAD OWNER REVIEW
 
 Architecture Review
-PENDING
+SATISFIED FOR BOUNDED M6-P0/P1 ONLY
+
+M6 Preconditions
+SATISFIED FOR BOUNDED INMEMORY M6-P0/P1 ONLY
+
+Formal 8765 Deployment
+NOT PERFORMED / NOT AUTHORIZED
+
+Frontend
+FROZEN / UNTOUCHED
 
 Production Ready
 NO
@@ -3042,10 +3051,11 @@ M6 门禁顺序统一为：
 7. M6 Preconditions 全部满足；
 8. Project Lead 单独授权 M6-P1。
 
-当前阶段是 `PRE-M6 RB1.3 Remediation`。R1-RV1 已独立接受，RB13-F001 已
-关闭。ADR-0002 已为 bounded R2 接受；R2-P1 InMemory 与 R2-P2 SQLite 垂直切片均已实现；
-RB13-F002 在独立复核前仍为阻塞项。正式数据库迁移、RB1.3 Closeout、M6 与 M7 未授权，
-Architecture Review 仍为 `PENDING`。
+上述八项已由 Project Lead 于 `2026-08-13` 裁定为仅对 bounded M6-P0/P1
+满足。R2-P1 与 R2-P2 已接受，RB13-F002 已在当前测试基线关闭，PRE-M6-RB1.3
+已正式关闭。该裁定不代表全系统 Architecture Review、Production Ready、正式
+8765 数据库部署或 M6-P2+ 授权。当前活动任务为 `ACS-M6-P0-P1`；M6 仍未开始，
+Frontend 保持冻结，M7-M19 未授权。
 
 ---
 
