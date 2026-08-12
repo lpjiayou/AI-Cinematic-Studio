@@ -15,6 +15,8 @@ from .errors import (
     LifecycleRollbackError,
 )
 from .in_memory import InMemoryLifecycleState
+from .migration import LifecycleMigrationError, migrate_lifecycle_database, validate_lifecycle_database
+from .sqlite_backend import SqliteLifecycleState
 
 
 def __getattr__(name: str):
@@ -38,4 +40,8 @@ __all__ = [
     "LifecycleLeaseView",
     "LifecycleOperation",
     "LifecycleRollbackError",
+    "LifecycleMigrationError",
+    "SqliteLifecycleState",
+    "migrate_lifecycle_database",
+    "validate_lifecycle_database",
 ]

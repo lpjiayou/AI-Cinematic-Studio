@@ -206,24 +206,51 @@ class InMemoryProjectAdapter:
 class SqliteProjectAdapter:
     """SQLite local-development durable adapter; it is not production storage."""
 
-    def __init__(self, database_path: Path | str) -> None:
+    def __init__(self, database_path: Path | str, *, lifecycle_state=None) -> None:
         self.database_path = Path(database_path).resolve()
         self.database_path.parent.mkdir(parents=True, exist_ok=True)
         self._lock = RLock()
+        self._lifecycle_state = lifecycle_state
         self._initialize()
 
     def _connect(self) -> sqlite3.Connection:
         connection = sqlite3.connect(self.database_path, timeout=10)
         connection.row_factory = sqlite3.Row
         connection.execute("PRAGMA foreign_keys = ON")
+        if connection.execute("PRAGMA foreign_keys").fetchone()[0] != 1:
+            connection.close()
+            raise RuntimeError("SQLite foreign key enforcement unavailable")
         return connection
 
     @contextmanager
     def _session(self):
+        shared = self._lifecycle_state.connection_or_none() if self._lifecycle_state else None
+        if shared is not None:
+            yield shared
+            return
         connection = self._connect()
         try:
             with connection:
                 yield connection
+        finally:
+            connection.close()
+
+    @contextmanager
+    def _write_session(self):
+        shared = self._lifecycle_state.connection_or_none() if self._lifecycle_state else None
+        if shared is not None:
+            yield shared
+            return
+        if self._lifecycle_state is not None:
+            raise RuntimeError("valid lifecycle lease is required")
+        connection = self._connect()
+        try:
+            connection.execute("BEGIN IMMEDIATE")
+            yield connection
+            connection.commit()
+        except BaseException:
+            connection.rollback()
+            raise
         finally:
             connection.close()
 
@@ -275,7 +302,7 @@ class SqliteProjectAdapter:
                 "SELECT schema_version FROM v5_project_schema WHERE component = ?",
                 ("project_context",),
             ).fetchone()
-            if row is None or row["schema_version"] != SQLITE_SCHEMA_VERSION:
+            if row is None or row["schema_version"] not in {SQLITE_SCHEMA_VERSION, 2}:
                 raise RuntimeError("unsupported Project local-development schema version")
 
     @staticmethod
@@ -301,7 +328,7 @@ class SqliteProjectAdapter:
         relationship: ProjectSeriesRelationship | None,
     ) -> tuple[ProjectRecord, ProjectSeriesRelationship | None]:
         try:
-            with self._lock, self._session() as connection:
+            with self._lock, self._write_session() as connection:
                 connection.execute(
                     "INSERT INTO v5_projects VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                     (
@@ -322,6 +349,8 @@ class SqliteProjectAdapter:
                         ),
                     )
         except sqlite3.IntegrityError as exc:
+            if "FOREIGN KEY" in str(exc).upper():
+                raise ProjectRecordNotFoundError("series was not found") from exc
             raise ProjectDuplicateError("project or series relationship already exists") from exc
         return project, relationship
 
@@ -385,7 +414,7 @@ class SqliteProjectAdapter:
         return project, relationship
 
     def archive_project(self, workspace_ref: str, project_ref: str, updated_at: str) -> ProjectRecord:
-        with self._lock, self._session() as connection:
+        with self._lock, self._write_session() as connection:
             row = connection.execute(
                 "SELECT * FROM v5_projects WHERE workspace_ref = ? AND project_ref = ?",
                 (workspace_ref, project_ref),

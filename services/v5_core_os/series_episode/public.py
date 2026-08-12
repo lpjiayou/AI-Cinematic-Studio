@@ -6,6 +6,8 @@ import os
 from pathlib import Path
 from typing import Any, Mapping
 
+from services.v5_core_os.lifecycle_integrity.contracts import LifecycleOperation
+
 from .foundation import (
     DependentRecordError,
     DuplicateRecordError,
@@ -68,8 +70,22 @@ class SeriesEpisodePublicBoundary:
         except SeriesEpisodeError as exc:
             raise self._error(exc) from None
 
+    def _lifecycle_write(self, workspace_ref, lifecycle_operation, operation, *args):
+        if self.__lifecycle_state is None:
+            return self._invoke(operation, *args)
+        try:
+            with self.__lifecycle_state.lease(
+                workspace_ref=workspace_ref, operation=lifecycle_operation
+            ) as lease:
+                return self.__lifecycle_state.apply_mutation(lease, lambda: operation(*args))
+        except SeriesEpisodeError as exc:
+            raise self._error(exc) from None
+
     def create_series(self, command: Mapping[str, Any]) -> dict[str, Any]:
-        return self._invoke(self.__service.create_series, command)
+        workspace_ref = str(command.get("workspaceRef") or "") if isinstance(command, Mapping) else ""
+        return self._lifecycle_write(
+            workspace_ref, LifecycleOperation.CREATE_SERIES, self.__service.create_series, command
+        )
 
     def get_series(self, workspace_ref: str, series_ref: str) -> dict[str, Any]:
         return self._invoke(self.__service.get_series, workspace_ref, series_ref)
@@ -78,10 +94,23 @@ class SeriesEpisodePublicBoundary:
         return self._invoke(self.__service.list_series, workspace_ref)
 
     def confirm_creative_plan(self, command: Mapping[str, Any]) -> dict[str, Any]:
-        return self._invoke(self.__service.confirm_creative_plan, command)
+        workspace_ref = str(command.get("workspaceRef") or "") if isinstance(command, Mapping) else ""
+        return self._lifecycle_write(
+            workspace_ref,
+            LifecycleOperation.CONFIRM_CREATIVE_PLAN,
+            self.__service.confirm_creative_plan,
+            command,
+        )
 
     def create_episode(self, command: Mapping[str, Any]) -> dict[str, Any]:
-        return self._invoke(self.__service.create_episode, command)
+        if self.__lifecycle_coordinator is None:
+            return self._invoke(self.__service.create_episode, command)
+        workspace_ref = str(command.get("workspaceRef") or "") if isinstance(command, Mapping) else ""
+        return self._invoke(
+            self.__lifecycle_coordinator.create_episode,
+            workspace_ref,
+            lambda: self.__service.create_episode(command),
+        )
 
     def get_episode(
         self,

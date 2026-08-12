@@ -360,24 +360,51 @@ class InMemorySeriesEpisodeAdapter:
 class SqliteSeriesEpisodeAdapter:
     """SQLite local-development durable adapter; it is not a production database."""
 
-    def __init__(self, database_path: Path | str) -> None:
+    def __init__(self, database_path: Path | str, *, lifecycle_state=None) -> None:
         self.database_path = Path(database_path).resolve()
         self.database_path.parent.mkdir(parents=True, exist_ok=True)
         self._lock = RLock()
+        self._lifecycle_state = lifecycle_state
         self._initialize()
 
     def _connect(self) -> sqlite3.Connection:
         connection = sqlite3.connect(self.database_path, timeout=10)
         connection.row_factory = sqlite3.Row
         connection.execute("PRAGMA foreign_keys = ON")
+        if connection.execute("PRAGMA foreign_keys").fetchone()[0] != 1:
+            connection.close()
+            raise RuntimeError("SQLite foreign key enforcement unavailable")
         return connection
 
     @contextmanager
     def _session(self):
+        shared = self._lifecycle_state.connection_or_none() if self._lifecycle_state else None
+        if shared is not None:
+            yield shared
+            return
         connection = self._connect()
         try:
             with connection:
                 yield connection
+        finally:
+            connection.close()
+
+    @contextmanager
+    def _write_session(self):
+        shared = self._lifecycle_state.connection_or_none() if self._lifecycle_state else None
+        if shared is not None:
+            yield shared
+            return
+        if self._lifecycle_state is not None:
+            raise RuntimeError("valid lifecycle lease is required")
+        connection = self._connect()
+        try:
+            connection.execute("BEGIN IMMEDIATE")
+            yield connection
+            connection.commit()
+        except BaseException:
+            connection.rollback()
+            raise
         finally:
             connection.close()
 
@@ -468,7 +495,7 @@ class SqliteSeriesEpisodeAdapter:
                 "SELECT schema_version FROM v5_series_episode_schema WHERE component = ?",
                 ("series_episode",),
             ).fetchone()
-            if row is None or row["schema_version"] != SQLITE_SCHEMA_VERSION:
+            if row is None or row["schema_version"] not in {SQLITE_SCHEMA_VERSION, 2}:
                 raise RuntimeError("unsupported Series/Episode local-development schema version")
 
     @staticmethod
@@ -510,7 +537,7 @@ class SqliteSeriesEpisodeAdapter:
 
     def create_series(self, record: SeriesRecord) -> SeriesRecord:
         try:
-            with self._lock, self._session() as connection:
+            with self._lock, self._write_session() as connection:
                 connection.execute(
                     "INSERT INTO v5_series VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                     (
@@ -547,7 +574,7 @@ class SqliteSeriesEpisodeAdapter:
 
     def store_confirmed_plan(self, record: ConfirmedCreativePlanRecord) -> ConfirmedCreativePlanRecord:
         try:
-            with self._lock, self._session() as connection:
+            with self._lock, self._write_session() as connection:
                 connection.execute(
                     "INSERT INTO v5_confirmed_creative_plans VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                     (
@@ -575,7 +602,7 @@ class SqliteSeriesEpisodeAdapter:
         binding: ConfirmedCreativePlanBinding,
     ) -> tuple[EpisodeRecord, ConfirmedCreativePlanBinding]:
         try:
-            with self._lock, self._session() as connection:
+            with self._lock, self._write_session() as connection:
                 connection.execute(
                     "INSERT INTO v5_episode_projects VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                     (
@@ -652,13 +679,21 @@ class SqliteSeriesEpisodeAdapter:
         series_ref: str,
         episode_ref: str,
     ) -> EpisodeRecord:
-        with self._lock, self._session() as connection:
+        with self._lock, self._write_session() as connection:
             row = connection.execute(
                 "SELECT * FROM v5_episode_projects WHERE workspace_ref = ? AND series_ref = ? AND episode_ref = ?",
                 (workspace_ref, series_ref, episode_ref),
             ).fetchone()
             if row is None:
                 raise RecordNotFoundError("episode was not found")
+            script = connection.execute(
+                "SELECT 1 FROM sqlite_master WHERE type='table' AND name='v5_scripts'"
+            ).fetchone()
+            if script is not None and connection.execute(
+                "SELECT 1 FROM v5_scripts WHERE workspace_ref=? AND series_ref=? AND episode_ref=? LIMIT 1",
+                (workspace_ref, series_ref, episode_ref),
+            ).fetchone() is not None:
+                raise DependentRecordError("dependent_script_exists")
             connection.execute(
                 "DELETE FROM v5_episode_plan_bindings WHERE workspace_ref = ? AND series_ref = ? AND episode_ref = ?",
                 (workspace_ref, series_ref, episode_ref),
@@ -674,13 +709,29 @@ class SqliteSeriesEpisodeAdapter:
         workspace_ref: str,
         series_ref: str,
     ) -> tuple[SeriesRecord, list[EpisodeRecord]]:
-        with self._lock, self._session() as connection:
+        with self._lock, self._write_session() as connection:
             series_row = connection.execute(
                 "SELECT * FROM v5_series WHERE workspace_ref = ? AND series_ref = ?",
                 (workspace_ref, series_ref),
             ).fetchone()
             if series_row is None:
                 raise RecordNotFoundError("series was not found")
+            project_table = connection.execute(
+                "SELECT 1 FROM sqlite_master WHERE type='table' AND name='v5_project_series_relationships'"
+            ).fetchone()
+            if project_table is not None and connection.execute(
+                "SELECT 1 FROM v5_project_series_relationships WHERE workspace_ref=? AND series_ref=? LIMIT 1",
+                (workspace_ref, series_ref),
+            ).fetchone() is not None:
+                raise DependentRecordError("dependent_project_exists")
+            script_table = connection.execute(
+                "SELECT 1 FROM sqlite_master WHERE type='table' AND name='v5_scripts'"
+            ).fetchone()
+            if script_table is not None and connection.execute(
+                "SELECT 1 FROM v5_scripts WHERE workspace_ref=? AND series_ref=? LIMIT 1",
+                (workspace_ref, series_ref),
+            ).fetchone() is not None:
+                raise DependentRecordError("dependent_script_exists")
             episode_rows = connection.execute(
                 "SELECT * FROM v5_episode_projects WHERE workspace_ref = ? AND series_ref = ? ORDER BY episode_number",
                 (workspace_ref, series_ref),

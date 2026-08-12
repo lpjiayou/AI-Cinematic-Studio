@@ -6,6 +6,8 @@ import os
 from pathlib import Path
 from typing import Any, Mapping
 
+from services.v5_core_os.lifecycle_integrity.contracts import LifecycleOperation
+
 from services.v5_core_os.series_episode import SeriesEpisodePublicBoundary
 
 from .foundation import (
@@ -104,7 +106,14 @@ class ProjectPublicBoundary:
         )
 
     def archive_project(self, workspace_ref: str, project_ref: str) -> dict[str, Any]:
-        return self._invoke(self.__service.archive_project, workspace_ref, project_ref)
+        if self.__lifecycle_state is None:
+            return self._invoke(self.__service.archive_project, workspace_ref, project_ref)
+        with self.__lifecycle_state.lease(
+            workspace_ref=workspace_ref, operation=LifecycleOperation.ARCHIVE_PROJECT
+        ) as lease:
+            return self.__lifecycle_state.apply_mutation(
+                lease, lambda: self._invoke(self.__service.archive_project, workspace_ref, project_ref)
+            )
 
 
 def create_in_memory_boundary(

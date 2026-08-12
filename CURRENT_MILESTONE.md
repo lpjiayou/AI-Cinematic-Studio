@@ -4,9 +4,9 @@
 >
 > Execution Mode: MANUAL
 >
-> Current Task: `PRE-M6-RB1.3-R2-P1 — InMemory Lifecycle Integrity Vertical Slice`
+> Current Task: `PRE-M6-RB1.3-R2-P2 — SQLite Lifecycle Integrity / FK / Migration`
 >
-> Current Work Package: `PRE-M6 RB1.3 Remediation / ADR-0002 accepted / R2-P1 implemented pending fast owner review`
+> Current Work Package: `PRE-M6 RB1.3 Remediation / ADR-0002 accepted / R2-P1 complete / R2-P2 implemented pending owner review`
 >
 > M6 Authorization: `NOT AUTHORIZED`
 >
@@ -78,7 +78,7 @@ Purpose:
 2. record PRE-M6-RB1.3-IR1 as `COMPLETED`;
 3. record Full Core Audit Report v1.2 as `INDEPENDENTLY ACCEPTED`;
 4. record PRE-M6-RB1.3-R1-RV1 as `INDEPENDENTLY ACCEPTED` and close RB13-F001;
-5. keep RB13-F002 blocking and record R2-P1 as `IMPLEMENTED / PENDING FAST OWNER REVIEW`;
+5. keep RB13-F002 blocking and record R2-P2 as `IMPLEMENTED / PENDING OWNER REVIEW`;
 6. keep RB1.3 Closeout unauthorized, Architecture Review pending, and M6/M7 not
    started and not authorized.
 
@@ -165,11 +165,11 @@ PRE-M6-RB1.3-R1-RV1 is `INDEPENDENTLY ACCEPTED`.
 RB13-F001 is `R1 IMPLEMENTED / INDEPENDENTLY ACCEPTED / CLOSED`.
 
 ADR-0002 is `ACCEPTED FOR BOUNDED R2 IMPLEMENTATION`. RB13-F002 remains
-`HIGH / CONFIRMED / BLOCKING / R2-P1 IMPLEMENTED / PENDING FAST OWNER REVIEW`.
-`PRE-M6-RB1.3-R2-P1` is the current authorized task. R2-P1 is limited to the InMemory
-LifecycleAssembly, Lease and Coordinator vertical slice. SQLite backend, foreign keys,
-schema, migration, formal database access, public API changes, Auth/RBAC/Permission,
-the separate Frontend repository, R2-P2, M6 and M7 remain outside this work package.
+`HIGH / CONFIRMED / BLOCKING / R2-P2 IMPLEMENTED / PENDING OWNER REVIEW`.
+`PRE-M6-RB1.3-R2-P2` is the current task. R2-P2 adds SQLite lifecycle transactions,
+foreign keys and explicit V1-to-V2 migration tested only on temporary databases. Formal
+database migration, public API changes, Auth/RBAC/Permission, the separate Frontend
+repository, M6 and M7 remain outside this work package.
 
 ---
 
@@ -266,7 +266,7 @@ Strict order:
 `PRE-M6-RB1.1` and `PRE-M6-RB1.2` are closed with remote-verified checkpoints.
 PRE-M6-RB1.3 is `EXECUTED / REJECTED / REMEDIATION IN PROGRESS`. IR1 is `COMPLETED`,
 Full Core Audit Report v1.2 and R1-RV1 are `INDEPENDENTLY ACCEPTED`, and RB13-F001 is
-closed. RB13-F002 remains blocking; R2-P1 is implemented pending fast owner review. No later step may
+closed. RB13-F002 remains blocking; R2-P2 is implemented pending owner review. No later step may
 be silently skipped or inferred complete.
 
 ---
@@ -315,10 +315,10 @@ capability.
 - PRE-M6-RB1.3-R1-RV1: `INDEPENDENTLY ACCEPTED`
 - RB13-F001: `R1 IMPLEMENTED / INDEPENDENTLY ACCEPTED / CLOSED`
 - ADR-0002 STATUS: `ACCEPTED FOR BOUNDED R2 IMPLEMENTATION`
-- RB13-F002: `HIGH / CONFIRMED / BLOCKING / R2-P1 IMPLEMENTED / PENDING FAST OWNER REVIEW`
-- CURRENT AUTHORIZED TASK: `PRE-M6-RB1.3-R2-P1`
-- R2-P1 STATUS: `IMPLEMENTED / PENDING FAST OWNER REVIEW`
-- R2-P2 STATUS: `NOT AUTHORIZED`
+- RB13-F002: `HIGH / CONFIRMED / BLOCKING / R2-P2 IMPLEMENTED / PENDING OWNER REVIEW`
+- CURRENT TASK: `PRE-M6-RB1.3-R2-P2`
+- R2-P1 STATUS: `COMPLETE`
+- R2-P2 STATUS: `IMPLEMENTED / PENDING OWNER REVIEW`
 - LEGACY REPOSITORY CAPABILITY PROVENANCE: `MEDIUM / OPEN / NON-BLOCKING`
 - P3-RV1-003: `OWNER GATE / OPEN / NON-BLOCKING EOL AUDIT DEBT`
 - RB1.3 CLOSEOUT: `NOT AUTHORIZED`
@@ -329,20 +329,21 @@ capability.
 - PRODUCTION CODE CHANGED BY R1: `NO`
 - TEST CODE CHANGED BY R1: `NO`
 
-The accepted R1 checkpoint closes RB13-F001. The bounded R2-P1 implementation does not
-close RB13-F002, authorize R2-P2 or RB1.3 Closeout, pass Architecture Review, or authorize M6.
+The accepted R1 checkpoint closes RB13-F001. The bounded R2-P1 checkpoint alone did not
+authorize R2-P2; the later explicit Project Lead instruction authorizes this P2 work package only.
+Neither checkpoint closes RB13-F002 or RB1.3, passes Architecture Review, or authorizes M6.
 
 ---
 
 # 9. Stop Rule
 
-After the R2-P1 implementation checkpoint is remote-verified:
+After the R2-P2 implementation checkpoint is remote-verified:
 
 STOP.
 
-Report the P1 checkpoint and wait for independent owner review.
+Report the P2 checkpoint and wait for independent owner review.
 
-Do not begin R2-P2, RB1.3 Closeout or Architecture Review within this work package.
+Do not migrate the formal database or begin RB1.3 Closeout or Architecture Review within this work package.
 
 Do not enter M6 or M7.
 
@@ -350,14 +351,14 @@ Do not enter M6 or M7.
 
 # 10. Current Authorized Task
 
-`PRE-M6-RB1.3-R2-P1 — InMemory Lifecycle Integrity Vertical Slice`
+`PRE-M6-RB1.3-R2-P2 — SQLite Lifecycle Integrity / FK / Migration`
 
 Status:
 
 `AUTHORIZED / IN PROGRESS`
 
-R2-P1 may proceed under the explicit Project Lead instruction dated `2026-08-12`.
-This authorization does not start R2-P2 and does not authorize RB1.3 Closeout,
-Architecture Review, M6 or M7.
+R2-P2 may proceed under the explicit Project Lead instruction dated `2026-08-12`.
+This authorization does not permit formal database migration and does not authorize
+RB1.3 Closeout, Architecture Review, M6 or M7.
 
 # End of CURRENT_MILESTONE.md

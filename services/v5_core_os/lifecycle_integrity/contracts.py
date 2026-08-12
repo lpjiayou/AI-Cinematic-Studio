@@ -8,6 +8,7 @@ from enum import Enum
 
 class BackendKind(str, Enum):
     IN_MEMORY = "in-memory"
+    SQLITE_LOCAL = "sqlite-local-development"
 
 
 class LeaseState(str, Enum):
@@ -24,8 +25,16 @@ class AssemblyState(str, Enum):
 
 
 class LifecycleOperation(str, Enum):
+    CREATE_SERIES = "create-series"
+    CONFIRM_CREATIVE_PLAN = "confirm-creative-plan"
+    CREATE_EPISODE = "create-episode"
     CREATE_PROJECT = "create-project"
+    ARCHIVE_PROJECT = "archive-project"
     CREATE_SCRIPT_VERSION = "create-script-version"
+    CONFIRM_SCRIPT_VERSION = "confirm-script-version"
+    CREATE_SERIES_PLAN = "create-series-plan"
+    APPEND_SERIES_PLAN_VERSION = "append-series-plan-version"
+    CONFIRM_SERIES_PLAN_VERSION = "confirm-series-plan-version"
     DELETE_EPISODE = "delete-episode"
     DELETE_SERIES = "delete-series"
 

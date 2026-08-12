@@ -6,6 +6,8 @@ import os
 from pathlib import Path
 from typing import Any, Mapping
 
+from services.v5_core_os.lifecycle_integrity.contracts import LifecycleOperation
+
 from services.v5_core_os.series_episode import SeriesEpisodePublicBoundary
 
 from .foundation import (
@@ -85,7 +87,15 @@ class ScriptStudioPublicBoundary:
         )
 
     def confirm_version(self, command: Mapping[str, Any]) -> dict[str, Any]:
-        return self._invoke(self.__service.confirm_version, command)
+        if self.__lifecycle_state is None:
+            return self._invoke(self.__service.confirm_version, command)
+        workspace_ref = str(command.get("workspaceRef") or "") if isinstance(command, Mapping) else ""
+        with self.__lifecycle_state.lease(
+            workspace_ref=workspace_ref, operation=LifecycleOperation.CONFIRM_SCRIPT_VERSION
+        ) as lease:
+            return self.__lifecycle_state.apply_mutation(
+                lease, lambda: self._invoke(self.__service.confirm_version, command)
+            )
 
     def build_storyboard_bootstrap(
         self,
