@@ -32,8 +32,24 @@ class ScriptStudioPublicError(RuntimeError):
 class ScriptStudioPublicBoundary:
     """The only Script/ScriptVersion surface available to Creator Application."""
 
-    def __init__(self, service: ScriptStudioService) -> None:
+    def __init__(self, service: ScriptStudioService, *, lifecycle_state=None) -> None:
         self.__service = service
+        self.__lifecycle_state = lifecycle_state
+        self.__lifecycle_coordinator = None
+        self.__lifecycle_assembly = None
+
+    def bind_lifecycle(self, coordinator) -> None:
+        if self.__lifecycle_coordinator is not None:
+            raise RuntimeError("lifecycle coordinator is already bound")
+        self.__lifecycle_coordinator = coordinator
+
+    def _bind_lifecycle_assembly(self, assembly) -> None:
+        if self.__lifecycle_assembly is not None:
+            raise RuntimeError("lifecycle assembly is already bound")
+        self.__lifecycle_assembly = assembly
+
+    def _lifecycle_assembly_or_none(self):
+        return self.__lifecycle_assembly
 
     @staticmethod
     def _error(exc: ScriptStudioError) -> ScriptStudioPublicError:
@@ -49,6 +65,8 @@ class ScriptStudioPublicBoundary:
 
     def _invoke(self, operation, *args):
         try:
+            if self.__lifecycle_state is not None:
+                self.__lifecycle_state.assert_ready()
             return operation(*args)
         except ScriptStudioError as exc:
             raise self._error(exc) from None
@@ -57,7 +75,14 @@ class ScriptStudioPublicBoundary:
         return self._invoke(self.__service.get_workspace, workspace_ref, series_ref, episode_ref)
 
     def create_version(self, command: Mapping[str, Any]) -> dict[str, Any]:
-        return self._invoke(self.__service.create_version, command)
+        if self.__lifecycle_coordinator is None:
+            return self._invoke(self.__service.create_version, command)
+        workspace_ref = str(command.get("workspaceRef") or "") if isinstance(command, Mapping) else ""
+        return self._invoke(
+            self.__lifecycle_coordinator.create_script_version,
+            workspace_ref,
+            lambda: self.__service.create_version(command),
+        )
 
     def confirm_version(self, command: Mapping[str, Any]) -> dict[str, Any]:
         return self._invoke(self.__service.confirm_version, command)
@@ -82,6 +107,10 @@ def create_in_memory_boundary(
     ref_factory=None,
     clock=None,
 ) -> ScriptStudioPublicBoundary:
+    if ref_factory is None and clock is None:
+        assembly = upstream._lifecycle_assembly_or_none()
+        if assembly is not None:
+            return assembly.script_studio
     kwargs = {}
     if ref_factory is not None:
         kwargs["ref_factory"] = ref_factory

@@ -31,8 +31,18 @@ class SeriesPlanningPublicError(RuntimeError):
 class SeriesPlanningPublicBoundary:
     """The only authoritative Series Planning surface exposed to Creator."""
 
-    def __init__(self, service: SeriesPlanningService) -> None:
+    def __init__(self, service: SeriesPlanningService, *, lifecycle_state=None) -> None:
         self.__service = service
+        self.__lifecycle_state = lifecycle_state
+        self.__lifecycle_assembly = None
+
+    def _bind_lifecycle_assembly(self, assembly) -> None:
+        if self.__lifecycle_assembly is not None:
+            raise RuntimeError("lifecycle assembly is already bound")
+        self.__lifecycle_assembly = assembly
+
+    def _lifecycle_assembly_or_none(self):
+        return self.__lifecycle_assembly
 
     @staticmethod
     def _error(exc: SeriesPlanningError) -> SeriesPlanningPublicError:
@@ -46,6 +56,8 @@ class SeriesPlanningPublicBoundary:
 
     def _invoke(self, operation, *args):
         try:
+            if self.__lifecycle_state is not None:
+                self.__lifecycle_state.assert_ready()
             return operation(*args)
         except SeriesPlanningError as exc:
             raise self._error(exc) from None
@@ -72,6 +84,10 @@ def create_in_memory_boundary(
     ref_factory=None,
     clock=None,
 ) -> SeriesPlanningPublicBoundary:
+    if ref_factory is None and clock is None:
+        assembly = project_boundary._lifecycle_assembly_or_none()
+        if assembly is not None:
+            return assembly.series_planning
     kwargs = {}
     if ref_factory is not None:
         kwargs["ref_factory"] = ref_factory

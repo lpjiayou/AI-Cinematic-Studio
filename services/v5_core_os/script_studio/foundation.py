@@ -382,6 +382,27 @@ class InMemoryScriptStudioAdapter:
         ]
         return sorted(records, key=lambda item: item.versionNumber)
 
+    def lifecycle_has_episode_dependency(self, workspace_ref, series_ref, episode_ref):
+        if (workspace_ref, series_ref, episode_ref) in self._episode_index:
+            return True
+        return any(
+            record.workspaceRef == workspace_ref
+            and record.seriesRef == series_ref
+            and record.episodeRef == episode_ref
+            for record in self._versions.values()
+        )
+
+    def lifecycle_has_series_dependency(self, workspace_ref, series_ref):
+        if any(
+            key[0] == workspace_ref and key[1] == series_ref
+            for key in self._episode_index
+        ):
+            return True
+        return any(
+            record.workspaceRef == workspace_ref and record.seriesRef == series_ref
+            for record in self._versions.values()
+        )
+
 
 class SqliteScriptStudioAdapter:
     """SQLite local-development durable adapter; not a production database."""

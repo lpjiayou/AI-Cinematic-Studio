@@ -2998,7 +2998,7 @@ RB13-F001 Governance Source-of-Truth Drift
 R1 IMPLEMENTED / INDEPENDENTLY ACCEPTED / CLOSED
 
 RB13-F002 Deletion Lifecycle Integrity
-HIGH / CONFIRMED / BLOCKING / R2-P1 AUTHORIZED / IMPLEMENTATION STARTED
+HIGH / CONFIRMED / BLOCKING / R2-P1 IMPLEMENTED / PENDING FAST OWNER REVIEW
 
 Next Authorized Task
 PRE-M6-RB1.3-R2-P1
@@ -3043,7 +3043,7 @@ M6 门禁顺序统一为：
 8. Project Lead 单独授权 M6-P1。
 
 当前阶段是 `PRE-M6 RB1.3 Remediation`。R1-RV1 已独立接受，RB13-F001 已
-关闭。ADR-0002 已为 bounded R2 接受，R2-P1 InMemory 垂直切片已授权并开始；
+关闭。ADR-0002 已为 bounded R2 接受，R2-P1 InMemory 垂直切片已实现并等待快速 Owner Review；
 RB13-F002 在独立复核前仍为阻塞项。R2-P2、RB1.3 Closeout、M6 与 M7 未授权，
 Architecture Review 仍为 `PENDING`。
 
