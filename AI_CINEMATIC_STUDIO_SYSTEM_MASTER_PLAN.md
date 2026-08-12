@@ -2,13 +2,13 @@
 
 > Document: `AI_CINEMATIC_STUDIO_SYSTEM_MASTER_PLAN.md`
 >
-> Status: `SYSTEM MASTER GOVERNANCE BASELINE / ADR-0001 ACCEPTED / PRE-M6-RB1.3 REMEDIATION`
+> Status: `SYSTEM MASTER GOVERNANCE BASELINE / ADR-0001 + ADR-0002 ACCEPTED / PRE-M6-RB1.3 REMEDIATION`
 >
 > Version: `v1.1`
 >
 > Date: `2026-08-11`
 >
-> Revision: `PRE-M6-RB1.3-R1 — Governance Source-of-Truth Synchronization`
+> Revision: `PRE-M6-RB1.3-R2-P1 — InMemory Lifecycle Integrity Authorization`
 >
 > Architecture Decision: `ADR-0001 — Separate Commercial Experience Layer from Core Creator Runtime / Accepted`
 >
@@ -2998,10 +2998,16 @@ RB13-F001 Governance Source-of-Truth Drift
 R1 IMPLEMENTED / INDEPENDENTLY ACCEPTED / CLOSED
 
 RB13-F002 Deletion Lifecycle Integrity
-HIGH / CONFIRMED / BLOCKING / R2 AUTHORIZED / NOT STARTED
+HIGH / CONFIRMED / BLOCKING / R2-P1 AUTHORIZED / IMPLEMENTATION STARTED
 
 Next Authorized Task
-PRE-M6-RB1.3-R2
+PRE-M6-RB1.3-R2-P1
+
+ADR-0002 V5 Lifecycle Integrity Boundary
+ACCEPTED FOR BOUNDED R2 IMPLEMENTATION
+
+R2-P2 SQLite Lifecycle Integrity
+NOT AUTHORIZED
 
 Legacy repository capability provenance
 MEDIUM / OPEN / NON-BLOCKING / OWNER GATE P3-RV1-003
@@ -3037,9 +3043,9 @@ M6 门禁顺序统一为：
 8. Project Lead 单独授权 M6-P1。
 
 当前阶段是 `PRE-M6 RB1.3 Remediation`。R1-RV1 已独立接受，RB13-F001 已
-关闭。RB13-F002 尚未修复；R2 是下一授权任务，但保持 `AUTHORIZED / NOT
-STARTED`。RB1.3 Closeout 未授权，Architecture Review 仍为 `PENDING`，M6
-仍为 `NOT STARTED / NOT AUTHORIZED`。
+关闭。ADR-0002 已为 bounded R2 接受，R2-P1 InMemory 垂直切片已授权并开始；
+RB13-F002 在独立复核前仍为阻塞项。R2-P2、RB1.3 Closeout、M6 与 M7 未授权，
+Architecture Review 仍为 `PENDING`。
 
 ---
 
