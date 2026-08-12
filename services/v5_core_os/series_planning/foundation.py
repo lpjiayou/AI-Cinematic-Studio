@@ -227,24 +227,51 @@ class InMemorySeriesPlanningAdapter:
 class SqliteSeriesPlanningAdapter:
     """Durable local-development adapter sharing the Creator SQLite database."""
 
-    def __init__(self, database_path: Path | str) -> None:
+    def __init__(self, database_path: Path | str, *, lifecycle_state=None) -> None:
         self.database_path = Path(database_path).resolve()
         self.database_path.parent.mkdir(parents=True, exist_ok=True)
         self._lock = RLock()
+        self._lifecycle_state = lifecycle_state
         self._initialize()
 
     def _connect(self) -> sqlite3.Connection:
         connection = sqlite3.connect(self.database_path, timeout=10)
         connection.row_factory = sqlite3.Row
         connection.execute("PRAGMA foreign_keys = ON")
+        if connection.execute("PRAGMA foreign_keys").fetchone()[0] != 1:
+            connection.close()
+            raise RuntimeError("SQLite foreign key enforcement unavailable")
         return connection
 
     @contextmanager
     def _session(self):
+        shared = self._lifecycle_state.connection_or_none() if self._lifecycle_state else None
+        if shared is not None:
+            yield shared
+            return
         connection = self._connect()
         try:
             with connection:
                 yield connection
+        finally:
+            connection.close()
+
+    @contextmanager
+    def _write_session(self):
+        shared = self._lifecycle_state.connection_or_none() if self._lifecycle_state else None
+        if shared is not None:
+            yield shared
+            return
+        if self._lifecycle_state is not None:
+            raise RuntimeError("valid lifecycle lease is required")
+        connection = self._connect()
+        try:
+            connection.execute("BEGIN IMMEDIATE")
+            yield connection
+            connection.commit()
+        except BaseException:
+            connection.rollback()
+            raise
         finally:
             connection.close()
 
@@ -300,7 +327,7 @@ class SqliteSeriesPlanningAdapter:
                 "SELECT schema_version FROM v5_series_planning_schema WHERE component = ?",
                 ("series_planning",),
             ).fetchone()
-            if row is None or row["schema_version"] != SQLITE_SCHEMA_VERSION:
+            if row is None or row["schema_version"] not in {SQLITE_SCHEMA_VERSION, 2}:
                 raise RuntimeError("unsupported Series Planning local-development schema version")
 
     @staticmethod
@@ -323,7 +350,7 @@ class SqliteSeriesPlanningAdapter:
 
     def create_plan_with_version(self, plan, version):
         try:
-            with self._lock, self._session() as connection:
+            with self._lock, self._write_session() as connection:
                 connection.execute(
                     "INSERT INTO v5_series_plans VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                     (
@@ -348,7 +375,7 @@ class SqliteSeriesPlanningAdapter:
 
     def append_version(self, updated_plan, version, expected_plan_version):
         try:
-            with self._lock, self._session() as connection:
+            with self._lock, self._write_session() as connection:
                 current = connection.execute(
                     "SELECT version FROM v5_series_plans WHERE workspace_ref = ? AND series_plan_ref = ?",
                     (updated_plan.workspaceRef, updated_plan.seriesPlanRef),
@@ -382,7 +409,7 @@ class SqliteSeriesPlanningAdapter:
         return updated_plan, version
 
     def confirm_version(self, updated_plan, expected_plan_version):
-        with self._lock, self._session() as connection:
+        with self._lock, self._write_session() as connection:
             exists = connection.execute(
                 "SELECT 1 FROM v5_series_plan_versions WHERE workspace_ref = ? AND series_plan_ref = ? AND series_plan_version_ref = ?",
                 (

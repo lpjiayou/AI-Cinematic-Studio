@@ -26,7 +26,6 @@ from services.v5_core_os.series_episode import (
     SeriesEpisodePublicBoundary,
     SeriesEpisodePublicError,
     create_in_memory_boundary as create_in_memory_series_boundary,
-    create_local_development_boundary_from_environment as create_local_series_boundary_from_environment,
 )
 from apps.creator_workspace_mvp.series_director import (
     SeriesDirectorApplicationService,
@@ -37,19 +36,16 @@ from services.v5_core_os.project_engine import (
     ProjectPublicBoundary,
     ProjectPublicError,
     create_in_memory_boundary as create_in_memory_project_boundary,
-    create_local_development_boundary_from_environment as create_local_project_boundary_from_environment,
 )
 from services.v5_core_os.script_studio import (
     ScriptStudioPublicBoundary,
     ScriptStudioPublicError,
     create_in_memory_boundary as create_in_memory_script_boundary,
-    create_local_development_boundary_from_environment as create_local_script_boundary_from_environment,
 )
 from services.v5_core_os.series_planning import (
     SeriesPlanningPublicBoundary,
     SeriesPlanningPublicError,
     create_in_memory_boundary as create_in_memory_series_planning_boundary,
-    create_local_development_boundary_from_environment as create_local_series_planning_boundary_from_environment,
 )
 from services.v4_platform import (
     ProviderConfigurationError,
@@ -722,7 +718,9 @@ def service_from_environment() -> AiDirectorService:
 
 
 def series_episode_boundary_from_environment() -> SeriesEpisodePublicBoundary:
-    return create_local_series_boundary_from_environment()
+    from services.v5_core_os.lifecycle_integrity import LifecycleAssembly
+
+    return LifecycleAssembly.sqlite_from_environment().series_episode
 
 
 def capability_services_from_environment() -> tuple[AiDirectorService, ScriptStudioApplicationService, SeriesDirectorApplicationService]:
@@ -735,9 +733,12 @@ def capability_services_from_environment() -> tuple[AiDirectorService, ScriptStu
 
 def main() -> None:
     series_boundary = series_episode_boundary_from_environment()
-    project_boundary = create_local_project_boundary_from_environment(series_boundary)
+    assembly = series_boundary._lifecycle_assembly_or_none()
+    if assembly is None:
+        raise RuntimeError("Creator SQLite lifecycle assembly is required")
+    project_boundary = assembly.project_context
     ai_director_service, script_service, series_director_service = capability_services_from_environment()
-    series_planning_boundary = create_local_series_planning_boundary_from_environment(project_boundary)
+    series_planning_boundary = assembly.series_planning
     server = create_server(
         ("127.0.0.1", 8765),
         ai_director_service,
@@ -746,7 +747,7 @@ def main() -> None:
         series_director_service=series_director_service,
         series_planning_boundary=series_planning_boundary,
         script_studio_service=script_service,
-        script_studio_boundary=create_local_script_boundary_from_environment(series_boundary),
+        script_studio_boundary=assembly.script_studio,
     )
     print("Creator Core API available at http://127.0.0.1:8765")
     try:

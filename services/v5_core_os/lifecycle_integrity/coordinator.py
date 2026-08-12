@@ -5,15 +5,12 @@ from __future__ import annotations
 from typing import Any, Callable
 
 from .contracts import LifecycleOperation
-from .in_memory import InMemoryLifecycleState
-
-
 class LifecycleIntegrityCoordinator:
     """Coordinates dependencies without owning any Project or production fact."""
 
     def __init__(
         self,
-        state: InMemoryLifecycleState,
+        state,
         *,
         episode_exists: Callable[[str, str, str], bool],
         series_exists: Callable[[str, str], bool],
@@ -37,10 +34,13 @@ class LifecycleIntegrityCoordinator:
         mutation: Callable[[], Any],
     ) -> Any:
         with self._state.lease(workspace_ref=workspace_ref, operation=operation) as lease:
-            return self._state.apply_preimaged(lease, mutation)
+            return self._state.apply_mutation(lease, mutation)
 
     def create_project(self, workspace_ref: str, mutation: Callable[[], Any]) -> Any:
         return self._mutate(workspace_ref, LifecycleOperation.CREATE_PROJECT, mutation)
+
+    def create_episode(self, workspace_ref: str, mutation: Callable[[], Any]) -> Any:
+        return self._mutate(workspace_ref, LifecycleOperation.CREATE_EPISODE, mutation)
 
     def create_script_version(self, workspace_ref: str, mutation: Callable[[], Any]) -> Any:
         return self._mutate(workspace_ref, LifecycleOperation.CREATE_SCRIPT_VERSION, mutation)

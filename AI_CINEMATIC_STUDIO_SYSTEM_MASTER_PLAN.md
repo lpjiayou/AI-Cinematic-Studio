@@ -8,7 +8,7 @@
 >
 > Date: `2026-08-11`
 >
-> Revision: `PRE-M6-RB1.3-R2-P1 — InMemory Lifecycle Integrity Authorization`
+> Revision: `PRE-M6-RB1.3-R2-P2 — SQLite Lifecycle Integrity Implementation`
 >
 > Architecture Decision: `ADR-0001 — Separate Commercial Experience Layer from Core Creator Runtime / Accepted`
 >
@@ -2998,16 +2998,16 @@ RB13-F001 Governance Source-of-Truth Drift
 R1 IMPLEMENTED / INDEPENDENTLY ACCEPTED / CLOSED
 
 RB13-F002 Deletion Lifecycle Integrity
-HIGH / CONFIRMED / BLOCKING / R2-P1 IMPLEMENTED / PENDING FAST OWNER REVIEW
+HIGH / CONFIRMED / BLOCKING / R2-P2 IMPLEMENTED / PENDING OWNER REVIEW
 
-Next Authorized Task
-PRE-M6-RB1.3-R2-P1
+Current Task
+PRE-M6-RB1.3-R2-P2
 
 ADR-0002 V5 Lifecycle Integrity Boundary
 ACCEPTED FOR BOUNDED R2 IMPLEMENTATION
 
 R2-P2 SQLite Lifecycle Integrity
-NOT AUTHORIZED
+IMPLEMENTED / PENDING OWNER REVIEW
 
 Legacy repository capability provenance
 MEDIUM / OPEN / NON-BLOCKING / OWNER GATE P3-RV1-003
@@ -3043,8 +3043,8 @@ M6 门禁顺序统一为：
 8. Project Lead 单独授权 M6-P1。
 
 当前阶段是 `PRE-M6 RB1.3 Remediation`。R1-RV1 已独立接受，RB13-F001 已
-关闭。ADR-0002 已为 bounded R2 接受，R2-P1 InMemory 垂直切片已实现并等待快速 Owner Review；
-RB13-F002 在独立复核前仍为阻塞项。R2-P2、RB1.3 Closeout、M6 与 M7 未授权，
+关闭。ADR-0002 已为 bounded R2 接受；R2-P1 InMemory 与 R2-P2 SQLite 垂直切片均已实现；
+RB13-F002 在独立复核前仍为阻塞项。正式数据库迁移、RB1.3 Closeout、M6 与 M7 未授权，
 Architecture Review 仍为 `PENDING`。
 
 ---

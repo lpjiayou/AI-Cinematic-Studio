@@ -407,24 +407,51 @@ class InMemoryScriptStudioAdapter:
 class SqliteScriptStudioAdapter:
     """SQLite local-development durable adapter; not a production database."""
 
-    def __init__(self, database_path: Path | str) -> None:
+    def __init__(self, database_path: Path | str, *, lifecycle_state=None) -> None:
         self.database_path = Path(database_path).resolve()
         self.database_path.parent.mkdir(parents=True, exist_ok=True)
         self._lock = RLock()
+        self._lifecycle_state = lifecycle_state
         self._initialize()
 
     def _connect(self) -> sqlite3.Connection:
         connection = sqlite3.connect(self.database_path, timeout=10)
         connection.row_factory = sqlite3.Row
         connection.execute("PRAGMA foreign_keys = ON")
+        if connection.execute("PRAGMA foreign_keys").fetchone()[0] != 1:
+            connection.close()
+            raise RuntimeError("SQLite foreign key enforcement unavailable")
         return connection
 
     @contextmanager
     def _session(self):
+        shared = self._lifecycle_state.connection_or_none() if self._lifecycle_state else None
+        if shared is not None:
+            yield shared
+            return
         connection = self._connect()
         try:
             with connection:
                 yield connection
+        finally:
+            connection.close()
+
+    @contextmanager
+    def _write_session(self):
+        shared = self._lifecycle_state.connection_or_none() if self._lifecycle_state else None
+        if shared is not None:
+            yield shared
+            return
+        if self._lifecycle_state is not None:
+            raise RuntimeError("valid lifecycle lease is required")
+        connection = self._connect()
+        try:
+            connection.execute("BEGIN IMMEDIATE")
+            yield connection
+            connection.commit()
+        except BaseException:
+            connection.rollback()
+            raise
         finally:
             connection.close()
 
@@ -481,7 +508,7 @@ class SqliteScriptStudioAdapter:
                 "SELECT schema_version FROM v5_script_studio_schema WHERE component = ?",
                 ("script_studio",),
             ).fetchone()
-            if row is None or row["schema_version"] != SQLITE_SCHEMA_VERSION:
+            if row is None or row["schema_version"] not in {SQLITE_SCHEMA_VERSION, 2}:
                 raise RuntimeError("unsupported Script Studio local-development schema version")
 
     @staticmethod
@@ -524,7 +551,7 @@ class SqliteScriptStudioAdapter:
 
     def create_script_with_version(self, script, version):
         try:
-            with self._lock, self._session() as connection:
+            with self._lock, self._write_session() as connection:
                 connection.execute(
                     "INSERT INTO v5_scripts VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                     self._script_values(script),
@@ -534,6 +561,8 @@ class SqliteScriptStudioAdapter:
                     self._version_values(version),
                 )
         except sqlite3.IntegrityError as exc:
+            if "FOREIGN KEY" in str(exc).upper():
+                raise RecordNotFoundError("Episode was not found") from exc
             raise DuplicateRecordError("Script or ScriptVersion already exists") from exc
         except sqlite3.DatabaseError as exc:
             raise RepositoryWriteError("Script write failed") from exc
@@ -541,7 +570,7 @@ class SqliteScriptStudioAdapter:
 
     def append_version(self, updated_script, version, expected_script_version):
         try:
-            with self._lock, self._session() as connection:
+            with self._lock, self._write_session() as connection:
                 row = connection.execute(
                     "SELECT version FROM v5_scripts WHERE workspace_ref = ? AND script_ref = ?",
                     (updated_script.workspaceRef, updated_script.scriptRef),
@@ -570,6 +599,8 @@ class SqliteScriptStudioAdapter:
                 if updated.rowcount != 1:
                     raise VersionConflictError("Script version changed")
         except sqlite3.IntegrityError as exc:
+            if "FOREIGN KEY" in str(exc).upper():
+                raise RecordNotFoundError("Episode was not found") from exc
             raise DuplicateRecordError("ScriptVersion already exists") from exc
         except sqlite3.DatabaseError as exc:
             raise RepositoryWriteError("ScriptVersion write failed") from exc
@@ -577,7 +608,7 @@ class SqliteScriptStudioAdapter:
 
     def confirm_version(self, updated_script, expected_script_version):
         try:
-            with self._lock, self._session() as connection:
+            with self._lock, self._write_session() as connection:
                 version = connection.execute(
                     """
                     SELECT 1 FROM v5_script_versions
@@ -611,6 +642,26 @@ class SqliteScriptStudioAdapter:
         except sqlite3.DatabaseError as exc:
             raise RepositoryWriteError("Script confirmation failed") from exc
         return updated_script
+
+    def lifecycle_has_episode_dependency(self, workspace_ref, series_ref, episode_ref):
+        with self._session() as connection:
+            return connection.execute(
+                "SELECT 1 FROM v5_scripts WHERE workspace_ref=? AND series_ref=? AND episode_ref=? LIMIT 1",
+                (workspace_ref, series_ref, episode_ref),
+            ).fetchone() is not None or connection.execute(
+                "SELECT 1 FROM v5_script_versions WHERE workspace_ref=? AND series_ref=? AND episode_ref=? LIMIT 1",
+                (workspace_ref, series_ref, episode_ref),
+            ).fetchone() is not None
+
+    def lifecycle_has_series_dependency(self, workspace_ref, series_ref):
+        with self._session() as connection:
+            return connection.execute(
+                "SELECT 1 FROM v5_scripts WHERE workspace_ref=? AND series_ref=? LIMIT 1",
+                (workspace_ref, series_ref),
+            ).fetchone() is not None or connection.execute(
+                "SELECT 1 FROM v5_script_versions WHERE workspace_ref=? AND series_ref=? LIMIT 1",
+                (workspace_ref, series_ref),
+            ).fetchone() is not None
 
     def get_script(self, workspace_ref, series_ref, episode_ref):
         with self._session() as connection:

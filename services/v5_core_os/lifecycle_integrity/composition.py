@@ -4,34 +4,42 @@ from __future__ import annotations
 
 from copy import copy
 from dataclasses import dataclass
+import os
+from pathlib import Path
 from typing import Any, Callable
 from uuid import uuid4
 
 from services.v5_core_os.project_engine.foundation import (
     InMemoryProjectAdapter,
     ProjectContextService,
+    SqliteProjectAdapter,
 )
 from services.v5_core_os.project_engine.public import ProjectPublicBoundary
 from services.v5_core_os.script_studio.foundation import (
     InMemoryScriptStudioAdapter,
     ScriptStudioService,
+    SqliteScriptStudioAdapter,
 )
 from services.v5_core_os.script_studio.public import ScriptStudioPublicBoundary
 from services.v5_core_os.series_episode.foundation import (
     DependentRecordError,
     InMemorySeriesEpisodeAdapter,
     SeriesEpisodeService,
+    SqliteSeriesEpisodeAdapter,
 )
 from services.v5_core_os.series_episode.public import SeriesEpisodePublicBoundary
 from services.v5_core_os.series_planning.foundation import (
     InMemorySeriesPlanningAdapter,
     SeriesPlanningService,
+    SqliteSeriesPlanningAdapter,
 )
 from services.v5_core_os.series_planning.public import SeriesPlanningPublicBoundary
 
 from .contracts import BackendKind, LifecycleAssemblyIdentity
 from .coordinator import LifecycleIntegrityCoordinator
 from .in_memory import InMemoryLifecycleState
+from .migration import migrate_lifecycle_database, validate_lifecycle_database
+from .sqlite_backend import SqliteLifecycleState
 
 
 def _capture(adapter: object, names: tuple[str, ...]) -> Callable[[], dict[str, Any]]:
@@ -151,6 +159,83 @@ class LifecycleAssembly:
         ):
             boundary._bind_lifecycle_assembly(assembly)
         return assembly
+
+    @classmethod
+    def sqlite(
+        cls,
+        database_path,
+        *,
+        ref_factory=None,
+        clock=None,
+        initialize_or_upgrade: bool = False,
+        transaction_hook=None,
+    ) -> "LifecycleAssembly":
+        if initialize_or_upgrade:
+            migrate_lifecycle_database(database_path, allow_upgrade=True)
+        else:
+            validate_lifecycle_database(database_path)
+        state = SqliteLifecycleState(database_path, transaction_hook=transaction_hook)
+        identity = state.identity
+        series_repository = SqliteSeriesEpisodeAdapter(database_path, lifecycle_state=state)
+        project_repository = SqliteProjectAdapter(database_path, lifecycle_state=state)
+        script_repository = SqliteScriptStudioAdapter(database_path, lifecycle_state=state)
+        planning_repository = SqliteSeriesPlanningAdapter(database_path, lifecycle_state=state)
+
+        kwargs: dict[str, Any] = {}
+        if ref_factory is not None:
+            kwargs["ref_factory"] = ref_factory
+        if clock is not None:
+            kwargs["clock"] = clock
+        series_service = SeriesEpisodeService(series_repository, **kwargs)
+        series_boundary = SeriesEpisodePublicBoundary(series_service, lifecycle_state=state)
+        project_service = ProjectContextService(
+            project_repository,
+            get_series=series_boundary.get_series,
+            get_episode=series_boundary.get_episode,
+            **kwargs,
+        )
+        project_boundary = ProjectPublicBoundary(project_service, lifecycle_state=state)
+        script_service = ScriptStudioService(script_repository, series_boundary, **kwargs)
+        script_boundary = ScriptStudioPublicBoundary(script_service, lifecycle_state=state)
+        planning_service = SeriesPlanningService(planning_repository, project_boundary, **kwargs)
+        planning_boundary = SeriesPlanningPublicBoundary(planning_service, lifecycle_state=state)
+        coordinator = LifecycleIntegrityCoordinator(
+            state,
+            episode_exists=lambda workspace, series, episode: (
+                series_repository.get_episode(workspace, series, episode) is not None
+            ),
+            series_exists=lambda workspace, series: (
+                series_repository.get_series(workspace, series) is not None
+            ),
+            project_depends_on_series=lambda workspace, series: (
+                project_repository.get_project_for_series(workspace, series) is not None
+            ),
+            script_depends_on_episode=script_repository.lifecycle_has_episode_dependency,
+            script_depends_on_series=script_repository.lifecycle_has_series_dependency,
+            dependency_error=lambda code: DependentRecordError(code),
+        )
+        series_boundary.bind_lifecycle(coordinator)
+        project_boundary.bind_lifecycle(coordinator)
+        script_boundary.bind_lifecycle(coordinator)
+        assembly = cls(
+            identity, state, coordinator, series_boundary, project_boundary,
+            script_boundary, planning_boundary,
+        )
+        for boundary in (series_boundary, project_boundary, script_boundary, planning_boundary):
+            boundary._bind_lifecycle_assembly(assembly)
+        return assembly
+
+    @classmethod
+    def sqlite_from_environment(cls, environ=None) -> "LifecycleAssembly":
+        values = os.environ if environ is None else environ
+        configured_path = str(values.get("CREATOR_DATA_PATH", "")).strip()
+        if configured_path:
+            database_path = Path(configured_path)
+        else:
+            local_app_data = str(values.get("LOCALAPPDATA", "")).strip()
+            root = Path(local_app_data) if local_app_data else Path.home() / ".ai-cinematic-studio"
+            database_path = root / "AI Cinematic Studio" / "creator-workspace.sqlite3"
+        return cls.sqlite(database_path)
 
     def diagnostic_snapshot(self) -> dict[str, Any]:
         return self.state.diagnostic_snapshot()

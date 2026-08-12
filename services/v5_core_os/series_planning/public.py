@@ -6,6 +6,8 @@ import os
 from pathlib import Path
 from typing import Any, Mapping
 
+from services.v5_core_os.lifecycle_integrity.contracts import LifecycleOperation
+
 from services.v5_core_os.project_engine import ProjectPublicBoundary
 
 from .foundation import (
@@ -66,13 +68,24 @@ class SeriesPlanningPublicBoundary:
         return self._invoke(self.__service.get_workspace, workspace_ref, project_ref, series_ref)
 
     def confirm_candidate(self, command: Mapping[str, Any]) -> dict[str, Any]:
-        return self._invoke(self.__service.confirm_candidate, command)
+        return self._lifecycle_write(command, LifecycleOperation.CREATE_SERIES_PLAN, self.__service.confirm_candidate)
 
     def create_manual_version(self, command: Mapping[str, Any]) -> dict[str, Any]:
-        return self._invoke(self.__service.create_manual_version, command)
+        return self._lifecycle_write(command, LifecycleOperation.APPEND_SERIES_PLAN_VERSION, self.__service.create_manual_version)
 
     def confirm_version(self, command: Mapping[str, Any]) -> dict[str, Any]:
-        return self._invoke(self.__service.confirm_version, command)
+        return self._lifecycle_write(command, LifecycleOperation.CONFIRM_SERIES_PLAN_VERSION, self.__service.confirm_version)
+
+    def _lifecycle_write(self, command, lifecycle_operation, operation):
+        if self.__lifecycle_state is None:
+            return self._invoke(operation, command)
+        workspace_ref = str(command.get("workspaceRef") or "") if isinstance(command, Mapping) else ""
+        with self.__lifecycle_state.lease(
+            workspace_ref=workspace_ref, operation=lifecycle_operation
+        ) as lease:
+            return self.__lifecycle_state.apply_mutation(
+                lease, lambda: self._invoke(operation, command)
+            )
 
     def build_m6_bootstrap(self, workspace_ref: str, project_ref: str, series_ref: str) -> dict[str, Any]:
         return self._invoke(self.__service.build_m6_bootstrap, workspace_ref, project_ref, series_ref)

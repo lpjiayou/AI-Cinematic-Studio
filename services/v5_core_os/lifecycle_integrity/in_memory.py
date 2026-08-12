@@ -155,6 +155,8 @@ class InMemoryLifecycleState:
         self._active[active.nonce] = replace(active, state=LeaseState.COMMITTED)
         return result
 
+    apply_mutation = apply_preimaged
+
     def diagnostic_snapshot(self) -> dict[str, Any]:
         return {
             "assemblyRef": self.identity.assembly_ref,
