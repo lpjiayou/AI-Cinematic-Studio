@@ -4,9 +4,9 @@
 >
 > Execution Mode: MANUAL
 >
-> Current Task: `PRE-M6-RB1.3-R2 — Deletion Lifecycle Remediation`
+> Current Task: `PRE-M6-RB1.3-R2-P1 — InMemory Lifecycle Integrity Vertical Slice`
 >
-> Current Work Package: `PRE-M6 RB1.3 Remediation / R1 independently accepted and closed / R2 authorized but not started`
+> Current Work Package: `PRE-M6 RB1.3 Remediation / ADR-0002 accepted / R2-P1 authorized and in progress`
 >
 > M6 Authorization: `NOT AUTHORIZED`
 >
@@ -164,11 +164,12 @@ PRE-M6-RB1.3-R1-RV1 is `INDEPENDENTLY ACCEPTED`.
 
 RB13-F001 is `R1 IMPLEMENTED / INDEPENDENTLY ACCEPTED / CLOSED`.
 
-RB13-F002 remains `HIGH / CONFIRMED / BLOCKING / R2 AUTHORIZED / NOT STARTED`.
-`PRE-M6-RB1.3-R2` is the next authorized task, but it is not implemented or started by
-this checkpoint. Public API contracts, Application use-case semantics, Domain rules,
-Persistence schema and migrations, runtime/API responsibilities, tests and the separate
-Frontend repository remain outside this checkpoint scope.
+ADR-0002 is `ACCEPTED FOR BOUNDED R2 IMPLEMENTATION`. RB13-F002 remains
+`HIGH / CONFIRMED / BLOCKING / R2-P1 AUTHORIZED / IMPLEMENTATION IN PROGRESS`.
+`PRE-M6-RB1.3-R2-P1` is the current authorized task. R2-P1 is limited to the InMemory
+LifecycleAssembly, Lease and Coordinator vertical slice. SQLite backend, foreign keys,
+schema, migration, formal database access, public API changes, Auth/RBAC/Permission,
+the separate Frontend repository, R2-P2, M6 and M7 remain outside this work package.
 
 ---
 
@@ -313,9 +314,11 @@ capability.
 - FULL CORE AUDIT REPORT v1.2: `INDEPENDENTLY ACCEPTED`
 - PRE-M6-RB1.3-R1-RV1: `INDEPENDENTLY ACCEPTED`
 - RB13-F001: `R1 IMPLEMENTED / INDEPENDENTLY ACCEPTED / CLOSED`
-- RB13-F002: `HIGH / CONFIRMED / BLOCKING / R2 AUTHORIZED / NOT STARTED`
-- NEXT AUTHORIZED TASK: `PRE-M6-RB1.3-R2`
-- R2 STATUS: `AUTHORIZED / NOT STARTED`
+- ADR-0002 STATUS: `ACCEPTED FOR BOUNDED R2 IMPLEMENTATION`
+- RB13-F002: `HIGH / CONFIRMED / BLOCKING / R2-P1 AUTHORIZED / IMPLEMENTATION IN PROGRESS`
+- CURRENT AUTHORIZED TASK: `PRE-M6-RB1.3-R2-P1`
+- R2-P1 STATUS: `AUTHORIZED / IN PROGRESS`
+- R2-P2 STATUS: `NOT AUTHORIZED`
 - LEGACY REPOSITORY CAPABILITY PROVENANCE: `MEDIUM / OPEN / NON-BLOCKING`
 - P3-RV1-003: `OWNER GATE / OPEN / NON-BLOCKING EOL AUDIT DEBT`
 - RB1.3 CLOSEOUT: `NOT AUTHORIZED`
@@ -333,27 +336,28 @@ authorize RB1.3 Closeout, pass Architecture Review, or authorize M6.
 
 # 9. Stop Rule
 
-After the R1 checkpoint is remote-verified:
+After the R2-P1 implementation checkpoint is remote-verified:
 
 STOP.
 
-Report the checkpoint and wait for the R2 implementation instruction.
+Report the P1 checkpoint and wait for independent owner review.
 
-Do not begin R2, RB1.3 Closeout or Architecture Review within this work package.
+Do not begin R2-P2, RB1.3 Closeout or Architecture Review within this work package.
 
 Do not enter M6 or M7.
 
 ---
 
-# 10. Next Authorized Task
+# 10. Current Authorized Task
 
-`PRE-M6-RB1.3-R2 — Deletion Lifecycle Remediation`
+`PRE-M6-RB1.3-R2-P1 — InMemory Lifecycle Integrity Vertical Slice`
 
 Status:
 
-`AUTHORIZED / NOT STARTED`
+`AUTHORIZED / IN PROGRESS`
 
-R2 may begin only under its implementation instruction. This checkpoint does not begin
-R2 and does not authorize RB1.3 Closeout, Architecture Review or M6.
+R2-P1 may proceed under the explicit Project Lead instruction dated `2026-08-12`.
+This authorization does not start R2-P2 and does not authorize RB1.3 Closeout,
+Architecture Review, M6 or M7.
 
 # End of CURRENT_MILESTONE.md
