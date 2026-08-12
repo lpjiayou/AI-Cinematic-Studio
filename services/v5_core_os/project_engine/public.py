@@ -32,8 +32,24 @@ class ProjectPublicError(RuntimeError):
 class ProjectPublicBoundary:
     """The only Project Context surface available to Creator Application."""
 
-    def __init__(self, service: ProjectContextService) -> None:
+    def __init__(self, service: ProjectContextService, *, lifecycle_state=None) -> None:
         self.__service = service
+        self.__lifecycle_state = lifecycle_state
+        self.__lifecycle_coordinator = None
+        self.__lifecycle_assembly = None
+
+    def bind_lifecycle(self, coordinator) -> None:
+        if self.__lifecycle_coordinator is not None:
+            raise RuntimeError("lifecycle coordinator is already bound")
+        self.__lifecycle_coordinator = coordinator
+
+    def _bind_lifecycle_assembly(self, assembly) -> None:
+        if self.__lifecycle_assembly is not None:
+            raise RuntimeError("lifecycle assembly is already bound")
+        self.__lifecycle_assembly = assembly
+
+    def _lifecycle_assembly_or_none(self):
+        return self.__lifecycle_assembly
 
     @staticmethod
     def _error(exc: ProjectContextError) -> ProjectPublicError:
@@ -47,12 +63,21 @@ class ProjectPublicBoundary:
 
     def _invoke(self, operation, *args):
         try:
+            if self.__lifecycle_state is not None:
+                self.__lifecycle_state.assert_ready()
             return operation(*args)
         except ProjectContextError as exc:
             raise self._error(exc) from None
 
     def create_project(self, command: Mapping[str, Any]) -> dict[str, Any]:
-        return self._invoke(self.__service.create_project, command)
+        if self.__lifecycle_coordinator is None:
+            return self._invoke(self.__service.create_project, command)
+        workspace_ref = str(command.get("workspaceRef") or "") if isinstance(command, Mapping) else ""
+        return self._invoke(
+            self.__lifecycle_coordinator.create_project,
+            workspace_ref,
+            lambda: self.__service.create_project(command),
+        )
 
     def get_project(self, workspace_ref: str, project_ref: str) -> dict[str, Any]:
         return self._invoke(self.__service.get_project, workspace_ref, project_ref)
@@ -88,6 +113,10 @@ def create_in_memory_boundary(
     ref_factory=None,
     clock=None,
 ) -> ProjectPublicBoundary:
+    if ref_factory is None and clock is None:
+        assembly = series_episode_boundary._lifecycle_assembly_or_none()
+        if assembly is not None:
+            return assembly.project_context
     kwargs = {}
     if ref_factory is not None:
         kwargs["ref_factory"] = ref_factory

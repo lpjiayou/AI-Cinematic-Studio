@@ -43,6 +43,16 @@ class ScopeMismatchError(SeriesEpisodeError):
     code = "scope_mismatch"
 
 
+class DependentRecordError(SeriesEpisodeError):
+    """Deletion was rejected by the authoritative lifecycle boundary."""
+
+    def __init__(self, code: str) -> None:
+        if code not in {"dependent_project_exists", "dependent_script_exists"}:
+            raise ValueError("unsupported dependency error")
+        super().__init__(code)
+        self.code = code
+
+
 def _utc_now() -> str:
     return datetime.now(timezone.utc).isoformat(timespec="milliseconds").replace("+00:00", "Z")
 

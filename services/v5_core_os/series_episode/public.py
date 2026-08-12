@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Any, Mapping
 
 from .foundation import (
+    DependentRecordError,
     DuplicateRecordError,
     InMemorySeriesEpisodeAdapter,
     RecordNotFoundError,
@@ -30,14 +31,30 @@ class SeriesEpisodePublicError(RuntimeError):
 class SeriesEpisodePublicBoundary:
     """The only Series/Episode surface available to Creator Application."""
 
-    def __init__(self, service: SeriesEpisodeService) -> None:
+    def __init__(self, service: SeriesEpisodeService, *, lifecycle_state=None) -> None:
         self.__service = service
+        self.__lifecycle_state = lifecycle_state
+        self.__lifecycle_coordinator = None
+        self.__lifecycle_assembly = None
+
+    def bind_lifecycle(self, coordinator) -> None:
+        if self.__lifecycle_coordinator is not None:
+            raise RuntimeError("lifecycle coordinator is already bound")
+        self.__lifecycle_coordinator = coordinator
+
+    def _bind_lifecycle_assembly(self, assembly) -> None:
+        if self.__lifecycle_assembly is not None:
+            raise RuntimeError("lifecycle assembly is already bound")
+        self.__lifecycle_assembly = assembly
+
+    def _lifecycle_assembly_or_none(self):
+        return self.__lifecycle_assembly
 
     @staticmethod
     def _error(exc: SeriesEpisodeError) -> SeriesEpisodePublicError:
         if isinstance(exc, RecordNotFoundError):
             return SeriesEpisodePublicError(exc.code, 404)
-        if isinstance(exc, (DuplicateRecordError, UnconfirmedPlanError)):
+        if isinstance(exc, (DuplicateRecordError, UnconfirmedPlanError, DependentRecordError)):
             return SeriesEpisodePublicError(exc.code, 409)
         if isinstance(exc, ScopeMismatchError):
             return SeriesEpisodePublicError(exc.code, 400)
@@ -45,6 +62,8 @@ class SeriesEpisodePublicBoundary:
 
     def _invoke(self, operation, *args):
         try:
+            if self.__lifecycle_state is not None:
+                self.__lifecycle_state.assert_ready()
             return operation(*args)
         except SeriesEpisodeError as exc:
             raise self._error(exc) from None
@@ -78,10 +97,25 @@ class SeriesEpisodePublicBoundary:
         series_ref: str,
         episode_ref: str,
     ) -> dict[str, Any]:
-        return self._invoke(self.__service.delete_episode, workspace_ref, series_ref, episode_ref)
+        if self.__lifecycle_coordinator is None:
+            return self._invoke(self.__service.delete_episode, workspace_ref, series_ref, episode_ref)
+        return self._invoke(
+            self.__lifecycle_coordinator.delete_episode,
+            workspace_ref,
+            series_ref,
+            episode_ref,
+            lambda: self.__service.delete_episode(workspace_ref, series_ref, episode_ref),
+        )
 
     def delete_series(self, workspace_ref: str, series_ref: str) -> dict[str, Any]:
-        return self._invoke(self.__service.delete_series, workspace_ref, series_ref)
+        if self.__lifecycle_coordinator is None:
+            return self._invoke(self.__service.delete_series, workspace_ref, series_ref)
+        return self._invoke(
+            self.__lifecycle_coordinator.delete_series,
+            workspace_ref,
+            series_ref,
+            lambda: self.__service.delete_series(workspace_ref, series_ref),
+        )
 
     def build_script_studio_bootstrap(
         self,
@@ -98,6 +132,13 @@ class SeriesEpisodePublicBoundary:
 
 
 def create_in_memory_boundary(*, ref_factory=None, clock=None) -> SeriesEpisodePublicBoundary:
+    # The default production-like InMemory composition must never construct
+    # independent repositories. Explicit factories are retained for isolated
+    # compatibility tests only.
+    if ref_factory is None and clock is None:
+        from services.v5_core_os.lifecycle_integrity.composition import LifecycleAssembly
+
+        return LifecycleAssembly.in_memory().series_episode
     kwargs = {}
     if ref_factory is not None:
         kwargs["ref_factory"] = ref_factory
