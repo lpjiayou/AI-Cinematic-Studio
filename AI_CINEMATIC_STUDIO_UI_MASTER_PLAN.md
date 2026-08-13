@@ -14,7 +14,7 @@
 > UI-R1 Accepted SHA:
 > `c9536fc0c745d0bf9e9c3eb543f4ab6c0566798a`
 >
-> Revision: M6-P3-B1 bounded Core authorization status synchronization; product IA and visual baseline unchanged.
+> Revision: M6-P3-B1-R1 bounded Core SQLite isolation authorization synchronization; product IA and visual baseline unchanged.
 >
 > Scope:
 > AI Cinematic Studio Creator / Project Workspace / Production Editors /
@@ -129,9 +129,11 @@ Accepted；`c524486c05c21b270a7dd75e89fae4312430736a` 的 M6-P3-G0 架构提案�
 Project Lead 与 Architecture Owner 接受为规范架构，但未授予任何实现权限。
 原 G1 `0c283eb653e74784301620bdaf64bf451bb687dd` 保持历史 `REVISION REQUIRED /
 NOT OWNER ACCEPTED`；修正后的 G1-R1 已在
-`d44f471c644e319bb4a5bf73707c3274ecbaa426` 获得 Owner Acceptance。当前只授权
-M6-P3-B1 Core-only 有界顺序：8 路径治理检查点远端验证后，实施冻结的 6 个生产
-与 9 个测试路径，再远端验证并停止等待 B1 Owner Review。Frontend 仍冻结。
+`d44f471c644e319bb4a5bf73707c3274ecbaa426` 获得 Owner Acceptance。B1 候选
+`8449b521c96bb8340806ecda8649698f4771914a` 已远端验证但 Owner Review 判定
+`REVISION REQUIRED`。当前只授权 B1-R1 Core-only 有界修订：8 路径治理检查点远端
+验证后，只修改一个生产与一个测试路径，再远端验证并停止等待 B1-R1 Owner
+Review。Frontend 仍冻结。
 
 ---
 
@@ -153,9 +155,9 @@ M6-P3-B1 Core-only 有界顺序：8 路径治理检查点远端验证后，实�
   IMPLEMENTATION AUTHORITY`；
 - ADR-0005 / M6 Consumer Contract：`ACCEPTED AS ARCHITECTURE / B1 BOUNDED
   IMPLEMENTATION AUTHORIZED / G1 UNAUTHORIZED`；
-- M6-P3-B1 EpisodePlanItemBinding：`GOVERNANCE REMOTE-VERIFIED AT
-  ae82ea27b39c44a8b77941f2b43abf7544492765 / BOUNDED IMPLEMENTATION CANDIDATE /
-  BLOCKS M6-P3-G1`；
+- M6-P3-B1 EpisodePlanItemBinding：`REMOTE-VERIFIED CANDIDATE AT
+  8449b521c96bb8340806ecda8649698f4771914a / OWNER REVIEW REVISION REQUIRED /
+  NOT OWNER ACCEPTED / BLOCKS M6-P3-G1`；
 - M6-P3-B1 Scope：`8 GOVERNANCE → 6 PRODUCTION + 9 TESTS → REMOTE VERIFY →
   STOP FOR OWNER REVIEW`；
 - M6-P3-B1 Version policy：`INITIAL V1 / V1→V1 / EXPLICIT V1→V2 / V2→V2 /
@@ -164,6 +166,12 @@ M6-P3-B1 Core-only 有界顺序：8 路径治理检查点远端验证后，实�
   NO ROUTE, HANDLER, EXTERNAL DTO SOURCE OR FRONTEND CHANGE`；
 - M6-P3-B1 Owner HTTP clarification：`EXISTING WORKSPACE VERSIONS V2 RESPONSE PASSES
   THROUGH episodePlanItemBindings / NO OTHER HTTP CONTRACT EXPANSION`；
+- M6-P3-B1-F001：`CONFIRMED / BLOCKING / SQLITE SAME-PROJECT CROSS-SERIES FALSE
+  DEPENDENCY`；
+- M6-P3-B1-R1：`AUTHORIZED / GOVERNANCE CHECKPOINT CANDIDATE / 8 GOVERNANCE →
+  1 PRODUCTION + 1 TEST → REMOTE VERIFY → STOP FOR OWNER REVIEW`；
+- M6-P3-B1-R1 UI boundary：`CORE SQLITE READ + CORE INTEGRATION TEST ONLY / NO ROUTE,
+  HANDLER, DTO OR FRONTEND CHANGE`；
 - ADR-0006 / V5 Text Generation Capability：`ACCEPTED FOR BOUNDED G1`；
 - ACS-ARCH-R1-V5-TEXT-GENERATION-G0：`COMPLETE / REMOTE-VERIFIED AT
   92d1f3ac9e08c71458af04514baa659555fc55a7`；

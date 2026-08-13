@@ -1,12 +1,12 @@
 # M6 Series Intelligence Consumer and Reconciliation Contract
 
-> Status: `ACCEPTED NORMATIVE ARCHITECTURE / B1 BOUNDED IMPLEMENTATION AUTHORIZED / G1 UNAUTHORIZED`
+> Status: `ACCEPTED NORMATIVE ARCHITECTURE / B1 CANDIDATE REVISION REQUIRED / B1-R1 BOUNDED CORRECTION AUTHORIZED / G1 UNAUTHORIZED`
 >
 > Authority: `ADR-0005 — ACCEPTED AS ARCHITECTURE DECISION`
 >
 > Evidence base: `8227c6c616140824fd70de920dc6fcf459bb734d`; G0 proposal checkpoint `c524486c05c21b270a7dd75e89fae4312430736a`
 >
-> Work package: `ACS-M6-P3-B1-EPISODE-PLAN-ITEM-BINDING`
+> Work package: `ACS-M6-P3-B1-R1-SQLITE-SERIES-ISOLATION`
 >
 > Owner HTTP clarification: `EXISTING CANONICAL V2 PROJECTION RETURNED BY WORKSPACE VERSIONS PASSES THROUGH episodePlanItemBindings / MANUAL AND BOOTSTRAP V1 BEHAVIOR UNCHANGED / NO ROUTE-HANDLER-EXTERNAL-DTO SOURCE CHANGE / NO OTHER HTTP EXPANSION`
 
@@ -590,9 +590,9 @@ The current B1 authorization does not authorize:
 - V4/V3, Provider, GPU, Worker or ComfyUI;
 - M6-P4+, M7-M19 implementation or Production Ready status.
 
-## 15. B1 authorization and Owner Review stop rule
+## 15. Historical B1 authorization and Owner Review stop rule
 
-The only authorized automatic sequence is:
+The original B1 authorized automatic sequence was:
 
 ```text
 B1 GOVERNANCE AUTHORIZATION CHECKPOINT
@@ -621,3 +621,52 @@ NEXT AUTHORIZED MILESTONE: NONE
 
 B1 is not Owner Accepted by remote verification. G1 requires a new explicit Project
 Lead authorization even after a later B1 Owner Acceptance.
+
+## 16. B1 Owner Review and authorized B1-R1 correction
+
+The B1 candidate is remote-verified at
+`8449b521c96bb8340806ecda8649698f4771914a` but is `REVISION REQUIRED / NOT OWNER
+ACCEPTED`. Owner Review reproduced a SQLite-only false dependency: for a valid Project
+related to two Series, an other-Series plan can be selected by Project relationship
+while its versions are filtered out by Series. The empty history then returns
+`dependent_series_plan_binding_exists / 409` for an unbound Episode in the requested
+Series. The equivalent InMemory state succeeds.
+
+This is `M6-P3-B1-F001` and violates sections 5 and 13.1: other-Series isolation and
+InMemory/SQLite parity are mandatory. Existing green tests do not override this
+blocking behavior.
+
+The Project Lead, Architecture Owner, Repository Governance Owner and affected M2/M5
+Domain Owners authorize `ACS-M6-P3-B1-R1-SQLITE-SERIES-ISOLATION` against base
+`8449b521c96bb8340806ecda8649698f4771914a`. Its exact technical allowlist is:
+
+```text
+services/v5_core_os/series_planning/foundation.py
+tests/integration/test_creator_lifecycle_sqlite_p2.py
+```
+
+The correction must distinguish:
+
+- exact requested-Series plans;
+- suspicious plans whose Project is related to the requested Series but whose stored
+  Series lacks a matching same-Project relationship, which remain fail-closed;
+- legitimate other-Series plans with their own matching same-Project relationship,
+  which remain isolated;
+- orphan versions whose own stored Series equals the requested Series, which remain
+  fail-closed.
+
+All versions for an exact/suspicious selected plan must be scanned even if their stored
+Series projection is malformed. No DDL, Migration, JSON1, schema, InMemory production,
+binding/version, digest, HTTP, DTO, consumer or ownership change is authorized.
+
+The same eight governance paths may first record this authorization with production
+and test diff zero, and may later record the remote governance SHA and factual
+technical evidence. After governance remote verification, implement the one-production
+and one-test correction, pass the updated SQLite module, all original B1 tests, full
+Core and static gates, commit, non-force push, verify Local SHA equals Remote SHA, then:
+
+```text
+STOP — M6-P3-B1-R1 REMOTE-VERIFIED CORRECTION CANDIDATE
+PROJECT LEAD B1-R1 OWNER REVIEW REQUIRED
+M6-P3-G1 NOT AUTHORIZED / NOT STARTED
+```

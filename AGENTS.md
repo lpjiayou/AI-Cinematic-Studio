@@ -360,7 +360,7 @@ The PRE-M6 route is fixed as:
 → `M6 Preconditions`
 → `M6-P1`
 
-The current phase is `M6-P3-B1 EpisodePlanItemBinding Implementation Candidate`.
+The current phase is `M6-P3-B1-R1 SQLite Same-Project Cross-Series Isolation`.
 
 Current governance state:
 
@@ -379,7 +379,7 @@ Current governance state:
 - M6 Preconditions: `SATISFIED FOR BOUNDED M6-P0/P1 AND M6-P2 LOCAL SQLITE ONLY`;
 - ACS-M6-P0-P1-R2: `OWNER ACCEPTED / COMPLETE / REMOTE-VERIFIED AT
   e38c75aa4ff26bdea80c82d8a24096f799dad860`;
-- current task: `ACS-M6-P3-B1-EPISODE-PLAN-ITEM-BINDING`;
+- current task: `ACS-M6-P3-B1-R1-SQLITE-SERIES-ISOLATION`;
 - legacy repository capability provenance: `MEDIUM / OPEN / NON-BLOCKING`,
   Owner Gate `P3-RV1-003`;
 - M6-P0: `CONTRACT ACCEPTED / COMPLETE`;
@@ -393,12 +393,22 @@ Current governance state:
 - ADR-0005 and M6 consumer contract: `ACCEPTED AS ARCHITECTURE / B1 BOUNDED
   IMPLEMENTATION AUTHORIZED / G1 UNAUTHORIZED`;
 - M6-P3-B1 binding prerequisite: `GOVERNANCE AUTHORIZATION REMOTE-VERIFIED AT
-  ae82ea27b39c44a8b77941f2b43abf7544492765 / BOUNDED IMPLEMENTATION CANDIDATE /
+  ae82ea27b39c44a8b77941f2b43abf7544492765 / IMPLEMENTATION REMOTE-VERIFIED AT
+  8449b521c96bb8340806ecda8649698f4771914a / OWNER REVIEW REVISION REQUIRED /
   BLOCKS M6-P3-G1`;
 - M6-P3-B1 authorized base:
   `6bb9d165a693057f38e5789c408293ff0eaf5bcc`;
 - M6-P3-B1 affected Domain Owners: `M2 / M4 / M5 / M6 APPROVED`;
 - M6-P3-B1 frozen scope: `8 GOVERNANCE / 6 PRODUCTION / 9 TEST PATHS`;
+- M6-P3-B1 implementation candidate: `REMOTE-VERIFIED AT
+  8449b521c96bb8340806ecda8649698f4771914a / OWNER REVIEW REVISION REQUIRED /
+  NOT OWNER ACCEPTED`;
+- M6-P3-B1-F001: `CONFIRMED / BLOCKING — SQLITE SAME-PROJECT CROSS-SERIES
+  FALSE dependent_series_plan_binding_exists`;
+- M6-P3-B1-R1: `AUTHORIZED / GOVERNANCE CHECKPOINT CANDIDATE / ONE PRODUCTION
+  + ONE TEST PATH / TECHNICAL FIX NOT STARTED`;
+- M6-P3-B1-R1 authorized base:
+  `8449b521c96bb8340806ecda8649698f4771914a`;
 - M6-P3-G1: `SEQUENCE DEFINED / BLOCKED UNTIL B1 OWNER ACCEPTED / NOT
   AUTHORIZED / NOT STARTED`;
 - M6-P3 after G1 / M6-P4+: `NOT AUTHORIZED / NOT STARTED`;
@@ -429,10 +439,12 @@ explicit Owner decision authorizes only bounded B1 after governance remote
 verification. The Project Lead accepted the corrected G1-R1
 checkpoint at `d44f471c644e319bb4a5bf73707c3274ecbaa426`, closing Architecture
 Remediation R1. The original G1 remains historical `REVISION REQUIRED / NOT OWNER
-ACCEPTED` and is superseded by G1-R1. The only active work is the auto-sequential B1
-authorization under `CURRENT_MILESTONE.md`: exact eight-path governance checkpoint,
-remote verification, exact six-production/nine-test implementation, remote
-verification, then STOP for Project Lead B1 Owner Review.
+ACCEPTED` and is superseded by G1-R1. B1 is remote-verified at
+`8449b521c96bb8340806ecda8649698f4771914a` but failed Owner Review because its SQLite
+dependency scan crosses legitimate Series histories inside one Project. The only
+active work is the auto-sequential B1-R1 correction under `CURRENT_MILESTONE.md`:
+exact eight-path governance checkpoint, remote verification, one production/one test
+correction, remote verification, then STOP for Project Lead B1-R1 Owner Review.
 
 The M6 gate order is:
 
@@ -538,8 +550,15 @@ The accepted architecture-remediation sequence is:
     M2/M4/M5/M6 Domain Owners authorize exact B1: first an eight-path governance
     checkpoint and remote verification, then the frozen six-production/nine-test
     implementation, remote verification and STOP for B1 Owner Review.
+13. B1 Owner Review marks candidate
+    `8449b521c96bb8340806ecda8649698f4771914a` `REVISION REQUIRED`; the Project Lead,
+    Architecture Owner, Repository Governance Owner and affected M2/M5 Domain Owners
+    authorize only `ACS-M6-P3-B1-R1-SQLITE-SERIES-ISOLATION`: the same eight governance
+    paths, then `services/v5_core_os/series_planning/foundation.py` and
+    `tests/integration/test_creator_lifecycle_sqlite_p2.py`, remote verification and
+    STOP for B1-R1 Owner Review.
 
-The current B1 authorization does not authorize Schema/Migration, formal port-8765
+The current B1-R1 authorization does not authorize Schema/Migration, formal port-8765
 database access, HTTP route/handler/external DTO source-file changes, HTTP expansion
 beyond the approved existing workspace versions v2 field pass-through, Auth/RBAC,
 Frontend, M3/M6 consumer, M6-P3-G1, M7+, V3, GPU, Worker or ComfyUI work. Any unlisted

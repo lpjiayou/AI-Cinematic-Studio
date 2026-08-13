@@ -1,5 +1,10 @@
 # ACS-M6-P3-B1 EpisodePlanItemBinding Authorization
 
+> Current amendment: the remote B1 candidate at
+> `8449b521c96bb8340806ecda8649698f4771914a` is `REVISION REQUIRED / NOT OWNER
+> ACCEPTED`. The Project Lead authorized the bounded B1-R1 correction recorded in
+> sections 10–15 on `2026-08-13`.
+
 ## 1. Record
 
 | Field | Value |
@@ -271,3 +276,132 @@ NEXT AUTHORIZED MILESTONE: NONE
 ```
 
 Only a new explicit Project Lead decision may Owner Accept B1 or authorize G1.
+
+## 10. B1 Owner Review result
+
+The B1 implementation candidate is remote-verified at
+`8449b521c96bb8340806ecda8649698f4771914a`. Independent Owner Review reproduced one
+blocking SQLite isolation defect even though the existing automated suites passed:
+
+- focused B1 tests: `173/173 PASS`;
+- full Core regression: `448/448 PASS`;
+- non-test Python AST: `63/63 PASS`;
+- exact path scope: `8 governance / 6 production / 9 test`, unexpected paths `0`;
+- secret, Markdown local-link and `git diff --check` gates: `PASS`;
+- Local SHA equals Remote SHA; ahead/behind `0/0`; worktree clean.
+
+The defect is `M6-P3-B1-F001 — SQLITE SAME-PROJECT CROSS-SERIES FALSE DEPENDENCY`.
+For a valid Project related to Series A and Series B, an unbound v1 plan owned by
+Series B is selected by the SQLite Episode-dependency plan query while its Series B
+versions are excluded by the following version query. The resulting empty history is
+then conservatively classified as an unreadable Series A dependency. Deleting an
+otherwise unbound Series A Episode incorrectly fails with
+`dependent_series_plan_binding_exists / 409`, while the equivalent InMemory state
+deletes successfully.
+
+This violates the accepted other-Series isolation rule and InMemory/SQLite parity.
+Therefore:
+
+```text
+B1 CANDIDATE 8449b521c96bb8340806ecda8649698f4771914a
+OWNER REVIEW: REVISION REQUIRED
+B1 OWNER ACCEPTED: NO
+M6-P3-G1: NOT AUTHORIZED / NOT STARTED
+```
+
+## 11. Authorized B1-R1 correction
+
+| Field | Value |
+| --- | --- |
+| Task | `ACS-M6-P3-B1-R1-SQLITE-SERIES-ISOLATION` |
+| Date | `2026-08-13` |
+| Decision | `AUTHORIZED / GOVERNANCE CHECKPOINT CANDIDATE / TECHNICAL FIX NOT STARTED` |
+| Authorized base | `8449b521c96bb8340806ecda8649698f4771914a` |
+| Execution mode | `AUTO-SEQUENTIAL / BOUNDED / FAIL-CLOSED` |
+| Governance scope | `SAME EIGHT GOVERNANCE PATHS / PRODUCTION AND TEST DIFF ZERO` |
+| Technical scope | `ONE PRODUCTION PATH + ONE TEST PATH` |
+| Final stop | `B1-R1 REMOTE-VERIFIED CANDIDATE / PROJECT LEAD OWNER REVIEW REQUIRED` |
+
+The Project Lead, Architecture Owner, Repository Governance Owner and affected M2 and
+M5 Domain Owners authorize only the correction of `M6-P3-B1-F001`. This authorization
+does not accept B1 or B1-R1 in advance and does not authorize M6-P3-G1.
+
+## 12. Frozen correction semantics
+
+B1-R1 shall preserve conservative deletion protection for every exact-scope historical
+v2 binding while preventing unrelated Series history from becoming a false dependency.
+The SQLite read must satisfy all of the following together:
+
+1. a plan whose stored `series_ref` equals the requested Series remains exact-scope;
+2. a plan whose Project is related to the requested Series but whose stored Series has
+   no matching same-Project relationship remains suspicious exact-scope corruption and
+   is scanned fail-closed;
+3. a legitimate other-Series plan whose stored Series has its own matching relationship
+   to the same Project is excluded from the requested Series dependency history;
+4. every version belonging to a selected exact/suspicious plan is read, even when its
+   stored Series projection is malformed;
+5. an orphan version whose own stored `series_ref` equals the requested Series remains
+   fail-closed;
+6. no binding, plan, version or relationship is mutated by this read;
+7. no DDL, Migration, JSON1, marker, schema or persistence-shape change is allowed;
+8. existing not-found and Script-dependency precedence remains unchanged.
+
+The correction must add a SQLite regression proving that a valid same-Workspace,
+same-Project, other-Series plan does not block deletion of an unbound Episode, while
+all existing malformed exact-scope and hidden-scope fail-closed tests continue to pass.
+
+## 13. B1-R1 allowlists
+
+The governance checkpoint may synchronize exactly the same eight paths:
+
+```text
+AGENTS.md
+AI_CINEMATIC_STUDIO_SYSTEM_MASTER_PLAN.md
+AI_CINEMATIC_STUDIO_UI_MASTER_PLAN.md
+CURRENT_MILESTONE.md
+README.md
+architecture/M6_SERIES_INTELLIGENCE_CONSUMER_CONTRACT.md
+governance/ADR-0005-m6-series-intelligence-consumer-boundary.md
+governance/ACS-M6-P3-B1-EPISODE-PLAN-ITEM-BINDING.md
+```
+
+Before that governance checkpoint is remote-verified, production and test diff must be
+zero. After remote verification, the technical correction may change exactly:
+
+```text
+services/v5_core_os/series_planning/foundation.py
+tests/integration/test_creator_lifecycle_sqlite_p2.py
+```
+
+The implementation checkpoint may synchronize the same eight governance paths with
+the governance SHA and factual test/candidate status. No other path is allowed.
+
+## 14. Required B1-R1 gates
+
+1. reproduce the pre-fix SQLite false `409` and prove the post-fix deletion succeeds;
+2. preserve the matching InMemory result;
+3. preserve historical binding deletion protection and malformed exact-scope
+   fail-closed behavior;
+4. pass the updated SQLite lifecycle test module;
+5. pass all nine original B1 test modules and the full Core regression;
+6. pass AST/architecture, secret, Markdown/local-link and `git diff --check` gates;
+7. confirm exact `8 governance + 1 production + 1 test` scope with no DDL/Migration;
+8. create one governance commit and one technical commit, non-force push each, fetch,
+   and verify Local SHA equals Remote SHA with ahead/behind `0/0` and clean worktree;
+9. stop for Project Lead B1-R1 Owner Review.
+
+## 15. B1-R1 exclusions and final stop
+
+B1-R1 does not authorize changes to InMemory production behavior, bindings/version
+semantics, route/handler/external DTO, M3/M6 consumer behavior, M6-P3-G1, Frontend,
+DDL/Migration, Auth/RBAC, M7+, V3/V4, Provider, GPU, Worker, ComfyUI or Production
+Ready status.
+
+After technical remote verification:
+
+```text
+STOP — M6-P3-B1-R1 REMOTE-VERIFIED CORRECTION CANDIDATE
+PROJECT LEAD B1-R1 OWNER REVIEW REQUIRED
+M6-P3-G1 NOT AUTHORIZED / NOT STARTED
+NEXT AUTHORIZED MILESTONE: NONE
+```
