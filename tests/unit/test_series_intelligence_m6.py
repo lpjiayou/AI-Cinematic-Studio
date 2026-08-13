@@ -47,14 +47,21 @@ class MutableScopeAuthority:
 class DeterministicM5Source:
     def __init__(self, version=1):
         self.version = version
+        self.digest_revision = None
         self.read_count = 0
 
     def switch_at_activation(self, version):
         self.version = version
 
+    def switch_digest_at_activation(self, revision):
+        self.digest_revision = revision
+
     def get_confirmed_m6_source_snapshot(self, workspace_ref, project_ref, series_ref):
         self.read_count += 1
         version_ref = f"series-plan-version-{self.version}"
+        digest_input = {"versionRef": version_ref}
+        if self.digest_revision is not None:
+            digest_input["digestRevision"] = self.digest_revision
         return {
             "schemaVersion": "v5.series-planning.m6-source.v1",
             "workspaceRef": workspace_ref,
@@ -62,7 +69,7 @@ class DeterministicM5Source:
             "seriesRef": series_ref,
             "seriesPlanRef": "series-plan-shared",
             "seriesPlanVersionRef": version_ref,
-            "seriesPlanVersionDigest": digest({"versionRef": version_ref}),
+            "seriesPlanVersionDigest": digest(digest_input),
             "status": "confirmed",
             "episodePlanItems": [
                 {"episodePlanItemRef": f"episode-plan-{index}"}
@@ -353,6 +360,50 @@ class SeriesIntelligenceLifecycleTests(unittest.TestCase):
         self.assertEqual(stale.exception.code, "stale_source")
         self.assertGreater(source.read_count, component_source_reads)
         self.assertEqual(m6.diagnostic_snapshot()["snapshotCount"], 0)
+        self.assertEqual(m6.get_outbox(), [])
+
+    def test_activation_rejects_same_m5_version_ref_when_only_digest_changes_without_partial_state(self):
+        source = DeterministicM5Source()
+        scope = M6Scope(
+            "series-production", "tenant-digest-race", "workspace-digest-race",
+            "project-digest-race", "series-digest-race",
+        )
+        _state, m6 = isolated_m6(MutableScopeAuthority(scope), source)
+        context = {
+            "workspaceRef": scope.workspace_ref,
+            "projectRef": scope.project_ref,
+            "seriesRef": scope.series_ref,
+        }
+        bible, characters = confirmed_components_from_source(m6, context, source)
+        original_source = source.get_confirmed_m6_source_snapshot(
+            scope.workspace_ref, scope.project_ref, scope.series_ref
+        )
+        before = m6.diagnostic_snapshot()
+        source.switch_digest_at_activation(2)
+        changed_source = source.get_confirmed_m6_source_snapshot(
+            scope.workspace_ref, scope.project_ref, scope.series_ref
+        )
+        self.assertEqual(
+            changed_source["seriesPlanVersionRef"],
+            original_source["seriesPlanVersionRef"],
+        )
+        self.assertNotEqual(
+            changed_source["seriesPlanVersionDigest"],
+            original_source["seriesPlanVersionDigest"],
+        )
+
+        with self.assertRaises(SeriesIntelligencePublicError) as stale:
+            m6.activate_baseline({
+                **base_command(context, "activation-source-digest-race"),
+                "seriesBibleRef": bible["root"]["seriesBibleRef"],
+                "seriesBibleVersionRef": bible["version"]["seriesBibleVersionRef"],
+                "characterContinuityRef": characters["root"]["characterContinuityRef"],
+                "characterContinuityVersionRef": characters["version"]["characterContinuityVersionRef"],
+                "expectedActivationRevision": 0,
+                "approvalRef": "approval-human",
+            })
+        self.assertEqual(stale.exception.code, "stale_source")
+        self.assertEqual(m6.diagnostic_snapshot(), before)
         self.assertEqual(m6.get_outbox(), [])
 
     def test_trusted_authority_empty_business_domain_or_tenant_and_ref_mismatches_fail_closed(self):
@@ -717,11 +768,15 @@ class SeriesIntelligenceLifecycleTests(unittest.TestCase):
             "approvalRef": "approval-human",
         })
         self.assertEqual(confirmed["version"]["status"], "CONFIRMED")
-        required = {
+        intelligence_fields = (
             "background", "belief", "conflict", "goal", "personality", "behaviorRules",
             "dialogueRules", "forbiddenBehavior", "visualIdentityRules",
-        }
-        self.assertTrue(required.issubset(confirmed["version"]["content"]["characters"][0]))
+        )
+        self.assertTrue(
+            set(intelligence_fields).issubset(
+                confirmed["version"]["content"]["characters"][0]
+            )
+        )
         immutable_digest = confirmed["version"]["contentDigest"]
         with self.assertRaises(SeriesIntelligencePublicError) as immutable:
             self.m6.submit_character_candidate({
@@ -732,30 +787,80 @@ class SeriesIntelligenceLifecycleTests(unittest.TestCase):
             })
         self.assertEqual(immutable.exception.code, "version_conflict")
 
-        changed_content = copy.deepcopy(content)
-        changed_content["characters"][0]["belief"] = "光会保存每一次归途"
-        version2 = self.m6.create_character_version({
-            **base_command(self.context, "character-intelligence-v2"),
-            "characterContinuityRef": confirmed["root"]["characterContinuityRef"],
-            "expectedRevision": confirmed["root"]["revision"],
-            "baseCharacterContinuityVersionRef": confirmed["version"]["characterContinuityVersionRef"],
-            "seriesBibleRef": bible["root"]["seriesBibleRef"],
-            "seriesBibleVersionRef": bible["version"]["seriesBibleVersionRef"],
-            "content": changed_content,
-        })
-        self.assertEqual(version2["version"]["versionNumber"], confirmed["version"]["versionNumber"] + 1)
-        self.assertEqual(
-            version2["version"]["parentCharacterContinuityVersionRef"],
-            confirmed["version"]["characterContinuityVersionRef"],
-        )
-        self.assertNotEqual(version2["version"]["contentDigest"], immutable_digest)
+        changes = {
+            "background": "曾在风暴中熄灭又被旅人重新点亮",
+            "belief": "光会保存每一次归途",
+            "conflict": "必须在照亮旅人与保护自身之间选择",
+            "goal": "在天亮前指引最后一位旅人回家",
+            "personality": "克制、坚定且富有同理心",
+            "behaviorRules": ["只以明暗和照射方向回应旅人"],
+            "dialogueRules": ["保持沉默，不使用任何语言表达"],
+            "forbiddenBehavior": ["不得离开灯柱或主动追逐旅人"],
+            "visualIdentityRules": ["暖黄色灯罩、斑驳铜柱与稳定光晕"],
+        }
+        created_versions = []
+        root_revision = confirmed["root"]["revision"]
+        base_version_ref = confirmed["version"]["characterContinuityVersionRef"]
+        for offset, field in enumerate(intelligence_fields, start=1):
+            changed_content = copy.deepcopy(content)
+            changed_content["characters"][0][field] = copy.deepcopy(changes[field])
+            created = self.m6.create_character_version({
+                **base_command(self.context, f"character-intelligence-{field}"),
+                "characterContinuityRef": confirmed["root"]["characterContinuityRef"],
+                "expectedRevision": root_revision,
+                "baseCharacterContinuityVersionRef": base_version_ref,
+                "seriesBibleRef": bible["root"]["seriesBibleRef"],
+                "seriesBibleVersionRef": bible["version"]["seriesBibleVersionRef"],
+                "content": changed_content,
+            })
+            self.assertEqual(
+                created["version"]["versionNumber"],
+                confirmed["version"]["versionNumber"] + offset,
+            )
+            self.assertEqual(
+                created["version"]["parentCharacterContinuityVersionRef"],
+                base_version_ref,
+            )
+            self.assertNotEqual(created["version"]["contentDigest"], immutable_digest)
+            created_versions.append((field, created["version"], changed_content["characters"][0]))
+            root_revision = created["root"]["revision"]
+
         workspace = self.m6.get_workspace(
             self.context["workspaceRef"], self.context["projectRef"], self.context["seriesRef"]
         )
-        historical, current = workspace["characterContinuityVersions"][-2:]
+        versions_by_ref = {
+            version["characterContinuityVersionRef"]: version
+            for version in workspace["characterContinuityVersions"]
+        }
+        historical = versions_by_ref[base_version_ref]
+        historical_character = next(
+            item for item in historical["content"]["characters"]
+            if item["characterRef"] == "character-lamp"
+        )
         self.assertEqual(historical["contentDigest"], immutable_digest)
         self.assertEqual(historical["status"], "CONFIRMED")
-        self.assertEqual(current["content"]["characters"][0]["belief"], "光会保存每一次归途")
+        self.assertEqual(
+            {
+                field: historical_character[field]
+                for field in intelligence_fields
+            },
+            {
+                field: content["characters"][0][field]
+                for field in intelligence_fields
+            },
+        )
+        for changed_field, created, expected_character in created_versions:
+            with self.subTest(field=changed_field):
+                projected = versions_by_ref[created["characterContinuityVersionRef"]]
+                projected_character = next(
+                    item for item in projected["content"]["characters"]
+                    if item["characterRef"] == "character-lamp"
+                )
+                self.assertEqual(
+                    {field: projected_character[field] for field in intelligence_fields},
+                    {field: expected_character[field] for field in intelligence_fields},
+                )
+                self.assertEqual(projected["contentDigest"], created["contentDigest"])
 
     def test_activation_lineage_events_order_idempotency_and_revision_conflict(self):
         bible, characters = confirmed_components(self.assembly, self.context)
