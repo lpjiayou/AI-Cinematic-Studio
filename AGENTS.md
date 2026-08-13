@@ -360,7 +360,7 @@ The PRE-M6 route is fixed as:
 → `M6 Preconditions`
 → `M6-P1`
 
-The current phase is `M6 Series Intelligence / P2 Closeout G3 and P3-G0 Architecture`.
+The current phase is `Architecture Remediation R1 / V5 Text Generation Boundary G0 → G1`.
 
 Current governance state:
 
@@ -369,7 +369,9 @@ Current governance state:
   0aa14b4e426a3d968ec314029d60a47ea30cbc4d`;
 - PRE-M6-RB1.3: `REMEDIATION COMPLETE / FORMALLY CLOSED BY PROJECT LEAD OWNER REVIEW`;
 - PRE-M6-RB1.3-IR1: `COMPLETED`;
-- Full Core Audit Report v1.2: `INDEPENDENTLY ACCEPTED`;
+- Full Core Audit Report v1.2 acceptance label: `PRESERVED`; repository-resident
+  report provenance: `OPEN / NON-BLOCKING UNDER R-CORE-GOV-002 / NOT AN
+  IMPLEMENTATION AUTHORITY`;
 - PRE-M6-RB1.3-R1-RV1: `INDEPENDENTLY ACCEPTED`;
 - RB13-F001: `R1 IMPLEMENTED / INDEPENDENTLY ACCEPTED / CLOSED`;
 - RB13-F002: `REMEDIATED / CLOSED IN CURRENT TESTED CORE BASELINE`;
@@ -377,7 +379,7 @@ Current governance state:
 - M6 Preconditions: `SATISFIED FOR BOUNDED M6-P0/P1 AND M6-P2 LOCAL SQLITE ONLY`;
 - ACS-M6-P0-P1-R2: `OWNER ACCEPTED / COMPLETE / REMOTE-VERIFIED AT
   e38c75aa4ff26bdea80c82d8a24096f799dad860`;
-- current task: `ACS-M6-P2-G1-CLOSEOUT-G3 / M6-P3-G0`;
+- current task: `ACS-ARCH-R1-V5-TEXT-GENERATION-G0 → G1`;
 - legacy repository capability provenance: `MEDIUM / OPEN / NON-BLOCKING`,
   Owner Gate `P3-RV1-003`;
 - M6-P0: `CONTRACT ACCEPTED / COMPLETE`;
@@ -386,12 +388,20 @@ Current governance state:
 - M6-P2-G0: `ADR-0004 AND SQLITE CONTRACT ACCEPTED / COMPLETE`;
 - M6-P2-G1: `OWNER ACCEPTED / COMPLETE / REMOTE-VERIFIED AT
   8227c6c616140824fd70de920dc6fcf459bb734d`;
-- M6-P3-G0: `ARCHITECTURE PROPOSAL DEFINED / BINDING PREREQUISITE OPEN /
-  GOVERNANCE-ONLY CHECKPOINT CANDIDATE / OWNER REVIEW PENDING`;
+- M6-P2-G1-CLOSEOUT-G3 / M6-P3-G0: `REMOTE-VERIFIED CHECKPOINT CANDIDATE AT
+  c524486c05c21b270a7dd75e89fae4312430736a / OWNER REVIEW PENDING / HOLD`;
 - ADR-0005 and M6 consumer contract: `PROPOSED / NO IMPLEMENTATION AUTHORITY`;
 - M6-P3-B1 binding prerequisite: `PROPOSED / NOT AUTHORIZED / NOT STARTED /
   BLOCKS M6-P3-G1`;
 - M6-P3-G1+: `NOT AUTHORIZED / NOT STARTED`;
+- R-CORE-ARCH-001: `CONFIRMED / HIGH / MITIGATING — APPLICATION DIRECT V4 DEPENDENCY`;
+- ADR-0006 V5 Text Generation Capability Boundary: `ACCEPTED FOR BOUNDED G1
+  REMEDIATION`;
+- ACS-ARCH-R1-V5-TEXT-GENERATION-G0: `GOVERNANCE / ARCHITECTURE CHECKPOINT IN
+  PROGRESS`;
+- ACS-ARCH-R1-V5-TEXT-GENERATION-G1: `AUTHORIZED ONLY AFTER G0 COMMIT, PUSH AND
+  REMOTE VERIFICATION`;
+- R-CORE-GOV-002 audit-report provenance: `OPEN / NON-BLOCKING`;
 - M7-M19: `NOT STARTED / NOT AUTHORIZED`;
 - Formal 8765 Deployment: `UNTOUCHED / NOT DEPLOYED`;
 - Frontend: `FROZEN / UNTOUCHED`;
@@ -399,10 +409,12 @@ Current governance state:
 
 Legacy repository implementation must not be counted as current Core production
 capability. RB13-F001 and RB13-F002 are closed in the accepted current tested Core
-baseline. M6-P0/P1 and M6-P2 are Owner Accepted. The current G3/P3-G0 authority is
-governance-only; it does not authorize M6-P3-B1, M6-P3-G1+, M7-M19, formal database
-deployment or Frontend work. Exact active task scope remains governed by
-`CURRENT_MILESTONE.md`.
+baseline. M6-P0/P1 and M6-P2 are Owner Accepted. The remote-verified
+G3/P3-G0 revision at `c524486c05c21b270a7dd75e89fae4312430736a` remains a
+checkpoint candidate on HOLD; it is not Owner Accepted and does not accept ADR-0005
+or authorize any P3 implementation. The Project Lead selected the V5-owned Text
+Generation remediation and accepted ADR-0006. The only active bounded wave is G0 →
+G1 under `CURRENT_MILESTONE.md`.
 
 The M6 gate order is:
 
@@ -440,6 +452,9 @@ M6-P3-B1 binding implementation before separately authorizing M6-P3-G1. M2 retai
 Series/Episode identity and membership; M4 retains Project identity and
 Project-to-Series context.
 
+That P3 proposal is now on HOLD. The current architecture-remediation wave neither
+accepts nor implements ADR-0005, M6-P3-B1 or M6-P3-G1.
+
 This does not establish a general Architecture Review, Production Ready status,
 formal database deployment, or authorization for M6-P3 implementation.
 
@@ -466,6 +481,26 @@ M6-P2-G1 is `OWNER ACCEPTED / COMPLETE / REMOTE-VERIFIED AT
 8227c6c616140824fd70de920dc6fcf459bb734d`; M6-P3-G0 is a governance-only
 checkpoint candidate with Proposed architecture; M6-P3-B1 and M6-P3-G1+ remain
 `NOT AUTHORIZED / NOT STARTED`.
+
+The accepted architecture-remediation sequence is:
+
+1. G0 records ADR-0006, the normative
+   `architecture/V5_TEXT_GENERATION_CAPABILITY_CONTRACT.md`, risks and exact G1
+   authority in one governance-only checkpoint;
+2. G0 is committed, pushed and remote-verified with no production or test diff;
+3. G1 introduces the V5-owned public Text Generation capability and migrates the
+   existing M1 AI Director, M3 Script Studio, M5 Series Director and Creator Server
+   composition from direct V4 imports to that V5 boundary;
+4. V5 alone consumes the existing public V4 `TextGenerationPort`; V4 retains Provider
+   execution and Adapter ownership and no second Provider stack is created;
+5. G1 preserves existing public HTTP/API, Domain, candidate validation and product
+   error semantics, adds an executable no-Application-to-V4 guard, passes the complete
+   Core regression, and is committed, pushed and remote-verified;
+6. after G1 remote verification: `STOP` for Project Lead owner review.
+
+This bounded wave does not authorize Schema/Migration, formal port-8765 database
+access, HTTP/Auth/RBAC contract expansion, Frontend, M6-P3, M7+, V3, GPU, Worker or
+ComfyUI work. Any such need is a Stop Condition.
 
 Legacy Phase 0 provenance debt remains `OPEN / NON-BLOCKING` under Owner Gate
 `P3-RV1-003`. This acknowledgement does not silently close the debt or import
@@ -546,6 +581,13 @@ including where applicable:
 - Audit / Outbox;
 - durable production semantics.
 
+V5 also owns the public Text Generation Capability boundary consumed by Creator
+Application. That capability owns provider-neutral Application-facing request,
+response and error semantics plus closed purpose-to-execution-policy mapping. Creator
+Application retains prompts, candidate schema parsing, local validation and the
+accepted maximum-one-repair orchestration. V5 does not own V4 Provider execution or
+Provider adapters.
+
 Do not duplicate these facts in Creator Application.
 
 ---
@@ -558,6 +600,10 @@ Early V4 may provide:
 
 TextGenerationPort
 → Provider Adapter
+
+The accepted V5 Text Generation Capability is the only production consumer of this
+V4 port in the current Core path. Creator Application must not import, configure or
+call V4 directly.
 
 Later V4 may provide:
 
@@ -655,7 +701,7 @@ DeepSeek is currently an accepted initial text intelligence provider.
 Approved path:
 
 Creator/Application
-→ capability service
+→ V5 Text Generation Capability
 → V4 TextGenerationPort
 → DeepSeek Adapter
 → DeepSeek API
