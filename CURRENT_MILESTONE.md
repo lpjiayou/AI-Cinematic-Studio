@@ -4,11 +4,11 @@
 >
 > Execution Mode: MANUAL
 >
-> Current Task: `ACS-M6-P0-P1 — SERIES INTELLIGENCE INMEMORY BASELINE`
+> Current Task: `ACS-M6-P0-P1-R1 — M6-P1 ACCEPTANCE GATE CLOSURE`
 >
-> Current Work Package: `M6 Series Intelligence / P0-P1 IMPLEMENTED + OWNER REVIEW PENDING`
+> Current Work Package: `M6 Series Intelligence / P0 COMPLETE + P1 CHECKPOINT CANDIDATE / OWNER REVIEW PENDING`
 >
-> M6 Authorization: `P0/P1 AUTHORIZED / P2+ NOT AUTHORIZED`
+> M6 Authorization: `P0 CONTRACT ACCEPTED / COMPLETE / P1 IMPLEMENTED / P2+ NOT AUTHORIZED / NOT STARTED`
 >
 > M7 Authorization: `NOT AUTHORIZED`
 >
@@ -268,13 +268,14 @@ Strict order:
 `PRE-M6-RB1.1`, `PRE-M6-RB1.2` and `PRE-M6-RB1.3` are closed. R2-P1 and R2-P2
 are accepted, and R2-P2 is remote-verified at
 `0aa14b4e426a3d968ec314029d60a47ea30cbc4d`. The next authorized task is
-`ACS-M6-P0-P1`; no later milestone may be silently entered.
+`ACS-M6-P0-P1-R1`; no later milestone may be silently entered.
 
 ---
 
 # 7. M6 Entry Conditions
 
-M6 remains `NOT STARTED / P0-P1 AUTHORIZED / P2+ NOT AUTHORIZED`.
+M6-P0 is `CONTRACT ACCEPTED / COMPLETE`; M6-P1 is `IMPLEMENTED / CHECKPOINT
+CANDIDATE / OWNER REVIEW PENDING`; M6-P2+ remains `NOT AUTHORIZED / NOT STARTED`.
 
 M6 Character Intelligence must include at least background, motivation, belief,
 conflict, goal, personality, behavior rules, dialogue rules, forbidden behavior,
@@ -318,7 +319,7 @@ capability.
 - RB13-F001: `R1 IMPLEMENTED / INDEPENDENTLY ACCEPTED / CLOSED`
 - ADR-0002 STATUS: `ACCEPTED FOR BOUNDED R2 IMPLEMENTATION`
 - RB13-F002: `REMEDIATED / CLOSED IN CURRENT TESTED CORE BASELINE`
-- CURRENT TASK: `ACS-M6-P0-P1`
+- CURRENT TASK: `ACS-M6-P0-P1-R1`
 - R2-P1 STATUS: `ACCEPTED`
 - R2-P2 STATUS: `OWNER ACCEPTED / COMPLETE / REMOTE-VERIFIED AT 0aa14b4e426a3d968ec314029d60a47ea30cbc4d`
 - LEGACY REPOSITORY CAPABILITY PROVENANCE: `MEDIUM / OPEN / NON-BLOCKING`
@@ -326,15 +327,16 @@ capability.
 - RB1.3 CLOSEOUT: `FORMALLY CLOSED`
 - ARCHITECTURE REVIEW: `SATISFIED FOR BOUNDED M6-P0/P1 ONLY`
 - M6 PRECONDITIONS: `SATISFIED FOR BOUNDED INMEMORY M6-P0/P1 ONLY`
-- M6: `P0-P1 IMPLEMENTED / OWNER REVIEW PENDING / P2+ NOT AUTHORIZED`
-- M6-P0 STATUS: `CONTRACT ACCEPTED`
+- M6: `P0 CONTRACT ACCEPTED / COMPLETE / P1 IMPLEMENTED / CHECKPOINT CANDIDATE / OWNER REVIEW PENDING / P2+ NOT AUTHORIZED / NOT STARTED`
+- M6-P0 STATUS: `CONTRACT ACCEPTED / COMPLETE`
 - M6-P1 STATUS: `IMPLEMENTED / CHECKPOINT CANDIDATE / OWNER REVIEW PENDING`
+- M6-P2+ STATUS: `NOT AUTHORIZED / NOT STARTED`
 - M7-M19: `NOT STARTED / NOT AUTHORIZED`
-- FORMAL 8765 DEPLOYMENT: `NOT PERFORMED / NOT AUTHORIZED`
+- FORMAL 8765 DEPLOYMENT: `UNTOUCHED / NOT DEPLOYED`
 - FRONTEND: `FROZEN / UNTOUCHED`
 - PRODUCTION READY: `NO`
-- PRODUCTION CODE CHANGED BY R1: `NO`
-- TEST CODE CHANGED BY R1: `NO`
+- PRODUCTION CODE CHANGED BY R1: `YES — BOUNDED M6 WORKSPACE VERSION PROJECTION ONLY`
+- TEST CODE CHANGED BY R1: `YES — M6 ACCEPTANCE GATE COVERAGE`
 
 The Project Lead, Architecture Owner and Repository Governance Owner close PRE-M6 and
 authorize only bounded M6-P0/P1. This is not Production Ready and does not authorize
@@ -357,14 +359,15 @@ deployment or Frontend work.
 
 # 10. Current Authorized Task
 
-`ACS-M6-P0-P1 — SERIES INTELLIGENCE INMEMORY BASELINE`
+`ACS-M6-P0-P1-R1 — M6-P1 ACCEPTANCE GATE CLOSURE`
 
 Status:
 
-`AUTHORIZED / NOT STARTED`
+`IMPLEMENTED / CHECKPOINT CANDIDATE / OWNER REVIEW PENDING`
 
-M6-P0 governance and M6-P1 InMemory implementation may proceed under the explicit
-Project Lead instruction dated `2026-08-13`. M6-P2+, M7-M19, formal database
-deployment, SQLite schema/migration changes and Frontend work remain unauthorized.
+M6-P0 is complete and M6-P1 is implemented under the explicit Project Lead instruction
+dated `2026-08-13`. This R1 closes only the bounded P1 acceptance evidence gaps.
+M6-P2+, M7-M19, formal database deployment, SQLite schema/migration changes and
+Frontend work remain unauthorized and not started.
 
 # End of CURRENT_MILESTONE.md

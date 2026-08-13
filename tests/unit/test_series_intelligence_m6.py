@@ -4,12 +4,16 @@ import unittest
 
 from services.v5_core_os.lifecycle_integrity import (
     AssemblyPoisonedError,
+    BackendKind,
+    InMemoryLifecycleState,
     LifecycleAssembly,
+    LifecycleAssemblyIdentity,
     LifecycleOperation,
     LifecycleRollbackError,
 )
 from services.v5_core_os.series_intelligence import M6Scope, VerifiedApproval
 from services.v5_core_os.series_intelligence.canonical import digest
+from services.v5_core_os.series_intelligence.composition import create_in_memory_participant
 from services.v5_core_os.series_intelligence.errors import AuthorityUnavailableError
 from services.v5_core_os.series_intelligence.public import SeriesIntelligencePublicError
 from tests.unit.test_series_planning_m5 import valid_candidate
@@ -30,6 +34,46 @@ class Refs:
 class ScopeAuthority:
     def resolve_scope(self, workspace_ref, project_ref, series_ref):
         return M6Scope("series-production", f"tenant-{workspace_ref}", workspace_ref, project_ref, series_ref)
+
+
+class MutableScopeAuthority:
+    def __init__(self, scope):
+        self.scope = scope
+
+    def resolve_scope(self, workspace_ref, project_ref, series_ref):
+        return self.scope
+
+
+class DeterministicM5Source:
+    def __init__(self, version=1):
+        self.version = version
+        self.read_count = 0
+
+    def switch_at_activation(self, version):
+        self.version = version
+
+    def get_confirmed_m6_source_snapshot(self, workspace_ref, project_ref, series_ref):
+        self.read_count += 1
+        version_ref = f"series-plan-version-{self.version}"
+        return {
+            "schemaVersion": "v5.series-planning.m6-source.v1",
+            "workspaceRef": workspace_ref,
+            "projectRef": project_ref,
+            "seriesRef": series_ref,
+            "seriesPlanRef": "series-plan-shared",
+            "seriesPlanVersionRef": version_ref,
+            "seriesPlanVersionDigest": digest({"versionRef": version_ref}),
+            "status": "confirmed",
+            "episodePlanItems": [
+                {"episodePlanItemRef": f"episode-plan-{index}"}
+                for index in range(1, 5)
+            ],
+        }
+
+
+class FixedM6Refs:
+    def __call__(self, prefix):
+        return f"{prefix}-shared"
 
 
 class ApprovalAuthority:
@@ -66,8 +110,34 @@ def bible_content(location_ref="location-lamp"):
 def character_content(episode_refs, location_ref="location-lamp", *, bindings=None):
     return {
         "characters": [
-            {"characterRef": "character-lamp", "name": "晚灯", "motivation": "陪伴"},
-            {"characterRef": "character-traveler", "name": "旅人", "motivation": "回家"},
+            {
+                "characterRef": "character-lamp",
+                "name": "晚灯",
+                "background": "在旧街角守望多年",
+                "motivation": "陪伴",
+                "belief": "每个夜归人都值得被照亮",
+                "conflict": "无法离开固定的位置",
+                "goal": "让旅人平安回家",
+                "personality": "沉静而温柔",
+                "behaviorRules": ["只通过光线变化表达"],
+                "dialogueRules": ["不直接说话"],
+                "forbiddenBehavior": ["不得主动移动"],
+                "visualIdentityRules": ["暖黄色旧路灯"],
+            },
+            {
+                "characterRef": "character-traveler",
+                "name": "旅人",
+                "background": "多年后回到旧城",
+                "motivation": "回家",
+                "belief": "记忆能指引归途",
+                "conflict": "认不出改变后的街道",
+                "goal": "找到童年的家",
+                "personality": "克制而敏感",
+                "behaviorRules": ["先观察再行动"],
+                "dialogueRules": ["短句且带停顿"],
+                "forbiddenBehavior": ["不得无缘由地信任陌生人"],
+                "visualIdentityRules": ["深色风衣与旧皮箱"],
+            },
         ],
         "stateIntervals": [{
             "intervalRef": "interval-location-1",
@@ -99,14 +169,14 @@ def base_command(context, operation):
 
 def seed_assembly(
     *, outbox_hook=None, journal_registrar=None, workspace="workspace-m6",
-    approval_authority=None,
+    approval_authority=None, scope_authority=None,
 ):
     refs = Refs()
     assembly = LifecycleAssembly.in_memory(
         ref_factory=refs,
         clock=lambda: NOW,
         journal_registrar=journal_registrar,
-        m6_scope_authority=ScopeAuthority(),
+        m6_scope_authority=scope_authority or ScopeAuthority(),
         m6_approval_authority=approval_authority or ApprovalAuthority(),
         m6_outbox_hook=outbox_hook,
     )
@@ -140,6 +210,22 @@ def seed_assembly(
     return assembly, context
 
 
+def isolated_m6(scope_authority, source_reader, *, ref_factory=None):
+    identity = LifecycleAssemblyIdentity(
+        "assembly-m6-test", BackendKind.IN_MEMORY, "memory:m6-test"
+    )
+    state = InMemoryLifecycleState(identity)
+    boundary = create_in_memory_participant(
+        lifecycle_state=state,
+        source_reader=source_reader,
+        scope_authority=scope_authority,
+        approval_authority=ApprovalAuthority(),
+        ref_factory=ref_factory or Refs(),
+        clock=lambda: NOW,
+    )
+    return state, boundary
+
+
 def confirmed_components(assembly, context):
     m6 = assembly.series_intelligence
     bible = m6.create_bible_version({
@@ -161,6 +247,39 @@ def confirmed_components(assembly, context):
         "seriesBibleRef": bible["root"]["seriesBibleRef"],
         "seriesBibleVersionRef": bible["version"]["seriesBibleVersionRef"],
         "content": character_content([item["episodePlanItemRef"] for item in source["episodePlanItems"]]),
+    })
+    characters = m6.confirm_character_version({
+        **base_command(context, "confirm-characters"),
+        "characterContinuityRef": characters["root"]["characterContinuityRef"],
+        "characterContinuityVersionRef": characters["version"]["characterContinuityVersionRef"],
+        "expectedRevision": characters["root"]["revision"],
+        "approvalRef": "approval-human",
+    })
+    return bible, characters
+
+
+def confirmed_components_from_source(m6, context, source_reader):
+    bible = m6.create_bible_version({
+        **base_command(context, "create-bible"), "candidate": True, "content": bible_content()
+    })
+    bible = m6.confirm_bible_version({
+        **base_command(context, "confirm-bible"),
+        "seriesBibleRef": bible["root"]["seriesBibleRef"],
+        "seriesBibleVersionRef": bible["version"]["seriesBibleVersionRef"],
+        "expectedRevision": bible["root"]["revision"],
+        "approvalRef": "approval-human",
+    })
+    source = source_reader.get_confirmed_m6_source_snapshot(
+        context["workspaceRef"], context["projectRef"], context["seriesRef"]
+    )
+    characters = m6.create_character_version({
+        **base_command(context, "create-characters"),
+        "candidate": True,
+        "seriesBibleRef": bible["root"]["seriesBibleRef"],
+        "seriesBibleVersionRef": bible["version"]["seriesBibleVersionRef"],
+        "content": character_content(
+            [item["episodePlanItemRef"] for item in source["episodePlanItems"]]
+        ),
     })
     characters = m6.confirm_character_version({
         **base_command(context, "confirm-characters"),
@@ -207,6 +326,53 @@ class SeriesIntelligenceLifecycleTests(unittest.TestCase):
         self.assertEqual(first["status"], "confirmed")
         self.assertEqual(len(first["episodePlanItems"]), 4)
         self.assertRegex(first["seriesPlanVersionDigest"], r"^[0-9a-f]{64}$")
+
+    def test_activation_rereads_m5_source_and_rejects_deterministic_switch(self):
+        source = DeterministicM5Source()
+        scope = M6Scope("series-production", "tenant-race", "workspace-race", "project-race", "series-race")
+        _state, m6 = isolated_m6(MutableScopeAuthority(scope), source)
+        context = {
+            "workspaceRef": scope.workspace_ref,
+            "projectRef": scope.project_ref,
+            "seriesRef": scope.series_ref,
+        }
+        bible, characters = confirmed_components_from_source(m6, context, source)
+        component_source_reads = source.read_count
+        source.switch_at_activation(2)
+
+        with self.assertRaises(SeriesIntelligencePublicError) as stale:
+            m6.activate_baseline({
+                **base_command(context, "activation-source-race"),
+                "seriesBibleRef": bible["root"]["seriesBibleRef"],
+                "seriesBibleVersionRef": bible["version"]["seriesBibleVersionRef"],
+                "characterContinuityRef": characters["root"]["characterContinuityRef"],
+                "characterContinuityVersionRef": characters["version"]["characterContinuityVersionRef"],
+                "expectedActivationRevision": 0,
+                "approvalRef": "approval-human",
+            })
+        self.assertEqual(stale.exception.code, "stale_source")
+        self.assertGreater(source.read_count, component_source_reads)
+        self.assertEqual(m6.diagnostic_snapshot()["snapshotCount"], 0)
+        self.assertEqual(m6.get_outbox(), [])
+
+    def test_trusted_authority_empty_business_domain_or_tenant_and_ref_mismatches_fail_closed(self):
+        authority = MutableScopeAuthority(M6Scope("placeholder", "placeholder", "w", "p", "s"))
+        assembly, context = seed_assembly(scope_authority=authority)
+        cases = (
+            ("empty-domain", M6Scope("", "tenant", context["workspaceRef"], context["projectRef"], context["seriesRef"]), "invalid_request"),
+            ("empty-tenant", M6Scope("series", "", context["workspaceRef"], context["projectRef"], context["seriesRef"]), "invalid_request"),
+            ("workspace", M6Scope("series", "tenant", "workspace-wrong", context["projectRef"], context["seriesRef"]), "scope_mismatch"),
+            ("project", M6Scope("series", "tenant", context["workspaceRef"], "project-wrong", context["seriesRef"]), "scope_mismatch"),
+            ("series", M6Scope("series", "tenant", context["workspaceRef"], context["projectRef"], "series-wrong"), "scope_mismatch"),
+        )
+        for name, scope, expected_code in cases:
+            authority.scope = scope
+            with self.subTest(name=name), self.assertRaises(SeriesIntelligencePublicError) as rejected:
+                assembly.series_intelligence.create_bible_version({
+                    **base_command(context, f"authority-{name}"), "content": bible_content()
+                })
+            self.assertEqual(rejected.exception.code, expected_code)
+        self.assertEqual(assembly.series_intelligence.diagnostic_snapshot()["bibleCount"], 0)
 
     def test_bible_draft_candidate_confirm_and_immutable_new_version(self):
         first = self.m6.create_bible_version({
@@ -362,6 +528,235 @@ class SeriesIntelligenceLifecycleTests(unittest.TestCase):
             })
         self.assertEqual(conflict.exception.code, "version_conflict")
 
+    def test_state_interval_boundaries_and_nonexclusive_round_trip(self):
+        bible, characters = confirmed_components(self.assembly, self.context)
+        source = self.assembly.series_planning.get_confirmed_m6_source_snapshot(
+            self.context["workspaceRef"], self.context["projectRef"], self.context["seriesRef"]
+        )
+        refs = [item["episodePlanItemRef"] for item in source["episodePlanItems"]]
+        invalid_ranges = ((refs[2], refs[1]), (refs[1], refs[1]))
+        for index, (start, end) in enumerate(invalid_ranges):
+            content = character_content(refs)
+            content["stateIntervals"][0].update({
+                "startEpisodePlanItemRef": start,
+                "endEpisodePlanItemRef": end,
+            })
+            with self.subTest(start=start, end=end), self.assertRaises(SeriesIntelligencePublicError) as invalid:
+                self.m6.create_character_version({
+                    **base_command(self.context, f"invalid-interval-{index}"),
+                    "characterContinuityRef": characters["root"]["characterContinuityRef"],
+                    "expectedRevision": characters["root"]["revision"],
+                    "seriesBibleRef": bible["root"]["seriesBibleRef"],
+                    "seriesBibleVersionRef": bible["version"]["seriesBibleVersionRef"],
+                    "content": content,
+                })
+            self.assertEqual(invalid.exception.code, "invalid_request")
+
+        content = character_content(refs)
+        content["stateIntervals"].extend([
+            {
+                "intervalRef": "knowledge-a",
+                "characterRef": "character-lamp",
+                "category": "Knowledge",
+                "startEpisodePlanItemRef": refs[0],
+                "endEpisodePlanItemRef": refs[3],
+                "valueRef": "knows-traveler",
+            },
+            {
+                "intervalRef": "knowledge-b",
+                "characterRef": "character-lamp",
+                "category": "Knowledge",
+                "startEpisodePlanItemRef": refs[1],
+                "endEpisodePlanItemRef": refs[3],
+                "valueRef": "knows-letter",
+            },
+        ])
+        stored = self.m6.create_character_version({
+            **base_command(self.context, "nonexclusive-coexist"),
+            "characterContinuityRef": characters["root"]["characterContinuityRef"],
+            "expectedRevision": characters["root"]["revision"],
+            "seriesBibleRef": bible["root"]["seriesBibleRef"],
+            "seriesBibleVersionRef": bible["version"]["seriesBibleVersionRef"],
+            "content": content,
+        })
+        self.assertEqual(
+            {item["intervalRef"] for item in stored["version"]["content"]["stateIntervals"] if item["category"] == "Knowledge"},
+            {"knowledge-a", "knowledge-b"},
+        )
+        workspace = self.m6.get_workspace(
+            self.context["workspaceRef"], self.context["projectRef"], self.context["seriesRef"]
+        )
+        round_trip = workspace["characterContinuityVersions"][-1]["content"]["stateIntervals"]
+        self.assertEqual(
+            {item["intervalRef"] for item in round_trip if item["category"] == "Knowledge"},
+            {"knowledge-a", "knowledge-b"},
+        )
+
+    def test_directed_relationships_require_explicit_reverse_and_valid_interval(self):
+        bible, characters = confirmed_components(self.assembly, self.context)
+        source = self.assembly.series_planning.get_confirmed_m6_source_snapshot(
+            self.context["workspaceRef"], self.context["projectRef"], self.context["seriesRef"]
+        )
+        refs = [item["episodePlanItemRef"] for item in source["episodePlanItems"]]
+        invalid = character_content(refs)
+        invalid["relationships"][0].update({
+            "startEpisodePlanItemRef": refs[2],
+            "endEpisodePlanItemRef": refs[1],
+        })
+        with self.assertRaises(SeriesIntelligencePublicError) as rejected:
+            self.m6.create_character_version({
+                **base_command(self.context, "invalid-relationship-time"),
+                "characterContinuityRef": characters["root"]["characterContinuityRef"],
+                "expectedRevision": characters["root"]["revision"],
+                "seriesBibleRef": bible["root"]["seriesBibleRef"],
+                "seriesBibleVersionRef": bible["version"]["seriesBibleVersionRef"],
+                "content": invalid,
+            })
+        self.assertEqual(rejected.exception.code, "invalid_request")
+
+        directed = character_content(refs)
+        directed["relationships"][0].update({
+            "startEpisodePlanItemRef": refs[0],
+            "endEpisodePlanItemRef": refs[2],
+        })
+        directed["relationships"].append({
+            "relationshipRef": "relationship-trusts",
+            "fromCharacterRef": "character-traveler",
+            "toCharacterRef": "character-lamp",
+            "relationshipType": "trusts",
+            "startEpisodePlanItemRef": refs[1],
+            "endEpisodePlanItemRef": refs[3],
+        })
+        stored = self.m6.create_character_version({
+            **base_command(self.context, "directed-relationships"),
+            "characterContinuityRef": characters["root"]["characterContinuityRef"],
+            "expectedRevision": characters["root"]["revision"],
+            "seriesBibleRef": bible["root"]["seriesBibleRef"],
+            "seriesBibleVersionRef": bible["version"]["seriesBibleVersionRef"],
+            "content": directed,
+        })
+        relationships = {
+            (item["fromCharacterRef"], item["toCharacterRef"]): item
+            for item in stored["version"]["content"]["relationships"]
+        }
+        self.assertEqual(
+            relationships[("character-lamp", "character-traveler")]["relationshipType"],
+            "watches-over",
+        )
+        self.assertEqual(
+            relationships[("character-traveler", "character-lamp")]["relationshipType"],
+            "trusts",
+        )
+        self.assertEqual(
+            relationships[("character-lamp", "character-traveler")]["endEpisodePlanItemRef"],
+            refs[2],
+        )
+        self.assertEqual(
+            relationships[("character-traveler", "character-lamp")]["startEpisodePlanItemRef"],
+            refs[1],
+        )
+
+    def test_activation_rejects_component_bible_mismatch_without_partial_state(self):
+        bible, characters = confirmed_components(self.assembly, self.context)
+        bible_v2 = self.m6.create_bible_version({
+            **base_command(self.context, "activation-bible-v2-create"),
+            "seriesBibleRef": bible["root"]["seriesBibleRef"],
+            "expectedRevision": bible["root"]["revision"],
+            "candidate": True,
+            "content": bible_content("location-v2"),
+        })
+        bible_v2 = self.m6.confirm_bible_version({
+            **base_command(self.context, "activation-bible-v2-confirm"),
+            "seriesBibleRef": bible_v2["root"]["seriesBibleRef"],
+            "seriesBibleVersionRef": bible_v2["version"]["seriesBibleVersionRef"],
+            "expectedRevision": bible_v2["root"]["revision"],
+            "approvalRef": "approval-human",
+        })
+        before = self.m6.diagnostic_snapshot()
+        with self.assertRaises(SeriesIntelligencePublicError) as stale:
+            self.m6.activate_baseline({
+                **base_command(self.context, "activation-bible-mismatch"),
+                "seriesBibleRef": bible_v2["root"]["seriesBibleRef"],
+                "seriesBibleVersionRef": bible_v2["version"]["seriesBibleVersionRef"],
+                "characterContinuityRef": characters["root"]["characterContinuityRef"],
+                "characterContinuityVersionRef": characters["version"]["characterContinuityVersionRef"],
+                "expectedActivationRevision": 0,
+                "approvalRef": "approval-human",
+            })
+        self.assertEqual(stale.exception.code, "stale_source")
+        self.assertEqual(self.m6.diagnostic_snapshot(), before)
+        self.assertEqual(self.m6.get_outbox(), [])
+
+    def test_character_lifecycle_immutable_confirmation_lineage_and_intelligence_digest(self):
+        bible, initial_characters = confirmed_components(self.assembly, self.context)
+        source = self.assembly.series_planning.get_confirmed_m6_source_snapshot(
+            self.context["workspaceRef"], self.context["projectRef"], self.context["seriesRef"]
+        )
+        refs = [item["episodePlanItemRef"] for item in source["episodePlanItems"]]
+        content = character_content(refs)
+        draft = self.m6.create_character_version({
+            **base_command(self.context, "character-lifecycle-draft"),
+            "characterContinuityRef": initial_characters["root"]["characterContinuityRef"],
+            "expectedRevision": initial_characters["root"]["revision"],
+            "seriesBibleRef": bible["root"]["seriesBibleRef"],
+            "seriesBibleVersionRef": bible["version"]["seriesBibleVersionRef"],
+            "content": content,
+        })
+        self.assertEqual(draft["version"]["status"], "DRAFT")
+        candidate = self.m6.submit_character_candidate({
+            **base_command(self.context, "character-lifecycle-candidate"),
+            "characterContinuityRef": draft["root"]["characterContinuityRef"],
+            "characterContinuityVersionRef": draft["version"]["characterContinuityVersionRef"],
+            "expectedRevision": draft["root"]["revision"],
+        })
+        confirmed = self.m6.confirm_character_version({
+            **base_command(self.context, "character-lifecycle-confirmed"),
+            "characterContinuityRef": candidate["root"]["characterContinuityRef"],
+            "characterContinuityVersionRef": candidate["version"]["characterContinuityVersionRef"],
+            "expectedRevision": candidate["root"]["revision"],
+            "approvalRef": "approval-human",
+        })
+        self.assertEqual(confirmed["version"]["status"], "CONFIRMED")
+        required = {
+            "background", "belief", "conflict", "goal", "personality", "behaviorRules",
+            "dialogueRules", "forbiddenBehavior", "visualIdentityRules",
+        }
+        self.assertTrue(required.issubset(confirmed["version"]["content"]["characters"][0]))
+        immutable_digest = confirmed["version"]["contentDigest"]
+        with self.assertRaises(SeriesIntelligencePublicError) as immutable:
+            self.m6.submit_character_candidate({
+                **base_command(self.context, "character-confirmed-mutation"),
+                "characterContinuityRef": confirmed["root"]["characterContinuityRef"],
+                "characterContinuityVersionRef": confirmed["version"]["characterContinuityVersionRef"],
+                "expectedRevision": confirmed["root"]["revision"],
+            })
+        self.assertEqual(immutable.exception.code, "version_conflict")
+
+        changed_content = copy.deepcopy(content)
+        changed_content["characters"][0]["belief"] = "光会保存每一次归途"
+        version2 = self.m6.create_character_version({
+            **base_command(self.context, "character-intelligence-v2"),
+            "characterContinuityRef": confirmed["root"]["characterContinuityRef"],
+            "expectedRevision": confirmed["root"]["revision"],
+            "baseCharacterContinuityVersionRef": confirmed["version"]["characterContinuityVersionRef"],
+            "seriesBibleRef": bible["root"]["seriesBibleRef"],
+            "seriesBibleVersionRef": bible["version"]["seriesBibleVersionRef"],
+            "content": changed_content,
+        })
+        self.assertEqual(version2["version"]["versionNumber"], confirmed["version"]["versionNumber"] + 1)
+        self.assertEqual(
+            version2["version"]["parentCharacterContinuityVersionRef"],
+            confirmed["version"]["characterContinuityVersionRef"],
+        )
+        self.assertNotEqual(version2["version"]["contentDigest"], immutable_digest)
+        workspace = self.m6.get_workspace(
+            self.context["workspaceRef"], self.context["projectRef"], self.context["seriesRef"]
+        )
+        historical, current = workspace["characterContinuityVersions"][-2:]
+        self.assertEqual(historical["contentDigest"], immutable_digest)
+        self.assertEqual(historical["status"], "CONFIRMED")
+        self.assertEqual(current["content"]["characters"][0]["belief"], "光会保存每一次归途")
+
     def test_activation_lineage_events_order_idempotency_and_revision_conflict(self):
         bible, characters = confirmed_components(self.assembly, self.context)
         command = {
@@ -421,6 +816,65 @@ class SeriesIntelligenceLifecycleTests(unittest.TestCase):
         self.assertEqual(first["root"]["seriesBibleRef"], second["root"]["seriesBibleRef"])
         self.assertNotEqual(first["root"]["tenantId"], second["root"]["tenantId"])
 
+    def test_complete_scope_key_isolates_entities_versions_idempotency_and_outbox_in_one_repository(self):
+        source = DeterministicM5Source()
+        scopes = (
+            M6Scope("domain-a", "tenant-a", "workspace-a", "project-a", "series-a"),
+            M6Scope("domain-b", "tenant-a", "workspace-a", "project-a", "series-a"),
+            M6Scope("domain-a", "tenant-b", "workspace-a", "project-a", "series-a"),
+            M6Scope("domain-a", "tenant-a", "workspace-b", "project-a", "series-a"),
+            M6Scope("domain-a", "tenant-a", "workspace-a", "project-b", "series-a"),
+            M6Scope("domain-a", "tenant-a", "workspace-a", "project-a", "series-b"),
+        )
+        authority = MutableScopeAuthority(scopes[0])
+        _state, m6 = isolated_m6(authority, source, ref_factory=FixedM6Refs())
+        observed = []
+        for scope in scopes:
+            authority.scope = scope
+            context = {
+                "workspaceRef": scope.workspace_ref,
+                "projectRef": scope.project_ref,
+                "seriesRef": scope.series_ref,
+            }
+            bible, characters = confirmed_components_from_source(m6, context, source)
+            snapshot = m6.activate_baseline({
+                **base_command(context, "activate"),
+                "seriesBibleRef": bible["root"]["seriesBibleRef"],
+                "seriesBibleVersionRef": bible["version"]["seriesBibleVersionRef"],
+                "characterContinuityRef": characters["root"]["characterContinuityRef"],
+                "characterContinuityVersionRef": characters["version"]["characterContinuityVersionRef"],
+                "expectedActivationRevision": 0,
+                "approvalRef": "approval-human",
+            })
+            replay = m6.create_bible_version({
+                **base_command(context, "create-bible"), "candidate": True, "content": bible_content()
+            })
+            self.assertEqual(replay["root"]["seriesBibleRef"], bible["root"]["seriesBibleRef"])
+            self.assertEqual(
+                replay["version"]["seriesBibleVersionRef"],
+                bible["version"]["seriesBibleVersionRef"],
+            )
+            self.assertEqual(replay["version"]["status"], "CANDIDATE")
+            workspace = m6.get_workspace(scope.workspace_ref, scope.project_ref, scope.series_ref)
+            self.assertEqual(workspace["scope"], scope.mapping())
+            self.assertEqual(len(workspace["seriesBibleVersions"]), 1)
+            self.assertEqual(len(workspace["characterContinuityVersions"]), 1)
+            observed.append((
+                workspace["seriesBible"]["seriesBibleRef"],
+                workspace["characterContinuity"]["characterContinuityRef"],
+                snapshot["m6BaselineSnapshotRef"],
+            ))
+        self.assertEqual(len(set(observed)), 1)
+        self.assertEqual(m6.diagnostic_snapshot()["operationCount"], len(scopes) * 5)
+        self.assertEqual(len(m6.get_outbox()), len(scopes))
+        self.assertEqual(
+            {
+                (event["businessDomain"], event["tenantId"], event["workspaceId"], event["projectRef"], event["seriesRef"])
+                for event in m6.get_outbox()
+            },
+            {scope.key for scope in scopes},
+        )
+
     def test_root_uniqueness_ip_universe_and_cross_scope_are_rejected(self):
         first = self.m6.create_bible_version({
             **base_command(self.context, "unique-root"), "content": bible_content()
@@ -441,6 +895,71 @@ class SeriesIntelligenceLifecycleTests(unittest.TestCase):
         with self.assertRaises(SeriesIntelligencePublicError) as mismatch:
             self.m6.create_bible_version(wrong)
         self.assertEqual(mismatch.exception.code, "scope_mismatch")
+
+    def test_character_root_is_unique_within_complete_scope(self):
+        bible, characters = confirmed_components(self.assembly, self.context)
+        source = self.assembly.series_planning.get_confirmed_m6_source_snapshot(
+            self.context["workspaceRef"], self.context["projectRef"], self.context["seriesRef"]
+        )
+        with self.assertRaises(SeriesIntelligencePublicError) as duplicate:
+            self.m6.create_character_version({
+                **base_command(self.context, "duplicate-character-root"),
+                "seriesBibleRef": bible["root"]["seriesBibleRef"],
+                "seriesBibleVersionRef": bible["version"]["seriesBibleVersionRef"],
+                "content": character_content(
+                    [item["episodePlanItemRef"] for item in source["episodePlanItems"]]
+                ),
+            })
+        self.assertEqual(duplicate.exception.code, "duplicate_record")
+        with self.assertRaises(SeriesIntelligencePublicError) as conflicting:
+            self.m6.create_character_version({
+                **base_command(self.context, "conflicting-character-root"),
+                "characterContinuityRef": "character-continuity-conflict",
+                "seriesBibleRef": bible["root"]["seriesBibleRef"],
+                "seriesBibleVersionRef": bible["version"]["seriesBibleVersionRef"],
+                "content": character_content(
+                    [item["episodePlanItemRef"] for item in source["episodePlanItems"]]
+                ),
+            })
+        self.assertEqual(conflicting.exception.code, "duplicate_record")
+        self.assertEqual(
+            self.m6.get_workspace(
+                self.context["workspaceRef"], self.context["projectRef"], self.context["seriesRef"]
+            )["characterContinuity"]["characterContinuityRef"],
+            characters["root"]["characterContinuityRef"],
+        )
+
+    def test_bound_character_ref_set_cannot_add_remove_or_replace_across_versions(self):
+        bible, characters = confirmed_components(self.assembly, self.context)
+        source = self.assembly.series_planning.get_confirmed_m6_source_snapshot(
+            self.context["workspaceRef"], self.context["projectRef"], self.context["seriesRef"]
+        )
+        refs = [item["episodePlanItemRef"] for item in source["episodePlanItems"]]
+        variants = {}
+        added = character_content(refs)
+        added["characters"].append({"characterRef": "character-new", "name": "新角色"})
+        variants["add"] = added
+        removed = character_content(refs)
+        removed["characters"].pop()
+        removed["relationships"] = []
+        variants["remove"] = removed
+        replaced = character_content(refs)
+        replaced["characters"][1]["characterRef"] = "character-replacement"
+        replaced["relationships"][0]["toCharacterRef"] = "character-replacement"
+        variants["replace"] = replaced
+        before = self.m6.diagnostic_snapshot()
+        for name, content in variants.items():
+            with self.subTest(name=name), self.assertRaises(SeriesIntelligencePublicError) as conflict:
+                self.m6.create_character_version({
+                    **base_command(self.context, f"character-ref-{name}"),
+                    "characterContinuityRef": characters["root"]["characterContinuityRef"],
+                    "expectedRevision": characters["root"]["revision"],
+                    "seriesBibleRef": bible["root"]["seriesBibleRef"],
+                    "seriesBibleVersionRef": bible["version"]["seriesBibleVersionRef"],
+                    "content": content,
+                })
+            self.assertEqual(conflict.exception.code, "version_conflict")
+        self.assertEqual(self.m6.diagnostic_snapshot(), before)
 
     def test_expected_revision_concurrent_writers_have_one_winner(self):
         first = self.m6.create_bible_version({

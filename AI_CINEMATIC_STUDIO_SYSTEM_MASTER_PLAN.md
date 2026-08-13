@@ -8,7 +8,7 @@
 >
 > Date: `2026-08-13`
 >
-> Revision: `ACS-M6-P0 — Series Intelligence Baseline Contract`
+> Revision: `ACS-M6-P0-P1-R1`
 >
 > Architecture Decision: `ADR-0001 — Separate Commercial Experience Layer from Core Creator Runtime / Accepted`
 >
@@ -2290,7 +2290,7 @@ Status:
 
 Status:
 
-`NOT STARTED / P0-P1 AUTHORIZED / P2+ NOT AUTHORIZED`
+`P0 CONTRACT ACCEPTED / COMPLETE / P1 IMPLEMENTED / CHECKPOINT CANDIDATE / OWNER REVIEW PENDING / P2+ NOT AUTHORIZED / NOT STARTED`
 
 目标范围：
 
@@ -2314,7 +2314,7 @@ Status:
 - M6 不实现 M7；
 - M6 不实现 GPU Render、ComfyUI 或 Worker；
 - M6 不实现跨仓 UI；
-- M6 当前仍为 `NOT STARTED / P0-P1 AUTHORIZED / P2+ NOT AUTHORIZED`。
+- M6-P2+ 保持 `NOT AUTHORIZED / NOT STARTED`。
 
 ---
 
@@ -3001,7 +3001,7 @@ RB13-F002 Deletion Lifecycle Integrity
 REMEDIATED / CLOSED IN CURRENT TESTED CORE BASELINE
 
 Current Task
-ACS-M6-P0-P1 — SERIES INTELLIGENCE INMEMORY BASELINE
+ACS-M6-P0-P1-R1 — M6-P1 ACCEPTANCE GATE CLOSURE
 
 ADR-0002 V5 Lifecycle Integrity Boundary
 ACCEPTED FOR BOUNDED R2 IMPLEMENTATION
@@ -3013,7 +3013,7 @@ Legacy repository capability provenance
 MEDIUM / OPEN / NON-BLOCKING / OWNER GATE P3-RV1-003
 
 M6 Series IP Bible + Character Intelligence
-P0 CONTRACT ACCEPTED / P1 IMPLEMENTED OWNER REVIEW PENDING / P2-P4 NOT AUTHORIZED
+P0 CONTRACT ACCEPTED / COMPLETE / P1 IMPLEMENTED / CHECKPOINT CANDIDATE / OWNER REVIEW PENDING / P2+ NOT AUTHORIZED / NOT STARTED
 
 M7-M19
 NOT STARTED / NOT AUTHORIZED
@@ -3028,7 +3028,7 @@ M6 Preconditions
 SATISFIED FOR BOUNDED INMEMORY M6-P0/P1 ONLY
 
 Formal 8765 Deployment
-NOT PERFORMED / NOT AUTHORIZED
+UNTOUCHED / NOT DEPLOYED
 
 Frontend
 FROZEN / UNTOUCHED
@@ -3058,7 +3058,7 @@ M6 门禁顺序统一为：
 上述八项已由 Project Lead 于 `2026-08-13` 裁定为仅对 bounded M6-P0/P1
 满足。R2-P1 与 R2-P2 已接受，RB13-F002 已在当前测试基线关闭，PRE-M6-RB1.3
 已正式关闭。该裁定不代表全系统 Architecture Review、Production Ready、正式
-8765 数据库部署或 M6-P2+ 授权。当前活动任务为 `ACS-M6-P0-P1`；M6-P1 已实施并等待 Owner Review，
+8765 数据库部署或 M6-P2+ 授权。当前活动任务为 `ACS-M6-P0-P1-R1`；M6-P1 已实施并处于 Checkpoint Candidate / Owner Review Pending，
 Frontend 保持冻结，M7-M19 未授权。
 
 ---

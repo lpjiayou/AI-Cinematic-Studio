@@ -1,3 +1,4 @@
+import copy
 import unittest
 
 from services.v5_core_os.series_intelligence.public import SeriesIntelligencePublicError
@@ -65,6 +66,46 @@ class SeriesIntelligenceProductionSpineTests(unittest.TestCase):
         self.assertEqual(project["projectRef"], self.context["projectRef"])
         self.assertEqual(plan["plan"]["status"], "confirmed")
         self.assertEqual(plan["plan"]["seriesRef"], self.context["seriesRef"])
+
+    def test_real_m5_source_switch_before_activation_is_reread_and_rolls_back_atomically(self):
+        bible, characters = confirmed_components(self.assembly, self.context)
+        original = self.context["plan"]
+        fields = {
+            "seriesConcept", "premise", "logline", "mainNarrativeDirection", "mainArcs",
+            "subArcs", "characterArcIntents", "episodePlanItems", "narrativeRhythm",
+            "worldIntent", "continuityIntent", "foreshadowingContext", "productionAssumptions",
+        }
+        content = {field: copy.deepcopy(original["version"][field]) for field in fields}
+        content["premise"] = "M5 source switched at the activation gate"
+        replacement = self.assembly.series_planning.create_manual_version({
+            "workspaceRef": self.context["workspaceRef"],
+            "projectRef": self.context["projectRef"],
+            "seriesRef": self.context["seriesRef"],
+            "seriesPlanRef": original["plan"]["seriesPlanRef"],
+            "expectedPlanVersion": original["plan"]["version"],
+            "content": content,
+        })
+        self.assembly.series_planning.confirm_version({
+            "workspaceRef": self.context["workspaceRef"],
+            "seriesPlanRef": replacement["plan"]["seriesPlanRef"],
+            "seriesPlanVersionRef": replacement["version"]["seriesPlanVersionRef"],
+            "expectedPlanVersion": replacement["plan"]["version"],
+            "humanConfirmed": True,
+        })
+        before = self.assembly.series_intelligence.diagnostic_snapshot()
+        with self.assertRaises(SeriesIntelligencePublicError) as stale:
+            self.assembly.series_intelligence.activate_baseline({
+                **base_command(self.context, "real-m5-activation-race"),
+                "seriesBibleRef": bible["root"]["seriesBibleRef"],
+                "seriesBibleVersionRef": bible["version"]["seriesBibleVersionRef"],
+                "characterContinuityRef": characters["root"]["characterContinuityRef"],
+                "characterContinuityVersionRef": characters["version"]["characterContinuityVersionRef"],
+                "expectedActivationRevision": 0,
+                "approvalRef": "approval-human",
+            })
+        self.assertEqual(stale.exception.code, "stale_source")
+        self.assertEqual(self.assembly.series_intelligence.diagnostic_snapshot(), before)
+        self.assertEqual(self.assembly.series_intelligence.get_outbox(), [])
 
 
 if __name__ == "__main__":
