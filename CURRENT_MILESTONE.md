@@ -16,7 +16,7 @@
 >
 > M7 Authorization: `NOT AUTHORIZED`
 >
-> Frontend Governance Authorization: `FE-G0 LIMITED GOVERNANCE-ONLY UNFREEZE AUTHORIZED ON 2026-08-13 / FRONTEND BASE 1cf2515 / CODE IMPLEMENTATION NOT AUTHORIZED`
+> Frontend Governance Authorization: `FE-G0-R1 GOVERNANCE-ONLY REV.3 CORRECTION AUTHORIZED ON 2026-08-14 / FRONTEND BASE 1cf2515 / CHECKPOINT CANDIDATE / CODE IMPLEMENTATION NOT AUTHORIZED`
 >
 > Frontend Implementation Authorization: `FE-G1 / FE-G2 / FE-G3 / EXPERIENCE ADAPTER / API INTEGRATION / M6 BINDING / GATE C NOT AUTHORIZED`
 >
@@ -163,12 +163,24 @@ The Frontend Experience Adapter belongs to the Frontend repository and may consu
 only Creator Public HTTP/API. The two repositories do not share customer UI source.
 
 On `2026-08-13`, the Project Lead authorized FE-G0 as a governance-only limited
-unfreeze in `AI-Cinematic-Studio-Frontend`, with sole baseline
+unfreeze in `AI-Cinematic-Studio-Frontend`, with sole application-code baseline
 `codex/frontend-character-studio-v1` at
-`1cf2515ceec6c6415cae2e21360782174525d3a5`. This authorization permits only the
-accepted Rev. 2 contract, the FE-G0 limited-unfreeze record, publication of exact
-future FE-G1/FE-G2 file allowlists, and this synchronized Core milestone-state
-update. FE-G1, FE-G2, FE-G3, Experience Adapter, Creator Public HTTP/API integration,
+`1cf2515ceec6c6415cae2e21360782174525d3a5`. The resulting Frontend checkpoint
+`df3ccf098d1b2eeaef2a21a1a397ea7fb24adceb` and Core synchronization checkpoint
+`61a94cd41e56d651d057c5f9529aef6adf5ede85` passed Git scope and remote-evidence
+review, but Rev. 2 failed Owner Review because it conflated New Project with the
+Global Creative Sandbox and removed page-owned headers before the pages entered the
+Creator layout. Those commits remain immutable historical evidence with disposition
+`REVISION REQUIRED / NOT OWNER ACCEPTED`.
+
+On `2026-08-14`, the Project Lead authorized only FE-G0-R1 governance correction:
+Rev. 3, the FE-G0-R1 record, the Frontend/Core Domain Alignment standard and this
+synchronized Core status. Rev. 3 directs the current `/create` New Project page to
+`/creator/projects/new`, keeps `/creator/create` unavailable for the separate Global
+Creative Sandbox, leaves existing headers untouched in additive FE-G1, and moves
+header removal into FE-G2 after route relocation. The sole application-code baseline
+remains `1cf2515`; the stale GitHub default branch remains prohibited as a development
+base. FE-G1, FE-G2, FE-G3, Experience Adapter, Creator Public HTTP/API integration,
 M6 data binding, real Project/Series/Episode state and Cross-Repo Gate C remain
 unauthorized. Script Studio remains unmigrated and no Ref may be fabricated.
 
@@ -200,8 +212,8 @@ satisfied only for bounded InMemory M6-P0/P1. That historical decision is preser
 the later ADR-0004 decision separately extends the active authorization to bounded
 M6-P2 local-development SQLite. Formal 8765 deployment remains unperformed and
 unauthorized. At that historical closeout point, the Frontend was frozen and
-untouched. Its current governance-only FE-G0 limited-unfreeze state is recorded in
-sections 2 and 8; Frontend implementation remains frozen. `P3-RV1-003` remains open
+untouched. Its current governance-only FE-G0-R1 Rev. 3 correction state is recorded
+in sections 2 and 8; Frontend implementation remains frozen. `P3-RV1-003` remains open
 and non-blocking.
 
 PRE-M6-RB1.3-CLOSEOUT-G1-R1 is `OWNER ACCEPTED / COMPLETE / REMOTE-VERIFIED`
@@ -498,7 +510,7 @@ capability.
 - M6-P3 AFTER G1 / M6-P4+ STATUS: `NOT AUTHORIZED / NOT STARTED`
 - M7-M19: `NOT STARTED / NOT AUTHORIZED`
 - FORMAL 8765 DEPLOYMENT: `UNTOUCHED / NOT DEPLOYED`
-- FRONTEND: `FE-G0 GOVERNANCE-ONLY LIMITED UNFREEZE / BASE 1cf2515 / REV.2 + EXACT FE-G1-FE-G2 ALLOWLISTS AUTHORIZED / FE-G1-FE-G3 IMPLEMENTATION FROZEN / OWNER REVIEW REQUIRED`
+- FRONTEND: `FE-G0-R1 GOVERNANCE-ONLY REV.3 CORRECTION AUTHORIZED / BASE 1cf2515 / REV.2 HISTORICAL REVISION REQUIRED / REV.3 + DOMAIN ALIGNMENT + CORRECTED FE-G1-FE-G2 ALLOWLISTS CHECKPOINT CANDIDATE / FE-G1-FE-G3 IMPLEMENTATION FROZEN / OWNER REVIEW REQUIRED`
 - PRODUCTION READY: `NO`
 - PRODUCTION CODE CHANGED BY G1-R1: `NO`
 - TEST CODE CHANGED BY G1-R1: `ONE AUTHORIZED CONTRACT TEST FILE`
@@ -546,7 +558,7 @@ Stop before any need to exceed the frozen one production, one test and eight
 governance paths, change InMemory production behavior, or add DDL/Migration,
 route/handler/external DTO source-file changes, M3/M6 consumer, M6-P3-G1, M7-M19,
 formal database deployment, Auth/RBAC expansion or Frontend implementation beyond
-the separately authorized FE-G0 governance-only documents and milestone-state sync.
+the separately authorized FE-G0-R1 governance-only documents and milestone-state sync.
 
 ---
 
@@ -582,7 +594,7 @@ Owner Review.
 
 Formal port-8765 database access/deployment, HTTP route/handler/external DTO
 source-file changes, HTTP expansion beyond the Owner-approved existing workspace
-versions v2 field pass-through, Auth/RBAC, Frontend implementation beyond FE-G0
+versions v2 field pass-through, Auth/RBAC, Frontend implementation beyond FE-G0-R1
 governance, Schema/Migration, M3/M6 consumer, P3-G1 and later M6 work, M7-M19, V3,
 GPU, Worker and ComfyUI remain unauthorized and not started. B1-R1 changes no
 existing Domain ownership or Production Spine.
