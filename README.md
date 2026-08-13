@@ -6,7 +6,7 @@ OS、V4 Platform、V3 Render Core、持久化与后端测试；客户 Commercial
 由独立 `AI-Cinematic-Studio-Frontend` 仓库承载。
 
 > 当前状态：M1–M5 已接受；M6-P0/P1 已 Owner Accepted；M6-P2 本地开发
-> Durable SQLite Slice 已授权；Production Ready = `NO`。
+> Durable SQLite Slice 已实施并等待 Owner Review；Production Ready = `NO`。
 
 ## 当前活动工作包
 
@@ -15,7 +15,7 @@ OS、V4 Platform、V3 Render Core、持久化与后端测试；客户 Commercial
 | Accepted M6-P0/P1 baseline | `e38c75aa4ff26bdea80c82d8a24096f799dad860` |
 | M6-P0/P1 | `OWNER ACCEPTED / COMPLETE / REMOTE-VERIFIED` |
 | ADR-0004 / M6-P2-G0 | `ACCEPTED / COMPLETE` |
-| M6-P2-G1 | `AUTHORIZED / NOT STARTED` |
+| M6-P2-G1 | `IMPLEMENTED / CHECKPOINT CANDIDATE / OWNER REVIEW PENDING` |
 | M6-P3+ | `NOT AUTHORIZED / NOT STARTED` |
 | M7-M19 | `NOT STARTED / NOT AUTHORIZED` |
 | Formal port-8765 database | `UNTOUCHED / NOT DEPLOYED` |

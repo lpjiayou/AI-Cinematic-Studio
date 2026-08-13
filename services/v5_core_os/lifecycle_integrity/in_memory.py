@@ -60,6 +60,18 @@ class InMemoryLifecycleState:
             raise LeaseRejectedError("assembly is not ready")
 
     @contextmanager
+    def read_snapshot(self):
+        """Hold one coherent in-memory view for a multi-resource read."""
+        self._lock.acquire()
+        try:
+            self.assert_ready()
+            if getattr(self._thread, "lease", None) is not None:
+                raise LeaseRejectedError("nested lifecycle access is forbidden")
+            yield
+        finally:
+            self._lock.release()
+
+    @contextmanager
     def lease(
         self,
         *,

@@ -14,7 +14,7 @@
 > UI-R1 Accepted SHA:
 > `c9536fc0c745d0bf9e9c3eb543f4ab6c0566798a`
 >
-> Revision: M6-P2-G0 governance status synchronization; product IA and visual baseline unchanged.
+> Revision: M6-P2-G1 checkpoint-candidate status synchronization; product IA and visual baseline unchanged.
 >
 > Scope:
 > AI Cinematic Studio Creator / Project Workspace / Production Editors /
@@ -141,7 +141,7 @@ PRE-M6-RB1.1、RB1.2 与 RB1.3 均已关闭。M6-P0/P1 已 Owner Accepted；当�
   `55813b26be76a3476820dd1f638ac2f4561da448`；
 - M6-P0/P1 — Series IP Bible + Character Intelligence：
   `OWNER ACCEPTED / COMPLETE / REMOTE-VERIFIED AT e38c75aa4ff26bdea80c82d8a24096f799dad860`；
-- M6-P2：`CORE SQLITE IMPLEMENTATION AUTHORIZED / NOT STARTED`；
+- M6-P2：`CORE SQLITE IMPLEMENTED / CHECKPOINT CANDIDATE / OWNER REVIEW PENDING`；
 - Frontend M6 activation：`FROZEN / NOT AUTHORIZED`；
 - M6-P3+、M7-M19：`NOT STARTED / NOT AUTHORIZED`。
 
@@ -965,8 +965,9 @@ Continuity
 Timeline and Continuity
 
 M6 边界：`M6 ≠ V5 Identity Lock`。M6 不实现 M7、GPU Render、ComfyUI、
-Worker 或跨仓 UI；M6-P0/P1 已 Owner Accepted，M6-P2 只授权 Core 的本地开发
-SQLite 持久化，当前 Frontend 激活仍为 `FROZEN / NOT AUTHORIZED`。
+Worker 或跨仓 UI；M6-P0/P1 已 Owner Accepted，M6-P2 Core 本地开发 SQLite
+持久化现为 Checkpoint Candidate / Owner Review Pending，当前 Frontend 激活仍为
+`FROZEN / NOT AUTHORIZED`。
 
 示意：
 

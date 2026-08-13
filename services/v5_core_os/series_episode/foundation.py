@@ -43,11 +43,22 @@ class ScopeMismatchError(SeriesEpisodeError):
     code = "scope_mismatch"
 
 
+class LifecycleUnavailableError(SeriesEpisodeError):
+    """Lifecycle dependency state could not be read safely."""
+
+    code = "lifecycle_unavailable"
+
+
 class DependentRecordError(SeriesEpisodeError):
     """Deletion was rejected by the authoritative lifecycle boundary."""
 
     def __init__(self, code: str) -> None:
-        if code not in {"dependent_project_exists", "dependent_script_exists"}:
+        if code not in {
+            "dependent_project_exists",
+            "dependent_script_exists",
+            "dependent_series_plan_exists",
+            "dependent_m6_series_intelligence_exists",
+        }:
             raise ValueError("unsupported dependency error")
         super().__init__(code)
         self.code = code

@@ -174,6 +174,12 @@ def base_command(context, operation):
     }
 
 
+def scoped_outbox(boundary, context):
+    return boundary.get_outbox(
+        context["workspaceRef"], context["projectRef"], context["seriesRef"]
+    )
+
+
 def seed_assembly(
     *, outbox_hook=None, journal_registrar=None, workspace="workspace-m6",
     approval_authority=None, scope_authority=None,
@@ -360,7 +366,7 @@ class SeriesIntelligenceLifecycleTests(unittest.TestCase):
         self.assertEqual(stale.exception.code, "stale_source")
         self.assertGreater(source.read_count, component_source_reads)
         self.assertEqual(m6.diagnostic_snapshot()["snapshotCount"], 0)
-        self.assertEqual(m6.get_outbox(), [])
+        self.assertEqual(scoped_outbox(m6, context), [])
 
     def test_activation_rejects_same_m5_version_ref_when_only_digest_changes_without_partial_state(self):
         source = DeterministicM5Source()
@@ -404,7 +410,7 @@ class SeriesIntelligenceLifecycleTests(unittest.TestCase):
             })
         self.assertEqual(stale.exception.code, "stale_source")
         self.assertEqual(m6.diagnostic_snapshot(), before)
-        self.assertEqual(m6.get_outbox(), [])
+        self.assertEqual(scoped_outbox(m6, context), [])
 
     def test_trusted_authority_empty_business_domain_or_tenant_and_ref_mismatches_fail_closed(self):
         authority = MutableScopeAuthority(M6Scope("placeholder", "placeholder", "w", "p", "s"))
@@ -736,7 +742,7 @@ class SeriesIntelligenceLifecycleTests(unittest.TestCase):
             })
         self.assertEqual(stale.exception.code, "stale_source")
         self.assertEqual(self.m6.diagnostic_snapshot(), before)
-        self.assertEqual(self.m6.get_outbox(), [])
+        self.assertEqual(scoped_outbox(self.m6, self.context), [])
 
     def test_character_lifecycle_immutable_confirmation_lineage_and_intelligence_digest(self):
         bible, initial_characters = confirmed_components(self.assembly, self.context)
@@ -878,8 +884,11 @@ class SeriesIntelligenceLifecycleTests(unittest.TestCase):
         self.assertEqual(first, replay)
         self.assertEqual(first["activationRevision"], 1)
         self.assertEqual(first["seriesPlanVersionRef"], self.context["plan"]["version"]["seriesPlanVersionRef"])
-        self.assertEqual([item["eventType"] for item in self.m6.get_outbox()], ["M6BaselineConfirmed"])
-        envelope = self.m6.get_outbox()[0]
+        self.assertEqual(
+            [item["eventType"] for item in scoped_outbox(self.m6, self.context)],
+            ["M6BaselineConfirmed"],
+        )
+        envelope = scoped_outbox(self.m6, self.context)[0]
         self.assertEqual(
             {
                 "eventId", "eventType", "eventVersion", "aggregateType", "aggregateRef",
@@ -896,7 +905,7 @@ class SeriesIntelligenceLifecycleTests(unittest.TestCase):
             "expectedActivationRevision": 1,
         })
         self.assertEqual(first, same_inputs_new_key)
-        self.assertEqual(len(self.m6.get_outbox()), 1)
+        self.assertEqual(len(scoped_outbox(self.m6, self.context)), 1)
         with self.assertRaises(SeriesIntelligencePublicError) as stale:
             self.m6.activate_baseline({**command, "operationRef": "stale", "idempotencyKey": "stale"})
         self.assertEqual(stale.exception.code, "version_conflict")
@@ -971,11 +980,17 @@ class SeriesIntelligenceLifecycleTests(unittest.TestCase):
             ))
         self.assertEqual(len(set(observed)), 1)
         self.assertEqual(m6.diagnostic_snapshot()["operationCount"], len(scopes) * 5)
-        self.assertEqual(len(m6.get_outbox()), len(scopes))
+        all_events = []
+        for scope in scopes:
+            authority.scope = scope
+            all_events.extend(m6.get_outbox(
+                scope.workspace_ref, scope.project_ref, scope.series_ref
+            ))
+        self.assertEqual(len(all_events), len(scopes))
         self.assertEqual(
             {
                 (event["businessDomain"], event["tenantId"], event["workspaceId"], event["projectRef"], event["seriesRef"])
-                for event in m6.get_outbox()
+                for event in all_events
             },
             {scope.key for scope in scopes},
         )
@@ -1266,7 +1281,7 @@ class SeriesIntelligenceLifecycleTests(unittest.TestCase):
             "approvalRef": "approval-human",
         })
         self.assertEqual(second["activationRevision"], 2)
-        events = self.m6.get_outbox()
+        events = scoped_outbox(self.m6, self.context)
         self.assertEqual(
             [item["eventType"] for item in events],
             ["M6BaselineConfirmed", "M6BaselineSuperseded", "M6BaselineConfirmed"],
@@ -1297,7 +1312,7 @@ class SeriesIntelligenceLifecycleTests(unittest.TestCase):
                 "approvalRef": "approval-human",
             })
         self.assertEqual(assembly.series_intelligence.diagnostic_snapshot()["snapshotCount"], 0)
-        self.assertEqual(assembly.series_intelligence.get_outbox(), [])
+        self.assertEqual(scoped_outbox(assembly.series_intelligence, context), [])
 
     def test_poisoned_assembly_rejects_m6_reads_and_writes(self):
         self.assembly.state.register_resource(
@@ -1310,12 +1325,14 @@ class SeriesIntelligenceLifecycleTests(unittest.TestCase):
                 self.assembly.state.apply_preimaged(
                     lease, lambda: (_ for _ in ()).throw(RuntimeError("mutation"))
                 )
-        with self.assertRaises(AssemblyPoisonedError):
+        with self.assertRaises(SeriesIntelligencePublicError) as read_error:
             self.m6.get_workspace(self.context["workspaceRef"], self.context["projectRef"], self.context["seriesRef"])
-        with self.assertRaises(AssemblyPoisonedError):
+        self.assertEqual(read_error.exception.code, "lifecycle_unavailable")
+        with self.assertRaises(SeriesIntelligencePublicError) as write_error:
             self.m6.create_bible_version({
                 **base_command(self.context, "poisoned"), "content": bible_content()
             })
+        self.assertEqual(write_error.exception.code, "lifecycle_unavailable")
 
 
 if __name__ == "__main__":

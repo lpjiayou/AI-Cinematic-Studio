@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 import sqlite3
 from pathlib import Path
 from typing import Callable
@@ -19,6 +20,145 @@ from .sqlite_schema import (
 
 class LifecycleMigrationError(RuntimeError):
     code = "lifecycle_migration_error"
+
+
+_V1_COMPONENT_TABLES = {
+    "v5_series_episode_schema": (
+        "v5_series",
+        "v5_confirmed_creative_plans",
+        "v5_episode_projects",
+        "v5_episode_plan_bindings",
+    ),
+    "v5_project_schema": (
+        "v5_projects",
+        "v5_project_series_relationships",
+    ),
+    "v5_script_studio_schema": (
+        "v5_scripts",
+        "v5_script_versions",
+    ),
+    "v5_series_planning_schema": (
+        "v5_series_plans",
+        "v5_series_plan_versions",
+    ),
+}
+
+
+def _normalized_sql(value: str | None) -> str:
+    return re.sub(r"\s+", "", str(value or "")).replace('"', "").lower()
+
+
+def _v1_table_sql() -> dict[str, str]:
+    """Return canonical table definitions emitted by the accepted V1 adapters."""
+
+    result = dict(zip(TABLE_ORDER, table_statements()))
+    result.update(
+        {
+            "v5_project_series_relationships": """CREATE TABLE v5_project_series_relationships (
+                workspace_ref TEXT NOT NULL, project_ref TEXT NOT NULL,
+                series_ref TEXT NOT NULL, schema_version TEXT NOT NULL,
+                linked_at TEXT NOT NULL, version INTEGER NOT NULL,
+                PRIMARY KEY(workspace_ref, project_ref, series_ref),
+                UNIQUE(workspace_ref, series_ref),
+                FOREIGN KEY(workspace_ref, project_ref)
+                    REFERENCES v5_projects(workspace_ref, project_ref) ON DELETE RESTRICT
+            )""",
+            "v5_scripts": """CREATE TABLE v5_scripts (
+                workspace_ref TEXT NOT NULL, series_ref TEXT NOT NULL,
+                episode_ref TEXT NOT NULL, script_ref TEXT NOT NULL,
+                schema_version TEXT NOT NULL, title TEXT NOT NULL,
+                current_script_version_ref TEXT NOT NULL,
+                confirmed_script_version_ref TEXT, created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL, version INTEGER NOT NULL,
+                PRIMARY KEY(workspace_ref, script_ref),
+                UNIQUE(workspace_ref, series_ref, episode_ref)
+            )""",
+            "v5_script_versions": """CREATE TABLE v5_script_versions (
+                workspace_ref TEXT NOT NULL, script_ref TEXT NOT NULL,
+                script_version_ref TEXT NOT NULL, schema_version TEXT NOT NULL,
+                series_ref TEXT NOT NULL, episode_ref TEXT NOT NULL,
+                source_plan_ref TEXT NOT NULL,
+                source_plan_schema_version TEXT NOT NULL,
+                source_plan_version INTEGER NOT NULL,
+                version_number INTEGER NOT NULL, content_json TEXT NOT NULL,
+                change_kind TEXT NOT NULL, parent_script_version_ref TEXT,
+                created_at TEXT NOT NULL,
+                PRIMARY KEY(workspace_ref, script_ref, script_version_ref),
+                UNIQUE(workspace_ref, script_ref, version_number),
+                FOREIGN KEY(workspace_ref, script_ref)
+                    REFERENCES v5_scripts(workspace_ref, script_ref) ON DELETE RESTRICT
+            )""",
+            "v5_series_plans": """CREATE TABLE v5_series_plans (
+                workspace_ref TEXT NOT NULL, series_plan_ref TEXT NOT NULL,
+                schema_version TEXT NOT NULL, content_profile_ref TEXT NOT NULL,
+                project_ref TEXT NOT NULL, series_ref TEXT NOT NULL,
+                current_version_ref TEXT NOT NULL, confirmed_version_ref TEXT,
+                status TEXT NOT NULL, created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL, version INTEGER NOT NULL,
+                PRIMARY KEY(workspace_ref, series_plan_ref),
+                UNIQUE(workspace_ref, project_ref, series_ref)
+            )""",
+        }
+    )
+    return result
+
+
+def _validate_v1_components(
+    connection: sqlite3.Connection, tables: set[str]
+) -> None:
+    """Accept any complete V1 component combination and reject partial repair."""
+
+    selected: set[str] = set()
+    expected_tables: set[str] = set()
+    for marker, owned in _V1_COMPONENT_TABLES.items():
+        present_owned = set(owned) & tables
+        marker_present = marker in tables
+        if marker_present != bool(present_owned) or (
+            marker_present and present_owned != set(owned)
+        ):
+            raise LifecycleMigrationError("partial Lifecycle V1 component")
+        if not marker_present:
+            continue
+        selected.add(marker)
+        expected_tables.update(owned)
+        columns = connection.execute(f"PRAGMA table_info({marker})").fetchall()
+        if tuple(row[1] for row in columns) != ("component", "schema_version"):
+            raise LifecycleMigrationError("unsupported Lifecycle V1 marker")
+        component_column, version_column = columns
+        if (
+            str(component_column[2]).upper() != "TEXT"
+            or int(component_column[5]) != 1
+            or str(version_column[2]).upper() != "INTEGER"
+            or int(version_column[3]) != 1
+            or int(version_column[5]) != 0
+        ):
+            raise LifecycleMigrationError("unsupported Lifecycle V1 marker")
+        rows = connection.execute(
+            f"SELECT component,schema_version FROM {marker} ORDER BY component"
+        ).fetchall()
+        if len(rows) != 1 or tuple(rows[0]) != (MARKERS[marker], 1):
+            raise LifecycleMigrationError("unsupported Lifecycle V1 marker")
+
+    if not selected or tables != selected | expected_tables:
+        raise LifecycleMigrationError("unsupported Lifecycle V1 schema objects")
+    forbidden = connection.execute(
+        "SELECT 1 FROM sqlite_master WHERE type IN ('view','trigger') LIMIT 1"
+    ).fetchone()
+    explicit_index = connection.execute(
+        "SELECT 1 FROM sqlite_master WHERE type='index' AND sql IS NOT NULL "
+        "AND name NOT LIKE 'sqlite_%' LIMIT 1"
+    ).fetchone()
+    if forbidden is not None or explicit_index is not None:
+        raise LifecycleMigrationError("unsupported Lifecycle V1 schema objects")
+    canonical = _v1_table_sql()
+    for table in expected_tables:
+        stored = connection.execute(
+            "SELECT sql FROM sqlite_master WHERE type='table' AND name=?", (table,)
+        ).fetchone()
+        if stored is None or _normalized_sql(stored[0]) != _normalized_sql(
+            canonical[table]
+        ):
+            raise LifecycleMigrationError("unsupported Lifecycle V1 table definition")
 
 
 def _connect(path: Path) -> sqlite3.Connection:
@@ -85,12 +225,28 @@ def validate_lifecycle_database(database_path: Path | str) -> None:
         versions = _marker_versions(connection, tables)
         if set(TABLE_ORDER) - tables or set(MARKERS) - tables:
             raise LifecycleMigrationError("partial lifecycle schema")
-        if set(versions.values()) != {SQLITE_LIFECYCLE_SCHEMA_VERSION}:
+        if set(versions) != set(MARKERS) or any(
+            versions[table] != SQLITE_LIFECYCLE_SCHEMA_VERSION for table in MARKERS
+        ):
             raise LifecycleMigrationError("lifecycle migration required")
+        for table, component in MARKERS.items():
+            rows = connection.execute(
+                f"SELECT component, schema_version FROM {table} ORDER BY component"
+            ).fetchall()
+            if len(rows) != 1 or tuple(rows[0]) != (
+                component,
+                SQLITE_LIFECYCLE_SCHEMA_VERSION,
+            ):
+                raise LifecycleMigrationError("unsupported lifecycle marker")
         if connection.execute("PRAGMA foreign_key_check").fetchone() is not None:
             raise LifecycleMigrationError("foreign key validation failed")
     finally:
         connection.close()
+    from services.v5_core_os.series_intelligence.migration import (
+        validate_series_intelligence_database,
+    )
+
+    validate_series_intelligence_database(path)
 
 
 def migrate_lifecycle_database(
@@ -107,14 +263,49 @@ def migrate_lifecycle_database(
     try:
         tables = _tables(connection)
         versions = _marker_versions(connection, tables)
-        if tables and set(TABLE_ORDER).issubset(tables) and set(MARKERS).issubset(tables) and set(versions.values()) == {SQLITE_LIFECYCLE_SCHEMA_VERSION}:
+        if (
+            tables
+            and set(TABLE_ORDER).issubset(tables)
+            and set(MARKERS).issubset(tables)
+            and set(versions) == set(MARKERS)
+            and all(
+                versions[table] == SQLITE_LIFECYCLE_SCHEMA_VERSION
+                for table in MARKERS
+            )
+        ):
+            from services.v5_core_os.series_intelligence.migration import (
+                _migrate_series_intelligence_connection,
+            )
+            from services.v5_core_os.series_intelligence.sqlite_schema import (
+                MARKER_TABLE as M6_MARKER_TABLE,
+                M6_TABLES,
+            )
+
+            # An accepted Lifecycle V2 database without M6 is an upgrade path,
+            # not a validated no-op.  Honour the caller's explicit upgrade gate
+            # before opening a write transaction or changing any schema object.
+            required_m6_objects = set(M6_TABLES) | {M6_MARKER_TABLE}
+            if not required_m6_objects.issubset(tables) and not allow_upgrade:
+                raise LifecycleMigrationError("M6 lifecycle migration required")
+
+            connection.execute("BEGIN IMMEDIATE")
+            try:
+                m6_result = _migrate_series_intelligence_connection(
+                    connection, fault=fault
+                )
+                connection.commit()
+            except BaseException:
+                connection.rollback()
+                raise
             validate_lifecycle_database(path)
-            return "no-op"
+            return "no-op" if m6_result == "no-op" else "upgrade"
         is_empty = not tables
         if not is_empty and (not versions or set(versions.values()) != {1}):
             raise LifecycleMigrationError("unsupported or partial lifecycle schema")
         if not is_empty and not allow_upgrade:
             raise LifecycleMigrationError("lifecycle migration required")
+        if not is_empty:
+            _validate_v1_components(connection, tables)
         _validate_no_orphans(connection, tables)
         before = {
             table: connection.execute(f"SELECT COUNT(*) FROM {table}").fetchone()[0]
@@ -174,6 +365,11 @@ def migrate_lifecycle_database(
             if connection.execute("PRAGMA foreign_key_check").fetchone() is not None:
                 raise LifecycleMigrationError("foreign key validation failed")
             fault("before-commit")
+            from services.v5_core_os.series_intelligence.migration import (
+                _migrate_series_intelligence_connection,
+            )
+
+            _migrate_series_intelligence_connection(connection, fault=fault)
             connection.commit()
         except BaseException:
             connection.rollback()

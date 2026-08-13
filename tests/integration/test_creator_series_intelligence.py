@@ -6,6 +6,7 @@ from tests.unit.test_series_intelligence_m6 import (
     base_command,
     bible_content,
     confirmed_components,
+    scoped_outbox,
     seed_assembly,
 )
 
@@ -105,7 +106,9 @@ class SeriesIntelligenceProductionSpineTests(unittest.TestCase):
             })
         self.assertEqual(stale.exception.code, "stale_source")
         self.assertEqual(self.assembly.series_intelligence.diagnostic_snapshot(), before)
-        self.assertEqual(self.assembly.series_intelligence.get_outbox(), [])
+        self.assertEqual(
+            scoped_outbox(self.assembly.series_intelligence, self.context), []
+        )
 
 
 if __name__ == "__main__":

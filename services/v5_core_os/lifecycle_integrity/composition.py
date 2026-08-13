@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from copy import copy
 from dataclasses import dataclass
+import sqlite3
 import os
 from pathlib import Path
 from typing import Any, Callable
@@ -24,6 +25,7 @@ from services.v5_core_os.script_studio.public import ScriptStudioPublicBoundary
 from services.v5_core_os.series_episode.foundation import (
     DependentRecordError,
     InMemorySeriesEpisodeAdapter,
+    LifecycleUnavailableError,
     SeriesEpisodeService,
     SqliteSeriesEpisodeAdapter,
 )
@@ -34,7 +36,11 @@ from services.v5_core_os.series_planning.foundation import (
     SqliteSeriesPlanningAdapter,
 )
 from services.v5_core_os.series_planning.public import SeriesPlanningPublicBoundary
-from services.v5_core_os.series_intelligence.composition import create_in_memory_participant
+from services.v5_core_os.series_intelligence.composition import (
+    create_in_memory_participant,
+    create_sqlite_participant,
+)
+from services.v5_core_os.series_intelligence.errors import SeriesIntelligenceError
 
 from .contracts import BackendKind, LifecycleAssemblyIdentity
 from .coordinator import LifecycleIntegrityCoordinator
@@ -53,6 +59,31 @@ def _restore(adapter: object, names: tuple[str, ...]) -> Callable[[dict[str, Any
             setattr(adapter, name, copy(snapshot[name]))
 
     return restore
+
+
+def _in_memory_series_plan_depends_on_series(repository, workspace_ref: str, series_ref: str) -> bool:
+    return any(
+        key[0] == workspace_ref and key[2] == series_ref
+        for key in repository._scope_index
+    )
+
+
+def _sqlite_series_plan_depends_on_series(repository, workspace_ref: str, series_ref: str) -> bool:
+    try:
+        with repository._session() as connection:
+            return connection.execute(
+                "SELECT 1 FROM v5_series_plans WHERE workspace_ref = ? AND series_ref = ? LIMIT 1",
+                (workspace_ref, series_ref),
+            ).fetchone() is not None
+    except sqlite3.DatabaseError:
+        raise LifecycleUnavailableError("lifecycle dependency state is unavailable") from None
+
+
+def _series_intelligence_depends_on_series(boundary, workspace_ref, series_ref) -> bool:
+    try:
+        return boundary.lifecycle_has_series_dependency(workspace_ref, series_ref)
+    except SeriesIntelligenceError:
+        raise LifecycleUnavailableError("lifecycle dependency state is unavailable") from None
 
 
 @dataclass(frozen=True)
@@ -153,6 +184,16 @@ class LifecycleAssembly:
             ),
             script_depends_on_episode=script_repository.lifecycle_has_episode_dependency,
             script_depends_on_series=script_repository.lifecycle_has_series_dependency,
+            series_plan_depends_on_series=lambda workspace, series: (
+                _in_memory_series_plan_depends_on_series(
+                    planning_repository, workspace, series
+                )
+            ),
+            series_intelligence_depends_on_series=lambda workspace, series: (
+                _series_intelligence_depends_on_series(
+                    intelligence_boundary, workspace, series
+                )
+            ),
             dependency_error=lambda code: DependentRecordError(code),
         )
         series_boundary.bind_lifecycle(coordinator)
@@ -187,6 +228,10 @@ class LifecycleAssembly:
         clock=None,
         initialize_or_upgrade: bool = False,
         transaction_hook=None,
+        m6_scope_authority=None,
+        m6_approval_authority=None,
+        m6_identity_authority=None,
+        m6_fault_hook=None,
     ) -> "LifecycleAssembly":
         if initialize_or_upgrade:
             migrate_lifecycle_database(database_path, allow_upgrade=True)
@@ -217,6 +262,17 @@ class LifecycleAssembly:
         script_boundary = ScriptStudioPublicBoundary(script_service, lifecycle_state=state)
         planning_service = SeriesPlanningService(planning_repository, project_boundary, **kwargs)
         planning_boundary = SeriesPlanningPublicBoundary(planning_service, lifecycle_state=state)
+        intelligence_boundary = create_sqlite_participant(
+            database_path=database_path,
+            lifecycle_state=state,
+            source_reader=planning_boundary,
+            scope_authority=m6_scope_authority,
+            approval_authority=m6_approval_authority,
+            identity_authority=m6_identity_authority,
+            ref_factory=ref_factory,
+            clock=clock,
+            fault_hook=m6_fault_hook,
+        )
         coordinator = LifecycleIntegrityCoordinator(
             state,
             episode_exists=lambda workspace, series, episode: (
@@ -230,6 +286,16 @@ class LifecycleAssembly:
             ),
             script_depends_on_episode=script_repository.lifecycle_has_episode_dependency,
             script_depends_on_series=script_repository.lifecycle_has_series_dependency,
+            series_plan_depends_on_series=lambda workspace, series: (
+                _sqlite_series_plan_depends_on_series(
+                    planning_repository, workspace, series
+                )
+            ),
+            series_intelligence_depends_on_series=lambda workspace, series: (
+                _series_intelligence_depends_on_series(
+                    intelligence_boundary, workspace, series
+                )
+            ),
             dependency_error=lambda code: DependentRecordError(code),
         )
         series_boundary.bind_lifecycle(coordinator)
@@ -237,9 +303,15 @@ class LifecycleAssembly:
         script_boundary.bind_lifecycle(coordinator)
         assembly = cls(
             identity, state, coordinator, series_boundary, project_boundary,
-            script_boundary, planning_boundary, None,
+            script_boundary, planning_boundary, intelligence_boundary,
         )
-        for boundary in (series_boundary, project_boundary, script_boundary, planning_boundary):
+        for boundary in (
+            series_boundary,
+            project_boundary,
+            script_boundary,
+            planning_boundary,
+            intelligence_boundary,
+        ):
             boundary._bind_lifecycle_assembly(assembly)
         return assembly
 
