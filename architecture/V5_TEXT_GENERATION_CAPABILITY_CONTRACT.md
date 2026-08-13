@@ -257,8 +257,21 @@ G1 adds an AST-based contract guard with these mandatory results:
 all apps/**/*.py imports of services.v4_platform = 0
 ```
 
-The guard examines both `import` and `from ... import ...` forms. A textual target
-check also prevents a dynamic/aliased bypass from becoming an accepted substitute.
+The guard examines both `import` and `from ... import ...` forms, including imported
+local bindings (`asname`) and relative-name resolution. Its programmatic-import check
+must resolve bindings for `importlib`, `builtins`, `importlib.import_module`,
+`importlib.__import__` and `builtins.__import__`; it must reject direct use, import
+aliases, simple assignment aliases and constant-attribute access to those primitives.
+Wildcard import from `importlib` or `builtins` fails closed.
+
+The guard must not treat an unrelated local function or object method named
+`import_module` as a Python import primitive. A textual target check may remain as
+defense in depth, but it cannot prove safety against aliases, concatenation or
+reflection and must not be the sole basis for this gate.
+
+This is a lightweight static architecture gate, not a Python security sandbox. It
+does not claim complete analysis of arbitrary `eval`/`exec`, runtime code generation,
+custom import hooks, complex reflection or cross-function container flows.
 
 Within `services/v5_core_os/text_generation`, only the V5-to-V4 implementation module
 `public.py` may import `services.v4_platform`. Contracts, errors, package exports and

@@ -360,7 +360,7 @@ The PRE-M6 route is fixed as:
 → `M6 Preconditions`
 → `M6-P1`
 
-The current phase is `Architecture Remediation R1 / V5 Text Generation Boundary G0 → G1`.
+The current phase is `Architecture Remediation R1 / V5 Text Generation G1-R1 Guard Correction`.
 
 Current governance state:
 
@@ -379,7 +379,7 @@ Current governance state:
 - M6 Preconditions: `SATISFIED FOR BOUNDED M6-P0/P1 AND M6-P2 LOCAL SQLITE ONLY`;
 - ACS-M6-P0-P1-R2: `OWNER ACCEPTED / COMPLETE / REMOTE-VERIFIED AT
   e38c75aa4ff26bdea80c82d8a24096f799dad860`;
-- current task: `ACS-ARCH-R1-V5-TEXT-GENERATION-G0 → G1`;
+- current task: `ACS-ARCH-R1-V5-TEXT-GENERATION-G1-R1`;
 - legacy repository capability provenance: `MEDIUM / OPEN / NON-BLOCKING`,
   Owner Gate `P3-RV1-003`;
 - M6-P0: `CONTRACT ACCEPTED / COMPLETE`;
@@ -397,10 +397,13 @@ Current governance state:
 - R-CORE-ARCH-001: `CONFIRMED / HIGH / MITIGATING — APPLICATION DIRECT V4 DEPENDENCY`;
 - ADR-0006 V5 Text Generation Capability Boundary: `ACCEPTED FOR BOUNDED G1
   REMEDIATION`;
-- ACS-ARCH-R1-V5-TEXT-GENERATION-G0: `GOVERNANCE / ARCHITECTURE CHECKPOINT IN
-  PROGRESS`;
-- ACS-ARCH-R1-V5-TEXT-GENERATION-G1: `AUTHORIZED ONLY AFTER G0 COMMIT, PUSH AND
-  REMOTE VERIFICATION`;
+- ACS-ARCH-R1-V5-TEXT-GENERATION-G0: `COMPLETE / REMOTE-VERIFIED AT
+  92d1f3ac9e08c71458af04514baa659555fc55a7`;
+- ACS-ARCH-R1-V5-TEXT-GENERATION-G1: `REMOTE-VERIFIED CANDIDATE AT
+  0c283eb653e74784301620bdaf64bf451bb687dd / REVISION REQUIRED / NOT OWNER
+  ACCEPTED`;
+- ACS-ARCH-R1-V5-TEXT-GENERATION-G1-R1: `GOVERNANCE AUTHORIZATION → TEST-ONLY
+  ALIAS-AWARE GUARD CORRECTION`;
 - R-CORE-GOV-002 audit-report provenance: `OPEN / NON-BLOCKING`;
 - M7-M19: `NOT STARTED / NOT AUTHORIZED`;
 - Formal 8765 Deployment: `UNTOUCHED / NOT DEPLOYED`;
@@ -413,8 +416,11 @@ baseline. M6-P0/P1 and M6-P2 are Owner Accepted. The remote-verified
 G3/P3-G0 revision at `c524486c05c21b270a7dd75e89fae4312430736a` remains a
 checkpoint candidate on HOLD; it is not Owner Accepted and does not accept ADR-0005
 or authorize any P3 implementation. The Project Lead selected the V5-owned Text
-Generation remediation and accepted ADR-0006. The only active bounded wave is G0 →
-G1 under `CURRENT_MILESTONE.md`.
+Generation remediation and accepted ADR-0006. G0 and the original G1 candidate are
+remote-verified, but independent review found that G1's dynamic-import guard does not
+resolve imported and simple assignment aliases. The only active bounded wave is the
+G1-R1 governance authorization followed by its one-file test-only correction under
+`CURRENT_MILESTONE.md`.
 
 The M6 gate order is:
 
@@ -496,7 +502,15 @@ The accepted architecture-remediation sequence is:
 5. G1 preserves existing public HTTP/API, Domain, candidate validation and product
    error semantics, adds an executable no-Application-to-V4 guard, passes the complete
    Core regression, and is committed, pushed and remote-verified;
-6. after G1 remote verification: `STOP` for Project Lead owner review.
+6. after G1 remote verification: `STOP` for Project Lead owner review;
+7. independent review marks the G1 candidate `REVISION REQUIRED` because the guard
+   misses aliased `importlib.import_module` / `__import__` access while the production
+   migration remains valid;
+8. G1-R1 first creates a governance-only authorization checkpoint, then changes only
+   `tests/contract/test_creator_series_planning_contract.py` to add binding-aware AST
+   analysis and positive/negative regression cases;
+9. after G1-R1 commit, push and remote verification: `STOP` for Project Lead owner
+   review.
 
 This bounded wave does not authorize Schema/Migration, formal port-8765 database
 access, HTTP/Auth/RBAC contract expansion, Frontend, M6-P3, M7+, V3, GPU, Worker or
