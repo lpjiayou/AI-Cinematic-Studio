@@ -2,13 +2,13 @@
 
 > Document: `AI_CINEMATIC_STUDIO_SYSTEM_MASTER_PLAN.md`
 >
-> Status: `SYSTEM MASTER GOVERNANCE BASELINE / PRE-M6-RB1.3 CLOSED / BOUNDED M6-P0-P1 AUTHORIZED`
+> Status: `SYSTEM MASTER GOVERNANCE BASELINE / M6-P0-P1 OWNER ACCEPTED / BOUNDED M6-P2 AUTHORIZED`
 >
-> Version: `v1.1`
+> Version: `v1.2`
 >
 > Date: `2026-08-13`
 >
-> Revision: `ACS-M6-P0-P1-R2`
+> Revision: `ACS-M6-P0-P1-R2-CLOSEOUT-G2 / M6-P2-G0`
 >
 > Architecture Decision: `ADR-0001 — Separate Commercial Experience Layer from Core Creator Runtime / Accepted`
 >
@@ -2290,7 +2290,7 @@ Status:
 
 Status:
 
-`P0 CONTRACT ACCEPTED / COMPLETE / P1 IMPLEMENTED / CHECKPOINT CANDIDATE / OWNER REVIEW PENDING / P2+ NOT AUTHORIZED / NOT STARTED`
+`P0-P1 OWNER ACCEPTED / COMPLETE / REMOTE-VERIFIED AT e38c75aa4ff26bdea80c82d8a24096f799dad860 / P2-G0 CONTRACT ACCEPTED / P2-G1 AUTHORIZED NOT STARTED / P3+ NOT AUTHORIZED`
 
 目标范围：
 
@@ -2314,7 +2314,9 @@ Status:
 - M6 不实现 M7；
 - M6 不实现 GPU Render、ComfyUI 或 Worker；
 - M6 不实现跨仓 UI；
-- M6-P2+ 保持 `NOT AUTHORIZED / NOT STARTED`。
+- M6-P2 只实现本地开发 SQLite 持久化、Migration、复合完整性、持久化幂等与
+  Outbox；正式 8765 数据库保持禁止访问；
+- M6-P3+ 保持 `NOT AUTHORIZED / NOT STARTED`。
 
 ---
 
@@ -3043,18 +3045,24 @@ NO
 PRE-M6-RB1.3-CLOSEOUT-G1-R1 is `OWNER ACCEPTED / COMPLETE / REMOTE-VERIFIED`
 at `dc9ab881b9f82ecd4a5927c456d5fe531f6850fa`. ADR-0003 accepts the bounded
 M6 Series Intelligence baseline for the already authorized P1 implementation.
+`ACS-M6-P0-P1-R2` is `OWNER ACCEPTED / COMPLETE / REMOTE-VERIFIED` at
+`e38c75aa4ff26bdea80c82d8a24096f799dad860`. ADR-0004 accepts the bounded M6-P2
+local-development durable SQLite boundary.
 
 当前执行状态（不属于上述历史快照）：
 
 ```text
 Current Work Package
-ACS-M6-P0-P1-R1 — M6-P1 ACCEPTANCE GATE CLOSURE
+ACS-M6-P2-G1 — M6 SERIES INTELLIGENCE DURABLE SQLITE SLICE
 
-Current Review Revision
-ACS-M6-P0-P1-R2 — FINAL GOVERNANCE AND EVIDENCE CLOSURE / CHECKPOINT CANDIDATE / OWNER REVIEW PENDING
+Accepted Governance / Architecture Checkpoint
+ACS-M6-P0-P1-R2-CLOSEOUT-G2 / M6-P2-G0
 
 M6 Series IP Bible + Character Intelligence
-P0 CONTRACT ACCEPTED / COMPLETE / P1 IMPLEMENTED / CHECKPOINT CANDIDATE / OWNER REVIEW PENDING / P2+ NOT AUTHORIZED / NOT STARTED
+P0-P1 OWNER ACCEPTED / COMPLETE / REMOTE-VERIFIED AT e38c75aa4ff26bdea80c82d8a24096f799dad860
+P2-G0 ADR-0004 + SQLITE CONTRACT ACCEPTED / COMPLETE
+P2-G1 AUTHORIZED / NOT STARTED
+P3+ NOT AUTHORIZED / NOT STARTED
 
 M7-M19
 NOT STARTED / NOT AUTHORIZED
@@ -3083,13 +3091,16 @@ M6 门禁顺序统一为：
 7. M6 Preconditions 全部满足；
 8. Project Lead 单独授权 M6-P1。
 
-上述八项已由 Project Lead 于 `2026-08-13` 裁定为仅对 bounded M6-P0/P1
-满足。R2-P1 与 R2-P2 已接受，RB13-F002 已在当前测试基线关闭，PRE-M6-RB1.3
-已正式关闭。该裁定不代表全系统 Architecture Review、Production Ready、正式
-8765 数据库部署或 M6-P2+ 授权。当前工作包仍为 `ACS-M6-P0-P1-R1`；
-`ACS-M6-P0-P1-R2` 仅为该候选的治理与测试证据关闭修订。M6-P1 已实施并
-处于 Checkpoint Candidate / Owner Review Pending，Frontend 保持冻结，
-M7-M19 未授权。
+上述八项已由 Project Lead 于 `2026-08-13` 裁定为满足 bounded M6-P0/P1。
+R2-P1 与 R2-P2 已接受，RB13-F002 已在当前测试基线关闭，PRE-M6-RB1.3 已正式
+关闭。`ACS-M6-P0-P1-R2` 已在
+`e38c75aa4ff26bdea80c82d8a24096f799dad860` 获得 Owner Acceptance。
+
+Project Lead 进一步接受 ADR-0004 与 M6 SQLite Contract，并授权
+`ACS-M6-P2-G1` 仅实现 local-development SQLite 持久化、Migration、完整性、
+持久化幂等和持久化 Outbox。该授权不代表全系统 Architecture Review、
+Production Ready 或正式 8765 数据库部署，也不授权 M6-P3+、M7-M19、HTTP/API、
+Frontend、V4/V3、Provider、GPU、Worker 或 ComfyUI。Frontend 保持冻结。
 
 ---
 

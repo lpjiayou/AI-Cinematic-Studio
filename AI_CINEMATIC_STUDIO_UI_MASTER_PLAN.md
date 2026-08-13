@@ -2,11 +2,11 @@
 
 > Document: `AI_CINEMATIC_STUDIO_UI_MASTER_PLAN.md`
 >
-> Status: `UI MASTER PRE-COMMIT CANDIDATE / UI-R1 FEATURE ACCEPTED HISTORY / SUBJECT TO ADR-0001 ACCEPTANCE`
+> Status: `UI MASTER / UI-R1 ACCEPTED HISTORY / ADR-0001 ACCEPTED / COMMERCIAL FRONTEND SEPARATED`
 >
 > Version: `v1.2`
 >
-> Date: `2026-08-11`
+> Date: `2026-08-13`
 >
 > UI-R1 Historical System Base:
 > `1cc768ee9db4b52a916c94ae6af7b95b811f1cb2`
@@ -14,7 +14,7 @@
 > UI-R1 Accepted SHA:
 > `c9536fc0c745d0bf9e9c3eb543f4ab6c0566798a`
 >
-> Revision: Proposed Commercial Experience Layer separation under `ADR-0001 / Proposed`.
+> Revision: M6-P2-G0 governance status synchronization; product IA and visual baseline unchanged.
 >
 > Scope:
 > AI Cinematic Studio Creator / Project Workspace / Production Editors /
@@ -26,16 +26,16 @@
 
 ## 0.1 UI Source-of-Truth Repository
 
-`PRE-M6-RB1.1` 当前只提出一项条件性目标：ADR-0001 后续获得正式接受并形成
-remote-verified 重基线后，AI Cinematic Studio 继续只有一个客户产品 UI，且
-其源码真源是独立仓库 `AI-Cinematic-Studio-Frontend`，不是 Core 仓库。
+ADR-0001 已接受，PRE-M6-RB1.1 与 RB1.2 已形成 remote-verified 重基线。
+AI Cinematic Studio 继续只有一个客户产品 UI，其源码真源是独立仓库
+`AI-Cinematic-Studio-Frontend`，不是 Core 仓库。
 
-本文件继续定义跨仓库的产品体验、信息架构、视觉与交互基线。该条件性提案
+本文件继续定义跨仓库的产品体验、信息架构、视觉与交互基线。已接受边界
 保留 Core 对 Creator Server Runtime、Creator Public HTTP/API、Creator
-Application 和 V5/V4/V3 等下层能力的责任，并拟议让 Core 不再承载第二套
-Commercial SaaS 客户页面。
+Application 和 V5/V4/V3 等下层能力的责任；Core 不再承载第二套 Commercial
+SaaS 客户页面。
 
-该提案要求 Frontend Experience Adapter 只通过公开 Creator HTTP/API 消费
+该边界要求 Frontend Experience Adapter 只通过公开 Creator HTTP/API 消费
 Core；禁止 Frontend 直接导入 Core 源码、访问 Creator Application、Domain、
 SQL、Persistence、Provider、private V5 Adapter、GPU、Worker 或 ComfyUI。
 
@@ -124,7 +124,8 @@ PRE-M6 严格路线为：
 → `M6 Preconditions`
 → `M6-P1`
 
-当前只处于 `PRE-M6-RB1.1` 修订阶段。
+PRE-M6-RB1.1、RB1.2 与 RB1.3 均已关闭。M6-P0/P1 已 Owner Accepted；当前只
+授权 M6-P2 local-development durable SQLite Core 工作，Frontend 仍冻结。
 
 ---
 
@@ -138,14 +139,16 @@ PRE-M6 严格路线为：
   `8c3e4271662e1e02e963618ade3c29d6e9f91e89`；
 - M4/M5 Accepted 状态的既有控制证据：
   `55813b26be76a3476820dd1f638ac2f4561da448`；
-- Future Milestone 从 M6 开始；
-- M6 — Series IP Bible + Character Intelligence：
-  `NOT STARTED / NOT AUTHORIZED`。
+- M6-P0/P1 — Series IP Bible + Character Intelligence：
+  `OWNER ACCEPTED / COMPLETE / REMOTE-VERIFIED AT e38c75aa4ff26bdea80c82d8a24096f799dad860`；
+- M6-P2：`CORE SQLITE IMPLEMENTATION AUTHORIZED / NOT STARTED`；
+- Frontend M6 activation：`FROZEN / NOT AUTHORIZED`；
+- M6-P3+、M7-M19：`NOT STARTED / NOT AUTHORIZED`。
 
 Milestone acceptance、implementation evidence、remote verification、UI/Product
-acceptance 和 current task status 是不同语义。M4/M5 的 Accepted 状态不表示
-ADR-0001 已接受、Architecture Review 已通过、Legacy UI 已获准删除、跨仓集成
-已经完成或 M6 已开始。
+acceptance 和 current task status 是不同语义。M4/M5 的 Accepted 状态本身并未
+授权 ADR-0001、Legacy UI 退役或 M6；这些事项后来通过各自独立治理 checkpoint
+接受。Cross-repository Gate C 与 Frontend M6 activation 仍未授权。
 
 ---
 
@@ -254,8 +257,7 @@ Dark Form System：
 - 专业 Editor 使用统一暗色工作区、对象导航、主编辑区、Inspector、Version / Job / Activity Drawer 和 Workflow Action Bar；
 - M4–M19 原则上只激活既有壳层，不再重做全局 IA、Project Shell 或 Editor 框架。
 
-拟议运行时与验收规则如下，须在 ADR-0001 后续接受并形成 remote-verified
-重基线后才生效：
+ADR-0001 与 PRE-M6-RB1.1 remote-verified 重基线已经接受以下运行时与验收规则：
 
 - ONE CREATOR UI = 独立 `AI-Cinematic-Studio-Frontend` 仓库中的客户体验层；
 - Frontend Experience Adapter 属于 Frontend，且只能通过 Creator Public
@@ -282,10 +284,10 @@ private V5、GPU、Worker 或 ComfyUI。Core 不重新建立客户 Commercial UI
   `Commercial Frontend → Frontend Experience Adapter → Creator Public HTTP/API → Creator Application → V5 → V4 → V3 → Compute/Foundation`；
   当前未实现，不允许共享源码集成。
 
-Core 中 `apps/creator-workspace-mvp` 的历史浏览器 UI 在本候选中继续标记为
-`DECOMMISSION CANDIDATE`，不是新的 UI 真源。其 server/API/Application 混合
-责任必须逐文件分类并保留；混合文件保持 `AMBIGUOUS_SHARED_FILE`。禁止盲目
-删除整个目录，实际退出只能在 `PRE-M6-RB1.2` 获得单独授权后执行。
+Core 中 `apps/creator-workspace-mvp` 的历史客户浏览器 UI 已通过
+PRE-M6-RB1.2 完成受控退役，不是新的 UI 真源。下划线路径
+`apps/creator_workspace_mvp` 继续保留 Creator Server/API/Application runtime，
+不得与已退役客户 UI 路径混淆。
 
 UI-R1 接受后，后续重点继续是稳定 Information Architecture、点亮真实能力和提升工作流效率，而不是无业务原因的整体换肤。
 
@@ -963,7 +965,8 @@ Continuity
 Timeline and Continuity
 
 M6 边界：`M6 ≠ V5 Identity Lock`。M6 不实现 M7、GPU Render、ComfyUI、
-Worker 或跨仓 UI；M6 当前仍为 `NOT STARTED / NOT AUTHORIZED`。
+Worker 或跨仓 UI；M6-P0/P1 已 Owner Accepted，M6-P2 只授权 Core 的本地开发
+SQLite 持久化，当前 Frontend 激活仍为 `FROZEN / NOT AUTHORIZED`。
 
 示意：
 

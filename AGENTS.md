@@ -360,7 +360,7 @@ The PRE-M6 route is fixed as:
 → `M6 Preconditions`
 → `M6-P1`
 
-The current phase is `M6 Series Intelligence / P0 Governance + P1 InMemory`.
+The current phase is `M6 Series Intelligence / P2 Durable SQLite`.
 
 Current governance state:
 
@@ -373,14 +373,19 @@ Current governance state:
 - PRE-M6-RB1.3-R1-RV1: `INDEPENDENTLY ACCEPTED`;
 - RB13-F001: `R1 IMPLEMENTED / INDEPENDENTLY ACCEPTED / CLOSED`;
 - RB13-F002: `REMEDIATED / CLOSED IN CURRENT TESTED CORE BASELINE`;
-- Architecture Review: `SATISFIED FOR BOUNDED M6-P0/P1 ONLY`;
-- M6 Preconditions: `SATISFIED FOR BOUNDED INMEMORY M6-P0/P1 ONLY`;
-- current task: `ACS-M6-P0-P1-R1`;
+- Architecture Review: `SATISFIED FOR BOUNDED M6-P0/P1 AND M6-P2 LOCAL SQLITE ONLY`;
+- M6 Preconditions: `SATISFIED FOR BOUNDED M6-P0/P1 AND M6-P2 LOCAL SQLITE ONLY`;
+- ACS-M6-P0-P1-R2: `OWNER ACCEPTED / COMPLETE / REMOTE-VERIFIED AT
+  e38c75aa4ff26bdea80c82d8a24096f799dad860`;
+- current task: `ACS-M6-P2-G1`;
 - legacy repository capability provenance: `MEDIUM / OPEN / NON-BLOCKING`,
   Owner Gate `P3-RV1-003`;
 - M6-P0: `CONTRACT ACCEPTED / COMPLETE`;
-- M6-P1: `IMPLEMENTED / CHECKPOINT CANDIDATE / OWNER REVIEW PENDING`;
-- M6-P2+: `NOT AUTHORIZED / NOT STARTED`;
+- M6-P1: `OWNER ACCEPTED / COMPLETE / REMOTE-VERIFIED AT
+  e38c75aa4ff26bdea80c82d8a24096f799dad860`;
+- M6-P2-G0: `ADR-0004 AND SQLITE CONTRACT ACCEPTED / COMPLETE`;
+- M6-P2-G1: `AUTHORIZED / NOT STARTED`;
+- M6-P3+: `NOT AUTHORIZED / NOT STARTED`;
 - M7-M19: `NOT STARTED / NOT AUTHORIZED`;
 - Formal 8765 Deployment: `UNTOUCHED / NOT DEPLOYED`;
 - Frontend: `FROZEN / UNTOUCHED`;
@@ -388,9 +393,9 @@ Current governance state:
 
 Legacy repository implementation must not be counted as current Core production
 capability. RB13-F001 and RB13-F002 are closed in the accepted current tested Core
-baseline. M6-P0/P1 authorization is bounded and does not authorize M6-P2+, M7-M19,
-formal database deployment or Frontend work. Exact active task scope remains governed
-by `CURRENT_MILESTONE.md`.
+baseline. M6-P0/P1 acceptance and M6-P2 authorization remain bounded. They do not
+authorize M6-P3+, M7-M19, formal database deployment or Frontend work. Exact active
+task scope remains governed by `CURRENT_MILESTONE.md`.
 
 The M6 gate order is:
 
@@ -403,9 +408,22 @@ The M6 gate order is:
 7. all M6 Preconditions are satisfied;
 8. the Project Lead separately authorizes M6-P1.
 
-All eight gates are satisfied only for the bounded M6-P0/P1 scope recorded by the
-Project Lead on `2026-08-13`. This does not establish a general Architecture Review,
-Production Ready status, formal database deployment, or authorization for M6-P2+.
+All eight gates are satisfied for the bounded M6-P0/P1 scope recorded by the Project
+Lead on `2026-08-13`. M6-P0/P1 is owner accepted and remote-verified at
+`e38c75aa4ff26bdea80c82d8a24096f799dad860`.
+
+The M6-P2 gate order is:
+
+1. M6-P0/P1 owner acceptance and remote verification pass;
+2. ADR-0004 and the M6 durable SQLite contract are accepted;
+3. only temporary file SQLite is used for migration and persistence evidence;
+4. InMemory/SQLite contract parity, restart, atomicity, lifecycle and concurrency pass;
+5. the complete M1-M6/P1 and R2 regression passes;
+6. the M6-P2 checkpoint is committed, pushed and remote-verified;
+7. execution stops for Project Lead owner review.
+
+This does not establish a general Architecture Review, Production Ready status,
+formal database deployment, or authorization for M6-P3+.
 
 M6 Character Intelligence must cover at least:
 
@@ -424,9 +442,10 @@ M6 Character Intelligence must cover at least:
 - timeline and continuity.
 
 `M6 ≠ V5 Identity Lock`. M6 does not implement M7, GPU Render, ComfyUI,
-Worker execution or cross-repository UI. M6-P0 is `CONTRACT ACCEPTED / COMPLETE`;
-M6-P1 is `IMPLEMENTED / CHECKPOINT CANDIDATE / OWNER REVIEW PENDING`; M6-P2+
-remains `NOT AUTHORIZED / NOT STARTED`.
+Worker execution or cross-repository UI. M6-P0/P1 is `OWNER ACCEPTED / COMPLETE /
+REMOTE-VERIFIED`; ADR-0004 and the M6-P2 SQLite contract are accepted;
+M6-P2-G1 is `AUTHORIZED / NOT STARTED`; M6-P3+ remains `NOT AUTHORIZED / NOT
+STARTED`.
 
 Legacy Phase 0 provenance debt remains `OPEN / NON-BLOCKING` under Owner Gate
 `P3-RV1-003`. This acknowledgement does not silently close the debt or import
@@ -1431,6 +1450,12 @@ Only milestones explicitly listed in that wave
 may be automatically entered.
 
 No implicit extension is allowed.
+
+The Project Lead standing instruction recorded on `2026-08-13` permits Codex to
+implement, test, commit, push and remote-verify without repeated conversational
+approval inside an explicitly listed bounded wave. It does not itself authorize an
+unlisted milestone and does not waive Source-of-Truth, final acceptance, destructive
+migration, security, rights, credential, data-loss or Stop Condition gates.
 
 ---
 
