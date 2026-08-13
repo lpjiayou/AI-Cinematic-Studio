@@ -2,17 +2,17 @@
 
 > Document: `CURRENT_MILESTONE.md`
 >
-> Execution Mode: `GOVERNANCE-ONLY / MANUAL / NO AUTO IMPLEMENTATION`
+> Execution Mode: `AUTO-SEQUENTIAL / BOUNDED / FAIL-CLOSED`
 >
-> Project Lead Authorization: `ADR-0005 + M6 CONSUMER CONTRACT ACCEPTED AS ARCHITECTURE / M6-P3-G0 OWNER ACCEPTANCE CHECKPOINT AUTHORIZED 2026-08-13`
+> Project Lead Authorization: `M6-P3-B1 IMPLEMENTATION REVIEW APPROVED BY PROJECT LEAD / ARCHITECTURE / REPOSITORY GOVERNANCE / M2-M4-M5-M6 DOMAIN OWNERS ON 2026-08-13`
 >
-> Authorized Wave: `ACS-M6-P3-G0-OWNER-ACCEPTANCE → PUSH → REMOTE VERIFY → STOP`
+> Authorized Wave: `B1 GOVERNANCE CHECKPOINT → REMOTE VERIFY → BOUNDED IMPLEMENTATION → REMOTE VERIFY → STOP FOR B1 OWNER REVIEW`
 >
-> Current Task: `ACS-M6-P3-G0-OWNER-ACCEPTANCE`
+> Current Task: `ACS-M6-P3-B1-EPISODE-PLAN-ITEM-BINDING`
 >
-> Current Work Package: `EIGHT-PATH GOVERNANCE / ARCHITECTURE ACCEPTANCE / NO PRODUCTION OR TEST CHANGE`
+> Current Work Package: `EIGHT GOVERNANCE PATHS → SIX PRODUCTION + NINE TEST PATHS → OWNER REVIEW`
 >
-> M6 Authorization: `P0-P2 OWNER ACCEPTED / P3-G0 OWNER ACCEPTED AS ARCHITECTURE / P3-B1 AND P3-G1 IMPLEMENTATION NOT AUTHORIZED`
+> M6 Authorization: `P0-P2 OWNER ACCEPTED / P3-G0 OWNER ACCEPTED AS ARCHITECTURE / P3-B1 BOUNDED IMPLEMENTATION AUTHORIZED AFTER GOVERNANCE REMOTE VERIFY / P3-G1 NOT AUTHORIZED`
 >
 > M7 Authorization: `NOT AUTHORIZED`
 >
@@ -66,28 +66,38 @@ decommission. It is no longer an active Core work package and does not authorize
 
 Current stage:
 
-`M6-P3-G0 Owner Acceptance Governance Checkpoint`
+`M6-P3-B1 EpisodePlanItemBinding Authorization Checkpoint`
 
 Title:
 
-ACS-M6-P3-G0 Owner Acceptance
+ACS-M6-P3-B1 EpisodePlanItemBinding
 
 Status:
 
-`P3-G0 OWNER ACCEPTED AS ARCHITECTURE / ADR-0005 + CONTRACT ACCEPTED / B1 NOT AUTHORIZED`
+`IMPLEMENTATION AUTHORIZED AFTER GOVERNANCE REMOTE VERIFICATION / G1 NOT AUTHORIZED`
 
 Purpose:
 
-1. preserve all accepted PRE-M6, M6-P0/P1/P2 and G1-R1 evidence;
-2. record ADR-0005 and the M6 Consumer Contract as accepted target architecture while
-   keeping every target type, method and data version unimplemented;
-3. establish the exact eight-path M6-P3-G0 Owner Acceptance governance checkpoint;
-4. preserve the c524 proposal and dec102 review-open records as immutable timepoint
-   history;
-5. keep applicable Domain Owner implementation review pending before any B1 authority;
-6. keep M6-P3-B1/G1, M7-M19, formal database deployment and Frontend unauthorized and
-   Production Ready as `NO`;
-7. commit, push, remote-verify and stop with no next authorized milestone.
+1. preserve all accepted PRE-M6, M6-P0/P1/P2, G1-R1 and P3-G0 evidence;
+2. record Project Lead, Architecture, Repository Governance and affected M2/M4/M5/M6
+   Domain Owner approval for bounded B1;
+3. establish and remote-verify the exact eight-path governance authorization
+   checkpoint before any production or test edit;
+4. automatically implement only the frozen six production and nine test paths;
+5. preserve initial v1 creation; allow v1→v1, explicit v1→v2 and v2→v2; reject
+   v2→v1 and require a new explicit v2 version for unbinding; `create_manual_version`
+   rejects a current v2 version, and only the dedicated method may create v2→v2;
+6. add only Core-only `create_episode_plan_item_binding_version`; modify no HTTP
+   route, handler or external DTO source file, while allowing the existing HTTP
+   workspace versions projection to pass through `episodePlanItemBindings` for v2;
+   add no DDL/migration, M3/M6 consumer, G1 or Frontend work;
+7. test, commit, non-force push, remote-verify and stop for B1 Owner Review.
+
+The exact command shape, v1/v2 method responsibilities, lifecycle-only execution,
+historical fail-closed scan, Owner-approved existing HTTP workspace versions v2 field
+pass-through and schema-version/digest rules are frozen by the M6 Consumer Contract
+and the B1 authorization record. Implementation may not select a looser
+interpretation.
 
 ---
 
@@ -296,7 +306,11 @@ The G3/P3-G0 proposal is remote-verified at
 `c524486c05c21b270a7dd75e89fae4312430736a`; its later review-open state is preserved
 at `dec102b2d70b95d6b69a96ae98d768a32723d4ba`. The Project Lead and Architecture
 Owner have now accepted ADR-0005 and the M6 Consumer Contract as architecture only.
-Implementation remains on HOLD and no M6-P3 implementation is authorized.
+That architecture checkpoint is remote-verified at
+`6bb9d165a693057f38e5789c408293ff0eaf5bcc`. The Project Lead, Architecture Owner,
+Repository Governance Owner and affected M2/M4/M5/M6 Domain Owners now authorize the
+bounded B1 sequence recorded in
+[`ACS-M6-P3-B1-EPISODE-PLAN-ITEM-BINDING.md`](governance/ACS-M6-P3-B1-EPISODE-PLAN-ITEM-BINDING.md).
 
 The completed architecture-remediation transition is:
 
@@ -324,23 +338,25 @@ The original G1 remains historical `REVISION REQUIRED / NOT OWNER ACCEPTED` and 
 superseded by the accepted G1-R1 result. The only current authorized transition is:
 
 ```text
-M6-P3-G0 OWNER ACCEPTANCE GOVERNANCE CHECKPOINT
-→ COMMIT / PUSH / REMOTE VERIFY
-→ STOP — NEXT AUTHORIZED MILESTONE NONE
+B1 GOVERNANCE AUTHORIZATION CHECKPOINT
+→ COMMIT / NON-FORCE PUSH / REMOTE VERIFY
+→ BOUNDED B1 IMPLEMENTATION AND TESTS
+→ COMMIT / NON-FORCE PUSH / REMOTE VERIFY
+→ STOP FOR PROJECT LEAD B1 OWNER REVIEW
 ```
 
-No M6-P3 implementation or later milestone may be silently entered.
+No G1 or later milestone may be silently entered.
 
 ---
 
-# 7. Accepted M6-P3-G0 Architecture and Implementation Hold
+# 7. Authorized M6-P3-B1 Binding Prerequisite
 
 M6-P0/P1 and M6-P2-G1 are `OWNER ACCEPTED / COMPLETE / REMOTE-VERIFIED`.
 The Project Lead and Architecture Owner accepted the G3/P3-G0 target architecture,
 ADR-0005 and the M6 consumer contract on `2026-08-13`. M6-P3-G0 is complete only as a
-governance/architecture decision; it grants no implementation authority. All target
-types, methods and data versions remain unimplemented. M6-P3-B1, M6-P3-G1 and all
-later M6 work remain `NOT AUTHORIZED / NOT STARTED`.
+governance/architecture decision. The later explicit Owner decision authorizes only
+M6-P3-B1 after its governance checkpoint is remote-verified. M6-P3-G1 and all later
+M6 work remain `NOT AUTHORIZED / NOT STARTED`.
 
 M6 Character Intelligence must include at least background, motivation, belief,
 conflict, goal, personality, behavior rules, dialogue rules, forbidden behavior,
@@ -383,17 +399,21 @@ future consistency verdicts; M9 remains owner of future AssetRequirement and
 asset-resolution readiness.
 
 Number, title, array position and display name matching are forbidden. The future
-sequence is two independent checkpoints: first P3-B1 implements the accepted target M5 v2
-binding, then P3-G1 implements the read-only M6/M3 consumer. P3-B1 must be separately
-authorized, tested, pushed, remote-verified and Owner Accepted before P3-G1 can be
-authorized. Neither implementation is authorized by this document.
+sequence is two independent checkpoints: first P3-B1 implements the accepted target
+M5 v2 binding, then a future separately authorized P3-G1 may implement the read-only
+M6/M3 consumer. The affected M2/M4/M5/M6 Domain Owners approve B1. P3-B1 is now
+authorized within exactly six production, nine test and eight governance paths; it
+must be tested, pushed, remote-verified and Owner Accepted before P3-G1 can be
+authorized.
 
-Applicable Domain Owner confirmation remains pending for affected implementation.
-P3 implementation may begin only through a later explicit Project Lead decision that
-separately authorizes B1. Architecture acceptance is not implementation authority.
+Initial plan creation stays v1. B1 allows v1→v1, explicit v1→v2 and v2→v2, forbids
+v2→v1 and requires a new explicit v2 version for unbinding. The only new operation is
+Core-only `create_episode_plan_item_binding_version`.
 
-This document does not authorize M6-P3 implementation, M7-M19, formal database
-deployment, HTTP/API/Auth/RBAC or Frontend implementation.
+This document does not authorize M6-P3-G1, M7-M19, formal database deployment,
+DDL/Migration, HTTP route/handler/external DTO source-file changes, any HTTP contract
+expansion beyond the approved existing workspace versions v2 field pass-through,
+Auth/RBAC or Frontend implementation.
 
 Legacy repository capability provenance remains `MEDIUM / OPEN / NON-BLOCKING` under
 Owner Gate `P3-RV1-003`. Old-repository implementation is not current Core production
@@ -416,9 +436,9 @@ capability.
 - RB13-F001: `R1 IMPLEMENTED / INDEPENDENTLY ACCEPTED / CLOSED`
 - ADR-0002 STATUS: `ACCEPTED FOR BOUNDED R2 IMPLEMENTATION`
 - RB13-F002: `REMEDIATED / CLOSED IN CURRENT TESTED CORE BASELINE`
-- EXECUTION MODE: `GOVERNANCE-ONLY / MANUAL / NO AUTO IMPLEMENTATION`
-- AUTHORIZED WAVE: `ACS-M6-P3-G0-OWNER-ACCEPTANCE → PUSH → REMOTE VERIFY → STOP`
-- CURRENT TASK: `ACS-M6-P3-G0-OWNER-ACCEPTANCE`
+- EXECUTION MODE: `AUTO-SEQUENTIAL / BOUNDED / FAIL-CLOSED`
+- AUTHORIZED WAVE: `B1 GOVERNANCE CHECKPOINT → REMOTE VERIFY → B1 IMPLEMENTATION → REMOTE VERIFY → STOP FOR OWNER REVIEW`
+- CURRENT TASK: `ACS-M6-P3-B1-EPISODE-PLAN-ITEM-BINDING`
 - G0 BASE: `c524486c05c21b270a7dd75e89fae4312430736a`
 - ADR-0006 STATUS: `ACCEPTED FOR BOUNDED G1`
 - V5 TEXT GENERATION CONTRACT: `ACCEPTED FOR BOUNDED G1`
@@ -435,7 +455,7 @@ capability.
 - RB1.3 CLOSEOUT: `FORMALLY CLOSED`
 - ARCHITECTURE REVIEW: `SATISFIED FOR BOUNDED M6-P0/P1 AND M6-P2 LOCAL SQLITE ONLY`
 - M6 PRECONDITIONS: `SATISFIED FOR BOUNDED M6-P0/P1 AND M6-P2 LOCAL SQLITE ONLY`
-- M6: `P0-P2 OWNER ACCEPTED / P3-G0 OWNER ACCEPTED AS ARCHITECTURE / P3-B1, P3-G1 AND LATER M6 WORK NOT AUTHORIZED`
+- M6: `P0-P2 OWNER ACCEPTED / P3-G0 OWNER ACCEPTED AS ARCHITECTURE / P3-B1 BOUNDED IMPLEMENTATION AUTHORIZED / P3-G1 AND LATER M6 WORK NOT AUTHORIZED`
 - M6-P0 STATUS: `CONTRACT ACCEPTED / COMPLETE`
 - M6-P1 STATUS: `OWNER ACCEPTED / COMPLETE / REMOTE-VERIFIED AT e38c75aa4ff26bdea80c82d8a24096f799dad860`
 - ADR-0004 STATUS: `ACCEPTED FOR BOUNDED M6-P2 IMPLEMENTATION`
@@ -443,9 +463,16 @@ capability.
 - M6-P2-G1 STATUS: `OWNER ACCEPTED / COMPLETE / REMOTE-VERIFIED AT 8227c6c616140824fd70de920dc6fcf459bb734d`
 - M6-P2-G1-CLOSEOUT-G3 STATUS: `REMOTE-VERIFIED HISTORICAL PROPOSAL CHECKPOINT AT c524486c05c21b270a7dd75e89fae4312430736a / PRESERVED`
 - M6-P3-G0 STATUS: `OWNER ACCEPTED / COMPLETE AS GOVERNANCE-ARCHITECTURE / NO IMPLEMENTATION AUTHORITY`
-- ADR-0005 STATUS: `ACCEPTED AS ARCHITECTURE DECISION / UNIMPLEMENTED / NO IMPLEMENTATION AUTHORITY`
-- M6 CONSUMER CONTRACT: `ACCEPTED AS NORMATIVE ARCHITECTURE CONTRACT / UNIMPLEMENTED / NO IMPLEMENTATION AUTHORITY`
-- M6-P3-B1 EPISODE-PLAN-ITEM BINDING: `ARCHITECTURE-DEFINED PREREQUISITE / NOT AUTHORIZED / NOT STARTED / BLOCKS M6-P3-G1`
+- ADR-0005 STATUS: `ACCEPTED AS ARCHITECTURE DECISION / B1 BOUNDED IMPLEMENTATION AUTHORIZED / G1 UNAUTHORIZED`
+- M6 CONSUMER CONTRACT: `ACCEPTED NORMATIVE ARCHITECTURE / B1 BOUNDED IMPLEMENTATION AUTHORIZED / CONSUMER UNIMPLEMENTED`
+- M6-P3-B1 EPISODE-PLAN-ITEM BINDING: `IMPLEMENTATION REVIEW APPROVED / GOVERNANCE AUTHORIZATION CHECKPOINT IN PROGRESS / TECHNICAL EDITS AFTER REMOTE VERIFY / BLOCKS M6-P3-G1`
+- M6-P3-B1 AUTHORIZED BASE: `6bb9d165a693057f38e5789c408293ff0eaf5bcc`
+- M6-P3-B1 DOMAIN OWNERS: `M2 / M4 / M5 / M6 APPROVED`
+- M6-P3-B1 FROZEN SCOPE: `8 GOVERNANCE / 6 PRODUCTION / 9 TEST PATHS`
+- M6-P3-B1 VERSION POLICY: `INITIAL V1 / V1→V1 / EXPLICIT V1→V2 / V2→V2 / V2→V1 FORBIDDEN / UNBIND VIA NEW V2`
+- M6-P3-B1 CORE OPERATION: `create_episode_plan_item_binding_version / NO ROUTE, HANDLER OR EXTERNAL DTO SOURCE CHANGE`
+- M6-P3-B1 MANUAL V2 RULE: `create_manual_version REJECTS CURRENT V2 WITHOUT WRITE / DEDICATED METHOD ALONE CREATES V2→V2`
+- M6-P3-B1 OWNER HTTP CLARIFICATION: `EXISTING CANONICAL V2 PROJECTION IN WORKSPACE VERSIONS PASSES THROUGH episodePlanItemBindings / MANUAL + BOOTSTRAP V1 BEHAVIOR UNCHANGED / NO OTHER HTTP CONTRACT EXPANSION`
 - M6-P3-G1 STATUS: `SEQUENCE DEFINED / BLOCKED UNTIL B1 OWNER ACCEPTED / NOT AUTHORIZED / NOT STARTED`
 - M6-P3 AFTER G1 / M6-P4+ STATUS: `NOT AUTHORIZED / NOT STARTED`
 - M7-M19: `NOT STARTED / NOT AUTHORIZED`
@@ -462,42 +489,47 @@ The Project Lead acceptance of bounded M6-P2-G1 at
 `8227c6c616140824fd70de920dc6fcf459bb734d` remains unchanged. The later c524
 G3/P3-G0 proposal and dec102 review-open checkpoint remain preserved historical
 evidence. ADR-0005 and the M6 Consumer Contract are now accepted as architecture only,
-with implementation HOLD unchanged. The Project Lead selected and accepted ADR-0006
-and later accepted corrected G1-R1 at
+and that G0 acceptance remains immutable timepoint evidence. The Project Lead selected
+and accepted ADR-0006 and later accepted corrected G1-R1 at
 `d44f471c644e319bb4a5bf73707c3274ecbaa426`. This closes the architecture-remediation
 wave but does not establish Production Ready or authorize formal database deployment,
-Frontend, M6-P3-B1, M6-P3-G1, later M6 work or M7-M19.
+Frontend, M6-P3-G1, later M6 work or M7-M19. B1 authority is limited to the explicit
+record and takes effect for technical edits only after governance remote verification.
 
 ---
 
 # 9. Stop Rule
 
-The current Owner Acceptance checkpoint must pass exact eight-path scope, production/test
-diff zero, Markdown structure, local links, secret scan, `git diff --check`, one
-commit, non-force push, Local SHA equals Remote SHA, ahead/behind `0/0` and clean
-worktree.
+The current governance authorization checkpoint must pass exact eight-path scope,
+production/test diff zero, Markdown structure, local links, secret scan,
+`git diff --check`, one commit, non-force push, Local SHA equals Remote SHA,
+ahead/behind `0/0` and clean worktree. Only then may the bounded B1 production/test
+implementation start automatically.
 
-After remote verification:
+After the implementation candidate is tested, committed, non-force pushed and
+remote-verified:
 
 ```text
-STOP — M6-P3-G0 OWNER ACCEPTANCE RECORDED
-ADR-0005 + M6 CONSUMER CONTRACT ACCEPTED AS ARCHITECTURE
-M6-P3-B1 NOT AUTHORIZED / NOT STARTED
+STOP — M6-P3-B1 REMOTE-VERIFIED IMPLEMENTATION CANDIDATE
+PROJECT LEAD B1 OWNER REVIEW REQUIRED
+M6-P3-G1 NOT AUTHORIZED / NOT STARTED
 NEXT AUTHORIZED MILESTONE: NONE
 ```
 
-Do not enter M6-P3-B1, M6-P3-G1, M7-M19, formal database deployment, HTTP/Auth/RBAC
-expansion or Frontend work.
+Stop before any need to exceed the frozen 6 production, 9 test and 8 governance paths,
+or to add DDL/Migration, route/handler/external DTO source-file changes, HTTP expansion
+beyond the approved workspace versions v2 field pass-through, M3/M6 consumer,
+M6-P3-G1, M7-M19, formal database deployment, Auth/RBAC expansion or Frontend work.
 
 ---
 
 # 10. Current Authorized Task
 
-`ACS-M6-P3-G0-OWNER-ACCEPTANCE`
+`ACS-M6-P3-B1-EPISODE-PLAN-ITEM-BINDING`
 
 Status:
 
-`GOVERNANCE-ONLY CHECKPOINT AUTHORIZED / IMPLEMENTATION HOLD`
+`GOVERNANCE AUTHORIZATION CHECKPOINT IN PROGRESS / BOUNDED IMPLEMENTATION AUTHORIZED AFTER REMOTE VERIFICATION`
 
 M6-P0/P1 and bounded M6-P2-G1 remain Owner Accepted at their remote-verified technical
 baselines. G1-R1 is Owner Accepted and complete at
@@ -513,16 +545,18 @@ Creator Application
 → Provider Adapter
 ```
 
-The Project Lead and Architecture Owner accept ADR-0005 and the M6 Consumer Contract
-as architecture only. The Repository Governance Owner authorizes the exact eight-path
-checkpoint recorded in
-[`ACS-M6-P3-G0-OWNER-ACCEPTANCE.md`](governance/ACS-M6-P3-G0-OWNER-ACCEPTANCE.md),
-including commit, non-force push and remote verification. Applicable Domain Owner
-implementation review remains pending and blocks any B1 authorization.
+The Project Lead, Architecture Owner, Repository Governance Owner and affected
+M2/M4/M5/M6 Domain Owners approve B1 and authorize the exact auto-sequential scope
+recorded in
+[`ACS-M6-P3-B1-EPISODE-PLAN-ITEM-BINDING.md`](governance/ACS-M6-P3-B1-EPISODE-PLAN-ITEM-BINDING.md):
+eight governance paths first; after remote verification, six production plus nine test
+paths; then test, commit, non-force push, remote verification and STOP for B1 Owner
+Review.
 
-Formal port-8765 database access/deployment, HTTP/Public API, Auth/RBAC, Frontend,
-Schema/Migration, public feature expansion, P3-B1/G1 and later M6 work, M7-M19, V3, GPU, Worker and
-ComfyUI remain unauthorized and not started. Architecture acceptance does not grant
-implementation authority or change existing Domain ownership or the Production Spine.
+Formal port-8765 database access/deployment, HTTP route/handler/external DTO
+source-file changes, HTTP expansion beyond the Owner-approved existing workspace
+versions v2 field pass-through, Auth/RBAC, Frontend, Schema/Migration, M3/M6 consumer,
+P3-G1 and later M6 work, M7-M19, V3, GPU, Worker and ComfyUI remain unauthorized and
+not started. B1 changes no existing Domain ownership or Production Spine.
 
 # End of CURRENT_MILESTONE.md

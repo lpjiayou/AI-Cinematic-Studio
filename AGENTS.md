@@ -360,7 +360,7 @@ The PRE-M6 route is fixed as:
 → `M6 Preconditions`
 → `M6-P1`
 
-The current phase is `M6-P3-G0 Owner Acceptance Governance Checkpoint`.
+The current phase is `M6-P3-B1 EpisodePlanItemBinding Authorization Checkpoint`.
 
 Current governance state:
 
@@ -379,7 +379,7 @@ Current governance state:
 - M6 Preconditions: `SATISFIED FOR BOUNDED M6-P0/P1 AND M6-P2 LOCAL SQLITE ONLY`;
 - ACS-M6-P0-P1-R2: `OWNER ACCEPTED / COMPLETE / REMOTE-VERIFIED AT
   e38c75aa4ff26bdea80c82d8a24096f799dad860`;
-- current task: `ACS-M6-P3-G0-OWNER-ACCEPTANCE`;
+- current task: `ACS-M6-P3-B1-EPISODE-PLAN-ITEM-BINDING`;
 - legacy repository capability provenance: `MEDIUM / OPEN / NON-BLOCKING`,
   Owner Gate `P3-RV1-003`;
 - M6-P0: `CONTRACT ACCEPTED / COMPLETE`;
@@ -390,10 +390,15 @@ Current governance state:
   8227c6c616140824fd70de920dc6fcf459bb734d`;
 - M6-P3-G0: `OWNER ACCEPTED / COMPLETE AS GOVERNANCE-ARCHITECTURE / NO
   IMPLEMENTATION AUTHORITY`;
-- ADR-0005 and M6 consumer contract: `ACCEPTED AS ARCHITECTURE / UNIMPLEMENTED /
-  NO IMPLEMENTATION AUTHORITY`;
-- M6-P3-B1 binding prerequisite: `ARCHITECTURE-DEFINED PREREQUISITE / NOT
-  AUTHORIZED / NOT STARTED / BLOCKS M6-P3-G1`;
+- ADR-0005 and M6 consumer contract: `ACCEPTED AS ARCHITECTURE / B1 BOUNDED
+  IMPLEMENTATION AUTHORIZED / G1 UNAUTHORIZED`;
+- M6-P3-B1 binding prerequisite: `IMPLEMENTATION REVIEW APPROVED / GOVERNANCE
+  AUTHORIZATION CHECKPOINT IN PROGRESS / BOUNDED TECHNICAL EDITS AFTER REMOTE
+  VERIFICATION / BLOCKS M6-P3-G1`;
+- M6-P3-B1 authorized base:
+  `6bb9d165a693057f38e5789c408293ff0eaf5bcc`;
+- M6-P3-B1 affected Domain Owners: `M2 / M4 / M5 / M6 APPROVED`;
+- M6-P3-B1 frozen scope: `8 GOVERNANCE / 6 PRODUCTION / 9 TEST PATHS`;
 - M6-P3-G1: `SEQUENCE DEFINED / BLOCKED UNTIL B1 OWNER ACCEPTED / NOT
   AUTHORIZED / NOT STARTED`;
 - M6-P3 after G1 / M6-P4+: `NOT AUTHORIZED / NOT STARTED`;
@@ -418,12 +423,16 @@ Legacy repository implementation must not be counted as current Core production
 capability. RB13-F001 and RB13-F002 are closed in the accepted current tested Core
 baseline. M6-P0/P1 and M6-P2 are Owner Accepted. The remote-verified G3/P3-G0
 revision at `c524486c05c21b270a7dd75e89fae4312430736a` has now been accepted as
-architecture only; ADR-0005 and the M6 consumer contract remain unimplemented and
-grant no P3 implementation authority. The Project Lead accepted the corrected G1-R1
+architecture only; its consumer behavior remains unimplemented and the architecture
+acceptance alone granted no implementation authority. The later
+explicit Owner decision authorizes only bounded B1 after governance remote
+verification. The Project Lead accepted the corrected G1-R1
 checkpoint at `d44f471c644e319bb4a5bf73707c3274ecbaa426`, closing Architecture
 Remediation R1. The original G1 remains historical `REVISION REQUIRED / NOT OWNER
-ACCEPTED` and is superseded by G1-R1. The only active work is the exact eight-path
-M6-P3-G0 Owner Acceptance governance checkpoint under `CURRENT_MILESTONE.md`.
+ACCEPTED` and is superseded by G1-R1. The only active work is the auto-sequential B1
+authorization under `CURRENT_MILESTONE.md`: exact eight-path governance checkpoint,
+remote verification, exact six-production/nine-test implementation, remote
+verification, then STOP for Project Lead B1 Owner Review.
 
 The M6 gate order is:
 
@@ -455,18 +464,22 @@ The Project Lead accepted M6-P2-G1 at
 Owner have now accepted ADR-0005 and its contract as the target M6 consumer
 architecture only. The accepted Core has no shared stable key between M2
 `episodeRef` and M5 `episodePlanItemRef`; number/title/index inference is forbidden.
-ADR-0005 therefore requires a future immutable M5 EpisodePlanItemBinding in a new exact
-SeriesPlanVersion. After applicable Domain Owner confirmation, the Project Lead must
-separately authorize and accept bounded
-M6-P3-B1 binding implementation before separately authorizing M6-P3-G1. M2 retains
-Series/Episode identity and membership; M4 retains Project identity and
-Project-to-Series context.
+ADR-0005 therefore requires an immutable M5 EpisodePlanItemBinding in a new exact
+SeriesPlanVersion. The Project Lead, Architecture Owner, Repository Governance Owner
+and affected M2/M4/M5/M6 Domain Owners now authorize bounded M6-P3-B1 after its
+governance checkpoint is remote-verified. M2 retains Series/Episode identity and
+membership; M4 retains Project identity and Project-to-Series context.
 
-Architecture acceptance implements none of ADR-0005, M6-P3-B1 or M6-P3-G1. B1 and G1
-remain on implementation HOLD, not authorized and not started.
+Initial plan creation remains v1. B1 permits v1→v1, explicit v1→v2 and v2→v2,
+forbids v2→v1 and requires an explicit new v2 version for unbinding. The only new
+operation is Core-only `create_episode_plan_item_binding_version`; no HTTP route,
+handler or external DTO source file may be added or changed. By explicit Owner
+clarification, the existing HTTP workspace versions projection passes through
+`episodePlanItemBindings` for v2 responses. v1 responses remain unchanged, and no
+other HTTP contract expansion is authorized.
 
 This does not establish a general Architecture Review, Production Ready status,
-formal database deployment, or authorization for M6-P3 implementation.
+formal database deployment, M3/M6 consumer authority or M6-P3-G1 authority.
 
 M6 Character Intelligence must cover at least:
 
@@ -489,8 +502,9 @@ Worker execution or cross-repository UI. M6-P0/P1 is `OWNER ACCEPTED / COMPLETE 
 REMOTE-VERIFIED`; ADR-0004 and the M6-P2 SQLite contract are accepted;
 M6-P2-G1 is `OWNER ACCEPTED / COMPLETE / REMOTE-VERIFIED AT
 8227c6c616140824fd70de920dc6fcf459bb734d`; M6-P3-G0 is `OWNER ACCEPTED /
-COMPLETE AS GOVERNANCE-ARCHITECTURE / NO IMPLEMENTATION AUTHORITY`; M6-P3-B1,
-M6-P3-G1 and all later M6 work remain `NOT AUTHORIZED / NOT STARTED`.
+COMPLETE AS GOVERNANCE-ARCHITECTURE`; M6-P3-B1 is `BOUNDED IMPLEMENTATION
+AUTHORIZED AFTER GOVERNANCE REMOTE VERIFICATION`; M6-P3-G1 and all later M6 work
+remain `NOT AUTHORIZED / NOT STARTED`.
 
 The accepted architecture-remediation sequence is:
 
@@ -519,12 +533,17 @@ The accepted architecture-remediation sequence is:
     `d44f471c644e319bb4a5bf73707c3274ecbaa426`, closes the remediation wave and
     historically authorizes governance closeout plus read-only M6-P3-G0 Owner Review;
 11. the Project Lead and Architecture Owner accept ADR-0005 and the M6 Consumer
-    Contract as architecture only and authorize this exact governance checkpoint.
+    Contract as architecture only;
+12. the Project Lead, Architecture Owner, Repository Governance Owner and affected
+    M2/M4/M5/M6 Domain Owners authorize exact B1: first an eight-path governance
+    checkpoint and remote verification, then the frozen six-production/nine-test
+    implementation, remote verification and STOP for B1 Owner Review.
 
-The current architecture acceptance does not authorize Schema/Migration, formal
-port-8765 database access, HTTP/Auth/RBAC contract expansion, Frontend, M6-P3-B1/G1
-implementation, M7+, V3, GPU, Worker or ComfyUI work. Any such need is a Stop
-Condition.
+The current B1 authorization does not authorize Schema/Migration, formal port-8765
+database access, HTTP route/handler/external DTO source-file changes, HTTP expansion
+beyond the approved existing workspace versions v2 field pass-through, Auth/RBAC,
+Frontend, M3/M6 consumer, M6-P3-G1, M7+, V3, GPU, Worker or ComfyUI work. Any unlisted
+path or such need is a Stop Condition.
 
 Legacy Phase 0 provenance debt remains `OPEN / NON-BLOCKING` under Owner Gate
 `P3-RV1-003`. This acknowledgement does not silently close the debt or import

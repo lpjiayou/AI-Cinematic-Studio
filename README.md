@@ -7,7 +7,8 @@ OS、V4 Platform、V3 Render Core、持久化与后端测试；客户 Commercial
 
 > 当前状态：M1–M5 已接受；M6-P0/P1 与 bounded M6-P2 已 Owner Accepted；
 > G1-R1 `d44f471…` 已 Owner Accepted 并关闭 Architecture Remediation R1；
-> M6-P3-G0 已作为架构治理检查点 Owner Accepted，所有 P3 实现继续 HOLD；
+> M6-P3-G0 已 Owner Accepted；M6-P3-B1 已获有界实现授权并等待治理检查点远端验证；
+> M6-P3-G1 继续未授权；
 > Production Ready = `NO`。
 
 ## 当前活动工作包
@@ -26,8 +27,13 @@ OS、V4 Platform、V3 Render Core、持久化与后端测试；客户 Commercial
 | R-CORE-ARCH-001 | `CONFIRMED / HIGH / MONITORING` |
 | R-CORE-GOV-002 | `OPEN / NON-BLOCKING` |
 | M6-P3-G0 | `OWNER ACCEPTED / COMPLETE AS GOVERNANCE-ARCHITECTURE / NO IMPLEMENTATION AUTHORITY` |
-| ADR-0005 / M6 Consumer Contract | `ACCEPTED AS ARCHITECTURE / UNIMPLEMENTED / NO IMPLEMENTATION AUTHORITY` |
-| M6-P3-B1 EpisodePlanItemBinding | `ARCHITECTURE-DEFINED PREREQUISITE / NOT AUTHORIZED / NOT STARTED / BLOCKS M6-P3-G1` |
+| ADR-0005 / M6 Consumer Contract | `ACCEPTED AS ARCHITECTURE / B1 BOUNDED IMPLEMENTATION AUTHORIZED / G1 UNAUTHORIZED` |
+| M6-P3-B1 EpisodePlanItemBinding | `IMPLEMENTATION REVIEW APPROVED / BOUNDED AUTHORIZATION AFTER GOVERNANCE REMOTE VERIFY / BLOCKS M6-P3-G1` |
+| B1 authorized base | `6bb9d165a693057f38e5789c408293ff0eaf5bcc` |
+| B1 scope | `8 GOVERNANCE → 6 PRODUCTION + 9 TESTS → REMOTE VERIFY → STOP FOR OWNER REVIEW` |
+| B1 version policy | `INITIAL V1 / V1→V1 / EXPLICIT V1→V2 / V2→V2 / NO V2→V1 / UNBIND VIA NEW V2` |
+| B1 Core operation | `create_episode_plan_item_binding_version / NO ROUTE, HANDLER OR EXTERNAL DTO SOURCE CHANGE` |
+| B1 Owner HTTP clarification | `EXISTING WORKSPACE VERSIONS V2 RESPONSE PASSES THROUGH episodePlanItemBindings / NO OTHER HTTP EXPANSION` |
 | M6-P3-G1 | `SEQUENCE DEFINED / BLOCKED UNTIL B1 OWNER ACCEPTED / NOT AUTHORIZED / NOT STARTED` |
 | M6-P3 after G1 / M6-P4+ | `NOT AUTHORIZED / NOT STARTED` |
 | M7-M19 | `NOT STARTED / NOT AUTHORIZED` |
@@ -52,9 +58,14 @@ V4 接触面，且当前生产树 `apps → V4` 为零。原 G1 的持续守卫�
 Acceptance。
 
 G3/P3-G0 在 `c524486c05c21b270a7dd75e89fae4312430736a` 的架构内容已通过 Owner
-Review；ADR-0005 与 M6 Consumer Contract 已作为架构规范接受，但未实施且不授予
-实现权限。M6-P3-B1/G1 均未授权、未开始。
-Schema/Migration、正式数据库、Public HTTP/API 扩张、Auth/RBAC、Frontend、M6-P3、
+Review；ADR-0005 与 M6 Consumer Contract 已作为架构规范接受，其 consumer
+行为仍未实施且不授予普遍实现权限。Project Lead、Architecture Owner、Repository Governance Owner 与
+M2/M4/M5/M6 Domain Owners 已批准精确 B1：先远端验证 8 文档治理检查点，再自动
+实施冻结的 6 个生产路径与 9 个测试路径，远端验证后停止等待 B1 Owner Review。
+M6-P3-G1 仍未授权、未开始。
+现有 HTTP workspace versions 的 v2 响应允许透传 `episodePlanItemBindings`，但不
+修改 route、handler 或外部 DTO 源文件。除该 Owner 消歧外的 Public HTTP/API 扩张、
+Schema/Migration、正式数据库、Auth/RBAC、Frontend、M6-P3-G1、
 M7+、V3、GPU、Worker 和 ComfyUI 不在当前授权范围内。
 
 权威执行状态见 [CURRENT_MILESTONE.md](CURRENT_MILESTONE.md)。
@@ -184,6 +195,7 @@ PYTHONDONTWRITEBYTECODE=1 python -m unittest discover -s tests -p 'test_*.py' -q
 - [ACS-ARCH-R1 G1-R1 Authorization](governance/ACS-ARCH-R1-V5-TEXT-GENERATION-G1-R1-AUTHORIZATION.md)
 - [ACS-ARCH-R1 G1-R1 Closeout / M6-P3-G0 Owner Review](governance/ACS-ARCH-R1-V5-TEXT-GENERATION-G1-R1-CLOSEOUT-M6-P3-G0-OWNER-REVIEW.md)
 - [M6-P3-G0 Owner Acceptance](governance/ACS-M6-P3-G0-OWNER-ACCEPTANCE.md)
+- [M6-P3-B1 EpisodePlanItemBinding Authorization](governance/ACS-M6-P3-B1-EPISODE-PLAN-ITEM-BINDING.md)
 - [M6 Domain Contract](architecture/M6_SERIES_INTELLIGENCE_DOMAIN_CONTRACT.md)
 - [M6 Durable SQLite Contract](architecture/M6_SERIES_INTELLIGENCE_SQLITE_CONTRACT.md)
 - [M6 Consumer Contract — Accepted Architecture](architecture/M6_SERIES_INTELLIGENCE_CONSUMER_CONTRACT.md)

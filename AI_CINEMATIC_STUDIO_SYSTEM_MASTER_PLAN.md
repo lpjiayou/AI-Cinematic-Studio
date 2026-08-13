@@ -2,13 +2,13 @@
 
 > Document: `AI_CINEMATIC_STUDIO_SYSTEM_MASTER_PLAN.md`
 >
-> Status: `SYSTEM MASTER GOVERNANCE BASELINE / G1-R1 OWNER ACCEPTED / M6-P3-G0 ARCHITECTURE OWNER ACCEPTED / IMPLEMENTATION HOLD`
+> Status: `SYSTEM MASTER GOVERNANCE BASELINE / M6-P3-B1 BOUNDED IMPLEMENTATION AUTHORIZED / G1 HOLD`
 >
 > Version: `v1.2`
 >
 > Date: `2026-08-13`
 >
-> Revision: `ACS-M6-P3-G0 OWNER ACCEPTANCE / GOVERNANCE-ONLY`
+> Revision: `ACS-M6-P3-B1 EPISODE-PLAN-ITEM-BINDING AUTHORIZATION`
 >
 > Architecture Decisions: `ADR-0001 / Accepted`; `ADR-0005 — M6 Consumer Boundary / Accepted as architecture only`; `ADR-0006 — V5 Text Generation Capability Boundary / Accepted for bounded G1`
 >
@@ -2315,7 +2315,7 @@ Status:
 
 Status:
 
-`P0-P1 OWNER ACCEPTED / COMPLETE / REMOTE-VERIFIED AT e38c75aa4ff26bdea80c82d8a24096f799dad860 / P2-G0 CONTRACT ACCEPTED / P2-G1 OWNER ACCEPTED / COMPLETE / REMOTE-VERIFIED AT 8227c6c616140824fd70de920dc6fcf459bb734d / P3-G0 OWNER ACCEPTED AS GOVERNANCE-ARCHITECTURE / ADR-0005 + M6 CONSUMER CONTRACT ACCEPTED AS ARCHITECTURE / UNIMPLEMENTED / NO IMPLEMENTATION AUTHORITY / P3-B1, P3-G1 AND LATER M6 WORK NOT AUTHORIZED`
+`P0-P1 OWNER ACCEPTED / COMPLETE / REMOTE-VERIFIED AT e38c75aa4ff26bdea80c82d8a24096f799dad860 / P2-G0 CONTRACT ACCEPTED / P2-G1 OWNER ACCEPTED / COMPLETE / REMOTE-VERIFIED AT 8227c6c616140824fd70de920dc6fcf459bb734d / P3-G0 OWNER ACCEPTED AS GOVERNANCE-ARCHITECTURE / ADR-0005 + M6 CONSUMER CONTRACT ACCEPTED / P3-B1 BOUNDED IMPLEMENTATION AUTHORIZED AFTER GOVERNANCE REMOTE VERIFICATION / P3-G1 AND LATER M6 WORK NOT AUTHORIZED`
 
 目标范围：
 
@@ -2341,10 +2341,14 @@ Status:
 - M6 不实现跨仓 UI；
 - M6-P2 只实现本地开发 SQLite 持久化、Migration、复合完整性、持久化幂等与
   Outbox；正式 8765 数据库保持禁止访问；
-- M6-P3-G0 仅接受 consumer/reconciliation target architecture；架构已接受，
-  类型、方法与数据版本均未实施且不授予实现权限；
-- M6-P3-B1 EpisodePlanItemBinding 为 architecture-defined prerequisite，未授权、
-  未开始；
+- M6-P3-G0 仅接受 consumer/reconciliation target architecture；架构已接受；
+- M6-P3-B1 EpisodePlanItemBinding 获得有界实现授权：治理 8 路径远端验证后，
+  仅可修改冻结的 6 个生产与 9 个测试路径；
+- B1 初始计划保持 v1，允许 v1→v1、显式 v1→v2、v2→v2，禁止 v2→v1，解绑
+  必须创建显式 v2 新版本；唯一新增操作为 Core-only
+  `create_episode_plan_item_binding_version`，不得新增或修改 HTTP route、handler、
+  外部 DTO 源文件；Owner 明确允许既有 HTTP workspace versions 的 v2 响应透传
+  `episodePlanItemBindings`，但不得扩大其他 HTTP contract；
 - M6-P3-G1 保持 `BLOCKED UNTIL B1 OWNER ACCEPTED / NOT AUTHORIZED / NOT STARTED`；
   G1 之后与 M6-P4+ 均为 `NOT AUTHORIZED / NOT STARTED`。
 
@@ -3083,21 +3087,22 @@ local-development durable SQLite boundary.
 
 ```text
 Current Work Package
-ACS-M6-P3-G0 OWNER ACCEPTANCE
+ACS-M6-P3-B1 EPISODE-PLAN-ITEM-BINDING
 
 Execution Mode
-GOVERNANCE-ONLY / MANUAL / NO AUTO IMPLEMENTATION
+AUTO-SEQUENTIAL / BOUNDED / FAIL-CLOSED
 
 Architecture Decision
 ADR-0006 V5 TEXT GENERATION CAPABILITY BOUNDARY
 ACCEPTED FOR BOUNDED G1
 
 Current Checkpoint
-M6-P3-G0 OWNER ACCEPTANCE / GOVERNANCE-ONLY
+M6-P3-B1 GOVERNANCE AUTHORIZATION / TECHNICAL EDITS AFTER REMOTE VERIFICATION
 
 Accepted Architecture Decision
 ADR-0005 + M6 CONSUMER CONTRACT ACCEPTED AS ARCHITECTURE
-UNIMPLEMENTED / NO IMPLEMENTATION AUTHORITY
+G0 ACCEPTANCE ITSELF GRANTED NO IMPLEMENTATION AUTHORITY
+B1 LATER SEPARATELY AUTHORIZED WITHIN FROZEN SCOPE
 
 Completed Architecture Checkpoint
 G0 COMPLETE / REMOTE-VERIFIED AT 92d1f3ac9e08c71458af04514baa659555fc55a7
@@ -3121,8 +3126,14 @@ P0-P1 OWNER ACCEPTED / COMPLETE / REMOTE-VERIFIED AT e38c75aa4ff26bdea80c82d8a24
 P2-G0 ADR-0004 + SQLITE CONTRACT ACCEPTED / COMPLETE
 P2-G1 OWNER ACCEPTED / COMPLETE / REMOTE-VERIFIED AT 8227c6c616140824fd70de920dc6fcf459bb734d
 G3 / P3-G0 OWNER ACCEPTED / COMPLETE AS GOVERNANCE-ARCHITECTURE / NO IMPLEMENTATION AUTHORITY
-ADR-0005 + M6 CONSUMER CONTRACT ACCEPTED AS ARCHITECTURE / UNIMPLEMENTED / NO IMPLEMENTATION AUTHORITY
-P3-B1 EPISODE-PLAN-ITEM BINDING ARCHITECTURE-DEFINED PREREQUISITE / NOT AUTHORIZED / NOT STARTED / BLOCKS P3-G1
+ADR-0005 + M6 CONSUMER CONTRACT ACCEPTED AS ARCHITECTURE / B1 BOUNDED IMPLEMENTATION AUTHORIZED / G1 UNAUTHORIZED
+P3-B1 EPISODE-PLAN-ITEM BINDING IMPLEMENTATION REVIEW APPROVED / BOUNDED AUTHORIZATION / BLOCKS P3-G1
+P3-B1 AUTHORIZED BASE 6bb9d165a693057f38e5789c408293ff0eaf5bcc
+P3-B1 DOMAIN OWNERS M2 / M4 / M5 / M6 APPROVED
+P3-B1 SCOPE 8 GOVERNANCE → 6 PRODUCTION + 9 TESTS → REMOTE VERIFY → STOP FOR OWNER REVIEW
+P3-B1 VERSION POLICY INITIAL V1 / V1→V1 / EXPLICIT V1→V2 / V2→V2 / V2→V1 FORBIDDEN / UNBIND VIA NEW V2
+P3-B1 CORE-ONLY OPERATION create_episode_plan_item_binding_version / NO ROUTE, HANDLER OR EXTERNAL DTO SOURCE CHANGE
+P3-B1 OWNER HTTP CLARIFICATION EXISTING WORKSPACE VERSIONS V2 RESPONSE PASSES THROUGH episodePlanItemBindings / NO OTHER HTTP EXPANSION
 P3-G1 SEQUENCE DEFINED / BLOCKED UNTIL B1 OWNER ACCEPTED / NOT AUTHORIZED / NOT STARTED
 P3 AFTER G1 / M6-P4+ NOT AUTHORIZED / NOT STARTED
 
@@ -3170,8 +3181,10 @@ REMOTE-VERIFIED`。
 `ACS-M6-P2-G1-CLOSEOUT-G3 / M6-P3-G0` 已在
 `c524486c05c21b270a7dd75e89fae4312430736a` 完成远端验证。Project Lead 与
 Architecture Owner 已接受 ADR-0005 和 M6 Consumer Contract 为规范架构；该接受
-不授予 M6-P3-B1 或 M6-P3-G1 实现权限，二者未开始。原 proposal/review
-checkpoint 作为时点历史保留且不得改写。
+本身不授予实现权限。后续 Project Lead、Architecture Owner、Repository
+Governance Owner 与 M2/M4/M5/M6 Domain Owners 已基于远端提交
+`6bb9d165a693057f38e5789c408293ff0eaf5bcc` 单独授权 M6-P3-B1；M6-P3-G1
+仍未授权。原 proposal/review checkpoint 作为时点历史保留且不得改写。
 
 代码审查确认 M1 AI Director、M3 Script Studio、M5 Series Director 与 Creator
 Server composition 存在 Application 直接依赖 V4 的重复模式，违反固定的
@@ -3206,11 +3219,15 @@ NOT OWNER ACCEPTED`。G1-R1 在唯一 Contract Test 文件中建立 binding-awar
 Owner Accept 该修正检查点，Architecture Remediation R1 因此关闭，
 `R-CORE-ARCH-001` 转入持续监控。
 
-当前只授权 M6-P3-G0 Owner Acceptance governance-only 检查点。ADR-0005 与 M6
-Consumer Contract 已作为架构接受，但任何目标类型、方法或数据版本均未实施；
-Applicable Domain Owner 实施审查仍待完成，B1 未授权、未开始。Schema/Migration、
-正式 8765、HTTP/Auth/RBAC 扩张、Frontend、M6-P3-B1/G1 实现、M7+、V3、GPU、
-Worker 或 ComfyUI 仍未授权。
+当前授权 `ACS-M6-P3-B1-EPISODE-PLAN-ITEM-BINDING` 自动顺序：先建立并远端
+验证精确 8 路径治理检查点，再实施精确 6 个生产路径与 9 个测试路径，完整测试、
+提交、非强推、远端验证后停止等待 B1 Owner Review。初始计划保持 v1；允许
+v1→v1、显式 v1→v2 和 v2→v2；禁止 v2→v1；解绑必须创建显式 v2 新版本。
+采用 Core-only `create_episode_plan_item_binding_version`，不得新增或修改 HTTP
+route、handler 或外部 DTO 源文件。Owner 消歧允许既有 HTTP workspace versions
+的 v2 响应透传 `episodePlanItemBindings`；除此之外不得扩大 HTTP contract。
+Schema/Migration、正式 8765、M3/M6 consumer、Frontend、M6-P3-G1、M7+、V3、
+GPU、Worker 或 ComfyUI 仍未授权；任何扩大 allowlist 的需要均立即停止。
 
 Full Core Audit Report v1.2 的历史接受标签不在本次修复中重写；仓库内缺少可复核
 报告实体/摘要引用的问题登记为 `R-CORE-GOV-002 / OPEN / NON-BLOCKING`，且该标签

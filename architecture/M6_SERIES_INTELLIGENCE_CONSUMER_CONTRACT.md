@@ -1,12 +1,14 @@
 # M6 Series Intelligence Consumer and Reconciliation Contract
 
-> Status: `ACCEPTED AS NORMATIVE ARCHITECTURE CONTRACT / UNIMPLEMENTED / NO IMPLEMENTATION AUTHORITY`
+> Status: `ACCEPTED NORMATIVE ARCHITECTURE / B1 BOUNDED IMPLEMENTATION AUTHORIZED / G1 UNAUTHORIZED`
 >
 > Authority: `ADR-0005 — ACCEPTED AS ARCHITECTURE DECISION`
 >
 > Evidence base: `8227c6c616140824fd70de920dc6fcf459bb734d`; G0 proposal checkpoint `c524486c05c21b270a7dd75e89fae4312430736a`
 >
-> Work package: `M6-P3-G0`
+> Work package: `ACS-M6-P3-B1-EPISODE-PLAN-ITEM-BINDING`
+>
+> Owner HTTP clarification: `EXISTING CANONICAL V2 PROJECTION RETURNED BY WORKSPACE VERSIONS PASSES THROUGH episodePlanItemBindings / MANUAL AND BOOTSTRAP V1 BEHAVIOR UNCHANGED / NO ROUTE-HANDLER-EXTERNAL-DTO SOURCE CHANGE / NO OTHER HTTP EXPANSION`
 
 ## 1. Purpose
 
@@ -15,9 +17,10 @@ downstream Core domain implementation shall consume the active M6 Series Intelli
 baseline without copying or taking ownership of M6 facts. It freezes the normative
 target Ref/Digest, Scope, staleness and reconciliation boundary.
 
-M6-P3-G0 is governance-only. Every type, method, data version and implementation item
-below remains unimplemented and unauthorized unless a later bounded task explicitly
-authorizes it. Architecture acceptance is not implementation authority.
+M6-P3-G0 was governance-only. The later B1 authorization permits only the exact
+EpisodePlanItemBinding prerequisite, version policy and frozen files recorded in
+section 12.1 after the governance checkpoint is remote-verified. Every consumer type,
+method and implementation item outside B1 remains unimplemented and unauthorized.
 
 ## 2. Owners and first direct consumer
 
@@ -117,7 +120,7 @@ EpisodePlanItemBinding
 └── episodePlanItemRef
 ```
 
-Any future separately authorized binding implementation shall satisfy:
+The authorized bounded B1 binding implementation shall satisfy:
 
 - the exact v2 top-level field is `episodePlanItemBindings`;
 - the v2 candidate has the v1 candidate's closed-world fields plus exactly that one
@@ -147,14 +150,55 @@ The accepted target versioned payload names are `creator.series-plan.candidate.v
 digest. These are data-contract versions, not permission to change the SQLite schema.
 Accepted v1 records remain valid historical facts but are `UNBOUND` for Episode-level
 M6 consumption. They are never inferred or backfilled. A compatible v2 version must be
-created and confirmed explicitly. These target versions remain unimplemented and are
-not authorized by this contract acceptance.
+created and confirmed explicitly.
+
+B1 adds only the Core operation `create_episode_plan_item_binding_version`. Initial
+plan creation remains v1. The exact allowed transitions are v1→v1, explicit v1→v2 and
+v2→v2. A v2→v1 downgrade is forbidden. Unbinding must create an explicit new v2
+version and may not mutate or downgrade an existing version. The operation is not an
+HTTP route, handler or external DTO. Owner clarification: this does not hide a stored
+v2 version from the existing HTTP workspace versions projection. Without changing any
+route, handler or external DTO source file, that projection may and shall include
+`episodePlanItemBindings` when it serializes a canonical v2 version. No other HTTP
+response, including manual-version, receives v2 authority from this clarification.
+
+The operation contract is closed-world:
+
+```text
+create_episode_plan_item_binding_version({
+  workspaceRef,
+  projectRef,
+  seriesRef,
+  seriesPlanRef,
+  expectedPlanVersion,
+  episodePlanItemBindings
+}) -> {plan, version}
+```
+
+Those six command fields are exact. `humanConfirmed`, `content` and unknown fields
+are rejected. `episodePlanItemBindings` is the complete desired replacement set;
+`[]` explicitly unbinds in a new v2 draft. Confirmation remains a separate,
+human-gated operation.
+
+`confirm_candidate` always creates v1. Existing `create_manual_version` remains the
+v1→v1 non-binding edit path and rejects a current v2 version without a durable write.
+It cannot create, replace, remove, remap or return bindings. Only
+`create_episode_plan_item_binding_version` may create v1→v2 or v2→v2 versions and
+change that set, including explicit unbinding. Trusted M2/M4 context is validated
+before each v2 durable write and the stored binding set is revalidated before
+confirmation.
+
+All v2 mutation and confirmation behavior requires the accepted lifecycle-bound
+`LifecycleAssembly`. Standalone or independently composed compatibility boundaries
+fail closed with `lifecycle_unavailable / 503`. The write reuses the existing
+`LifecycleOperation.APPEND_SERIES_PLAN_VERSION`; B1 adds no lifecycle operation or
+enum value.
 
 This binding must be implemented, independently tested, pushed, remote-verified and
-Owner Accepted in a separately authorized prerequisite checkpoint before any M6
-consumer implementation is authorized. If implementation requires a table, column,
-migration or other persistence expansion, execution stops for a separate ADR; the
-current architecture acceptance does not grant that authority.
+Owner Accepted in the bounded B1 prerequisite checkpoint before any M6 consumer
+implementation is authorized. If implementation requires a table, column, marker,
+migration or other persistence expansion beyond existing SQLite `content_json`,
+execution stops for a separate ADR; B1 grants no such authority.
 
 Every stored M5 version containing a binding, including historical versions, creates
 a lifecycle dependency on the referenced M2 Episode. Episode deletion preserves the
@@ -163,6 +207,31 @@ and returns stable `dependent_series_plan_binding_exists`. No cascade, inferred
 tombstone or dangling binding is allowed. Same refs in another Workspace or Series do
 not block deletion. This is a bounded extension of ADR-0002; M2 Episode ownership and
 M5 Series Planning ownership do not change.
+
+The dependency read covers all exact-scope historical v2 versions, including draft,
+current and confirmed records. Malformed, unknown or unreadable relevant-scope version
+data is fail-closed: it cannot return false and is conservatively reported as
+`dependent_series_plan_binding_exists / 409`. A later explicit unbind does not erase
+the dependency created by an older bound version. Other Workspace/Series data remains
+isolated.
+
+Version dispatch uses `SeriesPlanVersionRecord.schemaVersion` and its durable SQLite
+`schema_version` projection, never the presence or absence of a binding field. v1
+content bytes, fields, source projection and digest remain unchanged and are never
+rewritten. A v2 M5 source snapshot adds only the normalized binding set to the v2
+digest. SQLite reads/writes only existing `content_json`, uses strict Python JSON
+validation without JSON1, and changes no DDL, table, column, index, marker or migration.
+M6 `record_integrity` is limited to validating/recomputing the v1/v2 M5 source digest;
+it adds no consumer behavior.
+
+The binding-aware v2 result and M5 source snapshot remain owned by Core. The existing
+HTTP workspace versions projection passes through stored canonical versions. When it
+returns v2, its version object includes `episodePlanItemBindings`; when it returns v1,
+its shape is unchanged. This is an Owner-approved v2 field pass-through, not a new
+route, handler, external DTO source file or general HTTP contract expansion. Existing
+manual-version behavior remains v1-only, and `build_m6_bootstrap` retains its exact v1
+DTO with no binding field. No B1 path may modify route, handler or external DTO source
+files.
 
 ## 6. Accepted target immutable input snapshot
 
@@ -335,19 +404,19 @@ checkpoint table, acknowledgement or broker.
 These are accepted target internal domain meanings for future separately authorized
 implementation. HTTP status, public DTO and UI copy are out of scope.
 
-## 12. Future separately authorized two-checkpoint implementation sequence
+## 12. Authorized B1 and future separately authorized G1 sequence
 
-Architecture acceptance authorizes no implementation. The smallest safe future
-sequence has two independently authorized and accepted checkpoints.
+The smallest safe sequence has two independently authorized and accepted checkpoints.
+B1 alone is authorized; G1 remains a future separate decision.
 
 ### 12.1 Binding prerequisite — `ACS-M6-P3-B1`
 
-This checkpoint would only implement the M5 `EpisodePlanItemBinding` v2 data contract,
-trusted M2/M4 validation, immutable-version behavior and source projection. It would
-not implement the M6 reader or any M3 consumer.
+After its governance checkpoint is remote-verified, this checkpoint may implement only
+the M5 `EpisodePlanItemBinding` v2 data contract, trusted M2/M4 validation,
+immutable-version behavior and source projection. It may not implement the M6 reader
+or any M3 consumer.
 
-The following list is a future planning envelope only and grants no write authority.
-Any later B1 authorization may narrow this maximum file allowlist:
+The B1 technical implementation allowlist is frozen to exactly six production paths:
 
 ```text
 services/v5_core_os/series_planning/foundation.py
@@ -356,6 +425,11 @@ services/v5_core_os/series_episode/foundation.py
 services/v5_core_os/series_intelligence/record_integrity.py
 services/v5_core_os/lifecycle_integrity/composition.py
 services/v5_core_os/lifecycle_integrity/coordinator.py
+```
+
+and exactly nine test paths:
+
+```text
 tests/unit/test_series_planning_m5.py
 tests/unit/test_deletion_lifecycle_integrity.py
 tests/contract/test_creator_series_episode_contract.py
@@ -365,6 +439,12 @@ tests/integration/test_creator_series_planning.py
 tests/integration/test_creator_series_intelligence.py
 tests/integration/test_creator_series_intelligence_sqlite_p2.py
 tests/integration/test_creator_lifecycle_sqlite_p2.py
+```
+
+The governance authorization checkpoint and later factual status synchronization are
+limited to exactly these eight document paths:
+
+```text
 AGENTS.md
 AI_CINEMATIC_STUDIO_SYSTEM_MASTER_PLAN.md
 AI_CINEMATIC_STUDIO_UI_MASTER_PLAN.md
@@ -381,8 +461,10 @@ The Series/Episode foundation would be allowed only to add
 `dependent_series_plan_binding_exists` to the stable lifecycle dependency-error set;
 the Series/Episode contract test freezes its existing public `409` mapping. B1 would permit
 no M2 identity/write-model change, SQLite table/column/marker/migration, M6 consumer,
-M3 change, Public HTTP or Frontend change. Widening the planning envelope requires
-explicit Project Lead review.
+M3 change, Frontend change, route/handler/external DTO source-file change or HTTP
+contract expansion beyond the Owner-approved existing canonical v2 pass-through in
+workspace versions. Any need to widen the frozen allowlist is a
+hard stop for explicit Project Lead review.
 
 ### 12.2 Read-only consumer — `ACS-M6-P3-G1`
 
@@ -426,11 +508,11 @@ adapter, M3 create/confirm/rewrite behavior, ScriptVersion persistence change, p
 HTTP/DTO, Frontend, event consumer, dispatcher or checkpoint state. This architecture
 acceptance does not authorize any listed file to change.
 
-## 13. Future implementation acceptance gates
+## 13. Implementation acceptance gates
 
 ### 13.1 Binding prerequisite gates
 
-A separately authorized B1 must prove:
+The authorized bounded B1 must prove:
 
 1. explicit v2 bindings are created only in a new M5 candidate/version, validated
    against trusted M2 Episode membership plus M4 Project-to-Series context before the
@@ -453,8 +535,14 @@ A separately authorized B1 must prove:
 8. existing M6 source/digest activation semantics accept a valid v2 source without
    weakening v1 history or cross-Scope isolation;
 9. InMemory/SQLite behavior and restart agree without SQLite DDL or migration changes;
-10. full Core, AST, architecture, secret and diff checks pass; and
-11. execution stops after push and remote verification for Project Lead review.
+10. `create_manual_version` rejects a current v2 version without a durable write; only
+    the dedicated binding-version method creates v2→v2;
+11. the existing HTTP workspace versions projection includes
+    `episodePlanItemBindings` for canonical v2 versions without any route, handler or
+    external DTO source-file change; v1 projections, manual-version behavior and the
+    v1 bootstrap remain unchanged, and no other HTTP contract expands;
+12. full Core, AST, architecture, secret and diff checks pass; and
+13. execution stops after push and remote verification for Project Lead review.
 
 ### 13.2 Read-only consumer gates
 
@@ -487,31 +575,48 @@ At minimum, a separately authorized implementation must prove:
 
 ## 14. Explicit exclusions
 
-This architecture acceptance does not authorize:
+The current B1 authorization does not authorize:
 
-- any production or test implementation;
-- M6-P3-B1 binding implementation or M6-P3-G1 consumer implementation;
+- any production or test implementation outside the exact B1 allowlist;
+- M6-P3-G1 consumer implementation;
 - modification of existing ScriptVersion persistence;
 - consumer checkpoints, schema, migration or formal database work;
 - Outbox dispatch, acknowledgement, broker or external bus;
-- HTTP/Public API, DTO, Auth/RBAC or Frontend;
+- any route, handler or external DTO source-file change, or Creator Public HTTP/API
+  expansion other than the Owner-approved existing canonical v2 field pass-through
+  in workspace versions; Auth/RBAC and Frontend remain excluded;
 - M7 validation, findings, PASS/WARN/BLOCK or script correction;
 - M9 AssetRequirement, Identity/Rights/Asset or asset-resolution readiness;
 - V4/V3, Provider, GPU, Worker or ComfyUI;
 - M6-P4+, M7-M19 implementation or Production Ready status.
 
-## 15. Owner Acceptance stop rule
+## 15. B1 authorization and Owner Review stop rule
 
-After this accepted architecture contract, ADR-0005 and the Owner Acceptance record
-are committed, pushed and remote-verified:
+The only authorized automatic sequence is:
 
 ```text
-STOP — M6-P3-G0 OWNER ACCEPTED AS ARCHITECTURE
-M6-P3-B1 NOT AUTHORIZED / NOT STARTED
+B1 GOVERNANCE AUTHORIZATION CHECKPOINT
+→ COMMIT / NON-FORCE PUSH / REMOTE VERIFY
+→ BOUNDED B1 IMPLEMENTATION AND TESTS
+→ COMMIT / NON-FORCE PUSH / REMOTE VERIFY
+→ STOP FOR PROJECT LEAD B1 OWNER REVIEW
+```
+
+The affected M2, M4, M5 and M6 Domain Owner review is approved for B1. Production and
+test editing begins only after the governance checkpoint is remote-verified. If B1
+needs any unlisted path, DDL/migration, route/handler/external DTO source-file change,
+HTTP expansion beyond the approved existing canonical v2 pass-through in workspace
+versions, M3/M6 consumer, G1, Frontend or M7+ behavior, execution
+stops before that change.
+
+After the B1 implementation candidate is remote-verified:
+
+```text
+STOP — M6-P3-B1 REMOTE-VERIFIED IMPLEMENTATION CANDIDATE
+PROJECT LEAD B1 OWNER REVIEW REQUIRED
+M6-P3-G1 NOT AUTHORIZED / NOT STARTED
 NEXT AUTHORIZED MILESTONE: NONE
 ```
 
-No implementation begins from this acceptance. Applicable Domain Owner implementation
-review and a later explicit Project Lead authorization are required before B1 may
-start. B1 must then be implemented, tested, pushed, remote-verified and Owner Accepted
-before G1 can be separately authorized.
+B1 is not Owner Accepted by remote verification. G1 requires a new explicit Project
+Lead authorization even after a later B1 Owner Acceptance.
