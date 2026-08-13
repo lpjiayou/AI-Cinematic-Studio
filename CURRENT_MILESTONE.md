@@ -6,7 +6,7 @@
 >
 > Current Task: `ACS-M6-P0-P1 — SERIES INTELLIGENCE INMEMORY BASELINE`
 >
-> Current Work Package: `M6 Series Intelligence / P0 Governance + P1 InMemory`
+> Current Work Package: `M6 Series Intelligence / P0 CONTRACT ACCEPTED + P1 AUTHORIZED NOT STARTED`
 >
 > M6 Authorization: `P0/P1 AUTHORIZED / P2+ NOT AUTHORIZED`
 >
@@ -168,6 +168,11 @@ Architecture Review and M6 Preconditions are satisfied only for bounded InMemory
 M6-P0/P1. Formal 8765 deployment remains unperformed and unauthorized. The Frontend
 remains frozen and untouched. `P3-RV1-003` remains open and non-blocking.
 
+PRE-M6-RB1.3-CLOSEOUT-G1-R1 is `OWNER ACCEPTED / COMPLETE / REMOTE-VERIFIED`
+at `dc9ab881b9f82ecd4a5927c456d5fe531f6850fa`. ADR-0003 is
+`ACCEPTED FOR BOUNDED M6-P1 IMPLEMENTATION`. P1 authority comes from G1-R1; P0
+records its bounded design and does not create a new authorization.
+
 ---
 
 # 4. Legacy Core Creator UI Status
@@ -322,6 +327,8 @@ capability.
 - ARCHITECTURE REVIEW: `SATISFIED FOR BOUNDED M6-P0/P1 ONLY`
 - M6 PRECONDITIONS: `SATISFIED FOR BOUNDED INMEMORY M6-P0/P1 ONLY`
 - M6: `NOT STARTED / P0-P1 AUTHORIZED / P2+ NOT AUTHORIZED`
+- M6-P0 STATUS: `CONTRACT ACCEPTED`
+- M6-P1 STATUS: `AUTHORIZED / NOT STARTED`
 - M7-M19: `NOT STARTED / NOT AUTHORIZED`
 - FORMAL 8765 DEPLOYMENT: `NOT PERFORMED / NOT AUTHORIZED`
 - FRONTEND: `FROZEN / UNTOUCHED`

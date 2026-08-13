@@ -8,7 +8,7 @@
 >
 > Date: `2026-08-13`
 >
-> Revision: `PRE-M6-RB1.3-CLOSEOUT-G1 — Governance Source-of-Truth Synchronization`
+> Revision: `ACS-M6-P0 — Series Intelligence Baseline Contract`
 >
 > Architecture Decision: `ADR-0001 — Separate Commercial Experience Layer from Core Creator Runtime / Accepted`
 >
@@ -3013,7 +3013,7 @@ Legacy repository capability provenance
 MEDIUM / OPEN / NON-BLOCKING / OWNER GATE P3-RV1-003
 
 M6 Series IP Bible + Character Intelligence
-NOT STARTED / P0-P1 AUTHORIZED / P2-P4 NOT AUTHORIZED
+P0 CONTRACT ACCEPTED / P1 AUTHORIZED NOT STARTED / P2-P4 NOT AUTHORIZED
 
 M7-M19
 NOT STARTED / NOT AUTHORIZED
@@ -3036,6 +3036,10 @@ FROZEN / UNTOUCHED
 Production Ready
 NO
 ```
+
+PRE-M6-RB1.3-CLOSEOUT-G1-R1 is `OWNER ACCEPTED / COMPLETE / REMOTE-VERIFIED`
+at `dc9ab881b9f82ecd4a5927c456d5fe531f6850fa`. ADR-0003 accepts the bounded
+M6 Series Intelligence baseline for the already authorized P1 implementation.
 
 旧仓库中的实现不得计入当前 Core 生产能力。`P3-RV1-003` 继续拥有该来源
 审计债务；该债务为非阻塞项，不得被错误升级为当前 Core 能力。
