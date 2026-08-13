@@ -27,9 +27,18 @@ class SeriesIntelligenceContractTests(unittest.TestCase):
         }
         self.assertTrue(expected.issubset({item.value for item in LifecycleOperation}))
 
-    def test_sqlite_is_absent_from_m6_module_and_no_m6_http_endpoint_exists(self):
-        m6_files = sorted((ROOT / "services/v5_core_os/series_intelligence").glob("*.py"))
-        self.assertGreaterEqual(len(m6_files), 8)
+    def test_sqlite_is_absent_from_m6_domain_and_no_m6_http_endpoint_exists(self):
+        module = ROOT / "services/v5_core_os/series_intelligence"
+        m6_files = [
+            module / name
+            for name in (
+                "canonical.py",
+                "contracts.py",
+                "errors.py",
+                "foundation.py",
+                "public.py",
+            )
+        ]
         for path in m6_files:
             tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
             imports = {

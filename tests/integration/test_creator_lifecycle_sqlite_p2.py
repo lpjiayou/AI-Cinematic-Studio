@@ -98,6 +98,35 @@ class SqliteMigrationTests(unittest.TestCase):
             after.close()
         self.assertEqual(created["title"], "Legacy")
 
+    def test_partial_v1_marker_table_mismatch_fails_before_writes(self):
+        cases = ("marker-only", "tables-without-marker")
+        for case in cases:
+            with self.subTest(case=case):
+                path = Path(self.temp.name) / f"partial-v1-{case}.sqlite3"
+                if case == "marker-only":
+                    connection = open_fk(path)
+                    try:
+                        connection.execute(
+                            "CREATE TABLE v5_series_episode_schema("
+                            "component TEXT PRIMARY KEY,schema_version INTEGER NOT NULL)"
+                        )
+                        connection.execute(
+                            "INSERT INTO v5_series_episode_schema VALUES('series_episode',1)"
+                        )
+                    finally:
+                        connection.close()
+                else:
+                    SqliteSeriesEpisodeAdapter(path)
+                    connection = open_fk(path)
+                    try:
+                        connection.execute("DROP TABLE v5_series_episode_schema")
+                    finally:
+                        connection.close()
+                before = path.read_bytes()
+                with self.assertRaises(LifecycleMigrationError):
+                    migrate_lifecycle_database(path, allow_upgrade=True)
+                self.assertEqual(path.read_bytes(), before)
+
     def test_complete_v1_m1_to_m5_rows_are_preserved_exactly(self):
         self._v1_database_with_data()
         from services.v5_core_os.project_engine.foundation import SqliteProjectAdapter

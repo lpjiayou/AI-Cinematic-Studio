@@ -38,6 +38,37 @@ class SqliteLifecycleState:
         if self._state is not AssemblyState.READY:
             raise LeaseRejectedError("assembly is not ready")
 
+    @contextmanager
+    def read_snapshot(self):
+        """Expose one SQLite snapshot connection for a coherent bounded read."""
+        self._lock.acquire()
+        connection = None
+        try:
+            self.assert_ready()
+            if getattr(self._thread, "lease", None) is not None:
+                raise LeaseRejectedError("nested lifecycle access is forbidden")
+            try:
+                connection = self._connect()
+                # A coherent workspace projection spans several related tables.
+                # IMMEDIATE prevents a rollback-journal writer from entering the
+                # PENDING state between those SELECTs and deadlocking the reader.
+                connection.execute("BEGIN IMMEDIATE")
+            except sqlite3.DatabaseError as exc:
+                if connection is not None:
+                    connection.close()
+                connection = None
+                raise LeaseRejectedError("lifecycle read snapshot is unavailable") from exc
+            self._thread.read_connection = connection
+            try:
+                yield
+            finally:
+                connection.rollback()
+        finally:
+            self._thread.read_connection = None
+            if connection is not None:
+                connection.close()
+            self._lock.release()
+
     def _connect(self) -> sqlite3.Connection:
         connection = sqlite3.connect(self.database_path, timeout=10, isolation_level=None)
         connection.row_factory = sqlite3.Row
@@ -57,8 +88,14 @@ class SqliteLifecycleState:
             self.assert_ready()
             if getattr(self._thread, "lease", None) is not None:
                 raise LeaseRejectedError("nested lifecycle lease is forbidden")
-            connection = self._connect()
-            connection.execute("BEGIN IMMEDIATE")
+            try:
+                connection = self._connect()
+                connection.execute("BEGIN IMMEDIATE")
+            except sqlite3.DatabaseError as exc:
+                if connection is not None:
+                    connection.close()
+                connection = None
+                raise LeaseRejectedError("lifecycle write lease is unavailable") from exc
             self._transaction_hook(operation)
             lease = LifecycleLeaseView(
                 self._issuer_ref, self.identity, uuid4().hex, get_ident(),
@@ -119,6 +156,13 @@ class SqliteLifecycleState:
             lease, workspace_ref=lease.workspace_ref, allowed_operations=frozenset(LifecycleOperation)
         )
         return getattr(self._thread, "connection", None)
+
+    def read_connection_or_none(self) -> sqlite3.Connection | None:
+        """Return a validated write lease connection or an active read snapshot."""
+        connection = self.connection_or_none()
+        if connection is not None:
+            return connection
+        return getattr(self._thread, "read_connection", None)
 
     def apply_mutation(self, lease: object, mutation: Callable[[], Any]) -> Any:
         self.validate_lease(

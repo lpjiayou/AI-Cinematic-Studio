@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Mapping, Protocol, Sequence
+from typing import Any, Mapping, MutableMapping, Protocol, Sequence
 
 from .errors import AuthorityUnavailableError, IdentityBindingDeniedError
 
@@ -63,6 +63,66 @@ class ConfirmedM6SourceReader(Protocol):
     def get_confirmed_m6_source_snapshot(
         self, workspace_ref: str, project_ref: str, series_ref: str
     ) -> dict[str, Any]: ...
+
+
+class SeriesIntelligenceRepository(Protocol):
+    """Persistence-neutral storage surface consumed by the M6 domain service.
+
+    The mapping members intentionally preserve the accepted P1 service contract.
+    Durable adapters implement them as transactional database-backed mappings; the
+    service therefore does not learn SQL or persistence lifecycle details.
+    """
+
+    bibles: MutableMapping[tuple[str, ...], dict[str, Any]]
+    bible_versions: MutableMapping[tuple[str, ...], dict[str, Any]]
+    characters: MutableMapping[tuple[str, ...], dict[str, Any]]
+    character_versions: MutableMapping[tuple[str, ...], dict[str, Any]]
+    snapshots: MutableMapping[tuple[str, ...], dict[str, Any]]
+    active_snapshots: MutableMapping[tuple[str, ...], str]
+
+    def replay(
+        self,
+        scope_key: tuple[str, ...],
+        key: str,
+        payload_digest: str,
+        *,
+        operation_type: str,
+    ) -> Any | None: ...
+
+    def record_operation(
+        self,
+        scope_key: tuple[str, ...],
+        key: str,
+        payload_digest: str,
+        result: Any,
+        *,
+        operation_ref: str,
+        operation_type: str,
+    ) -> Any: ...
+
+    def append_event(self, event: dict[str, Any]) -> None: ...
+
+    def list_bible_versions(
+        self, scope_key: tuple[str, ...]
+    ) -> list[dict[str, Any]]: ...
+
+    def list_character_versions(
+        self, scope_key: tuple[str, ...]
+    ) -> list[dict[str, Any]]: ...
+
+    def list_snapshots(
+        self, scope_key: tuple[str, ...]
+    ) -> list[dict[str, Any]]: ...
+
+    def list_outbox(
+        self, scope_key: tuple[str, ...] | None = None
+    ) -> list[dict[str, Any]]: ...
+
+    def lifecycle_has_series_dependency(
+        self, workspace_ref: str, series_ref: str
+    ) -> bool: ...
+
+    def diagnostic(self) -> dict[str, int]: ...
 
 
 class RejectingScopeAuthority:

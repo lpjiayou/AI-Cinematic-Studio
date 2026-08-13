@@ -14,6 +14,7 @@ from .contracts import (
     IdentityAuthorizationPort,
     M6Scope,
     M6ScopeAuthorityPort,
+    SeriesIntelligenceRepository,
 )
 from .errors import (
     ConfirmationRequiredError,
@@ -26,9 +27,6 @@ from .errors import (
     StaleSourceError,
     VersionConflictError,
 )
-from .in_memory import InMemorySeriesIntelligenceRepository
-
-
 SERIES_BIBLE_SCHEMA_VERSION = "v5.series-bible.v1"
 SERIES_BIBLE_VERSION_SCHEMA_VERSION = "v5.series-bible-version.v1"
 CHARACTER_CONTINUITY_SCHEMA_VERSION = "v5.character-continuity.v1"
@@ -46,6 +44,10 @@ def _text(value: Any, field: str, *, optional: bool = False) -> str | None:
     if value is None and optional:
         return None
     result = str(value or "").strip()
+    normalized = normalize(result)
+    if not isinstance(normalized, str):
+        raise SeriesIntelligenceError(f"{field} is invalid")
+    result = normalized
     if not result:
         if optional:
             return None
@@ -284,7 +286,7 @@ def _normalize_character_content(
 class SeriesIntelligenceService:
     def __init__(
         self,
-        repository: InMemorySeriesIntelligenceRepository,
+        repository: SeriesIntelligenceRepository,
         source_reader: ConfirmedM6SourceReader,
         scope_authority: M6ScopeAuthorityPort,
         approval_authority: ApprovalAuthorityPort,
@@ -365,16 +367,36 @@ class SeriesIntelligenceService:
     def _version_key(scope: M6Scope, root_ref: str, version_ref: str) -> tuple[str, ...]:
         return (*scope.key, root_ref, version_ref)
 
-    def _idempotent(self, scope: M6Scope, command: Mapping[str, Any], action: Callable[[], Any]) -> Any:
-        _operation_ref, key = _operation(command)
+    def _idempotent(
+        self,
+        scope: M6Scope,
+        command: Mapping[str, Any],
+        operation_type: str,
+        action: Callable[[], Any],
+    ) -> Any:
+        operation_ref, key = _operation(command)
         payload = _payload_digest(command)
-        replay = self.repository.replay(scope.key, key, payload)
+        replay = self.repository.replay(
+            scope.key, key, payload, operation_type=operation_type
+        )
         if replay is not None:
             return replay
-        return self.repository.record_operation(scope.key, key, payload, action())
+        return self.repository.record_operation(
+            scope.key,
+            key,
+            payload,
+            action(),
+            operation_ref=operation_ref,
+            operation_type=operation_type,
+        )
 
     def create_bible_version(self, scope: M6Scope, command: Mapping[str, Any]) -> dict[str, Any]:
-        return self._idempotent(scope, command, lambda: self._create_bible(scope, command))
+        return self._idempotent(
+            scope,
+            command,
+            "create-series-bible-version",
+            lambda: self._create_bible(scope, command),
+        )
 
     def _create_bible(self, scope, command):
         source = self.source_for(scope)
@@ -451,10 +473,20 @@ class SeriesIntelligenceService:
         return {"root": deepcopy(root), "version": deepcopy(version)}
 
     def submit_bible_candidate(self, scope: M6Scope, command: Mapping[str, Any]) -> dict[str, Any]:
-        return self._idempotent(scope, command, lambda: self._set_bible_status(scope, command, "CANDIDATE"))
+        return self._idempotent(
+            scope,
+            command,
+            "submit-series-bible-candidate",
+            lambda: self._set_bible_status(scope, command, "CANDIDATE"),
+        )
 
     def confirm_bible_version(self, scope: M6Scope, command: Mapping[str, Any]) -> dict[str, Any]:
-        return self._idempotent(scope, command, lambda: self._confirm_bible(scope, command))
+        return self._idempotent(
+            scope,
+            command,
+            "confirm-series-bible-version",
+            lambda: self._confirm_bible(scope, command),
+        )
 
     def _set_bible_status(self, scope, command, status):
         root = self._bible_root(scope, command)
@@ -512,7 +544,12 @@ class SeriesIntelligenceService:
         return root
 
     def create_character_version(self, scope: M6Scope, command: Mapping[str, Any]) -> dict[str, Any]:
-        return self._idempotent(scope, command, lambda: self._create_character(scope, command))
+        return self._idempotent(
+            scope,
+            command,
+            "create-character-continuity-version",
+            lambda: self._create_character(scope, command),
+        )
 
     def _create_character(self, scope: M6Scope, command: Mapping[str, Any]) -> dict[str, Any]:
         source = self.source_for(scope)
@@ -618,10 +655,20 @@ class SeriesIntelligenceService:
         return {"root": deepcopy(root_record), "version": deepcopy(version)}
 
     def submit_character_candidate(self, scope: M6Scope, command: Mapping[str, Any]) -> dict[str, Any]:
-        return self._idempotent(scope, command, lambda: self._set_character_status(scope, command, False))
+        return self._idempotent(
+            scope,
+            command,
+            "submit-character-continuity-candidate",
+            lambda: self._set_character_status(scope, command, False),
+        )
 
     def confirm_character_version(self, scope: M6Scope, command: Mapping[str, Any]) -> dict[str, Any]:
-        return self._idempotent(scope, command, lambda: self._set_character_status(scope, command, True))
+        return self._idempotent(
+            scope,
+            command,
+            "confirm-character-continuity-version",
+            lambda: self._set_character_status(scope, command, True),
+        )
 
     def _set_character_status(self, scope, command, confirm):
         root = self.repository.characters.get(scope.key)
@@ -658,7 +705,12 @@ class SeriesIntelligenceService:
         return {"root": deepcopy(root), "version": deepcopy(version)}
 
     def activate_baseline(self, scope: M6Scope, command: Mapping[str, Any]) -> dict[str, Any]:
-        return self._idempotent(scope, command, lambda: self._activate(scope, command))
+        return self._idempotent(
+            scope,
+            command,
+            "activate-m6-baseline",
+            lambda: self._activate(scope, command),
+        )
 
     def _activate(self, scope, command):
         source = self.source_for(scope)
@@ -747,6 +799,14 @@ class SeriesIntelligenceService:
         return deepcopy(snapshot)
 
     def _event(self, scope, command, event_type, aggregate_ref, payload):
+        correlation_id = _ref(
+            command.get("correlationId") or command.get("operationRef"),
+            "correlationId",
+        )
+        causation_value = command.get("causationId")
+        causation_id = (
+            _ref(causation_value, "causationId") if causation_value is not None else None
+        )
         self.repository.append_event({
             "schemaVersion": M6_EVENT_SCHEMA_VERSION,
             "eventId": self._ref_factory("m6-event"),
@@ -760,8 +820,8 @@ class SeriesIntelligenceService:
             "projectRef": scope.project_ref,
             "seriesRef": scope.series_ref,
             "operationRef": _ref(command.get("operationRef"), "operationRef"),
-            "correlationId": command.get("correlationId") or command.get("operationRef"),
-            "causationId": command.get("causationId"),
+            "correlationId": correlation_id,
+            "causationId": causation_id,
             "occurredAt": self._clock(),
             "payload": normalize(payload),
         })
@@ -789,25 +849,17 @@ class SeriesIntelligenceService:
             "scope": scope.mapping(),
             "seriesBible": deepcopy(bible),
             "seriesBibleVersions": sorted(
-                [
-                    deepcopy(item)
-                    for key, item in self.repository.bible_versions.items()
-                    if key[:5] == scope.key
-                ],
+                self.repository.list_bible_versions(scope.key),
                 key=lambda item: item["versionNumber"],
             ),
             "characterContinuity": deepcopy(character),
             "characterContinuityVersions": sorted(
-                [
-                    deepcopy(item)
-                    for key, item in self.repository.character_versions.items()
-                    if key[:5] == scope.key
-                ],
+                self.repository.list_character_versions(scope.key),
                 key=lambda item: item["versionNumber"],
             ),
             "activeBaseline": active,
             "baselineHistory": sorted(
-                [deepcopy(item) for key, item in self.repository.snapshots.items() if key[:5] == scope.key],
+                self.repository.list_snapshots(scope.key),
                 key=lambda item: item["activationRevision"],
             ),
             "sourceCompatibility": compatibility,

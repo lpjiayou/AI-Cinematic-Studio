@@ -18,6 +18,8 @@ class LifecycleIntegrityCoordinator:
         script_depends_on_episode: Callable[[str, str, str], bool],
         script_depends_on_series: Callable[[str, str], bool],
         dependency_error: Callable[[str], BaseException],
+        series_plan_depends_on_series: Callable[[str, str], bool] | None = None,
+        series_intelligence_depends_on_series: Callable[[str, str], bool] | None = None,
     ) -> None:
         self._state = state
         self._episode_exists = episode_exists
@@ -25,6 +27,12 @@ class LifecycleIntegrityCoordinator:
         self._project_depends_on_series = project_depends_on_series
         self._script_depends_on_episode = script_depends_on_episode
         self._script_depends_on_series = script_depends_on_series
+        self._series_plan_depends_on_series = series_plan_depends_on_series or (
+            lambda _workspace, _series: False
+        )
+        self._series_intelligence_depends_on_series = (
+            series_intelligence_depends_on_series or (lambda _workspace, _series: False)
+        )
         self._dependency_error = dependency_error
 
     def _mutate(
@@ -75,6 +83,10 @@ class LifecycleIntegrityCoordinator:
                 raise self._dependency_error("dependent_project_exists")
             if self._script_depends_on_series(workspace_ref, series_ref):
                 raise self._dependency_error("dependent_script_exists")
+            if self._series_plan_depends_on_series(workspace_ref, series_ref):
+                raise self._dependency_error("dependent_series_plan_exists")
+            if self._series_intelligence_depends_on_series(workspace_ref, series_ref):
+                raise self._dependency_error("dependent_m6_series_intelligence_exists")
             return mutation()
 
         return self._mutate(workspace_ref, LifecycleOperation.DELETE_SERIES, checked)
