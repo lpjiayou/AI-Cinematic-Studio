@@ -4,7 +4,7 @@
 
 | Field | Value |
 | --- | --- |
-| Status | `ACCEPTED AS ARCHITECTURE DECISION / B1 CANDIDATE REVISION REQUIRED / B1-R1 BOUNDED CORRECTION AUTHORIZED / G1 UNAUTHORIZED` |
+| Status | `ACCEPTED AS ARCHITECTURE DECISION / B1 CANDIDATE REVISION REQUIRED / B1-R1 GOVERNANCE REMOTE-VERIFIED AT 716b4d298173f8123cafd93114dfc67339943ff3 / TECHNICAL CORRECTION CANDIDATE / G1 UNAUTHORIZED` |
 | Created | `2026-08-13` |
 | Author | `Codex architecture proposal under Project Lead G3/P3-G0 authority` |
 | Approval owners | `Project Lead / Architecture Owner — ACCEPTED; M2/M4/M5/M6 Domain Owners — APPROVED FOR B1; other applicable Domain Owners — PENDING FOR FUTURE WORK` |
@@ -48,7 +48,9 @@ REQUIRED / NOT OWNER ACCEPTED`. The Project Lead, Architecture Owner, Repository
 Governance Owner and affected M2/M5 Domain Owners authorize only the bounded B1-R1
 correction recorded in the B1 authorization amendment. This correction preserves this
 ADR's ownership and data-contract decision; it changes neither the architecture nor
-G1 authority.
+G1 authority. Its governance checkpoint is remote-verified at
+`716b4d298173f8123cafd93114dfc67339943ff3`; the bounded correction passes SQLite
+`30/30`, original B1 `174/174`, full Core `449/449` and non-test Python AST `63/63`.
 
 ## Decision — accepted target architecture
 
@@ -305,3 +307,4 @@ V4/V3, Provider, GPU, Worker, ComfyUI, M6-P4+ or Production Ready status.
 | `2026-08-13` | Accepted as architecture decision; implementation remains unimplemented and unauthorized | `Project Lead / Architecture Owner — M6-P3-G0 Owner Acceptance` |
 | `2026-08-13` | Bounded EpisodePlanItemBinding prerequisite implementation authorized; governance checkpoint remote-verified at `ae82ea27b39c44a8b77941f2b43abf7544492765`; G1 remains unauthorized | `Project Lead / Architecture Owner / Repository Governance Owner / M2-M4-M5-M6 Domain Owners` |
 | `2026-08-13` | B1 candidate `8449b521c96bb8340806ecda8649698f4771914a` marked Revision Required for SQLite cross-Series false dependency; bounded B1-R1 correction authorized; G1 remains unauthorized | `Project Lead / Architecture Owner / Repository Governance Owner / M2-M5 Domain Owners` |
+| `2026-08-13` | B1-R1 governance checkpoint remote-verified at `716b4d298173f8123cafd93114dfc67339943ff3`; exact one-production/one-test correction gates pass; technical remote verification and Owner Review remain | `Project Lead / Architecture Owner / Repository Governance Owner / M2-M5 Domain Owners` |

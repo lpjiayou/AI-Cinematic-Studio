@@ -10,7 +10,7 @@
 >
 > Current Task: `ACS-M6-P3-B1-R1-SQLITE-SERIES-ISOLATION`
 >
-> Current Work Package: `EIGHT GOVERNANCE PATHS → REMOTE VERIFY → ONE PRODUCTION + ONE TEST PATH → REMOTE VERIFY → OWNER REVIEW`
+> Current Work Package: `TECHNICAL CORRECTION CANDIDATE → REMOTE VERIFY → OWNER REVIEW`
 >
 > M6 Authorization: `P0-P2 OWNER ACCEPTED / P3-G0 OWNER ACCEPTED AS ARCHITECTURE / P3-B1 CANDIDATE REVISION REQUIRED / P3-B1-R1 BOUNDED CORRECTION AUTHORIZED / P3-G1 NOT AUTHORIZED`
 >
@@ -74,7 +74,7 @@ ACS-M6-P3-B1-R1 SQLite Series Isolation Correction
 
 Status:
 
-`B1 CANDIDATE 8449b521c96bb8340806ecda8649698f4771914a REVISION REQUIRED / B1-R1 AUTHORIZED / GOVERNANCE CHECKPOINT CANDIDATE / TECHNICAL FIX NOT STARTED / G1 NOT AUTHORIZED`
+`B1 CANDIDATE 8449b521c96bb8340806ecda8649698f4771914a REVISION REQUIRED / B1-R1 GOVERNANCE REMOTE-VERIFIED AT 716b4d298173f8123cafd93114dfc67339943ff3 / TECHNICAL CORRECTION CANDIDATE / GATES PASS / G1 NOT AUTHORIZED`
 
 Purpose:
 
@@ -474,9 +474,10 @@ capability.
 - M6-P3-B1 MANUAL V2 RULE: `create_manual_version REJECTS CURRENT V2 WITHOUT WRITE / DEDICATED METHOD ALONE CREATES V2→V2`
 - M6-P3-B1 OWNER HTTP CLARIFICATION: `EXISTING CANONICAL V2 PROJECTION IN WORKSPACE VERSIONS PASSES THROUGH episodePlanItemBindings / MANUAL + BOOTSTRAP V1 BEHAVIOR UNCHANGED / NO OTHER HTTP CONTRACT EXPANSION`
 - M6-P3-B1-F001: `CONFIRMED / BLOCKING / SQLITE SAME-PROJECT CROSS-SERIES FALSE DEPENDENCY`
-- M6-P3-B1-R1 STATUS: `AUTHORIZED / GOVERNANCE CHECKPOINT CANDIDATE / TECHNICAL FIX NOT STARTED`
+- M6-P3-B1-R1 STATUS: `GOVERNANCE REMOTE-VERIFIED AT 716b4d298173f8123cafd93114dfc67339943ff3 / TECHNICAL CORRECTION CANDIDATE / GATES PASS`
 - M6-P3-B1-R1 AUTHORIZED BASE: `8449b521c96bb8340806ecda8649698f4771914a`
 - M6-P3-B1-R1 SCOPE: `8 GOVERNANCE → 1 PRODUCTION + 1 TEST → REMOTE VERIFY → STOP FOR OWNER REVIEW`
+- M6-P3-B1-R1 EVIDENCE: `PRE-FIX SQLITE 409 REPRODUCED / POST-FIX SQLITE MODULE 30/30 / ORIGINAL B1 174/174 / FULL CORE 449/449 / NON-TEST PYTHON AST 63/63`
 - M6-P3-G1 STATUS: `SEQUENCE DEFINED / BLOCKED UNTIL B1 OWNER ACCEPTED / NOT AUTHORIZED / NOT STARTED`
 - M6-P3 AFTER G1 / M6-P4+ STATUS: `NOT AUTHORIZED / NOT STARTED`
 - M7-M19: `NOT STARTED / NOT AUTHORIZED`
@@ -505,15 +506,16 @@ record and takes effect for technical edits only after governance remote verific
 # 9. Stop Rule
 
 B1 is remote-verified at `8449b521c96bb8340806ecda8649698f4771914a` but is
-`REVISION REQUIRED / NOT OWNER ACCEPTED`. Before B1-R1 technical edits, its same exact
-eight-path governance checkpoint must be committed, non-force pushed and
-remote-verified with production and test diff zero.
+`REVISION REQUIRED / NOT OWNER ACCEPTED`. The B1-R1 exact eight-path governance
+checkpoint was committed and remote-verified at
+`716b4d298173f8123cafd93114dfc67339943ff3` with production and test diff zero.
 
-The B1-R1 correction must then pass its frozen one production, one test and eight
-governance path scope, updated SQLite lifecycle tests, all original B1 tests, complete
-Core regression, Markdown structure, local links, secret scan, `git diff --check`, one
-technical commit, non-force push, Local SHA equals Remote SHA, ahead/behind `0/0` and
-clean worktree.
+The B1-R1 correction now passes its frozen one production, one test and eight governance
+path scope, the updated SQLite lifecycle module `30/30`, all original B1 tests
+`174/174`, complete Core regression `449/449` and non-test Python AST `63/63`. It must
+still pass the final Markdown/local-link, secret and `git diff --check` gates, one
+technical commit, non-force remote publication, Local SHA equals Remote SHA,
+ahead/behind `0/0` and clean worktree.
 
 After the correction candidate is remote-verified:
 
@@ -537,7 +539,7 @@ formal database deployment, Auth/RBAC expansion or Frontend work.
 
 Status:
 
-`B1 CANDIDATE REVISION REQUIRED / B1-R1 AUTHORIZED / GOVERNANCE CHECKPOINT CANDIDATE / TECHNICAL FIX NOT STARTED`
+`B1 CANDIDATE REVISION REQUIRED / B1-R1 GOVERNANCE REMOTE-VERIFIED AT 716b4d298173f8123cafd93114dfc67339943ff3 / TECHNICAL CORRECTION CANDIDATE / GATES PASS`
 
 M6-P0/P1 and bounded M6-P2-G1 remain Owner Accepted at their remote-verified technical
 baselines. G1-R1 is Owner Accepted and complete at
@@ -554,11 +556,12 @@ Creator Application
 ```
 
 The Project Lead, Architecture Owner, Repository Governance Owner and affected M2/M5
-Domain Owners authorize the exact B1-R1 auto-sequential correction recorded in
+Domain Owners authorized the exact B1-R1 auto-sequential correction recorded in
 [`ACS-M6-P3-B1-EPISODE-PLAN-ITEM-BINDING.md`](governance/ACS-M6-P3-B1-EPISODE-PLAN-ITEM-BINDING.md):
-eight governance paths first; after remote verification, one production plus one test
-path; then test, commit, non-force push, remote verification and STOP for B1-R1 Owner
-Review.
+the eight-path governance checkpoint is remote-verified at
+`716b4d298173f8123cafd93114dfc67339943ff3`; the one-production/one-test correction
+passes its test gates. After technical commit and remote verification, STOP for B1-R1
+Owner Review.
 
 Formal port-8765 database access/deployment, HTTP route/handler/external DTO
 source-file changes, HTTP expansion beyond the Owner-approved existing workspace

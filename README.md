@@ -7,7 +7,7 @@ OS、V4 Platform、V3 Render Core、持久化与后端测试；客户 Commercial
 
 > 当前状态：M1–M5 已接受；M6-P0/P1 与 bounded M6-P2 已 Owner Accepted；
 > G1-R1 `d44f471…` 已 Owner Accepted 并关闭 Architecture Remediation R1；
-> M6-P3-G0 已 Owner Accepted；M6-P3-B1 候选 `8449b521…` 已远端验证但 Owner Review 为 `REVISION REQUIRED`；当前授权 B1-R1 最小 SQLite 跨 Series 隔离修订；
+> M6-P3-G0 已 Owner Accepted；M6-P3-B1 候选 `8449b521…` 已远端验证但 Owner Review 为 `REVISION REQUIRED`；B1-R1 治理检查点 `716b4d2…` 已远端验证，最小 SQLite 跨 Series 修订通过门禁并等待技术远端验证；
 > M6-P3-G1 继续未授权；
 > Production Ready = `NO`。
 
@@ -35,9 +35,10 @@ OS、V4 Platform、V3 Render Core、持久化与后端测试；客户 Commercial
 | B1 Core operation | `create_episode_plan_item_binding_version / NO ROUTE, HANDLER OR EXTERNAL DTO SOURCE CHANGE` |
 | B1 Owner HTTP clarification | `EXISTING WORKSPACE VERSIONS V2 RESPONSE PASSES THROUGH episodePlanItemBindings / NO OTHER HTTP EXPANSION` |
 | M6-P3-B1-F001 | `CONFIRMED / BLOCKING / SQLITE SAME-PROJECT CROSS-SERIES FALSE DEPENDENCY` |
-| M6-P3-B1-R1 | `AUTHORIZED / GOVERNANCE CHECKPOINT CANDIDATE / TECHNICAL FIX NOT STARTED` |
+| M6-P3-B1-R1 | `GOVERNANCE REMOTE-VERIFIED AT 716b4d298173f8123cafd93114dfc67339943ff3 / TECHNICAL CORRECTION CANDIDATE / GATES PASS` |
 | B1-R1 base | `8449b521c96bb8340806ecda8649698f4771914a` |
 | B1-R1 scope | `8 GOVERNANCE → 1 PRODUCTION + 1 TEST → REMOTE VERIFY → STOP FOR OWNER REVIEW` |
+| B1-R1 evidence | `PRE-FIX 409 REPRODUCED / SQLITE 30/30 / ORIGINAL B1 174/174 / FULL CORE 449/449 / AST 63/63` |
 | M6-P3-G1 | `SEQUENCE DEFINED / BLOCKED UNTIL B1 OWNER ACCEPTED / NOT AUTHORIZED / NOT STARTED` |
 | M6-P3 after G1 / M6-P4+ | `NOT AUTHORIZED / NOT STARTED` |
 | M7-M19 | `NOT STARTED / NOT AUTHORIZED` |
@@ -68,9 +69,11 @@ M2/M4/M5/M6 Domain Owners 已批准精确 B1；其实现候选已在
 `8449b521c96bb8340806ecda8649698f4771914a` 远端验证，但 Owner Review 复现 SQLite
 同一 Project 下跨 Series 的错误依赖并判定 `REVISION REQUIRED`。Project Lead、
 Architecture Owner、Repository Governance Owner 与 affected M2/M5 Domain Owners
-现仅授权 B1-R1：先同步 8 个治理路径，远端验证后只修改
+现仅授权 B1-R1；8 路径治理检查点已在
+`716b4d298173f8123cafd93114dfc67339943ff3` 远端验证，随后只修改了
 `services/v5_core_os/series_planning/foundation.py` 和
-`tests/integration/test_creator_lifecycle_sqlite_p2.py`，再次远端验证后停止等待
+`tests/integration/test_creator_lifecycle_sqlite_p2.py`。修订已通过 SQLite `30/30`、
+原 B1 `174/174`、完整 Core `449/449` 与 AST `63/63`；技术远端验证后停止等待
 B1-R1 Owner Review。
 M6-P3-G1 仍未授权、未开始。
 现有 HTTP workspace versions 的 v2 响应允许透传 `episodePlanItemBindings`，但不
