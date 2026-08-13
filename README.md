@@ -6,7 +6,8 @@ OS、V4 Platform、V3 Render Core、持久化与后端测试；客户 Commercial
 由独立 `AI-Cinematic-Studio-Frontend` 仓库承载。
 
 > 当前状态：M1–M5 已接受；M6-P0/P1 与 bounded M6-P2 已 Owner Accepted；
-> M6-P3-G0 consumer architecture 为治理候选；Production Ready = `NO`。
+> 当前执行 `ACS-ARCH-R1-V5-TEXT-GENERATION-G0 → G1`；M6-P3-G0 candidate
+> 保持 HOLD；Production Ready = `NO`。
 
 ## 当前活动工作包
 
@@ -16,22 +17,39 @@ OS、V4 Platform、V3 Render Core、持久化与后端测试；客户 Commercial
 | M6-P0/P1 | `OWNER ACCEPTED / COMPLETE / REMOTE-VERIFIED` |
 | ADR-0004 / M6-P2-G0 | `ACCEPTED / COMPLETE` |
 | M6-P2-G1 | `OWNER ACCEPTED / COMPLETE / REMOTE-VERIFIED AT 8227c6c616140824fd70de920dc6fcf459bb734d` |
-| M6-P3-G0 | `GOVERNANCE / ARCHITECTURE CHECKPOINT CANDIDATE / OWNER REVIEW PENDING` |
+| Architecture remediation wave | `ACS-ARCH-R1-V5-TEXT-GENERATION-G0 → G1 / AUTO-SEQUENTIAL BOUNDED` |
+| ADR-0006 / V5 Text Generation Contract | `ACCEPTED FOR BOUNDED G1` |
+| G0 | `GOVERNANCE / ARCHITECTURE SYNCHRONIZATION IN PROGRESS` |
+| G1 | `AUTHORIZED ONLY AFTER G0 REMOTE VERIFICATION / NOT STARTED` |
+| R-CORE-ARCH-001 | `CONFIRMED / HIGH / MITIGATING` |
+| R-CORE-GOV-002 | `OPEN / NON-BLOCKING` |
+| M6-P3-G0 | `REMOTE-VERIFIED CANDIDATE AT c524486c05c21b270a7dd75e89fae4312430736a / OWNER REVIEW PENDING / HOLD` |
 | ADR-0005 / M6 Consumer Contract | `PROPOSED / NO IMPLEMENTATION AUTHORITY` |
-| M6-P3-B1 EpisodePlanItemBinding | `PROPOSED / NOT AUTHORIZED / NOT STARTED / BLOCKS G1` |
+| M6-P3-B1 EpisodePlanItemBinding | `PROPOSED / NOT AUTHORIZED / NOT STARTED / BLOCKS M6-P3-G1` |
 | M6-P3-G1+ | `NOT AUTHORIZED / NOT STARTED` |
 | M7-M19 | `NOT STARTED / NOT AUTHORIZED` |
 | Formal port-8765 database | `UNTOUCHED / NOT DEPLOYED` |
 | Frontend | `FROZEN / UNTOUCHED` |
 | Production Ready | `NO` |
 
-当前执行范围只允许记录 M6-P2 Owner Acceptance，并提出 M6 到 M3 Script Studio
-的内部只读 Episode baseline consumer/reconciliation contract。提案明确 M4 拥有
-Project→Series context、M2 拥有 Series/Episode identity 与 membership。当前两侧
-没有共享 stable Ref，因此提案先在新 M5 SeriesPlanVersion 内建立 immutable
-EpisodePlanItemBinding；P3-B1 必须独立授权并接受后，才能另行授权 P3-G1。
-生产/测试代码、Schema/Migration、正式数据库、Public HTTP/API、Auth/RBAC、
-Frontend、M6-P3-B1、M6-P3-G1+ 和 M7+ 不在授权范围内。
+当前修复恢复既有 V2.3 相邻层方向：
+
+```text
+Creator Application
+→ V5 Text Generation Capability
+→ V4 TextGenerationPort
+→ Provider Adapter
+```
+
+G0 只同步 ADR-0006、规范合同、风险及 Source-of-Truth；G0 commit、push 和 remote
+verification 全部通过后，才自动进入 G1。G1 迁移 AI Director、Script Studio、
+Series Director 与 Creator Server composition 的四个直接 V4 接触面，并增加禁止
+`apps → V4` 的自动化守卫。G1 完成远端验证后必须 STOP 等待 Project Lead review。
+
+G3/P3-G0 在 `c524486c05c21b270a7dd75e89fae4312430736a` 的内容保持
+remote-verified candidate / HOLD；ADR-0005 仍为 Proposed，M6-P3-B1/G1 均不授权。
+Schema/Migration、正式数据库、Public HTTP/API 扩张、Auth/RBAC、Frontend、M6-P3、
+M7+、V3、GPU、Worker 和 ComfyUI 不在当前授权范围内。
 
 权威执行状态见 [CURRENT_MILESTONE.md](CURRENT_MILESTONE.md)。
 
@@ -75,7 +93,8 @@ Commercial Frontend
 ```
 
 - V5 拥有 Project、Series、Episode、Bible、Character、Script、Asset、版本和
-  生产事实。
+  生产事实，以及 Creator Application 消费的 public Text Generation Capability
+  boundary。
 - V4 执行 Provider、Job、Queue、Worker 和 Compute 调度，不拥有 V5 业务事实。
 - V3 负责确定性时间线、合成和渲染。
 - Frontend 只能通过公开 HTTP/API 使用 Core，不导入 Core 源码或访问 SQL。
@@ -117,8 +136,8 @@ businessDomain + tenantId + workspaceRef + projectRef + seriesRef
 
 | 路径 | 责任 |
 | --- | --- |
-| `apps/creator_workspace_mvp/` | Creator Server、Public HTTP/API 与 Application runtime |
-| `services/v5_core_os/` | V5 Domain、Application boundary 与 persistence adapters |
+| `apps/creator_workspace_mvp/` | Creator Server、Public HTTP/API 与 Application runtime；只消费 V5 公开边界 |
+| `services/v5_core_os/` | V5 Domain、Application-facing capability boundary 与 persistence adapters |
 | `services/v4_platform/` | V4 execution/provider boundary |
 | `services/v3_render_core/` | V3 deterministic render boundary |
 | `architecture/` | 架构合同、层级边界与 M6 规范 |
@@ -153,6 +172,9 @@ PYTHONDONTWRITEBYTECODE=1 python -m unittest discover -s tests -p 'test_*.py' -q
 - [System Master Plan](AI_CINEMATIC_STUDIO_SYSTEM_MASTER_PLAN.md)
 - [UI Master Plan](AI_CINEMATIC_STUDIO_UI_MASTER_PLAN.md)
 - [Current Milestone](CURRENT_MILESTONE.md)
+- [V5 Text Generation Capability Contract](architecture/V5_TEXT_GENERATION_CAPABILITY_CONTRACT.md)
+- [ADR-0006 — V5 Text Generation Capability Boundary](governance/ADR-0006-v5-text-generation-capability-boundary.md)
+- [ACS-ARCH-R1 G0 Record](governance/ACS-ARCH-R1-V5-TEXT-GENERATION-G0.md)
 - [M6 Domain Contract](architecture/M6_SERIES_INTELLIGENCE_DOMAIN_CONTRACT.md)
 - [M6 Durable SQLite Contract](architecture/M6_SERIES_INTELLIGENCE_SQLITE_CONTRACT.md)
 - [M6 Consumer Contract — Proposed](architecture/M6_SERIES_INTELLIGENCE_CONSUMER_CONTRACT.md)

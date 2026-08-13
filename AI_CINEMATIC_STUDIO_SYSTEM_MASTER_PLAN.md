@@ -2,15 +2,15 @@
 
 > Document: `AI_CINEMATIC_STUDIO_SYSTEM_MASTER_PLAN.md`
 >
-> Status: `SYSTEM MASTER GOVERNANCE BASELINE / M6-P0-P2 OWNER ACCEPTED / M6-P3-G0 GOVERNANCE CANDIDATE`
+> Status: `SYSTEM MASTER GOVERNANCE BASELINE / ARCH-R1 V5 TEXT GENERATION G0 → G1 ACTIVE`
 >
 > Version: `v1.2`
 >
 > Date: `2026-08-13`
 >
-> Revision: `ACS-M6-P2-G1-CLOSEOUT-G3 / M6-P3-G0`
+> Revision: `ACS-ARCH-R1-V5-TEXT-GENERATION-G0`
 >
-> Architecture Decision: `ADR-0001 — Separate Commercial Experience Layer from Core Creator Runtime / Accepted`
+> Architecture Decisions: `ADR-0001 / Accepted`; `ADR-0006 — V5 Text Generation Capability Boundary / Accepted for bounded G1`
 >
 > Scope: AI Cinematic Studio 全系统产品、Domain、生产链、技术分层、研发顺序与验收基线
 >
@@ -1805,6 +1805,7 @@ Domain、SQL、Persistence、Provider、private V5、GPU、Worker 或 ComfyUI；
 - public DTO / error contract；
 - application orchestration；
 - authorization、tenant/workspace 与 idempotency enforcement（按能力适用）。
+- 只通过 V5 公开 capability boundary 消费下层能力。
 
 客户 UI、浏览器交互、响应式、可访问性与视觉呈现属于独立 Frontend
 Experience Layer。Core 中只允许 Creator Server Runtime、API/Application
@@ -1817,6 +1818,9 @@ Experience Layer。Core 中只允许 Creator Server Runtime、API/Application
 不直接调用 private persistence adapter。
 
 不持有 Provider Secret。
+
+不得直接导入、配置或调用 V4 `TextGenerationPort`、Provider Factory 或 Provider
+错误类型。文本生成必须经 V5 Text Generation Capability 进入 V4。
 
 ---
 
@@ -1841,17 +1845,28 @@ Experience Layer。Core 中只允许 Creator Server Runtime、API/Application
 - Master metadata；
 - Audit / Outbox；
 - Durable Operation semantics。
+- Creator Application 消费的 public Text Generation Capability boundary，包括
+  provider-neutral Application-facing request、response、error 和封闭的
+  purpose-to-execution-policy 映射。
+
+V5 Text Generation Capability 不拥有 Provider 执行或 Provider Adapter；它只通过
+相邻层公开契约调用 V4 `TextGenerationPort`。Prompt、candidate schema parsing、
+本地语义校验和既有最多一次 repair 编排继续由 Creator Application 负责。
 
 ---
 
 # 36. V4 Platform
 
-早期已经负责：
+负责 Provider execution：
 
 ```text
-TextGenerationPort
+V5 Text Generation Capability
+→ TextGenerationPort
 → DeepSeek
 ```
+
+Creator Application 不得成为 V4 `TextGenerationPort` 的直接消费者。V4 继续拥有
+provider-neutral execution port、Provider Factory 和 Provider Adapter。
 
 未来逐步扩展：
 
@@ -1936,6 +1951,16 @@ Domain Contract 不随 Provider 改变。
 ---
 
 # 41. DeepSeek 当前角色
+
+唯一接受的调用路径是：
+
+```text
+Creator Application
+→ V5 Text Generation Capability
+→ V4 TextGenerationPort
+→ DeepSeek Adapter
+→ DeepSeek API
+```
 
 当前 DeepSeek 用于：
 
@@ -2290,7 +2315,7 @@ Status:
 
 Status:
 
-`P0-P1 OWNER ACCEPTED / COMPLETE / REMOTE-VERIFIED AT e38c75aa4ff26bdea80c82d8a24096f799dad860 / P2-G0 CONTRACT ACCEPTED / P2-G1 OWNER ACCEPTED / COMPLETE / REMOTE-VERIFIED AT 8227c6c616140824fd70de920dc6fcf459bb734d / P3-G0 GOVERNANCE-ONLY CHECKPOINT CANDIDATE / ADR-0005 PROPOSED / P3-B1 AND P3-G1+ NOT AUTHORIZED`
+`P0-P1 OWNER ACCEPTED / COMPLETE / REMOTE-VERIFIED AT e38c75aa4ff26bdea80c82d8a24096f799dad860 / P2-G0 CONTRACT ACCEPTED / P2-G1 OWNER ACCEPTED / COMPLETE / REMOTE-VERIFIED AT 8227c6c616140824fd70de920dc6fcf459bb734d / P3-G0 REMOTE-VERIFIED GOVERNANCE CHECKPOINT CANDIDATE AT c524486c05c21b270a7dd75e89fae4312430736a / OWNER REVIEW PENDING / HOLD / ADR-0005 PROPOSED / P3-B1 AND P3-G1+ NOT AUTHORIZED`
 
 目标范围：
 
@@ -2316,7 +2341,8 @@ Status:
 - M6 不实现跨仓 UI；
 - M6-P2 只实现本地开发 SQLite 持久化、Migration、复合完整性、持久化幂等与
   Outbox；正式 8765 数据库保持禁止访问；
-- M6-P3-G0 只定义 Proposed consumer/reconciliation architecture，不实施代码；
+- M6-P3-G0 只定义 Proposed consumer/reconciliation architecture，当前为
+  remote-verified candidate / HOLD，不实施代码；
 - M6-P3-B1 EpisodePlanItemBinding 仍为 Proposed prerequisite，未授权实施；
 - M6-P3-G1+ 保持 `NOT AUTHORIZED / NOT STARTED`。
 
@@ -3055,7 +3081,20 @@ local-development durable SQLite boundary.
 
 ```text
 Current Work Package
-ACS-M6-P2-G1-CLOSEOUT-G3 / M6-P3-G0 — GOVERNANCE AND CONSUMER CONTRACT
+ACS-ARCH-R1-V5-TEXT-GENERATION-G0 → G1
+
+Execution Mode
+AUTO-SEQUENTIAL / BOUNDED TO G0 → G1 ONLY
+
+Architecture Decision
+ADR-0006 V5 TEXT GENERATION CAPABILITY BOUNDARY
+ACCEPTED FOR BOUNDED G1
+
+Current Checkpoint
+G0 GOVERNANCE / ARCHITECTURE SYNCHRONIZATION IN PROGRESS
+
+Next Conditional Checkpoint
+G1 AUTHORIZED ONLY AFTER G0 COMMIT / PUSH / REMOTE VERIFICATION
 
 Accepted Governance / Architecture Checkpoint
 ACS-M6-P0-P1-R2-CLOSEOUT-G2 / M6-P2-G0
@@ -3067,10 +3106,14 @@ M6 Series IP Bible + Character Intelligence
 P0-P1 OWNER ACCEPTED / COMPLETE / REMOTE-VERIFIED AT e38c75aa4ff26bdea80c82d8a24096f799dad860
 P2-G0 ADR-0004 + SQLITE CONTRACT ACCEPTED / COMPLETE
 P2-G1 OWNER ACCEPTED / COMPLETE / REMOTE-VERIFIED AT 8227c6c616140824fd70de920dc6fcf459bb734d
-P3-G0 ARCHITECTURE PROPOSAL DEFINED / BINDING PREREQUISITE OPEN / GOVERNANCE-ONLY CHECKPOINT CANDIDATE / OWNER REVIEW PENDING
+G3 / P3-G0 REMOTE-VERIFIED CHECKPOINT CANDIDATE AT c524486c05c21b270a7dd75e89fae4312430736a / OWNER REVIEW PENDING / HOLD
 ADR-0005 + M6 CONSUMER CONTRACT PROPOSED / NO IMPLEMENTATION AUTHORITY
 P3-B1 EPISODE-PLAN-ITEM BINDING PROPOSED / NOT AUTHORIZED / NOT STARTED / BLOCKS P3-G1
 P3-G1+ NOT AUTHORIZED / NOT STARTED
+
+Architecture Risks
+R-CORE-ARCH-001 CONFIRMED / HIGH / MITIGATING / G1 REMEDIATION AUTHORIZED
+R-CORE-GOV-002 OPEN / NON-BLOCKING / AUDIT REPORT PROVENANCE
 
 M7-M19
 NOT STARTED / NOT AUTHORIZED
@@ -3109,20 +3152,48 @@ Project Lead 进一步接受 ADR-0004 与 M6 SQLite Contract，并于 `2026-08-1
 `8227c6c616140824fd70de920dc6fcf459bb734d` 为 `OWNER ACCEPTED / COMPLETE /
 REMOTE-VERIFIED`。
 
-当前 G3/P3-G0 仅记录该接受事实并提出 M6 到 M3 Script Studio 的内部只读
-Episode baseline consumer boundary。M4 只拥有可信 Project→Series context，M2
-拥有 Series/Episode identity 与 membership。当前两侧没有共享 stable Ref，且
-禁止以集号、标题或位置推断；提案因此在新的精确 SeriesPlanVersion 内增加由 M5
-拥有的 immutable EpisodePlanItemBinding。M7 仍拥有未来
-ConsistencyValidation 与 PASS/WARN/BLOCK，M9 仍拥有未来 AssetRequirement 与
-asset-resolution readiness。ADR-0005 与 M6 Consumer Contract 均为 `PROPOSED / NO
-IMPLEMENTATION AUTHORITY`。绑定实现 P3-B1 与 consumer 实现 P3-G1 均未授权；
-必须先独立授权、实施、远端验证并接受 P3-B1，才可另行授权 P3-G1。若 B1 需要
-SQLite DDL/Migration 或扩大所有权，必须 STOP 并建立独立 ADR。
+`ACS-M6-P2-G1-CLOSEOUT-G3 / M6-P3-G0` 已在
+`c524486c05c21b270a7dd75e89fae4312430736a` 完成远端验证，但仍只是
+`OWNER REVIEW PENDING` 的 checkpoint candidate，当前明确置于 HOLD。它不接受
+ADR-0005，也不授权 M6-P3-B1 或 M6-P3-G1；其历史内容不得因本次修复被改写。
 
-本治理候选不代表全系统 Architecture Review、Production Ready 或正式 8765
-数据库部署，也不授权 M6-P3-B1、M6-P3-G1+、M7-M19、HTTP/API、Frontend、V4/V3、
-Provider、GPU、Worker 或 ComfyUI。Frontend 保持冻结。
+代码审查确认 M1 AI Director、M3 Script Studio、M5 Series Director 与 Creator
+Server composition 存在 Application 直接依赖 V4 的重复模式，违反固定的
+`Application → V5 → V4` 相邻层链。该事实登记为 `R-CORE-ARCH-001 / CONFIRMED /
+HIGH / MITIGATING`。Project Lead 已明确选择 V5-owned Text Generation Capability，
+同时以 Project Lead、Architecture Owner 和 Repository Governance Owner 身份接受
+ADR-0006，并授权以下 bounded wave：
+
+```text
+ACS-ARCH-R1-V5-TEXT-GENERATION-G0
+→ ACS-ARCH-R1-V5-TEXT-GENERATION-G1
+→ STOP FOR OWNER REVIEW
+```
+
+规范合同为
+[`V5_TEXT_GENERATION_CAPABILITY_CONTRACT.md`](architecture/V5_TEXT_GENERATION_CAPABILITY_CONTRACT.md)。
+唯一接受的生产调用链是：
+
+```text
+Creator Application
+→ V5 Text Generation Capability
+→ V4 TextGenerationPort
+→ Provider Adapter
+```
+
+G0 只允许 ADR、规范合同、风险、治理和 Source-of-Truth 同步；其 production/test
+diff 必须为零。G0 commit、push、remote SHA equality 和 clean status 全部通过后，
+才允许自动进入 G1。G1 只迁移已识别的四个 Application/V4 接触面，保持既有
+HTTP/API、Domain ownership、candidate validation、Prompt/Provider behavior 和稳定
+产品错误语义，增加可执行的禁止 `apps → V4` 架构守卫并完成全量回归。
+
+G1 不授权 Schema/Migration、正式 8765、HTTP/Auth/RBAC 扩张、Frontend、M6-P3、
+M7+、V3、GPU、Worker 或 ComfyUI。G1 完成 commit、push 和 remote verification 后
+必须 STOP，等待 Project Lead Owner Review。
+
+Full Core Audit Report v1.2 的历史接受标签不在本次修复中重写；仓库内缺少可复核
+报告实体/摘要引用的问题登记为 `R-CORE-GOV-002 / OPEN / NON-BLOCKING`，且该标签
+不得作为 G1 实施授权依据。
 
 ---
 
