@@ -1,3 +1,5 @@
+import ast
+from importlib.util import resolve_name
 import inspect
 from pathlib import Path
 import unittest
@@ -10,6 +12,45 @@ from tests.unit.test_series_planning_m5 import WORKSPACE, confirm, create_contex
 ROOT = Path(__file__).resolve().parents[2]
 SERVER = ROOT / "apps" / "creator_workspace_mvp" / "server.py"
 APPLICATION = ROOT / "apps" / "creator_workspace_mvp" / "series_director.py"
+APPS_ROOT = ROOT / "apps"
+TEXT_GENERATION_ROOT = ROOT / "services" / "v5_core_os" / "text_generation"
+
+
+def _imports_module(
+    tree: ast.AST,
+    target: str,
+    *,
+    current_package: str | None = None,
+) -> bool:
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Import):
+            candidates = (alias.name for alias in node.names)
+        elif isinstance(node, ast.ImportFrom):
+            module = node.module or ""
+            if node.level:
+                if current_package is None:
+                    continue
+                try:
+                    module = resolve_name(f"{'.' * node.level}{module}", current_package)
+                except (ImportError, ValueError):
+                    continue
+            candidates = (module, *(f"{module}.{alias.name}".lstrip(".") for alias in node.names))
+        else:
+            continue
+        if any(name == target or name.startswith(f"{target}.") for name in candidates):
+            return True
+    return False
+
+
+def _uses_dynamic_import(tree: ast.AST) -> bool:
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Call):
+            continue
+        if isinstance(node.func, ast.Name) and node.func.id in {"__import__", "import_module"}:
+            return True
+        if isinstance(node.func, ast.Attribute) and node.func.attr == "import_module":
+            return True
+    return False
 
 
 class CreatorSeriesPlanningContractTests(unittest.TestCase):
@@ -52,19 +93,81 @@ class CreatorSeriesPlanningContractTests(unittest.TestCase):
         self.assertNotIn("projectTitle", bridge)
         self.assertNotIn("seriesTitle", bridge)
 
-    def test_application_uses_public_v5_boundary_and_v4_provider_port_only(self):
+    def test_application_uses_public_v5_boundaries_without_direct_v4_dependency(self):
         server = SERVER.read_text(encoding="utf-8")
         application = APPLICATION.read_text(encoding="utf-8")
         self.assertIn("from services.v5_core_os.series_planning import", server)
         self.assertNotIn("series_planning.foundation", server)
         self.assertNotIn("SqliteSeriesPlanningAdapter", server)
-        self.assertIn("from services.v4_platform import", application)
-        v5_sources = "".join(
-            path.read_text(encoding="utf-8")
-            for path in (ROOT / "services" / "v5_core_os" / "series_planning").glob("*.py")
+        self.assertIn("from services.v5_core_os.text_generation import", application)
+
+    def test_all_application_sources_have_zero_static_or_textual_v4_imports(self):
+        for path in APPS_ROOT.rglob("*.py"):
+            source = path.read_text(encoding="utf-8")
+            tree = ast.parse(source, filename=str(path))
+            current_package = ".".join(path.relative_to(ROOT).with_suffix("").parts[:-1])
+            with self.subTest(path=path.relative_to(ROOT)):
+                self.assertFalse(
+                    _imports_module(
+                        tree,
+                        "services.v4_platform",
+                        current_package=current_package,
+                    )
+                )
+                self.assertFalse(_uses_dynamic_import(tree))
+                self.assertNotIn("services.v4_platform", source)
+
+    def test_only_v5_text_generation_public_implementation_may_import_v4(self):
+        importers = []
+        for path in TEXT_GENERATION_ROOT.rglob("*.py"):
+            source = path.read_text(encoding="utf-8")
+            tree = ast.parse(source, filename=str(path))
+            current_package = ".".join(path.relative_to(ROOT).with_suffix("").parts[:-1])
+            if (
+                _imports_module(
+                    tree,
+                    "services.v4_platform",
+                    current_package=current_package,
+                )
+                or "services.v4_platform" in source
+            ):
+                importers.append(path.relative_to(TEXT_GENERATION_ROOT).as_posix())
+            if path.name != "public.py":
+                self.assertFalse(_uses_dynamic_import(tree))
+        self.assertEqual(importers, ["public.py"])
+
+    def test_v4_import_guard_rejects_parent_from_alias_and_dynamic_forms(self):
+        static_forms = (
+            "import services.v4_platform",
+            "import services.v4_platform as platform",
+            "from services.v4_platform import TextProvider",
+            "from services import v4_platform",
+            "from services import v4_platform as platform",
         )
-        self.assertNotIn("services.v4_platform", v5_sources)
-        self.assertNotIn("DeepSeek", v5_sources)
+        for source in static_forms:
+            with self.subTest(source=source):
+                self.assertTrue(_imports_module(ast.parse(source), "services.v4_platform"))
+        relative_forms = (
+            "from ... import v4_platform",
+            "from ...v4_platform import TextProvider",
+        )
+        for source in relative_forms:
+            with self.subTest(source=source):
+                self.assertTrue(
+                    _imports_module(
+                        ast.parse(source),
+                        "services.v4_platform",
+                        current_package="services.v5_core_os.text_generation",
+                    )
+                )
+        dynamic_forms = (
+            '__import__("services" + ".v4_platform")',
+            'importlib.import_module("services" + ".v4_platform")',
+            'import_module("services.v4_platform")',
+        )
+        for source in dynamic_forms:
+            with self.subTest(source=source):
+                self.assertTrue(_uses_dynamic_import(ast.parse(source)))
 
     def test_provider_failure_contract_exposes_only_safe_schema_diagnostics(self):
         server = SERVER.read_text(encoding="utf-8")

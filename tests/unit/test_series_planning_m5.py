@@ -11,7 +11,12 @@ from apps.creator_workspace_mvp.series_director import (
     SeriesPlanCandidateError,
     validate_series_plan_candidate,
 )
-from services.v4_platform import FakeTextProvider
+from services.v5_core_os.text_generation import (
+    TextGenerationPurpose,
+    TextGenerationTimeoutError,
+    TextGenerationUnavailableError,
+)
+from services.v5_core_os.text_generation.testing import FakeTextGenerationCapability
 from services.v5_core_os.project_engine import (
     create_in_memory_boundary as create_project_boundary,
     create_local_development_boundary as create_local_project_boundary,
@@ -135,18 +140,19 @@ class SeriesDirectorTests(unittest.TestCase):
         with self.assertRaises(SeriesPlanCandidateError):
             validate_series_plan_candidate(invalid, context)
 
-    def test_series_director_uses_v4_port_and_repairs_at_most_once(self):
+    def test_series_director_uses_v5_capability_and_repairs_at_most_once(self):
         invalid = valid_candidate()
         invalid["episodePlanItems"] = invalid["episodePlanItems"][:-1]
-        provider = FakeTextProvider([json.dumps(invalid), json.dumps(valid_candidate())])
-        result = SeriesDirectorApplicationService(provider).generate({"plannedEpisodeCount": 4}, "建立百集陪伴主线")
+        capability = FakeTextGenerationCapability([json.dumps(invalid), json.dumps(valid_candidate())])
+        result = SeriesDirectorApplicationService(capability).generate({"plannedEpisodeCount": 4}, "建立百集陪伴主线")
         self.assertEqual(len(result["episodePlanItems"]), 4)
-        self.assertEqual(len(provider.requests), 2)
+        self.assertEqual(len(capability.commands), 2)
+        self.assertTrue(all(command.purpose is TextGenerationPurpose.SERIES_PLAN_CANDIDATE for command in capability.commands))
 
     def test_provider_contract_contains_complete_exact_count_json_shape(self):
-        provider = FakeTextProvider([json.dumps(valid_candidate(), ensure_ascii=False)])
-        SeriesDirectorApplicationService(provider).generate({"plannedEpisodeCount": 4}, "建立系列主线")
-        prompt = json.loads(provider.requests[0].messages[1].content)
+        capability = FakeTextGenerationCapability([json.dumps(valid_candidate(), ensure_ascii=False)])
+        SeriesDirectorApplicationService(capability).generate({"plannedEpisodeCount": 4}, "建立系列主线")
+        prompt = json.loads(capability.commands[0].messages[1].content)
         contract = prompt["requiredContract"]
         example = contract["completeJsonShapeExample"]
         self.assertEqual(example["schemaVersion"], SERIES_PLAN_CANDIDATE_SCHEMA_VERSION)
@@ -155,11 +161,29 @@ class SeriesDirectorTests(unittest.TestCase):
         self.assertIn("raw JSON object without Markdown code fences", " ".join(contract["rules"]))
 
     def test_invalid_repair_never_becomes_authoritative_candidate(self):
-        provider = FakeTextProvider(["not-json", "still-not-json"])
+        capability = FakeTextGenerationCapability(["not-json", "still-not-json"])
         with self.assertRaises(SeriesDirectorGenerationError) as context:
-            SeriesDirectorApplicationService(provider).generate({"plannedEpisodeCount": 4}, "系列方向")
+            SeriesDirectorApplicationService(capability).generate({"plannedEpisodeCount": 4}, "系列方向")
         self.assertEqual(context.exception.code, "invalid_provider_output")
-        self.assertEqual(len(provider.requests), 2)
+        self.assertEqual(len(capability.commands), 2)
+
+    def test_timeout_maps_to_stable_series_director_error(self):
+        capability = FakeTextGenerationCapability([TextGenerationTimeoutError(status=504)])
+        with self.assertRaises(SeriesDirectorGenerationError) as context:
+            SeriesDirectorApplicationService(capability).generate({"plannedEpisodeCount": 4}, "系列方向")
+        self.assertEqual(context.exception.code, "provider_timeout")
+        self.assertEqual(context.exception.diagnostic_category, "provider_timeout")
+        self.assertEqual(context.exception.provider_status, 504)
+
+    def test_unavailable_maps_to_stable_series_director_error(self):
+        capability = FakeTextGenerationCapability([
+            TextGenerationUnavailableError(category="network_error", status=503)
+        ])
+        with self.assertRaises(SeriesDirectorGenerationError) as context:
+            SeriesDirectorApplicationService(capability).generate({"plannedEpisodeCount": 4}, "系列方向")
+        self.assertEqual(context.exception.code, "provider_unavailable")
+        self.assertEqual(context.exception.diagnostic_category, "network_error")
+        self.assertEqual(context.exception.provider_status, 503)
 
 
 class SeriesPlanningDomainTests(unittest.TestCase):

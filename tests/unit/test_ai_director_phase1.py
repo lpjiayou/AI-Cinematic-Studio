@@ -20,12 +20,12 @@ from apps.creator_workspace_mvp.ai_director import (
 )
 from apps.creator_workspace_mvp.server import (
     AI_DIRECTOR_ENDPOINT,
+    capability_services_from_environment,
     create_server,
     service_from_environment,
 )
 from services.v4_platform import (
     DeepSeekTextProvider,
-    FakeTextProvider,
     ProviderConfigurationError,
     ProviderMalformedResponseError,
     ProviderTimeoutError,
@@ -34,6 +34,12 @@ from services.v4_platform import (
     TextMessage,
     create_text_provider_from_environment,
 )
+from services.v5_core_os.text_generation import (
+    TextGenerationPurpose,
+    TextGenerationTimeoutError,
+    TextGenerationUnavailableError,
+)
+from services.v5_core_os.text_generation.testing import FakeTextGenerationCapability
 
 
 def valid_brief():
@@ -109,42 +115,43 @@ class AiDirectorCapabilityTests(unittest.TestCase):
         self.assertEqual(brief.duration_seconds, 30)
 
     def test_request_contract_is_provider_neutral_and_includes_character_context(self):
-        provider = FakeTextProvider([json.dumps(valid_plan(), ensure_ascii=False)])
-        AiDirectorService(provider).generate(valid_brief())
-        generation_request = provider.requests[0]
-        self.assertEqual(generation_request.response_format, "json_object")
-        self.assertEqual([item.role for item in generation_request.messages], ["system", "user"])
-        self.assertIn("晚灯", generation_request.messages[1].content)
-        self.assertIn(AI_DIRECTOR_SCHEMA_VERSION, generation_request.messages[0].content)
-        self.assertNotIn("DeepSeek", generation_request.messages[0].content)
+        capability = FakeTextGenerationCapability([json.dumps(valid_plan(), ensure_ascii=False)])
+        AiDirectorService(capability).generate(valid_brief())
+        command = capability.commands[0]
+        self.assertEqual(command.purpose, TextGenerationPurpose.AI_DIRECTOR_CANDIDATE)
+        self.assertEqual([item.role for item in command.messages], ["system", "user"])
+        self.assertIn("晚灯", command.messages[1].content)
+        self.assertIn(AI_DIRECTOR_SCHEMA_VERSION, command.messages[0].content)
+        self.assertNotIn("DeepSeek", command.messages[0].content)
 
     def test_fake_provider_success_returns_detached_validated_plan(self):
         plan = valid_plan()
-        provider = FakeTextProvider([json.dumps(plan, ensure_ascii=False)])
-        result = AiDirectorService(provider).generate(valid_brief())
+        capability = FakeTextGenerationCapability([json.dumps(plan, ensure_ascii=False)])
+        result = AiDirectorService(capability).generate(valid_brief())
         self.assertEqual(result, plan)
         self.assertIsNot(result, plan)
-        self.assertEqual(len(provider.requests), 1)
+        self.assertEqual(len(capability.commands), 1)
 
     def test_provider_timeout_maps_to_stable_capability_error(self):
-        provider = FakeTextProvider([ProviderTimeoutError("contains no secret")])
+        capability = FakeTextGenerationCapability([TextGenerationTimeoutError()])
         with self.assertRaises(PlanGenerationError) as context:
-            AiDirectorService(provider).generate(valid_brief())
+            AiDirectorService(capability).generate(valid_brief())
         self.assertEqual(context.exception.code, "provider_timeout")
 
     def test_malformed_output_gets_one_controlled_repair(self):
-        provider = FakeTextProvider(["not json", json.dumps(valid_plan(), ensure_ascii=False)])
-        result = AiDirectorService(provider).generate(valid_brief())
+        capability = FakeTextGenerationCapability(["not json", json.dumps(valid_plan(), ensure_ascii=False)])
+        result = AiDirectorService(capability).generate(valid_brief())
         self.assertEqual(result["schemaVersion"], AI_DIRECTOR_SCHEMA_VERSION)
-        self.assertEqual(len(provider.requests), 2)
-        self.assertIn("上一次 JSON 未通过本地验证", provider.requests[1].messages[1].content)
+        self.assertEqual(len(capability.commands), 2)
+        self.assertTrue(all(command.purpose is TextGenerationPurpose.AI_DIRECTOR_CANDIDATE for command in capability.commands))
+        self.assertIn("上一次 JSON 未通过本地验证", capability.commands[1].messages[1].content)
 
     def test_repair_failure_stops_after_exactly_two_provider_calls(self):
-        provider = FakeTextProvider(["not json", "still not json", json.dumps(valid_plan())])
+        capability = FakeTextGenerationCapability(["not json", "still not json", json.dumps(valid_plan())])
         with self.assertRaises(PlanGenerationError) as context:
-            AiDirectorService(provider).generate(valid_brief())
+            AiDirectorService(capability).generate(valid_brief())
         self.assertEqual(context.exception.code, "invalid_provider_output")
-        self.assertEqual(len(provider.requests), 2)
+        self.assertEqual(len(capability.commands), 2)
 
     def test_schema_version_and_required_fields_are_enforced(self):
         plan = valid_plan()
@@ -242,29 +249,6 @@ class TextProviderAdapterTests(unittest.TestCase):
         )
         self.assertEqual(default_provider.model, "deepseek-v4-pro")
 
-    def test_environment_is_read_when_server_service_is_created_not_at_import(self):
-        with patch.dict(
-            os.environ,
-            {
-                "TEXT_PROVIDER": "deepseek",
-                "TEXT_MODEL": "deepseek-v4-pro",
-                "PROVIDER_API_KEY": "startup-only-secret",
-            },
-            clear=True,
-        ):
-            service = service_from_environment()
-        self.assertIsInstance(service._provider, DeepSeekTextProvider)
-        self.assertEqual(service._provider.model, "deepseek-v4-pro")
-
-    def test_missing_startup_credential_uses_safe_unconfigured_branch(self):
-        with patch.dict(os.environ, {}, clear=True):
-            service = service_from_environment()
-        with self.assertRaises(PlanGenerationError) as context:
-            service.generate(valid_brief())
-        self.assertEqual(context.exception.code, "provider_unavailable")
-        self.assertEqual(context.exception.diagnostic_category, "credential_missing")
-        self.assertNotIn("PROVIDER_API_KEY", str(context.exception))
-
     @patch("services.v4_platform.text_generation.request.urlopen")
     def test_deepseek_adapter_uses_current_json_chat_contract(self, urlopen):
         class Response:
@@ -356,9 +340,43 @@ class TextProviderAdapterTests(unittest.TestCase):
         self.assertNotIn("test-only-secret", str(context.exception))
 
 
+class TextGenerationCompositionTests(unittest.TestCase):
+    def test_server_service_uses_v5_environment_factory_at_composition_time(self):
+        capability = FakeTextGenerationCapability([json.dumps(valid_plan())])
+        with patch(
+            "apps.creator_workspace_mvp.server.create_text_generation_capability_from_environment",
+            return_value=capability,
+        ) as factory:
+            service = service_from_environment()
+        factory.assert_called_once_with()
+        self.assertEqual(service.generate(valid_brief())["schemaVersion"], AI_DIRECTOR_SCHEMA_VERSION)
+        self.assertEqual(len(capability.commands), 1)
+
+    def test_environment_composition_shares_one_v5_capability_across_services(self):
+        capability = FakeTextGenerationCapability([])
+        with patch(
+            "apps.creator_workspace_mvp.server.create_text_generation_capability_from_environment",
+            return_value=capability,
+        ) as factory:
+            ai_director, script_studio, series_director = capability_services_from_environment()
+        factory.assert_called_once_with()
+        self.assertIs(ai_director._text_generation, capability)
+        self.assertIs(script_studio._text_generation, capability)
+        self.assertIs(series_director._text_generation, capability)
+
+    def test_missing_startup_credential_uses_safe_unconfigured_branch(self):
+        with patch.dict(os.environ, {}, clear=True):
+            service = service_from_environment()
+        with self.assertRaises(PlanGenerationError) as context:
+            service.generate(valid_brief())
+        self.assertEqual(context.exception.code, "provider_unavailable")
+        self.assertEqual(context.exception.diagnostic_category, "credential_missing")
+        self.assertNotIn("PROVIDER_API_KEY", str(context.exception))
+
+
 class CreatorAiDirectorEndpointTests(unittest.TestCase):
-    def _serve(self, provider):
-        server = create_server(("127.0.0.1", 0), AiDirectorService(provider))
+    def _serve(self, capability):
+        server = create_server(("127.0.0.1", 0), AiDirectorService(capability))
         thread = threading.Thread(target=server.serve_forever, daemon=True)
         thread.start()
         self.addCleanup(server.server_close)
@@ -389,8 +407,8 @@ class CreatorAiDirectorEndpointTests(unittest.TestCase):
         )
 
     def test_same_origin_endpoint_returns_candidate_not_domain_fact(self):
-        provider = FakeTextProvider([json.dumps(valid_plan(), ensure_ascii=False)])
-        base_url = self._serve(provider)
+        capability = FakeTextGenerationCapability([json.dumps(valid_plan(), ensure_ascii=False)])
+        base_url = self._serve(capability)
         with self._post(base_url, {"brief": valid_brief()}) as response:
             payload = json.loads(response.read().decode("utf-8"))
         self.assertNotEqual(response.status, 501)
@@ -398,10 +416,10 @@ class CreatorAiDirectorEndpointTests(unittest.TestCase):
         self.assertEqual(payload["kind"], "candidate-creative-plan")
         self.assertTrue(payload["confirmationRequired"])
         self.assertNotIn("projectId", payload)
-        self.assertEqual(len(provider.requests), 1)
+        self.assertEqual(len(capability.commands), 1)
 
     def test_malformed_json_returns_structured_client_error(self):
-        base_url = self._serve(FakeTextProvider([json.dumps(valid_plan())]))
+        base_url = self._serve(FakeTextGenerationCapability([json.dumps(valid_plan())]))
         with self.assertRaises(error.HTTPError) as context:
             self._post_raw(base_url, b"{not-json")
         payload = json.loads(context.exception.read().decode("utf-8"))
@@ -410,27 +428,27 @@ class CreatorAiDirectorEndpointTests(unittest.TestCase):
         self.assertEqual(payload["error"]["code"], "invalid_request")
 
     def test_non_json_content_type_is_rejected_before_provider_call(self):
-        provider = FakeTextProvider([json.dumps(valid_plan())])
-        base_url = self._serve(provider)
+        capability = FakeTextGenerationCapability([json.dumps(valid_plan())])
+        base_url = self._serve(capability)
         with self.assertRaises(error.HTTPError) as context:
             self._post_raw(base_url, b"{}", "text/plain")
         payload = json.loads(context.exception.read().decode("utf-8"))
         self.assertEqual(context.exception.code, 415)
         self.assertEqual(payload["error"]["code"], "unsupported_media_type")
-        self.assertEqual(provider.requests, [])
+        self.assertEqual(capability.commands, [])
 
     def test_endpoint_rejects_invalid_brief_without_provider_call(self):
-        provider = FakeTextProvider([json.dumps(valid_plan())])
-        base_url = self._serve(provider)
+        capability = FakeTextGenerationCapability([json.dumps(valid_plan())])
+        base_url = self._serve(capability)
         with self.assertRaises(error.HTTPError) as context:
             self._post(base_url, {"brief": {}})
         payload = json.loads(context.exception.read().decode("utf-8"))
         self.assertEqual(context.exception.code, 400)
         self.assertEqual(payload["error"]["code"], "invalid_brief")
-        self.assertEqual(provider.requests, [])
+        self.assertEqual(capability.commands, [])
 
     def test_endpoint_provider_error_is_sanitized(self):
-        base_url = self._serve(FakeTextProvider([ProviderTimeoutError("raw-secret")]))
+        base_url = self._serve(FakeTextGenerationCapability([TextGenerationTimeoutError()]))
         with self._post(base_url, {"brief": valid_brief()}) as response:
             body = response.read().decode("utf-8")
         payload = json.loads(body)
@@ -441,25 +459,41 @@ class CreatorAiDirectorEndpointTests(unittest.TestCase):
         self.assertNotIn("Authorization", body)
 
     def test_endpoint_logs_safe_provider_diagnostic_without_secret(self):
-        provider_error = ProviderUnavailableError(
-            "provider request failed",
+        capability_error = TextGenerationUnavailableError(
             category="provider_http_error",
             status=429,
         )
-        base_url = self._serve(FakeTextProvider([provider_error]))
+        base_url = self._serve(FakeTextGenerationCapability([capability_error]))
         diagnostic = StringIO()
         with patch("sys.stderr", diagnostic):
             with self._post(base_url, {"brief": valid_brief()}) as response:
                 body = response.read().decode("utf-8")
         self.assertIn(
             "AI_DIRECTOR_PROVIDER_ERROR category=provider_http_error "
-            "status=429 exception=ProviderUnavailableError",
+            "status=429 exception=TextGenerationUnavailableError",
             diagnostic.getvalue(),
         )
         self.assertNotIn("provider request failed", diagnostic.getvalue())
         self.assertNotIn("Authorization", diagnostic.getvalue())
         self.assertNotIn("test-only-secret", diagnostic.getvalue())
         self.assertNotIn("provider request failed", body)
+
+    def test_endpoint_normalizes_untrusted_v5_diagnostics_before_logging(self):
+        secret = "Authorization=Bearer sk-provider-secret"
+        capability_error = TextGenerationUnavailableError(category=secret, status=799)
+        base_url = self._serve(FakeTextGenerationCapability([capability_error]))
+        diagnostic = StringIO()
+        with patch("sys.stderr", diagnostic):
+            with self._post(base_url, {"brief": valid_brief()}) as response:
+                self.assertEqual(response.status, 200)
+        log = diagnostic.getvalue()
+        self.assertIn(
+            "AI_DIRECTOR_PROVIDER_ERROR category=network_error "
+            "status=none exception=TextGenerationUnavailableError",
+            log,
+        )
+        self.assertNotIn(secret, log)
+        self.assertNotIn("Authorization", diagnostic.getvalue())
 
 
 if __name__ == "__main__":

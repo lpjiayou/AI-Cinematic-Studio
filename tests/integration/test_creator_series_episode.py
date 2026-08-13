@@ -12,7 +12,7 @@ from apps.creator_workspace_mvp.server import (
     SERIES_ENDPOINT,
     create_server,
 )
-from services.v4_platform import FakeTextProvider
+from services.v5_core_os.text_generation.testing import FakeTextGenerationCapability
 from services.v5_core_os.series_episode import SeriesEpisodePublicBoundary
 from services.v5_core_os.series_episode.foundation import (
     InMemorySeriesEpisodeAdapter,
@@ -33,10 +33,10 @@ class CreatorSeriesEpisodeHttpTests(unittest.TestCase):
         self.repository = InMemorySeriesEpisodeAdapter()
         self.boundary = SeriesEpisodePublicBoundary(SeriesEpisodeService(self.repository))
         self.script_boundary = create_script_boundary(self.boundary)
-        self.provider = FakeTextProvider([])
+        self.capability = FakeTextGenerationCapability([])
         self.server = create_server(
             ("127.0.0.1", 0),
-            AiDirectorService(self.provider),
+            AiDirectorService(self.capability),
             series_episode_boundary=self.boundary,
             script_studio_boundary=self.script_boundary,
         )
@@ -263,7 +263,7 @@ class CreatorSeriesEpisodeHttpTests(unittest.TestCase):
         self.assertEqual(binding["sourcePlan"]["storyDirection"], valid_plan()["storyDirection"])
         self.assertEqual(binding["sourcePlan"]["creativeInterpretation"], valid_plan()["creativeInterpretation"])
         self.assertEqual(binding["sourcePlan"]["productionPlan"], valid_plan()["productionPlan"])
-        self.assertEqual(self.provider.requests, [])
+        self.assertEqual(self.capability.commands, [])
 
     def test_unconfirmed_plan_ref_is_rejected_with_stable_json_error(self):
         series = self.create_series()

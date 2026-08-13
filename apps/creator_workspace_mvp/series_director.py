@@ -7,12 +7,13 @@ import sys
 from dataclasses import dataclass
 from typing import Any, Mapping
 
-from services.v4_platform import (
-    ProviderTimeoutError,
-    TextGenerationRequest,
-    TextMessage,
-    TextProvider,
-    TextProviderError,
+from services.v5_core_os.text_generation import (
+    TextGenerationCapability,
+    TextGenerationCapabilityError,
+    TextGenerationCommand,
+    TextGenerationMessage,
+    TextGenerationPurpose,
+    TextGenerationTimeoutError,
 )
 
 
@@ -324,15 +325,18 @@ def _candidate_contract(context: Mapping[str, Any]) -> dict[str, Any]:
     }
 
 
-def _generation_messages(context: Mapping[str, Any], creative_input: str) -> tuple[TextMessage, ...]:
+def _generation_messages(
+    context: Mapping[str, Any],
+    creative_input: str,
+) -> tuple[TextGenerationMessage, ...]:
     return (
-        TextMessage(
+        TextGenerationMessage(
             "system",
             "You are the Series Director planning engine. Return one JSON object only and follow the supplied "
             "contract exactly. The output is an unconfirmed candidate. Never create system-owned references, "
             "production Episodes, approval claims, or provider-owned identity. Use concise Chinese content.",
         ),
-        TextMessage(
+        TextGenerationMessage(
             "user",
             json.dumps({
                 "task": "Generate a coherent long-form Series production plan candidate.",
@@ -349,14 +353,14 @@ def _repair_messages(
     creative_input: str,
     invalid_candidate: Any,
     issues: tuple[SeriesPlanValidationIssue, ...],
-) -> tuple[TextMessage, ...]:
+) -> tuple[TextGenerationMessage, ...]:
     return (
-        TextMessage(
+        TextGenerationMessage(
             "system",
             "Repair the Series Plan candidate exactly once. Return one complete JSON object only. Do not add "
             "system-owned references or create production Episode facts.",
         ),
-        TextMessage(
+        TextGenerationMessage(
             "user",
             json.dumps({
                 "task": "Repair the candidate against the contract.",
@@ -371,10 +375,10 @@ def _repair_messages(
 
 
 class SeriesDirectorApplicationService:
-    """Generate and locally validate Series Plan candidates through the V4 text port."""
+    """Generate Series Plan candidates through V5 and validate them locally."""
 
-    def __init__(self, provider: TextProvider) -> None:
-        self._provider = provider
+    def __init__(self, text_generation: TextGenerationCapability) -> None:
+        self._text_generation = text_generation
 
     def generate(self, context: Mapping[str, Any], creative_input: Any) -> dict[str, Any]:
         text = str(creative_input or "").strip()
@@ -409,19 +413,19 @@ class SeriesDirectorApplicationService:
                     validation_issues=tuple((item.field, item.rule, item.category) for item in (*issues, *repair_issues)),
                 ) from repair_error
 
-    def _call(self, messages: tuple[TextMessage, ...]) -> str:
+    def _call(self, messages: tuple[TextGenerationMessage, ...]) -> str:
         try:
-            return self._provider.generate(TextGenerationRequest(
-                messages=messages,
-                max_tokens=16_000,
-                temperature=0.3,
-                timeout_seconds=90,
-            ))
-        except ProviderTimeoutError as exc:
+            return self._text_generation.generate(
+                TextGenerationCommand(
+                    purpose=TextGenerationPurpose.SERIES_PLAN_CANDIDATE,
+                    messages=messages,
+                )
+            )
+        except TextGenerationTimeoutError as exc:
             raise SeriesDirectorGenerationError(
                 "provider_timeout", diagnostic_category=exc.category, provider_status=exc.status
             ) from exc
-        except TextProviderError as exc:
+        except TextGenerationCapabilityError as exc:
             raise SeriesDirectorGenerationError(
                 "provider_unavailable", diagnostic_category=exc.category, provider_status=exc.status
             ) from exc

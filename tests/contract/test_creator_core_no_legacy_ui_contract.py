@@ -6,7 +6,7 @@ from urllib import error, request
 
 from apps.creator_workspace_mvp.ai_director import AiDirectorService
 from apps.creator_workspace_mvp.server import SERIES_ENDPOINT, create_server
-from services.v4_platform import FakeTextProvider
+from services.v5_core_os.text_generation.testing import FakeTextGenerationCapability
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -18,7 +18,7 @@ class CreatorCoreNoLegacyUiContractTests(unittest.TestCase):
     def setUp(self):
         self.server = create_server(
             ("127.0.0.1", 0),
-            AiDirectorService(FakeTextProvider([])),
+            AiDirectorService(FakeTextGenerationCapability([])),
         )
         self.thread = threading.Thread(target=self.server.serve_forever, daemon=True)
         self.thread.start()

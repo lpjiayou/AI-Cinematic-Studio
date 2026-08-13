@@ -17,7 +17,12 @@ from apps.creator_workspace_mvp.script_studio import (
     _generation_messages,
     validate_script_candidate,
 )
-from services.v4_platform import FakeTextProvider, ProviderTimeoutError
+from services.v5_core_os.text_generation import (
+    TextGenerationPurpose,
+    TextGenerationTimeoutError,
+    TextGenerationUnavailableError,
+)
+from services.v5_core_os.text_generation.testing import FakeTextGenerationCapability
 from services.v5_core_os.script_studio.foundation import (
     InMemoryScriptStudioAdapter,
     RecordNotFoundError,
@@ -255,29 +260,30 @@ class ScriptStudioApplicationTests(unittest.TestCase):
         series, episode = seed_episode(upstream)
         self.bootstrap = upstream.build_script_studio_bootstrap(WORKSPACE, series["seriesRef"], episode["episodeRef"])
 
-    def test_generation_calls_existing_v4_port_and_validates_candidate(self):
-        provider = FakeTextProvider([json.dumps(script_candidate(), ensure_ascii=False)])
-        result = ScriptStudioApplicationService(provider).generate(self.bootstrap)
+    def test_generation_calls_v5_capability_and_validates_candidate(self):
+        capability = FakeTextGenerationCapability([json.dumps(script_candidate(), ensure_ascii=False)])
+        result = ScriptStudioApplicationService(capability).generate(self.bootstrap)
         self.assertEqual(result["targetDurationSec"], 30)
         self.assertEqual(len(result["scenes"]), 2)
-        self.assertEqual(len(provider.requests), 1)
-        self.assertIn("creator.script-studio.script-candidate.v1", provider.requests[0].messages[1].content)
+        self.assertEqual(len(capability.commands), 1)
+        self.assertEqual(capability.commands[0].purpose, TextGenerationPurpose.SCRIPT_CANDIDATE)
+        self.assertIn("creator.script-studio.script-candidate.v1", capability.commands[0].messages[1].content)
 
     def test_generation_failure_does_not_return_partial_candidate(self):
         invalid = json.dumps({"schemaVersion": SCRIPT_CANDIDATE_SCHEMA_VERSION})
-        provider = FakeTextProvider([invalid, invalid])
+        capability = FakeTextGenerationCapability([invalid, invalid])
         with self.assertRaises(ScriptGenerationError):
-            ScriptStudioApplicationService(provider).generate(self.bootstrap)
-        self.assertEqual(len(provider.requests), 2)
+            ScriptStudioApplicationService(capability).generate(self.bootstrap)
+        self.assertEqual(len(capability.commands), 2)
 
     def test_sanitized_regression_normalizes_only_missing_optional_arrays(self):
         candidate = script_candidate()
         for scene in candidate["scenes"]:
             for field in ("dialogue", "narration", "subtitleText", "continuityNotes", "productionNotes"):
                 scene.pop(field)
-        provider = FakeTextProvider([json.dumps(candidate, ensure_ascii=False)])
-        result = ScriptStudioApplicationService(provider).generate(self.bootstrap)
-        self.assertEqual(len(provider.requests), 1)
+        capability = FakeTextGenerationCapability([json.dumps(candidate, ensure_ascii=False)])
+        result = ScriptStudioApplicationService(capability).generate(self.bootstrap)
+        self.assertEqual(len(capability.commands), 1)
         for scene in result["scenes"]:
             self.assertEqual(scene["dialogue"], [])
             self.assertEqual(scene["narration"], [])
@@ -288,14 +294,14 @@ class ScriptStudioApplicationTests(unittest.TestCase):
     def test_exact_live_failure_missing_schema_version_is_repaired(self):
         invalid = script_candidate()
         invalid.pop("schemaVersion")
-        provider = FakeTextProvider([
+        capability = FakeTextGenerationCapability([
             json.dumps(invalid, ensure_ascii=False),
             json.dumps(script_candidate(), ensure_ascii=False),
         ])
-        result = ScriptStudioApplicationService(provider).generate(self.bootstrap)
+        result = ScriptStudioApplicationService(capability).generate(self.bootstrap)
         self.assertEqual(result["title"], script_candidate()["title"])
-        self.assertEqual(len(provider.requests), 2)
-        repair_prompt = json.loads(provider.requests[1].messages[1].content)
+        self.assertEqual(len(capability.commands), 2)
+        repair_prompt = json.loads(capability.commands[1].messages[1].content)
         self.assertIn(
             {"field": "schemaVersion", "rule": "required_field"},
             repair_prompt["validationIssues"],
@@ -324,14 +330,15 @@ class ScriptStudioApplicationTests(unittest.TestCase):
     def test_generation_uses_exactly_one_controlled_repair(self):
         invalid = script_candidate()
         invalid["scenes"][0].pop("action")
-        provider = FakeTextProvider([
+        capability = FakeTextGenerationCapability([
             json.dumps(invalid, ensure_ascii=False),
             json.dumps(script_candidate(), ensure_ascii=False),
         ])
-        result = ScriptStudioApplicationService(provider).generate(self.bootstrap)
+        result = ScriptStudioApplicationService(capability).generate(self.bootstrap)
         self.assertEqual(result["title"], script_candidate()["title"])
-        self.assertEqual(len(provider.requests), 2)
-        repair_prompt = json.loads(provider.requests[1].messages[1].content)
+        self.assertEqual(len(capability.commands), 2)
+        self.assertTrue(all(command.purpose is TextGenerationPurpose.SCRIPT_CANDIDATE for command in capability.commands))
+        repair_prompt = json.loads(capability.commands[1].messages[1].content)
         self.assertEqual(repair_prompt["task"], "Repair the Script Studio candidate once. Return a complete corrected JSON object only.")
         self.assertIn(
             {"field": "scenes[0].action", "rule": "required_field"},
@@ -342,10 +349,10 @@ class ScriptStudioApplicationTests(unittest.TestCase):
         invalid = script_candidate()
         invalid["scenes"][0].pop("scenePurpose")
         raw = json.dumps(invalid, ensure_ascii=False)
-        provider = FakeTextProvider([raw, raw])
+        capability = FakeTextGenerationCapability([raw, raw])
         with self.assertRaises(ScriptGenerationError) as context:
-            ScriptStudioApplicationService(provider).generate(self.bootstrap)
-        self.assertEqual(len(provider.requests), 2)
+            ScriptStudioApplicationService(capability).generate(self.bootstrap)
+        self.assertEqual(len(capability.commands), 2)
         self.assertEqual(context.exception.code, "invalid_provider_output")
         self.assertTrue(all(len(item) == 4 for item in context.exception.validation_issues))
         self.assertNotIn(raw, str(context.exception))
@@ -355,11 +362,11 @@ class ScriptStudioApplicationTests(unittest.TestCase):
         invalid.pop("schemaVersion")
         invalid["title"] = "sensitive-provider-content-marker"
         raw = json.dumps(invalid, ensure_ascii=False)
-        provider = FakeTextProvider([raw, raw])
+        capability = FakeTextGenerationCapability([raw, raw])
         stream = io.StringIO()
         with redirect_stderr(stream):
             with self.assertRaises(ScriptGenerationError):
-                ScriptStudioApplicationService(provider).generate(self.bootstrap)
+                ScriptStudioApplicationService(capability).generate(self.bootstrap)
         diagnostic = stream.getvalue()
         self.assertIn("SCRIPT_STUDIO_SCHEMA_ERROR", diagnostic)
         self.assertIn("field=schemaVersion", diagnostic)
@@ -369,13 +376,13 @@ class ScriptStudioApplicationTests(unittest.TestCase):
     def test_provider_cannot_supply_system_owned_scene_reference(self):
         invalid = script_candidate()
         invalid["scenes"][0]["scriptSceneRef"] = "provider-invented-ref"
-        provider = FakeTextProvider([
+        capability = FakeTextGenerationCapability([
             json.dumps(invalid, ensure_ascii=False),
             json.dumps(script_candidate(), ensure_ascii=False),
         ])
-        result = ScriptStudioApplicationService(provider).generate(self.bootstrap)
+        result = ScriptStudioApplicationService(capability).generate(self.bootstrap)
         self.assertNotIn("scriptSceneRef", result["scenes"][0])
-        repair_prompt = json.loads(provider.requests[1].messages[1].content)
+        repair_prompt = json.loads(capability.commands[1].messages[1].content)
         self.assertIn(
             {"field": "scenes[0].scriptSceneRef", "rule": "unsupported_field"},
             repair_prompt["validationIssues"],
@@ -402,10 +409,10 @@ class ScriptStudioApplicationTests(unittest.TestCase):
                 )
 
     def test_malformed_json_is_repaired_once_then_rejected(self):
-        provider = FakeTextProvider(["not-json", "still-not-json"])
+        capability = FakeTextGenerationCapability(["not-json", "still-not-json"])
         with self.assertRaises(ScriptGenerationError) as context:
-            ScriptStudioApplicationService(provider).generate(self.bootstrap)
-        self.assertEqual(len(provider.requests), 2)
+            ScriptStudioApplicationService(capability).generate(self.bootstrap)
+        self.assertEqual(len(capability.commands), 2)
         self.assertEqual(
             context.exception.validation_issues,
             (
@@ -415,11 +422,22 @@ class ScriptStudioApplicationTests(unittest.TestCase):
         )
 
     def test_provider_timeout_is_mapped_without_secret_or_raw_response(self):
-        provider = FakeTextProvider([ProviderTimeoutError("secret body")])
+        capability = FakeTextGenerationCapability([TextGenerationTimeoutError()])
         with self.assertRaises(ScriptGenerationError) as context:
-            ScriptStudioApplicationService(provider).generate(self.bootstrap)
+            ScriptStudioApplicationService(capability).generate(self.bootstrap)
         self.assertEqual(context.exception.code, "provider_timeout")
         self.assertNotIn("secret", str(context.exception))
+
+    def test_provider_unavailable_is_mapped_without_secret_or_raw_response(self):
+        capability = FakeTextGenerationCapability([
+            TextGenerationUnavailableError(category="provider_http_error", status=503)
+        ])
+        with self.assertRaises(ScriptGenerationError) as context:
+            ScriptStudioApplicationService(capability).generate(self.bootstrap)
+        self.assertEqual(context.exception.code, "provider_unavailable")
+        self.assertEqual(context.exception.diagnostic_category, "provider_http_error")
+        self.assertEqual(context.exception.provider_status, 503)
+        self.assertEqual(context.exception.exception_name, "TextGenerationUnavailableError")
 
     def test_scene_rewrite_changes_only_selected_scene(self):
         current = {**content_from_candidate(), "scriptRef": "script-1", "scriptVersionRef": "version-1"}
@@ -427,10 +445,10 @@ class ScriptStudioApplicationTests(unittest.TestCase):
         rewritten = dict(current["scenes"][0])
         rewritten.pop("scriptSceneRef")
         rewritten["action"] = "更克制的动作。"
-        provider = FakeTextProvider([
+        capability = FakeTextGenerationCapability([
             json.dumps({"schemaVersion": SCENE_REWRITE_SCHEMA_VERSION, "scene": rewritten}, ensure_ascii=False)
         ])
-        result = ScriptStudioApplicationService(provider).rewrite_scene(
+        result = ScriptStudioApplicationService(capability).rewrite_scene(
             bootstrap=self.bootstrap,
             current_version=current,
             script_scene_ref="scene-1",
@@ -438,6 +456,7 @@ class ScriptStudioApplicationTests(unittest.TestCase):
         )
         self.assertEqual(result["scenes"][0]["action"], "更克制的动作。")
         self.assertEqual(result["scenes"][1], current["scenes"][1])
+        self.assertEqual(capability.commands[0].purpose, TextGenerationPurpose.SCRIPT_SCENE_REWRITE)
 
     def test_candidate_validator_rejects_discontinuous_scenes(self):
         candidate = script_candidate()

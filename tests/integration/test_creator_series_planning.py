@@ -12,7 +12,8 @@ from apps.creator_workspace_mvp.server import (
     SERIES_PLANNING_M6_BOOTSTRAP_ENDPOINT,
     create_server,
 )
-from services.v4_platform import FakeTextProvider
+from services.v5_core_os.text_generation import TextGenerationPurpose
+from services.v5_core_os.text_generation.testing import FakeTextGenerationCapability
 from services.v5_core_os.project_engine import create_in_memory_boundary as create_project_boundary
 from services.v5_core_os.series_episode import create_in_memory_boundary as create_series_boundary
 from services.v5_core_os.series_planning import create_in_memory_boundary as create_planning_boundary
@@ -42,13 +43,13 @@ class CreatorSeriesPlanningHttpTests(unittest.TestCase):
             "title": "晚灯系列制作",
             "plannedEpisodeCount": 4,
         })
-        self.provider = FakeTextProvider([json.dumps(valid_candidate(), ensure_ascii=False)])
+        self.capability = FakeTextGenerationCapability([json.dumps(valid_candidate(), ensure_ascii=False)])
         self.server = create_server(
             ("127.0.0.1", 0),
-            AiDirectorService(FakeTextProvider([])),
+            AiDirectorService(FakeTextGenerationCapability([])),
             series_episode_boundary=self.series_boundary,
             project_boundary=self.project_boundary,
-            series_director_service=SeriesDirectorApplicationService(self.provider),
+            series_director_service=SeriesDirectorApplicationService(self.capability),
             series_planning_boundary=self.planning_boundary,
         )
         self.thread = threading.Thread(target=self.server.serve_forever, daemon=True)
@@ -88,7 +89,8 @@ class CreatorSeriesPlanningHttpTests(unittest.TestCase):
             self.assertEqual(response.status, 200)
             candidate_payload = json.loads(response.read().decode("utf-8"))
         self.assertTrue(candidate_payload["confirmationRequired"])
-        self.assertEqual(len(self.provider.requests), 1)
+        self.assertEqual(len(self.capability.commands), 1)
+        self.assertEqual(self.capability.commands[0].purpose, TextGenerationPurpose.SERIES_PLAN_CANDIDATE)
         with self.post(
             SERIES_PLANNING_CONFIRM_ENDPOINT,
             self.command(humanConfirmed=True, candidate=candidate_payload["candidate"]),
@@ -108,11 +110,11 @@ class CreatorSeriesPlanningHttpTests(unittest.TestCase):
         self.planning_boundary.confirm_candidate(self.command(
             humanConfirmed=True, candidate=valid_candidate()
         ))
-        before = len(self.provider.requests)
+        before = len(self.capability.commands)
         _, first = self.get(SERIES_PLANNING_M6_BOOTSTRAP_ENDPOINT)
         _, second = self.get(SERIES_PLANNING_M6_BOOTSTRAP_ENDPOINT)
         self.assertEqual(first, second)
-        self.assertEqual(len(self.provider.requests), before)
+        self.assertEqual(len(self.capability.commands), before)
         self.assertEqual(first["bootstrap"]["projectRef"], self.project["projectRef"])
 
     def test_invalid_candidate_returns_structured_4xx_without_partial_plan(self):
@@ -137,7 +139,7 @@ class CreatorSeriesPlanningHttpTests(unittest.TestCase):
             self.assertEqual(exc.code, 400)
         else:
             self.fail("wrong scope unexpectedly generated")
-        self.assertEqual(len(self.provider.requests), 0)
+        self.assertEqual(len(self.capability.commands), 0)
 
 if __name__ == "__main__":
     unittest.main()
