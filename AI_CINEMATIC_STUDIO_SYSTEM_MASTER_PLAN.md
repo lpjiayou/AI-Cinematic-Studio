@@ -2290,7 +2290,7 @@ Status:
 
 Status:
 
-`NOT STARTED / NOT AUTHORIZED`
+`NOT STARTED / P0-P1 AUTHORIZED / P2+ NOT AUTHORIZED`
 
 目标范围：
 
@@ -2944,7 +2944,7 @@ STOP。
 
 # 62. Current System State
 
-截至 `PRE-M6-RB1.3-R1`：
+截至 `PRE-M6-RB1.3-CLOSEOUT-G1`：
 
 ```text
 M1 AI Director
