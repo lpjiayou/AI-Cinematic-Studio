@@ -360,7 +360,7 @@ The PRE-M6 route is fixed as:
 → `M6 Preconditions`
 → `M6-P1`
 
-The current phase is `M6 Series Intelligence / P2 Durable SQLite`.
+The current phase is `M6 Series Intelligence / P2 Closeout G3 and P3-G0 Architecture`.
 
 Current governance state:
 
@@ -377,15 +377,21 @@ Current governance state:
 - M6 Preconditions: `SATISFIED FOR BOUNDED M6-P0/P1 AND M6-P2 LOCAL SQLITE ONLY`;
 - ACS-M6-P0-P1-R2: `OWNER ACCEPTED / COMPLETE / REMOTE-VERIFIED AT
   e38c75aa4ff26bdea80c82d8a24096f799dad860`;
-- current task: `ACS-M6-P2-G1`;
+- current task: `ACS-M6-P2-G1-CLOSEOUT-G3 / M6-P3-G0`;
 - legacy repository capability provenance: `MEDIUM / OPEN / NON-BLOCKING`,
   Owner Gate `P3-RV1-003`;
 - M6-P0: `CONTRACT ACCEPTED / COMPLETE`;
 - M6-P1: `OWNER ACCEPTED / COMPLETE / REMOTE-VERIFIED AT
   e38c75aa4ff26bdea80c82d8a24096f799dad860`;
 - M6-P2-G0: `ADR-0004 AND SQLITE CONTRACT ACCEPTED / COMPLETE`;
-- M6-P2-G1: `IMPLEMENTED / CHECKPOINT CANDIDATE / OWNER REVIEW PENDING`;
-- M6-P3+: `NOT AUTHORIZED / NOT STARTED`;
+- M6-P2-G1: `OWNER ACCEPTED / COMPLETE / REMOTE-VERIFIED AT
+  8227c6c616140824fd70de920dc6fcf459bb734d`;
+- M6-P3-G0: `ARCHITECTURE PROPOSAL DEFINED / BINDING PREREQUISITE OPEN /
+  GOVERNANCE-ONLY CHECKPOINT CANDIDATE / OWNER REVIEW PENDING`;
+- ADR-0005 and M6 consumer contract: `PROPOSED / NO IMPLEMENTATION AUTHORITY`;
+- M6-P3-B1 binding prerequisite: `PROPOSED / NOT AUTHORIZED / NOT STARTED /
+  BLOCKS M6-P3-G1`;
+- M6-P3-G1+: `NOT AUTHORIZED / NOT STARTED`;
 - M7-M19: `NOT STARTED / NOT AUTHORIZED`;
 - Formal 8765 Deployment: `UNTOUCHED / NOT DEPLOYED`;
 - Frontend: `FROZEN / UNTOUCHED`;
@@ -393,9 +399,10 @@ Current governance state:
 
 Legacy repository implementation must not be counted as current Core production
 capability. RB13-F001 and RB13-F002 are closed in the accepted current tested Core
-baseline. M6-P0/P1 acceptance and M6-P2 authorization remain bounded. They do not
-authorize M6-P3+, M7-M19, formal database deployment or Frontend work. Exact active
-task scope remains governed by `CURRENT_MILESTONE.md`.
+baseline. M6-P0/P1 and M6-P2 are Owner Accepted. The current G3/P3-G0 authority is
+governance-only; it does not authorize M6-P3-B1, M6-P3-G1+, M7-M19, formal database
+deployment or Frontend work. Exact active task scope remains governed by
+`CURRENT_MILESTONE.md`.
 
 The M6 gate order is:
 
@@ -422,8 +429,19 @@ The M6-P2 gate order is:
 6. the M6-P2 checkpoint is committed, pushed and remote-verified;
 7. execution stops for Project Lead owner review.
 
+The Project Lead accepted M6-P2-G1 at
+`8227c6c616140824fd70de920dc6fcf459bb734d`. P3-G0 may define a Proposed M6
+consumer boundary only. Before any P3 implementation, the Project Lead must accept
+ADR-0005 and its contract. The accepted Core has no shared stable key between M2
+`episodeRef` and M5 `episodePlanItemRef`; number/title/index inference is forbidden.
+ADR-0005 therefore proposes an immutable M5 EpisodePlanItemBinding in a new exact
+SeriesPlanVersion. The Project Lead must separately authorize and accept bounded
+M6-P3-B1 binding implementation before separately authorizing M6-P3-G1. M2 retains
+Series/Episode identity and membership; M4 retains Project identity and
+Project-to-Series context.
+
 This does not establish a general Architecture Review, Production Ready status,
-formal database deployment, or authorization for M6-P3+.
+formal database deployment, or authorization for M6-P3 implementation.
 
 M6 Character Intelligence must cover at least:
 
@@ -444,8 +462,10 @@ M6 Character Intelligence must cover at least:
 `M6 ≠ V5 Identity Lock`. M6 does not implement M7, GPU Render, ComfyUI,
 Worker execution or cross-repository UI. M6-P0/P1 is `OWNER ACCEPTED / COMPLETE /
 REMOTE-VERIFIED`; ADR-0004 and the M6-P2 SQLite contract are accepted;
-M6-P2-G1 is `IMPLEMENTED / CHECKPOINT CANDIDATE / OWNER REVIEW PENDING`;
-M6-P3+ remains `NOT AUTHORIZED / NOT STARTED`.
+M6-P2-G1 is `OWNER ACCEPTED / COMPLETE / REMOTE-VERIFIED AT
+8227c6c616140824fd70de920dc6fcf459bb734d`; M6-P3-G0 is a governance-only
+checkpoint candidate with Proposed architecture; M6-P3-B1 and M6-P3-G1+ remain
+`NOT AUTHORIZED / NOT STARTED`.
 
 Legacy Phase 0 provenance debt remains `OPEN / NON-BLOCKING` under Owner Gate
 `P3-RV1-003`. This acknowledgement does not silently close the debt or import

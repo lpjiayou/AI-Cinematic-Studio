@@ -2,13 +2,13 @@
 
 > Document: `AI_CINEMATIC_STUDIO_SYSTEM_MASTER_PLAN.md`
 >
-> Status: `SYSTEM MASTER GOVERNANCE BASELINE / M6-P0-P1 OWNER ACCEPTED / M6-P2-G1 CHECKPOINT CANDIDATE`
+> Status: `SYSTEM MASTER GOVERNANCE BASELINE / M6-P0-P2 OWNER ACCEPTED / M6-P3-G0 GOVERNANCE CANDIDATE`
 >
 > Version: `v1.2`
 >
 > Date: `2026-08-13`
 >
-> Revision: `ACS-M6-P2-G1`
+> Revision: `ACS-M6-P2-G1-CLOSEOUT-G3 / M6-P3-G0`
 >
 > Architecture Decision: `ADR-0001 — Separate Commercial Experience Layer from Core Creator Runtime / Accepted`
 >
@@ -2290,7 +2290,7 @@ Status:
 
 Status:
 
-`P0-P1 OWNER ACCEPTED / COMPLETE / REMOTE-VERIFIED AT e38c75aa4ff26bdea80c82d8a24096f799dad860 / P2-G0 CONTRACT ACCEPTED / P2-G1 IMPLEMENTED CHECKPOINT CANDIDATE OWNER REVIEW PENDING / P3+ NOT AUTHORIZED`
+`P0-P1 OWNER ACCEPTED / COMPLETE / REMOTE-VERIFIED AT e38c75aa4ff26bdea80c82d8a24096f799dad860 / P2-G0 CONTRACT ACCEPTED / P2-G1 OWNER ACCEPTED / COMPLETE / REMOTE-VERIFIED AT 8227c6c616140824fd70de920dc6fcf459bb734d / P3-G0 GOVERNANCE-ONLY CHECKPOINT CANDIDATE / ADR-0005 PROPOSED / P3-B1 AND P3-G1+ NOT AUTHORIZED`
 
 目标范围：
 
@@ -2316,7 +2316,9 @@ Status:
 - M6 不实现跨仓 UI；
 - M6-P2 只实现本地开发 SQLite 持久化、Migration、复合完整性、持久化幂等与
   Outbox；正式 8765 数据库保持禁止访问；
-- M6-P3+ 保持 `NOT AUTHORIZED / NOT STARTED`。
+- M6-P3-G0 只定义 Proposed consumer/reconciliation architecture，不实施代码；
+- M6-P3-B1 EpisodePlanItemBinding 仍为 Proposed prerequisite，未授权实施；
+- M6-P3-G1+ 保持 `NOT AUTHORIZED / NOT STARTED`。
 
 ---
 
@@ -3053,16 +3055,22 @@ local-development durable SQLite boundary.
 
 ```text
 Current Work Package
-ACS-M6-P2-G1 — M6 SERIES INTELLIGENCE DURABLE SQLITE SLICE
+ACS-M6-P2-G1-CLOSEOUT-G3 / M6-P3-G0 — GOVERNANCE AND CONSUMER CONTRACT
 
 Accepted Governance / Architecture Checkpoint
 ACS-M6-P0-P1-R2-CLOSEOUT-G2 / M6-P2-G0
 
+Accepted M6-P2 Technical Baseline
+8227c6c616140824fd70de920dc6fcf459bb734d
+
 M6 Series IP Bible + Character Intelligence
 P0-P1 OWNER ACCEPTED / COMPLETE / REMOTE-VERIFIED AT e38c75aa4ff26bdea80c82d8a24096f799dad860
 P2-G0 ADR-0004 + SQLITE CONTRACT ACCEPTED / COMPLETE
-P2-G1 IMPLEMENTED / CHECKPOINT CANDIDATE / OWNER REVIEW PENDING
-P3+ NOT AUTHORIZED / NOT STARTED
+P2-G1 OWNER ACCEPTED / COMPLETE / REMOTE-VERIFIED AT 8227c6c616140824fd70de920dc6fcf459bb734d
+P3-G0 ARCHITECTURE PROPOSAL DEFINED / BINDING PREREQUISITE OPEN / GOVERNANCE-ONLY CHECKPOINT CANDIDATE / OWNER REVIEW PENDING
+ADR-0005 + M6 CONSUMER CONTRACT PROPOSED / NO IMPLEMENTATION AUTHORITY
+P3-B1 EPISODE-PLAN-ITEM BINDING PROPOSED / NOT AUTHORIZED / NOT STARTED / BLOCKS P3-G1
+P3-G1+ NOT AUTHORIZED / NOT STARTED
 
 M7-M19
 NOT STARTED / NOT AUTHORIZED
@@ -3096,12 +3104,25 @@ R2-P1 与 R2-P2 已接受，RB13-F002 已在当前测试基线关闭，PRE-M6-RB
 关闭。`ACS-M6-P0-P1-R2` 已在
 `e38c75aa4ff26bdea80c82d8a24096f799dad860` 获得 Owner Acceptance。
 
-Project Lead 进一步接受 ADR-0004 与 M6 SQLite Contract，并授权的
-`ACS-M6-P2-G1` local-development SQLite 持久化、Migration、完整性、
-持久化幂等和持久化 Outbox 已实施，现为 Checkpoint Candidate / Owner Review
-Pending。该候选不代表全系统 Architecture Review、
-Production Ready 或正式 8765 数据库部署，也不授权 M6-P3+、M7-M19、HTTP/API、
-Frontend、V4/V3、Provider、GPU、Worker 或 ComfyUI。Frontend 保持冻结。
+Project Lead 进一步接受 ADR-0004 与 M6 SQLite Contract，并于 `2026-08-13`
+接受 `ACS-M6-P2-G1` technical baseline
+`8227c6c616140824fd70de920dc6fcf459bb734d` 为 `OWNER ACCEPTED / COMPLETE /
+REMOTE-VERIFIED`。
+
+当前 G3/P3-G0 仅记录该接受事实并提出 M6 到 M3 Script Studio 的内部只读
+Episode baseline consumer boundary。M4 只拥有可信 Project→Series context，M2
+拥有 Series/Episode identity 与 membership。当前两侧没有共享 stable Ref，且
+禁止以集号、标题或位置推断；提案因此在新的精确 SeriesPlanVersion 内增加由 M5
+拥有的 immutable EpisodePlanItemBinding。M7 仍拥有未来
+ConsistencyValidation 与 PASS/WARN/BLOCK，M9 仍拥有未来 AssetRequirement 与
+asset-resolution readiness。ADR-0005 与 M6 Consumer Contract 均为 `PROPOSED / NO
+IMPLEMENTATION AUTHORITY`。绑定实现 P3-B1 与 consumer 实现 P3-G1 均未授权；
+必须先独立授权、实施、远端验证并接受 P3-B1，才可另行授权 P3-G1。若 B1 需要
+SQLite DDL/Migration 或扩大所有权，必须 STOP 并建立独立 ADR。
+
+本治理候选不代表全系统 Architecture Review、Production Ready 或正式 8765
+数据库部署，也不授权 M6-P3-B1、M6-P3-G1+、M7-M19、HTTP/API、Frontend、V4/V3、
+Provider、GPU、Worker 或 ComfyUI。Frontend 保持冻结。
 
 ---
 
