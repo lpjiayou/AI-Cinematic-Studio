@@ -14,7 +14,7 @@
 > UI-R1 Accepted SHA:
 > `c9536fc0c745d0bf9e9c3eb543f4ab6c0566798a`
 >
-> Revision: M6-P3-G0 Architecture Owner Acceptance status synchronization; product IA and visual baseline unchanged.
+> Revision: M6-P3-B1 bounded Core authorization status synchronization; product IA and visual baseline unchanged.
 >
 > Scope:
 > AI Cinematic Studio Creator / Project Workspace / Production Editors /
@@ -130,7 +130,8 @@ Project Lead 与 Architecture Owner 接受为规范架构，但未授予任何�
 原 G1 `0c283eb653e74784301620bdaf64bf451bb687dd` 保持历史 `REVISION REQUIRED /
 NOT OWNER ACCEPTED`；修正后的 G1-R1 已在
 `d44f471c644e319bb4a5bf73707c3274ecbaa426` 获得 Owner Acceptance。当前只授权
-本次只授权 M6-P3-G0 Owner Acceptance 治理检查点，Frontend 仍冻结。
+M6-P3-B1 Core-only 有界顺序：8 路径治理检查点远端验证后，实施冻结的 6 个生产
+与 9 个测试路径，再远端验证并停止等待 B1 Owner Review。Frontend 仍冻结。
 
 ---
 
@@ -150,10 +151,18 @@ NOT OWNER ACCEPTED`；修正后的 G1-R1 已在
   8227c6c616140824fd70de920dc6fcf459bb734d`；
 - M6-P3-G0：`OWNER ACCEPTED / COMPLETE AS GOVERNANCE-ARCHITECTURE / NO
   IMPLEMENTATION AUTHORITY`；
-- ADR-0005 / M6 Consumer Contract：`ACCEPTED AS ARCHITECTURE / UNIMPLEMENTED /
-  NO IMPLEMENTATION AUTHORITY`；
-- M6-P3-B1 EpisodePlanItemBinding：`ARCHITECTURE-DEFINED PREREQUISITE / NOT
-  AUTHORIZED / NOT STARTED / BLOCKS M6-P3-G1`；
+- ADR-0005 / M6 Consumer Contract：`ACCEPTED AS ARCHITECTURE / B1 BOUNDED
+  IMPLEMENTATION AUTHORIZED / G1 UNAUTHORIZED`；
+- M6-P3-B1 EpisodePlanItemBinding：`IMPLEMENTATION REVIEW APPROVED / BOUNDED
+  AUTHORIZATION AFTER GOVERNANCE REMOTE VERIFY / BLOCKS M6-P3-G1`；
+- M6-P3-B1 Scope：`8 GOVERNANCE → 6 PRODUCTION + 9 TESTS → REMOTE VERIFY →
+  STOP FOR OWNER REVIEW`；
+- M6-P3-B1 Version policy：`INITIAL V1 / V1→V1 / EXPLICIT V1→V2 / V2→V2 /
+  V2→V1 FORBIDDEN / UNBIND VIA NEW V2`；
+- M6-P3-B1 Public/UI boundary：`CORE-ONLY create_episode_plan_item_binding_version /
+  NO ROUTE, HANDLER, EXTERNAL DTO SOURCE OR FRONTEND CHANGE`；
+- M6-P3-B1 Owner HTTP clarification：`EXISTING WORKSPACE VERSIONS V2 RESPONSE PASSES
+  THROUGH episodePlanItemBindings / NO OTHER HTTP CONTRACT EXPANSION`；
 - ADR-0006 / V5 Text Generation Capability：`ACCEPTED FOR BOUNDED G1`；
 - ACS-ARCH-R1-V5-TEXT-GENERATION-G0：`COMPLETE / REMOTE-VERIFIED AT
   92d1f3ac9e08c71458af04514baa659555fc55a7`；
@@ -989,9 +998,14 @@ Timeline and Continuity
 
 M6 边界：`M6 ≠ V5 Identity Lock`。M6 不实现 M7、GPU Render、ComfyUI、
 Worker 或跨仓 UI；M6-P0/P1 与 bounded M6-P2 已 Owner Accepted。M6-P3-G0 的
-Core 内部 consumer contract 已作为架构规范接受，但未实施且不授予 Public API、
-B1/G1 实现或任何 UI 激活权限。已接受的 V5 Text Generation 修复也不改变任何
-UI/UX/Frontend contract；Frontend 仍为 `FROZEN / NOT AUTHORIZED`。
+Core 内部 consumer contract 已作为架构规范接受，其 consumer 行为仍未实施且不
+授予 Public API、G1 或任何 UI 激活权限。B1 仅获 Core-only
+EpisodePlanItemBinding 有界实现授权，
+不得新增或修改 HTTP route、handler、外部 DTO 源文件或 Frontend。Owner 明确
+允许既有 HTTP workspace versions 的 v2 响应透传 `episodePlanItemBindings`；这不
+构成 UI 激活，且不得扩大其他 HTTP contract。已接受的 V5 Text Generation 修复也
+不改变任何 UI/UX/Frontend contract；Frontend 仍为
+`FROZEN / NOT AUTHORIZED`。
 
 示意：
 

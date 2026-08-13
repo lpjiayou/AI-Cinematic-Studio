@@ -4,12 +4,12 @@
 
 | Field | Value |
 | --- | --- |
-| Status | `ACCEPTED AS ARCHITECTURE DECISION / UNIMPLEMENTED / NO IMPLEMENTATION AUTHORITY` |
+| Status | `ACCEPTED AS ARCHITECTURE DECISION / B1 BOUNDED IMPLEMENTATION AUTHORIZED / G1 UNAUTHORIZED` |
 | Created | `2026-08-13` |
 | Author | `Codex architecture proposal under Project Lead G3/P3-G0 authority` |
-| Approval owners | `Project Lead / Architecture Owner — ACCEPTED; applicable Domain Owners — PENDING FOR AFFECTED IMPLEMENTATION` |
+| Approval owners | `Project Lead / Architecture Owner — ACCEPTED; M2/M4/M5/M6 Domain Owners — APPROVED FOR B1; other applicable Domain Owners — PENDING FOR FUTURE WORK` |
 | Decision evidence base | `8227c6c616140824fd70de920dc6fcf459bb734d`; G0 proposal checkpoint `c524486c05c21b270a7dd75e89fae4312430736a` |
-| Related task | `ACS-M6-P2-G1-CLOSEOUT-G3 / M6-P3-G0` |
+| Related task | `ACS-M6-P2-G1-CLOSEOUT-G3 / M6-P3-G0 / ACS-M6-P3-B1-EPISODE-PLAN-ITEM-BINDING` |
 | Extends | `ADR-0002`, `ADR-0003`, `ADR-0004` |
 | Supersedes | `None` |
 
@@ -34,9 +34,12 @@ acceptance and must not silently implement M7+. The active repository Source-of-
 not that target document, governs authorization.
 
 The Project Lead and Architecture Owner accepted this target architecture on
-`2026-08-13`. That acceptance changes the normative architecture only: it creates no
-implementation authority. Applicable Domain Owner confirmation remains a prerequisite
-for any affected implementation and blocks authorization of M6-P3-B1 until recorded.
+`2026-08-13`. The Project Lead, Architecture Owner, Repository Governance Owner and
+the affected M2, M4, M5 and M6 Domain Owners later approved the bounded M6-P3-B1
+implementation review against remote base
+`6bb9d165a693057f38e5789c408293ff0eaf5bcc`. B1 may begin only after its exact
+governance authorization checkpoint is pushed and remote-verified. This approval does
+not authorize M6-P3-G1 or any other affected implementation.
 
 ## Decision — accepted target architecture
 
@@ -109,6 +112,16 @@ contain only `episodeRef` and `episodePlanItemRef`; duplicates and unknown field
 rejected. Input order is normalized to the referenced EpisodePlanItem's position in
 the exact plan version, then `episodeRef`, before storage, projection and digest.
 
+The bounded B1 operation is Core-only
+`create_episode_plan_item_binding_version`. Initial plan creation remains v1. The
+accepted transitions are v1→v1, explicit v1→v2 and v2→v2; v2→v1 is forbidden.
+Unbinding must create an explicit new v2 version and may not mutate history or use a
+downgrade. No HTTP route, handler or external DTO source file is introduced or
+modified. By explicit Owner clarification, the existing HTTP workspace versions
+projection may and shall pass through `episodePlanItemBindings` when returning a v2
+version. This is not a new endpoint, DTO source or general HTTP contract expansion;
+v1 responses remain unchanged.
+
 Any stored historical M5 version containing a binding prevents deletion of that M2
 Episode. This is a bounded extension of ADR-0002's lifecycle-integrity coordinator;
 M2/M5 ownership remains unchanged. The stable lifecycle order remains not-found, then
@@ -118,10 +131,11 @@ tombstone inference or dangling binding is allowed. The first durable v2 write v
 the trusted M2/M4 relationship, and confirmation revalidates it before transition.
 
 The accepted target data contracts are `creator.series-plan.candidate.v2`,
-`v5.series-plan-version.v2` and `v5.series-plan.m6-source-snapshot.v2`. This decision
-does not authorize those contracts to be implemented and does not authorize a SQLite
-schema or migration. The binding prerequisite must be implemented and Owner Accepted
-in its own bounded checkpoint before the reader or M3 consumer can be authorized.
+`v5.series-plan-version.v2` and `v5.series-plan.m6-source-snapshot.v2`. The bounded B1
+authorization permits only their EpisodePlanItemBinding prerequisite within the exact
+frozen allowlist. It does not authorize a SQLite schema or migration. The binding
+prerequisite must be implemented and Owner Accepted in its own bounded checkpoint
+before the reader or M3 consumer can be authorized.
 
 `M6BaselineConfirmed` and `M6BaselineSuperseded` remain M6-owned events. A future
 consumer may combine ordered event handling with authoritative read-model
@@ -227,17 +241,20 @@ Public HTTP codes, UI wording and external DTOs are intentionally not decided he
   stop at a read-only Episode baseline input and must not write a ScriptVersion or
   produce consistency verdicts.
 
-## Future separately authorized implementation sequence
+## Authorized B1 and future separately authorized G1 sequence
 
 1. Project Lead and Architecture Owner accept this ADR and the normative architecture
    contract in a governance-only checkpoint, push, remote-verify and stop. This step is
-   complete as an architecture decision; applicable Domain Owner implementation review
-   remains pending.
-2. Only after applicable Domain Owner confirmation, the Project Lead may separately
-   authorize `ACS-M6-P3-B1` to implement only the M5 v2
-   EpisodePlanItemBinding prerequisite and prove v1 historical compatibility.
-3. Push, remote-verify and obtain Owner Acceptance for B1; stop if implementation needs
-   a SQLite schema/migration or any unlisted path.
+   complete as an architecture decision.
+2. The affected M2, M4, M5 and M6 Domain Owners approve B1, and the Project Lead
+   authorizes `ACS-M6-P3-B1-EPISODE-PLAN-ITEM-BINDING` against remote base
+   `6bb9d165a693057f38e5789c408293ff0eaf5bcc`.
+3. Push and remote-verify the exact eight-path governance checkpoint, then
+   automatically implement only the frozen six production and nine test paths. Push,
+   remote-verify and stop for B1 Owner Review. Stop earlier if implementation needs a
+   SQLite schema/migration, route/handler/external DTO source-file change, HTTP
+   expansion beyond the approved existing workspace versions v2 field pass-through,
+   M3/M6 consumer or any unlisted path.
 4. Only then separately authorize `ACS-M6-P3-G1` to implement the read-only M6 reader
    and exact M3 `get_m6_episode_baseline(...)` surface.
 5. Prove InMemory/SQLite parity, cross-Scope isolation, deterministic fact filtering,
@@ -246,16 +263,18 @@ Public HTTP codes, UI wording and external DTOs are intentionally not decided he
    separately accepted later contract and is not part of G1.
 6. Stop for Owner Review. M7 and M9 remain separate tasks.
 
-There is no migration or data write in M6-P3-G0. Existing data is unchanged. Neither
-B1 nor G1 is authorized by this decision. G1 remains blocked until B1 is independently
-implemented, tested, remote-verified and Owner Accepted.
+There is no migration or data write in M6-P3-G0. Existing data is unchanged. B1 alone
+is now authorized within its exact record; G1 remains unauthorized and blocked until
+B1 is independently implemented, tested, remote-verified and Owner Accepted.
 
 ## Explicit exclusions
 
-This decision does not authorize P3-B1 or P3-G1 implementation, production/test code,
-schema/migration, consumer
-checkpoint storage, Outbox dispatch/acknowledgement, broker integration, HTTP/Public
-API/DTO, Auth/RBAC, Frontend, formal port-8765 access, PostgreSQL, M7 verdicts or
+This decision does not authorize P3-G1 or any B1 path outside the exact authorization
+record. It does not authorize schema/migration, consumer
+checkpoint storage, Outbox dispatch/acknowledgement, broker integration, any
+route/handler/external DTO source-file change or HTTP expansion beyond the approved
+existing workspace versions v2 field pass-through, Auth/RBAC, Frontend, formal
+port-8765 access, PostgreSQL, M7 verdicts or
 correction, M9 AssetRequirement/asset-resolution readiness, Identity/Rights/Asset implementation,
 V4/V3, Provider, GPU, Worker, ComfyUI, M6-P4+ or Production Ready status.
 
@@ -263,9 +282,11 @@ V4/V3, Provider, GPU, Worker, ComfyUI, M6-P4+ or Production Ready status.
 
 | Role | Owner | Decision | Date | Notes |
 | --- | --- | --- | --- | --- |
-| Project Lead | `蔺鹏` | `ACCEPTED AS ARCHITECTURE` | `2026-08-13` | No implementation authority granted |
-| Architecture Owner | `蔺鹏` | `ACCEPTED AS ARCHITECTURE` | `2026-08-13` | Target boundary and two-checkpoint sequence accepted |
-| M2/M3/M4/M5/M6/M7/M9 Domain Owners | `PENDING` | `PENDING FOR AFFECTED IMPLEMENTATION` | — | Required before any affected implementation; blocks B1 authorization |
+| Project Lead | `蔺鹏` | `ACCEPTED AS ARCHITECTURE` | `2026-08-13` | Architecture acceptance itself granted no implementation authority; B1 was authorized later |
+| Architecture Owner | `蔺鹏` | `ACCEPTED AS ARCHITECTURE` | `2026-08-13` | Target boundary and two-checkpoint sequence accepted; bounded B1 later approved |
+| Repository Governance Owner | `蔺鹏` | `AUTHORIZED` | `2026-08-13` | Exact B1 governance and technical sequence |
+| M2/M4/M5/M6 Domain Owners | `蔺鹏` | `APPROVED FOR B1` | `2026-08-13` | Bounded binding, trusted-context, lifecycle and M6-source compatibility scope |
+| M3/M7/M9 and other future Domain Owners | `PENDING` | `PENDING FOR FUTURE AFFECTED IMPLEMENTATION` | — | No approval inferred; G1 and later work remain blocked |
 
 ## Change history
 
@@ -273,3 +294,4 @@ V4/V3, Provider, GPU, Worker, ComfyUI, M6-P4+ or Production Ready status.
 | --- | --- | --- |
 | `2026-08-13` | Initial Proposed ADR | `ACS-M6-P2-G1-CLOSEOUT-G3 / M6-P3-G0` |
 | `2026-08-13` | Accepted as architecture decision; implementation remains unimplemented and unauthorized | `Project Lead / Architecture Owner — M6-P3-G0 Owner Acceptance` |
+| `2026-08-13` | Bounded EpisodePlanItemBinding prerequisite implementation authorized after governance remote verification; G1 remains unauthorized | `Project Lead / Architecture Owner / Repository Governance Owner / M2-M4-M5-M6 Domain Owners` |
