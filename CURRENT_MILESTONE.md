@@ -18,7 +18,7 @@
 >
 > Frontend Governance Authorization: `FE-G0-R1 REV.3 OWNER ACCEPTED ON 2026-08-14 AT FRONTEND 7bac326c8307b0adb22b37e7ed60e80c3b7473c3 / FRONTEND BASE 1cf2515`
 >
-> Frontend Implementation Authorization: `FE-G1 EXACT EIGHT-PATH ALLOWLIST AUTHORIZED ON 2026-08-14 / FE-G2 / FE-G3 / EXPERIENCE ADAPTER / API INTEGRATION / M6 BINDING / GATE C NOT AUTHORIZED`
+> Frontend Implementation Authorization: `FE-G1 OWNER ACCEPTED ON 2026-08-14 AT FRONTEND 46c1a75547371bf0c99e346ef3beccd53771bf00 (TREE 43c095bf5891e9ad59b0477b9efff282ee718c11) / CORE 12f913f44b506e0a60654d16127fd884db3dadb2 / FE-G2-A ROUTE MIGRATION + REDIRECT CHECKPOINT AUTHORIZED / FE-G2-B / FE-G3 / EXPERIENCE ADAPTER / API INTEGRATION / M6 BINDING / GATE C NOT AUTHORIZED`
 >
 > Production Ready: `NO`
 
@@ -182,7 +182,8 @@ header removal into FE-G2 after route relocation. The sole application-code base
 remains `1cf2515`; the stale GitHub default branch remains prohibited as a development
 base. FE-G1, FE-G2, FE-G3, Experience Adapter, Creator Public HTTP/API integration,
 M6 data binding, real Project/Series/Episode state and Cross-Repo Gate C remain
-unauthorized. Script Studio remains unmigrated and no Ref may be fabricated.
+unauthorized at that timepoint. Script Studio remains unmigrated and no Ref may be
+fabricated.
 
 After independent Owner Review on `2026-08-14`, the Project Lead Owner Accepted the
 remote-verified Frontend Rev. 3 checkpoint
@@ -192,8 +193,25 @@ foundation only: one navigation definition, the future Creator layout and styles
 their tests, the root-layout type correction, README correction and Frontend CI. It
 does not move routes, remove existing page-owned headers, edit page bodies, touch
 Script Studio or connect to Core. FE-G1 must be tested, non-force published,
-remote-verified and stopped for Owner Review. FE-G2 and all integration remain
-unauthorized.
+remote-verified and stopped for Owner Review.
+
+The Project Lead subsequently Owner Accepted FE-G1 at Frontend
+`46c1a75547371bf0c99e346ef3beccd53771bf00` with tree
+`43c095bf5891e9ad59b0477b9efff282ee718c11`, together with the synchronized Core
+record at `12f913f44b506e0a60654d16127fd884db3dadb2`. Only FE-G2-A is now authorized as
+a separate checkpoint: relocate the five existing pages to `/creator`,
+`/creator/ai-director`, `/creator/projects/new`,
+`/creator/projects/[projectRef]/planning/bible` and
+`/creator/projects/[projectRef]/planning/characters`; add the five Rev. 3 section 4.1
+temporary 307 redirects; add `/creator/projects` and the Context-null
+`[projectRef]/layout.tsx`; and adjust only necessary imports. Existing page-owned
+headers, header-only CSS, per-page theme wiring, hardcoded cross-page navigation,
+page body behavior and page CSS content must remain intact. `/create` must redirect
+only to `/creator/projects/new`; the two legacy project-context entry points must
+redirect to `/creator/projects` without inventing a Ref. FE-G2-B, FE-G3, Experience
+Adapter, Creator Public HTTP/API integration, M6 data binding, Gate C, Script Studio
+migration and M6-P3-G1 remain `NOT AUTHORIZED / NOT STARTED`. FE-G2-A must be
+tested, non-force published, remote-verified and stopped for its own Owner Review.
 
 Forbidden:
 
@@ -223,9 +241,9 @@ satisfied only for bounded InMemory M6-P0/P1. That historical decision is preser
 the later ADR-0004 decision separately extends the active authorization to bounded
 M6-P2 local-development SQLite. Formal 8765 deployment remains unperformed and
 unauthorized. At that historical closeout point, the Frontend was frozen and
-untouched. Its current governance-only FE-G0-R1 Rev. 3 correction state is recorded
-in sections 2 and 8; only the exact FE-G1 eight-path Frontend implementation is
-authorized. `P3-RV1-003` remains open and non-blocking.
+untouched. Its current Frontend governance and implementation authority is recorded
+in sections 2 and 8; only the exact FE-G2-A checkpoint described there is authorized.
+`P3-RV1-003` remains open and non-blocking.
 
 PRE-M6-RB1.3-CLOSEOUT-G1-R1 is `OWNER ACCEPTED / COMPLETE / REMOTE-VERIFIED`
 at `dc9ab881b9f82ecd4a5927c456d5fe531f6850fa`. ADR-0003 is
@@ -521,7 +539,7 @@ capability.
 - M6-P3 AFTER G1 / M6-P4+ STATUS: `NOT AUTHORIZED / NOT STARTED`
 - M7-M19: `NOT STARTED / NOT AUTHORIZED`
 - FORMAL 8765 DEPLOYMENT: `UNTOUCHED / NOT DEPLOYED`
-- FRONTEND: `FE-G0-R1 REV.3 OWNER ACCEPTED AT 7bac326c8307b0adb22b37e7ed60e80c3b7473c3 / BASE 1cf2515 / FE-G1 EXACT EIGHT-PATH GLOBAL SHELL FOUNDATION AUTHORIZED / FE-G2-FE-G3 AND INTEGRATION FROZEN`
+- FRONTEND: `FE-G0-R1 REV.3 OWNER ACCEPTED AT 7bac326c8307b0adb22b37e7ed60e80c3b7473c3 / BASE 1cf2515 / FE-G1 OWNER ACCEPTED AT 46c1a75547371bf0c99e346ef3beccd53771bf00 (TREE 43c095bf5891e9ad59b0477b9efff282ee718c11) WITH CORE 12f913f44b506e0a60654d16127fd884db3dadb2 / FE-G2-A ROUTE MIGRATION + REDIRECT CHECKPOINT AUTHORIZED / FE-G2-B, FE-G3 AND INTEGRATION FROZEN`
 - PRODUCTION READY: `NO`
 - PRODUCTION CODE CHANGED BY G1-R1: `NO`
 - TEST CODE CHANGED BY G1-R1: `ONE AUTHORIZED CONTRACT TEST FILE`
@@ -538,9 +556,9 @@ and accepted ADR-0006 and later accepted corrected G1-R1 at
 `d44f471c644e319bb4a5bf73707c3274ecbaa426`. This closes the architecture-remediation
 wave but does not establish Production Ready or authorize formal database deployment,
 M6-P3-G1, later M6 work or M7-M19. That Core closeout did not itself authorize
-Frontend; the bounded FE-G1 authority derives only from the Project Lead decision
-recorded above. B1 authority is limited to the explicit record and takes effect for
-technical edits only after governance remote verification.
+Frontend; the bounded FE-G2-A authority derives only from the later Project Lead
+decision recorded above. B1 authority is limited to the explicit record and takes
+effect for technical edits only after governance remote verification.
 
 ---
 
@@ -571,7 +589,7 @@ Stop before any need to exceed the frozen one production, one test and eight
 governance paths, change InMemory production behavior, or add DDL/Migration,
 route/handler/external DTO source-file changes, M3/M6 consumer, M6-P3-G1, M7-M19,
 formal database deployment, Auth/RBAC expansion or Frontend implementation beyond
-the separately authorized FE-G1 exact eight-path allowlist.
+the separately authorized FE-G2-A route-migration checkpoint.
 
 ---
 
@@ -608,7 +626,7 @@ Owner Review.
 Formal port-8765 database access/deployment, HTTP route/handler/external DTO
 source-file changes, HTTP expansion beyond the Owner-approved existing workspace
 versions v2 field pass-through, Auth/RBAC, Frontend implementation beyond the exact
-FE-G1 eight-path allowlist, Schema/Migration, M3/M6 consumer, P3-G1 and later M6 work, M7-M19, V3,
+FE-G2-A route-migration checkpoint, Schema/Migration, M3/M6 consumer, P3-G1 and later M6 work, M7-M19, V3,
 GPU, Worker and ComfyUI remain unauthorized and not started. B1-R1 changes no
 existing Domain ownership or Production Spine.
 
