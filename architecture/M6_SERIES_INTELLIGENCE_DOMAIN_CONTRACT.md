@@ -101,3 +101,14 @@ P1 supplies only InMemory repository, operation registry and outbox registered i
 accepted LifecycleAssembly. It adds no HTTP endpoint and no durable/global outbox or
 operation claim. SQLite, migration, formal data, Frontend, M7+ and M6-P2+ remain out of
 scope.
+
+## Accepted P2 extension
+
+This document remains the normative P1 InMemory contract and is not rewritten by P2.
+ADR-0004 separately accepts a bounded local-development durable SQLite adapter that
+must preserve every domain, digest, authority, lifecycle and atomicity rule above.
+
+The P2 normative contract is
+[`M6_SERIES_INTELLIGENCE_SQLITE_CONTRACT.md`](M6_SERIES_INTELLIGENCE_SQLITE_CONTRACT.md).
+It does not authorize formal database deployment, Public API/HTTP, Frontend, M6-P3+
+or M7+.
