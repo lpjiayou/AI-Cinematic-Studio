@@ -6,9 +6,11 @@
 >
 > Current Task: `ACS-M6-P0-P1-R1 — M6-P1 ACCEPTANCE GATE CLOSURE`
 >
+> Current Review Revision: `ACS-M6-P0-P1-R2 — FINAL GOVERNANCE AND EVIDENCE CLOSURE`
+>
 > Current Work Package: `M6 Series Intelligence / P0 COMPLETE + P1 CHECKPOINT CANDIDATE / OWNER REVIEW PENDING`
 >
-> M6 Authorization: `P0 CONTRACT ACCEPTED / COMPLETE / P1 IMPLEMENTED / P2+ NOT AUTHORIZED / NOT STARTED`
+> M6 Authorization: `P0 CONTRACT ACCEPTED / COMPLETE / P1 IMPLEMENTED / CHECKPOINT CANDIDATE / OWNER REVIEW PENDING / P2+ NOT AUTHORIZED / NOT STARTED`
 >
 > M7 Authorization: `NOT AUTHORIZED`
 >
@@ -70,13 +72,14 @@ Series Intelligence InMemory Baseline
 
 Status:
 
-`NOT STARTED / P0-P1 AUTHORIZED / P2+ NOT AUTHORIZED`
+`P0 CONTRACT ACCEPTED / COMPLETE / P1 IMPLEMENTED / CHECKPOINT CANDIDATE / OWNER REVIEW PENDING / P2+ NOT AUTHORIZED / NOT STARTED`
 
 Purpose:
 
 1. preserve the remote-verified PRE-M6 checkpoints and accepted R2 evidence;
 2. record PRE-M6-RB1.3 as formally closed by Project Lead owner review;
-3. authorize only M6-P0 governance and M6-P1 InMemory implementation;
+3. record M6-P0 as contract accepted and complete, and M6-P1 as an implemented
+   checkpoint candidate pending Project Lead owner review;
 4. keep M6-P2+, M7-M19, formal database deployment and Frontend work unauthorized;
 5. keep Production Ready as `NO`.
 
@@ -267,8 +270,10 @@ Strict order:
 
 `PRE-M6-RB1.1`, `PRE-M6-RB1.2` and `PRE-M6-RB1.3` are closed. R2-P1 and R2-P2
 are accepted, and R2-P2 is remote-verified at
-`0aa14b4e426a3d968ec314029d60a47ea30cbc4d`. The next authorized task is
-`ACS-M6-P0-P1-R1`; no later milestone may be silently entered.
+`0aa14b4e426a3d968ec314029d60a47ea30cbc4d`. The current checkpoint under
+Project Lead owner review is `ACS-M6-P0-P1-R1`. `ACS-M6-P0-P1-R2` is its bounded
+final governance and test-evidence closure revision; no later milestone may be
+silently entered.
 
 ---
 
@@ -320,6 +325,7 @@ capability.
 - ADR-0002 STATUS: `ACCEPTED FOR BOUNDED R2 IMPLEMENTATION`
 - RB13-F002: `REMEDIATED / CLOSED IN CURRENT TESTED CORE BASELINE`
 - CURRENT TASK: `ACS-M6-P0-P1-R1`
+- CURRENT REVIEW REVISION: `ACS-M6-P0-P1-R2 — FINAL GOVERNANCE AND EVIDENCE CLOSURE / CHECKPOINT CANDIDATE / OWNER REVIEW PENDING`
 - R2-P1 STATUS: `ACCEPTED`
 - R2-P2 STATUS: `OWNER ACCEPTED / COMPLETE / REMOTE-VERIFIED AT 0aa14b4e426a3d968ec314029d60a47ea30cbc4d`
 - LEGACY REPOSITORY CAPABILITY PROVENANCE: `MEDIUM / OPEN / NON-BLOCKING`
@@ -366,8 +372,9 @@ Status:
 `IMPLEMENTED / CHECKPOINT CANDIDATE / OWNER REVIEW PENDING`
 
 M6-P0 is complete and M6-P1 is implemented under the explicit Project Lead instruction
-dated `2026-08-13`. This R1 closes only the bounded P1 acceptance evidence gaps.
-M6-P2+, M7-M19, formal database deployment, SQLite schema/migration changes and
-Frontend work remain unauthorized and not started.
+dated `2026-08-13`. `ACS-M6-P0-P1-R2` is limited to final governance and formal
+test-evidence closure for this R1 checkpoint; it adds no M6 capability or later-phase
+authorization. M6-P2+, M7-M19, formal database deployment, SQLite schema/migration
+changes and Frontend work remain unauthorized and not started.
 
 # End of CURRENT_MILESTONE.md

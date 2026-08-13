@@ -8,7 +8,7 @@
 >
 > Date: `2026-08-13`
 >
-> Revision: `ACS-M6-P0-P1-R1`
+> Revision: `ACS-M6-P0-P1-R2`
 >
 > Architecture Decision: `ADR-0001 — Separate Commercial Experience Layer from Core Creator Runtime / Accepted`
 >
@@ -2944,6 +2944,9 @@ STOP。
 
 # 62. Current System State
 
+以下代码块严格保留 `PRE-M6-RB1.3-CLOSEOUT-G1` 决策时点的历史快照；后续
+执行状态不得回写或覆盖该快照。
+
 截至 `PRE-M6-RB1.3-CLOSEOUT-G1`：
 
 ```text
@@ -3001,7 +3004,7 @@ RB13-F002 Deletion Lifecycle Integrity
 REMEDIATED / CLOSED IN CURRENT TESTED CORE BASELINE
 
 Current Task
-ACS-M6-P0-P1-R1 — M6-P1 ACCEPTANCE GATE CLOSURE
+ACS-M6-P0-P1 — SERIES INTELLIGENCE INMEMORY BASELINE
 
 ADR-0002 V5 Lifecycle Integrity Boundary
 ACCEPTED FOR BOUNDED R2 IMPLEMENTATION
@@ -3013,7 +3016,7 @@ Legacy repository capability provenance
 MEDIUM / OPEN / NON-BLOCKING / OWNER GATE P3-RV1-003
 
 M6 Series IP Bible + Character Intelligence
-P0 CONTRACT ACCEPTED / COMPLETE / P1 IMPLEMENTED / CHECKPOINT CANDIDATE / OWNER REVIEW PENDING / P2+ NOT AUTHORIZED / NOT STARTED
+NOT STARTED / P0-P1 AUTHORIZED / P2-P4 NOT AUTHORIZED
 
 M7-M19
 NOT STARTED / NOT AUTHORIZED
@@ -3028,7 +3031,7 @@ M6 Preconditions
 SATISFIED FOR BOUNDED INMEMORY M6-P0/P1 ONLY
 
 Formal 8765 Deployment
-UNTOUCHED / NOT DEPLOYED
+NOT PERFORMED / NOT AUTHORIZED
 
 Frontend
 FROZEN / UNTOUCHED
@@ -3040,6 +3043,31 @@ NO
 PRE-M6-RB1.3-CLOSEOUT-G1-R1 is `OWNER ACCEPTED / COMPLETE / REMOTE-VERIFIED`
 at `dc9ab881b9f82ecd4a5927c456d5fe531f6850fa`. ADR-0003 accepts the bounded
 M6 Series Intelligence baseline for the already authorized P1 implementation.
+
+当前执行状态（不属于上述历史快照）：
+
+```text
+Current Work Package
+ACS-M6-P0-P1-R1 — M6-P1 ACCEPTANCE GATE CLOSURE
+
+Current Review Revision
+ACS-M6-P0-P1-R2 — FINAL GOVERNANCE AND EVIDENCE CLOSURE / CHECKPOINT CANDIDATE / OWNER REVIEW PENDING
+
+M6 Series IP Bible + Character Intelligence
+P0 CONTRACT ACCEPTED / COMPLETE / P1 IMPLEMENTED / CHECKPOINT CANDIDATE / OWNER REVIEW PENDING / P2+ NOT AUTHORIZED / NOT STARTED
+
+M7-M19
+NOT STARTED / NOT AUTHORIZED
+
+Formal 8765 Deployment
+UNTOUCHED / NOT DEPLOYED
+
+Frontend
+FROZEN / UNTOUCHED
+
+Production Ready
+NO
+```
 
 旧仓库中的实现不得计入当前 Core 生产能力。`P3-RV1-003` 继续拥有该来源
 审计债务；该债务为非阻塞项，不得被错误升级为当前 Core 能力。
@@ -3058,8 +3086,10 @@ M6 门禁顺序统一为：
 上述八项已由 Project Lead 于 `2026-08-13` 裁定为仅对 bounded M6-P0/P1
 满足。R2-P1 与 R2-P2 已接受，RB13-F002 已在当前测试基线关闭，PRE-M6-RB1.3
 已正式关闭。该裁定不代表全系统 Architecture Review、Production Ready、正式
-8765 数据库部署或 M6-P2+ 授权。当前活动任务为 `ACS-M6-P0-P1-R1`；M6-P1 已实施并处于 Checkpoint Candidate / Owner Review Pending，
-Frontend 保持冻结，M7-M19 未授权。
+8765 数据库部署或 M6-P2+ 授权。当前工作包仍为 `ACS-M6-P0-P1-R1`；
+`ACS-M6-P0-P1-R2` 仅为该候选的治理与测试证据关闭修订。M6-P1 已实施并
+处于 Checkpoint Candidate / Owner Review Pending，Frontend 保持冻结，
+M7-M19 未授权。
 
 ---
 
