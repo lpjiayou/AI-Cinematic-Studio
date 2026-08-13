@@ -22,6 +22,7 @@ from services.v5_core_os.series_episode.foundation import SqliteSeriesEpisodeAda
 from services.v5_core_os.series_planning.foundation import SqliteSeriesPlanningAdapter
 from tests.unit.test_ai_director_phase1 import valid_brief, valid_plan
 from tests.unit.test_deletion_lifecycle_integrity import Refs, project_command, script_command
+from tests.unit.test_series_planning_m5 import valid_candidate
 
 
 NOW = "2026-08-12T00:00:00.000Z"
@@ -52,6 +53,42 @@ def seed_episode(assembly, series, workspace="workspace-a"):
         "workspaceRef": workspace, "seriesRef": series["seriesRef"],
         "creativePlanRef": plan["creativePlanRef"], "episodeNumber": 1, "title": "Episode",
     })
+
+
+def seed_bound_episode_plan(
+    assembly,
+    series,
+    episode,
+    *,
+    workspace="workspace-a",
+    profile="profile-a",
+):
+    project = assembly.project_context.create_project(
+        project_command(series, workspace, profile)
+    )
+    initial = assembly.series_planning.confirm_candidate({
+        "workspaceRef": workspace,
+        "projectRef": project["projectRef"],
+        "seriesRef": series["seriesRef"],
+        "humanConfirmed": True,
+        "candidate": valid_candidate(project["plannedEpisodeCount"]),
+    })
+    binding = {
+        "episodeRef": episode["episodeRef"],
+        "episodePlanItemRef": initial["version"]["episodePlanItems"][0][
+            "episodePlanItemRef"
+        ],
+    }
+    command = {
+        "workspaceRef": workspace,
+        "projectRef": project["projectRef"],
+        "seriesRef": series["seriesRef"],
+        "seriesPlanRef": initial["plan"]["seriesPlanRef"],
+        "expectedPlanVersion": initial["plan"]["version"],
+        "episodePlanItemBindings": [binding],
+    }
+    bound = assembly.series_planning.create_episode_plan_item_binding_version(command)
+    return project, initial, bound, binding
 
 
 class SqliteMigrationTests(unittest.TestCase):
@@ -316,6 +353,516 @@ class SqliteAssemblyTests(unittest.TestCase):
         self.assertEqual(results["second"][1].code, "dependent_script_exists")
         self.assert_integrity()
 
+    def test_historical_binding_blocks_episode_delete_after_unbind_and_restart(self):
+        series = seed_series(self.first)
+        episode = seed_episode(self.first, series)
+        project, initial, bound, _ = seed_bound_episode_plan(
+            self.first, series, episode
+        )
+        self.first.series_planning.create_episode_plan_item_binding_version({
+            "workspaceRef": "workspace-a",
+            "projectRef": project["projectRef"],
+            "seriesRef": series["seriesRef"],
+            "seriesPlanRef": initial["plan"]["seriesPlanRef"],
+            "expectedPlanVersion": bound["plan"]["version"],
+            "episodePlanItemBindings": [],
+        })
+        restarted = LifecycleAssembly.sqlite(self.path, ref_factory=Refs(), clock=lambda: NOW)
+
+        with self.assertRaises(SeriesEpisodePublicError) as error:
+            restarted.series_episode.delete_episode(
+                "workspace-a", series["seriesRef"], episode["episodeRef"]
+            )
+        self.assertEqual(
+            (error.exception.code, error.exception.status),
+            ("dependent_series_plan_binding_exists", 409),
+        )
+        connection = open_fk(self.path)
+        try:
+            self.assertEqual(
+                connection.execute(
+                    "SELECT COUNT(*) FROM v5_series_plan_versions "
+                    "WHERE workspace_ref=? AND series_ref=? AND schema_version=?",
+                    (
+                        "workspace-a",
+                        series["seriesRef"],
+                        "v5.series-plan-version.v2",
+                    ),
+                ).fetchone()[0],
+                2,
+            )
+            self.assertIsNotNone(
+                connection.execute(
+                    "SELECT 1 FROM v5_episode_projects "
+                    "WHERE workspace_ref=? AND series_ref=? AND episode_ref=?",
+                    ("workspace-a", series["seriesRef"], episode["episodeRef"]),
+                ).fetchone()
+            )
+        finally:
+            connection.close()
+        self.assert_integrity()
+
+    def test_v1_series_plan_row_bytes_are_unchanged_by_bind_unbind_and_restart(self):
+        series = seed_series(self.first)
+        episode = seed_episode(self.first, series)
+        project, initial, bound, _ = seed_bound_episode_plan(
+            self.first, series, episode
+        )
+        connection = open_fk(self.path)
+        try:
+            before = tuple(connection.execute(
+                "SELECT schema_version,content_json FROM v5_series_plan_versions "
+                "WHERE workspace_ref=? AND series_plan_version_ref=?",
+                ("workspace-a", initial["version"]["seriesPlanVersionRef"]),
+            ).fetchone())
+        finally:
+            connection.close()
+        self.first.series_planning.create_episode_plan_item_binding_version({
+            "workspaceRef": "workspace-a",
+            "projectRef": project["projectRef"],
+            "seriesRef": series["seriesRef"],
+            "seriesPlanRef": initial["plan"]["seriesPlanRef"],
+            "expectedPlanVersion": bound["plan"]["version"],
+            "episodePlanItemBindings": [],
+        })
+        LifecycleAssembly.sqlite(self.path, ref_factory=Refs(), clock=lambda: NOW)
+        connection = open_fk(self.path)
+        try:
+            after = tuple(connection.execute(
+                "SELECT schema_version,content_json FROM v5_series_plan_versions "
+                "WHERE workspace_ref=? AND series_plan_version_ref=?",
+                ("workspace-a", initial["version"]["seriesPlanVersionRef"]),
+            ).fetchone())
+        finally:
+            connection.close()
+        self.assertEqual(after, before)
+        self.assertEqual(before[0], "v5.series-plan-version.v1")
+
+    def test_binding_commit_uncertainty_poisons_and_restart_reconciles_durable_v2(self):
+        series = seed_series(self.first)
+        episode = seed_episode(self.first, series)
+        project = self.first.project_context.create_project(project_command(series))
+        initial = self.first.series_planning.confirm_candidate({
+            "workspaceRef": "workspace-a",
+            "projectRef": project["projectRef"],
+            "seriesRef": series["seriesRef"],
+            "humanConfirmed": True,
+            "candidate": valid_candidate(project["plannedEpisodeCount"]),
+        })
+        command = {
+            "workspaceRef": "workspace-a",
+            "projectRef": project["projectRef"],
+            "seriesRef": series["seriesRef"],
+            "seriesPlanRef": initial["plan"]["seriesPlanRef"],
+            "expectedPlanVersion": initial["plan"]["version"],
+            "episodePlanItemBindings": [{
+                "episodeRef": episode["episodeRef"],
+                "episodePlanItemRef": initial["version"]["episodePlanItems"][0][
+                    "episodePlanItemRef"
+                ],
+            }],
+        }
+        uncertain_refs = Refs()
+        uncertain_refs("series-plan-version")
+        uncertain = LifecycleAssembly.sqlite(
+            self.path, ref_factory=uncertain_refs, clock=lambda: NOW
+        )
+        state = uncertain.state
+        original_connect = state._connect
+
+        class CommitThenRaise:
+            def __init__(self, inner): self.inner = inner
+            def __getattr__(self, name): return getattr(self.inner, name)
+            def commit(self):
+                self.inner.commit()
+                raise sqlite3.OperationalError("commit outcome uncertain")
+
+        state._connect = lambda: CommitThenRaise(original_connect())
+        with self.assertRaises(LifecycleRollbackError):
+            uncertain.series_planning.create_episode_plan_item_binding_version(command)
+        self.assertEqual(uncertain.diagnostic_snapshot()["state"], "poisoned")
+        with self.assertRaises(AssemblyPoisonedError):
+            uncertain.series_planning.get_workspace(
+                "workspace-a", project["projectRef"], series["seriesRef"]
+            )
+        restarted = LifecycleAssembly.sqlite(self.path, ref_factory=Refs(), clock=lambda: NOW)
+        workspace = restarted.series_planning.get_workspace(
+            "workspace-a", project["projectRef"], series["seriesRef"]
+        )
+        self.assertEqual(workspace["versions"][-1]["schemaVersion"], "v5.series-plan-version.v2")
+        with self.assertRaises(SeriesEpisodePublicError) as blocked:
+            restarted.series_episode.delete_episode(
+                "workspace-a", series["seriesRef"], episode["episodeRef"]
+            )
+        self.assertEqual(blocked.exception.code, "dependent_series_plan_binding_exists")
+
+    def test_binding_rollback_failure_poisons_and_restart_reads_exact_preimage(self):
+        series = seed_series(self.first)
+        episode = seed_episode(self.first, series)
+        project = self.first.project_context.create_project(project_command(series))
+        initial = self.first.series_planning.confirm_candidate({
+            "workspaceRef": "workspace-a",
+            "projectRef": project["projectRef"],
+            "seriesRef": series["seriesRef"],
+            "humanConfirmed": True,
+            "candidate": valid_candidate(project["plannedEpisodeCount"]),
+        })
+        rollback_refs = Refs()
+        rollback_refs("series-plan-version")
+        uncertain = LifecycleAssembly.sqlite(
+            self.path, ref_factory=rollback_refs, clock=lambda: NOW
+        )
+        state = uncertain.state
+        original_connect = state._connect
+
+        class FailingRollback:
+            def __init__(self, inner): self.inner = inner
+            def __getattr__(self, name): return getattr(self.inner, name)
+            def rollback(self):
+                raise sqlite3.OperationalError("rollback outcome uncertain")
+
+        state._connect = lambda: FailingRollback(original_connect())
+        service = uncertain.series_planning._SeriesPlanningPublicBoundary__service
+        original_append = service.repository.append_version
+
+        def append_then_fail(*args, **kwargs):
+            original_append(*args, **kwargs)
+            raise RuntimeError("fail after binding append")
+
+        service.repository.append_version = append_then_fail
+        with self.assertRaises(LifecycleRollbackError):
+            uncertain.series_planning.create_episode_plan_item_binding_version({
+                "workspaceRef": "workspace-a",
+                "projectRef": project["projectRef"],
+                "seriesRef": series["seriesRef"],
+                "seriesPlanRef": initial["plan"]["seriesPlanRef"],
+                "expectedPlanVersion": initial["plan"]["version"],
+                "episodePlanItemBindings": [{
+                    "episodeRef": episode["episodeRef"],
+                    "episodePlanItemRef": initial["version"]["episodePlanItems"][0][
+                        "episodePlanItemRef"
+                    ],
+                }],
+            })
+        self.assertEqual(uncertain.diagnostic_snapshot()["state"], "poisoned")
+        restarted = LifecycleAssembly.sqlite(self.path, ref_factory=Refs(), clock=lambda: NOW)
+        workspace = restarted.series_planning.get_workspace(
+            "workspace-a", project["projectRef"], series["seriesRef"]
+        )
+        self.assertEqual(len(workspace["versions"]), 1)
+        self.assertEqual(workspace["plan"]["version"], initial["plan"]["version"])
+
+    def test_script_dependency_precedes_series_plan_binding_dependency(self):
+        series = seed_series(self.first)
+        episode = seed_episode(self.first, series)
+        seed_bound_episode_plan(self.first, series, episode)
+        self.first.script_studio.create_version(script_command(series, episode))
+
+        with self.assertRaises(SeriesEpisodePublicError) as error:
+            self.first.series_episode.delete_episode(
+                "workspace-a", series["seriesRef"], episode["episodeRef"]
+            )
+        self.assertEqual(
+            (error.exception.code, error.exception.status),
+            ("dependent_script_exists", 409),
+        )
+
+    def test_binding_create_and_episode_delete_cross_assembly_race(self):
+        series = seed_series(self.first)
+        episode = seed_episode(self.first, series)
+        project = self.first.project_context.create_project(project_command(series))
+        initial = self.first.series_planning.confirm_candidate({
+            "workspaceRef": "workspace-a",
+            "projectRef": project["projectRef"],
+            "seriesRef": series["seriesRef"],
+            "humanConfirmed": True,
+            "candidate": valid_candidate(project["plannedEpisodeCount"]),
+        })
+        command = {
+            "workspaceRef": "workspace-a",
+            "projectRef": project["projectRef"],
+            "seriesRef": series["seriesRef"],
+            "seriesPlanRef": initial["plan"]["seriesPlanRef"],
+            "expectedPlanVersion": initial["plan"]["version"],
+            "episodePlanItemBindings": [{
+                "episodeRef": episode["episodeRef"],
+                "episodePlanItemRef": initial["version"]["episodePlanItems"][0][
+                    "episodePlanItemRef"
+                ],
+            }],
+        }
+        binding_refs = Refs()
+        binding_refs("series-plan-version")
+        results = self.ordered_race(
+            LifecycleOperation.APPEND_SERIES_PLAN_VERSION,
+            lambda assembly: assembly.series_planning.create_episode_plan_item_binding_version(
+                command
+            ),
+            lambda assembly: assembly.series_episode.delete_episode(
+                "workspace-a", series["seriesRef"], episode["episodeRef"]
+            ),
+            ref_factory=binding_refs,
+        )
+        self.assertEqual(results["first"][0], "ok", repr(results))
+        self.assertEqual(
+            (results["second"][1].code, results["second"][1].status),
+            ("dependent_series_plan_binding_exists", 409),
+        )
+        self.assert_integrity()
+
+    def test_episode_delete_first_rejects_late_binding_cross_assembly(self):
+        series = seed_series(self.first)
+        episode = seed_episode(self.first, series)
+        project = self.first.project_context.create_project(project_command(series))
+        initial = self.first.series_planning.confirm_candidate({
+            "workspaceRef": "workspace-a",
+            "projectRef": project["projectRef"],
+            "seriesRef": series["seriesRef"],
+            "humanConfirmed": True,
+            "candidate": valid_candidate(project["plannedEpisodeCount"]),
+        })
+        command = {
+            "workspaceRef": "workspace-a",
+            "projectRef": project["projectRef"],
+            "seriesRef": series["seriesRef"],
+            "seriesPlanRef": initial["plan"]["seriesPlanRef"],
+            "expectedPlanVersion": initial["plan"]["version"],
+            "episodePlanItemBindings": [{
+                "episodeRef": episode["episodeRef"],
+                "episodePlanItemRef": initial["version"]["episodePlanItems"][0][
+                    "episodePlanItemRef"
+                ],
+            }],
+        }
+        results = self.ordered_race(
+            LifecycleOperation.DELETE_EPISODE,
+            lambda assembly: assembly.series_episode.delete_episode(
+                "workspace-a", series["seriesRef"], episode["episodeRef"]
+            ),
+            lambda assembly: assembly.series_planning.create_episode_plan_item_binding_version(
+                command
+            ),
+        )
+        self.assertEqual(results["first"][0], "ok", repr(results))
+        self.assertEqual(results["second"][0], "error", repr(results))
+        self.assertIn(results["second"][1].code, {"not_found", "scope_mismatch"})
+        connection = open_fk(self.path)
+        try:
+            self.assertEqual(
+                connection.execute(
+                    "SELECT COUNT(*) FROM v5_series_plan_versions "
+                    "WHERE workspace_ref=? AND series_plan_ref=?",
+                    ("workspace-a", initial["plan"]["seriesPlanRef"]),
+                ).fetchone()[0],
+                1,
+            )
+        finally:
+            connection.close()
+        self.assert_integrity()
+
+    def test_partial_binding_write_rolls_back_sqlite_version_and_episode(self):
+        series = seed_series(self.first)
+        episode = seed_episode(self.first, series)
+        project = self.first.project_context.create_project(project_command(series))
+        initial = self.first.series_planning.confirm_candidate({
+            "workspaceRef": "workspace-a",
+            "projectRef": project["projectRef"],
+            "seriesRef": series["seriesRef"],
+            "humanConfirmed": True,
+            "candidate": valid_candidate(project["plannedEpisodeCount"]),
+        })
+        service = self.first.series_planning._SeriesPlanningPublicBoundary__service
+        original = service.repository.append_version
+
+        def append_then_fail(*args, **kwargs):
+            original(*args, **kwargs)
+            raise RuntimeError("injected failure after SQLite binding append")
+
+        service.repository.append_version = append_then_fail
+        try:
+            with self.assertRaises(RuntimeError):
+                self.first.series_planning.create_episode_plan_item_binding_version({
+                    "workspaceRef": "workspace-a",
+                    "projectRef": project["projectRef"],
+                    "seriesRef": series["seriesRef"],
+                    "seriesPlanRef": initial["plan"]["seriesPlanRef"],
+                    "expectedPlanVersion": initial["plan"]["version"],
+                    "episodePlanItemBindings": [{
+                        "episodeRef": episode["episodeRef"],
+                        "episodePlanItemRef": initial["version"]["episodePlanItems"][0][
+                            "episodePlanItemRef"
+                        ],
+                    }],
+                })
+        finally:
+            service.repository.append_version = original
+        connection = open_fk(self.path)
+        try:
+            self.assertEqual(
+                connection.execute(
+                    "SELECT COUNT(*) FROM v5_series_plan_versions "
+                    "WHERE workspace_ref=? AND series_plan_ref=?",
+                    ("workspace-a", initial["plan"]["seriesPlanRef"]),
+                ).fetchone()[0],
+                1,
+            )
+            self.assertIsNotNone(
+                connection.execute(
+                    "SELECT 1 FROM v5_episode_projects "
+                    "WHERE workspace_ref=? AND series_ref=? AND episode_ref=?",
+                    ("workspace-a", series["seriesRef"], episode["episodeRef"]),
+                ).fetchone()
+            )
+        finally:
+            connection.close()
+        self.assertEqual(self.first.diagnostic_snapshot()["state"], "ready")
+        self.assert_integrity()
+
+    def test_malformed_and_unknown_exact_scope_v2_history_blocks_episode_delete(self):
+        for corruption in ("malformed-json", "unknown-schema", "empty-created-at"):
+            with self.subTest(corruption=corruption):
+                path = Path(self.temp.name) / f"{corruption}.sqlite3"
+                migrate_lifecycle_database(path, allow_upgrade=True)
+                assembly = LifecycleAssembly.sqlite(path, ref_factory=Refs(), clock=lambda: NOW)
+                series = seed_series(assembly)
+                episode = seed_episode(assembly, series)
+                _, _, bound, _ = seed_bound_episode_plan(assembly, series, episode)
+                connection = open_fk(path)
+                try:
+                    if corruption == "malformed-json":
+                        connection.execute(
+                            "UPDATE v5_series_plan_versions SET content_json=? "
+                            "WHERE workspace_ref=? AND series_plan_version_ref=?",
+                            (
+                                "{",
+                                "workspace-a",
+                                bound["version"]["seriesPlanVersionRef"],
+                            ),
+                        )
+                    elif corruption == "unknown-schema":
+                        connection.execute(
+                            "UPDATE v5_series_plan_versions SET schema_version=? "
+                            "WHERE workspace_ref=? AND series_plan_version_ref=?",
+                            (
+                                "v5.series-plan-version.unknown",
+                                "workspace-a",
+                                bound["version"]["seriesPlanVersionRef"],
+                            ),
+                        )
+                    else:
+                        connection.execute(
+                            "UPDATE v5_series_plan_versions SET created_at='' "
+                            "WHERE workspace_ref=? AND series_plan_version_ref=?",
+                            ("workspace-a", bound["version"]["seriesPlanVersionRef"]),
+                        )
+                finally:
+                    connection.close()
+                restarted = LifecycleAssembly.sqlite(path, ref_factory=Refs(), clock=lambda: NOW)
+                with self.assertRaises(SeriesEpisodePublicError) as error:
+                    restarted.series_episode.delete_episode(
+                        "workspace-a", series["seriesRef"], episode["episodeRef"]
+                    )
+                self.assertEqual(
+                    (error.exception.code, error.exception.status),
+                    ("dependent_series_plan_binding_exists", 409),
+                )
+
+    def test_exact_scope_plan_with_all_version_rows_missing_blocks_episode_delete(self):
+        series = seed_series(self.first)
+        episode = seed_episode(self.first, series)
+        _, initial, _, _ = seed_bound_episode_plan(self.first, series, episode)
+        connection = open_fk(self.path)
+        try:
+            connection.execute(
+                "DELETE FROM v5_series_plan_versions "
+                "WHERE workspace_ref=? AND series_plan_ref=?",
+                ("workspace-a", initial["plan"]["seriesPlanRef"]),
+            )
+        finally:
+            connection.close()
+
+        restarted = LifecycleAssembly.sqlite(self.path, ref_factory=Refs(), clock=lambda: NOW)
+        with self.assertRaises(SeriesEpisodePublicError) as error:
+            restarted.series_episode.delete_episode(
+                "workspace-a", series["seriesRef"], episode["episodeRef"]
+            )
+        self.assertEqual(
+            (error.exception.code, error.exception.status),
+            ("dependent_series_plan_binding_exists", 409),
+        )
+
+    def test_project_relationship_history_cannot_be_hidden_by_corrupt_sqlite_scope(self):
+        series = seed_series(self.first)
+        episode = seed_episode(self.first, series)
+        _, initial, _, _ = seed_bound_episode_plan(self.first, series, episode)
+        connection = sqlite3.connect(self.path, isolation_level=None)
+        try:
+            connection.execute(
+                "UPDATE v5_series_plans SET series_ref=? "
+                "WHERE workspace_ref=? AND series_plan_ref=?",
+                ("series-hidden", "workspace-a", initial["plan"]["seriesPlanRef"]),
+            )
+            connection.execute(
+                "UPDATE v5_series_plan_versions SET series_ref=? "
+                "WHERE workspace_ref=? AND series_plan_ref=?",
+                ("series-hidden", "workspace-a", initial["plan"]["seriesPlanRef"]),
+            )
+        finally:
+            connection.close()
+
+        repository = SqliteSeriesPlanningAdapter(self.path)
+        self.assertTrue(
+            repository.lifecycle_has_episode_binding_dependency(
+                "workspace-a", series["seriesRef"], episode["episodeRef"]
+            )
+        )
+        with self.assertRaises(LifecycleMigrationError):
+            LifecycleAssembly.sqlite(self.path, ref_factory=Refs(), clock=lambda: NOW)
+
+    def test_malformed_historical_version_ref_blocks_sqlite_episode_delete(self):
+        series = seed_series(self.first)
+        bound_episode = seed_episode(self.first, series)
+        other_episode = self.first.series_episode.create_episode({
+            "workspaceRef": "workspace-a",
+            "seriesRef": series["seriesRef"],
+            "creativePlanRef": bound_episode["creativePlanRef"],
+            "episodeNumber": 2,
+            "title": "第2集",
+        })
+        _, initial, bound, _ = seed_bound_episode_plan(
+            self.first, series, bound_episode
+        )
+        connection = open_fk(self.path)
+        try:
+            connection.execute(
+                "UPDATE v5_series_plan_versions SET series_plan_version_ref=? "
+                "WHERE workspace_ref=? AND series_plan_ref=? AND version_number=1",
+                ("bad ref", "workspace-a", initial["plan"]["seriesPlanRef"]),
+            )
+            connection.execute(
+                "UPDATE v5_series_plan_versions SET parent_version_ref=? "
+                "WHERE workspace_ref=? AND series_plan_ref=? AND version_number=2",
+                ("bad ref", "workspace-a", initial["plan"]["seriesPlanRef"]),
+            )
+            connection.execute(
+                "UPDATE v5_series_plans SET confirmed_version_ref=? "
+                "WHERE workspace_ref=? AND series_plan_ref=?",
+                (
+                    bound["version"]["seriesPlanVersionRef"],
+                    "workspace-a",
+                    initial["plan"]["seriesPlanRef"],
+                ),
+            )
+        finally:
+            connection.close()
+
+        restarted = LifecycleAssembly.sqlite(self.path, ref_factory=Refs(), clock=lambda: NOW)
+        with self.assertRaises(SeriesEpisodePublicError) as protected:
+            restarted.series_episode.delete_episode(
+                "workspace-a", series["seriesRef"], other_episode["episodeRef"]
+            )
+        self.assertEqual(protected.exception.code, "dependent_series_plan_binding_exists")
+
     def test_append_and_series_delete_cross_assembly_race(self):
         series = seed_series(self.first)
         episode = seed_episode(self.first, series)
@@ -357,6 +904,33 @@ class SqliteAssemblyTests(unittest.TestCase):
         assembly.script_studio.create_version(script_command(b, eb, "workspace-b"))
         assembly.series_episode.delete_episode("workspace-a", a["seriesRef"], ea["episodeRef"])
         self.assertEqual(assembly.series_episode.get_episode("workspace-b", b["seriesRef"], eb["episodeRef"])["workspaceRef"], "workspace-b")
+        self.assert_integrity()
+
+    def test_same_binding_refs_across_workspaces_are_isolated(self):
+        fixed = Refs(fixed=True)
+        assembly = LifecycleAssembly.sqlite(self.path, ref_factory=fixed, clock=lambda: NOW)
+        series_a = seed_series(assembly, "workspace-a", "profile-a")
+        episode_a = seed_episode(assembly, series_a, "workspace-a")
+        series_b = seed_series(assembly, "workspace-b", "profile-b")
+        episode_b = seed_episode(assembly, series_b, "workspace-b")
+        seed_bound_episode_plan(
+            assembly,
+            series_b,
+            episode_b,
+            workspace="workspace-b",
+            profile="profile-b",
+        )
+
+        deleted = assembly.series_episode.delete_episode(
+            "workspace-a", series_a["seriesRef"], episode_a["episodeRef"]
+        )
+        self.assertEqual(deleted["deletedEpisodeCount"], 1)
+        self.assertEqual(
+            assembly.series_episode.get_episode(
+                "workspace-b", series_b["seriesRef"], episode_b["episodeRef"]
+            )["workspaceRef"],
+            "workspace-b",
+        )
         self.assert_integrity()
 
     def test_fk_error_is_domain_mapped(self):

@@ -15,6 +15,7 @@ from services.v5_core_os.series_episode.foundation import (
     PLAN_BINDING_SCHEMA_VERSION,
     SERIES_SCHEMA_VERSION,
     ConfirmedCreativePlanBinding,
+    DependentRecordError,
     EpisodeRecord,
     InMemorySeriesEpisodeAdapter,
     SeriesEpisodeRepository,
@@ -276,6 +277,18 @@ class CreatorSeriesEpisodeArchitectureContractTests(unittest.TestCase):
         source = inspect.getsource(public_package.SeriesEpisodePublicBoundary)
         self.assertIn("SeriesEpisodePublicError", source)
         self.assertNotIn("sqlite3", source)
+
+    def test_series_plan_binding_dependency_has_stable_public_409_mapping(self):
+        domain_error = DependentRecordError("dependent_series_plan_binding_exists")
+        public_error = public_package.SeriesEpisodePublicBoundary._error(domain_error)
+        self.assertEqual(
+            (domain_error.code, public_error.code, public_error.status),
+            (
+                "dependent_series_plan_binding_exists",
+                "dependent_series_plan_binding_exists",
+                409,
+            ),
+        )
 
 
 if __name__ == "__main__":

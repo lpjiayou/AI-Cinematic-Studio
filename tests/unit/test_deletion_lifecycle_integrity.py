@@ -22,6 +22,7 @@ from services.v5_core_os.series_episode import create_in_memory_boundary as crea
 from services.v5_core_os.series_planning import create_in_memory_boundary as create_planning_boundary
 from tests.unit.test_ai_director_phase1 import valid_brief, valid_plan
 from tests.unit.test_script_studio_m3 import content_from_candidate
+from tests.unit.test_series_planning_m5 import valid_candidate
 
 
 NOW = "2026-08-12T00:00:00.000Z"
@@ -122,6 +123,42 @@ def script_command(series, episode, workspace="workspace-a"):
         "changeKind": "ai-generation",
         "content": content_from_candidate(),
     }
+
+
+def seed_bound_episode_plan(
+    assembly,
+    series,
+    episode,
+    *,
+    workspace="workspace-a",
+    profile="profile-a",
+):
+    project = assembly.project_context.create_project(
+        project_command(series, workspace, profile)
+    )
+    initial = assembly.series_planning.confirm_candidate({
+        "workspaceRef": workspace,
+        "projectRef": project["projectRef"],
+        "seriesRef": series["seriesRef"],
+        "humanConfirmed": True,
+        "candidate": valid_candidate(project["plannedEpisodeCount"]),
+    })
+    binding = {
+        "episodeRef": episode["episodeRef"],
+        "episodePlanItemRef": initial["version"]["episodePlanItems"][0][
+            "episodePlanItemRef"
+        ],
+    }
+    command = {
+        "workspaceRef": workspace,
+        "projectRef": project["projectRef"],
+        "seriesRef": series["seriesRef"],
+        "seriesPlanRef": initial["plan"]["seriesPlanRef"],
+        "expectedPlanVersion": initial["plan"]["version"],
+        "episodePlanItemBindings": [binding],
+    }
+    bound = assembly.series_planning.create_episode_plan_item_binding_version(command)
+    return project, initial, bound, binding
 
 
 class LifecycleLeaseContractTests(unittest.TestCase):
@@ -459,6 +496,224 @@ class LifecyclePublicBoundaryTests(unittest.TestCase):
         )
         self.assertEqual(len(workspace["versions"]), 2)
 
+    def test_historical_series_plan_binding_blocks_episode_delete_after_unbind(self):
+        series = seed_series(self.assembly)
+        episode = seed_episode(self.assembly, series)
+        project, initial, bound, _ = seed_bound_episode_plan(
+            self.assembly, series, episode
+        )
+        self.assembly.series_planning.create_episode_plan_item_binding_version({
+            "workspaceRef": "workspace-a",
+            "projectRef": project["projectRef"],
+            "seriesRef": series["seriesRef"],
+            "seriesPlanRef": initial["plan"]["seriesPlanRef"],
+            "expectedPlanVersion": bound["plan"]["version"],
+            "episodePlanItemBindings": [],
+        })
+
+        with self.assertRaises(SeriesEpisodePublicError) as error:
+            self.assembly.series_episode.delete_episode(
+                "workspace-a", series["seriesRef"], episode["episodeRef"]
+            )
+        self.assertEqual(
+            (error.exception.code, error.exception.status),
+            ("dependent_series_plan_binding_exists", 409),
+        )
+        self.assertEqual(
+            self.assembly.series_episode.get_episode(
+                "workspace-a", series["seriesRef"], episode["episodeRef"]
+            )["episodeRef"],
+            episode["episodeRef"],
+        )
+        workspace = self.assembly.series_planning.get_workspace(
+            "workspace-a", project["projectRef"], series["seriesRef"]
+        )
+        self.assertEqual(len(workspace["versions"]), 3)
+        self.assertEqual(workspace["versions"][-1]["episodePlanItemBindings"], [])
+
+    def test_script_dependency_precedes_series_plan_binding_dependency(self):
+        series = seed_series(self.assembly)
+        episode = seed_episode(self.assembly, series)
+        seed_bound_episode_plan(self.assembly, series, episode)
+        self.assembly.script_studio.create_version(script_command(series, episode))
+
+        with self.assertRaises(SeriesEpisodePublicError) as error:
+            self.assembly.series_episode.delete_episode(
+                "workspace-a", series["seriesRef"], episode["episodeRef"]
+            )
+        self.assertEqual(
+            (error.exception.code, error.exception.status),
+            ("dependent_script_exists", 409),
+        )
+
+    def test_unreadable_binding_history_blocks_existing_episode_after_not_found_gate(self):
+        series = seed_series(self.assembly)
+        episode = seed_episode(self.assembly, series)
+        repository = (
+            self.assembly.series_planning
+            ._SeriesPlanningPublicBoundary__service.repository
+        )
+        calls = []
+        original = repository.lifecycle_has_episode_binding_dependency
+
+        def unreadable(workspace_ref, series_ref, episode_ref):
+            calls.append((workspace_ref, series_ref, episode_ref))
+            raise RuntimeError("unreadable binding history")
+
+        repository.lifecycle_has_episode_binding_dependency = unreadable
+        try:
+            with self.assertRaises(SeriesEpisodePublicError) as missing:
+                self.assembly.series_episode.delete_episode(
+                    "workspace-a", series["seriesRef"], "episode-missing"
+                )
+            self.assertEqual((missing.exception.code, missing.exception.status), ("not_found", 404))
+            self.assertEqual(calls, [])
+
+            with self.assertRaises(SeriesEpisodePublicError) as protected:
+                self.assembly.series_episode.delete_episode(
+                    "workspace-a", series["seriesRef"], episode["episodeRef"]
+                )
+            self.assertEqual(
+                (protected.exception.code, protected.exception.status),
+                ("dependent_series_plan_binding_exists", 409),
+            )
+            self.assertEqual(calls, [("workspace-a", series["seriesRef"], episode["episodeRef"])])
+        finally:
+            repository.lifecycle_has_episode_binding_dependency = original
+
+    def test_binding_write_first_blocks_episode_delete_without_orphan(self):
+        series = seed_series(self.assembly)
+        episode = seed_episode(self.assembly, series)
+        project = self.assembly.project_context.create_project(project_command(series))
+        initial = self.assembly.series_planning.confirm_candidate({
+            "workspaceRef": "workspace-a",
+            "projectRef": project["projectRef"],
+            "seriesRef": series["seriesRef"],
+            "humanConfirmed": True,
+            "candidate": valid_candidate(project["plannedEpisodeCount"]),
+        })
+        command = {
+            "workspaceRef": "workspace-a",
+            "projectRef": project["projectRef"],
+            "seriesRef": series["seriesRef"],
+            "seriesPlanRef": initial["plan"]["seriesPlanRef"],
+            "expectedPlanVersion": initial["plan"]["version"],
+            "episodePlanItemBindings": [{
+                "episodeRef": episode["episodeRef"],
+                "episodePlanItemRef": initial["version"]["episodePlanItems"][0][
+                    "episodePlanItemRef"
+                ],
+            }],
+        }
+        result = self._run_race(
+            lambda: self.assembly.series_planning.create_episode_plan_item_binding_version(
+                command
+            ),
+            lambda: self.assembly.series_episode.delete_episode(
+                "workspace-a", series["seriesRef"], episode["episodeRef"]
+            ),
+        )
+        self.assertEqual(result["first"][0], "ok", repr(result))
+        self.assertEqual(
+            (result["second"][1].code, result["second"][1].status),
+            ("dependent_series_plan_binding_exists", 409),
+        )
+        self.assertEqual(
+            self.assembly.series_episode.get_episode(
+                "workspace-a", series["seriesRef"], episode["episodeRef"]
+            )["episodeRef"],
+            episode["episodeRef"],
+        )
+
+    def test_episode_delete_first_rejects_late_binding_without_orphan(self):
+        series = seed_series(self.assembly)
+        episode = seed_episode(self.assembly, series)
+        project = self.assembly.project_context.create_project(project_command(series))
+        initial = self.assembly.series_planning.confirm_candidate({
+            "workspaceRef": "workspace-a",
+            "projectRef": project["projectRef"],
+            "seriesRef": series["seriesRef"],
+            "humanConfirmed": True,
+            "candidate": valid_candidate(project["plannedEpisodeCount"]),
+        })
+        command = {
+            "workspaceRef": "workspace-a",
+            "projectRef": project["projectRef"],
+            "seriesRef": series["seriesRef"],
+            "seriesPlanRef": initial["plan"]["seriesPlanRef"],
+            "expectedPlanVersion": initial["plan"]["version"],
+            "episodePlanItemBindings": [{
+                "episodeRef": episode["episodeRef"],
+                "episodePlanItemRef": initial["version"]["episodePlanItems"][0][
+                    "episodePlanItemRef"
+                ],
+            }],
+        }
+        result = self._run_race(
+            lambda: self.assembly.series_episode.delete_episode(
+                "workspace-a", series["seriesRef"], episode["episodeRef"]
+            ),
+            lambda: self.assembly.series_planning.create_episode_plan_item_binding_version(
+                command
+            ),
+        )
+        self.assertEqual(result["first"][0], "ok", repr(result))
+        self.assertEqual(result["second"][0], "error", repr(result))
+        self.assertIn(result["second"][1].code, {"not_found", "scope_mismatch"})
+        workspace = self.assembly.series_planning.get_workspace(
+            "workspace-a", project["projectRef"], series["seriesRef"]
+        )
+        self.assertEqual(len(workspace["versions"]), 1)
+
+    def test_partial_binding_write_is_rolled_back_with_all_in_memory_resources(self):
+        series = seed_series(self.assembly)
+        episode = seed_episode(self.assembly, series)
+        project = self.assembly.project_context.create_project(project_command(series))
+        initial = self.assembly.series_planning.confirm_candidate({
+            "workspaceRef": "workspace-a",
+            "projectRef": project["projectRef"],
+            "seriesRef": series["seriesRef"],
+            "humanConfirmed": True,
+            "candidate": valid_candidate(project["plannedEpisodeCount"]),
+        })
+        service = self.assembly.series_planning._SeriesPlanningPublicBoundary__service
+        original = service.repository.append_version
+
+        def append_then_fail(*args, **kwargs):
+            original(*args, **kwargs)
+            raise RuntimeError("injected failure after binding append")
+
+        service.repository.append_version = append_then_fail
+        try:
+            with self.assertRaises(RuntimeError):
+                self.assembly.series_planning.create_episode_plan_item_binding_version({
+                    "workspaceRef": "workspace-a",
+                    "projectRef": project["projectRef"],
+                    "seriesRef": series["seriesRef"],
+                    "seriesPlanRef": initial["plan"]["seriesPlanRef"],
+                    "expectedPlanVersion": initial["plan"]["version"],
+                    "episodePlanItemBindings": [{
+                        "episodeRef": episode["episodeRef"],
+                        "episodePlanItemRef": initial["version"]["episodePlanItems"][0][
+                            "episodePlanItemRef"
+                        ],
+                    }],
+                })
+        finally:
+            service.repository.append_version = original
+        workspace = self.assembly.series_planning.get_workspace(
+            "workspace-a", project["projectRef"], series["seriesRef"]
+        )
+        self.assertEqual(len(workspace["versions"]), 1)
+        self.assertEqual(workspace["plan"]["version"], 1)
+        self.assertEqual(self.assembly.diagnostic_snapshot()["state"], "ready")
+        self.assertEqual(
+            self.assembly.series_episode.get_episode(
+                "workspace-a", series["seriesRef"], episode["episodeRef"]
+            )["episodeRef"],
+            episode["episodeRef"],
+        )
+
     def test_project_dependency_has_priority_over_script_dependency(self):
         series = seed_series(self.assembly)
         episode = seed_episode(self.assembly, series)
@@ -486,6 +741,162 @@ class LifecyclePublicBoundaryTests(unittest.TestCase):
             )["workspaceRef"],
             "workspace-b",
         )
+
+    def test_equal_binding_refs_in_other_workspace_do_not_cross_block(self):
+        assembly = LifecycleAssembly.in_memory(ref_factory=Refs(fixed=True), clock=lambda: NOW)
+        series_a = seed_series(assembly, "workspace-a", "profile-a")
+        episode_a = seed_episode(assembly, series_a, "workspace-a")
+        series_b = seed_series(assembly, "workspace-b", "profile-b")
+        episode_b = seed_episode(assembly, series_b, "workspace-b")
+        seed_bound_episode_plan(
+            assembly,
+            series_b,
+            episode_b,
+            workspace="workspace-b",
+            profile="profile-b",
+        )
+
+        deletion = assembly.series_episode.delete_episode(
+            "workspace-a", series_a["seriesRef"], episode_a["episodeRef"]
+        )
+        self.assertEqual(deletion["deletedEpisodeCount"], 1)
+        self.assertEqual(
+            assembly.series_episode.get_episode(
+                "workspace-b", series_b["seriesRef"], episode_b["episodeRef"]
+            )["workspaceRef"],
+            "workspace-b",
+        )
+
+    def test_other_series_corrupt_history_in_same_workspace_does_not_cross_block(self):
+        assembly = LifecycleAssembly.in_memory(ref_factory=Refs(), clock=lambda: NOW)
+        series_a = seed_series(assembly)
+        episode_a = seed_episode(assembly, series_a)
+        series_b = seed_series(assembly)
+        episode_b = seed_episode(assembly, series_b)
+        _, _, bound, _ = seed_bound_episode_plan(assembly, series_b, episode_b)
+        repository = assembly.series_planning._SeriesPlanningPublicBoundary__service.repository
+        key = (
+            "workspace-a",
+            bound["plan"]["seriesPlanRef"],
+            bound["version"]["seriesPlanVersionRef"],
+        )
+        repository._versions[key] = replace(repository._versions[key], contentJson="{")
+        deletion = assembly.series_episode.delete_episode(
+            "workspace-a", series_a["seriesRef"], episode_a["episodeRef"]
+        )
+        self.assertEqual(deletion["deletedEpisodeCount"], 1)
+        with self.assertRaises(SeriesEpisodePublicError) as protected:
+            assembly.series_episode.delete_episode(
+                "workspace-a", series_b["seriesRef"], episode_b["episodeRef"]
+            )
+        self.assertEqual(protected.exception.code, "dependent_series_plan_binding_exists")
+
+    def test_duplicate_version_identity_in_exact_scope_blocks_unrelated_episode_delete(self):
+        assembly = LifecycleAssembly.in_memory(ref_factory=Refs(), clock=lambda: NOW)
+        series = seed_series(assembly)
+        bound_episode = seed_episode(assembly, series)
+        other_episode = assembly.series_episode.create_episode({
+            "workspaceRef": "workspace-a",
+            "seriesRef": series["seriesRef"],
+            "creativePlanRef": bound_episode["creativePlanRef"],
+            "episodeNumber": 2,
+            "title": "第2集",
+        })
+        _, initial, bound, _ = seed_bound_episode_plan(
+            assembly, series, bound_episode
+        )
+        repository = assembly.series_planning._SeriesPlanningPublicBoundary__service.repository
+        bound_key = (
+            "workspace-a",
+            bound["plan"]["seriesPlanRef"],
+            bound["version"]["seriesPlanVersionRef"],
+        )
+        plan_key = ("workspace-a", bound["plan"]["seriesPlanRef"])
+        repository._versions[bound_key] = replace(
+            repository._versions[bound_key],
+            seriesPlanVersionRef=initial["version"]["seriesPlanVersionRef"],
+        )
+        repository._plans[plan_key] = replace(
+            repository._plans[plan_key],
+            currentSeriesPlanVersionRef=initial["version"]["seriesPlanVersionRef"],
+        )
+
+        with self.assertRaises(SeriesEpisodePublicError) as protected:
+            assembly.series_episode.delete_episode(
+                "workspace-a", series["seriesRef"], other_episode["episodeRef"]
+            )
+        self.assertEqual(
+            (protected.exception.code, protected.exception.status),
+            ("dependent_series_plan_binding_exists", 409),
+        )
+
+    def test_scope_index_history_cannot_be_hidden_by_corrupt_record_scope(self):
+        assembly = LifecycleAssembly.in_memory(ref_factory=Refs(), clock=lambda: NOW)
+        series = seed_series(assembly)
+        episode = seed_episode(assembly, series)
+        _, initial, _, _ = seed_bound_episode_plan(assembly, series, episode)
+        repository = assembly.series_planning._SeriesPlanningPublicBoundary__service.repository
+        plan_key = ("workspace-a", initial["plan"]["seriesPlanRef"])
+        version_key = (
+            "workspace-a",
+            initial["plan"]["seriesPlanRef"],
+            initial["version"]["seriesPlanVersionRef"],
+        )
+        repository._plans[plan_key] = replace(
+            repository._plans[plan_key], seriesRef="series-hidden"
+        )
+        repository._versions[version_key] = replace(
+            repository._versions[version_key], seriesRef="series-hidden"
+        )
+
+        with self.assertRaises(SeriesEpisodePublicError) as protected:
+            assembly.series_episode.delete_episode(
+                "workspace-a", series["seriesRef"], episode["episodeRef"]
+            )
+        self.assertEqual(
+            (protected.exception.code, protected.exception.status),
+            ("dependent_series_plan_binding_exists", 409),
+        )
+
+    def test_malformed_historical_version_ref_blocks_unrelated_episode_delete(self):
+        assembly = LifecycleAssembly.in_memory(ref_factory=Refs(), clock=lambda: NOW)
+        series = seed_series(assembly)
+        bound_episode = seed_episode(assembly, series)
+        other_episode = assembly.series_episode.create_episode({
+            "workspaceRef": "workspace-a",
+            "seriesRef": series["seriesRef"],
+            "creativePlanRef": bound_episode["creativePlanRef"],
+            "episodeNumber": 2,
+            "title": "第2集",
+        })
+        _, initial, bound, _ = seed_bound_episode_plan(
+            assembly, series, bound_episode
+        )
+        repository = assembly.series_planning._SeriesPlanningPublicBoundary__service.repository
+        plan_ref = initial["plan"]["seriesPlanRef"]
+        root_key = (
+            "workspace-a", plan_ref, initial["version"]["seriesPlanVersionRef"]
+        )
+        bound_key = (
+            "workspace-a", plan_ref, bound["version"]["seriesPlanVersionRef"]
+        )
+        root = repository._versions.pop(root_key)
+        repository._versions[("workspace-a", plan_ref, "bad ref")] = replace(
+            root, seriesPlanVersionRef="bad ref"
+        )
+        repository._versions[bound_key] = replace(
+            repository._versions[bound_key], parentSeriesPlanVersionRef="bad ref"
+        )
+        repository._plans[("workspace-a", plan_ref)] = replace(
+            repository._plans[("workspace-a", plan_ref)],
+            confirmedSeriesPlanVersionRef=bound["version"]["seriesPlanVersionRef"],
+        )
+
+        with self.assertRaises(SeriesEpisodePublicError) as protected:
+            assembly.series_episode.delete_episode(
+                "workspace-a", series["seriesRef"], other_episode["episodeRef"]
+            )
+        self.assertEqual(protected.exception.code, "dependent_series_plan_binding_exists")
 
     def test_default_in_memory_factories_reuse_one_authoritative_assembly(self):
         series_boundary = create_series_boundary()

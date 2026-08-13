@@ -57,6 +57,7 @@ class DependentRecordError(SeriesEpisodeError):
             "dependent_project_exists",
             "dependent_script_exists",
             "dependent_series_plan_exists",
+            "dependent_series_plan_binding_exists",
             "dependent_m6_series_intelligence_exists",
         }:
             raise ValueError("unsupported dependency error")

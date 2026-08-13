@@ -294,4 +294,4 @@ V4/V3, Provider, GPU, Worker, ComfyUI, M6-P4+ or Production Ready status.
 | --- | --- | --- |
 | `2026-08-13` | Initial Proposed ADR | `ACS-M6-P2-G1-CLOSEOUT-G3 / M6-P3-G0` |
 | `2026-08-13` | Accepted as architecture decision; implementation remains unimplemented and unauthorized | `Project Lead / Architecture Owner — M6-P3-G0 Owner Acceptance` |
-| `2026-08-13` | Bounded EpisodePlanItemBinding prerequisite implementation authorized after governance remote verification; G1 remains unauthorized | `Project Lead / Architecture Owner / Repository Governance Owner / M2-M4-M5-M6 Domain Owners` |
+| `2026-08-13` | Bounded EpisodePlanItemBinding prerequisite implementation authorized; governance checkpoint remote-verified at `ae82ea27b39c44a8b77941f2b43abf7544492765`; G1 remains unauthorized | `Project Lead / Architecture Owner / Repository Governance Owner / M2-M4-M5-M6 Domain Owners` |

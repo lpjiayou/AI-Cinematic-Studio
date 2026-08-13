@@ -1,4 +1,6 @@
 import ast
+import hashlib
+import json
 from pathlib import Path
 import re
 import sqlite3
@@ -195,6 +197,34 @@ class SeriesIntelligenceSqliteContractTests(unittest.TestCase):
                     )
         finally:
             connection.close()
+
+    def test_b1_reuses_exact_sqlite_schema_and_existing_content_json(self):
+        connection = open_fk(self.path)
+        try:
+            objects = [
+                tuple(row)
+                for row in connection.execute(
+                    "SELECT type,name,tbl_name,sql FROM sqlite_master "
+                    "WHERE name NOT LIKE 'sqlite_%' ORDER BY type,name"
+                )
+            ]
+            columns = tuple(
+                row["name"]
+                for row in connection.execute(
+                    "PRAGMA table_info(v5_series_plan_versions)"
+                )
+            )
+        finally:
+            connection.close()
+        schema_bytes = json.dumps(objects, separators=(",", ":")).encode("utf-8")
+        self.assertEqual(len(objects), 29)
+        self.assertEqual(
+            hashlib.sha256(schema_bytes).hexdigest(),
+            "0363442624c503a082e3ec1f97292268e81753c01ce0b60767a30d13f37f90e3",
+        )
+        self.assertIn("schema_version", columns)
+        self.assertIn("content_json", columns)
+        self.assertNotIn("episode_plan_item_bindings", columns)
 
     def test_all_marker_constraint_tampering_fails_closed_without_repair(self):
         markers = {
