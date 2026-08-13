@@ -90,6 +90,16 @@ class SeriesPlanningPublicBoundary:
     def build_m6_bootstrap(self, workspace_ref: str, project_ref: str, series_ref: str) -> dict[str, Any]:
         return self._invoke(self.__service.build_m6_bootstrap, workspace_ref, project_ref, series_ref)
 
+    def get_confirmed_m6_source_snapshot(
+        self, workspace_ref: str, project_ref: str, series_ref: str
+    ) -> dict[str, Any]:
+        return self._invoke(
+            self.__service.get_confirmed_m6_source_snapshot,
+            workspace_ref,
+            project_ref,
+            series_ref,
+        )
+
 
 def create_in_memory_boundary(
     project_boundary: ProjectPublicBoundary,

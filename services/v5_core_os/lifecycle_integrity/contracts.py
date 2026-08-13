@@ -35,6 +35,13 @@ class LifecycleOperation(str, Enum):
     CREATE_SERIES_PLAN = "create-series-plan"
     APPEND_SERIES_PLAN_VERSION = "append-series-plan-version"
     CONFIRM_SERIES_PLAN_VERSION = "confirm-series-plan-version"
+    CREATE_SERIES_BIBLE_VERSION = "create-series-bible-version"
+    SUBMIT_SERIES_BIBLE_CANDIDATE = "submit-series-bible-candidate"
+    CONFIRM_SERIES_BIBLE_VERSION = "confirm-series-bible-version"
+    CREATE_CHARACTER_CONTINUITY_VERSION = "create-character-continuity-version"
+    SUBMIT_CHARACTER_CONTINUITY_CANDIDATE = "submit-character-continuity-candidate"
+    CONFIRM_CHARACTER_CONTINUITY_VERSION = "confirm-character-continuity-version"
+    ACTIVATE_M6_BASELINE = "activate-m6-baseline"
     DELETE_EPISODE = "delete-episode"
     DELETE_SERIES = "delete-series"
 

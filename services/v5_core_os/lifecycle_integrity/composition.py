@@ -34,6 +34,7 @@ from services.v5_core_os.series_planning.foundation import (
     SqliteSeriesPlanningAdapter,
 )
 from services.v5_core_os.series_planning.public import SeriesPlanningPublicBoundary
+from services.v5_core_os.series_intelligence.composition import create_in_memory_participant
 
 from .contracts import BackendKind, LifecycleAssemblyIdentity
 from .coordinator import LifecycleIntegrityCoordinator
@@ -63,6 +64,7 @@ class LifecycleAssembly:
     project_context: ProjectPublicBoundary
     script_studio: ScriptStudioPublicBoundary
     series_planning: SeriesPlanningPublicBoundary
+    series_intelligence: object | None = None
 
     @classmethod
     def in_memory(
@@ -71,6 +73,10 @@ class LifecycleAssembly:
         ref_factory=None,
         clock=None,
         journal_registrar=None,
+        m6_scope_authority=None,
+        m6_approval_authority=None,
+        m6_identity_authority=None,
+        m6_outbox_hook=None,
     ) -> "LifecycleAssembly":
         identity = LifecycleAssemblyIdentity(
             f"assembly-{uuid4().hex}",
@@ -123,6 +129,16 @@ class LifecycleAssembly:
         script_boundary = ScriptStudioPublicBoundary(script_service, lifecycle_state=state)
         planning_service = SeriesPlanningService(planning_repository, project_boundary, **kwargs)
         planning_boundary = SeriesPlanningPublicBoundary(planning_service, lifecycle_state=state)
+        intelligence_boundary = create_in_memory_participant(
+            lifecycle_state=state,
+            source_reader=planning_boundary,
+            scope_authority=m6_scope_authority,
+            approval_authority=m6_approval_authority,
+            identity_authority=m6_identity_authority,
+            ref_factory=ref_factory,
+            clock=clock,
+            outbox_hook=m6_outbox_hook,
+        )
 
         coordinator = LifecycleIntegrityCoordinator(
             state,
@@ -150,12 +166,14 @@ class LifecycleAssembly:
             project_boundary,
             script_boundary,
             planning_boundary,
+            intelligence_boundary,
         )
         for boundary in (
             series_boundary,
             project_boundary,
             script_boundary,
             planning_boundary,
+            intelligence_boundary,
         ):
             boundary._bind_lifecycle_assembly(assembly)
         return assembly
@@ -219,7 +237,7 @@ class LifecycleAssembly:
         script_boundary.bind_lifecycle(coordinator)
         assembly = cls(
             identity, state, coordinator, series_boundary, project_boundary,
-            script_boundary, planning_boundary,
+            script_boundary, planning_boundary, None,
         )
         for boundary in (series_boundary, project_boundary, script_boundary, planning_boundary):
             boundary._bind_lifecycle_assembly(assembly)
