@@ -788,7 +788,23 @@ class SeriesIntelligenceService:
             "schemaVersion": "v5.series-intelligence.workspace.v1",
             "scope": scope.mapping(),
             "seriesBible": deepcopy(bible),
+            "seriesBibleVersions": sorted(
+                [
+                    deepcopy(item)
+                    for key, item in self.repository.bible_versions.items()
+                    if key[:5] == scope.key
+                ],
+                key=lambda item: item["versionNumber"],
+            ),
             "characterContinuity": deepcopy(character),
+            "characterContinuityVersions": sorted(
+                [
+                    deepcopy(item)
+                    for key, item in self.repository.character_versions.items()
+                    if key[:5] == scope.key
+                ],
+                key=lambda item: item["versionNumber"],
+            ),
             "activeBaseline": active,
             "baselineHistory": sorted(
                 [deepcopy(item) for key, item in self.repository.snapshots.items() if key[:5] == scope.key],

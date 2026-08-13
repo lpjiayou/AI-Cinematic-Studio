@@ -6,6 +6,7 @@ from services.v5_core_os.lifecycle_integrity import LifecycleAssembly
 from services.v5_core_os.lifecycle_integrity.contracts import LifecycleOperation
 from services.v5_core_os.series_intelligence import M6Scope
 from services.v5_core_os.series_intelligence.public import SeriesIntelligencePublicError
+from tests.unit.test_series_intelligence_m6 import confirmed_components, seed_assembly
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -65,6 +66,23 @@ class SeriesIntelligenceContractTests(unittest.TestCase):
         self.assertIn("M6-P1 InMemory only", adr)
         self.assertIn("M6-P2+ and M7-M19 remain", adr)
         self.assertIn("formal 8765 data", adr)
+
+    def test_workspace_contract_projects_immutable_bible_and_character_version_history(self):
+        assembly, context = seed_assembly()
+        bible, characters = confirmed_components(assembly, context)
+        workspace = assembly.series_intelligence.get_workspace(
+            context["workspaceRef"], context["projectRef"], context["seriesRef"]
+        )
+        self.assertEqual(
+            workspace["seriesBibleVersions"][0]["seriesBibleVersionRef"],
+            bible["version"]["seriesBibleVersionRef"],
+        )
+        self.assertEqual(
+            workspace["characterContinuityVersions"][0]["characterContinuityVersionRef"],
+            characters["version"]["characterContinuityVersionRef"],
+        )
+        self.assertEqual(workspace["seriesBibleVersions"][0]["status"], "CONFIRMED")
+        self.assertEqual(workspace["characterContinuityVersions"][0]["status"], "CONFIRMED")
 
 
 if __name__ == "__main__":

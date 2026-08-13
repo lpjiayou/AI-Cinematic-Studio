@@ -375,12 +375,14 @@ Current governance state:
 - RB13-F002: `REMEDIATED / CLOSED IN CURRENT TESTED CORE BASELINE`;
 - Architecture Review: `SATISFIED FOR BOUNDED M6-P0/P1 ONLY`;
 - M6 Preconditions: `SATISFIED FOR BOUNDED INMEMORY M6-P0/P1 ONLY`;
-- next authorized task: `ACS-M6-P0-P1`;
+- current task: `ACS-M6-P0-P1-R1`;
 - legacy repository capability provenance: `MEDIUM / OPEN / NON-BLOCKING`,
   Owner Gate `P3-RV1-003`;
-- M6: `NOT STARTED / P0-P1 AUTHORIZED / P2+ NOT AUTHORIZED`;
+- M6-P0: `CONTRACT ACCEPTED / COMPLETE`;
+- M6-P1: `IMPLEMENTED / CHECKPOINT CANDIDATE / OWNER REVIEW PENDING`;
+- M6-P2+: `NOT AUTHORIZED / NOT STARTED`;
 - M7-M19: `NOT STARTED / NOT AUTHORIZED`;
-- Formal 8765 Deployment: `NOT PERFORMED / NOT AUTHORIZED`;
+- Formal 8765 Deployment: `UNTOUCHED / NOT DEPLOYED`;
 - Frontend: `FROZEN / UNTOUCHED`;
 - Production Ready: `NO`.
 
@@ -422,8 +424,9 @@ M6 Character Intelligence must cover at least:
 - timeline and continuity.
 
 `M6 ≠ V5 Identity Lock`. M6 does not implement M7, GPU Render, ComfyUI,
-Worker execution or cross-repository UI. M6 remains
-`NOT STARTED / P0-P1 AUTHORIZED / P2+ NOT AUTHORIZED`.
+Worker execution or cross-repository UI. M6-P0 is `CONTRACT ACCEPTED / COMPLETE`;
+M6-P1 is `IMPLEMENTED / CHECKPOINT CANDIDATE / OWNER REVIEW PENDING`; M6-P2+
+remains `NOT AUTHORIZED / NOT STARTED`.
 
 Legacy Phase 0 provenance debt remains `OPEN / NON-BLOCKING` under Owner Gate
 `P3-RV1-003`. This acknowledgement does not silently close the debt or import
