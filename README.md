@@ -7,7 +7,7 @@ OS、V4 Platform、V3 Render Core、持久化与后端测试；客户 Commercial
 
 > 当前状态：M1–M5 已接受；M6-P0/P1 与 bounded M6-P2 已 Owner Accepted；
 > G1-R1 `d44f471…` 已 Owner Accepted 并关闭 Architecture Remediation R1；
-> M6-P3-G0 candidate 正在进行只读 Owner Review，所有 P3 实现继续 HOLD；
+> M6-P3-G0 已作为架构治理检查点 Owner Accepted，所有 P3 实现继续 HOLD；
 > Production Ready = `NO`。
 
 ## 当前活动工作包
@@ -25,10 +25,11 @@ OS、V4 Platform、V3 Render Core、持久化与后端测试；客户 Commercial
 | G1-R1 | `OWNER ACCEPTED / COMPLETE / REMOTE-VERIFIED AT d44f471c644e319bb4a5bf73707c3274ecbaa426` |
 | R-CORE-ARCH-001 | `CONFIRMED / HIGH / MONITORING` |
 | R-CORE-GOV-002 | `OPEN / NON-BLOCKING` |
-| M6-P3-G0 | `REMOTE-VERIFIED CANDIDATE AT c524486c05c21b270a7dd75e89fae4312430736a / OWNER REVIEW IN PROGRESS / IMPLEMENTATION HOLD` |
-| ADR-0005 / M6 Consumer Contract | `PROPOSED / UNDER OWNER REVIEW / NO IMPLEMENTATION AUTHORITY` |
-| M6-P3-B1 EpisodePlanItemBinding | `PROPOSED / NOT AUTHORIZED / NOT STARTED / BLOCKS M6-P3-G1` |
-| M6-P3-G1+ | `NOT AUTHORIZED / NOT STARTED` |
+| M6-P3-G0 | `OWNER ACCEPTED / COMPLETE AS GOVERNANCE-ARCHITECTURE / NO IMPLEMENTATION AUTHORITY` |
+| ADR-0005 / M6 Consumer Contract | `ACCEPTED AS ARCHITECTURE / UNIMPLEMENTED / NO IMPLEMENTATION AUTHORITY` |
+| M6-P3-B1 EpisodePlanItemBinding | `ARCHITECTURE-DEFINED PREREQUISITE / NOT AUTHORIZED / NOT STARTED / BLOCKS M6-P3-G1` |
+| M6-P3-G1 | `SEQUENCE DEFINED / BLOCKED UNTIL B1 OWNER ACCEPTED / NOT AUTHORIZED / NOT STARTED` |
+| M6-P3 after G1 / M6-P4+ | `NOT AUTHORIZED / NOT STARTED` |
 | M7-M19 | `NOT STARTED / NOT AUTHORIZED` |
 | Formal port-8765 database | `UNTOUCHED / NOT DEPLOYED` |
 | Frontend | `FROZEN / UNTOUCHED` |
@@ -50,9 +51,9 @@ V4 接触面，且当前生产树 `apps → V4` 为零。原 G1 的持续守卫�
 通过完整回归并在 `d44f471c644e319bb4a5bf73707c3274ecbaa426` 获得 Owner
 Acceptance。
 
-G3/P3-G0 在 `c524486c05c21b270a7dd75e89fae4312430736a` 的内容正进行只读
-Owner Review，并保持 implementation HOLD；ADR-0005 仍为 Proposed，M6-P3-B1/G1
-均不授权。
+G3/P3-G0 在 `c524486c05c21b270a7dd75e89fae4312430736a` 的架构内容已通过 Owner
+Review；ADR-0005 与 M6 Consumer Contract 已作为架构规范接受，但未实施且不授予
+实现权限。M6-P3-B1/G1 均未授权、未开始。
 Schema/Migration、正式数据库、Public HTTP/API 扩张、Auth/RBAC、Frontend、M6-P3、
 M7+、V3、GPU、Worker 和 ComfyUI 不在当前授权范围内。
 
@@ -182,12 +183,13 @@ PYTHONDONTWRITEBYTECODE=1 python -m unittest discover -s tests -p 'test_*.py' -q
 - [ACS-ARCH-R1 G0 Record](governance/ACS-ARCH-R1-V5-TEXT-GENERATION-G0.md)
 - [ACS-ARCH-R1 G1-R1 Authorization](governance/ACS-ARCH-R1-V5-TEXT-GENERATION-G1-R1-AUTHORIZATION.md)
 - [ACS-ARCH-R1 G1-R1 Closeout / M6-P3-G0 Owner Review](governance/ACS-ARCH-R1-V5-TEXT-GENERATION-G1-R1-CLOSEOUT-M6-P3-G0-OWNER-REVIEW.md)
+- [M6-P3-G0 Owner Acceptance](governance/ACS-M6-P3-G0-OWNER-ACCEPTANCE.md)
 - [M6 Domain Contract](architecture/M6_SERIES_INTELLIGENCE_DOMAIN_CONTRACT.md)
 - [M6 Durable SQLite Contract](architecture/M6_SERIES_INTELLIGENCE_SQLITE_CONTRACT.md)
-- [M6 Consumer Contract — Proposed](architecture/M6_SERIES_INTELLIGENCE_CONSUMER_CONTRACT.md)
+- [M6 Consumer Contract — Accepted Architecture](architecture/M6_SERIES_INTELLIGENCE_CONSUMER_CONTRACT.md)
 - [ADR-0003 — M6 InMemory baseline](governance/ADR-0003-m6-series-intelligence-baseline.md)
 - [ADR-0004 — M6 Durable SQLite boundary](governance/ADR-0004-m6-series-intelligence-durable-sqlite-boundary.md)
-- [ADR-0005 — M6 consumer boundary — Proposed](governance/ADR-0005-m6-series-intelligence-consumer-boundary.md)
+- [ADR-0005 — M6 consumer boundary — Accepted Architecture](governance/ADR-0005-m6-series-intelligence-consumer-boundary.md)
 - [Agent Constitution](AGENTS.md)
 
 ## 安全与发布边界

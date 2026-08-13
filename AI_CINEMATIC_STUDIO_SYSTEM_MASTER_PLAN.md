@@ -2,15 +2,15 @@
 
 > Document: `AI_CINEMATIC_STUDIO_SYSTEM_MASTER_PLAN.md`
 >
-> Status: `SYSTEM MASTER GOVERNANCE BASELINE / G1-R1 OWNER ACCEPTED / M6-P3-G0 OWNER REVIEW ACTIVE`
+> Status: `SYSTEM MASTER GOVERNANCE BASELINE / G1-R1 OWNER ACCEPTED / M6-P3-G0 ARCHITECTURE OWNER ACCEPTED / IMPLEMENTATION HOLD`
 >
 > Version: `v1.2`
 >
 > Date: `2026-08-13`
 >
-> Revision: `ACS-ARCH-R1-G1-R1-CLOSEOUT / M6-P3-G0 OWNER REVIEW START`
+> Revision: `ACS-M6-P3-G0 OWNER ACCEPTANCE / GOVERNANCE-ONLY`
 >
-> Architecture Decisions: `ADR-0001 / Accepted`; `ADR-0006 — V5 Text Generation Capability Boundary / Accepted for bounded G1`
+> Architecture Decisions: `ADR-0001 / Accepted`; `ADR-0005 — M6 Consumer Boundary / Accepted as architecture only`; `ADR-0006 — V5 Text Generation Capability Boundary / Accepted for bounded G1`
 >
 > Scope: AI Cinematic Studio 全系统产品、Domain、生产链、技术分层、研发顺序与验收基线
 >
@@ -2315,7 +2315,7 @@ Status:
 
 Status:
 
-`P0-P1 OWNER ACCEPTED / COMPLETE / REMOTE-VERIFIED AT e38c75aa4ff26bdea80c82d8a24096f799dad860 / P2-G0 CONTRACT ACCEPTED / P2-G1 OWNER ACCEPTED / COMPLETE / REMOTE-VERIFIED AT 8227c6c616140824fd70de920dc6fcf459bb734d / P3-G0 REMOTE-VERIFIED GOVERNANCE CHECKPOINT CANDIDATE AT c524486c05c21b270a7dd75e89fae4312430736a / OWNER REVIEW IN PROGRESS / IMPLEMENTATION HOLD / ADR-0005 PROPOSED UNDER REVIEW / P3-B1 AND P3-G1+ NOT AUTHORIZED`
+`P0-P1 OWNER ACCEPTED / COMPLETE / REMOTE-VERIFIED AT e38c75aa4ff26bdea80c82d8a24096f799dad860 / P2-G0 CONTRACT ACCEPTED / P2-G1 OWNER ACCEPTED / COMPLETE / REMOTE-VERIFIED AT 8227c6c616140824fd70de920dc6fcf459bb734d / P3-G0 OWNER ACCEPTED AS GOVERNANCE-ARCHITECTURE / ADR-0005 + M6 CONSUMER CONTRACT ACCEPTED AS ARCHITECTURE / UNIMPLEMENTED / NO IMPLEMENTATION AUTHORITY / P3-B1, P3-G1 AND LATER M6 WORK NOT AUTHORIZED`
 
 目标范围：
 
@@ -2341,10 +2341,12 @@ Status:
 - M6 不实现跨仓 UI；
 - M6-P2 只实现本地开发 SQLite 持久化、Migration、复合完整性、持久化幂等与
   Outbox；正式 8765 数据库保持禁止访问；
-- M6-P3-G0 只定义 Proposed consumer/reconciliation architecture，当前为
-  remote-verified candidate / Owner Review in progress / implementation HOLD，不实施代码；
-- M6-P3-B1 EpisodePlanItemBinding 仍为 Proposed prerequisite，未授权实施；
-- M6-P3-G1+ 保持 `NOT AUTHORIZED / NOT STARTED`。
+- M6-P3-G0 仅接受 consumer/reconciliation target architecture；架构已接受，
+  类型、方法与数据版本均未实施且不授予实现权限；
+- M6-P3-B1 EpisodePlanItemBinding 为 architecture-defined prerequisite，未授权、
+  未开始；
+- M6-P3-G1 保持 `BLOCKED UNTIL B1 OWNER ACCEPTED / NOT AUTHORIZED / NOT STARTED`；
+  G1 之后与 M6-P4+ 均为 `NOT AUTHORIZED / NOT STARTED`。
 
 ---
 
@@ -3081,20 +3083,21 @@ local-development durable SQLite boundary.
 
 ```text
 Current Work Package
-ACS-ARCH-R1-G1-R1-CLOSEOUT / M6-P3-G0 OWNER REVIEW
+ACS-M6-P3-G0 OWNER ACCEPTANCE
 
 Execution Mode
-GOVERNANCE-ONLY CLOSEOUT / READ-ONLY OWNER REVIEW / NO AUTO IMPLEMENTATION
+GOVERNANCE-ONLY / MANUAL / NO AUTO IMPLEMENTATION
 
 Architecture Decision
 ADR-0006 V5 TEXT GENERATION CAPABILITY BOUNDARY
 ACCEPTED FOR BOUNDED G1
 
 Current Checkpoint
-G1-R1 OWNER ACCEPTED / GOVERNANCE CLOSEOUT IN PROGRESS
+M6-P3-G0 OWNER ACCEPTANCE / GOVERNANCE-ONLY
 
-Current Review
-M6-P3-G0 / ADR-0005 / M6 CONSUMER CONTRACT OWNER REVIEW IN PROGRESS
+Accepted Architecture Decision
+ADR-0005 + M6 CONSUMER CONTRACT ACCEPTED AS ARCHITECTURE
+UNIMPLEMENTED / NO IMPLEMENTATION AUTHORITY
 
 Completed Architecture Checkpoint
 G0 COMPLETE / REMOTE-VERIFIED AT 92d1f3ac9e08c71458af04514baa659555fc55a7
@@ -3117,10 +3120,11 @@ M6 Series IP Bible + Character Intelligence
 P0-P1 OWNER ACCEPTED / COMPLETE / REMOTE-VERIFIED AT e38c75aa4ff26bdea80c82d8a24096f799dad860
 P2-G0 ADR-0004 + SQLITE CONTRACT ACCEPTED / COMPLETE
 P2-G1 OWNER ACCEPTED / COMPLETE / REMOTE-VERIFIED AT 8227c6c616140824fd70de920dc6fcf459bb734d
-G3 / P3-G0 REMOTE-VERIFIED CHECKPOINT CANDIDATE AT c524486c05c21b270a7dd75e89fae4312430736a / OWNER REVIEW IN PROGRESS / IMPLEMENTATION HOLD
-ADR-0005 + M6 CONSUMER CONTRACT PROPOSED / UNDER OWNER REVIEW / NO IMPLEMENTATION AUTHORITY
-P3-B1 EPISODE-PLAN-ITEM BINDING PROPOSED / NOT AUTHORIZED / NOT STARTED / BLOCKS P3-G1
-P3-G1+ NOT AUTHORIZED / NOT STARTED
+G3 / P3-G0 OWNER ACCEPTED / COMPLETE AS GOVERNANCE-ARCHITECTURE / NO IMPLEMENTATION AUTHORITY
+ADR-0005 + M6 CONSUMER CONTRACT ACCEPTED AS ARCHITECTURE / UNIMPLEMENTED / NO IMPLEMENTATION AUTHORITY
+P3-B1 EPISODE-PLAN-ITEM BINDING ARCHITECTURE-DEFINED PREREQUISITE / NOT AUTHORIZED / NOT STARTED / BLOCKS P3-G1
+P3-G1 SEQUENCE DEFINED / BLOCKED UNTIL B1 OWNER ACCEPTED / NOT AUTHORIZED / NOT STARTED
+P3 AFTER G1 / M6-P4+ NOT AUTHORIZED / NOT STARTED
 
 Architecture Risks
 R-CORE-ARCH-001 CONFIRMED / HIGH / MONITORING / G1-R1 OWNER ACCEPTED
@@ -3164,9 +3168,10 @@ Project Lead 进一步接受 ADR-0004 与 M6 SQLite Contract，并于 `2026-08-1
 REMOTE-VERIFIED`。
 
 `ACS-M6-P2-G1-CLOSEOUT-G3 / M6-P3-G0` 已在
-`c524486c05c21b270a7dd75e89fae4312430736a` 完成远端验证，当前进入只读
-`OWNER REVIEW IN PROGRESS`，并继续处于 implementation HOLD。开始审查不接受
-ADR-0005，也不授权 M6-P3-B1 或 M6-P3-G1；其历史内容不得被改写。
+`c524486c05c21b270a7dd75e89fae4312430736a` 完成远端验证。Project Lead 与
+Architecture Owner 已接受 ADR-0005 和 M6 Consumer Contract 为规范架构；该接受
+不授予 M6-P3-B1 或 M6-P3-G1 实现权限，二者未开始。原 proposal/review
+checkpoint 作为时点历史保留且不得改写。
 
 代码审查确认 M1 AI Director、M3 Script Studio、M5 Series Director 与 Creator
 Server composition 存在 Application 直接依赖 V4 的重复模式，违反固定的
@@ -3201,10 +3206,11 @@ NOT OWNER ACCEPTED`。G1-R1 在唯一 Contract Test 文件中建立 binding-awar
 Owner Accept 该修正检查点，Architecture Remediation R1 因此关闭，
 `R-CORE-ARCH-001` 转入持续监控。
 
-当前只授权 governance-only 关账和对现有 M6-P3-G0、ADR-0005、M6 Consumer
-Contract 的只读 Owner Review。开始审查不等于接受提案，也不授权 B1。Schema/
-Migration、正式 8765、HTTP/Auth/RBAC 扩张、Frontend、M6-P3-B1/G1 实现、M7+、
-V3、GPU、Worker 或 ComfyUI 仍未授权。
+当前只授权 M6-P3-G0 Owner Acceptance governance-only 检查点。ADR-0005 与 M6
+Consumer Contract 已作为架构接受，但任何目标类型、方法或数据版本均未实施；
+Applicable Domain Owner 实施审查仍待完成，B1 未授权、未开始。Schema/Migration、
+正式 8765、HTTP/Auth/RBAC 扩张、Frontend、M6-P3-B1/G1 实现、M7+、V3、GPU、
+Worker 或 ComfyUI 仍未授权。
 
 Full Core Audit Report v1.2 的历史接受标签不在本次修复中重写；仓库内缺少可复核
 报告实体/摘要引用的问题登记为 `R-CORE-GOV-002 / OPEN / NON-BLOCKING`，且该标签

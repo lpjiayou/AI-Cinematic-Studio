@@ -360,7 +360,7 @@ The PRE-M6 route is fixed as:
 → `M6 Preconditions`
 → `M6-P1`
 
-The current phase is `G1-R1 Governance Closeout / M6-P3-G0 Owner Review`.
+The current phase is `M6-P3-G0 Owner Acceptance Governance Checkpoint`.
 
 Current governance state:
 
@@ -379,7 +379,7 @@ Current governance state:
 - M6 Preconditions: `SATISFIED FOR BOUNDED M6-P0/P1 AND M6-P2 LOCAL SQLITE ONLY`;
 - ACS-M6-P0-P1-R2: `OWNER ACCEPTED / COMPLETE / REMOTE-VERIFIED AT
   e38c75aa4ff26bdea80c82d8a24096f799dad860`;
-- current task: `ACS-ARCH-R1-G1-R1-CLOSEOUT / M6-P3-G0 OWNER REVIEW`;
+- current task: `ACS-M6-P3-G0-OWNER-ACCEPTANCE`;
 - legacy repository capability provenance: `MEDIUM / OPEN / NON-BLOCKING`,
   Owner Gate `P3-RV1-003`;
 - M6-P0: `CONTRACT ACCEPTED / COMPLETE`;
@@ -388,14 +388,15 @@ Current governance state:
 - M6-P2-G0: `ADR-0004 AND SQLITE CONTRACT ACCEPTED / COMPLETE`;
 - M6-P2-G1: `OWNER ACCEPTED / COMPLETE / REMOTE-VERIFIED AT
   8227c6c616140824fd70de920dc6fcf459bb734d`;
-- M6-P2-G1-CLOSEOUT-G3 / M6-P3-G0: `REMOTE-VERIFIED CHECKPOINT CANDIDATE AT
-  c524486c05c21b270a7dd75e89fae4312430736a / OWNER REVIEW IN PROGRESS /
-  IMPLEMENTATION HOLD`;
-- ADR-0005 and M6 consumer contract: `PROPOSED / UNDER OWNER REVIEW / NO
+- M6-P3-G0: `OWNER ACCEPTED / COMPLETE AS GOVERNANCE-ARCHITECTURE / NO
   IMPLEMENTATION AUTHORITY`;
-- M6-P3-B1 binding prerequisite: `PROPOSED / NOT AUTHORIZED / NOT STARTED /
-  BLOCKS M6-P3-G1`;
-- M6-P3-G1+: `NOT AUTHORIZED / NOT STARTED`;
+- ADR-0005 and M6 consumer contract: `ACCEPTED AS ARCHITECTURE / UNIMPLEMENTED /
+  NO IMPLEMENTATION AUTHORITY`;
+- M6-P3-B1 binding prerequisite: `ARCHITECTURE-DEFINED PREREQUISITE / NOT
+  AUTHORIZED / NOT STARTED / BLOCKS M6-P3-G1`;
+- M6-P3-G1: `SEQUENCE DEFINED / BLOCKED UNTIL B1 OWNER ACCEPTED / NOT
+  AUTHORIZED / NOT STARTED`;
+- M6-P3 after G1 / M6-P4+: `NOT AUTHORIZED / NOT STARTED`;
 - R-CORE-ARCH-001: `CONFIRMED / HIGH / MONITORING — APPLICATION DIRECT V4
   DEPENDENCY REMEDIATED AT OWNER-ACCEPTED G1-R1`;
 - ADR-0006 V5 Text Generation Capability Boundary: `ACCEPTED FOR BOUNDED G1
@@ -415,14 +416,14 @@ Current governance state:
 
 Legacy repository implementation must not be counted as current Core production
 capability. RB13-F001 and RB13-F002 are closed in the accepted current tested Core
-baseline. M6-P0/P1 and M6-P2 are Owner Accepted. The remote-verified
-G3/P3-G0 revision at `c524486c05c21b270a7dd75e89fae4312430736a` is under read-only
-Owner Review and remains on implementation HOLD; it does not yet accept ADR-0005 or
-authorize any P3 implementation. The Project Lead accepted the corrected G1-R1
+baseline. M6-P0/P1 and M6-P2 are Owner Accepted. The remote-verified G3/P3-G0
+revision at `c524486c05c21b270a7dd75e89fae4312430736a` has now been accepted as
+architecture only; ADR-0005 and the M6 consumer contract remain unimplemented and
+grant no P3 implementation authority. The Project Lead accepted the corrected G1-R1
 checkpoint at `d44f471c644e319bb4a5bf73707c3274ecbaa426`, closing Architecture
 Remediation R1. The original G1 remains historical `REVISION REQUIRED / NOT OWNER
-ACCEPTED` and is superseded by G1-R1. The only active work is the governance closeout
-followed by read-only M6-P3-G0 review under `CURRENT_MILESTONE.md`.
+ACCEPTED` and is superseded by G1-R1. The only active work is the exact eight-path
+M6-P3-G0 Owner Acceptance governance checkpoint under `CURRENT_MILESTONE.md`.
 
 The M6 gate order is:
 
@@ -450,18 +451,19 @@ The M6-P2 gate order is:
 7. execution stops for Project Lead owner review.
 
 The Project Lead accepted M6-P2-G1 at
-`8227c6c616140824fd70de920dc6fcf459bb734d`. P3-G0 may define a Proposed M6
-consumer boundary only. Before any P3 implementation, the Project Lead must accept
-ADR-0005 and its contract. The accepted Core has no shared stable key between M2
+`8227c6c616140824fd70de920dc6fcf459bb734d`. The Project Lead and Architecture
+Owner have now accepted ADR-0005 and its contract as the target M6 consumer
+architecture only. The accepted Core has no shared stable key between M2
 `episodeRef` and M5 `episodePlanItemRef`; number/title/index inference is forbidden.
-ADR-0005 therefore proposes an immutable M5 EpisodePlanItemBinding in a new exact
-SeriesPlanVersion. The Project Lead must separately authorize and accept bounded
+ADR-0005 therefore requires a future immutable M5 EpisodePlanItemBinding in a new exact
+SeriesPlanVersion. After applicable Domain Owner confirmation, the Project Lead must
+separately authorize and accept bounded
 M6-P3-B1 binding implementation before separately authorizing M6-P3-G1. M2 retains
 Series/Episode identity and membership; M4 retains Project identity and
 Project-to-Series context.
 
-That P3 proposal is now under read-only Owner Review and remains on implementation
-HOLD. Opening review neither accepts nor implements ADR-0005, M6-P3-B1 or M6-P3-G1.
+Architecture acceptance implements none of ADR-0005, M6-P3-B1 or M6-P3-G1. B1 and G1
+remain on implementation HOLD, not authorized and not started.
 
 This does not establish a general Architecture Review, Production Ready status,
 formal database deployment, or authorization for M6-P3 implementation.
@@ -486,9 +488,9 @@ M6 Character Intelligence must cover at least:
 Worker execution or cross-repository UI. M6-P0/P1 is `OWNER ACCEPTED / COMPLETE /
 REMOTE-VERIFIED`; ADR-0004 and the M6-P2 SQLite contract are accepted;
 M6-P2-G1 is `OWNER ACCEPTED / COMPLETE / REMOTE-VERIFIED AT
-8227c6c616140824fd70de920dc6fcf459bb734d`; M6-P3-G0 is a governance-only
-checkpoint candidate with Proposed architecture; M6-P3-B1 and M6-P3-G1+ remain
-`NOT AUTHORIZED / NOT STARTED`.
+8227c6c616140824fd70de920dc6fcf459bb734d`; M6-P3-G0 is `OWNER ACCEPTED /
+COMPLETE AS GOVERNANCE-ARCHITECTURE / NO IMPLEMENTATION AUTHORITY`; M6-P3-B1,
+M6-P3-G1 and all later M6 work remain `NOT AUTHORIZED / NOT STARTED`.
 
 The accepted architecture-remediation sequence is:
 
@@ -515,11 +517,14 @@ The accepted architecture-remediation sequence is:
    review;
 10. the Project Lead accepts G1-R1 at
     `d44f471c644e319bb4a5bf73707c3274ecbaa426`, closes the remediation wave and
-    authorizes only governance closeout plus read-only M6-P3-G0 Owner Review.
+    historically authorizes governance closeout plus read-only M6-P3-G0 Owner Review;
+11. the Project Lead and Architecture Owner accept ADR-0005 and the M6 Consumer
+    Contract as architecture only and authorize this exact governance checkpoint.
 
-The current review does not authorize Schema/Migration, formal port-8765 database
-access, HTTP/Auth/RBAC contract expansion, Frontend, M6-P3-B1/G1 implementation,
-M7+, V3, GPU, Worker or ComfyUI work. Any such need is a Stop Condition.
+The current architecture acceptance does not authorize Schema/Migration, formal
+port-8765 database access, HTTP/Auth/RBAC contract expansion, Frontend, M6-P3-B1/G1
+implementation, M7+, V3, GPU, Worker or ComfyUI work. Any such need is a Stop
+Condition.
 
 Legacy Phase 0 provenance debt remains `OPEN / NON-BLOCKING` under Owner Gate
 `P3-RV1-003`. This acknowledgement does not silently close the debt or import
