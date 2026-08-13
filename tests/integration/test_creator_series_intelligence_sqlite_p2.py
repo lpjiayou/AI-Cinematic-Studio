@@ -36,6 +36,7 @@ from tests.unit.test_series_intelligence_m6 import (
     character_content,
     confirmed_components,
 )
+from tests.unit.test_ai_director_phase1 import valid_brief, valid_plan
 from tests.unit.test_series_planning_m5 import valid_candidate
 
 
@@ -300,6 +301,56 @@ def seed_m1_to_m5(assembly, *, workspace="workspace-m6"):
         "seriesRef": series["seriesRef"],
         "plan": plan,
     }
+
+
+def seed_bound_v2(assembly, context, *, binding_count=2):
+    source = valid_plan()
+    confirmed = assembly.series_episode.confirm_creative_plan({
+        "workspaceRef": context["workspaceRef"],
+        "humanConfirmed": True,
+        "sourcePlanRef": f"binding-source-{context['workspaceRef']}",
+        "sourcePlanSchemaVersion": source["schemaVersion"],
+        "sourcePlanVersion": 1,
+        "brief": valid_brief(),
+        "sourcePlan": source,
+    })
+    episodes = [
+        assembly.series_episode.create_episode({
+            "workspaceRef": context["workspaceRef"],
+            "seriesRef": context["seriesRef"],
+            "creativePlanRef": confirmed["creativePlanRef"],
+            "episodeNumber": number,
+            "title": f"第{number}集",
+        })
+        for number in range(1, binding_count + 1)
+    ]
+    item_refs = [
+        item["episodePlanItemRef"]
+        for item in context["plan"]["version"]["episodePlanItems"]
+    ]
+    requested = [
+        {
+            "episodeRef": episode["episodeRef"],
+            "episodePlanItemRef": item_refs[index],
+        }
+        for index, episode in enumerate(episodes)
+    ]
+    created = assembly.series_planning.create_episode_plan_item_binding_version({
+        "workspaceRef": context["workspaceRef"],
+        "projectRef": context["projectRef"],
+        "seriesRef": context["seriesRef"],
+        "seriesPlanRef": context["plan"]["plan"]["seriesPlanRef"],
+        "expectedPlanVersion": context["plan"]["plan"]["version"],
+        "episodePlanItemBindings": list(reversed(requested)),
+    })
+    assembly.series_planning.confirm_version({
+        "workspaceRef": context["workspaceRef"],
+        "seriesPlanRef": created["plan"]["seriesPlanRef"],
+        "seriesPlanVersionRef": created["version"]["seriesPlanVersionRef"],
+        "expectedPlanVersion": created["plan"]["version"],
+        "humanConfirmed": True,
+    })
+    return created, requested
 
 
 def activate(assembly, context, bible, characters, operation="activate"):
@@ -1029,6 +1080,249 @@ class SeriesIntelligenceSqliteRuntimeTests(unittest.TestCase):
             self.assertEqual(connection.execute("PRAGMA integrity_check").fetchone()[0], "ok")
         finally:
             connection.close()
+
+    def test_confirmed_v2_source_and_digest_survive_sqlite_restart(self):
+        created, expected_bindings = seed_bound_v2(self.assembly, self.context)
+        source = self.assembly.series_planning.get_confirmed_m6_source_snapshot(
+            self.context["workspaceRef"],
+            self.context["projectRef"],
+            self.context["seriesRef"],
+        )
+        self.assertEqual(
+            created["version"]["episodePlanItemBindings"], expected_bindings
+        )
+        self.assertEqual(
+            source["schemaVersion"], "v5.series-plan.m6-source-snapshot.v2"
+        )
+        self.assertEqual(source["episodePlanItemBindings"], expected_bindings)
+        bible, characters = confirmed_components(self.assembly, self.context)
+        snapshot = activate(
+            self.assembly,
+            self.context,
+            bible,
+            characters,
+            "v2-restart-activate",
+        )
+        self.assertEqual(
+            snapshot["seriesPlanVersionDigest"], source["seriesPlanVersionDigest"]
+        )
+        validate_series_intelligence_database(self.path)
+
+        restarted = self.restart(tag="v2-source-restart")
+        self.assertEqual(
+            restarted.series_planning.get_confirmed_m6_source_snapshot(
+                self.context["workspaceRef"],
+                self.context["projectRef"],
+                self.context["seriesRef"],
+            ),
+            source,
+        )
+        self.assertEqual(
+            restarted.series_intelligence.get_workspace(
+                self.context["workspaceRef"],
+                self.context["projectRef"],
+                self.context["seriesRef"],
+            )["activeBaseline"]["seriesPlanVersionDigest"],
+            source["seriesPlanVersionDigest"],
+        )
+
+    def test_write_accepted_subarc_edge_survives_v2_m6_validation_and_restart(self):
+        connection = open_fk(self.path)
+        try:
+            row = connection.execute(
+                "SELECT series_plan_version_ref,content_json "
+                "FROM v5_series_plan_versions WHERE schema_version=?",
+                ("v5.series-plan-version.v1",),
+            ).fetchone()
+            content = json.loads(row["content_json"])
+            content["subArcs"][0]["episodeStart"] = 2
+            content["subArcs"][0]["episodeEnd"] = 1
+            connection.execute(
+                "UPDATE v5_series_plan_versions SET content_json=? "
+                "WHERE series_plan_version_ref=?",
+                (
+                    json.dumps(content, ensure_ascii=False, sort_keys=True),
+                    row["series_plan_version_ref"],
+                ),
+            )
+        finally:
+            connection.close()
+        created, _ = seed_bound_v2(self.assembly, self.context, binding_count=1)
+        self.assertEqual(
+            created["version"]["subArcs"][0],
+            content["subArcs"][0],
+        )
+        bible, characters = confirmed_components(self.assembly, self.context)
+        activate(
+            self.assembly,
+            self.context,
+            bible,
+            characters,
+            "v2-subarc-edge-activate",
+        )
+        validate_series_intelligence_database(self.path)
+        restarted = self.restart(tag="v2-subarc-edge-restart")
+        self.assertEqual(
+            restarted.series_planning.get_confirmed_m6_source_snapshot(
+                self.context["workspaceRef"],
+                self.context["projectRef"],
+                self.context["seriesRef"],
+            )["seriesPlanVersionRef"],
+            created["version"]["seriesPlanVersionRef"],
+        )
+
+    def test_tampered_v2_m5_content_fails_validation_and_restarted_m6_read(self):
+        def mutate_schema(path):
+            connection = open_fk(path)
+            try:
+                connection.execute(
+                    "UPDATE v5_series_plan_versions "
+                    "SET schema_version='v5.series-plan-version.v99' "
+                    "WHERE schema_version='v5.series-plan-version.v2'"
+                )
+            finally:
+                connection.close()
+
+        def mutate_content(path, mutation):
+            connection = open_fk(path)
+            try:
+                row = connection.execute(
+                    "SELECT series_plan_version_ref,content_json "
+                    "FROM v5_series_plan_versions "
+                    "WHERE schema_version='v5.series-plan-version.v2'"
+                ).fetchone()
+                content = json.loads(row["content_json"])
+                mutation(content)
+                connection.execute(
+                    "UPDATE v5_series_plan_versions SET content_json=? "
+                    "WHERE series_plan_version_ref=?",
+                    (
+                        json.dumps(content, ensure_ascii=False, sort_keys=True),
+                        row["series_plan_version_ref"],
+                    ),
+                )
+            finally:
+                connection.close()
+
+        def mutate_raw_content(path, mutation):
+            connection = open_fk(path)
+            try:
+                row = connection.execute(
+                    "SELECT series_plan_version_ref,content_json "
+                    "FROM v5_series_plan_versions "
+                    "WHERE schema_version='v5.series-plan-version.v2'"
+                ).fetchone()
+                connection.execute(
+                    "UPDATE v5_series_plan_versions SET content_json=? "
+                    "WHERE series_plan_version_ref=?",
+                    (
+                        mutation(row["content_json"]),
+                        row["series_plan_version_ref"],
+                    ),
+                )
+            finally:
+                connection.close()
+
+        cases = {
+            "unknown-schema": mutate_schema,
+            "unknown-field": lambda path: mutate_content(
+                path, lambda content: content.__setitem__("unexpected", True)
+            ),
+            "noncanonical-binding-order": lambda path: mutate_content(
+                path, lambda content: content["episodePlanItemBindings"].reverse()
+            ),
+            "floating-number": lambda path: mutate_content(
+                path,
+                lambda content: content["episodePlanItems"][0].__setitem__(
+                    "episodeNumber", 1.0
+                ),
+            ),
+            "noncanonical-json": lambda path: mutate_raw_content(
+                path,
+                lambda raw: json.dumps(
+                    json.loads(raw),
+                    ensure_ascii=False,
+                    sort_keys=True,
+                    separators=(",", ":"),
+                ),
+            ),
+            "nfc-duplicate-key": lambda path: mutate_raw_content(
+                path,
+                lambda raw: '{"e\\u0301": 1, "é": 2, ' + raw[1:],
+            ),
+            "leading-space-text": lambda path: mutate_content(
+                path,
+                lambda content: content.__setitem__(
+                    "seriesConcept", " " + content["seriesConcept"]
+                ),
+            ),
+            "overlong-text": lambda path: mutate_content(
+                path, lambda content: content.__setitem__("seriesConcept", "x" * 6001)
+            ),
+            "subarc-out-of-range": lambda path: mutate_content(
+                path,
+                lambda content: content["subArcs"][0].__setitem__(
+                    "episodeStart", len(content["episodePlanItems"]) + 1
+                ),
+            ),
+            "overlong-list-item": lambda path: mutate_content(
+                path,
+                lambda content: content["productionAssumptions"].__setitem__(
+                    0, "x" * 1201
+                ),
+            ),
+        }
+        for name, mutate in cases.items():
+            with self.subTest(name=name):
+                path = Path(self.temp.name) / f"v2-source-tamper-{name}.sqlite3"
+                migrate_lifecycle_database(path, allow_upgrade=True)
+                assembly = new_assembly(path, refs=TaggedRefs(name))
+                context = seed_m1_to_m5(
+                    assembly, workspace=f"workspace-{name}"
+                )
+                seed_bound_v2(assembly, context)
+                confirmed_components(assembly, context)
+                validate_series_intelligence_database(path)
+                mutate(path)
+                before = snapshot_database(path)
+
+                for validation in (
+                    validate_series_intelligence_database,
+                    migrate_series_intelligence_database,
+                ):
+                    with self.subTest(validation=validation.__name__):
+                        with self.assertRaises(RuntimeError):
+                            validation(path)
+                with self.assertRaises(RuntimeError):
+                    new_assembly(path, refs=TaggedRefs(f"restart-{name}"))
+                self.assertEqual(snapshot_database(path), before)
+
+    def test_v1_schema_marker_cannot_smuggle_v2_binding_field(self):
+        bible, characters = confirmed_components(self.assembly, self.context)
+        activate(self.assembly, self.context, bible, characters, "v1-field-spoof")
+        connection = open_fk(self.path)
+        try:
+            row = connection.execute(
+                "SELECT series_plan_version_ref,content_json "
+                "FROM v5_series_plan_versions WHERE schema_version=?",
+                ("v5.series-plan-version.v1",),
+            ).fetchone()
+            content = json.loads(row["content_json"])
+            content["episodePlanItemBindings"] = []
+            connection.execute(
+                "UPDATE v5_series_plan_versions SET content_json=? "
+                "WHERE series_plan_version_ref=?",
+                (
+                    json.dumps(content, ensure_ascii=False, sort_keys=True),
+                    row["series_plan_version_ref"],
+                ),
+            )
+        finally:
+            connection.close()
+        with self.assertRaises(RuntimeError):
+            validate_series_intelligence_database(self.path)
+        with self.assertRaises(RuntimeError):
+            self.restart(tag="v1-field-spoof-restart")
 
     def assert_ref_collision_rolls_back(self, assembly, collision):
         boundary = assembly.series_intelligence

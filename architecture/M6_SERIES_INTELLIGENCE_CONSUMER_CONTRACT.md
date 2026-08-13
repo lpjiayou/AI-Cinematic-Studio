@@ -602,8 +602,9 @@ B1 GOVERNANCE AUTHORIZATION CHECKPOINT
 → STOP FOR PROJECT LEAD B1 OWNER REVIEW
 ```
 
-The affected M2, M4, M5 and M6 Domain Owner review is approved for B1. Production and
-test editing begins only after the governance checkpoint is remote-verified. If B1
+The affected M2, M4, M5 and M6 Domain Owner review is approved for B1. The governance
+checkpoint is remote-verified at `ae82ea27b39c44a8b77941f2b43abf7544492765`.
+If B1
 needs any unlisted path, DDL/migration, route/handler/external DTO source-file change,
 HTTP expansion beyond the approved existing canonical v2 pass-through in workspace
 versions, M3/M6 consumer, G1, Frontend or M7+ behavior, execution

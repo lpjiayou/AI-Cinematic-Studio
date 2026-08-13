@@ -7,7 +7,7 @@ OS、V4 Platform、V3 Render Core、持久化与后端测试；客户 Commercial
 
 > 当前状态：M1–M5 已接受；M6-P0/P1 与 bounded M6-P2 已 Owner Accepted；
 > G1-R1 `d44f471…` 已 Owner Accepted 并关闭 Architecture Remediation R1；
-> M6-P3-G0 已 Owner Accepted；M6-P3-B1 已获有界实现授权并等待治理检查点远端验证；
+> M6-P3-G0 已 Owner Accepted；M6-P3-B1 治理检查点已在 `ae82ea27…` 远端验证，当前为有界实现候选，技术远端验证后进入 Owner Review；
 > M6-P3-G1 继续未授权；
 > Production Ready = `NO`。
 
@@ -28,7 +28,7 @@ OS、V4 Platform、V3 Render Core、持久化与后端测试；客户 Commercial
 | R-CORE-GOV-002 | `OPEN / NON-BLOCKING` |
 | M6-P3-G0 | `OWNER ACCEPTED / COMPLETE AS GOVERNANCE-ARCHITECTURE / NO IMPLEMENTATION AUTHORITY` |
 | ADR-0005 / M6 Consumer Contract | `ACCEPTED AS ARCHITECTURE / B1 BOUNDED IMPLEMENTATION AUTHORIZED / G1 UNAUTHORIZED` |
-| M6-P3-B1 EpisodePlanItemBinding | `IMPLEMENTATION REVIEW APPROVED / BOUNDED AUTHORIZATION AFTER GOVERNANCE REMOTE VERIFY / BLOCKS M6-P3-G1` |
+| M6-P3-B1 EpisodePlanItemBinding | `GOVERNANCE REMOTE-VERIFIED AT ae82ea27b39c44a8b77941f2b43abf7544492765 / BOUNDED IMPLEMENTATION CANDIDATE / BLOCKS M6-P3-G1` |
 | B1 authorized base | `6bb9d165a693057f38e5789c408293ff0eaf5bcc` |
 | B1 scope | `8 GOVERNANCE → 6 PRODUCTION + 9 TESTS → REMOTE VERIFY → STOP FOR OWNER REVIEW` |
 | B1 version policy | `INITIAL V1 / V1→V1 / EXPLICIT V1→V2 / V2→V2 / NO V2→V1 / UNBIND VIA NEW V2` |
@@ -60,8 +60,9 @@ Acceptance。
 G3/P3-G0 在 `c524486c05c21b270a7dd75e89fae4312430736a` 的架构内容已通过 Owner
 Review；ADR-0005 与 M6 Consumer Contract 已作为架构规范接受，其 consumer
 行为仍未实施且不授予普遍实现权限。Project Lead、Architecture Owner、Repository Governance Owner 与
-M2/M4/M5/M6 Domain Owners 已批准精确 B1：先远端验证 8 文档治理检查点，再自动
-实施冻结的 6 个生产路径与 9 个测试路径，远端验证后停止等待 B1 Owner Review。
+M2/M4/M5/M6 Domain Owners 已批准精确 B1；8 文档治理检查点已在
+`ae82ea27b39c44a8b77941f2b43abf7544492765` 远端验证；当前技术变更严格限制为冻结的
+6 个生产路径与 9 个测试路径，技术候选远端验证后停止等待 B1 Owner Review。
 M6-P3-G1 仍未授权、未开始。
 现有 HTTP workspace versions 的 v2 响应允许透传 `episodePlanItemBindings`，但不
 修改 route、handler 或外部 DTO 源文件。除该 Owner 消歧外的 Public HTTP/API 扩张、

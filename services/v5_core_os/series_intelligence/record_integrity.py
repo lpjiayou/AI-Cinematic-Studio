@@ -184,6 +184,249 @@ def _validate_version_status(record: Mapping[str, Any]) -> None:
         raise DurableRecordIntegrityError("unsupported M6 version status")
 
 
+_M5_V2_CONTENT_FIELDS = frozenset(
+    {
+        "seriesConcept",
+        "premise",
+        "logline",
+        "mainNarrativeDirection",
+        "mainArcs",
+        "subArcs",
+        "characterArcIntents",
+        "episodePlanItems",
+        "narrativeRhythm",
+        "worldIntent",
+        "continuityIntent",
+        "foreshadowingContext",
+        "productionAssumptions",
+        "episodePlanItemBindings",
+    }
+)
+_M5_V1_CONTENT_FIELDS = _M5_V2_CONTENT_FIELDS - {"episodePlanItemBindings"}
+
+
+def _m5_v2_object(value: Any, fields: frozenset[str], label: str) -> dict[str, Any]:
+    if not isinstance(value, dict) or set(value) != fields:
+        raise DurableRecordIntegrityError(f"M5 v2 {label} shape is invalid")
+    return value
+
+
+def _m5_v2_text(value: Any, label: str, *, limit: int = 6000) -> str:
+    if (
+        not isinstance(value, str)
+        or not value
+        or value != value.strip()
+        or len(value) > limit
+    ):
+        raise DurableRecordIntegrityError(f"M5 v2 {label} text is invalid")
+    return value
+
+
+def _m5_v2_ref(value: Any, label: str) -> str:
+    ref = _m5_v2_text(value, label, limit=200)
+    if not ref.isprintable() or any(character.isspace() for character in ref):
+        raise DurableRecordIntegrityError(f"M5 v2 {label} ref is invalid")
+    return ref
+
+
+def _m5_v2_positive_int(
+    value: Any,
+    label: str,
+    *,
+    maximum: int = 100_000,
+) -> int:
+    if (
+        isinstance(value, bool)
+        or not isinstance(value, int)
+        or value < 1
+        or value > maximum
+    ):
+        raise DurableRecordIntegrityError(f"M5 v2 {label} integer is invalid")
+    return value
+
+
+def _m5_v2_array(value: Any, label: str) -> list[Any]:
+    if not isinstance(value, list):
+        raise DurableRecordIntegrityError(f"M5 v2 {label} array is invalid")
+    return value
+
+
+def _m5_v2_text_array(value: Any, label: str) -> list[str]:
+    items = _m5_v2_array(value, label)
+    for item in items:
+        _m5_v2_text(item, label, limit=1200)
+    return items
+
+
+def _validate_m5_v2_content(content: Any) -> list[dict[str, str]]:
+    value = _m5_v2_object(content, _M5_V2_CONTENT_FIELDS, "content")
+    for field in (
+        "seriesConcept",
+        "premise",
+        "logline",
+        "mainNarrativeDirection",
+        "narrativeRhythm",
+        "worldIntent",
+    ):
+        _m5_v2_text(value[field], field)
+    for field in (
+        "continuityIntent",
+        "foreshadowingContext",
+        "productionAssumptions",
+    ):
+        _m5_v2_text_array(value[field], field)
+    raw_items = _m5_v2_array(value["episodePlanItems"], "episodePlanItems")
+    if not raw_items or len(raw_items) > 100_000:
+        raise DurableRecordIntegrityError("M5 v2 episodePlanItems count is invalid")
+    episode_count = len(raw_items)
+
+    main_arcs = _m5_v2_array(value["mainArcs"], "mainArcs")
+    if not main_arcs:
+        raise DurableRecordIntegrityError("M5 v2 mainArcs is empty")
+    arc_fields = frozenset(
+        {"arcNumber", "title", "episodeStart", "episodeEnd", "objective", "turningPoint"}
+    )
+    for index, raw_arc in enumerate(main_arcs, start=1):
+        arc = _m5_v2_object(raw_arc, arc_fields, "mainArc")
+        if _m5_v2_positive_int(arc["arcNumber"], "arcNumber", maximum=100) != index:
+            raise DurableRecordIntegrityError("M5 v2 mainArc order is invalid")
+        start = _m5_v2_positive_int(
+            arc["episodeStart"], "episodeStart", maximum=episode_count
+        )
+        end = _m5_v2_positive_int(
+            arc["episodeEnd"], "episodeEnd", maximum=episode_count
+        )
+        if start > end:
+            raise DurableRecordIntegrityError("M5 v2 mainArc range is invalid")
+        _m5_v2_text(arc["title"], "title", limit=300)
+        for field in ("objective", "turningPoint"):
+            _m5_v2_text(arc[field], field)
+
+    sub_arc_fields = frozenset({"title", "episodeStart", "episodeEnd", "purpose"})
+    for raw_arc in _m5_v2_array(value["subArcs"], "subArcs"):
+        arc = _m5_v2_object(raw_arc, sub_arc_fields, "subArc")
+        _m5_v2_positive_int(
+            arc["episodeStart"], "episodeStart", maximum=episode_count
+        )
+        end = _m5_v2_positive_int(
+            arc["episodeEnd"], "episodeEnd", maximum=episode_count
+        )
+        _m5_v2_text(arc["title"], "title", limit=300)
+        _m5_v2_text(arc["purpose"], "purpose")
+
+    intent_fields = frozenset(
+        {"roleLabel", "startingState", "developmentIntent", "destination"}
+    )
+    intents = _m5_v2_array(value["characterArcIntents"], "characterArcIntents")
+    if not intents:
+        raise DurableRecordIntegrityError("M5 v2 characterArcIntents is empty")
+    for raw_intent in intents:
+        intent = _m5_v2_object(raw_intent, intent_fields, "characterArcIntent")
+        for field in intent_fields:
+            _m5_v2_text(intent[field], field)
+
+    item_fields = frozenset(
+        {
+            "episodePlanItemRef",
+            "episodeNumber",
+            "title",
+            "logline",
+            "arcNumber",
+            "narrativePurpose",
+            "continuityNotes",
+            "foreshadowing",
+        }
+    )
+    item_positions: dict[str, int] = {}
+    for position, raw_item in enumerate(raw_items):
+        item = _m5_v2_object(raw_item, item_fields, "episodePlanItem")
+        item_ref = _m5_v2_ref(item["episodePlanItemRef"], "episodePlanItemRef")
+        if item_ref in item_positions:
+            raise DurableRecordIntegrityError("M5 v2 episodePlanItemRef is duplicated")
+        item_positions[item_ref] = position
+        if _m5_v2_positive_int(
+            item["episodeNumber"], "episodeNumber", maximum=len(raw_items)
+        ) != position + 1:
+            raise DurableRecordIntegrityError("M5 v2 episodePlanItem order is invalid")
+        arc_number = _m5_v2_positive_int(
+            item["arcNumber"], "arcNumber", maximum=len(main_arcs)
+        )
+        if arc_number > len(main_arcs):
+            raise DurableRecordIntegrityError("M5 v2 episodePlanItem arc is invalid")
+        _m5_v2_text(item["title"], "title", limit=300)
+        for field in ("logline", "narrativePurpose"):
+            _m5_v2_text(item[field], field)
+        _m5_v2_text_array(item["continuityNotes"], "continuityNotes")
+        _m5_v2_text_array(item["foreshadowing"], "foreshadowing")
+
+    coverage: set[int] = set()
+    for raw_arc in main_arcs:
+        coverage.update(range(raw_arc["episodeStart"], raw_arc["episodeEnd"] + 1))
+        if raw_arc["episodeEnd"] > episode_count:
+            raise DurableRecordIntegrityError("M5 v2 mainArc exceeds episodePlanItems")
+    if coverage != set(range(1, episode_count + 1)):
+        raise DurableRecordIntegrityError("M5 v2 mainArcs coverage is invalid")
+    for raw_arc in value["subArcs"]:
+        if raw_arc["episodeEnd"] > episode_count:
+            raise DurableRecordIntegrityError("M5 v2 subArc exceeds episodePlanItems")
+
+    binding_fields = frozenset({"episodeRef", "episodePlanItemRef"})
+    bindings: list[dict[str, str]] = []
+    episode_refs: set[str] = set()
+    bound_item_refs: set[str] = set()
+    for raw_binding in _m5_v2_array(
+        value["episodePlanItemBindings"], "episodePlanItemBindings"
+    ):
+        binding = _m5_v2_object(raw_binding, binding_fields, "episodePlanItemBinding")
+        episode_ref = _m5_v2_ref(binding["episodeRef"], "episodeRef")
+        item_ref = _m5_v2_ref(binding["episodePlanItemRef"], "episodePlanItemRef")
+        if episode_ref in episode_refs or item_ref in bound_item_refs:
+            raise DurableRecordIntegrityError("M5 v2 binding identity is duplicated")
+        if item_ref not in item_positions:
+            raise DurableRecordIntegrityError("M5 v2 binding plan item is unavailable")
+        episode_refs.add(episode_ref)
+        bound_item_refs.add(item_ref)
+        bindings.append({"episodeRef": episode_ref, "episodePlanItemRef": item_ref})
+    if bindings != sorted(
+        bindings,
+        key=lambda item: (item_positions[item["episodePlanItemRef"]], item["episodeRef"]),
+    ):
+        raise DurableRecordIntegrityError("M5 v2 binding order is not canonical")
+    return bindings
+
+
+def _load_m5_v2_content(raw: Any) -> Any:
+    if not isinstance(raw, str):
+        raise DurableRecordIntegrityError("M5 source JSON is invalid")
+
+    def reject_duplicates(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
+        value: dict[str, Any] = {}
+        for raw_key, item in pairs:
+            key = unicodedata.normalize("NFC", raw_key)
+            if key in value:
+                raise DurableRecordIntegrityError("M5 source JSON has duplicate keys")
+            value[key] = item
+        return value
+
+    def reject_number(_value: str) -> Any:
+        raise DurableRecordIntegrityError("M5 source JSON has a forbidden number")
+
+    try:
+        value = json.loads(
+            raw,
+            object_pairs_hook=reject_duplicates,
+            parse_float=reject_number,
+            parse_constant=reject_number,
+        )
+    except DurableRecordIntegrityError:
+        raise
+    except (TypeError, ValueError, json.JSONDecodeError, RecursionError):
+        raise DurableRecordIntegrityError("M5 source JSON is invalid") from None
+    if json.dumps(value, ensure_ascii=False, sort_keys=True) != raw:
+        raise DurableRecordIntegrityError("M5 source JSON is not canonical")
+    return value
+
+
 def _m5_source_digest(connection: Any, row: Any, cache: dict[tuple[str, ...], str]) -> str:
     key = (
         str(row["workspace_ref"]),
@@ -196,7 +439,11 @@ def _m5_source_digest(connection: Any, row: Any, cache: dict[tuple[str, ...], st
     if cached is not None:
         return cached
     parent = connection.execute(
-        "SELECT p.content_profile_ref, v.content_json "
+        "SELECT p.content_profile_ref AS parent_content_profile_ref, "
+        "p.project_ref AS parent_project_ref, p.series_ref AS parent_series_ref, "
+        "v.content_profile_ref AS version_content_profile_ref, "
+        "v.project_ref AS version_project_ref, v.series_ref AS version_series_ref, "
+        "v.schema_version, v.content_json "
         "FROM v5_series_plans p JOIN v5_series_plan_versions v "
         "ON v.workspace_ref=p.workspace_ref AND v.series_plan_ref=p.series_plan_ref "
         "WHERE p.workspace_ref=? AND p.project_ref=? AND p.series_ref=? "
@@ -205,10 +452,23 @@ def _m5_source_digest(connection: Any, row: Any, cache: dict[tuple[str, ...], st
     ).fetchone()
     if parent is None:
         raise DurableRecordIntegrityError("M5 source lineage is unavailable")
-    try:
-        content = json.loads(parent["content_json"])
-    except (TypeError, ValueError, json.JSONDecodeError, RecursionError):
-        raise DurableRecordIntegrityError("M5 source JSON is invalid") from None
+    if (
+        str(parent["parent_content_profile_ref"])
+        != str(parent["version_content_profile_ref"])
+        or str(parent["version_project_ref"]) != key[1]
+        or str(parent["version_series_ref"]) != key[2]
+        or str(parent["parent_project_ref"]) != key[1]
+        or str(parent["parent_series_ref"]) != key[2]
+    ):
+        raise DurableRecordIntegrityError("M5 source scope lineage is invalid")
+    schema_version = parent["schema_version"]
+    if schema_version == "v5.series-plan-version.v2":
+        content = _load_m5_v2_content(parent["content_json"])
+    else:
+        try:
+            content = json.loads(parent["content_json"])
+        except (TypeError, ValueError, json.JSONDecodeError, RecursionError):
+            raise DurableRecordIntegrityError("M5 source JSON is invalid") from None
     if not isinstance(content, dict):
         raise DurableRecordIntegrityError("M5 source content is invalid")
     required = (
@@ -219,18 +479,28 @@ def _m5_source_digest(connection: Any, row: Any, cache: dict[tuple[str, ...], st
         "continuityIntent",
         "foreshadowingContext",
     )
-    if any(field not in content for field in required):
-        raise DurableRecordIntegrityError("M5 source content is incomplete")
+    if schema_version == "v5.series-plan-version.v1":
+        if set(content) != _M5_V1_CONTENT_FIELDS:
+            raise DurableRecordIntegrityError("M5 v1 source content shape is invalid")
+        snapshot_schema = "v5.series-plan.m6-source-snapshot.v1"
+        binding_projection: dict[str, Any] = {}
+    elif schema_version == "v5.series-plan-version.v2":
+        bindings = _validate_m5_v2_content(content)
+        snapshot_schema = "v5.series-plan.m6-source-snapshot.v2"
+        binding_projection = {"episodePlanItemBindings": bindings}
+    else:
+        raise DurableRecordIntegrityError("M5 source schema is unsupported")
     snapshot = {
-        "schemaVersion": "v5.series-plan.m6-source-snapshot.v1",
+        "schemaVersion": snapshot_schema,
         "workspaceRef": key[0],
-        "contentProfileRef": parent["content_profile_ref"],
+        "contentProfileRef": parent["parent_content_profile_ref"],
         "projectRef": key[1],
         "seriesRef": key[2],
         "seriesPlanRef": key[3],
         "seriesPlanVersionRef": key[4],
         "status": "confirmed",
         **{field: content[field] for field in required},
+        **binding_projection,
     }
     result = _digest(snapshot)
     cache[key] = result

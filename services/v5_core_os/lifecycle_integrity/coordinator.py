@@ -19,6 +19,7 @@ class LifecycleIntegrityCoordinator:
         script_depends_on_series: Callable[[str, str], bool],
         dependency_error: Callable[[str], BaseException],
         series_plan_depends_on_series: Callable[[str, str], bool] | None = None,
+        series_plan_depends_on_episode: Callable[[str, str, str], bool] | None = None,
         series_intelligence_depends_on_series: Callable[[str, str], bool] | None = None,
     ) -> None:
         self._state = state
@@ -29,6 +30,9 @@ class LifecycleIntegrityCoordinator:
         self._script_depends_on_series = script_depends_on_series
         self._series_plan_depends_on_series = series_plan_depends_on_series or (
             lambda _workspace, _series: False
+        )
+        self._series_plan_depends_on_episode = series_plan_depends_on_episode or (
+            lambda _workspace, _series, _episode: False
         )
         self._series_intelligence_depends_on_series = (
             series_intelligence_depends_on_series or (lambda _workspace, _series: False)
@@ -66,6 +70,10 @@ class LifecycleIntegrityCoordinator:
                 return mutation()
             if self._script_depends_on_episode(workspace_ref, series_ref, episode_ref):
                 raise self._dependency_error("dependent_script_exists")
+            if self._series_plan_depends_on_episode(
+                workspace_ref, series_ref, episode_ref
+            ):
+                raise self._dependency_error("dependent_series_plan_binding_exists")
             return mutation()
 
         return self._mutate(workspace_ref, LifecycleOperation.DELETE_EPISODE, checked)

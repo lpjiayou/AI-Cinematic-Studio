@@ -1,4 +1,5 @@
 import ast
+import hashlib
 from importlib.util import resolve_name
 import inspect
 from pathlib import Path
@@ -196,6 +197,40 @@ class CreatorSeriesPlanningContractTests(unittest.TestCase):
         owner_path = Path(inspect.getfile(SeriesPlanningPublicBoundary)).resolve()
         self.assertIn("v5_core_os", owner_path.parts)
         self.assertNotIn("apps", owner_path.parts)
+
+    def test_binding_version_is_core_only_and_adds_no_application_route_or_dto(self):
+        signature = inspect.signature(
+            SeriesPlanningPublicBoundary.create_episode_plan_item_binding_version
+        )
+        self.assertEqual(tuple(signature.parameters), ("self", "command"))
+        self.assertEqual(
+            hashlib.sha256(SERVER.read_bytes()).hexdigest(),
+            "03dee2dc8a290884d022aa073f391f67ac7c72b1a153585c20f87f5534d6a9fc",
+        )
+        server_source = SERVER.read_text(encoding="utf-8")
+        endpoint_names = {
+            target.id
+            for node in ast.walk(ast.parse(server_source))
+            if isinstance(node, ast.Assign)
+            for target in node.targets
+            if isinstance(target, ast.Name) and target.id.startswith("SERIES_PLANNING_")
+        }
+        self.assertEqual(
+            endpoint_names,
+            {
+                "SERIES_PLANNING_ENDPOINT",
+                "SERIES_PLANNING_GENERATE_ENDPOINT",
+                "SERIES_PLANNING_CONFIRM_ENDPOINT",
+                "SERIES_PLANNING_MANUAL_VERSION_ENDPOINT",
+                "SERIES_PLANNING_CONFIRM_VERSION_ENDPOINT",
+                "SERIES_PLANNING_M6_BOOTSTRAP_ENDPOINT",
+            },
+        )
+        for path in APPS_ROOT.rglob("*.py"):
+            source = path.read_text(encoding="utf-8")
+            with self.subTest(path=path.relative_to(ROOT)):
+                self.assertNotIn("create_episode_plan_item_binding_version", source)
+                self.assertNotIn("episodePlanItemBindings", source)
 
     def test_m6_bridge_preserves_lineage_and_contains_no_display_name_lookup(self):
         _, _, planning, series, project = create_context()

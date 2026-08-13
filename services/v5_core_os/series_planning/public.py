@@ -13,6 +13,7 @@ from services.v5_core_os.project_engine import ProjectPublicBoundary
 from .foundation import (
     DuplicateRecordError,
     InMemorySeriesPlanningAdapter,
+    LifecycleUnavailableError,
     PlanNotConfirmedError,
     RecordNotFoundError,
     ScopeMismatchError,
@@ -37,10 +38,12 @@ class SeriesPlanningPublicBoundary:
         self.__service = service
         self.__lifecycle_state = lifecycle_state
         self.__lifecycle_assembly = None
+        self.__lifecycle_token = None
 
     def _bind_lifecycle_assembly(self, assembly) -> None:
         if self.__lifecycle_assembly is not None:
             raise RuntimeError("lifecycle assembly is already bound")
+        self.__lifecycle_token = self.__service._bind_lifecycle_assembly()
         self.__lifecycle_assembly = assembly
 
     def _lifecycle_assembly_or_none(self):
@@ -54,6 +57,8 @@ class SeriesPlanningPublicBoundary:
             return SeriesPlanningPublicError(exc.code, 409)
         if isinstance(exc, ScopeMismatchError):
             return SeriesPlanningPublicError(exc.code, 400)
+        if isinstance(exc, LifecycleUnavailableError):
+            return SeriesPlanningPublicError(exc.code, 503)
         return SeriesPlanningPublicError(exc.code, 400)
 
     def _invoke(self, operation, *args):
@@ -73,8 +78,29 @@ class SeriesPlanningPublicBoundary:
     def create_manual_version(self, command: Mapping[str, Any]) -> dict[str, Any]:
         return self._lifecycle_write(command, LifecycleOperation.APPEND_SERIES_PLAN_VERSION, self.__service.create_manual_version)
 
+    def create_episode_plan_item_binding_version(
+        self, command: Mapping[str, Any]
+    ) -> dict[str, Any]:
+        if self.__lifecycle_state is None or self.__lifecycle_assembly is None:
+            raise SeriesPlanningPublicError("lifecycle_unavailable", 503)
+        return self._lifecycle_write(
+            command,
+            LifecycleOperation.APPEND_SERIES_PLAN_VERSION,
+            lambda payload: self.__service.create_episode_plan_item_binding_version(
+                payload,
+                lifecycle_token=self.__lifecycle_token,
+            ),
+        )
+
     def confirm_version(self, command: Mapping[str, Any]) -> dict[str, Any]:
-        return self._lifecycle_write(command, LifecycleOperation.CONFIRM_SERIES_PLAN_VERSION, self.__service.confirm_version)
+        return self._lifecycle_write(
+            command,
+            LifecycleOperation.CONFIRM_SERIES_PLAN_VERSION,
+            lambda payload: self.__service.confirm_version(
+                payload,
+                lifecycle_token=self.__lifecycle_token,
+            ),
+        )
 
     def _lifecycle_write(self, command, lifecycle_operation, operation):
         if self.__lifecycle_state is None:

@@ -6,11 +6,11 @@
 >
 > Project Lead Authorization: `M6-P3-B1 IMPLEMENTATION REVIEW APPROVED BY PROJECT LEAD / ARCHITECTURE / REPOSITORY GOVERNANCE / M2-M4-M5-M6 DOMAIN OWNERS ON 2026-08-13`
 >
-> Authorized Wave: `B1 GOVERNANCE CHECKPOINT → REMOTE VERIFY → BOUNDED IMPLEMENTATION → REMOTE VERIFY → STOP FOR B1 OWNER REVIEW`
+> Authorized Wave: `B1 GOVERNANCE CHECKPOINT REMOTE-VERIFIED AT ae82ea27b39c44a8b77941f2b43abf7544492765 → BOUNDED IMPLEMENTATION CANDIDATE → REMOTE VERIFY → STOP FOR B1 OWNER REVIEW`
 >
 > Current Task: `ACS-M6-P3-B1-EPISODE-PLAN-ITEM-BINDING`
 >
-> Current Work Package: `EIGHT GOVERNANCE PATHS → SIX PRODUCTION + NINE TEST PATHS → OWNER REVIEW`
+> Current Work Package: `SIX PRODUCTION + NINE TEST PATHS → REMOTE VERIFY → OWNER REVIEW`
 >
 > M6 Authorization: `P0-P2 OWNER ACCEPTED / P3-G0 OWNER ACCEPTED AS ARCHITECTURE / P3-B1 BOUNDED IMPLEMENTATION AUTHORIZED AFTER GOVERNANCE REMOTE VERIFY / P3-G1 NOT AUTHORIZED`
 >
@@ -66,7 +66,7 @@ decommission. It is no longer an active Core work package and does not authorize
 
 Current stage:
 
-`M6-P3-B1 EpisodePlanItemBinding Authorization Checkpoint`
+`M6-P3-B1 EpisodePlanItemBinding Implementation Candidate`
 
 Title:
 
@@ -74,7 +74,7 @@ ACS-M6-P3-B1 EpisodePlanItemBinding
 
 Status:
 
-`IMPLEMENTATION AUTHORIZED AFTER GOVERNANCE REMOTE VERIFICATION / G1 NOT AUTHORIZED`
+`GOVERNANCE REMOTE-VERIFIED AT ae82ea27b39c44a8b77941f2b43abf7544492765 / BOUNDED IMPLEMENTATION CANDIDATE / OWNER REVIEW ONLY AFTER TECHNICAL REMOTE VERIFICATION / G1 NOT AUTHORIZED`
 
 Purpose:
 
@@ -465,7 +465,7 @@ capability.
 - M6-P3-G0 STATUS: `OWNER ACCEPTED / COMPLETE AS GOVERNANCE-ARCHITECTURE / NO IMPLEMENTATION AUTHORITY`
 - ADR-0005 STATUS: `ACCEPTED AS ARCHITECTURE DECISION / B1 BOUNDED IMPLEMENTATION AUTHORIZED / G1 UNAUTHORIZED`
 - M6 CONSUMER CONTRACT: `ACCEPTED NORMATIVE ARCHITECTURE / B1 BOUNDED IMPLEMENTATION AUTHORIZED / CONSUMER UNIMPLEMENTED`
-- M6-P3-B1 EPISODE-PLAN-ITEM BINDING: `IMPLEMENTATION REVIEW APPROVED / GOVERNANCE AUTHORIZATION CHECKPOINT IN PROGRESS / TECHNICAL EDITS AFTER REMOTE VERIFY / BLOCKS M6-P3-G1`
+- M6-P3-B1 EPISODE-PLAN-ITEM BINDING: `IMPLEMENTATION REVIEW APPROVED / GOVERNANCE REMOTE-VERIFIED AT ae82ea27b39c44a8b77941f2b43abf7544492765 / BOUNDED IMPLEMENTATION CANDIDATE / BLOCKS M6-P3-G1`
 - M6-P3-B1 AUTHORIZED BASE: `6bb9d165a693057f38e5789c408293ff0eaf5bcc`
 - M6-P3-B1 DOMAIN OWNERS: `M2 / M4 / M5 / M6 APPROVED`
 - M6-P3-B1 FROZEN SCOPE: `8 GOVERNANCE / 6 PRODUCTION / 9 TEST PATHS`
@@ -500,11 +500,12 @@ record and takes effect for technical edits only after governance remote verific
 
 # 9. Stop Rule
 
-The current governance authorization checkpoint must pass exact eight-path scope,
-production/test diff zero, Markdown structure, local links, secret scan,
-`git diff --check`, one commit, non-force push, Local SHA equals Remote SHA,
-ahead/behind `0/0` and clean worktree. Only then may the bounded B1 production/test
-implementation start automatically.
+The governance authorization checkpoint passed its exact eight-path scope and was
+remote-verified at `ae82ea27b39c44a8b77941f2b43abf7544492765`. Before B1 Owner
+Review, the bounded implementation candidate must pass its frozen 6 production,
+9 test and 8 governance path scope, required tests, Markdown structure, local links,
+secret scan, `git diff --check`, one commit, non-force push, Local SHA equals Remote
+SHA, ahead/behind `0/0` and clean worktree.
 
 After the implementation candidate is tested, committed, non-force pushed and
 remote-verified:
@@ -529,7 +530,7 @@ M6-P3-G1, M7-M19, formal database deployment, Auth/RBAC expansion or Frontend wo
 
 Status:
 
-`GOVERNANCE AUTHORIZATION CHECKPOINT IN PROGRESS / BOUNDED IMPLEMENTATION AUTHORIZED AFTER REMOTE VERIFICATION`
+`GOVERNANCE REMOTE-VERIFIED AT ae82ea27b39c44a8b77941f2b43abf7544492765 / BOUNDED IMPLEMENTATION CANDIDATE / OWNER REVIEW ONLY AFTER TECHNICAL REMOTE VERIFICATION`
 
 M6-P0/P1 and bounded M6-P2-G1 remain Owner Accepted at their remote-verified technical
 baselines. G1-R1 is Owner Accepted and complete at

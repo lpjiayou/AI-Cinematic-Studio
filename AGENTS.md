@@ -360,7 +360,7 @@ The PRE-M6 route is fixed as:
 → `M6 Preconditions`
 → `M6-P1`
 
-The current phase is `M6-P3-B1 EpisodePlanItemBinding Authorization Checkpoint`.
+The current phase is `M6-P3-B1 EpisodePlanItemBinding Implementation Candidate`.
 
 Current governance state:
 
@@ -392,9 +392,9 @@ Current governance state:
   IMPLEMENTATION AUTHORITY`;
 - ADR-0005 and M6 consumer contract: `ACCEPTED AS ARCHITECTURE / B1 BOUNDED
   IMPLEMENTATION AUTHORIZED / G1 UNAUTHORIZED`;
-- M6-P3-B1 binding prerequisite: `IMPLEMENTATION REVIEW APPROVED / GOVERNANCE
-  AUTHORIZATION CHECKPOINT IN PROGRESS / BOUNDED TECHNICAL EDITS AFTER REMOTE
-  VERIFICATION / BLOCKS M6-P3-G1`;
+- M6-P3-B1 binding prerequisite: `GOVERNANCE AUTHORIZATION REMOTE-VERIFIED AT
+  ae82ea27b39c44a8b77941f2b43abf7544492765 / BOUNDED IMPLEMENTATION CANDIDATE /
+  BLOCKS M6-P3-G1`;
 - M6-P3-B1 authorized base:
   `6bb9d165a693057f38e5789c408293ff0eaf5bcc`;
 - M6-P3-B1 affected Domain Owners: `M2 / M4 / M5 / M6 APPROVED`;

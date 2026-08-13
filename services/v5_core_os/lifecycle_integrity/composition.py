@@ -79,6 +79,24 @@ def _sqlite_series_plan_depends_on_series(repository, workspace_ref: str, series
         raise LifecycleUnavailableError("lifecycle dependency state is unavailable") from None
 
 
+def _series_plan_depends_on_episode(
+    repository,
+    workspace_ref: str,
+    series_ref: str,
+    episode_ref: str,
+) -> bool:
+    try:
+        return repository.lifecycle_has_episode_binding_dependency(
+            workspace_ref,
+            series_ref,
+            episode_ref,
+        )
+    except Exception:
+        # An exact-scope historical binding record that cannot be read safely must
+        # conservatively retain the Episode rather than permit an orphan.
+        return True
+
+
 def _series_intelligence_depends_on_series(boundary, workspace_ref, series_ref) -> bool:
     try:
         return boundary.lifecycle_has_series_dependency(workspace_ref, series_ref)
@@ -158,7 +176,12 @@ class LifecycleAssembly:
         project_boundary = ProjectPublicBoundary(project_service, lifecycle_state=state)
         script_service = ScriptStudioService(script_repository, series_boundary, **kwargs)
         script_boundary = ScriptStudioPublicBoundary(script_service, lifecycle_state=state)
-        planning_service = SeriesPlanningService(planning_repository, project_boundary, **kwargs)
+        planning_service = SeriesPlanningService(
+            planning_repository,
+            project_boundary,
+            binding_context_reader=project_boundary,
+            **kwargs,
+        )
         planning_boundary = SeriesPlanningPublicBoundary(planning_service, lifecycle_state=state)
         intelligence_boundary = create_in_memory_participant(
             lifecycle_state=state,
@@ -184,6 +207,14 @@ class LifecycleAssembly:
             ),
             script_depends_on_episode=script_repository.lifecycle_has_episode_dependency,
             script_depends_on_series=script_repository.lifecycle_has_series_dependency,
+            series_plan_depends_on_episode=lambda workspace, series, episode: (
+                _series_plan_depends_on_episode(
+                    planning_repository,
+                    workspace,
+                    series,
+                    episode,
+                )
+            ),
             series_plan_depends_on_series=lambda workspace, series: (
                 _in_memory_series_plan_depends_on_series(
                     planning_repository, workspace, series
@@ -260,7 +291,12 @@ class LifecycleAssembly:
         project_boundary = ProjectPublicBoundary(project_service, lifecycle_state=state)
         script_service = ScriptStudioService(script_repository, series_boundary, **kwargs)
         script_boundary = ScriptStudioPublicBoundary(script_service, lifecycle_state=state)
-        planning_service = SeriesPlanningService(planning_repository, project_boundary, **kwargs)
+        planning_service = SeriesPlanningService(
+            planning_repository,
+            project_boundary,
+            binding_context_reader=project_boundary,
+            **kwargs,
+        )
         planning_boundary = SeriesPlanningPublicBoundary(planning_service, lifecycle_state=state)
         intelligence_boundary = create_sqlite_participant(
             database_path=database_path,
@@ -286,6 +322,14 @@ class LifecycleAssembly:
             ),
             script_depends_on_episode=script_repository.lifecycle_has_episode_dependency,
             script_depends_on_series=script_repository.lifecycle_has_series_dependency,
+            series_plan_depends_on_episode=lambda workspace, series, episode: (
+                _series_plan_depends_on_episode(
+                    planning_repository,
+                    workspace,
+                    series,
+                    episode,
+                )
+            ),
             series_plan_depends_on_series=lambda workspace, series: (
                 _sqlite_series_plan_depends_on_series(
                     planning_repository, workspace, series

@@ -1,4 +1,6 @@
 import copy
+from dataclasses import replace
+import hashlib
 import json
 from pathlib import Path
 import tempfile
@@ -18,6 +20,7 @@ from services.v5_core_os.text_generation import (
 )
 from services.v5_core_os.text_generation.testing import FakeTextGenerationCapability
 from services.v5_core_os.project_engine import (
+    ProjectPublicError,
     create_in_memory_boundary as create_project_boundary,
     create_local_development_boundary as create_local_project_boundary,
 )
@@ -30,6 +33,8 @@ from services.v5_core_os.series_planning import (
     create_in_memory_boundary as create_planning_boundary,
     create_local_development_boundary as create_local_planning_boundary,
 )
+from services.v5_core_os.lifecycle_integrity import LifecycleAssembly
+from tests.unit.test_ai_director_phase1 import valid_brief, valid_plan
 
 
 WORKSPACE = "workspace-m5"
@@ -128,6 +133,62 @@ def confirm(planning, series_record, project, candidate=None):
         "humanConfirmed": True,
         "candidate": candidate or valid_candidate(project["plannedEpisodeCount"]),
     })
+
+
+def create_binding_context(*, count=4):
+    refs = Refs()
+    assembly = LifecycleAssembly.in_memory(
+        ref_factory=refs,
+        clock=lambda: "2026-08-10T00:00:00.000Z",
+    )
+    series_record = assembly.series_episode.create_series({
+        "workspaceRef": WORKSPACE,
+        "contentProfileRef": PROFILE,
+        "title": "晚灯",
+        "plannedEpisodeCount": count,
+    })
+    project = assembly.project_context.create_project({
+        "workspaceRef": WORKSPACE,
+        "contentProfileRef": PROFILE,
+        "projectType": "series",
+        "seriesRef": series_record["seriesRef"],
+        "title": "晚灯系列制作",
+        "plannedEpisodeCount": count,
+    })
+    source_plan = valid_plan()
+    confirmed_creative_plan = assembly.series_episode.confirm_creative_plan({
+        "workspaceRef": WORKSPACE,
+        "humanConfirmed": True,
+        "sourcePlanRef": "director-plan-m5",
+        "sourcePlanSchemaVersion": source_plan["schemaVersion"],
+        "sourcePlanVersion": 1,
+        "brief": valid_brief(),
+        "sourcePlan": source_plan,
+    })
+    episodes = [
+        assembly.series_episode.create_episode({
+            "workspaceRef": WORKSPACE,
+            "seriesRef": series_record["seriesRef"],
+            "creativePlanRef": confirmed_creative_plan["creativePlanRef"],
+            "episodeNumber": number,
+            "title": f"第{number}集",
+        })
+        for number in range(1, count + 1)
+    ]
+    initial = confirm(
+        assembly.series_planning,
+        series_record,
+        project,
+        valid_candidate(count),
+    )
+    bindings = [
+        {
+            "episodeRef": episode["episodeRef"],
+            "episodePlanItemRef": item["episodePlanItemRef"],
+        }
+        for episode, item in zip(episodes, initial["version"]["episodePlanItems"])
+    ]
+    return assembly, series_record, project, episodes, initial, bindings
 
 
 class SeriesDirectorTests(unittest.TestCase):
@@ -252,6 +313,389 @@ class SeriesPlanningDomainTests(unittest.TestCase):
         self.assertEqual(first["schemaVersion"], "creator.series-plan.m6-bootstrap.v1")
         self.assertEqual(first["projectRef"], self.project["projectRef"])
         self.assertEqual(first["seriesPlanRef"], result["plan"]["seriesPlanRef"])
+
+    def test_v1_version_and_m6_source_remain_golden_and_unbound(self):
+        created = confirm(self.planning, self.series_record, self.project)
+        version = created["version"]
+        self.assertEqual(version["schemaVersion"], "v5.series-plan-version.v1")
+        self.assertNotIn("episodePlanItemBindings", version)
+        self.assertEqual(
+            set(version),
+            {
+                "schemaVersion", "workspaceRef", "contentProfileRef", "projectRef",
+                "seriesRef", "seriesPlanRef", "seriesPlanVersionRef", "versionNumber",
+                "seriesConcept", "premise", "logline", "mainNarrativeDirection",
+                "mainArcs", "subArcs", "characterArcIntents", "episodePlanItems",
+                "narrativeRhythm", "worldIntent", "continuityIntent",
+                "foreshadowingContext", "productionAssumptions", "changeKind",
+                "parentSeriesPlanVersionRef", "createdAt",
+            },
+        )
+        source = self.planning.get_confirmed_m6_source_snapshot(
+            WORKSPACE, self.project["projectRef"], self.series_record["seriesRef"]
+        )
+        digest_payload = dict(source)
+        digest = digest_payload.pop("seriesPlanVersionDigest")
+        recomputed = hashlib.sha256(json.dumps(
+            digest_payload,
+            ensure_ascii=False,
+            sort_keys=True,
+            separators=(",", ":"),
+        ).encode("utf-8")).hexdigest()
+        self.assertEqual(digest, recomputed)
+        self.assertEqual(digest, "a96cd7d0998788ed41206f28b81f38ce1e468fa16e4c6a4c780c92d793071aee")
+        self.assertEqual(source["schemaVersion"], "v5.series-plan.m6-source-snapshot.v1")
+        self.assertNotIn("episodePlanItemBindings", source)
+
+    def test_standalone_binding_version_fails_closed_without_writing(self):
+        initial = confirm(self.planning, self.series_record, self.project)
+        before = self.planning.get_workspace(
+            WORKSPACE, self.project["projectRef"], self.series_record["seriesRef"]
+        )
+        with self.assertRaises(SeriesPlanningPublicError) as unavailable:
+            self.planning.create_episode_plan_item_binding_version({
+                "workspaceRef": WORKSPACE,
+                "projectRef": self.project["projectRef"],
+                "seriesRef": self.series_record["seriesRef"],
+                "seriesPlanRef": initial["plan"]["seriesPlanRef"],
+                "expectedPlanVersion": initial["plan"]["version"],
+                "episodePlanItemBindings": [],
+            })
+        self.assertEqual(
+            (unavailable.exception.code, unavailable.exception.status),
+            ("lifecycle_unavailable", 503),
+        )
+        self.assertEqual(
+            self.planning.get_workspace(
+                WORKSPACE, self.project["projectRef"], self.series_record["seriesRef"]
+            ),
+            before,
+        )
+
+
+class SeriesPlanItemBindingVersionTests(unittest.TestCase):
+    def binding_command(self, project, series, initial, bindings):
+        return {
+            "workspaceRef": WORKSPACE,
+            "projectRef": project["projectRef"],
+            "seriesRef": series["seriesRef"],
+            "seriesPlanRef": initial["plan"]["seriesPlanRef"],
+            "expectedPlanVersion": initial["plan"]["version"],
+            "episodePlanItemBindings": bindings,
+        }
+
+    def test_dedicated_operation_normalizes_v1_to_v2_and_explicit_v2_unbind(self):
+        assembly, series, project, _, initial, bindings = create_binding_context()
+        self.assertEqual(initial["version"]["schemaVersion"], "v5.series-plan-version.v1")
+        self.assertNotIn("episodePlanItemBindings", initial["version"])
+
+        bound = assembly.series_planning.create_episode_plan_item_binding_version(
+            self.binding_command(project, series, initial, list(reversed(bindings)))
+        )
+        self.assertEqual(bound["version"]["schemaVersion"], "v5.series-plan-version.v2")
+        self.assertEqual(bound["version"]["versionNumber"], 2)
+        self.assertEqual(bound["version"]["parentSeriesPlanVersionRef"], initial["version"]["seriesPlanVersionRef"])
+        self.assertEqual(bound["version"]["episodePlanItemBindings"], bindings)
+        self.assertEqual(bound["plan"]["status"], "draft")
+        self.assertEqual(
+            bound["plan"]["confirmedSeriesPlanVersionRef"],
+            initial["version"]["seriesPlanVersionRef"],
+        )
+
+        unbound_command = self.binding_command(project, series, bound, [])
+        unbound = assembly.series_planning.create_episode_plan_item_binding_version(unbound_command)
+        self.assertEqual(unbound["version"]["schemaVersion"], "v5.series-plan-version.v2")
+        self.assertEqual(unbound["version"]["versionNumber"], 3)
+        self.assertEqual(unbound["version"]["episodePlanItemBindings"], [])
+        self.assertEqual(unbound["version"]["parentSeriesPlanVersionRef"], bound["version"]["seriesPlanVersionRef"])
+        workspace = assembly.series_planning.get_workspace(
+            WORKSPACE, project["projectRef"], series["seriesRef"]
+        )
+        self.assertNotIn("episodePlanItemBindings", workspace["versions"][0])
+        self.assertEqual(workspace["versions"][1]["episodePlanItemBindings"], bindings)
+        self.assertEqual(workspace["versions"][2]["episodePlanItemBindings"], [])
+
+    def test_exact_command_and_binding_objects_reject_unknown_missing_and_duplicate_fields(self):
+        assembly, series, project, _, initial, bindings = create_binding_context()
+        command = self.binding_command(project, series, initial, bindings)
+        invalid_commands = []
+        for field in tuple(command):
+            invalid_commands.append({key: value for key, value in command.items() if key != field})
+        for extra in ("humanConfirmed", "content", "unknown"):
+            invalid_commands.append({**command, extra: True})
+        invalid_commands.extend((
+            {**command, "expectedPlanVersion": "1"},
+            {**command, "expectedPlanVersion": 1.9},
+            {**command, "expectedPlanVersion": True},
+            {**command, "episodePlanItemBindings": [{**bindings[0], "unknown": True}]},
+            {**command, "episodePlanItemBindings": [bindings[0], {
+                **bindings[1], "episodeRef": bindings[0]["episodeRef"],
+            }]},
+            {**command, "episodePlanItemBindings": [bindings[0], {
+                **bindings[1], "episodePlanItemRef": bindings[0]["episodePlanItemRef"],
+            }]},
+        ))
+        for invalid in invalid_commands:
+            with self.subTest(fields=tuple(invalid)):
+                with self.assertRaises(SeriesPlanningPublicError) as rejected:
+                    assembly.series_planning.create_episode_plan_item_binding_version(invalid)
+                self.assertEqual(
+                    (rejected.exception.code, rejected.exception.status),
+                    ("invalid_request", 400),
+                )
+        workspace = assembly.series_planning.get_workspace(
+            WORKSPACE, project["projectRef"], series["seriesRef"]
+        )
+        self.assertEqual(len(workspace["versions"]), 1)
+        self.assertEqual(workspace["plan"]["version"], 1)
+
+    def test_binding_scope_rejects_unknown_episode_and_wrong_plan_item_without_write(self):
+        for mutation in (
+            lambda bindings: [{**bindings[0], "episodeRef": "episode-outside-scope"}],
+            lambda bindings: [{**bindings[0], "episodePlanItemRef": "item-outside-version"}],
+        ):
+            assembly, series, project, _, initial, bindings = create_binding_context()
+            command = self.binding_command(project, series, initial, mutation(bindings))
+            with self.assertRaises(SeriesPlanningPublicError) as rejected:
+                assembly.series_planning.create_episode_plan_item_binding_version(command)
+            self.assertEqual(
+                (rejected.exception.code, rejected.exception.status),
+                ("scope_mismatch", 400),
+            )
+            workspace = assembly.series_planning.get_workspace(
+                WORKSPACE, project["projectRef"], series["seriesRef"]
+            )
+            self.assertEqual(len(workspace["versions"]), 1)
+            self.assertEqual(workspace["plan"]["version"], 1)
+
+    def test_v2_confirmation_revalidates_episode_membership_and_is_zero_write_on_failure(self):
+        assembly, series, project, episodes, initial, bindings = create_binding_context()
+        bound = assembly.series_planning.create_episode_plan_item_binding_version(
+            self.binding_command(project, series, initial, bindings)
+        )
+        original_build_context = assembly.project_context.build_context
+
+        def missing_episode(workspace_ref, project_ref, series_ref=None, episode_ref=None):
+            if episode_ref == episodes[0]["episodeRef"]:
+                raise ProjectPublicError("not_found", 404)
+            return original_build_context(workspace_ref, project_ref, series_ref, episode_ref)
+
+        assembly.project_context.build_context = missing_episode
+        try:
+            with self.assertRaises(SeriesPlanningPublicError) as rejected:
+                assembly.series_planning.confirm_version({
+                    "workspaceRef": WORKSPACE,
+                    "seriesPlanRef": bound["plan"]["seriesPlanRef"],
+                    "seriesPlanVersionRef": bound["version"]["seriesPlanVersionRef"],
+                    "expectedPlanVersion": bound["plan"]["version"],
+                    "humanConfirmed": True,
+                })
+        finally:
+            assembly.project_context.build_context = original_build_context
+        self.assertEqual(
+            (rejected.exception.code, rejected.exception.status),
+            ("scope_mismatch", 400),
+        )
+        workspace = assembly.series_planning.get_workspace(
+            WORKSPACE, project["projectRef"], series["seriesRef"]
+        )
+        self.assertEqual(workspace["plan"]["version"], bound["plan"]["version"])
+        self.assertEqual(workspace["plan"]["status"], "draft")
+        self.assertEqual(
+            workspace["plan"]["confirmedSeriesPlanVersionRef"],
+            initial["version"]["seriesPlanVersionRef"],
+        )
+
+    def test_binding_write_and_confirmation_revalidate_project_series_relationship(self):
+        for phase in ("write", "confirm"):
+            with self.subTest(phase=phase):
+                assembly, series, project, _, initial, bindings = create_binding_context()
+                original = assembly.project_context.build_context
+                bound = None
+                if phase == "confirm":
+                    bound = assembly.series_planning.create_episode_plan_item_binding_version(
+                        self.binding_command(project, series, initial, bindings)
+                    )
+
+                def wrong_series(workspace_ref, project_ref, series_ref=None, episode_ref=None):
+                    context = original(workspace_ref, project_ref, series_ref, episode_ref)
+                    context["project"] = {
+                        **context["project"],
+                        "seriesRefs": ["series-not-associated"],
+                    }
+                    return context
+
+                assembly.project_context.build_context = wrong_series
+                try:
+                    with self.assertRaises(SeriesPlanningPublicError) as rejected:
+                        if phase == "write":
+                            assembly.series_planning.create_episode_plan_item_binding_version(
+                                self.binding_command(project, series, initial, bindings)
+                            )
+                        else:
+                            assembly.series_planning.confirm_version({
+                                "workspaceRef": WORKSPACE,
+                                "seriesPlanRef": bound["plan"]["seriesPlanRef"],
+                                "seriesPlanVersionRef": bound["version"]["seriesPlanVersionRef"],
+                                "expectedPlanVersion": bound["plan"]["version"],
+                                "humanConfirmed": True,
+                            })
+                finally:
+                    assembly.project_context.build_context = original
+                self.assertEqual(
+                    (rejected.exception.code, rejected.exception.status),
+                    ("scope_mismatch", 400),
+                )
+                workspace = assembly.series_planning.get_workspace(
+                    WORKSPACE, project["projectRef"], series["seriesRef"]
+                )
+                self.assertEqual(len(workspace["versions"]), 1 if phase == "write" else 2)
+                self.assertEqual(
+                    workspace["plan"]["confirmedSeriesPlanVersionRef"],
+                    initial["version"]["seriesPlanVersionRef"],
+                )
+
+    def test_manual_version_rejects_current_v2_and_cannot_downgrade_or_write(self):
+        assembly, series, project, _, initial, bindings = create_binding_context()
+        bound = assembly.series_planning.create_episode_plan_item_binding_version(
+            self.binding_command(project, series, initial, bindings)
+        )
+        before = assembly.series_planning.get_workspace(
+            WORKSPACE, project["projectRef"], series["seriesRef"]
+        )
+        with self.assertRaises(SeriesPlanningPublicError) as rejected:
+            assembly.series_planning.create_manual_version({
+                "workspaceRef": WORKSPACE,
+                "projectRef": project["projectRef"],
+                "seriesRef": series["seriesRef"],
+                "seriesPlanRef": bound["plan"]["seriesPlanRef"],
+                "expectedPlanVersion": bound["plan"]["version"],
+                "content": {},
+            })
+        self.assertEqual(
+            (rejected.exception.code, rejected.exception.status),
+            ("version_conflict", 409),
+        )
+        self.assertEqual(
+            assembly.series_planning.get_workspace(
+                WORKSPACE, project["projectRef"], series["seriesRef"]
+            ),
+            before,
+        )
+
+    def test_binding_write_and_confirmation_reject_tampered_operation_lineage(self):
+        for phase in ("root-write", "v2-confirm", "plan-version-write"):
+            with self.subTest(phase=phase):
+                assembly, series, project, _, initial, bindings = create_binding_context()
+                service = assembly.series_planning._SeriesPlanningPublicBoundary__service
+                repository = service.repository
+                plan_key = (WORKSPACE, initial["plan"]["seriesPlanRef"])
+                root_key = (
+                    WORKSPACE,
+                    initial["plan"]["seriesPlanRef"],
+                    initial["version"]["seriesPlanVersionRef"],
+                )
+                command = self.binding_command(project, series, initial, bindings)
+
+                if phase == "root-write":
+                    repository._versions[root_key] = replace(
+                        repository._versions[root_key], changeKind="manual-edit"
+                    )
+                    operation = lambda: assembly.series_planning.create_episode_plan_item_binding_version(
+                        command
+                    )
+                    expected_count = 1
+                else:
+                    bound = assembly.series_planning.create_episode_plan_item_binding_version(
+                        command
+                    )
+                    bound_key = (
+                        WORKSPACE,
+                        bound["plan"]["seriesPlanRef"],
+                        bound["version"]["seriesPlanVersionRef"],
+                    )
+                    if phase == "v2-confirm":
+                        repository._versions[bound_key] = replace(
+                            repository._versions[bound_key], changeKind="manual-edit"
+                        )
+                        operation = lambda: assembly.series_planning.confirm_version({
+                            "workspaceRef": WORKSPACE,
+                            "seriesPlanRef": bound["plan"]["seriesPlanRef"],
+                            "seriesPlanVersionRef": bound["version"]["seriesPlanVersionRef"],
+                            "expectedPlanVersion": bound["plan"]["version"],
+                            "humanConfirmed": True,
+                        })
+                    else:
+                        repository._plans[plan_key] = replace(
+                            repository._plans[plan_key], version=1
+                        )
+                        command = self.binding_command(project, series, bound, [])
+                        command["expectedPlanVersion"] = 1
+                        operation = lambda: assembly.series_planning.create_episode_plan_item_binding_version(
+                            command
+                        )
+                    expected_count = 2
+
+                with self.assertRaises(SeriesPlanningPublicError) as rejected:
+                    operation()
+                self.assertEqual(
+                    (rejected.exception.code, rejected.exception.status),
+                    ("version_conflict", 409),
+                )
+                self.assertEqual(len(repository.list_versions(WORKSPACE, plan_key[1])), expected_count)
+
+    def test_workspace_rejects_corrupt_plan_and_version_identity_lineage(self):
+        for corruption in (
+            "plan-schema", "profile", "version-ref", "version-number-type", "created-at"
+        ):
+            with self.subTest(corruption=corruption):
+                assembly, series, project, _, initial, _ = create_binding_context()
+                repository = (
+                    assembly.series_planning._SeriesPlanningPublicBoundary__service.repository
+                )
+                plan_key = (WORKSPACE, initial["plan"]["seriesPlanRef"])
+                version_key = (
+                    WORKSPACE,
+                    initial["plan"]["seriesPlanRef"],
+                    initial["version"]["seriesPlanVersionRef"],
+                )
+                if corruption == "plan-schema":
+                    repository._plans[plan_key] = replace(
+                        repository._plans[plan_key], schemaVersion="v5.series-plan.unknown"
+                    )
+                elif corruption == "profile":
+                    repository._plans[plan_key] = replace(
+                        repository._plans[plan_key], contentProfileRef=""
+                    )
+                    repository._versions[version_key] = replace(
+                        repository._versions[version_key], contentProfileRef=""
+                    )
+                elif corruption == "version-ref":
+                    repository._plans[plan_key] = replace(
+                        repository._plans[plan_key],
+                        currentSeriesPlanVersionRef="bad ref",
+                        confirmedSeriesPlanVersionRef="bad ref",
+                    )
+                    repository._versions[version_key] = replace(
+                        repository._versions[version_key], seriesPlanVersionRef="bad ref"
+                    )
+                elif corruption == "version-number-type":
+                    repository._versions[version_key] = replace(
+                        repository._versions[version_key], versionNumber="1"
+                    )
+                else:
+                    repository._versions[version_key] = replace(
+                        repository._versions[version_key], createdAt=""
+                    )
+
+                with self.assertRaises(SeriesPlanningPublicError) as rejected:
+                    assembly.series_planning.get_workspace(
+                        WORKSPACE, project["projectRef"], series["seriesRef"]
+                    )
+                self.assertEqual(
+                    (rejected.exception.code, rejected.exception.status),
+                    ("version_conflict", 409),
+                )
 
 
 class SeriesPlanningPersistenceTests(unittest.TestCase):
