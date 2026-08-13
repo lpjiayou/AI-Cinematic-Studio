@@ -47,11 +47,9 @@ from services.v5_core_os.series_planning import (
     SeriesPlanningPublicError,
     create_in_memory_boundary as create_in_memory_series_planning_boundary,
 )
-from services.v4_platform import (
-    ProviderConfigurationError,
-    TextGenerationRequest,
-    TextProvider,
-    create_text_provider_from_environment,
+from services.v5_core_os.text_generation import (
+    create_text_generation_capability_from_environment,
+    create_unconfigured_text_generation_capability,
 )
 
 
@@ -74,11 +72,6 @@ SERIES_PLANNING_MANUAL_VERSION_ENDPOINT = f"{SERIES_PLANNING_ENDPOINT}/manual-ve
 SERIES_PLANNING_CONFIRM_VERSION_ENDPOINT = f"{SERIES_PLANNING_ENDPOINT}/confirm-version"
 SERIES_PLANNING_M6_BOOTSTRAP_ENDPOINT = f"{SERIES_PLANNING_ENDPOINT}/m6-bootstrap"
 MAX_REQUEST_BYTES = 512_000
-
-
-class _UnconfiguredTextProvider:
-    def generate(self, generation_request: TextGenerationRequest) -> str:
-        raise ProviderConfigurationError("provider credential is required")
 
 
 class CreatorRequestHandler(BaseHTTPRequestHandler):
@@ -694,14 +687,17 @@ def create_server(
     series_boundary = series_episode_boundary or create_in_memory_series_boundary()
     projects = project_boundary or create_in_memory_project_boundary(series_boundary)
     planning = series_planning_boundary or create_in_memory_series_planning_boundary(projects)
+    default_text_generation = create_unconfigured_text_generation_capability()
     handler = partial(
         CreatorRequestHandler,
         ai_director_service=service,
         series_episode_boundary=series_boundary,
         project_boundary=projects,
-        series_director_service=series_director_service or SeriesDirectorApplicationService(_UnconfiguredTextProvider()),
+        series_director_service=series_director_service
+        or SeriesDirectorApplicationService(default_text_generation),
         series_planning_boundary=planning,
-        script_studio_service=script_studio_service or ScriptStudioApplicationService(_UnconfiguredTextProvider()),
+        script_studio_service=script_studio_service
+        or ScriptStudioApplicationService(default_text_generation),
         script_studio_boundary=script_studio_boundary or create_in_memory_script_boundary(series_boundary),
     )
     server = ThreadingHTTPServer(address, handler)
@@ -710,11 +706,7 @@ def create_server(
 
 
 def service_from_environment() -> AiDirectorService:
-    try:
-        provider: TextProvider = create_text_provider_from_environment()
-    except ProviderConfigurationError:
-        provider = _UnconfiguredTextProvider()
-    return AiDirectorService(provider)
+    return AiDirectorService(create_text_generation_capability_from_environment())
 
 
 def series_episode_boundary_from_environment() -> SeriesEpisodePublicBoundary:
@@ -724,11 +716,12 @@ def series_episode_boundary_from_environment() -> SeriesEpisodePublicBoundary:
 
 
 def capability_services_from_environment() -> tuple[AiDirectorService, ScriptStudioApplicationService, SeriesDirectorApplicationService]:
-    try:
-        provider: TextProvider = create_text_provider_from_environment()
-    except ProviderConfigurationError:
-        provider = _UnconfiguredTextProvider()
-    return AiDirectorService(provider), ScriptStudioApplicationService(provider), SeriesDirectorApplicationService(provider)
+    text_generation = create_text_generation_capability_from_environment()
+    return (
+        AiDirectorService(text_generation),
+        ScriptStudioApplicationService(text_generation),
+        SeriesDirectorApplicationService(text_generation),
+    )
 
 
 def main() -> None:

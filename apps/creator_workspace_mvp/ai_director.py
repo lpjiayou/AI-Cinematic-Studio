@@ -7,12 +7,13 @@ import json
 import re
 from typing import Any, Mapping
 
-from services.v4_platform import (
-    ProviderTimeoutError,
-    TextGenerationRequest,
-    TextMessage,
-    TextProvider,
-    TextProviderError,
+from services.v5_core_os.text_generation import (
+    TextGenerationCapability,
+    TextGenerationCapabilityError,
+    TextGenerationCommand,
+    TextGenerationMessage,
+    TextGenerationPurpose,
+    TextGenerationTimeoutError,
 )
 
 
@@ -181,7 +182,7 @@ def _build_messages(
     *,
     invalid_output: str | None = None,
     validation_errors: tuple[str, ...] = (),
-) -> tuple[TextMessage, ...]:
+) -> tuple[TextGenerationMessage, ...]:
     brief_json = json.dumps(brief.as_prompt_payload(), ensure_ascii=False)
     if invalid_output is None:
         user_content = f"Creative Brief JSON：{brief_json}\n请生成严格 JSON 候选导演方案。"
@@ -194,8 +195,8 @@ def _build_messages(
             "只修复结构与约束，返回完整严格 JSON。"
         )
     return (
-        TextMessage(role="system", content=SYSTEM_PROMPT),
-        TextMessage(role="user", content=user_content),
+        TextGenerationMessage(role="system", content=SYSTEM_PROMPT),
+        TextGenerationMessage(role="user", content=user_content),
     )
 
 
@@ -425,10 +426,10 @@ def build_session_project_draft_input(
 
 
 class AiDirectorService:
-    """Construct prompts, call V4, validate locally, and repair at most once."""
+    """Construct prompts, generate through V5, validate locally, and repair once."""
 
-    def __init__(self, provider: TextProvider) -> None:
-        self._provider = provider
+    def __init__(self, text_generation: TextGenerationCapability) -> None:
+        self._text_generation = text_generation
 
     def generate(self, brief_value: Mapping[str, Any]) -> dict[str, Any]:
         brief = CreativeBrief.from_mapping(brief_value)
@@ -452,17 +453,22 @@ class AiDirectorService:
                     exception_name=type(exc).__name__,
                 ) from exc
 
-    def _call_provider(self, messages: tuple[TextMessage, ...]) -> str:
+    def _call_provider(self, messages: tuple[TextGenerationMessage, ...]) -> str:
         try:
-            return self._provider.generate(TextGenerationRequest(messages=messages))
-        except ProviderTimeoutError as exc:
+            return self._text_generation.generate(
+                TextGenerationCommand(
+                    purpose=TextGenerationPurpose.AI_DIRECTOR_CANDIDATE,
+                    messages=messages,
+                )
+            )
+        except TextGenerationTimeoutError as exc:
             raise PlanGenerationError(
                 "provider_timeout",
                 diagnostic_category=exc.category,
                 provider_status=exc.status,
                 exception_name=type(exc).__name__,
             ) from exc
-        except TextProviderError as exc:
+        except TextGenerationCapabilityError as exc:
             raise PlanGenerationError(
                 "provider_unavailable",
                 diagnostic_category=exc.category,

@@ -19,7 +19,8 @@ from apps.creator_workspace_mvp.server import (
     STORYBOARD_BOOTSTRAP_ENDPOINT,
     create_server,
 )
-from services.v4_platform import FakeTextProvider, ProviderTimeoutError
+from services.v5_core_os.text_generation import TextGenerationTimeoutError
+from services.v5_core_os.text_generation.testing import FakeTextGenerationCapability
 from services.v5_core_os.script_studio import (
     create_in_memory_boundary as create_script_boundary,
     create_local_development_boundary as create_local_script_boundary,
@@ -39,7 +40,7 @@ class ScriptStudioHttpIntegrationTests(unittest.TestCase):
         self.script_boundary = create_script_boundary(self.series_boundary, ref_factory=self.refs)
         rewrite_scene = dict(script_candidate()["scenes"][0])
         rewrite_scene["action"] = "晚灯收住动作，只留下一点暖光。"
-        self.provider = FakeTextProvider(
+        self.capability = FakeTextGenerationCapability(
             [
                 json.dumps(script_candidate(), ensure_ascii=False),
                 json.dumps(
@@ -53,9 +54,9 @@ class ScriptStudioHttpIntegrationTests(unittest.TestCase):
         )
         self.server = create_server(
             ("127.0.0.1", 0),
-            AiDirectorService(self.provider),
+            AiDirectorService(self.capability),
             series_episode_boundary=self.series_boundary,
-            script_studio_service=ScriptStudioApplicationService(self.provider),
+            script_studio_service=ScriptStudioApplicationService(self.capability),
             script_studio_boundary=self.script_boundary,
         )
         self.thread = threading.Thread(target=self.server.serve_forever, daemon=True)
@@ -146,7 +147,7 @@ class ScriptStudioHttpIntegrationTests(unittest.TestCase):
         self.assertEqual(bootstrap["schemaVersion"], "creator.storyboard.bootstrap-input.v1")
         self.assertEqual(bootstrap["scriptVersionRef"], v3["scriptVersion"]["scriptVersionRef"])
         self.assertEqual(bootstrap["sourcePlanRef"], self.episode["sourcePlanRef"])
-        self.assertEqual(len(self.provider.requests), 2)
+        self.assertEqual(len(self.capability.commands), 2)
 
     def test_workspace_http_projection_preserves_version_history(self):
         v1 = self.generate()
@@ -159,12 +160,12 @@ class ScriptStudioHttpIntegrationTests(unittest.TestCase):
     def test_http_generation_repairs_missing_schema_version_once_before_persisting(self):
         invalid = script_candidate()
         invalid.pop("schemaVersion")
-        self.provider._outcomes = [
+        self.capability._outcomes = [
             json.dumps(invalid, ensure_ascii=False),
             json.dumps(script_candidate(), ensure_ascii=False),
         ]
         generated = self.generate()
-        self.assertEqual(len(self.provider.requests), 2)
+        self.assertEqual(len(self.capability.commands), 2)
         self.assertEqual(generated["scriptVersion"]["schemaVersion"], "creator.script-studio.script-version.v1")
         self.assertTrue(
             all(item["scriptSceneRef"].startswith("script-scene-") for item in generated["scriptVersion"]["scenes"])
@@ -178,7 +179,7 @@ class ScriptStudioHttpIntegrationTests(unittest.TestCase):
         self.assertEqual((context.exception.code, payload["error"]["code"]), (409, "script_not_confirmed"))
 
     def test_provider_failure_leaves_no_empty_script_version_and_hides_secret(self):
-        self.provider._outcomes = [ProviderTimeoutError("secret-provider-body")]
+        self.capability._outcomes = [TextGenerationTimeoutError()]
         with self.post(SCRIPT_GENERATE_ENDPOINT, self.scope) as response:
             payload = self.payload(response)
         self.assertFalse(payload["ok"])
@@ -190,7 +191,7 @@ class ScriptStudioHttpIntegrationTests(unittest.TestCase):
 
     def test_invalid_rewrite_leaves_version_history_unchanged(self):
         generated = self.generate()
-        self.provider._outcomes = [json.dumps({"schemaVersion": SCENE_REWRITE_SCHEMA_VERSION})]
+        self.capability._outcomes = [json.dumps({"schemaVersion": SCENE_REWRITE_SCHEMA_VERSION})]
         with self.post(
             SCRIPT_REWRITE_ENDPOINT,
             {

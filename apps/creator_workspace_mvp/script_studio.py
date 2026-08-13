@@ -7,12 +7,13 @@ import sys
 from dataclasses import dataclass
 from typing import Any, Mapping
 
-from services.v4_platform import (
-    ProviderTimeoutError,
-    TextGenerationRequest,
-    TextMessage,
-    TextProvider,
-    TextProviderError,
+from services.v5_core_os.text_generation import (
+    TextGenerationCapability,
+    TextGenerationCapabilityError,
+    TextGenerationCommand,
+    TextGenerationMessage,
+    TextGenerationPurpose,
+    TextGenerationTimeoutError,
 )
 
 
@@ -397,10 +398,10 @@ def _candidate_contract(bootstrap: Mapping[str, Any]) -> dict[str, Any]:
     }
 
 
-def _generation_messages(bootstrap: Mapping[str, Any]) -> tuple[TextMessage, ...]:
+def _generation_messages(bootstrap: Mapping[str, Any]) -> tuple[TextGenerationMessage, ...]:
     contract = _candidate_contract(bootstrap)
     return (
-        TextMessage(
+        TextGenerationMessage(
             "system",
             "You are the Script Studio writing engine. Return one JSON object only. "
             "Follow the supplied schema exactly. Preserve the confirmed plan, keep scene numbers continuous, "
@@ -409,7 +410,7 @@ def _generation_messages(bootstrap: Mapping[str, Any]) -> tuple[TextMessage, ...
             "Optional scene arrays may be omitted only when empty; do not omit required semantic fields. "
             "Do not claim approval, rights clearance, storyboard production, or project lifecycle changes.",
         ),
-        TextMessage(
+        TextGenerationMessage(
             "user",
             json.dumps(
                 {
@@ -427,7 +428,7 @@ def _repair_messages(
     bootstrap: Mapping[str, Any],
     invalid_candidate: Any,
     issues: tuple[ScriptCandidateValidationIssue, ...],
-) -> tuple[TextMessage, ...]:
+) -> tuple[TextGenerationMessage, ...]:
     repair_input: dict[str, Any] = {
         "task": "Repair the Script Studio candidate once. Return a complete corrected JSON object only.",
         "requiredContract": _candidate_contract(bootstrap),
@@ -442,13 +443,13 @@ def _repair_messages(
     else:
         repair_input["invalidCandidate"] = "UNPARSEABLE_JSON_REGENERATE_FROM_CONTEXT"
     return (
-        TextMessage(
+        TextGenerationMessage(
             "system",
             "Perform exactly one schema repair for a Script Studio candidate. Return one JSON object only. "
             "Do not add system-owned references. Do not invent missing required semantic content; regenerate it "
             "from the confirmed Episode context. Obey every required field and duration rule.",
         ),
-        TextMessage("user", json.dumps(repair_input, ensure_ascii=False)),
+        TextGenerationMessage("user", json.dumps(repair_input, ensure_ascii=False)),
     )
 
 
@@ -467,15 +468,15 @@ def _rewrite_messages(
     current_version: Mapping[str, Any],
     source_scene: Mapping[str, Any],
     instruction: str,
-) -> tuple[TextMessage, ...]:
+) -> tuple[TextGenerationMessage, ...]:
     return (
-        TextMessage(
+        TextGenerationMessage(
             "system",
             "Rewrite exactly one selected Script Studio scene. Return one JSON object only with schemaVersion "
             f"{SCENE_REWRITE_SCHEMA_VERSION} and a complete scene object. Preserve sceneNumber, Episode context, "
             "confirmed CreativePlan constraints, and characters. Do not rewrite other scenes or claim confirmation.",
         ),
-        TextMessage(
+        TextGenerationMessage(
             "user",
             json.dumps(
                 {
@@ -496,13 +497,16 @@ def _rewrite_messages(
 
 
 class ScriptStudioApplicationService:
-    """Call the accepted V4 provider port and return locally validated candidates."""
+    """Generate through the V5 capability and return validated candidates."""
 
-    def __init__(self, provider: TextProvider) -> None:
-        self._provider = provider
+    def __init__(self, text_generation: TextGenerationCapability) -> None:
+        self._text_generation = text_generation
 
     def generate(self, bootstrap: Mapping[str, Any]) -> dict[str, Any]:
-        raw = self._call_provider(_generation_messages(bootstrap), max_tokens=8000)
+        raw = self._call_provider(
+            _generation_messages(bootstrap),
+            purpose=TextGenerationPurpose.SCRIPT_CANDIDATE,
+        )
         first_error: ScriptCandidateValidationError | None = None
         try:
             _, result = _parse_script_candidate(raw, bootstrap)
@@ -519,7 +523,7 @@ class ScriptStudioApplicationService:
                 parsed = None
             repaired_raw = self._call_provider(
                 _repair_messages(bootstrap, parsed, first_error.issues),
-                max_tokens=8000,
+                purpose=TextGenerationPurpose.SCRIPT_CANDIDATE,
             )
             _, result = _parse_script_candidate(repaired_raw, bootstrap)
             return result
@@ -565,7 +569,7 @@ class ScriptStudioApplicationService:
             ])
         raw = self._call_provider(
             _rewrite_messages(bootstrap, current_version, selected, request_text),
-            max_tokens=3500,
+            purpose=TextGenerationPurpose.SCRIPT_SCENE_REWRITE,
         )
         try:
             parsed = json.loads(raw)
@@ -590,27 +594,25 @@ class ScriptStudioApplicationService:
 
     def _call_provider(
         self,
-        messages: tuple[TextMessage, ...],
+        messages: tuple[TextGenerationMessage, ...],
         *,
-        max_tokens: int,
+        purpose: TextGenerationPurpose,
     ) -> str:
         try:
-            return self._provider.generate(
-                TextGenerationRequest(
+            return self._text_generation.generate(
+                TextGenerationCommand(
+                    purpose=purpose,
                     messages=messages,
-                    max_tokens=max_tokens,
-                    temperature=0.35,
-                    timeout_seconds=45,
                 )
             )
-        except ProviderTimeoutError as exc:
+        except TextGenerationTimeoutError as exc:
             raise ScriptGenerationError(
                 "provider_timeout",
                 diagnostic_category=exc.category,
                 provider_status=exc.status,
                 exception_name=type(exc).__name__,
             ) from exc
-        except TextProviderError as exc:
+        except TextGenerationCapabilityError as exc:
             raise ScriptGenerationError(
                 "provider_unavailable",
                 diagnostic_category=exc.category,

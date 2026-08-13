@@ -8,14 +8,14 @@ from apps.creator_workspace_mvp import (
     ProjectDraftInputError,
     build_session_project_draft_input,
 )
-from services.v4_platform import FakeTextProvider
+from services.v5_core_os.text_generation.testing import FakeTextGenerationCapability
 from tests.unit.test_ai_director_phase1 import valid_brief, valid_plan
 
 
 class AiDirectorProjectDraftFlowIntegrationTests(unittest.TestCase):
     def test_validated_plan_requires_confirmation_then_maps_without_free_text_bridge(self):
-        provider = FakeTextProvider([json.dumps(valid_plan(), ensure_ascii=False)])
-        plan = AiDirectorService(provider).generate(valid_brief())
+        capability = FakeTextGenerationCapability([json.dumps(valid_plan(), ensure_ascii=False)])
+        plan = AiDirectorService(capability).generate(valid_brief())
 
         with self.assertRaises(ProjectDraftInputError):
             build_session_project_draft_input(

@@ -14,7 +14,7 @@ from apps.creator_workspace_mvp.server import (
     SERIES_ENDPOINT,
     create_server,
 )
-from services.v4_platform import FakeTextProvider
+from services.v5_core_os.text_generation.testing import FakeTextGenerationCapability
 from services.v5_core_os.project_engine import (
     create_in_memory_boundary as create_project_boundary,
     create_local_development_boundary as create_local_project_boundary,
@@ -37,7 +37,7 @@ class CreatorProjectHttpTests(unittest.TestCase):
         self.project_boundary = create_project_boundary(self.series_boundary)
         self.server = create_server(
             ("127.0.0.1", 0),
-            AiDirectorService(FakeTextProvider([])),
+            AiDirectorService(FakeTextGenerationCapability([])),
             series_episode_boundary=self.series_boundary,
             project_boundary=self.project_boundary,
             script_studio_boundary=create_script_boundary(self.series_boundary),
