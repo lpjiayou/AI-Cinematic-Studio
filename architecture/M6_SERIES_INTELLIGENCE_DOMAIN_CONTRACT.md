@@ -90,6 +90,11 @@ scope, correlation/causation/operation refs, time and payload. Replacement emits
 Superseded before Confirmed. Failure creates no partial snapshot, dual active or orphan
 event; undo failure poisons the Assembly.
 
+`IdentityBindingChanged` is the reserved event contract for a future accepted identity
+binding authority. Its envelope uses the same event metadata and must identify the old
+and new binding Refs, Versions, Digests and RightsGrantRef. P1 rejects every non-empty
+IdentityBinding, so P1 must never emit or fabricate this event.
+
 ## P1 boundary
 
 P1 supplies only InMemory repository, operation registry and outbox registered in the

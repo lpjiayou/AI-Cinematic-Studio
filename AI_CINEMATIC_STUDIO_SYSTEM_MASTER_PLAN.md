@@ -3013,7 +3013,7 @@ Legacy repository capability provenance
 MEDIUM / OPEN / NON-BLOCKING / OWNER GATE P3-RV1-003
 
 M6 Series IP Bible + Character Intelligence
-P0 CONTRACT ACCEPTED / P1 AUTHORIZED NOT STARTED / P2-P4 NOT AUTHORIZED
+P0 CONTRACT ACCEPTED / P1 IMPLEMENTED OWNER REVIEW PENDING / P2-P4 NOT AUTHORIZED
 
 M7-M19
 NOT STARTED / NOT AUTHORIZED
@@ -3058,7 +3058,7 @@ M6 门禁顺序统一为：
 上述八项已由 Project Lead 于 `2026-08-13` 裁定为仅对 bounded M6-P0/P1
 满足。R2-P1 与 R2-P2 已接受，RB13-F002 已在当前测试基线关闭，PRE-M6-RB1.3
 已正式关闭。该裁定不代表全系统 Architecture Review、Production Ready、正式
-8765 数据库部署或 M6-P2+ 授权。当前活动任务为 `ACS-M6-P0-P1`；M6 仍未开始，
+8765 数据库部署或 M6-P2+ 授权。当前活动任务为 `ACS-M6-P0-P1`；M6-P1 已实施并等待 Owner Review，
 Frontend 保持冻结，M7-M19 未授权。
 
 ---

@@ -5,12 +5,14 @@ from __future__ import annotations
 from contextlib import contextmanager
 from dataclasses import dataclass, replace
 from datetime import datetime, timezone
+import hashlib
 import json
 from pathlib import Path
 import sqlite3
 from threading import RLock
 from typing import Any, Callable, Mapping, Protocol
 from uuid import uuid4
+import unicodedata
 
 
 SERIES_PLAN_SCHEMA_VERSION = "v5.series-plan.v1"
@@ -18,6 +20,7 @@ SERIES_PLAN_VERSION_SCHEMA_VERSION = "v5.series-plan-version.v1"
 SERIES_PLAN_CANDIDATE_SCHEMA_VERSION = "creator.series-plan.candidate.v1"
 SERIES_PLAN_WORKSPACE_SCHEMA_VERSION = "creator.series-planning.workspace.v1"
 M6_BOOTSTRAP_SCHEMA_VERSION = "creator.series-plan.m6-bootstrap.v1"
+M6_SOURCE_SNAPSHOT_SCHEMA_VERSION = "v5.series-plan.m6-source-snapshot.v1"
 SQLITE_SCHEMA_VERSION = 1
 
 
@@ -43,6 +46,37 @@ class VersionConflictError(SeriesPlanningError):
 
 class PlanNotConfirmedError(SeriesPlanningError):
     code = "series_plan_not_confirmed"
+
+
+def _canonical_m6_source(value: Any) -> Any:
+    if isinstance(value, str):
+        return unicodedata.normalize("NFC", value)
+    if value is None or isinstance(value, (bool, int)):
+        return value
+    if isinstance(value, float):
+        raise SeriesPlanningError("M6 source snapshot cannot contain floating-point values")
+    if isinstance(value, list):
+        return [_canonical_m6_source(item) for item in value]
+    if isinstance(value, Mapping):
+        normalized: dict[str, Any] = {}
+        for raw_key, raw_value in value.items():
+            key = unicodedata.normalize("NFC", str(raw_key))
+            if key in normalized:
+                raise SeriesPlanningError("M6 source snapshot has duplicate normalized keys")
+            normalized[key] = _canonical_m6_source(raw_value)
+        return normalized
+    raise SeriesPlanningError("M6 source snapshot is not canonical JSON")
+
+
+def _m6_source_digest(value: Mapping[str, Any]) -> str:
+    payload = json.dumps(
+        _canonical_m6_source(value),
+        ensure_ascii=False,
+        sort_keys=True,
+        separators=(",", ":"),
+        allow_nan=False,
+    ).encode("utf-8")
+    return hashlib.sha256(payload).hexdigest()
 
 
 class UpstreamProjectReader(Protocol):
@@ -758,3 +792,28 @@ class SeriesPlanningService:
             "continuityIntent": version["continuityIntent"],
             "foreshadowingContext": version["foreshadowingContext"],
         }
+
+    def get_confirmed_m6_source_snapshot(
+        self, workspace_ref: str, project_ref: str, series_ref: str
+    ) -> dict[str, Any]:
+        """Return M5-owned, read-only confirmed input and its canonical digest."""
+        bootstrap = self.build_m6_bootstrap(workspace_ref, project_ref, series_ref)
+        snapshot = {
+            "schemaVersion": M6_SOURCE_SNAPSHOT_SCHEMA_VERSION,
+            "workspaceRef": bootstrap["workspaceRef"],
+            "contentProfileRef": bootstrap["contentProfileRef"],
+            "projectRef": bootstrap["projectRef"],
+            "seriesRef": bootstrap["seriesRef"],
+            "seriesPlanRef": bootstrap["seriesPlanRef"],
+            "seriesPlanVersionRef": bootstrap["seriesPlanVersionRef"],
+            "status": "confirmed",
+            "mainArcs": bootstrap["mainArcs"],
+            "episodePlanItems": bootstrap["episodePlanItems"],
+            "characterArcIntents": bootstrap["characterArcIntents"],
+            "worldIntent": bootstrap["worldIntent"],
+            "continuityIntent": bootstrap["continuityIntent"],
+            "foreshadowingContext": bootstrap["foreshadowingContext"],
+        }
+        # Digest ownership stays in M5. M6 is allowed only to compare this value.
+        snapshot["seriesPlanVersionDigest"] = _m6_source_digest(snapshot)
+        return json.loads(json.dumps(snapshot, ensure_ascii=False))
