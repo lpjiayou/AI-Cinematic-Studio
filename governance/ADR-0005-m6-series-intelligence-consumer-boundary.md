@@ -4,12 +4,12 @@
 
 | Field | Value |
 | --- | --- |
-| Status | `ACCEPTED AS ARCHITECTURE DECISION / B1 BOUNDED IMPLEMENTATION AUTHORIZED / G1 UNAUTHORIZED` |
+| Status | `ACCEPTED AS ARCHITECTURE DECISION / B1 CANDIDATE REVISION REQUIRED / B1-R1 BOUNDED CORRECTION AUTHORIZED / G1 UNAUTHORIZED` |
 | Created | `2026-08-13` |
 | Author | `Codex architecture proposal under Project Lead G3/P3-G0 authority` |
 | Approval owners | `Project Lead / Architecture Owner — ACCEPTED; M2/M4/M5/M6 Domain Owners — APPROVED FOR B1; other applicable Domain Owners — PENDING FOR FUTURE WORK` |
 | Decision evidence base | `8227c6c616140824fd70de920dc6fcf459bb734d`; G0 proposal checkpoint `c524486c05c21b270a7dd75e89fae4312430736a` |
-| Related task | `ACS-M6-P2-G1-CLOSEOUT-G3 / M6-P3-G0 / ACS-M6-P3-B1-EPISODE-PLAN-ITEM-BINDING` |
+| Related task | `ACS-M6-P2-G1-CLOSEOUT-G3 / M6-P3-G0 / ACS-M6-P3-B1-EPISODE-PLAN-ITEM-BINDING / ACS-M6-P3-B1-R1-SQLITE-SERIES-ISOLATION` |
 | Extends | `ADR-0002`, `ADR-0003`, `ADR-0004` |
 | Supersedes | `None` |
 
@@ -40,6 +40,15 @@ implementation review against remote base
 `6bb9d165a693057f38e5789c408293ff0eaf5bcc`. B1 may begin only after its exact
 governance authorization checkpoint is pushed and remote-verified. This approval does
 not authorize M6-P3-G1 or any other affected implementation.
+
+The first B1 technical candidate was later remote-verified at
+`8449b521c96bb8340806ecda8649698f4771914a`, but Owner Review reproduced a blocking
+SQLite same-Project cross-Series false dependency and marked that candidate `REVISION
+REQUIRED / NOT OWNER ACCEPTED`. The Project Lead, Architecture Owner, Repository
+Governance Owner and affected M2/M5 Domain Owners authorize only the bounded B1-R1
+correction recorded in the B1 authorization amendment. This correction preserves this
+ADR's ownership and data-contract decision; it changes neither the architecture nor
+G1 authority.
 
 ## Decision — accepted target architecture
 
@@ -295,3 +304,4 @@ V4/V3, Provider, GPU, Worker, ComfyUI, M6-P4+ or Production Ready status.
 | `2026-08-13` | Initial Proposed ADR | `ACS-M6-P2-G1-CLOSEOUT-G3 / M6-P3-G0` |
 | `2026-08-13` | Accepted as architecture decision; implementation remains unimplemented and unauthorized | `Project Lead / Architecture Owner — M6-P3-G0 Owner Acceptance` |
 | `2026-08-13` | Bounded EpisodePlanItemBinding prerequisite implementation authorized; governance checkpoint remote-verified at `ae82ea27b39c44a8b77941f2b43abf7544492765`; G1 remains unauthorized | `Project Lead / Architecture Owner / Repository Governance Owner / M2-M4-M5-M6 Domain Owners` |
+| `2026-08-13` | B1 candidate `8449b521c96bb8340806ecda8649698f4771914a` marked Revision Required for SQLite cross-Series false dependency; bounded B1-R1 correction authorized; G1 remains unauthorized | `Project Lead / Architecture Owner / Repository Governance Owner / M2-M5 Domain Owners` |
