@@ -4,13 +4,13 @@
 
 | Field | Value |
 | --- | --- |
-| Status | `PROPOSED / NO IMPLEMENTATION AUTHORITY` |
+| Status | `ACCEPTED AS ARCHITECTURE DECISION / UNIMPLEMENTED / NO IMPLEMENTATION AUTHORITY` |
 | Created | `2026-08-13` |
 | Author | `Codex architecture proposal under Project Lead G3/P3-G0 authority` |
-| Approval owners | `Project Lead / Architecture Owner / applicable Domain Owners — PENDING` |
-| Proposal base | `8227c6c616140824fd70de920dc6fcf459bb734d` |
+| Approval owners | `Project Lead / Architecture Owner — ACCEPTED; applicable Domain Owners — PENDING FOR AFFECTED IMPLEMENTATION` |
+| Decision evidence base | `8227c6c616140824fd70de920dc6fcf459bb734d`; G0 proposal checkpoint `c524486c05c21b270a7dd75e89fae4312430736a` |
 | Related task | `ACS-M6-P2-G1-CLOSEOUT-G3 / M6-P3-G0` |
-| Extends if accepted | `ADR-0002`, `ADR-0003`, `ADR-0004` |
+| Extends | `ADR-0002`, `ADR-0003`, `ADR-0004` |
 | Supersedes | `None` |
 
 ## Context
@@ -20,7 +20,7 @@ M6BaselineSnapshot and ordered domain events. M6-P2 added a local-development du
 SQLite adapter and persistent Outbox. The Project Lead accepted that bounded technical
 baseline at `8227c6c616140824fd70de920dc6fcf459bb734d`.
 
-The current Core still has no accepted downstream consumer contract that binds an M3
+The current Core still has no implemented downstream consumer contract that binds an M3
 ScriptVersion, future M7 ConsistencyValidation or future M9 readiness decision to the
 exact M6 baseline Ref and Digest. The existing M3 ScriptVersion record predates M6 and
 does not contain this lineage. Reading copied Bible content would create a second
@@ -31,21 +31,24 @@ The Project Lead-supplied
 non-authoritative design input, states in sections 8.11 and 8.14 that M6-P3 covers
 M3/M4/M7/M9 integration contracts, domain events and reconciliation, requires P2
 acceptance and must not silently implement M7+. The active repository Source-of-Truth,
-not that target document, governs authorization and has not yet accepted this boundary.
+not that target document, governs authorization.
 
-This ADR is therefore a proposal. It does not change the current architecture until
-the required owners explicitly accept it.
+The Project Lead and Architecture Owner accepted this target architecture on
+`2026-08-13`. That acceptance changes the normative architecture only: it creates no
+implementation authority. Applicable Domain Owner confirmation remains a prerequisite
+for any affected implementation and blocks authorization of M6-P3-B1 until recorded.
 
-## Proposed decision
+## Decision — accepted target architecture
 
-If accepted, introduce one internal, read-only and persistence-neutral
-`ActiveM6BaselineReader`. The first bounded direct consumer would be M3 Script Studio
+Any future separately authorized implementation shall introduce one internal,
+read-only and persistence-neutral `ActiveM6BaselineReader`. The first bounded direct
+consumer would be M3 Script Studio
 through a read-only Episode baseline input. M4 owns Project identity and trusted
 Project-to-Series context. M2 owns Series/Episode identity and Series-to-Episode
 membership. The consumer composes those two accepted read boundaries; neither becomes
 a second M6 consumer authority.
 
-The proposed method is conceptually:
+The accepted target method is conceptually:
 
 ```text
 get_active_episode_baseline(
@@ -86,14 +89,14 @@ It would return only confirmed/current compatible lineage or a stable fail-close
 status. Consumers must not persist copied M6 authority. A future Script generation or
 rewrite task that creates a new ScriptVersion would need to retain the exact binding
 that influenced it, but that write belongs to a later accepted task and is not part of
-the first proposed read-only slice. Existing ScriptVersions remain readable historical
+the first future read-only slice. Existing ScriptVersions remain readable historical
 facts and are not backfilled or silently rebound.
 
 M6 applicability uses M5 `episodePlanItemRef`, while M2 owns `episodeRef` and Episode
 membership. The accepted records have no common stable key: a read-only resolver alone
 cannot produce a valid match without prohibited number/title/index inference.
 
-If accepted, this ADR therefore assigns M5 Series Planning a proposed immutable
+This ADR therefore assigns M5 Series Planning ownership of a future immutable
 `EpisodePlanItemBinding { episodeRef, episodePlanItemRef }` embedded in an exact
 SeriesPlanVersion. A new M5 candidate/version would list explicit bindings and confirm
 them only after trusted M2 Episode membership and M4 Project-to-Series validation.
@@ -114,8 +117,8 @@ existing Script dependency, then M5 binding dependency with
 tombstone inference or dangling binding is allowed. The first durable v2 write validates
 the trusted M2/M4 relationship, and confirmation revalidates it before transition.
 
-The proposed data contracts are `creator.series-plan.candidate.v2`,
-`v5.series-plan-version.v2` and `v5.series-plan.m6-source-snapshot.v2`. This proposal
+The accepted target data contracts are `creator.series-plan.candidate.v2`,
+`v5.series-plan-version.v2` and `v5.series-plan.m6-source-snapshot.v2`. This decision
 does not authorize those contracts to be implemented and does not authorize a SQLite
 schema or migration. The binding prerequisite must be implemented and Owner Accepted
 in its own bounded checkpoint before the reader or M3 consumer can be authorized.
@@ -126,8 +129,8 @@ reconciliation. The event is a notification, never the sole truth. Reconciliatio
 must handle missed, duplicate, delayed and out-of-order delivery by re-reading the
 authoritative active baseline and comparing activation revision plus digest.
 
-Acceptance of this ADR would accept only those event-as-notification semantics. It
-would not accept an event consumer. Event-driven reconciliation, consumer checkpoints,
+Acceptance of this ADR accepts only those event-as-notification semantics. It does not
+accept an event consumer. Event-driven reconciliation, consumer checkpoints,
 dispatch and acknowledgement require a new accepted ADR and task and are not part of
 the first implementation slice.
 
@@ -138,7 +141,7 @@ dispatcher, checkpoint persistence or asynchronous infrastructure.
 ## Ownership preserved
 
 - M5 remains sole owner of SeriesPlanVersion and its canonical digest.
-- M5 would own the proposed immutable EpisodePlanItemBinding and resolver inside an
+- M5 will own the future immutable EpisodePlanItemBinding and resolver inside an
   exact SeriesPlanVersion; M2 retains Series/Episode identity and membership.
 - M6 remains sole owner of SeriesBible, CharacterContinuity, active baseline and M6
   event facts.
@@ -152,9 +155,9 @@ dispatcher, checkpoint persistence or asynchronous infrastructure.
 No consumer may modify M6 history, overwrite a ScriptVersion, infer authority from a
 name, or treat an event payload as a mutable local Bible.
 
-## Proposed fail-closed semantics
+## Accepted target fail-closed semantics
 
-The proposed contract distinguishes:
+Any future separately authorized contract shall distinguish:
 
 - `m6_baseline_not_available` — no active baseline exists;
 - `m6_baseline_stale` — active M6 no longer matches the current confirmed M5 source;
@@ -175,15 +178,15 @@ Public HTTP codes, UI wording and external DTOs are intentionally not decided he
 - Benefit: no current schema or dependency change.
 - Cost: M6 cannot influence real Script lineage and remains disconnected from the
   Production Spine.
-- Result: not recommended as the long-term direction; it may remain the current state
-  until this ADR is accepted.
+- Result: not recommended as the long-term direction; it remains the current state
+  until a later implementation is separately authorized and completed.
 
 ### B. Copy Bible/Character JSON into Script Studio
 
 - Benefit: superficially simple integration.
 - Cost: duplicates authority, loses Ref/Digest lineage, breaks deterministic
   staleness and creates cross-tenant risk.
-- Result: rejected by this proposal.
+- Result: rejected by this decision.
 
 ### C. Internal immutable binding through a read-only port
 
@@ -191,21 +194,21 @@ Public HTTP codes, UI wording and external DTOs are intentionally not decided he
   reconciliation, and closes the next Production Spine edge without HTTP/UI work.
 - Cost: future implementation requires an explicit ScriptVersion binding and may
   require a separately accepted persistence migration.
-- Result: proposed.
+- Result: accepted as the target architecture.
 
 ### D. Implement all M3/M4/M7/M9 consumers and Outbox dispatch together
 
 - Benefit: broad integration in one step.
 - Cost: crosses multiple unstarted milestones, owners, persistence and security
   boundaries; violates vertical-closure and authorization rules.
-- Result: rejected by this proposal.
+- Result: rejected by this decision.
 
-## Consequences if accepted
+## Consequences of the decision
 
 ### Positive
 
-- New ScriptVersions can identify the exact M5/M6 facts that influenced generation or
-  rewrite.
+- Future new ScriptVersions could identify the exact M5/M6 facts that influenced
+  generation or rewrite after separately authorized implementation.
 - M6 baseline changes can make downstream bindings deterministically stale without
   rewriting historical facts.
 - M7 and M9 can later consume the same lineage contract without redefining M6
@@ -219,16 +222,19 @@ Public HTTP codes, UI wording and external DTOs are intentionally not decided he
 - Accepted M2 and M5 facts currently lack a shared stable Ref, so a separately accepted
   M5 v2 binding prerequisite must precede consumer implementation.
 - Adding a persistent consumer checkpoint, dispatcher or schema migration would
-  require its own accepted scope and tests; this proposal does not authorize it.
+  require its own accepted scope and tests; this decision does not authorize it.
 - A broad consumer implementation could accidentally become M7. The first slice must
   stop at a read-only Episode baseline input and must not write a ScriptVersion or
   produce consistency verdicts.
 
-## Proposed implementation sequence
+## Future separately authorized implementation sequence
 
-1. Project Lead, Architecture Owner and applicable Domain Owners review this ADR and
-   the normative proposal.
-2. If accepted, separately authorize `ACS-M6-P3-B1` to implement only the M5 v2
+1. Project Lead and Architecture Owner accept this ADR and the normative architecture
+   contract in a governance-only checkpoint, push, remote-verify and stop. This step is
+   complete as an architecture decision; applicable Domain Owner implementation review
+   remains pending.
+2. Only after applicable Domain Owner confirmation, the Project Lead may separately
+   authorize `ACS-M6-P3-B1` to implement only the M5 v2
    EpisodePlanItemBinding prerequisite and prove v1 historical compatibility.
 3. Push, remote-verify and obtain Owner Acceptance for B1; stop if implementation needs
    a SQLite schema/migration or any unlisted path.
@@ -241,12 +247,12 @@ Public HTTP codes, UI wording and external DTOs are intentionally not decided he
 6. Stop for Owner Review. M7 and M9 remain separate tasks.
 
 There is no migration or data write in M6-P3-G0. Existing data is unchanged. Neither
-B1 nor G1 is authorized by this proposal. G1 remains blocked until B1 is independently
+B1 nor G1 is authorized by this decision. G1 remains blocked until B1 is independently
 implemented, tested, remote-verified and Owner Accepted.
 
 ## Explicit exclusions
 
-This proposal does not authorize P3-B1 or P3-G1 implementation, production/test code,
+This decision does not authorize P3-B1 or P3-G1 implementation, production/test code,
 schema/migration, consumer
 checkpoint storage, Outbox dispatch/acknowledgement, broker integration, HTTP/Public
 API/DTO, Auth/RBAC, Frontend, formal port-8765 access, PostgreSQL, M7 verdicts or
@@ -257,12 +263,13 @@ V4/V3, Provider, GPU, Worker, ComfyUI, M6-P4+ or Production Ready status.
 
 | Role | Owner | Decision | Date | Notes |
 | --- | --- | --- | --- | --- |
-| Project Lead | `蔺鹏` | `PENDING` | — | G0 authoring authorized; ADR acceptance not yet issued |
-| Architecture Owner | `蔺鹏` | `PENDING` | — | Independent architecture acceptance required |
-| M2/M3/M4/M5/M6/M7/M9 Domain Owners | `PENDING` | `PENDING` | — | Required before any affected implementation |
+| Project Lead | `蔺鹏` | `ACCEPTED AS ARCHITECTURE` | `2026-08-13` | No implementation authority granted |
+| Architecture Owner | `蔺鹏` | `ACCEPTED AS ARCHITECTURE` | `2026-08-13` | Target boundary and two-checkpoint sequence accepted |
+| M2/M3/M4/M5/M6/M7/M9 Domain Owners | `PENDING` | `PENDING FOR AFFECTED IMPLEMENTATION` | — | Required before any affected implementation; blocks B1 authorization |
 
 ## Change history
 
 | Date | Change | Authority |
 | --- | --- | --- |
 | `2026-08-13` | Initial Proposed ADR | `ACS-M6-P2-G1-CLOSEOUT-G3 / M6-P3-G0` |
+| `2026-08-13` | Accepted as architecture decision; implementation remains unimplemented and unauthorized | `Project Lead / Architecture Owner — M6-P3-G0 Owner Acceptance` |
