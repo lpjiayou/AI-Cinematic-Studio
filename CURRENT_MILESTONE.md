@@ -2,17 +2,17 @@
 
 > Document: `CURRENT_MILESTONE.md`
 >
-> Execution Mode: `AUTO-SEQUENTIAL`
+> Execution Mode: `GOVERNANCE-ONLY CLOSEOUT / READ-ONLY OWNER REVIEW`
 >
-> Project Lead Authorization: `G1-R1 ALIAS-AWARE ARCHITECTURE GUARD CORRECTION AUTHORIZED 2026-08-13`
+> Project Lead Authorization: `G1-R1 OWNER ACCEPTED AT d44f471c644e319bb4a5bf73707c3274ecbaa426 / M6-P3-G0 OWNER REVIEW AUTHORIZED 2026-08-13`
 >
-> Authorized Wave: `ACS-ARCH-R1-V5-TEXT-GENERATION-G1-R1-AUTHORIZATION → G1-R1 TEST-ONLY CORRECTION`
+> Authorized Wave: `G1-R1 GOVERNANCE CLOSEOUT → M6-P3-G0 READ-ONLY OWNER REVIEW`
 >
-> Current Task: `ACS-ARCH-R1-V5-TEXT-GENERATION-G1-R1-AUTHORIZATION — GOVERNANCE-ONLY CHECKPOINT`
+> Current Task: `ACS-ARCH-R1-G1-R1-CLOSEOUT / M6-P3-G0 OWNER REVIEW`
 >
-> Current Work Package: `G1-R1 GOVERNANCE IN PROGRESS / ONE-FILE CORRECTION AFTER REMOTE VERIFICATION`
+> Current Work Package: `SEVEN-PATH GOVERNANCE CLOSEOUT / NO PRODUCTION OR TEST CHANGE`
 >
-> M6 Authorization: `P0-P2 OWNER ACCEPTED / G3-P3-G0 REMOTE-VERIFIED CANDIDATE ON HOLD / P3 IMPLEMENTATION NOT AUTHORIZED`
+> M6 Authorization: `P0-P2 OWNER ACCEPTED / P3-G0 OWNER REVIEW IN PROGRESS / P3 IMPLEMENTATION NOT AUTHORIZED`
 >
 > M7 Authorization: `NOT AUTHORIZED`
 >
@@ -66,29 +66,28 @@ decommission. It is no longer an active Core work package and does not authorize
 
 Current stage:
 
-`Architecture Remediation R1 — V5 Text Generation Guard Correction`
+`G1-R1 Governance Closeout — M6-P3-G0 Owner Review`
 
 Title:
 
-ACS-ARCH-R1 V5 Text Generation G1-R1
+ACS-ARCH-R1 G1-R1 Closeout / M6-P3-G0 Review
 
 Status:
 
-`ADR-0006 ACCEPTED / G0 REMOTE-VERIFIED / G1 REVISION REQUIRED / G1-R1 AUTHORIZED / P3 ON HOLD`
+`ADR-0006 ACCEPTED / G1-R1 OWNER ACCEPTED / ARCH-R1 CLOSED / P3-G0 UNDER REVIEW / B1 NOT AUTHORIZED`
 
 Purpose:
 
 1. preserve the remote-verified PRE-M6 checkpoints and accepted M6-P0/P1/P2 evidence;
 2. keep the remote-verified c524 G3/P3-G0 candidate on HOLD without accepting P3;
-3. record `R-CORE-ARCH-001 / CONFIRMED / HIGH / MITIGATING`;
+3. record `R-CORE-ARCH-001 / CONFIRMED / HIGH / MONITORING` after accepted correction;
 4. preserve ADR-0006 and the completed V5 Text Generation production migration;
-5. record G0 as remote-verified and G1 `0c283eb…` as a remote-verified candidate that
-   requires revision before Owner Acceptance;
-6. correct only the dynamic-import architecture guard so it resolves Python import
-   primitive aliases without false-positive name matching;
-7. stop after G1-R1 remote verification for Project Lead owner review;
-8. keep M6-P3, M7-M19, formal database deployment and Frontend unauthorized and
-   Production Ready as `NO`.
+5. preserve G0 and original G1 `0c283eb…` as historical evidence while recording that
+   G1-R1 `d44f471…` supersedes and corrects the defective guard;
+6. close Architecture Remediation R1 at the Owner-accepted G1-R1 checkpoint;
+7. begin read-only Owner Review of M6-P3-G0, ADR-0005 and the consumer contract;
+8. keep M6-P3-B1/G1 implementation, M7-M19, formal database deployment and Frontend
+   unauthorized and Production Ready as `NO`.
 
 ---
 
@@ -294,8 +293,8 @@ contract are accepted. `ACS-M6-P2-G1` is now `OWNER ACCEPTED / COMPLETE /
 REMOTE-VERIFIED` at `8227c6c616140824fd70de920dc6fcf459bb734d`.
 
 The G3/P3-G0 governance revision is remote-verified at
-`c524486c05c21b270a7dd75e89fae4312430736a`, but remains an Owner Review
-Pending checkpoint candidate and is now on HOLD. It does not accept ADR-0005 or
+`c524486c05c21b270a7dd75e89fae4312430736a` and is now under read-only Owner
+Review. Implementation remains on HOLD. Opening review does not accept ADR-0005 or
 authorize M6-P3 implementation.
 
 The completed architecture-remediation transition is:
@@ -312,25 +311,33 @@ review then confirmed that the production migration is intact but the guard can 
 programmatic-import aliases. The original G1 candidate is therefore `REVISION
 REQUIRED / NOT OWNER ACCEPTED`.
 
-The only current authorized transition is:
+The corrected remediation transition is complete:
 
 ```text
 ACS-ARCH-R1-V5-TEXT-GENERATION-G1-R1-AUTHORIZATION
 → G1-R1 TEST-ONLY GUARD CORRECTION
-→ STOP FOR PROJECT LEAD OWNER REVIEW
+→ OWNER ACCEPTED AT d44f471c644e319bb4a5bf73707c3274ecbaa426
 ```
 
-The test-only correction may begin only after its governance checkpoint is pushed and
-Local SHA equals Remote SHA. No M6-P3 implementation or later milestone may be
-silently entered.
+The original G1 remains historical `REVISION REQUIRED / NOT OWNER ACCEPTED` and is
+superseded by the accepted G1-R1 result. The only current authorized transition is:
+
+```text
+G1-R1 GOVERNANCE CLOSEOUT
+→ M6-P3-G0 READ-ONLY OWNER REVIEW
+→ STOP FOR OWNER DECISION
+```
+
+No M6-P3 implementation or later milestone may be silently entered.
 
 ---
 
-# 7. Preserved M6-P3-G0 Proposal and Current Hold
+# 7. Preserved M6-P3-G0 Proposal and Current Owner Review
 
 M6-P0/P1 and M6-P2-G1 are `OWNER ACCEPTED / COMPLETE / REMOTE-VERIFIED`.
-The G3/P3-G0 revision is `REMOTE-VERIFIED / OWNER REVIEW PENDING / HOLD`. ADR-0005
-and the M6 consumer contract remain `PROPOSED / NO IMPLEMENTATION AUTHORITY`.
+The G3/P3-G0 revision is `REMOTE-VERIFIED / OWNER REVIEW IN PROGRESS /
+IMPLEMENTATION HOLD`. ADR-0005 and the M6 consumer contract remain `PROPOSED /
+UNDER OWNER REVIEW / NO IMPLEMENTATION AUTHORITY`.
 M6-P3-B1 and M6-P3-G1+ remain `NOT AUTHORIZED / NOT STARTED`.
 
 M6 Character Intelligence must include at least background, motivation, belief,
@@ -379,8 +386,9 @@ binding, then P3-G1 implements the read-only M6/M3 consumer. P3-B1 must be separ
 authorized, tested, pushed, remote-verified and Owner Accepted before P3-G1 can be
 authorized. Neither implementation is authorized by this document.
 
-The current ADR-0006 remediation wave neither accepts nor rejects this proposal. P3
-may resume only through a later explicit Project Lead decision after G1 owner review.
+The closed ADR-0006 remediation wave neither accepts nor rejects this proposal. The
+Project Lead has opened review, but P3 implementation may resume only through a later
+explicit decision that accepts or revises the proposal and separately authorizes B1.
 
 This document does not authorize M6-P3 implementation, M7-M19, formal database
 deployment, HTTP/API/Auth/RBAC or Frontend implementation.
@@ -406,17 +414,17 @@ capability.
 - RB13-F001: `R1 IMPLEMENTED / INDEPENDENTLY ACCEPTED / CLOSED`
 - ADR-0002 STATUS: `ACCEPTED FOR BOUNDED R2 IMPLEMENTATION`
 - RB13-F002: `REMEDIATED / CLOSED IN CURRENT TESTED CORE BASELINE`
-- EXECUTION MODE: `AUTO-SEQUENTIAL`
-- AUTHORIZED WAVE: `G1-R1 AUTHORIZATION → TEST-ONLY CORRECTION`
-- CURRENT TASK: `G1-R1 GOVERNANCE-ONLY AUTHORIZATION CHECKPOINT`
+- EXECUTION MODE: `GOVERNANCE-ONLY CLOSEOUT / READ-ONLY OWNER REVIEW`
+- AUTHORIZED WAVE: `G1-R1 GOVERNANCE CLOSEOUT → M6-P3-G0 OWNER REVIEW`
+- CURRENT TASK: `ACS-ARCH-R1-G1-R1-CLOSEOUT / M6-P3-G0 OWNER REVIEW`
 - G0 BASE: `c524486c05c21b270a7dd75e89fae4312430736a`
 - ADR-0006 STATUS: `ACCEPTED FOR BOUNDED G1`
 - V5 TEXT GENERATION CONTRACT: `ACCEPTED FOR BOUNDED G1`
-- R-CORE-ARCH-001: `CONFIRMED / HIGH / MITIGATING / G1-R1 GUARD CORRECTION AUTHORIZED`
+- R-CORE-ARCH-001: `CONFIRMED / HIGH / MONITORING / G1-R1 OWNER ACCEPTED`
 - R-CORE-GOV-002: `OPEN / NON-BLOCKING`
 - G0 STATUS: `COMPLETE / REMOTE-VERIFIED AT 92d1f3ac9e08c71458af04514baa659555fc55a7`
-- G1 STATUS: `REMOTE-VERIFIED CANDIDATE AT 0c283eb653e74784301620bdaf64bf451bb687dd / REVISION REQUIRED / NOT OWNER ACCEPTED`
-- G1-R1 STATUS: `GOVERNANCE AUTHORIZATION IN PROGRESS / TEST-ONLY CORRECTION CONDITIONAL`
+- G1 STATUS: `REMOTE-VERIFIED CANDIDATE AT 0c283eb653e74784301620bdaf64bf451bb687dd / REVISION REQUIRED / NOT OWNER ACCEPTED / SUPERSEDED BY G1-R1`
+- G1-R1 STATUS: `OWNER ACCEPTED / COMPLETE / REMOTE-VERIFIED AT d44f471c644e319bb4a5bf73707c3274ecbaa426`
 - ACS-M6-P0-P1-R2: `OWNER ACCEPTED / COMPLETE / REMOTE-VERIFIED AT e38c75aa4ff26bdea80c82d8a24096f799dad860`
 - R2-P1 STATUS: `ACCEPTED`
 - R2-P2 STATUS: `OWNER ACCEPTED / COMPLETE / REMOTE-VERIFIED AT 0aa14b4e426a3d968ec314029d60a47ea30cbc4d`
@@ -425,58 +433,55 @@ capability.
 - RB1.3 CLOSEOUT: `FORMALLY CLOSED`
 - ARCHITECTURE REVIEW: `SATISFIED FOR BOUNDED M6-P0/P1 AND M6-P2 LOCAL SQLITE ONLY`
 - M6 PRECONDITIONS: `SATISFIED FOR BOUNDED M6-P0/P1 AND M6-P2 LOCAL SQLITE ONLY`
-- M6: `P0-P2 OWNER ACCEPTED / P3-G0 REMOTE-VERIFIED CANDIDATE ON HOLD / P3-B1 AND P3-G1+ NOT AUTHORIZED`
+- M6: `P0-P2 OWNER ACCEPTED / P3-G0 OWNER REVIEW IN PROGRESS / P3-B1 AND P3-G1+ NOT AUTHORIZED`
 - M6-P0 STATUS: `CONTRACT ACCEPTED / COMPLETE`
 - M6-P1 STATUS: `OWNER ACCEPTED / COMPLETE / REMOTE-VERIFIED AT e38c75aa4ff26bdea80c82d8a24096f799dad860`
 - ADR-0004 STATUS: `ACCEPTED FOR BOUNDED M6-P2 IMPLEMENTATION`
 - M6-P2-G0 STATUS: `CONTRACT ACCEPTED / COMPLETE`
 - M6-P2-G1 STATUS: `OWNER ACCEPTED / COMPLETE / REMOTE-VERIFIED AT 8227c6c616140824fd70de920dc6fcf459bb734d`
-- M6-P2-G1-CLOSEOUT-G3 STATUS: `REMOTE-VERIFIED CHECKPOINT CANDIDATE AT c524486c05c21b270a7dd75e89fae4312430736a / OWNER REVIEW PENDING / HOLD`
-- M6-P3-G0 STATUS: `ARCHITECTURE PROPOSAL DEFINED / BINDING PREREQUISITE OPEN / REMOTE-VERIFIED CHECKPOINT CANDIDATE / OWNER REVIEW PENDING / HOLD`
-- ADR-0005 STATUS: `PROPOSED / NO IMPLEMENTATION AUTHORITY`
-- M6 CONSUMER CONTRACT: `PROPOSED / NO IMPLEMENTATION AUTHORITY`
+- M6-P2-G1-CLOSEOUT-G3 STATUS: `REMOTE-VERIFIED CHECKPOINT CANDIDATE AT c524486c05c21b270a7dd75e89fae4312430736a / OWNER REVIEW IN PROGRESS / IMPLEMENTATION HOLD`
+- M6-P3-G0 STATUS: `ARCHITECTURE PROPOSAL DEFINED / BINDING PREREQUISITE OPEN / REMOTE-VERIFIED CHECKPOINT CANDIDATE / OWNER REVIEW IN PROGRESS / IMPLEMENTATION HOLD`
+- ADR-0005 STATUS: `PROPOSED / UNDER OWNER REVIEW / NO IMPLEMENTATION AUTHORITY`
+- M6 CONSUMER CONTRACT: `PROPOSED / UNDER OWNER REVIEW / NO IMPLEMENTATION AUTHORITY`
 - M6-P3-B1 EPISODE-PLAN-ITEM BINDING: `PROPOSED / NOT AUTHORIZED / NOT STARTED / BLOCKS M6-P3-G1`
 - M6-P3-G1+ STATUS: `NOT AUTHORIZED / NOT STARTED`
 - M7-M19: `NOT STARTED / NOT AUTHORIZED`
 - FORMAL 8765 DEPLOYMENT: `UNTOUCHED / NOT DEPLOYED`
 - FRONTEND: `FROZEN / UNTOUCHED`
 - PRODUCTION READY: `NO`
-- PRODUCTION CODE CHANGED BY G1-R1 AUTHORIZATION: `NO`
-- TEST CODE CHANGED BY G1-R1 AUTHORIZATION: `NO`
-- G1 REVIEWED EVIDENCE: `TARGETED 124/124 / FULL CORE 404/404 — UNIT 226 /
+- PRODUCTION CODE CHANGED BY G1-R1: `NO`
+- TEST CODE CHANGED BY G1-R1: `ONE AUTHORIZED CONTRACT TEST FILE`
+- G1-R1 ACCEPTED EVIDENCE: `TARGETED 124/124 / FULL CORE 404/404 — UNIT 226 /
   CONTRACT 81 / INTEGRATION 97 / M6-P2 STRICT 52/52 / LIFECYCLE 31/31 /
-  PYTHON AST 63/63`; architecture guard result superseded by confirmed alias-bypass
-  defect and must be rerun after G1-R1.
+  PYTHON AST 63/63 / APPLICATION V4 IMPORTS 0 / LOCAL=REMOTE / OWNER ACCEPTED`.
 
 The Project Lead acceptance of bounded M6-P2-G1 at
 `8227c6c616140824fd70de920dc6fcf459bb734d` remains unchanged. The later c524
-G3/P3-G0 checkpoint remains a remote-verified candidate on HOLD and does not accept
-ADR-0005. The Project Lead selected and accepted ADR-0006. The completed G1 production
-migration is preserved, but its candidate is not Owner Accepted because the continuing
-guard has a confirmed alias-bypass gap. Only the bounded G1-R1 governance checkpoint
-and one-file test correction are authorized. This is not Production Ready and does
-not authorize formal database deployment, Frontend, M6-P3-B1, M6-P3-G1+ or M7-M19.
+G3/P3-G0 checkpoint is under read-only Owner Review and remains on implementation
+HOLD; ADR-0005 is not yet accepted. The Project Lead selected and accepted ADR-0006
+and later accepted corrected G1-R1 at
+`d44f471c644e319bb4a5bf73707c3274ecbaa426`. This closes the architecture-remediation
+wave but does not establish Production Ready or authorize formal database deployment,
+Frontend, M6-P3-B1, M6-P3-G1+ or M7-M19.
 
 ---
 
 # 9. Stop Rule
 
-G1-R1 authorization is governance-only. It must pass Markdown structure, local links,
-secret scan, `git diff --check`, production/test diff zero, exact eight-file scope,
-commit, push, Local SHA equals Remote SHA, ahead/behind `0/0` and clean-status gates
-before the correction begins.
+The current governance closeout must pass exact seven-path scope, production/test
+diff zero, Markdown structure, local links, secret scan, `git diff --check`, one
+commit, non-force push, Local SHA equals Remote SHA, ahead/behind `0/0` and clean
+worktree.
 
-After that remote verification, Codex may change only
-`tests/contract/test_creator_series_planning_contract.py`. The correction must add a
-binding-aware guard for the accepted Python programmatic-import primitives and prove
-both bypass rejection and same-name non-regression. Production diff must remain zero.
+After remote verification, only read-only M6-P3-G0 Owner Review may continue. The
+review may recommend `ACCEPT`, `REVISION REQUIRED` or `REJECT`; it may not modify
+ADR-0005, the consumer contract, production or tests under this authorization.
 
-After G1-R1 passes targeted and full Core regression, is committed, pushed and
-remote-verified:
+After the review result is reported:
 
 ```text
-STOP — CORRECTED ARCHITECTURE REMEDIATION TECHNICAL CHECKPOINT CANDIDATE
-PROJECT LEAD OWNER REVIEW REQUIRED
+STOP — M6-P3-G0 OWNER DECISION REQUIRED
+M6-P3-B1 REMAINS NOT AUTHORIZED
 ```
 
 Do not enter M6-P3-B1, M6-P3-G1, M7-M19, formal database deployment, HTTP/Auth/RBAC
@@ -486,15 +491,16 @@ expansion or Frontend work.
 
 # 10. Current Authorized Task
 
-`ACS-ARCH-R1-V5-TEXT-GENERATION-G1-R1-AUTHORIZATION — GOVERNANCE-ONLY CHECKPOINT`
+`ACS-ARCH-R1-G1-R1-CLOSEOUT / M6-P3-G0 OWNER REVIEW`
 
 Status:
 
-`IN PROGRESS`
+`GOVERNANCE CLOSEOUT IN PROGRESS / READ-ONLY REVIEW AUTHORIZED`
 
 M6-P0/P1 and bounded M6-P2-G1 remain Owner Accepted at their remote-verified technical
-baselines. The c524 G3/P3-G0 revision remains a remote-verified checkpoint candidate
-on HOLD; ADR-0005 remains Proposed and no P3 implementation is authorized.
+baselines. G1-R1 is Owner Accepted and complete at
+`d44f471c644e319bb4a5bf73707c3274ecbaa426`. The original G1 remains historical
+`REVISION REQUIRED / NOT OWNER ACCEPTED / SUPERSEDED BY G1-R1`.
 
 ADR-0006 accepts the single production path:
 
@@ -505,19 +511,16 @@ Creator Application
 → Provider Adapter
 ```
 
-G0 and G1 are already remote-verified. The production dependency correction remains
-valid, while the original G1 candidate is `REVISION REQUIRED` because its AST guard
-does not resolve imported and simple assignment aliases of `importlib.import_module`
-and `__import__`. The Project Lead authorizes the governance checkpoint recorded in
-[`ACS-ARCH-R1-V5-TEXT-GENERATION-G1-R1-AUTHORIZATION.md`](governance/ACS-ARCH-R1-V5-TEXT-GENERATION-G1-R1-AUTHORIZATION.md)
-and, only after that checkpoint is remote-verified, one test-only correction under the
-normative
-[`V5_TEXT_GENERATION_CAPABILITY_CONTRACT.md`](architecture/V5_TEXT_GENERATION_CAPABILITY_CONTRACT.md).
+The Project Lead authorizes the seven-path closeout recorded in
+[`ACS-ARCH-R1-V5-TEXT-GENERATION-G1-R1-CLOSEOUT-M6-P3-G0-OWNER-REVIEW.md`](governance/ACS-ARCH-R1-V5-TEXT-GENERATION-G1-R1-CLOSEOUT-M6-P3-G0-OWNER-REVIEW.md)
+and a read-only review of the c524 M6-P3-G0 candidate, ADR-0005 and the M6 consumer
+contract. ADR-0005 remains `PROPOSED / UNDER OWNER REVIEW / NO IMPLEMENTATION
+AUTHORITY` until a separate Project Lead decision.
 
 Formal port-8765 database access/deployment, HTTP/Public API, Auth/RBAC, Frontend,
 Schema/Migration, public feature expansion, P3-B1/G1+, M7-M19, V3, GPU, Worker and
-ComfyUI remain unauthorized and not started. G1-R1 must not modify production code,
-create a second Provider stack or change existing Domain ownership, candidate
-semantics or Production Spine.
+ComfyUI remain unauthorized and not started. Review does not grant implementation
+authority or change existing Domain ownership, candidate semantics or Production
+Spine.
 
 # End of CURRENT_MILESTONE.md

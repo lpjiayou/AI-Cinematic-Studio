@@ -2,13 +2,13 @@
 
 > Document: `AI_CINEMATIC_STUDIO_SYSTEM_MASTER_PLAN.md`
 >
-> Status: `SYSTEM MASTER GOVERNANCE BASELINE / ARCH-R1 V5 TEXT GENERATION G1-R1 GUARD CORRECTION ACTIVE`
+> Status: `SYSTEM MASTER GOVERNANCE BASELINE / G1-R1 OWNER ACCEPTED / M6-P3-G0 OWNER REVIEW ACTIVE`
 >
 > Version: `v1.2`
 >
 > Date: `2026-08-13`
 >
-> Revision: `ACS-ARCH-R1-V5-TEXT-GENERATION-G1-R1-AUTHORIZATION`
+> Revision: `ACS-ARCH-R1-G1-R1-CLOSEOUT / M6-P3-G0 OWNER REVIEW START`
 >
 > Architecture Decisions: `ADR-0001 / Accepted`; `ADR-0006 — V5 Text Generation Capability Boundary / Accepted for bounded G1`
 >
@@ -2315,7 +2315,7 @@ Status:
 
 Status:
 
-`P0-P1 OWNER ACCEPTED / COMPLETE / REMOTE-VERIFIED AT e38c75aa4ff26bdea80c82d8a24096f799dad860 / P2-G0 CONTRACT ACCEPTED / P2-G1 OWNER ACCEPTED / COMPLETE / REMOTE-VERIFIED AT 8227c6c616140824fd70de920dc6fcf459bb734d / P3-G0 REMOTE-VERIFIED GOVERNANCE CHECKPOINT CANDIDATE AT c524486c05c21b270a7dd75e89fae4312430736a / OWNER REVIEW PENDING / HOLD / ADR-0005 PROPOSED / P3-B1 AND P3-G1+ NOT AUTHORIZED`
+`P0-P1 OWNER ACCEPTED / COMPLETE / REMOTE-VERIFIED AT e38c75aa4ff26bdea80c82d8a24096f799dad860 / P2-G0 CONTRACT ACCEPTED / P2-G1 OWNER ACCEPTED / COMPLETE / REMOTE-VERIFIED AT 8227c6c616140824fd70de920dc6fcf459bb734d / P3-G0 REMOTE-VERIFIED GOVERNANCE CHECKPOINT CANDIDATE AT c524486c05c21b270a7dd75e89fae4312430736a / OWNER REVIEW IN PROGRESS / IMPLEMENTATION HOLD / ADR-0005 PROPOSED UNDER REVIEW / P3-B1 AND P3-G1+ NOT AUTHORIZED`
 
 目标范围：
 
@@ -2342,7 +2342,7 @@ Status:
 - M6-P2 只实现本地开发 SQLite 持久化、Migration、复合完整性、持久化幂等与
   Outbox；正式 8765 数据库保持禁止访问；
 - M6-P3-G0 只定义 Proposed consumer/reconciliation architecture，当前为
-  remote-verified candidate / HOLD，不实施代码；
+  remote-verified candidate / Owner Review in progress / implementation HOLD，不实施代码；
 - M6-P3-B1 EpisodePlanItemBinding 仍为 Proposed prerequisite，未授权实施；
 - M6-P3-G1+ 保持 `NOT AUTHORIZED / NOT STARTED`。
 
@@ -3081,27 +3081,31 @@ local-development durable SQLite boundary.
 
 ```text
 Current Work Package
-ACS-ARCH-R1-V5-TEXT-GENERATION-G1-R1
+ACS-ARCH-R1-G1-R1-CLOSEOUT / M6-P3-G0 OWNER REVIEW
 
 Execution Mode
-AUTO-SEQUENTIAL / BOUNDED TO G1-R1 AUTHORIZATION → TEST-ONLY CORRECTION
+GOVERNANCE-ONLY CLOSEOUT / READ-ONLY OWNER REVIEW / NO AUTO IMPLEMENTATION
 
 Architecture Decision
 ADR-0006 V5 TEXT GENERATION CAPABILITY BOUNDARY
 ACCEPTED FOR BOUNDED G1
 
 Current Checkpoint
-G1-R1 GOVERNANCE AUTHORIZATION IN PROGRESS
+G1-R1 OWNER ACCEPTED / GOVERNANCE CLOSEOUT IN PROGRESS
 
-Next Conditional Checkpoint
-G1-R1 TEST-ONLY GUARD CORRECTION AFTER GOVERNANCE COMMIT / PUSH / REMOTE VERIFICATION
+Current Review
+M6-P3-G0 / ADR-0005 / M6 CONSUMER CONTRACT OWNER REVIEW IN PROGRESS
 
 Completed Architecture Checkpoint
 G0 COMPLETE / REMOTE-VERIFIED AT 92d1f3ac9e08c71458af04514baa659555fc55a7
 
 Revision-Required Technical Candidate
 G1 REMOTE-VERIFIED AT 0c283eb653e74784301620bdaf64bf451bb687dd
-REVISION REQUIRED / NOT OWNER ACCEPTED
+REVISION REQUIRED / NOT OWNER ACCEPTED / SUPERSEDED BY G1-R1
+
+Accepted Corrected Technical Checkpoint
+G1-R1 OWNER ACCEPTED / COMPLETE / REMOTE-VERIFIED AT
+d44f471c644e319bb4a5bf73707c3274ecbaa426
 
 Accepted Governance / Architecture Checkpoint
 ACS-M6-P0-P1-R2-CLOSEOUT-G2 / M6-P2-G0
@@ -3113,13 +3117,13 @@ M6 Series IP Bible + Character Intelligence
 P0-P1 OWNER ACCEPTED / COMPLETE / REMOTE-VERIFIED AT e38c75aa4ff26bdea80c82d8a24096f799dad860
 P2-G0 ADR-0004 + SQLITE CONTRACT ACCEPTED / COMPLETE
 P2-G1 OWNER ACCEPTED / COMPLETE / REMOTE-VERIFIED AT 8227c6c616140824fd70de920dc6fcf459bb734d
-G3 / P3-G0 REMOTE-VERIFIED CHECKPOINT CANDIDATE AT c524486c05c21b270a7dd75e89fae4312430736a / OWNER REVIEW PENDING / HOLD
-ADR-0005 + M6 CONSUMER CONTRACT PROPOSED / NO IMPLEMENTATION AUTHORITY
+G3 / P3-G0 REMOTE-VERIFIED CHECKPOINT CANDIDATE AT c524486c05c21b270a7dd75e89fae4312430736a / OWNER REVIEW IN PROGRESS / IMPLEMENTATION HOLD
+ADR-0005 + M6 CONSUMER CONTRACT PROPOSED / UNDER OWNER REVIEW / NO IMPLEMENTATION AUTHORITY
 P3-B1 EPISODE-PLAN-ITEM BINDING PROPOSED / NOT AUTHORIZED / NOT STARTED / BLOCKS P3-G1
 P3-G1+ NOT AUTHORIZED / NOT STARTED
 
 Architecture Risks
-R-CORE-ARCH-001 CONFIRMED / HIGH / MITIGATING / G1-R1 GUARD CORRECTION AUTHORIZED
+R-CORE-ARCH-001 CONFIRMED / HIGH / MONITORING / G1-R1 OWNER ACCEPTED
 R-CORE-GOV-002 OPEN / NON-BLOCKING / AUDIT REPORT PROVENANCE
 
 M7-M19
@@ -3160,14 +3164,14 @@ Project Lead 进一步接受 ADR-0004 与 M6 SQLite Contract，并于 `2026-08-1
 REMOTE-VERIFIED`。
 
 `ACS-M6-P2-G1-CLOSEOUT-G3 / M6-P3-G0` 已在
-`c524486c05c21b270a7dd75e89fae4312430736a` 完成远端验证，但仍只是
-`OWNER REVIEW PENDING` 的 checkpoint candidate，当前明确置于 HOLD。它不接受
-ADR-0005，也不授权 M6-P3-B1 或 M6-P3-G1；其历史内容不得因本次修复被改写。
+`c524486c05c21b270a7dd75e89fae4312430736a` 完成远端验证，当前进入只读
+`OWNER REVIEW IN PROGRESS`，并继续处于 implementation HOLD。开始审查不接受
+ADR-0005，也不授权 M6-P3-B1 或 M6-P3-G1；其历史内容不得被改写。
 
 代码审查确认 M1 AI Director、M3 Script Studio、M5 Series Director 与 Creator
 Server composition 存在 Application 直接依赖 V4 的重复模式，违反固定的
 `Application → V5 → V4` 相邻层链。该事实登记为 `R-CORE-ARCH-001 / CONFIRMED /
-HIGH / MITIGATING`。Project Lead 已明确选择 V5-owned Text Generation Capability，
+HIGH`。Project Lead 已明确选择 V5-owned Text Generation Capability，
 同时以 Project Lead、Architecture Owner 和 Repository Governance Owner 身份接受
 ADR-0006，并授权以下 bounded wave：
 
@@ -3190,16 +3194,17 @@ Creator Application
 
 G0 已在 `92d1f3ac9e08c71458af04514baa659555fc55a7` 完成远端验证。G1 已在
 `0c283eb653e74784301620bdaf64bf451bb687dd` 完成四个 Application/V4 接触面迁移，
-当前生产树 `apps → V4` 为零；但独立复核证明其动态导入守卫不能识别
-`importlib.import_module` / `__import__` 的导入别名与简单赋值别名，因此 G1 保持
-`REVISION REQUIRED / NOT OWNER ACCEPTED`。
+但其持续守卫存在动态导入别名缺口，所以该 SHA 保持历史 `REVISION REQUIRED /
+NOT OWNER ACCEPTED`。G1-R1 在唯一 Contract Test 文件中建立 binding-aware AST
+守卫和正反例矩阵，生产 diff 为零，并在
+`d44f471c644e319bb4a5bf73707c3274ecbaa426` 完成远端验证。Project Lead 已明确
+Owner Accept 该修正检查点，Architecture Remediation R1 因此关闭，
+`R-CORE-ARCH-001` 转入持续监控。
 
-Project Lead 已授权 G1-R1：先提交并远端验证独立 governance-only 授权 checkpoint，
-再只修改 `tests/contract/test_creator_series_planning_contract.py`，建立
-binding-aware AST 守卫和正反例矩阵。生产、HTTP、Provider、Persistence、Frontend
-diff 必须为零。G1-R1 不授权 Schema/Migration、正式 8765、HTTP/Auth/RBAC 扩张、
-Frontend、M6-P3、M7+、V3、GPU、Worker 或 ComfyUI；修复完成 commit、push 和
-remote verification 后必须 STOP，等待 Project Lead Owner Review。
+当前只授权 governance-only 关账和对现有 M6-P3-G0、ADR-0005、M6 Consumer
+Contract 的只读 Owner Review。开始审查不等于接受提案，也不授权 B1。Schema/
+Migration、正式 8765、HTTP/Auth/RBAC 扩张、Frontend、M6-P3-B1/G1 实现、M7+、
+V3、GPU、Worker 或 ComfyUI 仍未授权。
 
 Full Core Audit Report v1.2 的历史接受标签不在本次修复中重写；仓库内缺少可复核
 报告实体/摘要引用的问题登记为 `R-CORE-GOV-002 / OPEN / NON-BLOCKING`，且该标签

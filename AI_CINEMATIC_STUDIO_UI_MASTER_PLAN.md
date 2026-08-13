@@ -14,7 +14,7 @@
 > UI-R1 Accepted SHA:
 > `c9536fc0c745d0bf9e9c3eb543f4ab6c0566798a`
 >
-> Revision: ACS-ARCH-R1 V5 Text Generation G1-R1 guard-correction status synchronization; product IA and visual baseline unchanged.
+> Revision: G1-R1 Owner Acceptance / M6-P3-G0 Owner Review status synchronization; product IA and visual baseline unchanged.
 >
 > Scope:
 > AI Cinematic Studio Creator / Project Workspace / Production Editors /
@@ -126,10 +126,11 @@ PRE-M6 严格路线为：
 
 PRE-M6-RB1.1、RB1.2 与 RB1.3 均已关闭。M6-P0/P1 与 bounded M6-P2 已 Owner
 Accepted；`c524486c05c21b270a7dd75e89fae4312430736a` 的 M6-P3-G0
-governance candidate 仍为 `OWNER REVIEW PENDING / HOLD`。G0 已完成；G1
-`0c283eb653e74784301620bdaf64bf451bb687dd` 因架构守卫别名绕过处于
-`REVISION REQUIRED / NOT OWNER ACCEPTED`。当前只授权 test-only G1-R1 Core
-correction，Frontend 仍冻结。
+governance candidate 已进入 `OWNER REVIEW IN PROGRESS / IMPLEMENTATION HOLD`。
+原 G1 `0c283eb653e74784301620bdaf64bf451bb687dd` 保持历史 `REVISION REQUIRED /
+NOT OWNER ACCEPTED`；修正后的 G1-R1 已在
+`d44f471c644e319bb4a5bf73707c3274ecbaa426` 获得 Owner Acceptance。当前只授权
+治理关账和只读 M6-P3-G0 review，Frontend 仍冻结。
 
 ---
 
@@ -148,8 +149,10 @@ correction，Frontend 仍冻结。
 - M6-P2-G1：`OWNER ACCEPTED / COMPLETE / REMOTE-VERIFIED AT
   8227c6c616140824fd70de920dc6fcf459bb734d`；
 - M6-P3-G0：`REMOTE-VERIFIED GOVERNANCE / ARCHITECTURE CHECKPOINT CANDIDATE AT
-  c524486c05c21b270a7dd75e89fae4312430736a / OWNER REVIEW PENDING / HOLD`；
-- ADR-0005 / M6 Consumer Contract：`PROPOSED / NO IMPLEMENTATION AUTHORITY`；
+  c524486c05c21b270a7dd75e89fae4312430736a / OWNER REVIEW IN PROGRESS /
+  IMPLEMENTATION HOLD`；
+- ADR-0005 / M6 Consumer Contract：`PROPOSED / UNDER OWNER REVIEW / NO
+  IMPLEMENTATION AUTHORITY`；
 - M6-P3-B1 EpisodePlanItemBinding：`PROPOSED / NOT AUTHORIZED / NOT STARTED /
   BLOCKS M6-P3-G1`；
 - ADR-0006 / V5 Text Generation Capability：`ACCEPTED FOR BOUNDED G1`；
@@ -157,9 +160,9 @@ correction，Frontend 仍冻结。
   92d1f3ac9e08c71458af04514baa659555fc55a7`；
 - ACS-ARCH-R1-V5-TEXT-GENERATION-G1：`REMOTE-VERIFIED CANDIDATE AT
   0c283eb653e74784301620bdaf64bf451bb687dd / REVISION REQUIRED / NOT OWNER
-  ACCEPTED`；
-- ACS-ARCH-R1-V5-TEXT-GENERATION-G1-R1：`TEST-ONLY ARCHITECTURE GUARD
-  CORRECTION AUTHORIZED`；
+  ACCEPTED / SUPERSEDED BY G1-R1`；
+- ACS-ARCH-R1-V5-TEXT-GENERATION-G1-R1：`OWNER ACCEPTED / COMPLETE /
+  REMOTE-VERIFIED AT d44f471c644e319bb4a5bf73707c3274ecbaa426`；
 - Frontend M6 activation：`FROZEN / NOT AUTHORIZED`；
 - M6-P3-G1+、M7-M19：`NOT STARTED / NOT AUTHORIZED`。
 
@@ -984,9 +987,10 @@ Timeline and Continuity
 
 M6 边界：`M6 ≠ V5 Identity Lock`。M6 不实现 M7、GPU Render、ComfyUI、
 Worker 或跨仓 UI；M6-P0/P1 与 bounded M6-P2 已 Owner Accepted。M6-P3-G0
-仅提出 Core 内部 consumer contract，现为 remote-verified candidate / HOLD，不授权
-Public API 或任何 UI 激活。当前 V5 Text Generation 修复也不改变任何
-UI/UX/Frontend contract；Frontend 仍为 `FROZEN / NOT AUTHORIZED`。
+仅提出 Core 内部 consumer contract，现为 remote-verified candidate / Owner Review
+in progress / implementation HOLD，不授权 Public API 或任何 UI 激活。已接受的 V5
+Text Generation 修复也不改变任何 UI/UX/Frontend contract；Frontend 仍为
+`FROZEN / NOT AUTHORIZED`。
 
 示意：
 
