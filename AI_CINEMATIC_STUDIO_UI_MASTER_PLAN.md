@@ -14,7 +14,7 @@
 > UI-R1 Accepted SHA:
 > `c9536fc0c745d0bf9e9c3eb543f4ab6c0566798a`
 >
-> Revision: ACS-ARCH-R1 V5 Text Generation G0→G1 governance status synchronization; product IA and visual baseline unchanged.
+> Revision: ACS-ARCH-R1 V5 Text Generation G1-R1 guard-correction status synchronization; product IA and visual baseline unchanged.
 >
 > Scope:
 > AI Cinematic Studio Creator / Project Workspace / Production Editors /
@@ -126,9 +126,10 @@ PRE-M6 严格路线为：
 
 PRE-M6-RB1.1、RB1.2 与 RB1.3 均已关闭。M6-P0/P1 与 bounded M6-P2 已 Owner
 Accepted；`c524486c05c21b270a7dd75e89fae4312430736a` 的 M6-P3-G0
-governance candidate 仍为 `OWNER REVIEW PENDING / HOLD`。当前只授权
-`ACS-ARCH-R1-V5-TEXT-GENERATION-G0 → G1` bounded Core architecture
-remediation，Frontend 仍冻结。
+governance candidate 仍为 `OWNER REVIEW PENDING / HOLD`。G0 已完成；G1
+`0c283eb653e74784301620bdaf64bf451bb687dd` 因架构守卫别名绕过处于
+`REVISION REQUIRED / NOT OWNER ACCEPTED`。当前只授权 test-only G1-R1 Core
+correction，Frontend 仍冻结。
 
 ---
 
@@ -152,10 +153,13 @@ remediation，Frontend 仍冻结。
 - M6-P3-B1 EpisodePlanItemBinding：`PROPOSED / NOT AUTHORIZED / NOT STARTED /
   BLOCKS M6-P3-G1`；
 - ADR-0006 / V5 Text Generation Capability：`ACCEPTED FOR BOUNDED G1`；
-- ACS-ARCH-R1-V5-TEXT-GENERATION-G0：`GOVERNANCE / ARCHITECTURE CHECKPOINT IN
-  PROGRESS`；
-- ACS-ARCH-R1-V5-TEXT-GENERATION-G1：`AUTHORIZED ONLY AFTER G0 REMOTE
-  VERIFICATION / NOT STARTED`；
+- ACS-ARCH-R1-V5-TEXT-GENERATION-G0：`COMPLETE / REMOTE-VERIFIED AT
+  92d1f3ac9e08c71458af04514baa659555fc55a7`；
+- ACS-ARCH-R1-V5-TEXT-GENERATION-G1：`REMOTE-VERIFIED CANDIDATE AT
+  0c283eb653e74784301620bdaf64bf451bb687dd / REVISION REQUIRED / NOT OWNER
+  ACCEPTED`；
+- ACS-ARCH-R1-V5-TEXT-GENERATION-G1-R1：`TEST-ONLY ARCHITECTURE GUARD
+  CORRECTION AUTHORIZED`；
 - Frontend M6 activation：`FROZEN / NOT AUTHORIZED`；
 - M6-P3-G1+、M7-M19：`NOT STARTED / NOT AUTHORIZED`。
 

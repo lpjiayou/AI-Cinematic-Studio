@@ -2,13 +2,13 @@
 
 > Document: `AI_CINEMATIC_STUDIO_SYSTEM_MASTER_PLAN.md`
 >
-> Status: `SYSTEM MASTER GOVERNANCE BASELINE / ARCH-R1 V5 TEXT GENERATION G0 → G1 ACTIVE`
+> Status: `SYSTEM MASTER GOVERNANCE BASELINE / ARCH-R1 V5 TEXT GENERATION G1-R1 GUARD CORRECTION ACTIVE`
 >
 > Version: `v1.2`
 >
 > Date: `2026-08-13`
 >
-> Revision: `ACS-ARCH-R1-V5-TEXT-GENERATION-G0`
+> Revision: `ACS-ARCH-R1-V5-TEXT-GENERATION-G1-R1-AUTHORIZATION`
 >
 > Architecture Decisions: `ADR-0001 / Accepted`; `ADR-0006 — V5 Text Generation Capability Boundary / Accepted for bounded G1`
 >
@@ -3081,20 +3081,27 @@ local-development durable SQLite boundary.
 
 ```text
 Current Work Package
-ACS-ARCH-R1-V5-TEXT-GENERATION-G0 → G1
+ACS-ARCH-R1-V5-TEXT-GENERATION-G1-R1
 
 Execution Mode
-AUTO-SEQUENTIAL / BOUNDED TO G0 → G1 ONLY
+AUTO-SEQUENTIAL / BOUNDED TO G1-R1 AUTHORIZATION → TEST-ONLY CORRECTION
 
 Architecture Decision
 ADR-0006 V5 TEXT GENERATION CAPABILITY BOUNDARY
 ACCEPTED FOR BOUNDED G1
 
 Current Checkpoint
-G0 GOVERNANCE / ARCHITECTURE SYNCHRONIZATION IN PROGRESS
+G1-R1 GOVERNANCE AUTHORIZATION IN PROGRESS
 
 Next Conditional Checkpoint
-G1 AUTHORIZED ONLY AFTER G0 COMMIT / PUSH / REMOTE VERIFICATION
+G1-R1 TEST-ONLY GUARD CORRECTION AFTER GOVERNANCE COMMIT / PUSH / REMOTE VERIFICATION
+
+Completed Architecture Checkpoint
+G0 COMPLETE / REMOTE-VERIFIED AT 92d1f3ac9e08c71458af04514baa659555fc55a7
+
+Revision-Required Technical Candidate
+G1 REMOTE-VERIFIED AT 0c283eb653e74784301620bdaf64bf451bb687dd
+REVISION REQUIRED / NOT OWNER ACCEPTED
 
 Accepted Governance / Architecture Checkpoint
 ACS-M6-P0-P1-R2-CLOSEOUT-G2 / M6-P2-G0
@@ -3112,7 +3119,7 @@ P3-B1 EPISODE-PLAN-ITEM BINDING PROPOSED / NOT AUTHORIZED / NOT STARTED / BLOCKS
 P3-G1+ NOT AUTHORIZED / NOT STARTED
 
 Architecture Risks
-R-CORE-ARCH-001 CONFIRMED / HIGH / MITIGATING / G1 REMEDIATION AUTHORIZED
+R-CORE-ARCH-001 CONFIRMED / HIGH / MITIGATING / G1-R1 GUARD CORRECTION AUTHORIZED
 R-CORE-GOV-002 OPEN / NON-BLOCKING / AUDIT REPORT PROVENANCE
 
 M7-M19
@@ -3181,15 +3188,18 @@ Creator Application
 → Provider Adapter
 ```
 
-G0 只允许 ADR、规范合同、风险、治理和 Source-of-Truth 同步；其 production/test
-diff 必须为零。G0 commit、push、remote SHA equality 和 clean status 全部通过后，
-才允许自动进入 G1。G1 只迁移已识别的四个 Application/V4 接触面，保持既有
-HTTP/API、Domain ownership、candidate validation、Prompt/Provider behavior 和稳定
-产品错误语义，增加可执行的禁止 `apps → V4` 架构守卫并完成全量回归。
+G0 已在 `92d1f3ac9e08c71458af04514baa659555fc55a7` 完成远端验证。G1 已在
+`0c283eb653e74784301620bdaf64bf451bb687dd` 完成四个 Application/V4 接触面迁移，
+当前生产树 `apps → V4` 为零；但独立复核证明其动态导入守卫不能识别
+`importlib.import_module` / `__import__` 的导入别名与简单赋值别名，因此 G1 保持
+`REVISION REQUIRED / NOT OWNER ACCEPTED`。
 
-G1 不授权 Schema/Migration、正式 8765、HTTP/Auth/RBAC 扩张、Frontend、M6-P3、
-M7+、V3、GPU、Worker 或 ComfyUI。G1 完成 commit、push 和 remote verification 后
-必须 STOP，等待 Project Lead Owner Review。
+Project Lead 已授权 G1-R1：先提交并远端验证独立 governance-only 授权 checkpoint，
+再只修改 `tests/contract/test_creator_series_planning_contract.py`，建立
+binding-aware AST 守卫和正反例矩阵。生产、HTTP、Provider、Persistence、Frontend
+diff 必须为零。G1-R1 不授权 Schema/Migration、正式 8765、HTTP/Auth/RBAC 扩张、
+Frontend、M6-P3、M7+、V3、GPU、Worker 或 ComfyUI；修复完成 commit、push 和
+remote verification 后必须 STOP，等待 Project Lead Owner Review。
 
 Full Core Audit Report v1.2 的历史接受标签不在本次修复中重写；仓库内缺少可复核
 报告实体/摘要引用的问题登记为 `R-CORE-GOV-002 / OPEN / NON-BLOCKING`，且该标签
