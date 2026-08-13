@@ -14,7 +14,7 @@
 > UI-R1 Accepted SHA:
 > `c9536fc0c745d0bf9e9c3eb543f4ab6c0566798a`
 >
-> Revision: M6-P2-G1 checkpoint-candidate status synchronization; product IA and visual baseline unchanged.
+> Revision: M6-P2 Owner Acceptance and M6-P3-G0 governance status synchronization; product IA and visual baseline unchanged.
 >
 > Scope:
 > AI Cinematic Studio Creator / Project Workspace / Production Editors /
@@ -124,8 +124,8 @@ PRE-M6 严格路线为：
 → `M6 Preconditions`
 → `M6-P1`
 
-PRE-M6-RB1.1、RB1.2 与 RB1.3 均已关闭。M6-P0/P1 已 Owner Accepted；当前只
-授权 M6-P2 local-development durable SQLite Core 工作，Frontend 仍冻结。
+PRE-M6-RB1.1、RB1.2 与 RB1.3 均已关闭。M6-P0/P1 与 bounded M6-P2 已 Owner
+Accepted；当前只授权 M6-P3-G0 governance/architecture work，Frontend 仍冻结。
 
 ---
 
@@ -141,9 +141,15 @@ PRE-M6-RB1.1、RB1.2 与 RB1.3 均已关闭。M6-P0/P1 已 Owner Accepted；当�
   `55813b26be76a3476820dd1f638ac2f4561da448`；
 - M6-P0/P1 — Series IP Bible + Character Intelligence：
   `OWNER ACCEPTED / COMPLETE / REMOTE-VERIFIED AT e38c75aa4ff26bdea80c82d8a24096f799dad860`；
-- M6-P2：`CORE SQLITE IMPLEMENTED / CHECKPOINT CANDIDATE / OWNER REVIEW PENDING`；
+- M6-P2-G1：`OWNER ACCEPTED / COMPLETE / REMOTE-VERIFIED AT
+  8227c6c616140824fd70de920dc6fcf459bb734d`；
+- M6-P3-G0：`GOVERNANCE / ARCHITECTURE CHECKPOINT CANDIDATE / OWNER REVIEW
+  PENDING`；
+- ADR-0005 / M6 Consumer Contract：`PROPOSED / NO IMPLEMENTATION AUTHORITY`；
+- M6-P3-B1 EpisodePlanItemBinding：`PROPOSED / NOT AUTHORIZED / NOT STARTED /
+  BLOCKS M6-P3-G1`；
 - Frontend M6 activation：`FROZEN / NOT AUTHORIZED`；
-- M6-P3+、M7-M19：`NOT STARTED / NOT AUTHORIZED`。
+- M6-P3-G1+、M7-M19：`NOT STARTED / NOT AUTHORIZED`。
 
 Milestone acceptance、implementation evidence、remote verification、UI/Product
 acceptance 和 current task status 是不同语义。M4/M5 的 Accepted 状态本身并未
@@ -965,9 +971,9 @@ Continuity
 Timeline and Continuity
 
 M6 边界：`M6 ≠ V5 Identity Lock`。M6 不实现 M7、GPU Render、ComfyUI、
-Worker 或跨仓 UI；M6-P0/P1 已 Owner Accepted，M6-P2 Core 本地开发 SQLite
-持久化现为 Checkpoint Candidate / Owner Review Pending，当前 Frontend 激活仍为
-`FROZEN / NOT AUTHORIZED`。
+Worker 或跨仓 UI；M6-P0/P1 与 bounded M6-P2 已 Owner Accepted。M6-P3-G0
+仅提出 Core 内部 consumer contract，不授权 Public API 或任何 UI 激活；当前
+Frontend 仍为 `FROZEN / NOT AUTHORIZED`。
 
 示意：
 

@@ -5,8 +5,8 @@ AI 影视生产系统。Core 仓库负责 Creator Server/Public API/Application�
 OS、V4 Platform、V3 Render Core、持久化与后端测试；客户 Commercial SaaS UI
 由独立 `AI-Cinematic-Studio-Frontend` 仓库承载。
 
-> 当前状态：M1–M5 已接受；M6-P0/P1 已 Owner Accepted；M6-P2 本地开发
-> Durable SQLite Slice 已实施并等待 Owner Review；Production Ready = `NO`。
+> 当前状态：M1–M5 已接受；M6-P0/P1 与 bounded M6-P2 已 Owner Accepted；
+> M6-P3-G0 consumer architecture 为治理候选；Production Ready = `NO`。
 
 ## 当前活动工作包
 
@@ -15,16 +15,23 @@ OS、V4 Platform、V3 Render Core、持久化与后端测试；客户 Commercial
 | Accepted M6-P0/P1 baseline | `e38c75aa4ff26bdea80c82d8a24096f799dad860` |
 | M6-P0/P1 | `OWNER ACCEPTED / COMPLETE / REMOTE-VERIFIED` |
 | ADR-0004 / M6-P2-G0 | `ACCEPTED / COMPLETE` |
-| M6-P2-G1 | `IMPLEMENTED / CHECKPOINT CANDIDATE / OWNER REVIEW PENDING` |
-| M6-P3+ | `NOT AUTHORIZED / NOT STARTED` |
+| M6-P2-G1 | `OWNER ACCEPTED / COMPLETE / REMOTE-VERIFIED AT 8227c6c616140824fd70de920dc6fcf459bb734d` |
+| M6-P3-G0 | `GOVERNANCE / ARCHITECTURE CHECKPOINT CANDIDATE / OWNER REVIEW PENDING` |
+| ADR-0005 / M6 Consumer Contract | `PROPOSED / NO IMPLEMENTATION AUTHORITY` |
+| M6-P3-B1 EpisodePlanItemBinding | `PROPOSED / NOT AUTHORIZED / NOT STARTED / BLOCKS G1` |
+| M6-P3-G1+ | `NOT AUTHORIZED / NOT STARTED` |
 | M7-M19 | `NOT STARTED / NOT AUTHORIZED` |
 | Formal port-8765 database | `UNTOUCHED / NOT DEPLOYED` |
 | Frontend | `FROZEN / UNTOUCHED` |
 | Production Ready | `NO` |
 
-当前执行范围只允许 M6 local-development SQLite 持久化、Migration、完整 Scope
-约束、删除完整性、持久化幂等与持久化 Outbox。正式数据库、Public HTTP/API
-扩展、Auth/RBAC、Frontend、M6-P3+ 和 M7+ 不在授权范围内。
+当前执行范围只允许记录 M6-P2 Owner Acceptance，并提出 M6 到 M3 Script Studio
+的内部只读 Episode baseline consumer/reconciliation contract。提案明确 M4 拥有
+Project→Series context、M2 拥有 Series/Episode identity 与 membership。当前两侧
+没有共享 stable Ref，因此提案先在新 M5 SeriesPlanVersion 内建立 immutable
+EpisodePlanItemBinding；P3-B1 必须独立授权并接受后，才能另行授权 P3-G1。
+生产/测试代码、Schema/Migration、正式数据库、Public HTTP/API、Auth/RBAC、
+Frontend、M6-P3-B1、M6-P3-G1+ 和 M7+ 不在授权范围内。
 
 权威执行状态见 [CURRENT_MILESTONE.md](CURRENT_MILESTONE.md)。
 
@@ -84,6 +91,7 @@ Commercial Frontend
 - M4 — Project Context Foundation
 - M5 — Series Planning + Series Director
 - M6-P0/P1 — Series Bible + Character Intelligence InMemory baseline
+- M6-P2 — bounded local-development durable SQLite adapter
 
 M6-P0/P1 已实现两个不可变版本根和一个原子基线：
 
@@ -94,6 +102,10 @@ M5 Confirmed SeriesPlanVersion + Digest
 → M6BaselineSnapshot
 → ordered Outbox
 ```
+
+M6-P2 已将相同领域语义接入 LifecycleAssembly 的本地开发 SQLite Adapter，
+覆盖原子 Migration、完整 Scope/FK、持久化幂等、持久化 Outbox、重启一致性和
+删除完整性；它不是正式数据库或 Production 部署。
 
 完整 Scope 为：
 
@@ -143,8 +155,10 @@ PYTHONDONTWRITEBYTECODE=1 python -m unittest discover -s tests -p 'test_*.py' -q
 - [Current Milestone](CURRENT_MILESTONE.md)
 - [M6 Domain Contract](architecture/M6_SERIES_INTELLIGENCE_DOMAIN_CONTRACT.md)
 - [M6 Durable SQLite Contract](architecture/M6_SERIES_INTELLIGENCE_SQLITE_CONTRACT.md)
+- [M6 Consumer Contract — Proposed](architecture/M6_SERIES_INTELLIGENCE_CONSUMER_CONTRACT.md)
 - [ADR-0003 — M6 InMemory baseline](governance/ADR-0003-m6-series-intelligence-baseline.md)
 - [ADR-0004 — M6 Durable SQLite boundary](governance/ADR-0004-m6-series-intelligence-durable-sqlite-boundary.md)
+- [ADR-0005 — M6 consumer boundary — Proposed](governance/ADR-0005-m6-series-intelligence-consumer-boundary.md)
 - [Agent Constitution](AGENTS.md)
 
 ## 安全与发布边界

@@ -2,17 +2,17 @@
 
 > Document: `CURRENT_MILESTONE.md`
 >
-> Execution Mode: AUTO-SEQUENTIAL
+> Execution Mode: MANUAL
 >
-> Project Lead Authorization: `BOUNDED STANDING AUTHORITY RECORDED 2026-08-13`
+> Project Lead Authorization: `GOVERNANCE-ONLY G3 / M6-P3-G0 AUTHORIZED 2026-08-13`
 >
-> Authorized Wave: `ACS-M6-P0-P1-R2-CLOSEOUT-G2 / M6-P2-G0 → ACS-M6-P2-G1`
+> Authorized Work Package: `ACS-M6-P2-G1-CLOSEOUT-G3 / M6-P3-G0`
 >
-> Current Task: `ACS-M6-P2-G1 — M6 SERIES INTELLIGENCE DURABLE SQLITE SLICE`
+> Current Task: `ACS-M6-P2-G1-CLOSEOUT-G3 / M6-P3-G0 — GOVERNANCE AND CONSUMER CONTRACT`
 >
-> Current Work Package: `P0-P1 OWNER ACCEPTED / P2-G0 CONTRACT ACCEPTED / P2-G1 IMPLEMENTED / OWNER REVIEW PENDING`
+> Current Work Package: `P0-P2 OWNER ACCEPTED / P3-G0 GOVERNANCE CHECKPOINT CANDIDATE / OWNER REVIEW PENDING`
 >
-> M6 Authorization: `P0-P1 OWNER ACCEPTED / COMPLETE / REMOTE-VERIFIED / P2-G1 CHECKPOINT CANDIDATE / P3+ NOT AUTHORIZED`
+> M6 Authorization: `P0-P2 OWNER ACCEPTED / P3-G0 GOVERNANCE-ONLY / P3-B1 AND P3-G1+ NOT AUTHORIZED`
 >
 > M7 Authorization: `NOT AUTHORIZED`
 >
@@ -70,11 +70,11 @@ Current stage:
 
 Title:
 
-Series Intelligence Durable SQLite Slice
+M6-P2 Closeout and Series Intelligence Consumer Architecture Proposal
 
 Status:
 
-`P0-P1 OWNER ACCEPTED / COMPLETE / REMOTE-VERIFIED / P2-G0 CONTRACT ACCEPTED / P2-G1 IMPLEMENTED CHECKPOINT CANDIDATE OWNER REVIEW PENDING / P3+ NOT AUTHORIZED`
+`P0-P1 OWNER ACCEPTED / P2-G0 CONTRACT ACCEPTED / P2-G1 OWNER ACCEPTED / COMPLETE / REMOTE-VERIFIED / P3-G0 GOVERNANCE-ONLY CHECKPOINT CANDIDATE / OWNER REVIEW PENDING / P3-B1 AND P3-G1+ NOT AUTHORIZED`
 
 Purpose:
 
@@ -82,9 +82,13 @@ Purpose:
 2. record PRE-M6-RB1.3 as formally closed by Project Lead owner review;
 3. record M6-P0/P1 as Owner Accepted and remote-verified at
    `e38c75aa4ff26bdea80c82d8a24096f799dad860`;
-4. implement only the ADR-0004 bounded local-development durable SQLite slice;
-5. keep M6-P3+, M7-M19, formal database deployment and Frontend work unauthorized;
-6. keep Production Ready as `NO`.
+4. record M6-P2-G1 as Owner Accepted and remote-verified at
+   `8227c6c616140824fd70de920dc6fcf459bb734d`;
+5. define only a Proposed M6-to-M3 internal consumer/reconciliation boundary;
+6. preserve M2/M4/M5/M6/M7/M9 ownership and propose an immutable M5
+   EpisodePlanItemBinding inside a new exact SeriesPlanVersion;
+7. keep M6-P3-B1, M6-P3-G1+, M7-M19, formal database deployment and Frontend work unauthorized;
+8. keep Production Ready as `NO`.
 
 ---
 
@@ -285,23 +289,27 @@ are accepted, and R2-P2 is remote-verified at
 `0aa14b4e426a3d968ec314029d60a47ea30cbc4d`.
 
 `ACS-M6-P0-P1-R2` is `OWNER ACCEPTED / COMPLETE / REMOTE-VERIFIED` at
-`e38c75aa4ff26bdea80c82d8a24096f799dad860`. The accepted next transition is:
+`e38c75aa4ff26bdea80c82d8a24096f799dad860`. ADR-0004 and the M6 SQLite
+contract are accepted. `ACS-M6-P2-G1` is now `OWNER ACCEPTED / COMPLETE /
+REMOTE-VERIFIED` at `8227c6c616140824fd70de920dc6fcf459bb734d`.
+
+The current authorized transition is governance-only:
 
 ```text
-ACS-M6-P0-P1-R2-CLOSEOUT-G2 / M6-P2-G0
-→ ACS-M6-P2-G1
+ACS-M6-P2-G1-CLOSEOUT-G3
+→ M6-P3-G0 architecture and contract proposal
 ```
 
-No task after M6-P2-G1 may be silently entered.
+No M6-P3 implementation or later milestone may be silently entered.
 
 ---
 
-# 7. M6-P2 Entry Conditions
+# 7. M6-P3-G0 Entry Conditions
 
-M6-P0/P1 is `OWNER ACCEPTED / COMPLETE / REMOTE-VERIFIED`. ADR-0004 and the
-M6 durable SQLite contract are accepted. M6-P2-G1 is
-`IMPLEMENTED / CHECKPOINT CANDIDATE / OWNER REVIEW PENDING`.
-M6-P3+ remains `NOT AUTHORIZED / NOT STARTED`.
+M6-P0/P1 and M6-P2-G1 are `OWNER ACCEPTED / COMPLETE / REMOTE-VERIFIED`.
+The Project Lead authorizes only G3/P3-G0 governance and architecture work. ADR-0005
+and the M6 consumer contract are `PROPOSED / NO IMPLEMENTATION AUTHORITY`.
+M6-P3-G1+ remains `NOT AUTHORIZED / NOT STARTED`.
 
 M6 Character Intelligence must include at least background, motivation, belief,
 conflict, goal, personality, behavior rules, dialogue rules, forbidden behavior,
@@ -322,7 +330,7 @@ The completed P0/P1 gate order is:
 7. all M6 Preconditions are satisfied;
 8. the Project Lead separately authorizes M6-P1.
 
-All eight gates are satisfied for bounded M6-P0/P1. The M6-P2 gate order is:
+All eight gates are satisfied for bounded M6-P0/P1. The accepted M6-P2 gate order was:
 
 1. use only temporary file SQLite databases;
 2. preserve the accepted M6 domain and full Scope authority;
@@ -333,8 +341,24 @@ All eight gates are satisfied for bounded M6-P0/P1. The M6-P2 gate order is:
 7. commit, push, fetch and verify Local SHA equals Remote SHA;
 8. report a checkpoint candidate and stop.
 
-This document does not authorize M6-P3+, M7-M19, formal database deployment or
-Frontend implementation.
+All M6-P2 gates passed and the Project Lead accepted the remote technical baseline.
+
+M6-P3-G0 now defines only a Proposed internal, read-only, persistence-neutral M6
+Episode baseline consumer for M3 Script Studio. M4 owns trusted Project-to-Series
+context; M2 owns Series/Episode identity and membership. The accepted records have no
+shared stable key, so ADR-0005 proposes an immutable M5 EpisodePlanItemBinding inside a
+new exact SeriesPlanVersion. M6 keeps its existing facts; M7 remains owner of future
+consistency verdicts; M9 remains owner of future AssetRequirement and asset-resolution
+readiness.
+
+Number, title, array position and display name matching are forbidden. The future
+sequence is two independent checkpoints: first P3-B1 implements the proposed M5 v2
+binding, then P3-G1 implements the read-only M6/M3 consumer. P3-B1 must be separately
+authorized, tested, pushed, remote-verified and Owner Accepted before P3-G1 can be
+authorized. Neither implementation is authorized by this document.
+
+This document does not authorize M6-P3 implementation, M7-M19, formal database
+deployment, HTTP/API/Auth/RBAC or Frontend implementation.
 
 Legacy repository capability provenance remains `MEDIUM / OPEN / NON-BLOCKING` under
 Owner Gate `P3-RV1-003`. Old-repository implementation is not current Core production
@@ -356,9 +380,9 @@ capability.
 - RB13-F001: `R1 IMPLEMENTED / INDEPENDENTLY ACCEPTED / CLOSED`
 - ADR-0002 STATUS: `ACCEPTED FOR BOUNDED R2 IMPLEMENTATION`
 - RB13-F002: `REMEDIATED / CLOSED IN CURRENT TESTED CORE BASELINE`
-- EXECUTION MODE: `AUTO-SEQUENTIAL`
-- AUTHORIZED WAVE: `ACS-M6-P0-P1-R2-CLOSEOUT-G2 / M6-P2-G0 → ACS-M6-P2-G1`
-- CURRENT TASK: `ACS-M6-P2-G1 — M6 SERIES INTELLIGENCE DURABLE SQLITE SLICE`
+- EXECUTION MODE: `MANUAL`
+- AUTHORIZED WORK PACKAGE: `ACS-M6-P2-G1-CLOSEOUT-G3 / M6-P3-G0`
+- CURRENT TASK: `GOVERNANCE AND M6 CONSUMER CONTRACT PROPOSAL`
 - ACS-M6-P0-P1-R2: `OWNER ACCEPTED / COMPLETE / REMOTE-VERIFIED AT e38c75aa4ff26bdea80c82d8a24096f799dad860`
 - R2-P1 STATUS: `ACCEPTED`
 - R2-P2 STATUS: `OWNER ACCEPTED / COMPLETE / REMOTE-VERIFIED AT 0aa14b4e426a3d968ec314029d60a47ea30cbc4d`
@@ -367,61 +391,71 @@ capability.
 - RB1.3 CLOSEOUT: `FORMALLY CLOSED`
 - ARCHITECTURE REVIEW: `SATISFIED FOR BOUNDED M6-P0/P1 AND M6-P2 LOCAL SQLITE ONLY`
 - M6 PRECONDITIONS: `SATISFIED FOR BOUNDED M6-P0/P1 AND M6-P2 LOCAL SQLITE ONLY`
-- M6: `P0-P1 OWNER ACCEPTED / P2-G0 CONTRACT ACCEPTED / P2-G1 CHECKPOINT CANDIDATE / P3+ NOT AUTHORIZED`
+- M6: `P0-P2 OWNER ACCEPTED / P3-G0 GOVERNANCE-ONLY CANDIDATE / P3-B1 AND P3-G1+ NOT AUTHORIZED`
 - M6-P0 STATUS: `CONTRACT ACCEPTED / COMPLETE`
 - M6-P1 STATUS: `OWNER ACCEPTED / COMPLETE / REMOTE-VERIFIED AT e38c75aa4ff26bdea80c82d8a24096f799dad860`
 - ADR-0004 STATUS: `ACCEPTED FOR BOUNDED M6-P2 IMPLEMENTATION`
 - M6-P2-G0 STATUS: `CONTRACT ACCEPTED / COMPLETE`
-- M6-P2-G1 STATUS: `IMPLEMENTED / CHECKPOINT CANDIDATE / OWNER REVIEW PENDING`
-- M6-P3+ STATUS: `NOT AUTHORIZED / NOT STARTED`
+- M6-P2-G1 STATUS: `OWNER ACCEPTED / COMPLETE / REMOTE-VERIFIED AT 8227c6c616140824fd70de920dc6fcf459bb734d`
+- M6-P2-G1-CLOSEOUT-G3 STATUS: `OWNER ACCEPTANCE RECORDED / GOVERNANCE CHECKPOINT CANDIDATE`
+- M6-P3-G0 STATUS: `ARCHITECTURE PROPOSAL DEFINED / BINDING PREREQUISITE OPEN / GOVERNANCE-ONLY CHECKPOINT CANDIDATE / OWNER REVIEW PENDING`
+- ADR-0005 STATUS: `PROPOSED / NO IMPLEMENTATION AUTHORITY`
+- M6 CONSUMER CONTRACT: `PROPOSED / NO IMPLEMENTATION AUTHORITY`
+- M6-P3-B1 EPISODE-PLAN-ITEM BINDING: `PROPOSED / NOT AUTHORIZED / NOT STARTED / BLOCKS M6-P3-G1`
+- M6-P3-G1+ STATUS: `NOT AUTHORIZED / NOT STARTED`
 - M7-M19: `NOT STARTED / NOT AUTHORIZED`
 - FORMAL 8765 DEPLOYMENT: `UNTOUCHED / NOT DEPLOYED`
 - FRONTEND: `FROZEN / UNTOUCHED`
 - PRODUCTION READY: `NO`
-- PRODUCTION CODE CHANGED BY G1: `YES — BOUNDED LOCAL-DEVELOPMENT M6 SQLITE SLICE`
-- TEST CODE CHANGED BY G1: `YES — M6 SQLITE CONTRACT, MIGRATION AND INTEGRATION COVERAGE`
+- PRODUCTION CODE CHANGED BY THIS G0: `NO`
+- TEST CODE CHANGED BY THIS G0: `NO`
 - M6-P2 STRICT TESTS: `52/52 PASS`
 - FULL CORE REGRESSION: `385/385 PASS — UNIT 210 / CONTRACT 78 / INTEGRATION 97`
 - PYTHON AST: `58/58 PASS`
 
-The Project Lead, Architecture Owner and Repository Governance Owner accept bounded
-M6-P0/P1 and authorize only the ADR-0004 local-development M6-P2 SQLite slice. This is
-not Production Ready and does not authorize formal database deployment, Frontend work,
-M6-P3+ or M7-M19.
+The Project Lead accepts bounded M6-P2-G1 at `8227c6c616140824fd70de920dc6fcf459bb734d`
+and authorizes only this G3/P3-G0 governance and architecture proposal. This is not
+Production Ready and does not accept ADR-0005, authorize formal database deployment,
+Frontend work, M6-P3-B1, M6-P3-G1+ or M7-M19.
 
 ---
 
 # 9. Stop Rule
 
-After the ACS-M6-P2-G1 checkpoint is pushed and remote-verified:
+After the ACS-M6-P2-G1-CLOSEOUT-G3 / M6-P3-G0 governance checkpoint is pushed and
+remote-verified:
 
 STOP.
 
-Report the M6-P2 checkpoint candidate and wait for Project Lead owner review.
+Report the governance/architecture checkpoint candidate and wait for Project Lead
+review of ADR-0005, the consumer contract and the proposed two-checkpoint B1→G1
+sequence.
 
-Do not automatically enter M6-P3, M7-M19, formal database deployment or Frontend work.
+Do not automatically enter M6-P3-B1, M6-P3-G1, M7-M19, formal database deployment,
+HTTP/Auth or Frontend work.
 
 ---
 
 # 10. Current Authorized Task
 
-`ACS-M6-P2-G1 — M6 SERIES INTELLIGENCE DURABLE SQLITE SLICE`
+`ACS-M6-P2-G1-CLOSEOUT-G3 / M6-P3-G0 — GOVERNANCE AND CONSUMER CONTRACT`
 
 Status:
 
-`IMPLEMENTED / CHECKPOINT CANDIDATE / OWNER REVIEW PENDING`
+`GOVERNANCE / ARCHITECTURE CHECKPOINT CANDIDATE / OWNER REVIEW PENDING`
 
-M6-P0/P1 is Owner Accepted at the remote-verified technical baseline. Under ADR-0004
-and the M6 durable SQLite contract, M6-P2-G1 has implemented local-development SQLite
-persistence, migration, full-Scope integrity, durable operations and durable Outbox.
+M6-P0/P1 and bounded M6-P2-G1 are Owner Accepted at their remote-verified technical
+baselines. This work package records the P2 acceptance and proposes, but does not
+accept, an internal M6 Episode baseline consumer architecture.
 
-The standing Project Lead instruction permits implementation, tests, commits, pushes
-and remote verification without repeated conversational approval inside this exact
-wave. It does not waive Source-of-Truth, destructive migration, security, rights,
-credential, data-loss or Stop Condition gates.
+The Project Lead authorization permits governance/architecture documents, validation,
+one commit, push and remote verification for this exact task. It does not authorize
+production/test implementation and does not waive Source-of-Truth, architecture,
+security, rights, credential, data-loss or Stop Condition gates.
 
 Formal port-8765 database access/deployment, HTTP/Public API, Auth/RBAC, Frontend,
-M3/M4/M7/M9 consumers, M6-P3+, M7-M19, V4/V3, Provider, GPU, Worker and ComfyUI remain
-unauthorized and not started.
+M3/M4/M7/M9 implementation, P3-B1 binding implementation, consumer
+persistence/dispatch, M6-P3-G1+, M7-M19, V4/V3,
+Provider, GPU, Worker and ComfyUI remain unauthorized and not started.
 
 # End of CURRENT_MILESTONE.md
