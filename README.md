@@ -6,9 +6,9 @@ OS、V4 Platform、V3 Render Core、持久化与后端测试；客户 Commercial
 由独立 `AI-Cinematic-Studio-Frontend` 仓库承载。
 
 > 当前状态：M1–M5 已接受；M6-P0/P1 与 bounded M6-P2 已 Owner Accepted；
-> G0 已远端验证，G1 `0c283eb…` 因动态导入别名守卫缺口处于
-> `REVISION REQUIRED`；当前只执行 test-only G1-R1 修复；M6-P3-G0 candidate
-> 保持 HOLD；Production Ready = `NO`。
+> G1-R1 `d44f471…` 已 Owner Accepted 并关闭 Architecture Remediation R1；
+> M6-P3-G0 candidate 正在进行只读 Owner Review，所有 P3 实现继续 HOLD；
+> Production Ready = `NO`。
 
 ## 当前活动工作包
 
@@ -18,15 +18,15 @@ OS、V4 Platform、V3 Render Core、持久化与后端测试；客户 Commercial
 | M6-P0/P1 | `OWNER ACCEPTED / COMPLETE / REMOTE-VERIFIED` |
 | ADR-0004 / M6-P2-G0 | `ACCEPTED / COMPLETE` |
 | M6-P2-G1 | `OWNER ACCEPTED / COMPLETE / REMOTE-VERIFIED AT 8227c6c616140824fd70de920dc6fcf459bb734d` |
-| Architecture remediation wave | `G1-R1 AUTHORIZATION → TEST-ONLY CORRECTION / AUTO-SEQUENTIAL BOUNDED` |
+| Architecture remediation wave | `CLOSED AT OWNER-ACCEPTED G1-R1 d44f471c644e319bb4a5bf73707c3274ecbaa426` |
 | ADR-0006 / V5 Text Generation Contract | `ACCEPTED FOR BOUNDED G1` |
 | G0 | `COMPLETE / REMOTE-VERIFIED AT 92d1f3ac9e08c71458af04514baa659555fc55a7` |
-| G1 | `REMOTE-VERIFIED CANDIDATE AT 0c283eb653e74784301620bdaf64bf451bb687dd / REVISION REQUIRED / NOT OWNER ACCEPTED` |
-| G1-R1 | `ALIAS-AWARE ARCHITECTURE GUARD CORRECTION AUTHORIZED / TEST-ONLY` |
-| R-CORE-ARCH-001 | `CONFIRMED / HIGH / MITIGATING` |
+| G1 | `REMOTE-VERIFIED CANDIDATE AT 0c283eb653e74784301620bdaf64bf451bb687dd / REVISION REQUIRED / NOT OWNER ACCEPTED / SUPERSEDED BY G1-R1` |
+| G1-R1 | `OWNER ACCEPTED / COMPLETE / REMOTE-VERIFIED AT d44f471c644e319bb4a5bf73707c3274ecbaa426` |
+| R-CORE-ARCH-001 | `CONFIRMED / HIGH / MONITORING` |
 | R-CORE-GOV-002 | `OPEN / NON-BLOCKING` |
-| M6-P3-G0 | `REMOTE-VERIFIED CANDIDATE AT c524486c05c21b270a7dd75e89fae4312430736a / OWNER REVIEW PENDING / HOLD` |
-| ADR-0005 / M6 Consumer Contract | `PROPOSED / NO IMPLEMENTATION AUTHORITY` |
+| M6-P3-G0 | `REMOTE-VERIFIED CANDIDATE AT c524486c05c21b270a7dd75e89fae4312430736a / OWNER REVIEW IN PROGRESS / IMPLEMENTATION HOLD` |
+| ADR-0005 / M6 Consumer Contract | `PROPOSED / UNDER OWNER REVIEW / NO IMPLEMENTATION AUTHORITY` |
 | M6-P3-B1 EpisodePlanItemBinding | `PROPOSED / NOT AUTHORIZED / NOT STARTED / BLOCKS M6-P3-G1` |
 | M6-P3-G1+ | `NOT AUTHORIZED / NOT STARTED` |
 | M7-M19 | `NOT STARTED / NOT AUTHORIZED` |
@@ -45,13 +45,14 @@ Creator Application
 
 G0 已完成 ADR-0006、规范合同、风险及 Source-of-Truth 同步。G1 已迁移 AI
 Director、Script Studio、Series Director 与 Creator Server composition 的四个直接
-V4 接触面，且当前生产树 `apps → V4` 为零。独立复核发现其持续守卫没有解析
-`import_module` / `__import__` 的导入别名，因此旧 G1 candidate 不可 Owner Accept。
-当前 G1-R1 只允许修订一个 Contract Test 文件，补齐 binding-aware AST 守卫；完成
-远端验证后再次 STOP 等待 Project Lead review。
+V4 接触面，且当前生产树 `apps → V4` 为零。原 G1 的持续守卫存在动态导入别名
+缺口，因此保留历史 `REVISION REQUIRED`。G1-R1 已补齐 binding-aware AST 守卫、
+通过完整回归并在 `d44f471c644e319bb4a5bf73707c3274ecbaa426` 获得 Owner
+Acceptance。
 
-G3/P3-G0 在 `c524486c05c21b270a7dd75e89fae4312430736a` 的内容保持
-remote-verified candidate / HOLD；ADR-0005 仍为 Proposed，M6-P3-B1/G1 均不授权。
+G3/P3-G0 在 `c524486c05c21b270a7dd75e89fae4312430736a` 的内容正进行只读
+Owner Review，并保持 implementation HOLD；ADR-0005 仍为 Proposed，M6-P3-B1/G1
+均不授权。
 Schema/Migration、正式数据库、Public HTTP/API 扩张、Auth/RBAC、Frontend、M6-P3、
 M7+、V3、GPU、Worker 和 ComfyUI 不在当前授权范围内。
 
@@ -180,6 +181,7 @@ PYTHONDONTWRITEBYTECODE=1 python -m unittest discover -s tests -p 'test_*.py' -q
 - [ADR-0006 — V5 Text Generation Capability Boundary](governance/ADR-0006-v5-text-generation-capability-boundary.md)
 - [ACS-ARCH-R1 G0 Record](governance/ACS-ARCH-R1-V5-TEXT-GENERATION-G0.md)
 - [ACS-ARCH-R1 G1-R1 Authorization](governance/ACS-ARCH-R1-V5-TEXT-GENERATION-G1-R1-AUTHORIZATION.md)
+- [ACS-ARCH-R1 G1-R1 Closeout / M6-P3-G0 Owner Review](governance/ACS-ARCH-R1-V5-TEXT-GENERATION-G1-R1-CLOSEOUT-M6-P3-G0-OWNER-REVIEW.md)
 - [M6 Domain Contract](architecture/M6_SERIES_INTELLIGENCE_DOMAIN_CONTRACT.md)
 - [M6 Durable SQLite Contract](architecture/M6_SERIES_INTELLIGENCE_SQLITE_CONTRACT.md)
 - [M6 Consumer Contract — Proposed](architecture/M6_SERIES_INTELLIGENCE_CONSUMER_CONTRACT.md)
