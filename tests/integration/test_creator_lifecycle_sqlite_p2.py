@@ -819,6 +819,40 @@ class SqliteAssemblyTests(unittest.TestCase):
         with self.assertRaises(LifecycleMigrationError):
             LifecycleAssembly.sqlite(self.path, ref_factory=Refs(), clock=lambda: NOW)
 
+    def test_same_project_other_series_plan_history_is_isolated(self):
+        series = seed_series(self.first)
+        episode = seed_episode(self.first, series)
+        project = self.first.project_context.create_project(project_command(series))
+        other_series = seed_series(self.first)
+        connection = open_fk(self.path)
+        try:
+            connection.execute(
+                "INSERT INTO v5_project_series_relationships VALUES (?, ?, ?, ?, ?, ?)",
+                (
+                    "workspace-a",
+                    project["projectRef"],
+                    other_series["seriesRef"],
+                    "v5.project-series-relationship.v1",
+                    NOW,
+                    1,
+                ),
+            )
+        finally:
+            connection.close()
+        self.first.series_planning.confirm_candidate({
+            "workspaceRef": "workspace-a",
+            "projectRef": project["projectRef"],
+            "seriesRef": other_series["seriesRef"],
+            "humanConfirmed": True,
+            "candidate": valid_candidate(project["plannedEpisodeCount"]),
+        })
+
+        deleted = self.first.series_episode.delete_episode(
+            "workspace-a", series["seriesRef"], episode["episodeRef"]
+        )
+        self.assertEqual(deleted["deletedEpisodeCount"], 1)
+        self.assert_integrity()
+
     def test_malformed_historical_version_ref_blocks_sqlite_episode_delete(self):
         series = seed_series(self.first)
         bound_episode = seed_episode(self.first, series)

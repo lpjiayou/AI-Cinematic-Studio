@@ -1,6 +1,6 @@
 # M6 Series Intelligence Consumer and Reconciliation Contract
 
-> Status: `ACCEPTED NORMATIVE ARCHITECTURE / B1 CANDIDATE REVISION REQUIRED / B1-R1 BOUNDED CORRECTION AUTHORIZED / G1 UNAUTHORIZED`
+> Status: `ACCEPTED NORMATIVE ARCHITECTURE / B1 CANDIDATE REVISION REQUIRED / B1-R1 GOVERNANCE REMOTE-VERIFIED AT 716b4d298173f8123cafd93114dfc67339943ff3 / TECHNICAL CORRECTION CANDIDATE / G1 UNAUTHORIZED`
 >
 > Authority: `ADR-0005 — ACCEPTED AS ARCHITECTURE DECISION`
 >
@@ -659,11 +659,13 @@ All versions for an exact/suspicious selected plan must be scanned even if their
 Series projection is malformed. No DDL, Migration, JSON1, schema, InMemory production,
 binding/version, digest, HTTP, DTO, consumer or ownership change is authorized.
 
-The same eight governance paths may first record this authorization with production
-and test diff zero, and may later record the remote governance SHA and factual
-technical evidence. After governance remote verification, implement the one-production
-and one-test correction, pass the updated SQLite module, all original B1 tests, full
-Core and static gates, commit, non-force push, verify Local SHA equals Remote SHA, then:
+The same eight governance paths recorded this authorization with production and test
+diff zero and were remote-verified at
+`716b4d298173f8123cafd93114dfc67339943ff3`. The one-production/one-test correction
+then reproduced the pre-fix false `409` and passes the updated SQLite module `30/30`,
+all original B1 tests `174/174`, full Core `449/449` and non-test Python AST `63/63`.
+After the technical commit, non-force remote publication and Local/Remote equality
+verification, stop at:
 
 ```text
 STOP — M6-P3-B1-R1 REMOTE-VERIFIED CORRECTION CANDIDATE

@@ -618,12 +618,18 @@ class SqliteSeriesPlanningAdapter:
             with self._session() as connection:
                 plan_rows = connection.execute(
                     "SELECT DISTINCT p.* FROM v5_series_plans p "
-                    "LEFT JOIN v5_project_series_relationships r "
-                    "ON p.workspace_ref = r.workspace_ref "
-                    "AND p.project_ref = r.project_ref "
+                    "LEFT JOIN v5_project_series_relationships target_relationship "
+                    "ON p.workspace_ref = target_relationship.workspace_ref "
+                    "AND p.project_ref = target_relationship.project_ref "
+                    "AND target_relationship.series_ref = ? "
+                    "LEFT JOIN v5_project_series_relationships own_relationship "
+                    "ON p.workspace_ref = own_relationship.workspace_ref "
+                    "AND p.project_ref = own_relationship.project_ref "
+                    "AND p.series_ref = own_relationship.series_ref "
                     "WHERE p.workspace_ref = ? "
-                    "AND (p.series_ref = ? OR r.series_ref = ?)",
-                    (workspace_ref, series_ref, series_ref),
+                    "AND (p.series_ref = ? OR (target_relationship.series_ref IS NOT NULL "
+                    "AND own_relationship.series_ref IS NULL))",
+                    (series_ref, workspace_ref, series_ref),
                 ).fetchall()
                 rows = connection.execute(
                     "SELECT v.*, p.schema_version AS parent_schema_version, "
@@ -636,10 +642,26 @@ class SqliteSeriesPlanningAdapter:
                     "FROM v5_series_plan_versions v LEFT JOIN v5_series_plans p "
                     "ON v.workspace_ref = p.workspace_ref "
                     "AND v.series_plan_ref = p.series_plan_ref "
-                    "WHERE (p.workspace_ref = ? AND p.series_ref = ?) "
-                    "OR (v.workspace_ref = ? AND v.series_ref = ?) "
+                    "LEFT JOIN v5_project_series_relationships target_relationship "
+                    "ON p.workspace_ref = target_relationship.workspace_ref "
+                    "AND p.project_ref = target_relationship.project_ref "
+                    "AND target_relationship.series_ref = ? "
+                    "LEFT JOIN v5_project_series_relationships own_relationship "
+                    "ON p.workspace_ref = own_relationship.workspace_ref "
+                    "AND p.project_ref = own_relationship.project_ref "
+                    "AND p.series_ref = own_relationship.series_ref "
+                    "WHERE (v.workspace_ref = ? AND v.series_ref = ?) "
+                    "OR (p.workspace_ref = ? AND (p.series_ref = ? "
+                    "OR (target_relationship.series_ref IS NOT NULL "
+                    "AND own_relationship.series_ref IS NULL))) "
                     "ORDER BY v.series_plan_ref, v.version_number",
-                    (workspace_ref, series_ref, workspace_ref, series_ref),
+                    (
+                        series_ref,
+                        workspace_ref,
+                        series_ref,
+                        workspace_ref,
+                        series_ref,
+                    ),
                 ).fetchall()
         except sqlite3.DatabaseError:
             return True

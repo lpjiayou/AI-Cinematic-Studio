@@ -14,7 +14,7 @@
 > UI-R1 Accepted SHA:
 > `c9536fc0c745d0bf9e9c3eb543f4ab6c0566798a`
 >
-> Revision: M6-P3-B1-R1 bounded Core SQLite isolation authorization synchronization; product IA and visual baseline unchanged.
+> Revision: M6-P3-B1-R1 bounded Core SQLite isolation technical-candidate synchronization; product IA and visual baseline unchanged.
 >
 > Scope:
 > AI Cinematic Studio Creator / Project Workspace / Production Editors /
@@ -131,9 +131,10 @@ Project Lead 与 Architecture Owner 接受为规范架构，但未授予任何�
 NOT OWNER ACCEPTED`；修正后的 G1-R1 已在
 `d44f471c644e319bb4a5bf73707c3274ecbaa426` 获得 Owner Acceptance。B1 候选
 `8449b521c96bb8340806ecda8649698f4771914a` 已远端验证但 Owner Review 判定
-`REVISION REQUIRED`。当前只授权 B1-R1 Core-only 有界修订：8 路径治理检查点远端
-验证后，只修改一个生产与一个测试路径，再远端验证并停止等待 B1-R1 Owner
-Review。Frontend 仍冻结。
+`REVISION REQUIRED`。B1-R1 Core-only 有界修订的 8 路径治理检查点已在
+`716b4d298173f8123cafd93114dfc67339943ff3` 远端验证；一个生产与一个测试路径的
+技术候选已通过 SQLite `30/30`、原 B1 `174/174`、完整 Core `449/449` 与 AST
+`63/63`，技术远端验证后停止等待 B1-R1 Owner Review。Frontend 仍冻结。
 
 ---
 
@@ -168,8 +169,10 @@ Review。Frontend 仍冻结。
   THROUGH episodePlanItemBindings / NO OTHER HTTP CONTRACT EXPANSION`；
 - M6-P3-B1-F001：`CONFIRMED / BLOCKING / SQLITE SAME-PROJECT CROSS-SERIES FALSE
   DEPENDENCY`；
-- M6-P3-B1-R1：`AUTHORIZED / GOVERNANCE CHECKPOINT CANDIDATE / 8 GOVERNANCE →
-  1 PRODUCTION + 1 TEST → REMOTE VERIFY → STOP FOR OWNER REVIEW`；
+- M6-P3-B1-R1：`GOVERNANCE REMOTE-VERIFIED AT
+  716b4d298173f8123cafd93114dfc67339943ff3 / TECHNICAL CORRECTION CANDIDATE /
+  SQLITE 30/30 / ORIGINAL B1 174/174 / FULL CORE 449/449 / AST 63/63 / REMOTE VERIFY
+  → STOP FOR OWNER REVIEW`；
 - M6-P3-B1-R1 UI boundary：`CORE SQLITE READ + CORE INTEGRATION TEST ONLY / NO ROUTE,
   HANDLER, DTO OR FRONTEND CHANGE`；
 - ADR-0006 / V5 Text Generation Capability：`ACCEPTED FOR BOUNDED G1`；

@@ -405,10 +405,14 @@ Current governance state:
   NOT OWNER ACCEPTED`;
 - M6-P3-B1-F001: `CONFIRMED / BLOCKING — SQLITE SAME-PROJECT CROSS-SERIES
   FALSE dependent_series_plan_binding_exists`;
-- M6-P3-B1-R1: `AUTHORIZED / GOVERNANCE CHECKPOINT CANDIDATE / ONE PRODUCTION
-  + ONE TEST PATH / TECHNICAL FIX NOT STARTED`;
+- M6-P3-B1-R1: `GOVERNANCE REMOTE-VERIFIED AT
+  716b4d298173f8123cafd93114dfc67339943ff3 / ONE PRODUCTION + ONE TEST
+  TECHNICAL CORRECTION CANDIDATE / GATES PASS`;
 - M6-P3-B1-R1 authorized base:
   `8449b521c96bb8340806ecda8649698f4771914a`;
+- M6-P3-B1-R1 evidence: `PRE-FIX SQLITE REGRESSION REPRODUCED 409 / POST-FIX
+  SQLITE MODULE 30/30 / ORIGINAL B1 SUITE 174/174 / FULL CORE 449/449 /
+  NON-TEST PYTHON AST 63/63`;
 - M6-P3-G1: `SEQUENCE DEFINED / BLOCKED UNTIL B1 OWNER ACCEPTED / NOT
   AUTHORIZED / NOT STARTED`;
 - M6-P3 after G1 / M6-P4+: `NOT AUTHORIZED / NOT STARTED`;
@@ -441,10 +445,11 @@ checkpoint at `d44f471c644e319bb4a5bf73707c3274ecbaa426`, closing Architecture
 Remediation R1. The original G1 remains historical `REVISION REQUIRED / NOT OWNER
 ACCEPTED` and is superseded by G1-R1. B1 is remote-verified at
 `8449b521c96bb8340806ecda8649698f4771914a` but failed Owner Review because its SQLite
-dependency scan crosses legitimate Series histories inside one Project. The only
-active work is the auto-sequential B1-R1 correction under `CURRENT_MILESTONE.md`:
-exact eight-path governance checkpoint, remote verification, one production/one test
-correction, remote verification, then STOP for Project Lead B1-R1 Owner Review.
+dependency scan crosses legitimate Series histories inside one Project. The B1-R1
+governance checkpoint is remote-verified at
+`716b4d298173f8123cafd93114dfc67339943ff3`; its exact one-production/one-test
+correction passes the frozen gates and is the current technical candidate. After
+technical remote verification, STOP for Project Lead B1-R1 Owner Review.
 
 The M6 gate order is:
 

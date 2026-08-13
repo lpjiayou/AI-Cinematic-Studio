@@ -3,7 +3,8 @@
 > Current amendment: the remote B1 candidate at
 > `8449b521c96bb8340806ecda8649698f4771914a` is `REVISION REQUIRED / NOT OWNER
 > ACCEPTED`. The Project Lead authorized the bounded B1-R1 correction recorded in
-> sections 10–15 on `2026-08-13`.
+> sections 10–15 on `2026-08-13`; its governance checkpoint is remote-verified at
+> `716b4d298173f8123cafd93114dfc67339943ff3` and its technical gates pass.
 
 ## 1. Record
 
@@ -315,7 +316,7 @@ M6-P3-G1: NOT AUTHORIZED / NOT STARTED
 | --- | --- |
 | Task | `ACS-M6-P3-B1-R1-SQLITE-SERIES-ISOLATION` |
 | Date | `2026-08-13` |
-| Decision | `AUTHORIZED / GOVERNANCE CHECKPOINT CANDIDATE / TECHNICAL FIX NOT STARTED` |
+| Decision | `GOVERNANCE REMOTE-VERIFIED AT 716b4d298173f8123cafd93114dfc67339943ff3 / TECHNICAL CORRECTION CANDIDATE / GATES PASS` |
 | Authorized base | `8449b521c96bb8340806ecda8649698f4771914a` |
 | Execution mode | `AUTO-SEQUENTIAL / BOUNDED / FAIL-CLOSED` |
 | Governance scope | `SAME EIGHT GOVERNANCE PATHS / PRODUCTION AND TEST DIFF ZERO` |
@@ -389,6 +390,16 @@ the governance SHA and factual test/candidate status. No other path is allowed.
 8. create one governance commit and one technical commit, non-force push each, fetch,
    and verify Local SHA equals Remote SHA with ahead/behind `0/0` and clean worktree;
 9. stop for Project Lead B1-R1 Owner Review.
+
+Candidate evidence before the technical commit:
+
+- pre-fix regression: reproduced false `dependent_series_plan_binding_exists / 409`;
+- post-fix SQLite lifecycle module: `30/30 PASS`;
+- original B1 nine-module suite: `174/174 PASS`;
+- full Core regression: `449/449 PASS`;
+- non-test Python AST: `63/63 PASS`;
+- exact cumulative scope: `8 governance + 1 production + 1 test`, unexpected paths
+  `0`, DDL/Migration changes `0`.
 
 ## 15. B1-R1 exclusions and final stop
 
