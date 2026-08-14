@@ -1,6 +1,6 @@
 # M6 Series Intelligence Consumer and Reconciliation Contract
 
-> Status: `ACCEPTED NORMATIVE ARCHITECTURE / B1 OWNER ACCEPTED THROUGH B1-R1 AT 5c656992d9fade3683b70e3c57f8b8ba7d26c7f7 / G1 LOCAL TECHNICAL CANDIDATE / 14/14 + FULL CORE 463/463 / REMOTE VERIFICATION PENDING / NOT OWNER ACCEPTED`
+> Status: `ACCEPTED NORMATIVE ARCHITECTURE / B1 OWNER ACCEPTED THROUGH B1-R1 / G1 OWNER ACCEPTED THROUGH G1-R1 AT e172cc7c9bfca04066153d9edad70d9074bb37e5 / FULL CORE 464/464`
 >
 > Authority: `ADR-0005 — ACCEPTED AS ARCHITECTURE DECISION`
 >
@@ -678,12 +678,24 @@ REMOTE-VERIFIED AT 5c656992d9fade3683b70e3c57f8b8ba7d26c7f7
 M6-P3-G1 BOUNDED IMPLEMENTATION AUTHORIZED / GOVERNANCE REMOTE VERIFY REQUIRED
 ```
 
-## 17. G1 local technical candidate
+## 17. G1 and G1-R1 accepted result
 
 After governance remote verification, the bounded G1 implementation changes exactly
 the seven production paths and adds exactly the three test paths in the accepted G1
 record. Focused G1 passes `14/14` (`5` unit, `4` contract, `5` integration); full Core
 passes `463/463` (`252` unit, `88` contract, `123` integration). Markdown `88/88`,
 local documentation links `323/323`, non-test Python AST `63/63`, architecture,
-secret, `__init__`, HTTP/Migration/DDL and diff gates pass. Technical remote
-publication and equality verification remain pending; this is not Owner Acceptance.
+secret, `__init__`, HTTP/Migration/DDL and diff gates pass. The original remote G1
+checkpoint `3696d6af12222d30eb99b65d67e6db18897eb42f` is `REVISION REQUIRED / NOT
+OWNER ACCEPTED / SUPERSEDED` because its unknown-exception fallback distorted error
+semantics.
+
+G1-R1 changes only `services/v5_core_os/script_studio/public.py` and adds only
+`tests/unit/test_m6_p3_g1_r1_error_semantics.py`. It preserves the five accepted
+business mappings and maps unknown failures to neutral
+`m6_consumer_internal_error / 500` with `from None`. The accepted result is
+remote-verified at `e172cc7c9bfca04066153d9edad70d9074bb37e5`, has tree
+`be7447c3d60510262e428b86cd1a6a83972f64c0` and passes full Core `464/464`.
+Protected `main` was converged through PR `#2` with `Rebase and merge`; resulting main
+`5976263f92f7f9cbe9c091719eccb036ee8c0c2d` has the exact accepted tree and its
+post-merge Repository Validation passes.

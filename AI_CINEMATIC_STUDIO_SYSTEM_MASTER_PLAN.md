@@ -2,13 +2,13 @@
 
 > Document: `AI_CINEMATIC_STUDIO_SYSTEM_MASTER_PLAN.md`
 >
-> Status: `SYSTEM MASTER GOVERNANCE BASELINE / M6-P3-B1 OWNER ACCEPTED THROUGH B1-R1 / G1 LOCAL TECHNICAL CANDIDATE / REMOTE VERIFICATION PENDING`
+> Status: `SYSTEM MASTER GOVERNANCE BASELINE / M6-P3-G1 OWNER ACCEPTED THROUGH G1-R1 / CORE MAIN CONVERGED / POST-G1 GOVERNANCE CLOSEOUT`
 >
 > Version: `v1.2`
 >
 > Date: `2026-08-13`
 >
-> Revision: `ACS-M6-P3-G1 EPISODE BASELINE CONSUMER LOCAL CANDIDATE`
+> Revision: `ACS-GOV-POST-M6-P3-G1-CLOSEOUT`
 >
 > Architecture Decisions: `ADR-0001 / Accepted`; `ADR-0005 — M6 Consumer Boundary / Accepted as architecture only`; `ADR-0006 — V5 Text Generation Capability Boundary / Accepted for bounded G1`
 >
@@ -2315,7 +2315,7 @@ Status:
 
 Status:
 
-`P0-P1 OWNER ACCEPTED / COMPLETE / REMOTE-VERIFIED AT e38c75aa4ff26bdea80c82d8a24096f799dad860 / P2-G0 CONTRACT ACCEPTED / P2-G1 OWNER ACCEPTED / COMPLETE / REMOTE-VERIFIED AT 8227c6c616140824fd70de920dc6fcf459bb734d / P3-G0 OWNER ACCEPTED AS GOVERNANCE-ARCHITECTURE / ADR-0005 + M6 CONSUMER CONTRACT ACCEPTED / P3-B1 OWNER ACCEPTED THROUGH B1-R1 AT 5c656992d9fade3683b70e3c57f8b8ba7d26c7f7 / P3-G1 LOCAL TECHNICAL CANDIDATE / G1 14/14 / FULL CORE 463/463 / REMOTE VERIFICATION PENDING / NOT OWNER ACCEPTED / LATER M6 WORK NOT AUTHORIZED`
+`P0-P1 OWNER ACCEPTED / COMPLETE / REMOTE-VERIFIED AT e38c75aa4ff26bdea80c82d8a24096f799dad860 / P2-G0 CONTRACT ACCEPTED / P2-G1 OWNER ACCEPTED / COMPLETE / REMOTE-VERIFIED AT 8227c6c616140824fd70de920dc6fcf459bb734d / P3-G0 OWNER ACCEPTED AS GOVERNANCE-ARCHITECTURE / ADR-0005 + M6 CONSUMER CONTRACT ACCEPTED / P3-B1 OWNER ACCEPTED THROUGH B1-R1 AT 5c656992d9fade3683b70e3c57f8b8ba7d26c7f7 / P3-G1 ORIGINAL 3696d6af REVISION REQUIRED / G1-R1 OWNER ACCEPTED AT e172cc7c9bfca04066153d9edad70d9074bb37e5 / TREE be7447c3 / FULL CORE 464/464 / CORE MAIN 5976263f SAME TREE / LATER M6 WORK NOT AUTHORIZED`
 
 目标范围：
 
@@ -2364,9 +2364,16 @@ Status:
 - M6-P3-G1 的 B1 前置条件已满足；Project Lead 于 `2026-08-14` 单独授权精确
   Core-only 只读实现。必须先远端验证 8 路径治理检查点，再限于 7 个生产路径
   与 3 个新增测试路径，技术候选远端验证后停止等待 Owner Review；
-- 治理检查点已远端验证；精确技术候选通过 G1 `14/14`、完整 Core `463/463`、
-  AST `63/63`、Markdown `88/88`、links `323/323` 与全部范围/安全门禁；技术
-  remote verification 尚待执行；
+- 治理检查点已远端验证；原技术候选通过 G1 `14/14`、完整 Core `463/463`、
+  AST `63/63`、Markdown `88/88`、links `323/323` 与全部范围/安全门禁，但
+  `3696d6af12222d30eb99b65d67e6db18897eb42f` 因未知异常语义失真保持
+  `REVISION REQUIRED / NOT OWNER ACCEPTED / SUPERSEDED`；
+- G1-R1 `e172cc7c9bfca04066153d9edad70d9074bb37e5` 仅将未知异常映射改为中性
+  `m6_consumer_internal_error / 500` 并新增一个测试文件，五个 ADR-0005 业务码
+  不变，完整 Core `464/464`，Owner Accepted；
+- 受保护 `main` 通过 PR `#2` 使用 `Rebase and merge` 收敛为
+  `5976263f92f7f9cbe9c091719eccb036ee8c0c2d`，tree 与 G1-R1 完全一致，
+  post-merge Repository Validation 通过；
 - G1 之后与 M6-P4+ 均为 `NOT AUTHORIZED / NOT STARTED`。
 
 ---
@@ -3160,7 +3167,9 @@ P3-B1-R1 GOVERNANCE REMOTE-VERIFIED AT 716b4d298173f8123cafd93114dfc67339943ff3
 P3-B1-R1 SCOPE 8 GOVERNANCE → 1 PRODUCTION + 1 TEST → REMOTE VERIFY → STOP FOR OWNER REVIEW
 P3-B1-R1 EVIDENCE PRE-FIX 409 REPRODUCED / SQLITE 30/30 / ORIGINAL B1 174/174 / FULL CORE 449/449 / AST 63/63
 P3-B1-R1 OWNER ACCEPTED / COMPLETE / REMOTE-VERIFIED AT 5c656992d9fade3683b70e3c57f8b8ba7d26c7f7
-P3-G1 BOUNDED CORE-ONLY IMPLEMENTATION AUTHORIZED / GOVERNANCE REMOTE VERIFY REQUIRED BEFORE CODE / NOT OWNER ACCEPTED
+P3-G1 ORIGINAL 3696d6af12222d30eb99b65d67e6db18897eb42f REVISION REQUIRED / SUPERSEDED
+P3-G1-R1 OWNER ACCEPTED / COMPLETE / REMOTE-VERIFIED AT e172cc7c9bfca04066153d9edad70d9074bb37e5 / TREE be7447c3d60510262e428b86cd1a6a83972f64c0 / FULL CORE 464/464
+CORE MAIN CONVERGED THROUGH PR #2 REBASE AND MERGE AT 5976263f92f7f9cbe9c091719eccb036ee8c0c2d / SAME TREE / POST-MERGE CI PASS
 P3 AFTER G1 / M6-P4+ NOT AUTHORIZED / NOT STARTED
 
 Architecture Risks
@@ -3209,8 +3218,9 @@ REMOTE-VERIFIED`。
 Architecture Owner 已接受 ADR-0005 和 M6 Consumer Contract 为规范架构；该接受
 本身不授予实现权限。后续 Project Lead、Architecture Owner、Repository
 Governance Owner 与 M2/M4/M5/M6 Domain Owners 已基于远端提交
-`6bb9d165a693057f38e5789c408293ff0eaf5bcc` 单独授权 M6-P3-B1；M6-P3-G1
-仍未授权。原 proposal/review checkpoint 作为时点历史保留且不得改写。
+`6bb9d165a693057f38e5789c408293ff0eaf5bcc` 单独授权 M6-P3-B1。该段保留当时
+M6-P3-G1 尚未授权的时点历史；后续 G1 已单独授权并最终仅通过 G1-R1 获得
+Owner Acceptance。原 proposal/review checkpoint 作为时点历史保留且不得改写。
 
 代码审查确认 M1 AI Director、M3 Script Studio、M5 Series Director 与 Creator
 Server composition 存在 Application 直接依赖 V4 的重复模式，违反固定的
@@ -3252,8 +3262,9 @@ Owner Accept 该修正检查点，Architecture Remediation R1 因此关闭，
 checkpoint。修订仅纠正 SQLite
 exact-Series/suspicious-scope history selection 并隔离合法 other-Series plan；初始
 v1、v1/v2 转换、历史绑定、Core-only operation 与 HTTP v2 pass-through 均保持不变。
-Schema/Migration、正式 8765、M3/M6 consumer、Frontend、M6-P3-G1、M7+、V3、
-GPU、Worker 或 ComfyUI 仍未授权；任何扩大 allowlist 的需要均立即停止。
+该 B1-R1 时点尚未授权 M3/M6 consumer；后续 G1/G1-R1 已独立完成并接受。
+Schema/Migration、正式 8765、Frontend、G1 之后的 M6 工作、M7+、V3、GPU、
+Worker 或 ComfyUI 仍未授权；任何扩大 allowlist 的需要均立即停止。
 
 Full Core Audit Report v1.2 的历史接受标签不在本次修复中重写；仓库内缺少可复核
 报告实体/摘要引用的问题登记为 `R-CORE-GOV-002 / OPEN / NON-BLOCKING`，且该标签

@@ -6,20 +6,23 @@
 | --- | --- |
 | Task | `ACS-M6-P3-G1-EPISODE-BASELINE-CONSUMER` |
 | Date | `2026-08-14` |
-| Decision | `BOUNDED IMPLEMENTATION COMPLETE LOCALLY / ALL GATES PASS / REMOTE VERIFICATION PENDING / NOT OWNER ACCEPTED` |
+| Decision | `ORIGINAL G1 REVISION REQUIRED / G1-R1 OWNER ACCEPTED / COMPLETE / REMOTE-VERIFIED` |
 | Execution mode | `AUTO-SEQUENTIAL / BOUNDED / FAIL-CLOSED` |
 | Authorized base | `c5485b70b17f9154ff17246f6329a99113a5eaa9` |
 | Accepted technical prerequisite | `M6-P3-B1-R1 OWNER ACCEPTED AT 5c656992d9fade3683b70e3c57f8b8ba7d26c7f7` |
 | Frontend sequence evidence | `main b4997ec6fdaaf9d2874141571163056ba19950ef / TREE 90a4c663ea8fcda5556e4ca3d107ce48d6147bf7 / POST-MERGE CI 31759310779 SUCCESS` |
 | Governance checkpoint | `EIGHT GOVERNANCE PATHS / PRODUCTION AND TEST DIFF ZERO` |
 | Technical allowlist | `SEVEN PRODUCTION PATHS + THREE NEW TEST PATHS` |
-| Final stop | `AFTER TECHNICAL REMOTE VERIFICATION / PROJECT LEAD OWNER REVIEW REQUIRED` |
+| Original G1 checkpoint | `3696d6af12222d30eb99b65d67e6db18897eb42f / TREE 37cf9a4154ee27c53c4671c1b677ff0eada21a0c / REVISION REQUIRED` |
+| Accepted G1-R1 checkpoint | `e172cc7c9bfca04066153d9edad70d9074bb37e5 / TREE be7447c3d60510262e428b86cd1a6a83972f64c0 / 464/464 / OWNER ACCEPTED` |
+| Converged main | `5976263f92f7f9cbe9c091719eccb036ee8c0c2d / SAME TREE / PR #2 REBASE AND MERGE / MAIN CI PASS` |
 
 The Project Lead, Architecture Owner, Repository Governance Owner and affected M2,
 M3, M4, M5 and M6 Domain Owners authorize the bounded Core-only implementation
 defined here. ADR-0005 and the M6 Consumer Contract remain the normative architecture.
-This decision does not pre-accept the implementation and does not authorize any work
-after G1.
+The original G1 implementation was not accepted and is superseded by the bounded
+G1-R1 error-semantics correction. Owner Acceptance of G1-R1 does not authorize any
+work after G1.
 
 ## 2. Authorized outcome
 
@@ -178,3 +181,34 @@ determinism and write neutrality, existing Script workspace stability, baseline
 replacement, InMemory/SQLite parity, SQLite restart and coherent-read blocking against
 an M5 write. Remote publication and equality verification remain pending at this
 documented local-candidate timepoint.
+
+The later remote technical checkpoint is
+`3696d6af12222d30eb99b65d67e6db18897eb42f`; Owner Review marked it
+`REVISION REQUIRED / NOT OWNER ACCEPTED` because its unknown-exception fallback
+incorrectly returned the specific `m6_lineage_mismatch / 409` business semantic.
+
+## 10. G1-R1 correction and Owner Acceptance
+
+The separately authorized G1-R1 correction changes only:
+
+```text
+services/v5_core_os/script_studio/public.py
+tests/unit/test_m6_p3_g1_r1_error_semantics.py
+```
+
+It maps an unknown consumer exception to neutral
+`m6_consumer_internal_error / 500`, preserves `from None`, leaves all five ADR-0005
+business failure mappings unchanged and adds the exact unknown-exception regression.
+The accepted result is:
+
+```text
+M6-P3-G1-R1 OWNER ACCEPTED / COMPLETE
+REMOTE-VERIFIED AT e172cc7c9bfca04066153d9edad70d9074bb37e5
+TREE be7447c3d60510262e428b86cd1a6a83972f64c0
+FULL CORE 464/464 PASS
+```
+
+Core `main` was later converged through PR `#2` using `Rebase and merge`. The resulting
+`main` SHA is `5976263f92f7f9cbe9c091719eccb036ee8c0c2d` and has the exact accepted
+G1-R1 tree. This closeout does not authorize M6-P4+, M7-M19, HTTP/API, Frontend,
+Schema/Migration, GPU, Worker or ComfyUI work.

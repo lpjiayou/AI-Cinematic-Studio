@@ -8,7 +8,9 @@ OS、V4 Platform、V3 Render Core、持久化与后端测试；客户 Commercial
 > 当前状态：M1–M5 已接受；M6-P0/P1 与 bounded M6-P2 已 Owner Accepted；
 > G1-R1 `d44f471…` 已 Owner Accepted 并关闭 Architecture Remediation R1；
 > M6-P3-G0 已 Owner Accepted；M6-P3-B1 原候选 `8449b521…` 的 Owner Review 为 `REVISION REQUIRED`；修正后的 B1-R1 `5c656992…` 已远端验证并于 `2026-08-14` Owner Accepted；
-> M6-P3-G1 governance checkpoint 已远端验证；有界技术实现与全部本地门禁完成，待远端验证后停止等待 Owner Review；
+> M6-P3-G1 原候选 `3696d6af…` 为 `REVISION REQUIRED`；G1-R1
+> `e172cc7c…` 已通过 464/464、远端验证和 Owner Review；Core `main`
+> `5976263f…` 以相同 tree 完成 PR rebase 收敛并通过 post-merge CI；
 > Production Ready = `NO`。
 
 ## 当前活动工作包
@@ -39,7 +41,10 @@ OS、V4 Platform、V3 Render Core、持久化与后端测试；客户 Commercial
 | B1-R1 base | `8449b521c96bb8340806ecda8649698f4771914a` |
 | B1-R1 scope | `8 GOVERNANCE → 1 PRODUCTION + 1 TEST → REMOTE VERIFY → STOP FOR OWNER REVIEW` |
 | B1-R1 evidence | `PRE-FIX 409 REPRODUCED / SQLITE 30/30 / ORIGINAL B1 174/174 / FULL CORE 449/449 / AST 63/63` |
-| M6-P3-G1 | `LOCAL TECHNICAL CANDIDATE / G1 14/14 / FULL CORE 463/463 / REMOTE VERIFICATION PENDING / NOT OWNER ACCEPTED` |
+| M6-P3-G1 | `ORIGINAL 3696d6af REVISION REQUIRED / G1-R1 OWNER ACCEPTED AT e172cc7c / TREE be7447c3 / FULL CORE 464/464` |
+| Core main convergence | `OWNER ACCEPTED / PR #2 REBASE AND MERGE / MAIN 5976263f / TREE be7447c3 / POST-MERGE CI PASS` |
+| Current governance checkpoint | `ACS-GOV-POST-M6-P3-G1-CLOSEOUT / GOVERNANCE-ONLY / OWNER REVIEW REQUIRED` |
+| Next separately authorized checkpoint | `ACS-CCV-R1-EVIDENCE-HARDENING / BLOCKED UNTIL CLOSEOUT OWNER ACCEPTED` |
 | M6-P3 after G1 / M6-P4+ | `NOT AUTHORIZED / NOT STARTED` |
 | M7-M19 | `NOT STARTED / NOT AUTHORIZED` |
 | Formal port-8765 database | `UNTOUCHED / NOT DEPLOYED` |
@@ -78,10 +83,15 @@ Architecture Owner、Repository Governance Owner 与 affected M2/M5 Domain Owner
 M6-P3-G1 前置条件已满足，Project Lead 于 `2026-08-14` 单独授权有界 Core-only
 只读 consumer。授权顺序、7 个生产路径、3 个新增测试路径与禁止项冻结于
 `governance/ACS-M6-P3-G1-EPISODE-BASELINE-CONSUMER.md`；在治理检查点远端验证
-前不得修改生产或测试路径。治理检查点现已远端验证；技术候选精确修改 7 个
+前不得修改生产或测试路径。治理检查点已远端验证；原技术候选精确修改 7 个
 生产路径并新增 3 个测试路径，通过 G1 `14/14`、完整 Core `463/463`、AST
-`63/63`、Markdown `88/88` 与 links `323/323`。远端验证后必须停止等待 Owner
-Review。
+`63/63`、Markdown `88/88` 与 links `323/323`，但 Owner Review 发现其未知异常
+兜底错误映射为 `m6_lineage_mismatch / 409`，因此 `3696d6af…` 保持历史
+`REVISION REQUIRED`。G1-R1 仅修正该一行生产错误语义并新增一个测试文件，
+在 `e172cc7c9bfca04066153d9edad70d9074bb37e5` 通过 `464/464` 并获 Owner
+Acceptance。受保护的 `main` 通过 PR `#2` 以 `Rebase and merge` 收敛至
+`5976263f92f7f9cbe9c091719eccb036ee8c0c2d`，tree 与 G1-R1 相同，post-merge
+Repository Validation 通过。
 现有 HTTP workspace versions 的 v2 响应允许透传 `episodePlanItemBindings`，但不
 修改 route、handler 或外部 DTO 源文件。除该 Owner 消歧外的 Public HTTP/API 扩张、
 Schema/Migration、正式数据库、Auth/RBAC、Frontend、G1 之后的 M6 工作、
