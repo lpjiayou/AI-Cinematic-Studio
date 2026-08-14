@@ -9,8 +9,9 @@ OS、V4 Platform、V3 Render Core、持久化与后端测试；客户 Commercial
 > G1-R1 `d44f471…` 已 Owner Accepted 并关闭 Architecture Remediation R1；
 > M6-P3-G0 已 Owner Accepted；M6-P3-B1 原候选 `8449b521…` 的 Owner Review 为 `REVISION REQUIRED`；修正后的 B1-R1 `5c656992…` 已远端验证并于 `2026-08-14` Owner Accepted；
 > M6-P3-G1 原候选 `3696d6af…` 为 `REVISION REQUIRED`；G1-R1
-> `e172cc7c…` 已通过 464/464、远端验证和 Owner Review；Core `main`
-> `5976263f…` 以相同 tree 完成 PR rebase 收敛并通过 post-merge CI；
+> `e172cc7c…` 已通过 464/464、远端验证和 Owner Review；CCV-R1 seed-type
+> 修正 `0c2552bf…` 已直接 Owner Accepted；Core `main` 已通过 PR #4 rebase
+> 收敛至 `9c13e8f8…`，tree `8ee5c3ba…`，并通过 464/464 与 post-merge CI；
 > Production Ready = `NO`。
 
 ## 当前活动工作包
@@ -45,7 +46,9 @@ OS、V4 Platform、V3 Render Core、持久化与后端测试；客户 Commercial
 | Core main convergence | `OWNER ACCEPTED / PR #2 REBASE AND MERGE / MAIN 5976263f / TREE be7447c3 / POST-MERGE CI PASS` |
 | Accepted governance checkpoint | `ACS-GOV-POST-M6-P3-G1-CLOSEOUT / OWNER ACCEPTED AT 20207e7f / TREE e3638838` |
 | Original CCV-R1 candidate | `57cbbd4959f5f3d50b4d453cb6ae96b225cb7759 / REVISION REQUIRED / NOT OWNER ACCEPTED` |
-| Current checkpoint | `ACS-CCV-R1-R1-EVIDENCE-VALIDATOR-HARDENING / EXPERIMENT EVIDENCE ONLY / IN PROGRESS` |
+| CCV-R1 accepted checkpoint | `0c2552bf49923d45c2c5542cdb39f512a7e7d15d / TREE 8ee5c3ba / OWNER ACCEPTED` |
+| CCV-R1 main convergence | `PR #4 REBASE AND MERGE / MAIN 9c13e8f8 / TREE 8ee5c3ba / 464/464 / POST-MERGE CI PASS` |
+| Current checkpoint | `ACS-CCV-R1-HISTORICAL-EVIDENCE-CAPTURE-G0 / PREPARATION ONLY / EXTERNAL GPU NOT STARTED` |
 | Character Consistency evidence status | `EXPERIMENT REPORTED / INDEPENDENT REPRODUCTION NOT POSSIBLE / SYNTHETIC_TEST_ONLY / NOT FOR PRODUCTION` |
 | CCV-R2 / Character Visual Identity schema | `NOT AUTHORIZED / NOT STARTED` |
 | M6-P3 after G1 / M6-P4+ | `NOT AUTHORIZED / NOT STARTED` |

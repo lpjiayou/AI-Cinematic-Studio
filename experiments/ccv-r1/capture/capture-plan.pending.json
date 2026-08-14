@@ -1,0 +1,75 @@
+{
+  "$schema": "./capture-plan.schema.json",
+  "planVersion": "1.0",
+  "captureId": "acs-ccv-r1-historical-evidence",
+  "status": "PENDING_EXTERNAL_GPU_CAPTURE",
+  "historicalExecutionDate": "2026-08-14",
+  "captureMode": "READ_ONLY_NO_RERUN",
+  "rightsLabels": ["SYNTHETIC_TEST_ONLY", "NOT_FOR_PRODUCTION"],
+  "sourceHostState": "POWERED_OFF",
+  "sourceDiskSnapshotRef": null,
+  "runRegister": "../experiment-manifest.pending.json",
+  "expectedRunCounts": {"round-1": 10, "round-2": 25, "round-3": 15, "total": 50},
+  "groups": {
+    "historicalScripts": [
+      {"evidenceRef": "ccv-r1-script-round-1", "roundId": "round-1", "role": "historical_script", "logicalName": "character_consistency_test.py", "sourcePath": null, "collectionState": "PENDING", "sizeBytes": null, "sha256": null, "usageLinkState": "PENDING", "storageRef": null, "source": "PENDING_EXTERNAL_GPU", "licenseStatus": "PROJECT_INTERNAL_PENDING_VERIFICATION"},
+      {"evidenceRef": "ccv-r1-script-round-2", "roundId": "round-2", "role": "historical_script", "logicalName": "ipadapter_face_test.py", "sourcePath": null, "collectionState": "PENDING", "sizeBytes": null, "sha256": null, "usageLinkState": "PENDING", "storageRef": null, "source": "PENDING_EXTERNAL_GPU", "licenseStatus": "PROJECT_INTERNAL_PENDING_VERIFICATION"},
+      {"evidenceRef": "ccv-r1-script-round-3", "roundId": "round-3", "role": "historical_script", "logicalName": "ipadapter_pose_test.py", "sourcePath": null, "collectionState": "PENDING", "sizeBytes": null, "sha256": null, "usageLinkState": "PENDING", "storageRef": null, "source": "PENDING_EXTERNAL_GPU", "licenseStatus": "PROJECT_INTERNAL_PENDING_VERIFICATION"}
+    ],
+    "workflows": [
+      {"evidenceRef": "ccv-r1-workflow-round-1", "roundId": "round-1", "role": "comfyui_workflow", "logicalName": "round-1.api.json", "sourcePath": null, "collectionState": "PENDING", "sizeBytes": null, "sha256": null, "usageLinkState": "PENDING", "storageRef": null, "source": "PENDING_EXTERNAL_GPU", "licenseStatus": "PROJECT_INTERNAL_PENDING_VERIFICATION"},
+      {"evidenceRef": "ccv-r1-workflow-round-2", "roundId": "round-2", "role": "comfyui_workflow", "logicalName": "round-2.api.json", "sourcePath": null, "collectionState": "PENDING", "sizeBytes": null, "sha256": null, "usageLinkState": "PENDING", "storageRef": null, "source": "PENDING_EXTERNAL_GPU", "licenseStatus": "PROJECT_INTERNAL_PENDING_VERIFICATION"},
+      {"evidenceRef": "ccv-r1-workflow-round-3", "roundId": "round-3", "role": "comfyui_workflow", "logicalName": "round-3.api.json", "sourcePath": null, "collectionState": "PENDING", "sizeBytes": null, "sha256": null, "usageLinkState": "PENDING", "storageRef": null, "source": "PENDING_EXTERNAL_GPU", "licenseStatus": "PROJECT_INTERNAL_PENDING_VERIFICATION"}
+    ],
+    "models": [
+      {"evidenceRef": "ccv-r1-model-sdxl-base", "roundId": "shared", "role": "base", "logicalName": "sd_xl_base_1.0.safetensors", "sourcePath": null, "collectionState": "PENDING", "sizeBytes": null, "sha256": null, "usageLinkState": "PENDING", "storageRef": null, "source": "PENDING_EXTERNAL_GPU", "licenseStatus": "PENDING_VERIFICATION"},
+      {"evidenceRef": "ccv-r1-model-ipadapter-face", "roundId": "shared", "role": "identity_adapter", "logicalName": "ip-adapter-plus-face_sdxl_vit-h.safetensors", "sourcePath": null, "collectionState": "PENDING", "sizeBytes": null, "sha256": null, "usageLinkState": "PENDING", "storageRef": null, "source": "PENDING_EXTERNAL_GPU", "licenseStatus": "PENDING_VERIFICATION"},
+      {"evidenceRef": "ccv-r1-model-clip-encoder", "roundId": "shared", "role": "image_encoder", "logicalName": "CLIP-ViT-H-14-laion2B-s32B-b79K.safetensors", "sourcePath": null, "collectionState": "PENDING", "sizeBytes": null, "sha256": null, "usageLinkState": "PENDING", "storageRef": null, "source": "PENDING_EXTERNAL_GPU", "licenseStatus": "PENDING_VERIFICATION"},
+      {"evidenceRef": "ccv-r1-model-openpose-sdxl", "roundId": "round-3", "role": "pose_control", "logicalName": "controlnet-openpose-sdxl.safetensors", "sourcePath": null, "collectionState": "PENDING", "sizeBytes": null, "sha256": null, "usageLinkState": "PENDING", "storageRef": null, "source": "PENDING_EXTERNAL_GPU", "licenseStatus": "PENDING_VERIFICATION"}
+    ],
+    "references": [
+      {"evidenceRef": "ccv-r1-reference-full-body", "roundId": "round-2", "role": "full_body_reference", "logicalName": "consistency_fixed_01_medium_front.png", "sourcePath": null, "collectionState": "PENDING", "sizeBytes": null, "sha256": null, "usageLinkState": "PENDING", "storageRef": null, "source": "PENDING_EXTERNAL_GPU", "licenseStatus": "SYNTHETIC_SOURCE_PENDING_VERIFICATION"},
+      {"evidenceRef": "ccv-r1-reference-face-crop", "roundId": "shared", "role": "face_crop_reference", "logicalName": "consistency_fixed_01_medium_front_face_crop.png", "sourcePath": null, "collectionState": "PENDING", "sizeBytes": null, "sha256": null, "usageLinkState": "PENDING", "storageRef": null, "source": "PENDING_CROP_LINEAGE", "licenseStatus": "SYNTHETIC_SOURCE_PENDING_VERIFICATION"}
+    ],
+    "poseSkeletons": [
+      {"evidenceRef": "ccv-r1-skeleton-01", "roundId": "round-3", "role": "pose_skeleton", "logicalName": "01_medium_front_coco18.png", "sourcePath": null, "collectionState": "PENDING", "sizeBytes": null, "sha256": null, "usageLinkState": "PENDING", "storageRef": null, "source": "PENDING_EXTERNAL_GPU", "licenseStatus": "SYNTHETIC_SOURCE_PENDING_VERIFICATION"},
+      {"evidenceRef": "ccv-r1-skeleton-02", "roundId": "round-3", "role": "pose_skeleton", "logicalName": "02_closeup_side_coco18.png", "sourcePath": null, "collectionState": "PENDING", "sizeBytes": null, "sha256": null, "usageLinkState": "PENDING", "storageRef": null, "source": "PENDING_EXTERNAL_GPU", "licenseStatus": "SYNTHETIC_SOURCE_PENDING_VERIFICATION"},
+      {"evidenceRef": "ccv-r1-skeleton-03", "roundId": "round-3", "role": "pose_skeleton", "logicalName": "03_full_walking_coco18.png", "sourcePath": null, "collectionState": "PENDING", "sizeBytes": null, "sha256": null, "usageLinkState": "PENDING", "storageRef": null, "source": "PENDING_EXTERNAL_GPU", "licenseStatus": "SYNTHETIC_SOURCE_PENDING_VERIFICATION"},
+      {"evidenceRef": "ccv-r1-skeleton-04", "roundId": "round-3", "role": "pose_skeleton", "logicalName": "04_back_turning_coco18.png", "sourcePath": null, "collectionState": "PENDING", "sizeBytes": null, "sha256": null, "usageLinkState": "PENDING", "storageRef": null, "source": "PENDING_EXTERNAL_GPU", "licenseStatus": "SYNTHETIC_SOURCE_PENDING_VERIFICATION"},
+      {"evidenceRef": "ccv-r1-skeleton-05", "roundId": "round-3", "role": "pose_skeleton", "logicalName": "05_sitting_high_coco18.png", "sourcePath": null, "collectionState": "PENDING", "sizeBytes": null, "sha256": null, "usageLinkState": "PENDING", "storageRef": null, "source": "PENDING_EXTERNAL_GPU", "licenseStatus": "SYNTHETIC_SOURCE_PENDING_VERIFICATION"}
+    ],
+    "runLogs": [
+      {"evidenceRef": "ccv-r1-log-round-1", "roundId": "round-1", "role": "historical_run_log", "logicalName": "round-1.log", "sourcePath": null, "collectionState": "PENDING", "sizeBytes": null, "sha256": null, "usageLinkState": "PENDING", "storageRef": null, "source": "PENDING_EXTERNAL_GPU", "licenseStatus": "PROJECT_INTERNAL_PENDING_SECRET_SCAN"},
+      {"evidenceRef": "ccv-r1-log-round-2", "roundId": "round-2", "role": "historical_run_log", "logicalName": "round-2.log", "sourcePath": null, "collectionState": "PENDING", "sizeBytes": null, "sha256": null, "usageLinkState": "PENDING", "storageRef": null, "source": "PENDING_EXTERNAL_GPU", "licenseStatus": "PROJECT_INTERNAL_PENDING_SECRET_SCAN"},
+      {"evidenceRef": "ccv-r1-log-round-3", "roundId": "round-3", "role": "historical_run_log", "logicalName": "round-3.log", "sourcePath": null, "collectionState": "PENDING", "sizeBytes": null, "sha256": null, "usageLinkState": "PENDING", "storageRef": null, "source": "PENDING_EXTERNAL_GPU", "licenseStatus": "PROJECT_INTERNAL_PENDING_SECRET_SCAN"}
+    ],
+    "environmentRecords": [
+      {"evidenceRef": "ccv-r1-environment-gpu-driver", "roundId": "shared", "role": "environment_capture", "logicalName": "nvidia-smi.txt", "sourcePath": null, "collectionState": "PENDING", "sizeBytes": null, "sha256": null, "usageLinkState": "PENDING", "storageRef": null, "source": "CAPTURE_TIME_STATE_NOT_HISTORICAL_WITHOUT_LINK", "licenseStatus": "PROJECT_INTERNAL"},
+      {"evidenceRef": "ccv-r1-environment-python", "roundId": "shared", "role": "environment_capture", "logicalName": "python-version.txt", "sourcePath": null, "collectionState": "PENDING", "sizeBytes": null, "sha256": null, "usageLinkState": "PENDING", "storageRef": null, "source": "CAPTURE_TIME_STATE_NOT_HISTORICAL_WITHOUT_LINK", "licenseStatus": "PROJECT_INTERNAL"},
+      {"evidenceRef": "ccv-r1-environment-pytorch", "roundId": "shared", "role": "environment_capture", "logicalName": "pytorch-version.txt", "sourcePath": null, "collectionState": "PENDING", "sizeBytes": null, "sha256": null, "usageLinkState": "PENDING", "storageRef": null, "source": "CAPTURE_TIME_STATE_NOT_HISTORICAL_WITHOUT_LINK", "licenseStatus": "PROJECT_INTERNAL"},
+      {"evidenceRef": "ccv-r1-environment-comfyui", "roundId": "shared", "role": "repository_commit", "logicalName": "comfyui-commit.txt", "sourcePath": null, "collectionState": "PENDING", "sizeBytes": null, "sha256": null, "usageLinkState": "PENDING", "storageRef": null, "source": "PENDING_EXTERNAL_GPU", "licenseStatus": "PROJECT_INTERNAL"},
+      {"evidenceRef": "ccv-r1-environment-custom-nodes", "roundId": "shared", "role": "repository_commit", "logicalName": "custom-node-commits.json", "sourcePath": null, "collectionState": "PENDING", "sizeBytes": null, "sha256": null, "usageLinkState": "PENDING", "storageRef": null, "source": "PENDING_EXTERNAL_GPU", "licenseStatus": "PROJECT_INTERNAL"}
+    ],
+    "failureRecords": [
+      {"evidenceRef": "ccv-r1-failure-zero-byte-controlnet", "roundId": "round-3", "role": "failure_record", "logicalName": "zero-byte-controlnet-download.txt", "sourcePath": null, "collectionState": "PENDING", "sizeBytes": null, "sha256": null, "usageLinkState": "PENDING", "storageRef": null, "source": "PENDING_EXTERNAL_GPU", "licenseStatus": "PROJECT_INTERNAL_PENDING_SECRET_SCAN"},
+      {"evidenceRef": "ccv-r1-failure-sd15-sdxl", "roundId": "round-3", "role": "failure_record", "logicalName": "sd15-sdxl-dimension-mismatch.txt", "sourcePath": null, "collectionState": "PENDING", "sizeBytes": null, "sha256": null, "usageLinkState": "PENDING", "storageRef": null, "source": "PENDING_EXTERNAL_GPU", "licenseStatus": "PROJECT_INTERNAL_PENDING_SECRET_SCAN"}
+    ]
+  },
+  "coverage": {
+    "outputRunIds": "ALL_RUN_IDS_FROM_RUN_REGISTER",
+    "seedRunIds": "ALL_RUN_IDS_FROM_RUN_REGISTER"
+  },
+  "toolingBlockers": [
+    {"code": "CCV-CAPTURE-001", "status": "OPEN", "summary": "Historical-script recovery flag and records are not yet writable by the finalizer."},
+    {"code": "CCV-CAPTURE-002", "status": "OPEN", "summary": "Reference, crop-lineage, environment and model source/license capture must be normalized before host start."},
+    {"code": "CCV-CAPTURE-003", "status": "OPEN", "summary": "Failure, retry and exclusion history requires a normalized evidence ledger."}
+  ],
+  "claims": {
+    "externalCollectionStarted": false,
+    "historicalUsageVerified": false,
+    "independentReproductionPossible": false,
+    "validationAccepted": false,
+    "schemaChangeAuthorized": false,
+    "ccvR2Authorized": false
+  }
+}

@@ -1,0 +1,134 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ai-cinematic-studio.local/schemas/ccv-r1-capture-plan.schema.json",
+  "title": "ACS CCV-R1 Historical Evidence Capture Plan",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "planVersion",
+    "captureId",
+    "status",
+    "historicalExecutionDate",
+    "captureMode",
+    "rightsLabels",
+    "sourceHostState",
+    "sourceDiskSnapshotRef",
+    "runRegister",
+    "expectedRunCounts",
+    "groups",
+    "coverage",
+    "toolingBlockers",
+    "claims"
+  ],
+  "properties": {
+    "planVersion": {"const": "1.0"},
+    "captureId": {"const": "acs-ccv-r1-historical-evidence"},
+    "status": {"const": "PENDING_EXTERNAL_GPU_CAPTURE"},
+    "historicalExecutionDate": {"const": "2026-08-14"},
+    "captureMode": {"const": "READ_ONLY_NO_RERUN"},
+    "rightsLabels": {"const": ["SYNTHETIC_TEST_ONLY", "NOT_FOR_PRODUCTION"]},
+    "sourceHostState": {"const": "POWERED_OFF"},
+    "sourceDiskSnapshotRef": {"type": "null"},
+    "runRegister": {"const": "../experiment-manifest.pending.json"},
+    "expectedRunCounts": {
+      "const": {"round-1": 10, "round-2": 25, "round-3": 15, "total": 50}
+    },
+    "groups": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "historicalScripts",
+        "workflows",
+        "models",
+        "references",
+        "poseSkeletons",
+        "runLogs",
+        "environmentRecords",
+        "failureRecords"
+      ],
+      "properties": {
+        "historicalScripts": {"$ref": "#/$defs/records"},
+        "workflows": {"$ref": "#/$defs/records"},
+        "models": {"$ref": "#/$defs/records"},
+        "references": {"$ref": "#/$defs/records"},
+        "poseSkeletons": {"$ref": "#/$defs/records"},
+        "runLogs": {"$ref": "#/$defs/records"},
+        "environmentRecords": {"$ref": "#/$defs/records"},
+        "failureRecords": {"$ref": "#/$defs/records"}
+      }
+    },
+    "coverage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["outputRunIds", "seedRunIds"],
+      "properties": {
+        "outputRunIds": {"const": "ALL_RUN_IDS_FROM_RUN_REGISTER"},
+        "seedRunIds": {"const": "ALL_RUN_IDS_FROM_RUN_REGISTER"}
+      }
+    },
+    "toolingBlockers": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["code", "status", "summary"],
+        "properties": {
+          "code": {"type": "string", "pattern": "^CCV-CAPTURE-[0-9]{3}$"},
+          "status": {"const": "OPEN"},
+          "summary": {"type": "string", "minLength": 1}
+        }
+      }
+    },
+    "claims": {
+      "const": {
+        "externalCollectionStarted": false,
+        "historicalUsageVerified": false,
+        "independentReproductionPossible": false,
+        "validationAccepted": false,
+        "schemaChangeAuthorized": false,
+        "ccvR2Authorized": false
+      }
+    }
+  },
+  "$defs": {
+    "records": {
+      "type": "array",
+      "minItems": 1,
+      "items": {"$ref": "#/$defs/pendingRecord"}
+    },
+    "pendingRecord": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "evidenceRef",
+        "roundId",
+        "role",
+        "logicalName",
+        "sourcePath",
+        "collectionState",
+        "sizeBytes",
+        "sha256",
+        "usageLinkState",
+        "storageRef",
+        "source",
+        "licenseStatus"
+      ],
+      "properties": {
+        "evidenceRef": {"type": "string", "pattern": "^ccv-r1-[a-z0-9-]+$"},
+        "roundId": {"enum": ["round-1", "round-2", "round-3", "shared"]},
+        "role": {"type": "string", "minLength": 1},
+        "logicalName": {"type": "string", "minLength": 1},
+        "sourcePath": {"type": "null"},
+        "collectionState": {"const": "PENDING"},
+        "sizeBytes": {"type": "null"},
+        "sha256": {"type": "null"},
+        "usageLinkState": {"const": "PENDING"},
+        "storageRef": {"type": "null"},
+        "source": {"type": "string"},
+        "licenseStatus": {"type": "string"}
+      }
+    }
+  }
+}
