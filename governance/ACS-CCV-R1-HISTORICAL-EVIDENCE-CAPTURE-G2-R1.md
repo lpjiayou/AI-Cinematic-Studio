@@ -5,8 +5,8 @@
 | Field | Value |
 | --- | --- |
 | Task | `ACS-CCV-R1-HISTORICAL-EVIDENCE-CAPTURE-G2-R1` |
-| Date | `2026-08-14` |
-| Decision | `REPEAT SOURCE-READ-ONLY CUSTODY RECOVERY AUTHORIZED` |
+| Date | `2026-08-15` |
+| Decision | `INDEPENDENT REVIEW PASS / G2-R1 CLOSED` |
 | Execution mode | `MANUAL / BOUNDED / FAIL-CLOSED` |
 | Remote parent | `f48aa7fba0a7c6a9428d629094eca8a0e722ba95` |
 | Remote parent tree | `c097a337ef2773e470437a7c2ecd21f9681a7a96` |
@@ -142,10 +142,50 @@ or failed reattach keeps `CCV-R2-G0` inactive.
 After repeat capture, normalization, persistent transfer and reattach verification:
 
 ```text
-ACS-CCV-R1-HISTORICAL-EVIDENCE-CAPTURE-G2-R1 CHECKPOINT CANDIDATE
-EVIDENCE CAPTURED OR EXPLICITLY MARKED UNAVAILABLE AND PERSISTED
-INDEPENDENT REVIEW REQUIRED
-CCV-R2-G0 CONDITIONALLY AUTHORIZED ONLY AFTER INDEPENDENT REVIEW PASS
-PRODUCT SCHEMA AND PRODUCTION WORK NOT AUTHORIZED
+ACS-CCV-R1-HISTORICAL-EVIDENCE-CAPTURE-G2-R1 CLOSED
+INDEPENDENT REVIEW: PASS
+EVIDENCE CAPTURE REMAINS PARTIAL / NOT VALIDATION ACCEPTED
+CCV-R2-G0 ACTIVE FOR GOVERNANCE + REPRODUCIBLE EXPERIMENT DESIGN ONLY
+PRODUCT SCHEMA / GPU EXECUTION / PRODUCTION WORK NOT AUTHORIZED
 PRODUCTION READY: NO
 ```
+
+## 10. Independent-review closeout
+
+| Field | Verified value |
+| --- | --- |
+| Review date | `2026-08-15` |
+| Governance checkpoint reviewed | `5522646dd1cd6c0d2688d7adc176407b014c18ba` |
+| Review decision | `PASS` |
+| Review package SHA-256 | `4fd5996704fad495134dd725284251b55132be3620656bf0d7c5df923d1e9447` |
+| Manifest status | `EVIDENCE_CAPTURE_PARTIAL_NOT_VALIDATION_ACCEPTED` |
+| Manifest SHA-256 | `e8dfa407ebe55b190150a6e41c68403f3acbbdffd87876bcbad698e4cfa96fbf` |
+| Source inventory SHA-256 | `42d3a42a638dd03e92586d8c113fde2ef270e4b0ee0b3f2ddd350386aa2a0dc5` |
+| Custody inventory SHA-256 | `2e00b4250af0a8dee9bbc25c9fcb830f333e61e7f8241abefd3a6afc59e26d95` |
+| Custody entries | `69 / 69 VERIFIED` |
+| Run outputs | `50 / 50 RETAINED` |
+| Non-output record states | `18 RECOVERED / 7 MISSING / 2 AMBIGUOUS` |
+| Archive volumes | `6 / 6 CROSS-INSTANCE VERIFIED` |
+| Archive bytes | `12868843520` |
+| Archive SHA-256 | `6892d76fe60f0ed1950313ee40e7df88e7a4b4e177666e97a10c601dd40ef364` |
+| Volume-index SHA-256 | `ebe33d81d3589d1fdb8f62b98a35289525364c9851aa03e2c26e82f74887bedb` |
+| Archive file-list SHA-256 | `23a9fd403f35cc70b02f4f9786cce7b46677cec279012472ee2f2d7d2a36fe87` |
+| Final archive custody binding | `69 / 69 CUSTODY + 2 / 2 AUDIT METADATA / PASS` |
+
+The independent review verified the sanitized package, frozen registers, fail-closed
+validators, retained custody bytes, deterministic six-volume archive and successful
+cross-instance reattachment. The final streamed archive check bound every one of the
+`69` custody entries and both audit metadata files to their fixed digests.
+
+This PASS accepts the G2-R1 custody and governance checkpoint only. It does not turn
+partial historical evidence into a completed historical validation. Historical usage,
+rights, exact face-crop lineage and missing failure evidence remain explicitly
+unverified or unavailable. The manifest claims therefore remain fail-closed:
+`validationAccepted=false`, `independentReproductionPossible=false` and
+`ccvR2Authorized=false`.
+
+The transition condition in section 8 is now satisfied. `CCV-R2-G0` may begin only
+as governance and reproducible-experiment design. Product schema implementation,
+GPU execution, Worker/ComfyUI production integration, M6/M8/M10 work and Production
+Ready remain unauthorized.
+
