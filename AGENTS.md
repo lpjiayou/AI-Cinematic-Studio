@@ -379,7 +379,7 @@ Current governance state:
 - M6 Preconditions: `SATISFIED FOR BOUNDED M6-P0/P1 AND M6-P2 LOCAL SQLITE ONLY`;
 - ACS-M6-P0-P1-R2: `OWNER ACCEPTED / COMPLETE / REMOTE-VERIFIED AT
   e38c75aa4ff26bdea80c82d8a24096f799dad860`;
-- current task: `ACS-M6-P3-B1-R1-OWNER-ACCEPTANCE-CLOSEOUT`;
+- current task: `ACS-M6-P3-G1-EPISODE-BASELINE-CONSUMER`;
 - legacy repository capability provenance: `MEDIUM / OPEN / NON-BLOCKING`,
   Owner Gate `P3-RV1-003`;
 - M6-P0: `CONTRACT ACCEPTED / COMPLETE`;
@@ -391,7 +391,7 @@ Current governance state:
 - M6-P3-G0: `OWNER ACCEPTED / COMPLETE AS GOVERNANCE-ARCHITECTURE / NO
   IMPLEMENTATION AUTHORITY`;
 - ADR-0005 and M6 consumer contract: `ACCEPTED AS ARCHITECTURE / B1 OWNER
-  ACCEPTED THROUGH B1-R1 / G1 UNAUTHORIZED`;
+  ACCEPTED THROUGH B1-R1 / G1 BOUNDED IMPLEMENTATION AUTHORIZED`;
 - M6-P3-B1 binding prerequisite: `ORIGINAL CANDIDATE REMOTE-VERIFIED AT
   8449b521c96bb8340806ecda8649698f4771914a / REVISION REQUIRED / CORRECTED
   THROUGH B1-R1 / OWNER ACCEPTED AT 5c656992d9fade3683b70e3c57f8b8ba7d26c7f7`;
@@ -411,8 +411,8 @@ Current governance state:
 - M6-P3-B1-R1 evidence: `PRE-FIX SQLITE REGRESSION REPRODUCED 409 / POST-FIX
   SQLITE MODULE 30/30 / ORIGINAL B1 SUITE 174/174 / FULL CORE 449/449 /
   NON-TEST PYTHON AST 63/63`;
-- M6-P3-G1: `PREREQUISITE SATISFIED / SEPARATE AUTHORIZATION STILL REQUIRED /
-  NOT AUTHORIZED / NOT STARTED`;
+- M6-P3-G1: `BOUNDED CORE-ONLY IMPLEMENTATION AUTHORIZED ON 2026-08-14 /
+  GOVERNANCE REMOTE VERIFICATION REQUIRED BEFORE CODE / NOT OWNER ACCEPTED`;
 - M6-P3 after G1 / M6-P4+: `NOT AUTHORIZED / NOT STARTED`;
 - R-CORE-ARCH-001: `CONFIRMED / HIGH / MONITORING — APPLICATION DIRECT V4
   DEPENDENCY REMEDIATED AT OWNER-ACCEPTED G1-R1`;
@@ -449,8 +449,8 @@ governance checkpoint is remote-verified at
 correction is remote-verified at
 `5c656992d9fade3683b70e3c57f8b8ba7d26c7f7`. Independent Owner Review reproduced
 the original false `409`, confirmed the correction, reran the complete `449/449`
-regression and accepted B1-R1 on `2026-08-14`. M6-P3-G1 still requires a separate
-explicit authorization.
+regression and accepted B1-R1 on `2026-08-14`. M6-P3-G1 received its separate bounded
+authorization later that day; its governance checkpoint must be remote-verified first.
 
 The M6 gate order is:
 
@@ -521,8 +521,9 @@ REMOTE-VERIFIED`; ADR-0004 and the M6-P2 SQLite contract are accepted;
 M6-P2-G1 is `OWNER ACCEPTED / COMPLETE / REMOTE-VERIFIED AT
 8227c6c616140824fd70de920dc6fcf459bb734d`; M6-P3-G0 is `OWNER ACCEPTED /
 COMPLETE AS GOVERNANCE-ARCHITECTURE`; M6-P3-B1 is `OWNER ACCEPTED THROUGH B1-R1 AT
-5c656992d9fade3683b70e3c57f8b8ba7d26c7f7`; M6-P3-G1 and all later M6 work remain
-`NOT AUTHORIZED / NOT STARTED`.
+5c656992d9fade3683b70e3c57f8b8ba7d26c7f7`; M6-P3-G1 is separately authorized
+only by `governance/ACS-M6-P3-G1-EPISODE-BASELINE-CONSUMER.md`. All work after G1
+remains `NOT AUTHORIZED / NOT STARTED`.
 
 The accepted architecture-remediation sequence is:
 
@@ -567,11 +568,14 @@ The accepted architecture-remediation sequence is:
     the corrected exact/suspicious-scope selection, reruns `449/449` and accepts the
     remote technical checkpoint at `5c656992d9fade3683b70e3c57f8b8ba7d26c7f7`.
 
-The B1-R1 acceptance does not authorize Schema/Migration, formal port-8765 database
-access, HTTP route/handler/external DTO source-file changes, HTTP expansion beyond the
-approved existing workspace versions v2 field pass-through, Auth/RBAC, Frontend,
-M3/M6 consumer, M6-P3-G1, M7+, V3, GPU, Worker or ComfyUI work. G1 requires its own
-explicit governance checkpoint before any implementation path may change.
+The G1 authorization requires its exact eight-path governance checkpoint to be
+remote-verified before production or test edits. It then permits only the seven
+production and three new test paths frozen in
+`governance/ACS-M6-P3-G1-EPISODE-BASELINE-CONSUMER.md`, followed by complete gates,
+non-force publication, remote verification and STOP for Project Lead Owner Review.
+It authorizes no Schema/Migration, formal port-8765 database access, HTTP route,
+handler or external DTO source-file change, Auth/RBAC, Frontend, M7+, V3, GPU, Worker
+or ComfyUI work.
 
 Legacy Phase 0 provenance debt remains `OPEN / NON-BLOCKING` under Owner Gate
 `P3-RV1-003`. This acknowledgement does not silently close the debt or import

@@ -1,12 +1,12 @@
 # M6 Series Intelligence Consumer and Reconciliation Contract
 
-> Status: `ACCEPTED NORMATIVE ARCHITECTURE / B1 ORIGINAL CANDIDATE REVISION REQUIRED / B1-R1 OWNER ACCEPTED AT 5c656992d9fade3683b70e3c57f8b8ba7d26c7f7 / G1 UNAUTHORIZED`
+> Status: `ACCEPTED NORMATIVE ARCHITECTURE / B1 OWNER ACCEPTED THROUGH B1-R1 AT 5c656992d9fade3683b70e3c57f8b8ba7d26c7f7 / G1 BOUNDED IMPLEMENTATION AUTHORIZED / NOT OWNER ACCEPTED`
 >
 > Authority: `ADR-0005 — ACCEPTED AS ARCHITECTURE DECISION`
 >
 > Evidence base: `8227c6c616140824fd70de920dc6fcf459bb734d`; G0 proposal checkpoint `c524486c05c21b270a7dd75e89fae4312430736a`
 >
-> Work package: `ACS-M6-P3-B1-R1-OWNER-ACCEPTANCE-CLOSEOUT`
+> Work package: `ACS-M6-P3-G1-EPISODE-BASELINE-CONSUMER`
 >
 > Owner HTTP clarification: `EXISTING CANONICAL V2 PROJECTION RETURNED BY WORKSPACE VERSIONS PASSES THROUGH episodePlanItemBindings / MANUAL AND BOOTSTRAP V1 BEHAVIOR UNCHANGED / NO ROUTE-HANDLER-EXTERNAL-DTO SOURCE CHANGE / NO OTHER HTTP EXPANSION`
 
@@ -468,8 +468,9 @@ hard stop for explicit Project Lead review.
 
 ### 12.2 Read-only consumer — `ACS-M6-P3-G1`
 
-Only after B1 is Owner Accepted and a compatible bound M5/M6 test baseline exists may
-a separate G1 implement:
+With B1 Owner Accepted through B1-R1 and the Project Lead's separate `2026-08-14`
+authorization recorded in `governance/ACS-M6-P3-G1-EPISODE-BASELINE-CONSUMER.md`,
+G1 may implement after its governance-only checkpoint is remote-verified:
 
 1. one internal `ActiveM6BaselineReader`;
 2. the exact M3 `get_m6_episode_baseline(...)` read surface;
@@ -477,8 +478,8 @@ a separate G1 implement:
 4. InMemory and temporary-file SQLite parity;
 5. no ScriptVersion write, event consumer or M7/M9 behavior.
 
-The following list is a future planning envelope only and grants no write authority.
-Any later G1 authorization may narrow this maximum file allowlist:
+The following list remains the maximum envelope. The G1 authorization narrows it to
+the exact seven production, three new test and eight governance paths in its record:
 
 ```text
 services/v5_core_os/series_intelligence/contracts.py
@@ -506,7 +507,7 @@ Widening the planning envelope requires explicit Project Lead review. This plann
 envelope permits no `__init__` export, schema/migration, M6 SQLite
 adapter, M3 create/confirm/rewrite behavior, ScriptVersion persistence change, public
 HTTP/DTO, Frontend, event consumer, dispatcher or checkpoint state. This architecture
-acceptance does not authorize any listed file to change.
+acceptance authorizes only the narrower paths and sequence in the separate G1 record.
 
 ## 13. Implementation acceptance gates
 
@@ -615,12 +616,13 @@ After the B1 implementation candidate is remote-verified:
 ```text
 STOP — M6-P3-B1 REMOTE-VERIFIED IMPLEMENTATION CANDIDATE
 PROJECT LEAD B1 OWNER REVIEW REQUIRED
-M6-P3-G1 NOT AUTHORIZED / NOT STARTED
-NEXT AUTHORIZED MILESTONE: NONE
+M6-P3-G1 BOUNDED IMPLEMENTATION AUTHORIZED / GOVERNANCE REMOTE VERIFY REQUIRED
+NEXT AUTHORIZED MILESTONE AFTER GOVERNANCE VERIFY: M6-P3-G1
 ```
 
 B1 became Owner Accepted only through the independently reviewed B1-R1 correction.
-G1 still requires a new explicit Project Lead authorization.
+G1 received explicit Project Lead authorization on `2026-08-14`; implementation
+remains gated by remote verification of its governance-only checkpoint.
 
 ## 16. B1 Owner Review and authorized B1-R1 correction
 
@@ -673,5 +675,5 @@ accepted B1-R1. The final state is:
 ```text
 M6-P3-B1-R1 OWNER ACCEPTED / COMPLETE
 REMOTE-VERIFIED AT 5c656992d9fade3683b70e3c57f8b8ba7d26c7f7
-M6-P3-G1 NOT AUTHORIZED / NOT STARTED
+M6-P3-G1 BOUNDED IMPLEMENTATION AUTHORIZED / GOVERNANCE REMOTE VERIFY REQUIRED
 ```
