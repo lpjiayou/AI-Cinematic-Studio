@@ -65,7 +65,7 @@ G1 must not:
 - Seeds: `123456`, `223456`, `323456`
 - Planned runs: `3 × 5 × 3 = 45`
 - Resolution: `1024 × 1024`
-- Sampler: `euler / normal / 20 steps / CFG 7.0`
+- Sampler: `dpmpp_2m / karras / 25 steps / CFG 7.0`
 - A1 identity weight: `0.6 / linear`
 - A2 identity weight: `0.6 / linear`
 - A2 OpenPose strength: `0.8 / start 0.0 / end 1.0`

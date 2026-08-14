@@ -1,0 +1,68 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ai-cinematic-studio.local/schemas/ccv-r2-execution-readiness-1.json",
+  "title": "CCV-R2 G1 Execution Readiness Receipt",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "experimentId",
+    "protocolVersion",
+    "state",
+    "governanceCheckpoint",
+    "g0CloseoutCommit",
+    "createdAt",
+    "host",
+    "software",
+    "immutableControls",
+    "verifiedAssets",
+    "promptSources",
+    "baseWorkflows",
+    "requests",
+    "counts",
+    "provenanceLimitations",
+    "claims"
+  ],
+  "properties": {
+    "schemaVersion": {"const": "ACS-CCV-R2-EXECUTION-READINESS-1"},
+    "experimentId": {"const": "acs-ccv-r2"},
+    "protocolVersion": {"const": "g0-v1"},
+    "state": {"const": "GPU_READY_PREPARATION_COMPLETE_NO_GPU_EXECUTION"},
+    "governanceCheckpoint": {"const": "ACS-CCV-R2-G1-GPU-EXECUTION-PREPARATION"},
+    "g0CloseoutCommit": {"pattern": "^[0-9a-f]{40}$"},
+    "createdAt": {"type": "string", "format": "date-time"},
+    "host": {"type": "object"},
+    "software": {"type": "object"},
+    "immutableControls": {"type": "array", "minItems": 2},
+    "verifiedAssets": {"type": "array", "minItems": 11, "maxItems": 11},
+    "promptSources": {"type": "array", "minItems": 3, "maxItems": 3},
+    "baseWorkflows": {"type": "array", "minItems": 3, "maxItems": 3},
+    "requests": {"type": "array", "minItems": 45, "maxItems": 45},
+    "counts": {
+      "const": {"arms": 3, "shots": 5, "seeds": 3, "runs": 45}
+    },
+    "provenanceLimitations": {"type": "array", "minItems": 3},
+    "claims": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "gpuExecutionAuthorized",
+        "gpuExecutionStarted",
+        "comfyUiQueueTouched",
+        "modelLoaded",
+        "imageGenerated",
+        "validationAccepted",
+        "productionReady"
+      ],
+      "properties": {
+        "gpuExecutionAuthorized": {"const": false},
+        "gpuExecutionStarted": {"const": false},
+        "comfyUiQueueTouched": {"const": false},
+        "modelLoaded": {"const": false},
+        "imageGenerated": {"const": false},
+        "validationAccepted": {"const": false},
+        "productionReady": {"const": false}
+      }
+    }
+  }
+}

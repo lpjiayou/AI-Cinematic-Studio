@@ -1,0 +1,17 @@
+{
+  "schemaVersion": "ACS-CCV-R2-EXECUTION-READINESS-1",
+  "experimentId": "acs-ccv-r2",
+  "protocolVersion": "g0-v1",
+  "state": "PENDING_G1_HOST_PREFLIGHT",
+  "governanceCheckpoint": "ACS-CCV-R2-G1-GPU-EXECUTION-PREPARATION",
+  "g0CloseoutCommit": "0376ee3c5b7a4c78735a04578a9a12fa1df6c2a2",
+  "claims": {
+    "gpuExecutionAuthorized": false,
+    "gpuExecutionStarted": false,
+    "comfyUiQueueTouched": false,
+    "modelLoaded": false,
+    "imageGenerated": false,
+    "validationAccepted": false,
+    "productionReady": false
+  }
+}
