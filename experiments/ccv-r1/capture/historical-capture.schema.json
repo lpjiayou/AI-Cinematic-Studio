@@ -1,0 +1,259 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ai-cinematic-studio.local/schemas/ccv-r1-historical-capture.schema.json",
+  "title": "ACS CCV-R1 Historical Evidence Collection Input",
+  "description": "EXPERIMENT EVIDENCE / NOT PRODUCTION CODE / SYNTHETIC_TEST_ONLY / NOT FOR PRODUCTION",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "captureVersion",
+    "captureId",
+    "status",
+    "rightsLabels",
+    "snapshotState",
+    "sourceDiskSnapshotRef",
+    "records",
+    "runs",
+    "failureLedger",
+    "claims"
+  ],
+  "properties": {
+    "$schema": {"type": "string"},
+    "captureVersion": {"const": "1.0"},
+    "captureId": {"const": "acs-ccv-r1-historical-evidence"},
+    "status": {"enum": ["CAPTURE_TEMPLATE", "COLLECTION_INPUT_NOT_REVIEWED"]},
+    "rightsLabels": {"const": ["SYNTHETIC_TEST_ONLY", "NOT_FOR_PRODUCTION"]},
+    "snapshotState": {"enum": ["PENDING", "CAPTURED", "UNAVAILABLE"]},
+    "sourceDiskSnapshotRef": {"type": ["string", "null"]},
+    "manifestCreatedAt": {"type": ["string", "null"], "format": "date-time"},
+    "records": {
+      "type": "array",
+      "minItems": 27,
+      "maxItems": 27,
+      "items": {"$ref": "#/$defs/record"}
+    },
+    "runs": {
+      "type": "array",
+      "minItems": 50,
+      "maxItems": 50,
+      "items": {"$ref": "#/$defs/run"}
+    },
+    "failureLedger": {
+      "type": "array",
+      "minItems": 2,
+      "items": {"$ref": "#/$defs/failureEvent"}
+    },
+    "claims": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "externalCollectionStarted",
+        "validationAccepted",
+        "independentReproductionPossible",
+        "schemaChangeAuthorized",
+        "ccvR2Authorized"
+      ],
+      "properties": {
+        "externalCollectionStarted": {"type": "boolean"},
+        "validationAccepted": {"const": false},
+        "independentReproductionPossible": {"const": false},
+        "schemaChangeAuthorized": {"const": false},
+        "ccvR2Authorized": {"const": false}
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": {"properties": {"status": {"const": "CAPTURE_TEMPLATE"}}, "required": ["status"]},
+      "then": {
+        "properties": {
+          "snapshotState": {"const": "PENDING"},
+          "sourceDiskSnapshotRef": {"type": "null"},
+          "records": {"items": {"$ref": "#/$defs/pendingRecord"}},
+          "runs": {"items": {"$ref": "#/$defs/pendingRun"}},
+          "failureLedger": {"items": {"$ref": "#/$defs/pendingFailureEvent"}},
+          "claims": {
+            "properties": {"externalCollectionStarted": {"const": false}}
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {"status": {"const": "COLLECTION_INPUT_NOT_REVIEWED"}},
+        "required": ["status"]
+      },
+      "then": {
+        "required": ["manifestCreatedAt"],
+        "properties": {
+          "snapshotState": {"enum": ["CAPTURED", "UNAVAILABLE"]},
+          "records": {"items": {"$ref": "#/$defs/resolvedRecord"}},
+          "runs": {"items": {"$ref": "#/$defs/resolvedRun"}},
+          "failureLedger": {"items": {"$ref": "#/$defs/resolvedFailureEvent"}},
+          "claims": {
+            "properties": {"externalCollectionStarted": {"const": true}}
+          }
+        }
+      }
+    },
+    {
+      "if": {"properties": {"snapshotState": {"const": "CAPTURED"}}, "required": ["snapshotState"]},
+      "then": {"properties": {"sourceDiskSnapshotRef": {"type": "string", "minLength": 1}}}
+    },
+    {
+      "if": {"properties": {"snapshotState": {"enum": ["PENDING", "UNAVAILABLE"]}}, "required": ["snapshotState"]},
+      "then": {"properties": {"sourceDiskSnapshotRef": {"type": "null"}}}
+    }
+  ],
+  "$defs": {
+    "record": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "evidenceRef",
+        "roundId",
+        "role",
+        "logicalName",
+        "collectionState",
+        "sourcePath",
+        "usageLinkState",
+        "usageLinkEvidenceRefs",
+        "storageRef",
+        "source",
+        "licenseStatus",
+        "lineage"
+      ],
+      "properties": {
+        "evidenceRef": {"type": "string", "pattern": "^ccv-r1-[a-z0-9-]+$"},
+        "roundId": {"enum": ["round-1", "round-2", "round-3", "shared"]},
+        "role": {"type": "string", "minLength": 1},
+        "logicalName": {"type": "string", "minLength": 1},
+        "collectionState": {"enum": ["PENDING", "RECOVERED", "MISSING", "AMBIGUOUS"]},
+        "sourcePath": {"type": ["string", "null"]},
+        "usageLinkState": {"enum": ["PENDING", "VERIFIED", "UNVERIFIED", "NOT_APPLICABLE"]},
+        "usageLinkEvidenceRefs": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {"type": "string", "pattern": "^ccv-r1-[a-z0-9-]+$"}
+        },
+        "storageRef": {"type": ["string", "null"]},
+        "source": {"type": "string", "minLength": 1},
+        "licenseStatus": {"type": "string", "minLength": 1},
+        "lineage": {
+          "oneOf": [
+            {"type": "null"},
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["parentEvidenceRef", "operation"],
+              "properties": {
+                "parentEvidenceRef": {"type": "string", "pattern": "^ccv-r1-[a-z0-9-]+$"},
+                "operation": {"const": "FACE_CROP"}
+              }
+            }
+          ]
+        }
+      }
+    },
+    "pendingRecord": {
+      "allOf": [
+        {"$ref": "#/$defs/record"},
+        {
+          "properties": {
+            "collectionState": {"const": "PENDING"},
+            "sourcePath": {"type": "null"},
+            "usageLinkState": {"const": "PENDING"},
+            "usageLinkEvidenceRefs": {"maxItems": 0},
+            "storageRef": {"type": "null"},
+            "lineage": {"type": "null"}
+          }
+        }
+      ]
+    },
+    "resolvedRecord": {
+      "allOf": [
+        {"$ref": "#/$defs/record"},
+        {"properties": {"collectionState": {"enum": ["RECOVERED", "MISSING", "AMBIGUOUS"]}, "usageLinkState": {"enum": ["VERIFIED", "UNVERIFIED", "NOT_APPLICABLE"]}}}
+      ]
+    },
+    "run": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "runId",
+        "seed",
+        "outputCollectionState",
+        "outputSourcePath",
+        "usageLinkState",
+        "usageLinkEvidenceRefs",
+        "retryOfRunId",
+        "excluded",
+        "exclusionReason"
+      ],
+      "properties": {
+        "runId": {"type": "string", "minLength": 1},
+        "seed": {"type": ["integer", "null"], "minimum": 0},
+        "outputCollectionState": {"enum": ["PENDING", "RECOVERED", "MISSING", "AMBIGUOUS"]},
+        "outputSourcePath": {"type": ["string", "null"]},
+        "usageLinkState": {"enum": ["PENDING", "VERIFIED", "UNVERIFIED", "NOT_APPLICABLE"]},
+        "usageLinkEvidenceRefs": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {"type": "string", "pattern": "^ccv-r1-[a-z0-9-]+$"}
+        },
+        "retryOfRunId": {"type": ["string", "null"]},
+        "excluded": {"type": "boolean"},
+        "exclusionReason": {"type": ["string", "null"]}
+      }
+    },
+    "pendingRun": {
+      "allOf": [
+        {"$ref": "#/$defs/run"},
+        {"properties": {"outputCollectionState": {"const": "PENDING"}, "outputSourcePath": {"type": "null"}, "usageLinkState": {"const": "PENDING"}, "usageLinkEvidenceRefs": {"maxItems": 0}}}
+      ]
+    },
+    "resolvedRun": {
+      "allOf": [
+        {"$ref": "#/$defs/run"},
+        {"properties": {"outputCollectionState": {"enum": ["RECOVERED", "MISSING", "AMBIGUOUS"]}, "usageLinkState": {"enum": ["VERIFIED", "UNVERIFIED", "NOT_APPLICABLE"]}}}
+      ]
+    },
+    "failureEvent": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "eventId",
+        "roundId",
+        "eventType",
+        "eventState",
+        "runId",
+        "relatedRunId",
+        "sourceEvidenceRefs",
+        "summary",
+        "occurredAt"
+      ],
+      "properties": {
+        "eventId": {"type": "string", "pattern": "^ccv-r1-event-[a-z0-9-]+$"},
+        "roundId": {"enum": ["round-1", "round-2", "round-3", "shared"]},
+        "eventType": {"enum": ["FAILURE", "RETRY", "EXCLUSION"]},
+        "eventState": {"enum": ["PENDING", "RECOVERED", "MISSING", "AMBIGUOUS"]},
+        "runId": {"type": ["string", "null"]},
+        "relatedRunId": {"type": ["string", "null"]},
+        "sourceEvidenceRefs": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {"type": "string", "pattern": "^ccv-r1-[a-z0-9-]+$"}
+        },
+        "summary": {"type": "string", "minLength": 1},
+        "occurredAt": {"type": ["string", "null"], "format": "date-time"}
+      }
+    },
+    "pendingFailureEvent": {
+      "allOf": [{"$ref": "#/$defs/failureEvent"}, {"properties": {"eventState": {"const": "PENDING"}}}]
+    },
+    "resolvedFailureEvent": {
+      "allOf": [{"$ref": "#/$defs/failureEvent"}, {"properties": {"eventState": {"enum": ["RECOVERED", "MISSING", "AMBIGUOUS"]}}}]
+    }
+  }
+}

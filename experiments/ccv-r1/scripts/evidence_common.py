@@ -21,6 +21,7 @@ from typing import Any
 RIGHTS_LABELS = ("SYNTHETIC_TEST_ONLY", "NOT_FOR_PRODUCTION")
 PENDING_STATUS = "EXPERIMENT_REPORTED_INDEPENDENT_REPRODUCTION_NOT_POSSIBLE"
 FINAL_STATUS = "EVIDENCE_CAPTURED_NOT_VALIDATION_ACCEPTED"
+PARTIAL_STATUS = "EVIDENCE_CAPTURE_PARTIAL_NOT_VALIDATION_ACCEPTED"
 MAX_SAFETENSORS_HEADER_BYTES = 64 * 1024 * 1024
 CONDITIONING_TENSOR_SUFFIXES = {
     "base": (".attn2.to_k.weight", ".attn2.to_v.weight"),
@@ -364,6 +365,225 @@ def verify_model_record(record: dict[str, Any], label: str) -> tuple[int, str, d
     return size, digest, architecture
 
 
+def historical_script_bytes_recovered(records: list[dict[str, Any]]) -> bool:
+    """Derive historical-script custody from the exact three script records."""
+
+    expected = {
+        "character_consistency_test.py",
+        "ipadapter_face_test.py",
+        "ipadapter_pose_test.py",
+    }
+    by_name = {
+        record.get("logicalName"): record
+        for record in records
+        if isinstance(record, dict) and isinstance(record.get("logicalName"), str)
+    }
+    if set(by_name) != expected:
+        return False
+    return all(
+        record.get("collectionState") == "RECOVERED"
+        and isinstance(record.get("sizeBytes"), int)
+        and record["sizeBytes"] > 0
+        and _is_sha256(record.get("sha256"))
+        for record in by_name.values()
+    )
+
+
+def _validate_historical_capture_manifest(manifest: dict[str, Any]) -> None:
+    scripts = manifest.get("historicalScripts")
+    _require(isinstance(scripts, list), "historical capture requires historicalScripts")
+    expected_scripts = {
+        "character_consistency_test.py",
+        "ipadapter_face_test.py",
+        "ipadapter_pose_test.py",
+    }
+    _require(
+        {record.get("logicalName") for record in scripts if isinstance(record, dict)} == expected_scripts,
+        "historicalScripts must contain the exact three historical scripts",
+    )
+    derived_script_state = historical_script_bytes_recovered(scripts)
+    _require(
+        manifest.get("historicalScriptBytesRecovered") is derived_script_state,
+        "historicalScriptBytesRecovered must be derived from the three historical-script records",
+    )
+
+    models = manifest.get("models")
+    artifacts = manifest.get("artifacts")
+    _require(isinstance(models, list) and isinstance(artifacts, list), "historical evidence collections are required")
+    evidence_records = scripts + models + artifacts
+    evidence_refs = [record.get("evidenceRef") for record in evidence_records]
+    _require(len(evidence_records) == 27, "historical capture must contain exactly 27 non-output evidence records")
+    _require(
+        len(evidence_refs) == len(set(evidence_refs)) and all(isinstance(ref, str) and ref for ref in evidence_refs),
+        "historical evidenceRef values must be unique",
+    )
+    evidence_by_ref = {record["evidenceRef"]: record for record in evidence_records}
+
+    allowed_states = {"RECOVERED", "MISSING", "AMBIGUOUS"}
+    allowed_usage_states = {"VERIFIED", "UNVERIFIED", "NOT_APPLICABLE"}
+    for record in evidence_records:
+        label = record.get("evidenceRef", "unknown-evidence")
+        state = record.get("collectionState")
+        _require(state in allowed_states, f"{label}: invalid collectionState")
+        _require(record.get("usageLinkState") in allowed_usage_states, f"{label}: invalid usageLinkState")
+        usage_refs = record.get("usageLinkEvidenceRefs")
+        _require(
+            isinstance(usage_refs, list)
+            and len(usage_refs) == len(set(usage_refs))
+            and all(ref in evidence_refs for ref in usage_refs),
+            f"{label}: invalid usageLinkEvidenceRefs",
+        )
+        if record.get("usageLinkState") == "VERIFIED":
+            _require(usage_refs, f"{label}: VERIFIED usage requires evidence references")
+            _require(
+                all(evidence_by_ref[ref].get("collectionState") == "RECOVERED" for ref in usage_refs),
+                f"{label}: VERIFIED usage cannot reference unavailable evidence",
+            )
+        if state == "RECOVERED":
+            _require(isinstance(record.get("filePath"), str) and record["filePath"], f"{label}: recovered filePath is required")
+            _require(isinstance(record.get("sizeBytes"), int) and record["sizeBytes"] > 0, f"{label}: recovered sizeBytes is required")
+            _require(_is_sha256(record.get("sha256")), f"{label}: recovered SHA-256 is required")
+            _require(isinstance(record.get("storageRef"), str) and record["storageRef"], f"{label}: recovered storageRef is required")
+        else:
+            _require(record.get("filePath") is None, f"{label}: unavailable filePath must be null")
+            _require(record.get("sizeBytes") is None and record.get("sha256") is None, f"{label}: unavailable digest fields must be null")
+
+    model_roles = {"base", "identity_adapter", "image_encoder", "pose_control"}
+    for model in models:
+        if model.get("collectionState") != "RECOVERED":
+            continue
+        label = model.get("evidenceRef", "unknown-model")
+        _require(model.get("role") in model_roles, f"{label}: unexpected model role")
+        _require(
+            isinstance(model.get("source"), str) and model["source"] and not model["source"].startswith("PENDING"),
+            f"{label}: recovered model source must be explicit",
+        )
+        _require(
+            isinstance(model.get("licenseStatus"), str)
+            and model["licenseStatus"]
+            and not model["licenseStatus"].startswith("PENDING"),
+            f"{label}: recovered model licenseStatus must be explicit",
+        )
+
+    face_crop = next(record for record in evidence_records if record.get("evidenceRef") == "ccv-r1-reference-face-crop")
+    if face_crop.get("collectionState") == "RECOVERED":
+        lineage = face_crop.get("lineage")
+        _require(isinstance(lineage, dict), "face crop requires explicit lineage")
+        _require(
+            lineage.get("parentEvidenceRef") == "ccv-r1-reference-full-body"
+            and lineage.get("operation") == "FACE_CROP",
+            "face crop lineage must reference the full-body source",
+        )
+        _require(
+            evidence_by_ref["ccv-r1-reference-full-body"].get("collectionState") == "RECOVERED",
+            "face crop lineage parent must be recovered",
+        )
+
+    receipt = manifest.get("captureReceipt")
+    _require(isinstance(receipt, dict), "historical capture requires captureReceipt")
+    recovered_count = sum(record.get("collectionState") == "RECOVERED" for record in evidence_records)
+    _require(receipt.get("recordCount") == 27, "captureReceipt.recordCount must be 27")
+    _require(receipt.get("recoveredRecordCount") == recovered_count, "captureReceipt recovered count mismatch")
+
+    runs = manifest["runs"]
+    run_ids = {run["runId"] for run in runs}
+    for run in runs:
+        label = run["runId"]
+        output = run.get("output")
+        _require(isinstance(output, dict), f"{label}: output is required")
+        state = output.get("collectionState")
+        expected_run_state = {
+            "RECOVERED": "CAPTURED",
+            "MISSING": "MISSING_EVIDENCE",
+            "AMBIGUOUS": "AMBIGUOUS_EVIDENCE",
+        }.get(state)
+        _require(expected_run_state is not None and run.get("runState") == expected_run_state, f"{label}: output/run state mismatch")
+        usage_refs = output.get("usageLinkEvidenceRefs")
+        _require(
+            isinstance(usage_refs, list)
+            and len(usage_refs) == len(set(usage_refs))
+            and all(ref in evidence_by_ref for ref in usage_refs),
+            f"{label}: invalid output usageLinkEvidenceRefs",
+        )
+        if output.get("usageLinkState") == "VERIFIED":
+            _require(usage_refs, f"{label}: VERIFIED output usage requires evidence references")
+            _require(
+                all(evidence_by_ref[ref].get("collectionState") == "RECOVERED" for ref in usage_refs),
+                f"{label}: VERIFIED output usage cannot reference unavailable evidence",
+            )
+        if state == "RECOVERED":
+            _require(isinstance(output.get("filePath"), str) and output["filePath"], f"{label}: recovered output filePath is required")
+            _require(isinstance(output.get("sizeBytes"), int) and output["sizeBytes"] > 0, f"{label}: recovered output sizeBytes is required")
+            _require(_is_sha256(output.get("sha256")), f"{label}: recovered output SHA-256 is required")
+        else:
+            _require(output.get("filePath") is None, f"{label}: unavailable output filePath must be null")
+            _require(output.get("sizeBytes") is None and output.get("sha256") is None, f"{label}: unavailable output digest fields must be null")
+    failure_ledger = manifest.get("failureLedger")
+    _require(isinstance(failure_ledger, list) and failure_ledger, "failureLedger must be a non-empty list")
+    event_ids = [event.get("eventId") for event in failure_ledger]
+    _require(
+        len(event_ids) == len(set(event_ids)) and all(isinstance(event_id, str) and event_id for event_id in event_ids),
+        "failureLedger eventId values must be unique",
+    )
+    event_types = {"FAILURE", "RETRY", "EXCLUSION"}
+    event_states = {"RECOVERED", "MISSING", "AMBIGUOUS"}
+    known_failure_refs = {
+        "ccv-r1-failure-zero-byte-controlnet",
+        "ccv-r1-failure-sd15-sdxl",
+    }
+    linked_failure_refs: set[str] = set()
+    for event in failure_ledger:
+        label = event.get("eventId", "unknown-event")
+        _require(event.get("eventType") in event_types, f"{label}: invalid eventType")
+        _require(event.get("eventState") in event_states, f"{label}: invalid eventState")
+        for field in ("runId", "relatedRunId"):
+            value = event.get(field)
+            _require(value is None or value in run_ids, f"{label}: unknown {field}")
+        source_refs = event.get("sourceEvidenceRefs")
+        _require(
+            isinstance(source_refs, list)
+            and len(source_refs) == len(set(source_refs))
+            and all(ref in evidence_refs for ref in source_refs),
+            f"{label}: invalid sourceEvidenceRefs",
+        )
+        linked_failure_refs.update(ref for ref in source_refs if ref in known_failure_refs)
+        if event.get("eventState") == "RECOVERED":
+            _require(
+                all(evidence_by_ref[ref].get("collectionState") == "RECOVERED" for ref in source_refs),
+                f"{label}: recovered event cannot reference unavailable evidence",
+            )
+        _require(isinstance(event.get("summary"), str) and event["summary"], f"{label}: summary is required")
+    _require(linked_failure_refs == known_failure_refs, "failureLedger must retain both known failure records")
+
+    complete = (
+        recovered_count == 27
+        and all(run.get("runState") == "CAPTURED" for run in runs)
+        and all(type(run.get("parameters", {}).get("seed")) is int for run in runs)
+        and all(run.get("excluded") is False for run in runs)
+        and all(event.get("eventState") == "RECOVERED" for event in failure_ledger)
+    )
+    _require(receipt.get("captureComplete") is complete, "captureReceipt.captureComplete must be derived")
+    expected_status = FINAL_STATUS if complete else PARTIAL_STATUS
+    _require(manifest.get("status") == expected_status, "historical capture status must be derived from completeness")
+    claims = manifest.get("claims")
+    _require(isinstance(claims, dict), "historical capture claims are required")
+    _require(claims.get("captureComplete") is complete, "claims.captureComplete must be derived")
+    verified_usage = all(
+        record.get("collectionState") == "RECOVERED"
+        and record.get("usageLinkState") in {"VERIFIED", "NOT_APPLICABLE"}
+        for record in evidence_records
+    ) and all(
+        run.get("runState") == "CAPTURED"
+        and run.get("output", {}).get("usageLinkState") in {"VERIFIED", "NOT_APPLICABLE"}
+        for run in runs
+    ) and all(event.get("eventState") == "RECOVERED" for event in failure_ledger)
+    _require(claims.get("historicalUsageVerified") is verified_usage, "historicalUsageVerified must be derived")
+    _require(claims.get("validationAccepted") is False, "capture cannot accept validation")
+    _require(claims.get("independentReproductionPossible") is False, "capture cannot claim reproduction")
+    _require(claims.get("schemaChangeAuthorized") is False, "capture cannot authorize schema change")
+    _require(claims.get("ccvR2Authorized") is False, "capture cannot authorize CCV-R2")
+
+
 def validate_manifest_consistency(manifest: dict[str, Any], *, finalized: bool) -> None:
     runs = manifest.get("runs")
     _require(isinstance(runs, list) and runs, "manifest.runs must be a non-empty list")
@@ -381,7 +601,8 @@ def validate_manifest_consistency(manifest: dict[str, Any], *, finalized: bool) 
         _require(manifest.get("status") == PENDING_STATUS, "pending manifest has an invalid status")
         return
 
-    _require(manifest.get("status") == FINAL_STATUS, "finalized manifest has an invalid status")
+    status = manifest.get("status")
+    _require(status in {FINAL_STATUS, PARTIAL_STATUS}, "finalized manifest has an invalid status")
     created_at = manifest.get("manifestCreatedAt")
     _require(isinstance(created_at, str) and created_at, "finalized manifestCreatedAt is required")
     try:
@@ -389,14 +610,23 @@ def validate_manifest_consistency(manifest: dict[str, Any], *, finalized: bool) 
     except ValueError as error:
         raise EvidenceError("finalized manifestCreatedAt must be an ISO-8601 timestamp") from error
     _require(parsed_created_at.tzinfo is not None, "finalized manifestCreatedAt must include a timezone")
+    historical_capture = round_id == "all-rounds" and (
+        status == PARTIAL_STATUS
+        or "historicalScripts" in manifest
+        or "captureReceipt" in manifest
+        or "failureLedger" in manifest
+    )
     for collection_name in ("hardenedSuccessorScripts", "models", "artifacts"):
         collection = manifest.get(collection_name)
         _require(isinstance(collection, list), f"manifest.{collection_name} must be a list")
         for index, record in enumerate(collection):
             label = f"{collection_name}[{index}]"
-            _require(isinstance(record.get("sizeBytes"), int) and record["sizeBytes"] > 0, f"{label}: positive sizeBytes is required")
-            _require(_is_sha256(record.get("sha256")), f"{label}: lowercase SHA-256 is required")
-            if collection_name in {"models", "artifacts"}:
+            recovered_historical = historical_capture and record.get("collectionState") == "RECOVERED"
+            strict_record = collection_name == "hardenedSuccessorScripts" or not historical_capture or recovered_historical
+            if strict_record:
+                _require(isinstance(record.get("sizeBytes"), int) and record["sizeBytes"] > 0, f"{label}: positive sizeBytes is required")
+                _require(_is_sha256(record.get("sha256")), f"{label}: lowercase SHA-256 is required")
+            if collection_name in {"models", "artifacts"} and strict_record:
                 _require(isinstance(record.get("filePath"), str) and record["filePath"], f"{label}: filePath is required")
             if collection_name == "models" and record.get("role") in CONDITIONING_TENSOR_SUFFIXES:
                 architecture = record.get("architectureEvidence")
@@ -419,11 +649,16 @@ def validate_manifest_consistency(manifest: dict[str, Any], *, finalized: bool) 
     for run in runs:
         run_id = run.get("runId", "unknown-run")
         seed = run.get("parameters", {}).get("seed")
+        if historical_capture and status == PARTIAL_STATUS and run.get("runState") != "CAPTURED":
+            _require(seed is None or (type(seed) is int and seed >= 0), f"{run_id}: seed must be pending or exact")
+            continue
         _require(type(seed) is int and seed >= 0, f"{run_id}: exact non-negative seed is required")
         _require(run.get("runState") == "CAPTURED", f"{run_id}: runState must be CAPTURED")
         output = run.get("output", {})
         _require(isinstance(output.get("sizeBytes"), int) and output["sizeBytes"] > 0, f"{run_id}: positive output sizeBytes is required")
         _require(_is_sha256(output.get("sha256")), f"{run_id}: lowercase output SHA-256 is required")
+    if historical_capture:
+        _validate_historical_capture_manifest(manifest)
 
 
 def build_manifest(
@@ -464,6 +699,7 @@ def build_manifest(
     else:
         validate_model_compatibility(models)
 
+    historical_scripts: list[dict[str, Any]] = []
     manifest = {
         "$schema": "./experiment-manifest.schema.json",
         "manifestVersion": "1.0",
@@ -473,7 +709,8 @@ def build_manifest(
         "rightsLabels": list(RIGHTS_LABELS),
         "historicalExecutionDate": "2026-08-14",
         "manifestCreatedAt": datetime.now(timezone.utc).isoformat() if finalized else None,
-        "historicalScriptBytesRecovered": False,
+        "historicalScriptBytesRecovered": historical_script_bytes_recovered(historical_scripts),
+        "historicalScripts": historical_scripts,
         "hardenedSuccessorScripts": [
             {
                 "role": "hardened_successor_script",

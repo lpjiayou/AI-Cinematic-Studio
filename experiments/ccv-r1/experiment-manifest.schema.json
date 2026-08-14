@@ -38,6 +38,7 @@
     "status": {
       "enum": [
         "EXPERIMENT_REPORTED_INDEPENDENT_REPRODUCTION_NOT_POSSIBLE",
+        "EVIDENCE_CAPTURE_PARTIAL_NOT_VALIDATION_ACCEPTED",
         "EVIDENCE_CAPTURED_NOT_VALIDATION_ACCEPTED"
       ]
     },
@@ -53,6 +54,12 @@
     },
     "historicalScriptBytesRecovered": {
       "type": "boolean"
+    },
+    "historicalScripts": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/fileEvidence"
+      }
     },
     "hardenedSuccessorScripts": {
       "type": "array",
@@ -88,6 +95,15 @@
         "$ref": "#/$defs/runEvidence"
       }
     },
+    "failureLedger": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/failureEvent"
+      }
+    },
+    "captureReceipt": {
+      "$ref": "#/$defs/captureReceipt"
+    },
     "claims": {
       "type": "object",
       "additionalProperties": false,
@@ -100,6 +116,18 @@
           "const": false
         },
         "schemaChangeAuthorized": {
+          "const": false
+        },
+        "externalCollectionStarted": {
+          "type": "boolean"
+        },
+        "captureComplete": {
+          "type": "boolean"
+        },
+        "historicalUsageVerified": {
+          "type": "boolean"
+        },
+        "ccvR2Authorized": {
           "const": false
         }
       }
@@ -126,6 +154,11 @@
               "$ref": "#/$defs/finalizedDigestEvidence"
             }
           },
+          "historicalScripts": {
+            "items": {
+              "$ref": "#/$defs/finalizedFileEvidence"
+            }
+          },
           "models": {
             "items": {
               "$ref": "#/$defs/finalizedModelEvidence"
@@ -139,6 +172,39 @@
           "runs": {
             "items": {
               "$ref": "#/$defs/finalizedRunEvidence"
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "roundId": {"const": "all-rounds"},
+          "status": {
+            "enum": [
+              "EVIDENCE_CAPTURE_PARTIAL_NOT_VALIDATION_ACCEPTED",
+              "EVIDENCE_CAPTURED_NOT_VALIDATION_ACCEPTED"
+            ]
+          }
+        },
+        "required": ["roundId", "status"]
+      },
+      "then": {
+        "required": ["historicalScripts", "failureLedger", "captureReceipt"],
+        "properties": {
+          "historicalScripts": {"minItems": 3, "maxItems": 3},
+          "failureLedger": {"minItems": 2},
+          "claims": {
+            "required": [
+              "externalCollectionStarted",
+              "captureComplete",
+              "historicalUsageVerified",
+              "ccvR2Authorized"
+            ],
+            "properties": {
+              "externalCollectionStarted": {"const": true},
+              "ccvR2Authorized": {"const": false}
             }
           }
         }
@@ -261,6 +327,30 @@
         },
         "architectureEvidence": {
           "$ref": "#/$defs/architectureEvidence"
+        },
+        "evidenceRef": {
+          "type": "string",
+          "pattern": "^ccv-r1-[a-z0-9-]+$"
+        },
+        "roundId": {
+          "enum": ["round-1", "round-2", "round-3", "shared"]
+        },
+        "collectionState": {
+          "enum": ["RECOVERED", "MISSING", "AMBIGUOUS"]
+        },
+        "usageLinkState": {
+          "enum": ["VERIFIED", "UNVERIFIED", "NOT_APPLICABLE"]
+        },
+        "usageLinkEvidenceRefs": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {"type": "string", "pattern": "^ccv-r1-[a-z0-9-]+$"}
+        },
+        "storageRef": {
+          "type": ["string", "null"]
+        },
+        "lineage": {
+          "type": ["object", "null"]
         }
       },
       "additionalProperties": true
@@ -375,11 +465,32 @@
             },
             "sha256": {
               "$ref": "#/$defs/sha256"
+            },
+            "filePath": {
+              "type": ["string", "null"]
+            },
+            "collectionState": {
+              "enum": ["RECOVERED", "MISSING", "AMBIGUOUS"]
+            },
+            "usageLinkState": {
+              "enum": ["VERIFIED", "UNVERIFIED", "NOT_APPLICABLE"]
+            },
+            "usageLinkEvidenceRefs": {
+              "type": "array",
+              "uniqueItems": true,
+              "items": {"type": "string", "pattern": "^ccv-r1-[a-z0-9-]+$"}
             }
           }
         },
         "runState": {
-          "enum": ["PENDING_EXTERNAL_EVIDENCE", "CAPTURED", "FAILED", "EXCLUDED"]
+          "enum": [
+            "PENDING_EXTERNAL_EVIDENCE",
+            "CAPTURED",
+            "MISSING_EVIDENCE",
+            "AMBIGUOUS_EVIDENCE",
+            "FAILED",
+            "EXCLUDED"
+          ]
         },
         "failure": {
           "type": ["object", "null"]
@@ -418,6 +529,57 @@
           }
         }
       ]
+    },
+    "failureEvent": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "eventId",
+        "roundId",
+        "eventType",
+        "eventState",
+        "runId",
+        "relatedRunId",
+        "sourceEvidenceRefs",
+        "summary",
+        "occurredAt"
+      ],
+      "properties": {
+        "eventId": {"type": "string", "pattern": "^ccv-r1-event-[a-z0-9-]+$"},
+        "roundId": {"enum": ["round-1", "round-2", "round-3", "shared"]},
+        "eventType": {"enum": ["FAILURE", "RETRY", "EXCLUSION"]},
+        "eventState": {"enum": ["RECOVERED", "MISSING", "AMBIGUOUS"]},
+        "runId": {"type": ["string", "null"]},
+        "relatedRunId": {"type": ["string", "null"]},
+        "sourceEvidenceRefs": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {"type": "string", "pattern": "^ccv-r1-[a-z0-9-]+$"}
+        },
+        "summary": {"type": "string", "minLength": 1},
+        "occurredAt": {"type": ["string", "null"], "format": "date-time"}
+      }
+    },
+    "captureReceipt": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "captureId",
+        "snapshotState",
+        "sourceDiskSnapshotRef",
+        "recordCount",
+        "recoveredRecordCount",
+        "captureComplete"
+      ],
+      "properties": {
+        "captureId": {"const": "acs-ccv-r1-historical-evidence"},
+        "snapshotState": {"enum": ["CAPTURED", "UNAVAILABLE"]},
+        "sourceDiskSnapshotRef": {"type": ["string", "null"]},
+        "recordCount": {"const": 27},
+        "recoveredRecordCount": {"type": "integer", "minimum": 0, "maximum": 27},
+        "captureComplete": {"type": "boolean"}
+      }
     }
   }
 }

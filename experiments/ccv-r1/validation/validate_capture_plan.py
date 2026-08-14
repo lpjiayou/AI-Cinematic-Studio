@@ -14,6 +14,8 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 PLAN_PATH = ROOT / "capture" / "capture-plan.pending.json"
+CAPTURE_SCHEMA_PATH = ROOT / "capture" / "historical-capture.schema.json"
+MANIFEST_SCHEMA_PATH = ROOT / "experiment-manifest.schema.json"
 
 
 def require(condition: bool, message: str) -> None:
@@ -109,6 +111,20 @@ def main() -> int:
     blockers = {blocker["code"] for blocker in plan["toolingBlockers"]}
     require(blockers == {"CCV-CAPTURE-001", "CCV-CAPTURE-002", "CCV-CAPTURE-003"}, "tooling blockers changed")
     require(all(blocker["status"] == "OPEN" for blocker in plan["toolingBlockers"]), "G0 must not close G1 blockers")
+
+    capture_schema = load_json(CAPTURE_SCHEMA_PATH)
+    manifest_schema = load_json(MANIFEST_SCHEMA_PATH)
+    capture_properties = capture_schema["properties"]
+    require(capture_properties["records"]["minItems"] == 27, "G1 capture schema must require 27 records")
+    require(capture_properties["runs"]["minItems"] == 50, "G1 capture schema must require 50 runs")
+    require("failureLedger" in capture_properties, "G1 capture schema must define failureLedger")
+    statuses = manifest_schema["properties"]["status"]["enum"]
+    require(
+        "EVIDENCE_CAPTURE_PARTIAL_NOT_VALIDATION_ACCEPTED" in statuses,
+        "manifest schema must distinguish partial recovery",
+    )
+    require("historicalScripts" in manifest_schema["properties"], "manifest schema must normalize historical scripts")
+    require("captureReceipt" in manifest_schema["properties"], "manifest schema must define captureReceipt")
     require(plan["claims"] == {
         "externalCollectionStarted": False,
         "historicalUsageVerified": False,
@@ -122,7 +138,8 @@ def main() -> int:
     print("run register: round-1=10, round-2=25, round-3=15, total=50")
     print(f"pending non-output evidence records: {len(records)}")
     print("external GPU access: NOT STARTED")
-    print("tooling blockers: 3 OPEN")
+    print("G0 plan blockers: 3 OPEN as immutable historical plan state")
+    print("G1 schema surfaces: historical scripts / 27 records / 50 runs / failure ledger PASS")
     return 0
 
 
