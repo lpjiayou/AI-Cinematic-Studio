@@ -117,7 +117,7 @@ class ScriptStudioPublicBoundary:
                 "m6_consumer_authority_unavailable", 503
             ) from None
         except Exception:
-            raise ScriptStudioPublicError("m6_lineage_mismatch", 409) from None
+            raise ScriptStudioPublicError("m6_consumer_internal_error", 500) from None
 
     def create_version(self, command: Mapping[str, Any]) -> dict[str, Any]:
         if self.__lifecycle_coordinator is None:
