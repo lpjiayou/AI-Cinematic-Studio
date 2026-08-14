@@ -360,7 +360,7 @@ The PRE-M6 route is fixed as:
 → `M6 Preconditions`
 → `M6-P1`
 
-The current phase is `M6-P3-B1-R1 Owner Acceptance Closeout`.
+The current phase is `ACS-GOV-POST-M6-P3-G1-CLOSEOUT`.
 
 Current governance state:
 
@@ -379,7 +379,7 @@ Current governance state:
 - M6 Preconditions: `SATISFIED FOR BOUNDED M6-P0/P1 AND M6-P2 LOCAL SQLITE ONLY`;
 - ACS-M6-P0-P1-R2: `OWNER ACCEPTED / COMPLETE / REMOTE-VERIFIED AT
   e38c75aa4ff26bdea80c82d8a24096f799dad860`;
-- current task: `ACS-M6-P3-G1-EPISODE-BASELINE-CONSUMER`;
+- current task: `ACS-GOV-POST-M6-P3-G1-CLOSEOUT`;
 - legacy repository capability provenance: `MEDIUM / OPEN / NON-BLOCKING`,
   Owner Gate `P3-RV1-003`;
 - M6-P0: `CONTRACT ACCEPTED / COMPLETE`;
@@ -391,7 +391,7 @@ Current governance state:
 - M6-P3-G0: `OWNER ACCEPTED / COMPLETE AS GOVERNANCE-ARCHITECTURE / NO
   IMPLEMENTATION AUTHORITY`;
 - ADR-0005 and M6 consumer contract: `ACCEPTED AS ARCHITECTURE / B1 OWNER
-  ACCEPTED THROUGH B1-R1 / G1 BOUNDED IMPLEMENTATION AUTHORIZED`;
+  ACCEPTED THROUGH B1-R1 / G1 OWNER ACCEPTED THROUGH G1-R1`;
 - M6-P3-B1 binding prerequisite: `ORIGINAL CANDIDATE REMOTE-VERIFIED AT
   8449b521c96bb8340806ecda8649698f4771914a / REVISION REQUIRED / CORRECTED
   THROUGH B1-R1 / OWNER ACCEPTED AT 5c656992d9fade3683b70e3c57f8b8ba7d26c7f7`;
@@ -411,9 +411,17 @@ Current governance state:
 - M6-P3-B1-R1 evidence: `PRE-FIX SQLITE REGRESSION REPRODUCED 409 / POST-FIX
   SQLITE MODULE 30/30 / ORIGINAL B1 SUITE 174/174 / FULL CORE 449/449 /
   NON-TEST PYTHON AST 63/63`;
-- M6-P3-G1: `GOVERNANCE REMOTE-VERIFIED / LOCAL TECHNICAL CANDIDATE /
-  G1 14/14 / FULL CORE 463/463 / REMOTE TECHNICAL VERIFICATION PENDING /
-  NOT OWNER ACCEPTED`;
+- M6-P3-G1 original: `REMOTE-VERIFIED AT
+  3696d6af12222d30eb99b65d67e6db18897eb42f / G1 14/14 / FULL CORE 463/463 /
+  REVISION REQUIRED / NOT OWNER ACCEPTED / SUPERSEDED BY G1-R1`;
+- M6-P3-G1-R1: `OWNER ACCEPTED / COMPLETE / REMOTE-VERIFIED AT
+  e172cc7c9bfca04066153d9edad70d9074bb37e5 / TREE
+  be7447c3d60510262e428b86cd1a6a83972f64c0 / FULL CORE 464/464`;
+- Core main convergence: `OWNER ACCEPTED / PR #2 REBASE AND MERGE / MAIN
+  5976263f92f7f9cbe9c091719eccb036ee8c0c2d / SAME ACCEPTED TREE /
+  POST-MERGE REPOSITORY VALIDATION PASS`;
+- next separately authorized checkpoint: `ACS-CCV-R1-EVIDENCE-HARDENING /
+  BLOCKED UNTIL ACS-GOV CLOSEOUT OWNER ACCEPTED`;
 - M6-P3 after G1 / M6-P4+: `NOT AUTHORIZED / NOT STARTED`;
 - R-CORE-ARCH-001: `CONFIRMED / HIGH / MONITORING — APPLICATION DIRECT V4
   DEPENDENCY REMEDIATED AT OWNER-ACCEPTED G1-R1`;
@@ -451,7 +459,13 @@ correction is remote-verified at
 `5c656992d9fade3683b70e3c57f8b8ba7d26c7f7`. Independent Owner Review reproduced
 the original false `409`, confirmed the correction, reran the complete `449/449`
 regression and accepted B1-R1 on `2026-08-14`. M6-P3-G1 received its separate bounded
-authorization later that day; its governance checkpoint must be remote-verified first.
+authorization later that day. The original G1 checkpoint
+`3696d6af12222d30eb99b65d67e6db18897eb42f` is `REVISION REQUIRED` for unknown-error
+semantic distortion. G1-R1 `e172cc7c9bfca04066153d9edad70d9074bb37e5`
+corrects only that fallback, passes `464/464` and is Owner Accepted. Protected `main`
+was converged through PR `#2` with `Rebase and merge` at
+`5976263f92f7f9cbe9c091719eccb036ee8c0c2d`; its tree equals accepted G1-R1 and
+post-merge validation passes.
 
 The M6 gate order is:
 
@@ -497,8 +511,10 @@ clarification, the existing HTTP workspace versions projection passes through
 `episodePlanItemBindings` for v2 responses. v1 responses remain unchanged, and no
 other HTTP contract expansion is authorized.
 
-This does not establish a general Architecture Review, Production Ready status,
-formal database deployment, M3/M6 consumer authority or M6-P3-G1 authority.
+At the B1 authorization time this did not establish a general Architecture Review,
+Production Ready status, formal database deployment, M3/M6 consumer authority or
+M6-P3-G1 authority. The later exact G1/G1-R1 authorization and acceptance does not
+retroactively widen B1.
 
 M6 Character Intelligence must cover at least:
 
@@ -522,9 +538,9 @@ REMOTE-VERIFIED`; ADR-0004 and the M6-P2 SQLite contract are accepted;
 M6-P2-G1 is `OWNER ACCEPTED / COMPLETE / REMOTE-VERIFIED AT
 8227c6c616140824fd70de920dc6fcf459bb734d`; M6-P3-G0 is `OWNER ACCEPTED /
 COMPLETE AS GOVERNANCE-ARCHITECTURE`; M6-P3-B1 is `OWNER ACCEPTED THROUGH B1-R1 AT
-5c656992d9fade3683b70e3c57f8b8ba7d26c7f7`; M6-P3-G1 is separately authorized
-only by `governance/ACS-M6-P3-G1-EPISODE-BASELINE-CONSUMER.md`. All work after G1
-remains `NOT AUTHORIZED / NOT STARTED`.
+5c656992d9fade3683b70e3c57f8b8ba7d26c7f7`; M6-P3-G1 is Owner Accepted only through
+G1-R1 at `e172cc7c9bfca04066153d9edad70d9074bb37e5`. All work after G1 remains
+`NOT AUTHORIZED / NOT STARTED`.
 
 The accepted architecture-remediation sequence is:
 
@@ -568,6 +584,17 @@ The accepted architecture-remediation sequence is:
 14. B1-R1 Owner Review independently reproduces the original false `409`, verifies
     the corrected exact/suspicious-scope selection, reruns `449/449` and accepts the
     remote technical checkpoint at `5c656992d9fade3683b70e3c57f8b8ba7d26c7f7`.
+15. M6-P3-G1 implements the exact read-only consumer and is remote-verified at
+    `3696d6af12222d30eb99b65d67e6db18897eb42f`; Owner Review marks it
+    `REVISION REQUIRED` because unknown exceptions are incorrectly reported as the
+    specific `m6_lineage_mismatch / 409` business failure.
+16. G1-R1 changes only `services/v5_core_os/script_studio/public.py`, adds only
+    `tests/unit/test_m6_p3_g1_r1_error_semantics.py`, maps unknown exceptions to
+    `m6_consumer_internal_error / 500`, passes `464/464` and is Owner Accepted at
+    `e172cc7c9bfca04066153d9edad70d9074bb37e5`.
+17. Core `main` converges through PR `#2` using `Rebase and merge` at
+    `5976263f92f7f9cbe9c091719eccb036ee8c0c2d`; its tree equals G1-R1, its
+    post-merge Repository Validation passes and no historical branch is deleted.
 
 The G1 authorization requires its exact eight-path governance checkpoint to be
 remote-verified before production or test edits. It then permits only the seven
@@ -578,11 +605,12 @@ It authorizes no Schema/Migration, formal port-8765 database access, HTTP route,
 handler or external DTO source-file change, Auth/RBAC, Frontend, M7+, V3, GPU, Worker
 or ComfyUI work.
 
-The bounded G1 local technical candidate changes the exact seven production paths and
-adds the exact three tests in its record. G1 `14/14`, full Core `463/463`, Markdown
-`88/88`, local links `323/323`, non-test Python AST `63/63`, architecture, secret,
-`__init__`, HTTP/Migration/DDL and diff gates pass. Technical non-force publication,
-remote equality verification and the mandatory Owner Review stop remain.
+The bounded original G1 changes the exact seven production paths and adds the exact
+three tests in its record. G1 `14/14`, full Core `463/463`, Markdown `88/88`, local
+links `323/323`, non-test Python AST `63/63`, architecture, secret, `__init__`,
+HTTP/Migration/DDL and diff gates pass. Those green gates did not override its unknown
+error semantic defect; the original remains `REVISION REQUIRED`. G1-R1 is the accepted
+technical result at `e172cc7c9bfca04066153d9edad70d9074bb37e5`, full Core `464/464`.
 
 Legacy Phase 0 provenance debt remains `OPEN / NON-BLOCKING` under Owner Gate
 `P3-RV1-003`. This acknowledgement does not silently close the debt or import

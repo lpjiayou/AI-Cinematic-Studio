@@ -14,7 +14,7 @@
 > UI-R1 Accepted SHA:
 > `c9536fc0c745d0bf9e9c3eb543f4ab6c0566798a`
 >
-> Revision: M6-P3-G1 Core-only local candidate synchronization; product IA and visual baseline unchanged.
+> Revision: M6-P3-G1-R1 Owner Acceptance and Core main convergence synchronization; product IA and visual baseline unchanged.
 >
 > Scope:
 > AI Cinematic Studio Creator / Project Workspace / Production Editors /
@@ -136,6 +136,12 @@ NOT OWNER ACCEPTED`；修正后的 G1-R1 已在
 技术提交 `5c656992d9fade3683b70e3c57f8b8ba7d26c7f7` 已通过 SQLite `30/30`、
 原 B1 `174/174`、完整 Core `449/449` 与 AST `63/63`，并于 `2026-08-14`
 获得 Owner Acceptance。该 Core-only 结论不改变 Frontend 产品 IA 或视觉基线。
+后续 M6-P3-G1 原候选 `3696d6af12222d30eb99b65d67e6db18897eb42f`
+因未知异常语义失真保持历史 `REVISION REQUIRED`；G1-R1
+`e172cc7c9bfca04066153d9edad70d9074bb37e5` 通过 `464/464` 并获 Owner
+Acceptance。Core `main` 的 PR rebase 收敛结果
+`5976263f92f7f9cbe9c091719eccb036ee8c0c2d` 与 G1-R1 tree 完全一致。上述
+Core-only 结论仍不授权任何 Frontend、Experience Adapter 或 Gate C 实施。
 
 ---
 
@@ -184,8 +190,13 @@ NOT OWNER ACCEPTED`；修正后的 G1-R1 已在
 - ACS-ARCH-R1-V5-TEXT-GENERATION-G1-R1：`OWNER ACCEPTED / COMPLETE /
   REMOTE-VERIFIED AT d44f471c644e319bb4a5bf73707c3274ecbaa426`；
 - Frontend M6 activation：`FROZEN / NOT AUTHORIZED`；
-- M6-P3-G1：`CORE-ONLY LOCAL TECHNICAL CANDIDATE / G1 14/14 / FULL CORE 463/463 /
-  REMOTE VERIFICATION PENDING / NO FRONTEND AUTHORITY / NOT OWNER ACCEPTED`；
+- M6-P3-G1：`ORIGINAL 3696d6af REVISION REQUIRED / G1-R1 OWNER ACCEPTED AT
+  e172cc7c9bfca04066153d9edad70d9074bb37e5 / TREE be7447c3 / FULL CORE 464/464 /
+  NO FRONTEND AUTHORITY`；
+- Core main convergence：`PR #2 REBASE AND MERGE / MAIN 5976263f92f7f9cbe9c091719eccb036ee8c0c2d /
+  SAME ACCEPTED TREE / POST-MERGE CI PASS / NO FRONTEND CHANGE`；
+- ACS-CCV-R1：`EVIDENCE HARDENING SEPARATELY AUTHORIZED / BLOCKED UNTIL GOVERNANCE
+  CLOSEOUT OWNER ACCEPTED / NO FRONTEND AUTHORITY`；
 - M6-P3 after G1 / M6-P4+：`NOT AUTHORIZED / NOT STARTED`；
 - M7-M19：`NOT STARTED / NOT AUTHORIZED`。
 

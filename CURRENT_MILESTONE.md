@@ -2,17 +2,19 @@
 
 > Document: `CURRENT_MILESTONE.md`
 >
-> Execution Mode: `AUTO-SEQUENTIAL / BOUNDED / FAIL-CLOSED`
+> Execution Mode: `MANUAL / BOUNDED / FAIL-CLOSED`
 >
-> Project Lead Authorization: `M6-P3-G1 BOUNDED CORE-ONLY IMPLEMENTATION AUTHORIZED BY PROJECT LEAD / ARCHITECTURE / REPOSITORY GOVERNANCE / M2-M6 DOMAIN OWNERS ON 2026-08-14`
+> Project Lead Authorization: `ACS-GOV-POST-M6-P3-G1-CLOSEOUT AND ACS-CCV-R1-EVIDENCE-HARDENING SEPARATELY AUTHORIZED ON 2026-08-14`
 >
-> Authorized Wave: `G1 GOVERNANCE-ONLY CHECKPOINT → REMOTE VERIFY → BOUNDED CORE IMPLEMENTATION → REMOTE VERIFY → STOP FOR OWNER REVIEW`
+> Authorized Wave: `ACS-GOV NINE-PATH GOVERNANCE-ONLY SYNCHRONIZATION → REMOTE VERIFY → STOP FOR OWNER REVIEW`
 >
-> Current Task: `ACS-M6-P3-G1-EPISODE-BASELINE-CONSUMER`
+> Current Task: `ACS-GOV-POST-M6-P3-G1-CLOSEOUT`
 >
-> Current Work Package: `BOUNDED G1 TECHNICAL CANDIDATE / LOCAL GATES PASS / REMOTE VERIFICATION PENDING`
+> Current Work Package: `GOVERNANCE-ONLY OWNER-ACCEPTANCE AND CORE MAIN CONVERGENCE SYNCHRONIZATION`
 >
-> M6 Authorization: `P0-P2 OWNER ACCEPTED / P3-G0 OWNER ACCEPTED AS ARCHITECTURE / P3-B1 OWNER ACCEPTED THROUGH B1-R1 / P3-G1 BOUNDED IMPLEMENTATION AUTHORIZED / NOT OWNER ACCEPTED`
+> M6 Authorization: `P0-P2 OWNER ACCEPTED / P3-G0 OWNER ACCEPTED AS ARCHITECTURE / P3-B1 OWNER ACCEPTED THROUGH B1-R1 / P3-G1 OWNER ACCEPTED THROUGH G1-R1 / LATER M6 NOT AUTHORIZED`
+
+> Next Separately Authorized Checkpoint: `ACS-CCV-R1-EVIDENCE-HARDENING / BLOCKED UNTIL ACS-GOV CLOSEOUT OWNER ACCEPTED`
 >
 > M7 Authorization: `NOT AUTHORIZED`
 >
@@ -66,31 +68,34 @@ decommission. It is no longer an active Core work package and does not authorize
 
 Current stage:
 
-`M6-P3-G1 Governance Authorization`
+`Post M6-P3-G1 Governance Closeout`
 
 Title:
 
-ACS-M6-P3-G1 Episode Baseline Consumer
+ACS-GOV-POST-M6-P3-G1-CLOSEOUT
 
 Status:
 
-`B1-R1 OWNER ACCEPTED / ADR-0005 CLOSED AT ARCHITECTURE LAYER / G1 LOCAL TECHNICAL CANDIDATE / 14/14 + FULL CORE 463/463 / REMOTE VERIFICATION PENDING / NOT OWNER ACCEPTED`
+`G1 ORIGINAL REVISION REQUIRED / G1-R1 OWNER ACCEPTED AT e172cc7c / CORE MAIN CONVERGED AT 5976263f / NINE-PATH GOVERNANCE SYNCHRONIZATION IN PROGRESS`
 
 Purpose:
 
-1. preserve B1-R1 Owner Acceptance and ADR-0005 architecture closure as prerequisites;
-2. establish and remote-verify the exact eight-path G1 governance authorization
-   checkpoint before any production or test edit;
-3. implement only the internal read-only `ActiveM6BaselineReader` and exact M3
-   `get_m6_episode_baseline(...)` surface within the frozen seven production paths;
-4. add only the three frozen G1 unit/contract/integration test files;
-5. preserve ScriptVersion persistence, all existing Script behavior, HTTP/API,
-   Frontend, schema/migration and event semantics;
-6. test, commit, non-force publish, remote-verify and stop for G1 Owner Review.
+1. preserve the original G1 `3696d6af12222d30eb99b65d67e6db18897eb42f` as
+   historical `REVISION REQUIRED / NOT OWNER ACCEPTED / SUPERSEDED`;
+2. record G1-R1 `e172cc7c9bfca04066153d9edad70d9074bb37e5` as Owner
+   Accepted with tree `be7447c3d60510262e428b86cd1a6a83972f64c0` and full Core
+   `464/464`;
+3. record protected Core `main` convergence through PR `#2` using `Rebase and merge`
+   at `5976263f92f7f9cbe9c091719eccb036ee8c0c2d` with the same tree and passing
+   post-merge Repository Validation;
+4. change only the exact nine governance/status paths frozen in
+   `governance/ACS-GOV-POST-M6-P3-G1-CLOSEOUT.md`;
+5. preserve production, tests, HTTP/API, Frontend, schema/migration and event semantics;
+6. test, commit, non-force publish, remote-verify and stop for Owner Review.
 
-The exact selection semantics and allowlists are frozen by
-`governance/ACS-M6-P3-G1-EPISODE-BASELINE-CONSUMER.md` and Consumer Contract sections
-6, 11, 12.2 and 13.2. Implementation may not select a looser interpretation.
+The separately authorized `ACS-CCV-R1-EVIDENCE-HARDENING` checkpoint may start only
+after this closeout is Owner Accepted. It authorizes evidence hardening only and no M6
+schema or production implementation.
 
 ---
 
@@ -331,17 +336,18 @@ The original G1 remains historical `REVISION REQUIRED / NOT OWNER ACCEPTED` and 
 superseded by the accepted G1-R1 result. B1 candidate
 `8449b521c96bb8340806ecda8649698f4771914a` is also `REVISION REQUIRED / NOT OWNER
 ACCEPTED`. B1-R1 corrected that defect and is Owner Accepted at
-`5c656992d9fade3683b70e3c57f8b8ba7d26c7f7`. The current authorized transition is
-governance-only:
+`5c656992d9fade3683b70e3c57f8b8ba7d26c7f7`. M6-P3-G1 and G1-R1 were later completed
+as recorded below. The current authorized transition is governance-only:
 
 ```text
-B1-R1 OWNER REVIEW PASS
-→ SYNCHRONIZE OWNER ACCEPTANCE IN THE EIGHT GOVERNANCE PATHS
+M6-P3-G1-R1 OWNER REVIEW PASS
+→ SYNCHRONIZE OWNER ACCEPTANCE AND CORE MAIN CONVERGENCE IN NINE PATHS
 → COMMIT / NON-FORCE PUSH / REMOTE VERIFY
 → STOP
 ```
 
-No G1 or later milestone may be silently entered.
+No Character Consistency evidence work or later milestone may be silently entered
+before this closeout is Owner Accepted.
 
 ---
 
@@ -351,9 +357,10 @@ M6-P0/P1 and M6-P2-G1 are `OWNER ACCEPTED / COMPLETE / REMOTE-VERIFIED`.
 The Project Lead and Architecture Owner accepted the G3/P3-G0 target architecture,
 ADR-0005 and the M6 consumer contract on `2026-08-13`. M6-P3-G0 is complete only as a
 governance/architecture decision. The later explicit Owner decision authorized
-M6-P3-B1, and the corrected B1-R1 checkpoint is now Owner Accepted. M6-P3-G1 and all
-later M6 work remain `NOT AUTHORIZED / NOT STARTED` until their own explicit
-governance authorization.
+M6-P3-B1, and the corrected B1-R1 checkpoint is Owner Accepted. M6-P3-G1 was later
+separately authorized and is Owner Accepted only through G1-R1 at
+`e172cc7c9bfca04066153d9edad70d9074bb37e5`. All work after G1 remains
+`NOT AUTHORIZED / NOT STARTED` until its own explicit governance authorization.
 
 M6 Character Intelligence must include at least background, motivation, belief,
 conflict, goal, personality, behavior rules, dialogue rules, forbidden behavior,
@@ -432,9 +439,9 @@ capability.
 - RB13-F001: `R1 IMPLEMENTED / INDEPENDENTLY ACCEPTED / CLOSED`
 - ADR-0002 STATUS: `ACCEPTED FOR BOUNDED R2 IMPLEMENTATION`
 - RB13-F002: `REMEDIATED / CLOSED IN CURRENT TESTED CORE BASELINE`
-- EXECUTION MODE: `AUTO-SEQUENTIAL / BOUNDED / FAIL-CLOSED`
-- AUTHORIZED WAVE: `G1 GOVERNANCE CHECKPOINT → REMOTE VERIFY → BOUNDED IMPLEMENTATION → REMOTE VERIFY → STOP FOR OWNER REVIEW`
-- CURRENT TASK: `ACS-M6-P3-G1-EPISODE-BASELINE-CONSUMER`
+- EXECUTION MODE: `MANUAL / BOUNDED / FAIL-CLOSED`
+- AUTHORIZED WAVE: `ACS-GOV NINE-PATH GOVERNANCE-ONLY SYNCHRONIZATION → REMOTE VERIFY → STOP FOR OWNER REVIEW`
+- CURRENT TASK: `ACS-GOV-POST-M6-P3-G1-CLOSEOUT`
 - G0 BASE: `c524486c05c21b270a7dd75e89fae4312430736a`
 - ADR-0006 STATUS: `ACCEPTED FOR BOUNDED G1`
 - V5 TEXT GENERATION CONTRACT: `ACCEPTED FOR BOUNDED G1`
@@ -451,7 +458,7 @@ capability.
 - RB1.3 CLOSEOUT: `FORMALLY CLOSED`
 - ARCHITECTURE REVIEW: `SATISFIED FOR BOUNDED M6-P0/P1 AND M6-P2 LOCAL SQLITE ONLY`
 - M6 PRECONDITIONS: `SATISFIED FOR BOUNDED M6-P0/P1 AND M6-P2 LOCAL SQLITE ONLY`
-- M6: `P0-P2 OWNER ACCEPTED / P3-G0 OWNER ACCEPTED AS ARCHITECTURE / P3-B1 OWNER ACCEPTED THROUGH B1-R1 / P3-G1 BOUNDED IMPLEMENTATION AUTHORIZED / LATER M6 WORK NOT AUTHORIZED`
+- M6: `P0-P2 OWNER ACCEPTED / P3-G0 OWNER ACCEPTED AS ARCHITECTURE / P3-B1 OWNER ACCEPTED THROUGH B1-R1 / P3-G1 OWNER ACCEPTED THROUGH G1-R1 / LATER M6 WORK NOT AUTHORIZED`
 - M6-P0 STATUS: `CONTRACT ACCEPTED / COMPLETE`
 - M6-P1 STATUS: `OWNER ACCEPTED / COMPLETE / REMOTE-VERIFIED AT e38c75aa4ff26bdea80c82d8a24096f799dad860`
 - ADR-0004 STATUS: `ACCEPTED FOR BOUNDED M6-P2 IMPLEMENTATION`
@@ -459,8 +466,8 @@ capability.
 - M6-P2-G1 STATUS: `OWNER ACCEPTED / COMPLETE / REMOTE-VERIFIED AT 8227c6c616140824fd70de920dc6fcf459bb734d`
 - M6-P2-G1-CLOSEOUT-G3 STATUS: `REMOTE-VERIFIED HISTORICAL PROPOSAL CHECKPOINT AT c524486c05c21b270a7dd75e89fae4312430736a / PRESERVED`
 - M6-P3-G0 STATUS: `OWNER ACCEPTED / COMPLETE AS GOVERNANCE-ARCHITECTURE / NO IMPLEMENTATION AUTHORITY`
-- ADR-0005 STATUS: `ACCEPTED AS ARCHITECTURE DECISION / B1 OWNER ACCEPTED THROUGH B1-R1 / G1 BOUNDED IMPLEMENTATION AUTHORIZED`
-- M6 CONSUMER CONTRACT: `ACCEPTED NORMATIVE ARCHITECTURE / B1 OWNER ACCEPTED THROUGH B1-R1 / G1 AUTHORIZED BUT NOT YET IMPLEMENTED`
+- ADR-0005 STATUS: `ACCEPTED AS ARCHITECTURE DECISION / B1 OWNER ACCEPTED THROUGH B1-R1 / G1 OWNER ACCEPTED THROUGH G1-R1`
+- M6 CONSUMER CONTRACT: `ACCEPTED NORMATIVE ARCHITECTURE / B1 OWNER ACCEPTED THROUGH B1-R1 / G1 OWNER ACCEPTED THROUGH G1-R1`
 - M6-P3-B1 EPISODE-PLAN-ITEM BINDING: `ORIGINAL CANDIDATE AT 8449b521c96bb8340806ecda8649698f4771914a REVISION REQUIRED / CORRECTED AND OWNER ACCEPTED THROUGH B1-R1 AT 5c656992d9fade3683b70e3c57f8b8ba7d26c7f7`
 - M6-P3-B1 AUTHORIZED BASE: `6bb9d165a693057f38e5789c408293ff0eaf5bcc`
 - M6-P3-B1 DOMAIN OWNERS: `M2 / M4 / M5 / M6 APPROVED`
@@ -474,7 +481,10 @@ capability.
 - M6-P3-B1-R1 AUTHORIZED BASE: `8449b521c96bb8340806ecda8649698f4771914a`
 - M6-P3-B1-R1 SCOPE: `8 GOVERNANCE → 1 PRODUCTION + 1 TEST → REMOTE VERIFY → STOP FOR OWNER REVIEW`
 - M6-P3-B1-R1 EVIDENCE: `PRE-FIX SQLITE 409 REPRODUCED / POST-FIX SQLITE MODULE 30/30 / ORIGINAL B1 174/174 / FULL CORE 449/449 / NON-TEST PYTHON AST 63/63`
-- M6-P3-G1 STATUS: `GOVERNANCE REMOTE-VERIFIED / LOCAL TECHNICAL CANDIDATE / G1 14/14 / FULL CORE 463/463 / REMOTE TECHNICAL VERIFICATION PENDING / NOT OWNER ACCEPTED`
+- M6-P3-G1 ORIGINAL STATUS: `REMOTE-VERIFIED AT 3696d6af12222d30eb99b65d67e6db18897eb42f / G1 14/14 / FULL CORE 463/463 / REVISION REQUIRED / NOT OWNER ACCEPTED / SUPERSEDED`
+- M6-P3-G1-R1 STATUS: `OWNER ACCEPTED / COMPLETE / REMOTE-VERIFIED AT e172cc7c9bfca04066153d9edad70d9074bb37e5 / TREE be7447c3d60510262e428b86cd1a6a83972f64c0 / FULL CORE 464/464`
+- CORE MAIN CONVERGENCE: `OWNER ACCEPTED / PR #2 REBASE AND MERGE / MAIN 5976263f92f7f9cbe9c091719eccb036ee8c0c2d / SAME TREE / POST-MERGE CI PASS`
+- NEXT SEPARATELY AUTHORIZED CHECKPOINT: `ACS-CCV-R1-EVIDENCE-HARDENING / BLOCKED UNTIL ACS-GOV CLOSEOUT OWNER ACCEPTED`
 - M6-P3 AFTER G1 / M6-P4+ STATUS: `NOT AUTHORIZED / NOT STARTED`
 - M7-M19: `NOT STARTED / NOT AUTHORIZED`
 - FORMAL 8765 DEPLOYMENT: `UNTOUCHED / NOT DEPLOYED`
@@ -494,82 +504,60 @@ and that G0 acceptance remains immutable timepoint evidence. The Project Lead se
 and accepted ADR-0006 and later accepted corrected G1-R1 at
 `d44f471c644e319bb4a5bf73707c3274ecbaa426`. This closes the architecture-remediation
 wave but does not establish Production Ready or authorize formal database deployment,
-Frontend, M6-P3-G1, later M6 work or M7-M19. B1 is accepted only through the explicit
-B1-R1 correction and does not create any later implementation authority.
+Frontend, later M6 work or M7-M19. B1 is accepted only through the explicit B1-R1
+correction and did not itself create G1 implementation authority; G1 was later
+separately authorized and accepted through G1-R1.
 
 ---
 
 # 9. Stop Rule
 
-B1 is remote-verified at `8449b521c96bb8340806ecda8649698f4771914a` but is
-`REVISION REQUIRED / NOT OWNER ACCEPTED`. The B1-R1 exact eight-path governance
-checkpoint was committed and remote-verified at
-`716b4d298173f8123cafd93114dfc67339943ff3` with production and test diff zero.
-
-The B1-R1 correction is remote-verified at
-`5c656992d9fade3683b70e3c57f8b8ba7d26c7f7`. Owner Review independently reproduced
-the original false `409`, confirmed the corrected path, reran SQLite `30/30`, complete
-Core `449/449`, Markdown `87/87`, local links `322/322`, non-test Python AST `63/63`,
-secret, DDL/Migration and `git diff --check` gates, and accepted B1-R1 on
-`2026-08-14`.
-
-After the G1 governance-only authorization checkpoint is remote-verified:
+The current checkpoint changes exactly the nine governance/status paths in
+[`ACS-GOV-POST-M6-P3-G1-CLOSEOUT.md`](governance/ACS-GOV-POST-M6-P3-G1-CLOSEOUT.md).
+Production and test diff must remain zero. After documentation, regression, commit,
+non-force push, remote equality and CI observation:
 
 ```text
-M6-P3-G1 BOUNDED IMPLEMENTATION MAY START
-ONLY THE FROZEN SEVEN PRODUCTION + THREE NEW TEST PATHS
-AFTER TECHNICAL REMOTE VERIFICATION: STOP FOR OWNER REVIEW
+ACS-GOV-POST-M6-P3-G1-CLOSEOUT CHECKPOINT CANDIDATE
+PROJECT LEAD OWNER REVIEW REQUIRED
+DO NOT ENTER ACS-CCV-R1 UNTIL CLOSEOUT OWNER ACCEPTED
 ```
 
-Stop before any need to exceed the G1 frozen seven production, three new test and eight
-governance paths, or add DDL/Migration, route/handler/external DTO source-file changes,
-Script writes, M7-M19, formal database deployment, Auth/RBAC expansion or Frontend work.
+Stop before any production/test change, M6 schema change, DDL/Migration,
+route/handler/external DTO change, Script write, later M6, M7-M19, formal database,
+Auth/RBAC, Frontend, GPU, Worker or ComfyUI work.
 
 ---
 
 # 10. Current Authorized Task
 
-`ACS-M6-P3-G1-EPISODE-BASELINE-CONSUMER`
+`ACS-GOV-POST-M6-P3-G1-CLOSEOUT`
 
 Status:
 
-`LOCAL TECHNICAL CANDIDATE / ALL LOCAL GATES PASS / REMOTE VERIFICATION PENDING / NOT OWNER ACCEPTED`
+`GOVERNANCE-ONLY SYNCHRONIZATION / NINE-PATH ALLOWLIST / OWNER REVIEW REQUIRED`
 
-M6-P0/P1 and bounded M6-P2-G1 remain Owner Accepted at their remote-verified technical
-baselines. G1-R1 is Owner Accepted and complete at
-`d44f471c644e319bb4a5bf73707c3274ecbaa426`. The original G1 remains historical
-`REVISION REQUIRED / NOT OWNER ACCEPTED / SUPERSEDED BY G1-R1`.
-
-ADR-0006 accepts the single production path:
+Accepted technical evidence:
 
 ```text
-Creator Application
-→ V5 Text Generation Capability
-→ V4 TextGenerationPort
-→ Provider Adapter
+ORIGINAL M6-P3-G1: 3696d6af12222d30eb99b65d67e6db18897eb42f
+STATUS: REVISION REQUIRED / NOT OWNER ACCEPTED / SUPERSEDED
+
+M6-P3-G1-R1: e172cc7c9bfca04066153d9edad70d9074bb37e5
+TREE: be7447c3d60510262e428b86cd1a6a83972f64c0
+STATUS: OWNER ACCEPTED / COMPLETE / REMOTE-VERIFIED / FULL CORE 464/464
+
+CORE MAIN: 5976263f92f7f9cbe9c091719eccb036ee8c0c2d
+TREE: be7447c3d60510262e428b86cd1a6a83972f64c0
+STATUS: PR #2 REBASE AND MERGE / POST-MERGE CI PASS / OWNER ACCEPTED
 ```
 
-The Project Lead, Architecture Owner, Repository Governance Owner and affected M2/M5
-Domain Owners accepted the exact B1-R1 correction recorded in
-[`ACS-M6-P3-B1-EPISODE-PLAN-ITEM-BINDING.md`](governance/ACS-M6-P3-B1-EPISODE-PLAN-ITEM-BINDING.md):
-the eight-path governance checkpoint is remote-verified at
-`716b4d298173f8123cafd93114dfc67339943ff3`; the one-production/one-test correction
-is remote-verified at `5c656992d9fade3683b70e3c57f8b8ba7d26c7f7` and passed
-independent Owner Review. G1 authority comes only from the later exact G1 record.
+The next separately authorized checkpoint is `ACS-CCV-R1-EVIDENCE-HARDENING`, but it
+remains blocked until this governance closeout is Owner Accepted. It may revise and
+package experimental Character Consistency evidence only; it may not change M6,
+Identity, Asset, HTTP/API or Frontend production behavior.
 
-That exact authorization is
-[`ACS-M6-P3-G1-EPISODE-BASELINE-CONSUMER.md`](governance/ACS-M6-P3-G1-EPISODE-BASELINE-CONSUMER.md).
-It freezes the eight-path governance checkpoint followed by seven production and three
-new test paths. The governance checkpoint is remote-verified. The local implementation
-passes focused G1 `14/14`, full Core `463/463`, Markdown `88/88`, links `323/323`,
-non-test AST `63/63` and all scope/security checks. It must stop after technical remote
-verification for Owner Review.
-
-Formal port-8765 database access/deployment, HTTP route/handler/external DTO
-source-file changes, HTTP expansion beyond the Owner-approved existing workspace
-versions v2 field pass-through, Auth/RBAC, Frontend, Schema/Migration, G1 work outside
-the exact read-only consumer, later M6 work, M7-M19, V3, GPU, Worker and ComfyUI remain
-unauthorized and not started. B1-R1 changes no existing Domain ownership or Production
-Spine.
+Formal port-8765 deployment, later M6 work, M7-M19, Schema/Migration, Frontend,
+production GPU/Worker/ComfyUI integration and Production Ready remain unauthorized.
 
 # End of CURRENT_MILESTONE.md

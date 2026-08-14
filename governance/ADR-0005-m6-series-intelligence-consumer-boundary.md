@@ -4,7 +4,7 @@
 
 | Field | Value |
 | --- | --- |
-| Status | `ACCEPTED AS ARCHITECTURE DECISION / B1 OWNER ACCEPTED THROUGH B1-R1 AT 5c656992d9fade3683b70e3c57f8b8ba7d26c7f7 / G1 LOCAL TECHNICAL CANDIDATE / REMOTE VERIFICATION PENDING / NOT OWNER ACCEPTED` |
+| Status | `ACCEPTED AS ARCHITECTURE DECISION / B1 OWNER ACCEPTED THROUGH B1-R1 / G1 OWNER ACCEPTED THROUGH G1-R1 AT e172cc7c9bfca04066153d9edad70d9074bb37e5` |
 | Created | `2026-08-13` |
 | Author | `Codex architecture proposal under Project Lead G3/P3-G0 authority` |
 | Approval owners | `Project Lead / Architecture Owner — ACCEPTED; M2/M4/M5/M6 Domain Owners — APPROVED FOR B1; other applicable Domain Owners — PENDING FOR FUTURE WORK` |
@@ -53,7 +53,8 @@ G1 authority. Its governance checkpoint is remote-verified at
 `30/30`, original B1 `174/174`, full Core `449/449` and non-test Python AST `63/63`.
 The correction is remote-verified at
 `5c656992d9fade3683b70e3c57f8b8ba7d26c7f7` and was Owner Accepted on
-`2026-08-14`. This acceptance satisfies the B1 prerequisite but does not authorize G1.
+`2026-08-14`. That acceptance satisfied the B1 prerequisite. G1 was later separately
+authorized, implemented and accepted only through G1-R1.
 
 ## Decision — accepted target architecture
 
@@ -280,9 +281,10 @@ Public HTTP codes, UI wording and external DTOs are intentionally not decided he
 6. Stop for Owner Review. M7 and M9 remain separate tasks.
 
 There is no migration or data write in M6-P3-G0. Existing data is unchanged. B1 is
-Owner Accepted through B1-R1. G1 is now authorized only within
-`ACS-M6-P3-G1-EPISODE-BASELINE-CONSUMER` and remains blocked until that record's
-governance-only checkpoint is remote-verified.
+Owner Accepted through B1-R1. G1 is Owner Accepted only through the G1-R1 correction
+at `e172cc7c9bfca04066153d9edad70d9074bb37e5`; the original G1 candidate
+`3696d6af12222d30eb99b65d67e6db18897eb42f` remains historical `REVISION REQUIRED /
+NOT OWNER ACCEPTED / SUPERSEDED`.
 
 ## Explicit exclusions
 
@@ -304,7 +306,7 @@ V4/V3, Provider, GPU, Worker, ComfyUI, M6-P4+ or Production Ready status.
 | Architecture Owner | `蔺鹏` | `ACCEPTED AS ARCHITECTURE` | `2026-08-13` | Target boundary and two-checkpoint sequence accepted; bounded B1 later approved |
 | Repository Governance Owner | `蔺鹏` | `AUTHORIZED` | `2026-08-13` | Exact B1 governance and technical sequence |
 | M2/M4/M5/M6 Domain Owners | `蔺鹏` | `APPROVED FOR B1` | `2026-08-13` | Bounded binding, trusted-context, lifecycle and M6-source compatibility scope |
-| M3 Domain Owner | `蔺鹏` | `APPROVED FOR BOUNDED G1 READ SURFACE` | `2026-08-14` | Exact `get_m6_episode_baseline(...)` only; no Script write or persistence change |
+| M3 Domain Owner | `蔺鹏` | `OWNER ACCEPTED THROUGH G1-R1` | `2026-08-14` | Exact `get_m6_episode_baseline(...)` only; neutral unknown-error correction; no Script write or persistence change |
 | M7/M9 and other future Domain Owners | `PENDING` | `PENDING FOR FUTURE AFFECTED IMPLEMENTATION` | — | No approval inferred; later work remains blocked |
 
 ## Change history
@@ -319,3 +321,5 @@ V4/V3, Provider, GPU, Worker, ComfyUI, M6-P4+ or Production Ready status.
 | `2026-08-14` | B1-R1 correction at `5c656992d9fade3683b70e3c57f8b8ba7d26c7f7` Owner Accepted after independent defect reproduction and complete regression; G1 remains separately gated | `Project Lead / Architecture Owner / Repository Governance Owner / M2-M5 Domain Owners` |
 | `2026-08-14` | Bounded G1 Core-only read consumer separately authorized; governance-only checkpoint must be remote-verified before the exact seven-production/three-new-test implementation | `Project Lead / Architecture Owner / Repository Governance Owner / M2-M3-M4-M5-M6 Domain Owners` |
 | `2026-08-14` | G1 governance checkpoint remote-verified; exact local technical candidate passes G1 `14/14`, full Core `463/463` and all static/scope gates; technical remote verification and Owner Review remain | `Codex implementation evidence under bounded G1 authority` |
+| `2026-08-14` | Original G1 `3696d6af12222d30eb99b65d67e6db18897eb42f` marked Revision Required for unknown-error semantic distortion; G1-R1 `e172cc7c9bfca04066153d9edad70d9074bb37e5` maps unknown failures to neutral `m6_consumer_internal_error / 500`, passes `464/464` and is Owner Accepted | `Project Lead / Architecture Owner / Repository Governance Owner / M2-M3-M4-M5-M6 Domain Owners` |
+| `2026-08-14` | Core `main` converged through PR `#2` with `Rebase and merge` at `5976263f92f7f9cbe9c091719eccb036ee8c0c2d`; tree equals accepted G1-R1 and post-merge Repository Validation passes | `ACS-CORE-MAIN-SYNC-G2 / Project Lead Owner Review` |
