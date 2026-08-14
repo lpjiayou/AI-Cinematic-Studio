@@ -65,6 +65,18 @@ class ConfirmedM6SourceReader(Protocol):
     ) -> dict[str, Any]: ...
 
 
+class M6ConsumerContextReader(Protocol):
+    """Trusted M4/M2 Project, Series and Episode context used by the consumer."""
+
+    def build_context(
+        self,
+        workspace_ref: str,
+        project_ref: str,
+        series_ref: str,
+        episode_ref: str,
+    ) -> dict[str, Any]: ...
+
+
 class SeriesIntelligenceRepository(Protocol):
     """Persistence-neutral storage surface consumed by the M6 domain service.
 

@@ -10,7 +10,7 @@
 >
 > Current Task: `ACS-M6-P3-G1-EPISODE-BASELINE-CONSUMER`
 >
-> Current Work Package: `GOVERNANCE-ONLY AUTHORIZATION CHECKPOINT / PRODUCTION AND TEST DIFF ZERO`
+> Current Work Package: `BOUNDED G1 TECHNICAL CANDIDATE / LOCAL GATES PASS / REMOTE VERIFICATION PENDING`
 >
 > M6 Authorization: `P0-P2 OWNER ACCEPTED / P3-G0 OWNER ACCEPTED AS ARCHITECTURE / P3-B1 OWNER ACCEPTED THROUGH B1-R1 / P3-G1 BOUNDED IMPLEMENTATION AUTHORIZED / NOT OWNER ACCEPTED`
 >
@@ -74,7 +74,7 @@ ACS-M6-P3-G1 Episode Baseline Consumer
 
 Status:
 
-`B1-R1 OWNER ACCEPTED / ADR-0005 CLOSED AT ARCHITECTURE LAYER / G1 BOUNDED IMPLEMENTATION AUTHORIZED / GOVERNANCE CHECKPOINT NOT YET REMOTE-VERIFIED`
+`B1-R1 OWNER ACCEPTED / ADR-0005 CLOSED AT ARCHITECTURE LAYER / G1 LOCAL TECHNICAL CANDIDATE / 14/14 + FULL CORE 463/463 / REMOTE VERIFICATION PENDING / NOT OWNER ACCEPTED`
 
 Purpose:
 
@@ -474,7 +474,7 @@ capability.
 - M6-P3-B1-R1 AUTHORIZED BASE: `8449b521c96bb8340806ecda8649698f4771914a`
 - M6-P3-B1-R1 SCOPE: `8 GOVERNANCE → 1 PRODUCTION + 1 TEST → REMOTE VERIFY → STOP FOR OWNER REVIEW`
 - M6-P3-B1-R1 EVIDENCE: `PRE-FIX SQLITE 409 REPRODUCED / POST-FIX SQLITE MODULE 30/30 / ORIGINAL B1 174/174 / FULL CORE 449/449 / NON-TEST PYTHON AST 63/63`
-- M6-P3-G1 STATUS: `BOUNDED CORE-ONLY IMPLEMENTATION AUTHORIZED / GOVERNANCE REMOTE VERIFY REQUIRED BEFORE CODE / NOT OWNER ACCEPTED`
+- M6-P3-G1 STATUS: `GOVERNANCE REMOTE-VERIFIED / LOCAL TECHNICAL CANDIDATE / G1 14/14 / FULL CORE 463/463 / REMOTE TECHNICAL VERIFICATION PENDING / NOT OWNER ACCEPTED`
 - M6-P3 AFTER G1 / M6-P4+ STATUS: `NOT AUTHORIZED / NOT STARTED`
 - M7-M19: `NOT STARTED / NOT AUTHORIZED`
 - FORMAL 8765 DEPLOYMENT: `UNTOUCHED / NOT DEPLOYED`
@@ -533,7 +533,7 @@ Script writes, M7-M19, formal database deployment, Auth/RBAC expansion or Fronte
 
 Status:
 
-`BOUNDED IMPLEMENTATION AUTHORIZED / GOVERNANCE REMOTE VERIFICATION REQUIRED BEFORE CODE / NOT OWNER ACCEPTED`
+`LOCAL TECHNICAL CANDIDATE / ALL LOCAL GATES PASS / REMOTE VERIFICATION PENDING / NOT OWNER ACCEPTED`
 
 M6-P0/P1 and bounded M6-P2-G1 remain Owner Accepted at their remote-verified technical
 baselines. G1-R1 is Owner Accepted and complete at
@@ -560,7 +560,10 @@ independent Owner Review. G1 authority comes only from the later exact G1 record
 That exact authorization is
 [`ACS-M6-P3-G1-EPISODE-BASELINE-CONSUMER.md`](governance/ACS-M6-P3-G1-EPISODE-BASELINE-CONSUMER.md).
 It freezes the eight-path governance checkpoint followed by seven production and three
-new test paths. The implementation must stop after remote verification for Owner Review.
+new test paths. The governance checkpoint is remote-verified. The local implementation
+passes focused G1 `14/14`, full Core `463/463`, Markdown `88/88`, links `323/323`,
+non-test AST `63/63` and all scope/security checks. It must stop after technical remote
+verification for Owner Review.
 
 Formal port-8765 database access/deployment, HTTP route/handler/external DTO
 source-file changes, HTTP expansion beyond the Owner-approved existing workspace

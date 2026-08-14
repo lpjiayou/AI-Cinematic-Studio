@@ -10,7 +10,7 @@ from .contracts import (
     RejectingIdentityAuthorization,
     RejectingScopeAuthority,
 )
-from .foundation import SeriesIntelligenceService
+from .foundation import ActiveM6BaselineReader, SeriesIntelligenceService
 from .in_memory import InMemorySeriesIntelligenceRepository
 from .public import SeriesIntelligencePublicBoundary
 from .sqlite_backend import SqliteSeriesIntelligenceRepository
@@ -21,6 +21,7 @@ def _create_participant(
     repository,
     lifecycle_state,
     source_reader,
+    consumer_context_reader,
     scope_authority: M6ScopeAuthorityPort | None,
     approval_authority: ApprovalAuthorityPort | None,
     identity_authority: IdentityAuthorizationPort | None,
@@ -40,11 +41,21 @@ def _create_participant(
         identity_authority or RejectingIdentityAuthorization(),
         **kwargs,
     )
-    return SeriesIntelligencePublicBoundary(service, lifecycle_state=lifecycle_state)
+    active_reader = (
+        ActiveM6BaselineReader(service, consumer_context_reader)
+        if consumer_context_reader is not None
+        else None
+    )
+    return SeriesIntelligencePublicBoundary(
+        service,
+        lifecycle_state=lifecycle_state,
+        active_m6_baseline_reader=active_reader,
+    )
 
 
 def create_in_memory_participant(
-    *, lifecycle_state, source_reader, scope_authority: M6ScopeAuthorityPort | None = None,
+    *, lifecycle_state, source_reader, consumer_context_reader=None,
+    scope_authority: M6ScopeAuthorityPort | None = None,
     approval_authority: ApprovalAuthorityPort | None = None,
     identity_authority: IdentityAuthorizationPort | None = None,
     ref_factory=None, clock=None, outbox_hook=None,
@@ -55,6 +66,7 @@ def create_in_memory_participant(
         repository=repository,
         lifecycle_state=lifecycle_state,
         source_reader=source_reader,
+        consumer_context_reader=consumer_context_reader,
         scope_authority=scope_authority,
         approval_authority=approval_authority,
         identity_authority=identity_authority,
@@ -68,6 +80,7 @@ def create_sqlite_participant(
     database_path,
     lifecycle_state,
     source_reader,
+    consumer_context_reader=None,
     scope_authority: M6ScopeAuthorityPort | None = None,
     approval_authority: ApprovalAuthorityPort | None = None,
     identity_authority: IdentityAuthorizationPort | None = None,
@@ -84,6 +97,7 @@ def create_sqlite_participant(
         repository=repository,
         lifecycle_state=lifecycle_state,
         source_reader=source_reader,
+        consumer_context_reader=consumer_context_reader,
         scope_authority=scope_authority,
         approval_authority=approval_authority,
         identity_authority=identity_authority,

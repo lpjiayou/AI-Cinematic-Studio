@@ -1,6 +1,6 @@
 # M6 Series Intelligence Consumer and Reconciliation Contract
 
-> Status: `ACCEPTED NORMATIVE ARCHITECTURE / B1 OWNER ACCEPTED THROUGH B1-R1 AT 5c656992d9fade3683b70e3c57f8b8ba7d26c7f7 / G1 BOUNDED IMPLEMENTATION AUTHORIZED / NOT OWNER ACCEPTED`
+> Status: `ACCEPTED NORMATIVE ARCHITECTURE / B1 OWNER ACCEPTED THROUGH B1-R1 AT 5c656992d9fade3683b70e3c57f8b8ba7d26c7f7 / G1 LOCAL TECHNICAL CANDIDATE / 14/14 + FULL CORE 463/463 / REMOTE VERIFICATION PENDING / NOT OWNER ACCEPTED`
 >
 > Authority: `ADR-0005 — ACCEPTED AS ARCHITECTURE DECISION`
 >
@@ -677,3 +677,13 @@ M6-P3-B1-R1 OWNER ACCEPTED / COMPLETE
 REMOTE-VERIFIED AT 5c656992d9fade3683b70e3c57f8b8ba7d26c7f7
 M6-P3-G1 BOUNDED IMPLEMENTATION AUTHORIZED / GOVERNANCE REMOTE VERIFY REQUIRED
 ```
+
+## 17. G1 local technical candidate
+
+After governance remote verification, the bounded G1 implementation changes exactly
+the seven production paths and adds exactly the three test paths in the accepted G1
+record. Focused G1 passes `14/14` (`5` unit, `4` contract, `5` integration); full Core
+passes `463/463` (`252` unit, `88` contract, `123` integration). Markdown `88/88`,
+local documentation links `323/323`, non-test Python AST `63/63`, architecture,
+secret, `__init__`, HTTP/Migration/DDL and diff gates pass. Technical remote
+publication and equality verification remain pending; this is not Owner Acceptance.

@@ -12,6 +12,7 @@ from .contracts import (
     ApprovalAuthorityPort,
     ConfirmedM6SourceReader,
     IdentityAuthorizationPort,
+    M6ConsumerContextReader,
     M6Scope,
     M6ScopeAuthorityPort,
     SeriesIntelligenceRepository,
@@ -21,6 +22,11 @@ from .errors import (
     DuplicateRecordError,
     InvalidReferenceError,
     IdentityBindingDeniedError,
+    M6BaselineNotAvailableError,
+    M6BaselineStaleError,
+    M6ConsumerAuthorityUnavailableError,
+    M6EpisodeMappingUnavailableError,
+    M6LineageMismatchError,
     RecordNotFoundError,
     ScopeMismatchError,
     SeriesIntelligenceError,
@@ -33,6 +39,7 @@ CHARACTER_CONTINUITY_SCHEMA_VERSION = "v5.character-continuity.v1"
 CHARACTER_CONTINUITY_VERSION_SCHEMA_VERSION = "v5.character-continuity-version.v1"
 M6_BASELINE_SCHEMA_VERSION = "v5.m6-baseline-snapshot.v1"
 M6_EVENT_SCHEMA_VERSION = "v5.m6-series-intelligence-event.v1"
+M6_EPISODE_BASELINE_SCHEMA_VERSION = "v5.m6-episode-baseline-input.v1"
 CANONICAL_SCHEMA_VERSION = "canonical-json-v1"
 
 
@@ -864,3 +871,403 @@ class SeriesIntelligenceService:
             ),
             "sourceCompatibility": compatibility,
         }
+
+
+class ActiveM6BaselineReader:
+    """Resolve one coherent, read-only M6 input for an exact trusted Episode."""
+
+    def __init__(
+        self,
+        service: SeriesIntelligenceService,
+        context_reader: M6ConsumerContextReader,
+    ) -> None:
+        self.__service = service
+        self.__context_reader = context_reader
+
+    @staticmethod
+    def _lineage_digest(value: Mapping[str, Any]) -> str:
+        try:
+            return digest(value)
+        except Exception:
+            raise M6LineageMismatchError("canonical lineage cannot be verified") from None
+
+    @staticmethod
+    def _consumer_scope(
+        service: SeriesIntelligenceService,
+        workspace_ref: str,
+        project_ref: str,
+        series_ref: str,
+    ) -> M6Scope:
+        try:
+            return service.resolve_scope({
+                "workspaceRef": workspace_ref,
+                "projectRef": project_ref,
+                "seriesRef": series_ref,
+            })
+        except SeriesIntelligenceError:
+            raise M6ConsumerAuthorityUnavailableError() from None
+
+    def _trusted_context(
+        self,
+        scope: M6Scope,
+        episode_ref: str,
+    ) -> dict[str, Any]:
+        try:
+            context = self.__context_reader.build_context(
+                scope.workspace_ref,
+                scope.project_ref,
+                scope.series_ref,
+                episode_ref,
+            )
+        except Exception:
+            raise M6ConsumerAuthorityUnavailableError() from None
+        if not isinstance(context, Mapping):
+            raise M6ConsumerAuthorityUnavailableError()
+        expected = (
+            scope.workspace_ref,
+            scope.project_ref,
+            scope.series_ref,
+            episode_ref,
+        )
+        actual = tuple(
+            context.get(field)
+            for field in ("workspaceRef", "projectRef", "seriesRef", "episodeRef")
+        )
+        episode = context.get("episode")
+        series = context.get("series")
+        project = context.get("project")
+        project_series_refs = (
+            project.get("seriesRefs") if isinstance(project, Mapping) else None
+        )
+        if (
+            actual != expected
+            or not isinstance(project, Mapping)
+            or not isinstance(series, Mapping)
+            or not isinstance(episode, Mapping)
+            or not isinstance(project_series_refs, list)
+            or project.get("workspaceRef") != scope.workspace_ref
+            or project.get("projectRef") != scope.project_ref
+            or scope.series_ref not in project_series_refs
+            or series.get("workspaceRef") != scope.workspace_ref
+            or series.get("seriesRef") != scope.series_ref
+            or episode.get("workspaceRef") != scope.workspace_ref
+            or episode.get("seriesRef") != scope.series_ref
+            or episode.get("episodeRef") != episode_ref
+        ):
+            raise M6ConsumerAuthorityUnavailableError()
+        return dict(context)
+
+    def _bound_source(
+        self,
+        scope: M6Scope,
+        episode_ref: str,
+    ) -> tuple[dict[str, Any], dict[str, Any], int, dict[str, int]]:
+        try:
+            source = self.__service.source_reader.get_confirmed_m6_source_snapshot(
+                scope.workspace_ref,
+                scope.project_ref,
+                scope.series_ref,
+            )
+        except Exception:
+            raise M6EpisodeMappingUnavailableError() from None
+        if not isinstance(source, Mapping):
+            raise M6EpisodeMappingUnavailableError()
+        source = dict(source)
+        if (
+            source.get("status") != "confirmed"
+            or source.get("workspaceRef") != scope.workspace_ref
+            or source.get("projectRef") != scope.project_ref
+            or source.get("seriesRef") != scope.series_ref
+        ):
+            raise M6LineageMismatchError("M5 source scope is inconsistent")
+        if source.get("schemaVersion") != "v5.series-plan.m6-source-snapshot.v2":
+            raise M6EpisodeMappingUnavailableError("confirmed M5 source is unbound")
+        source_digest = source.get("seriesPlanVersionDigest")
+        if not all(
+            isinstance(source.get(field), str) and source.get(field)
+            for field in ("seriesPlanRef", "seriesPlanVersionRef")
+        ):
+            raise M6LineageMismatchError("M5 source identity is inconsistent")
+        if (
+            not isinstance(source_digest, str)
+            or not source_digest
+            or self._lineage_digest({
+                key: value
+                for key, value in source.items()
+                if key != "seriesPlanVersionDigest"
+            }) != source_digest
+        ):
+            raise M6LineageMismatchError("M5 source digest is inconsistent")
+        items = source.get("episodePlanItems")
+        bindings = source.get("episodePlanItemBindings")
+        if (
+            not isinstance(items, list)
+            or not all(isinstance(item, Mapping) for item in items)
+            or not isinstance(bindings, list)
+            or not all(isinstance(item, Mapping) for item in bindings)
+        ):
+            raise M6LineageMismatchError("M5 source binding shape is inconsistent")
+        positions: dict[str, int] = {}
+        normalized_items: list[dict[str, Any]] = []
+        for index, raw in enumerate(items):
+            item = dict(raw)
+            item_ref = item.get("episodePlanItemRef")
+            if not isinstance(item_ref, str) or not item_ref or item_ref in positions:
+                raise M6LineageMismatchError("M5 EpisodePlanItem identity is inconsistent")
+            positions[item_ref] = index
+            normalized_items.append(item)
+        seen_episode_refs: set[str] = set()
+        seen_item_refs: set[str] = set()
+        for raw in bindings:
+            binding = dict(raw)
+            if set(binding) != {"episodeRef", "episodePlanItemRef"}:
+                raise M6LineageMismatchError("M5 binding is not closed-world")
+            bound_episode_ref = binding.get("episodeRef")
+            bound_item_ref = binding.get("episodePlanItemRef")
+            if (
+                not isinstance(bound_episode_ref, str)
+                or not bound_episode_ref
+                or not isinstance(bound_item_ref, str)
+                or bound_item_ref not in positions
+                or bound_episode_ref in seen_episode_refs
+                or bound_item_ref in seen_item_refs
+            ):
+                raise M6LineageMismatchError("M5 binding identity is inconsistent")
+            seen_episode_refs.add(bound_episode_ref)
+            seen_item_refs.add(bound_item_ref)
+        matches = [dict(item) for item in bindings if item.get("episodeRef") == episode_ref]
+        if len(matches) != 1:
+            raise M6EpisodeMappingUnavailableError()
+        item_ref = matches[0].get("episodePlanItemRef")
+        if not isinstance(item_ref, str) or item_ref not in positions:
+            raise M6EpisodeMappingUnavailableError()
+        bound_item = normalized_items[positions[item_ref]]
+        return source, bound_item, positions[item_ref], positions
+
+    def _active_components(
+        self,
+        scope: M6Scope,
+        source: Mapping[str, Any],
+    ) -> tuple[dict[str, Any], dict[str, Any], dict[str, Any]]:
+        repository = self.__service.repository
+        active_ref = repository.active_snapshots.get(scope.key)
+        if not active_ref:
+            raise M6BaselineNotAvailableError()
+        snapshot = repository.snapshots.get((*scope.key, active_ref))
+        if snapshot is None:
+            raise M6LineageMismatchError("active M6 baseline pointer is inconsistent")
+        snapshot = dict(snapshot)
+        if (
+            snapshot.get("m6BaselineSnapshotRef") != active_ref
+            or snapshot.get("status") != "ACTIVE"
+            or snapshot.get("scope") != scope.mapping()
+            or snapshot.get("canonicalDigest") != snapshot.get("contentDigest")
+            or not isinstance(snapshot.get("activationRevision"), int)
+            or isinstance(snapshot.get("activationRevision"), bool)
+            or snapshot.get("activationRevision", 0) < 1
+        ):
+            raise M6LineageMismatchError("active M6 baseline is inconsistent")
+        if (
+            snapshot.get("sourceSeriesPlanVersionRef")
+            != snapshot.get("seriesPlanVersionRef")
+            or snapshot.get("sourceSeriesPlanDigest")
+            != snapshot.get("seriesPlanVersionDigest")
+        ):
+            raise M6LineageMismatchError("active M6 source lineage is inconsistent")
+        if (
+            snapshot.get("seriesPlanRef") != source.get("seriesPlanRef")
+            or (
+                snapshot.get("seriesPlanVersionRef"),
+                snapshot.get("seriesPlanVersionDigest"),
+            ) != (
+                source.get("seriesPlanVersionRef"),
+                source.get("seriesPlanVersionDigest"),
+            )
+        ):
+            raise M6BaselineStaleError()
+        bible_ref = snapshot.get("seriesBibleRef")
+        bible_version_ref = snapshot.get("seriesBibleVersionRef")
+        character_ref = snapshot.get("characterContinuityRef")
+        character_version_ref = snapshot.get("characterContinuityVersionRef")
+        if not all(
+            isinstance(value, str) and value
+            for value in (bible_ref, bible_version_ref, character_ref, character_version_ref)
+        ):
+            raise M6LineageMismatchError("active M6 component identity is inconsistent")
+        bible = repository.bible_versions.get(
+            self.__service._version_key(scope, bible_ref, bible_version_ref)
+        )
+        character = repository.character_versions.get(
+            self.__service._version_key(scope, character_ref, character_version_ref)
+        )
+        if bible is None or character is None:
+            raise M6LineageMismatchError("active M6 component is unavailable")
+        bible = dict(bible)
+        character = dict(character)
+        source_lineage = (
+            source.get("seriesPlanVersionRef"),
+            source.get("seriesPlanVersionDigest"),
+        )
+        if (
+            bible.get("status") != "CONFIRMED"
+            or character.get("status") != "CONFIRMED"
+            or bible.get("seriesBibleRef") != bible_ref
+            or bible.get("seriesBibleVersionRef") != bible_version_ref
+            or character.get("characterContinuityRef") != character_ref
+            or character.get("characterContinuityVersionRef") != character_version_ref
+            or any(
+                record.get(field) != value
+                for record in (bible, character)
+                for field, value in scope.mapping().items()
+            )
+            or (bible.get("seriesPlanVersionRef"), bible.get("seriesPlanVersionDigest"))
+            != source_lineage
+            or (character.get("seriesPlanVersionRef"), character.get("seriesPlanVersionDigest"))
+            != source_lineage
+            or bible.get("contentDigest") != snapshot.get("seriesBibleVersionDigest")
+            or character.get("contentDigest")
+            != snapshot.get("characterContinuityVersionDigest")
+            or character.get("seriesBibleVersionRef") != bible_version_ref
+            or character.get("seriesBibleVersionDigest") != bible.get("contentDigest")
+        ):
+            raise M6LineageMismatchError("active M6 component lineage is inconsistent")
+        bible_content = bible.get("content")
+        character_content = character.get("content")
+        if not isinstance(bible_content, Mapping) or not isinstance(character_content, Mapping):
+            raise M6LineageMismatchError("active M6 content is inconsistent")
+        expected_bible_digest = self._lineage_digest({
+            "schemaVersion": SERIES_BIBLE_VERSION_SCHEMA_VERSION,
+            "scope": scope.mapping(),
+            "seriesPlanVersionRef": source["seriesPlanVersionRef"],
+            "seriesPlanVersionDigest": source["seriesPlanVersionDigest"],
+            "content": bible_content,
+        })
+        expected_character_digest = self._lineage_digest({
+            "schemaVersion": CHARACTER_CONTINUITY_VERSION_SCHEMA_VERSION,
+            "scope": scope.mapping(),
+            "seriesPlanVersionRef": source["seriesPlanVersionRef"],
+            "seriesPlanVersionDigest": source["seriesPlanVersionDigest"],
+            "seriesBibleVersionRef": bible_version_ref,
+            "seriesBibleVersionDigest": expected_bible_digest,
+            "content": character_content,
+        })
+        expected_snapshot_digest = self._lineage_digest({
+            "schemaVersion": M6_BASELINE_SCHEMA_VERSION,
+            "scope": scope.mapping(),
+            "seriesPlanRef": source["seriesPlanRef"],
+            "seriesPlanVersionRef": source["seriesPlanVersionRef"],
+            "seriesPlanVersionDigest": source["seriesPlanVersionDigest"],
+            "sourceSeriesPlanVersionRef": source["seriesPlanVersionRef"],
+            "sourceSeriesPlanDigest": source["seriesPlanVersionDigest"],
+            "seriesBibleRef": bible_ref,
+            "seriesBibleVersionRef": bible_version_ref,
+            "seriesBibleVersionDigest": expected_bible_digest,
+            "characterContinuityRef": character_ref,
+            "characterContinuityVersionRef": character_version_ref,
+            "characterContinuityVersionDigest": expected_character_digest,
+        })
+        if (
+            bible.get("contentDigest") != expected_bible_digest
+            or bible.get("canonicalDigest") != expected_bible_digest
+            or character.get("contentDigest") != expected_character_digest
+            or character.get("canonicalDigest") != expected_character_digest
+            or snapshot.get("canonicalDigest") != expected_snapshot_digest
+        ):
+            raise M6LineageMismatchError("active M6 canonical lineage is inconsistent")
+        return snapshot, bible, character
+
+    @staticmethod
+    def _applies(
+        item: Mapping[str, Any],
+        position: int,
+        positions: Mapping[str, int],
+    ) -> bool:
+        start_ref = item.get("startEpisodePlanItemRef")
+        end_ref = item.get("endEpisodePlanItemRef")
+        if start_ref not in positions or (end_ref is not None and end_ref not in positions):
+            raise M6LineageMismatchError("M6 applicability lineage is inconsistent")
+        return positions[start_ref] <= position and (
+            end_ref is None or positions[end_ref] > position
+        )
+
+    @staticmethod
+    def _stable_ref_facts(
+        values: Sequence[Mapping[str, Any]],
+        ref_field: str,
+    ) -> list[dict[str, Any]]:
+        result: list[dict[str, Any]] = []
+        seen: set[str] = set()
+        for value in values:
+            item = dict(value)
+            item_ref = item.get(ref_field)
+            if not isinstance(item_ref, str) or not item_ref or item_ref in seen:
+                raise M6LineageMismatchError("M6 fact identity is inconsistent")
+            seen.add(item_ref)
+            result.append(deepcopy(item))
+        return sorted(result, key=lambda item: item[ref_field])
+
+    def get_active_episode_baseline(
+        self,
+        workspace_ref: str,
+        project_ref: str,
+        series_ref: str,
+        episode_ref: str,
+    ) -> dict[str, Any]:
+        scope = self._consumer_scope(
+            self.__service,
+            workspace_ref,
+            project_ref,
+            series_ref,
+        )
+        self._trusted_context(scope, episode_ref)
+        source, bound_item, position, positions = self._bound_source(scope, episode_ref)
+        snapshot, bible, character = self._active_components(scope, source)
+        bible_content = bible.get("content")
+        character_content = character.get("content")
+        if not isinstance(bible_content, Mapping) or not isinstance(character_content, Mapping):
+            raise M6LineageMismatchError("active M6 content is inconsistent")
+        facts: dict[str, Any] = {"episodePlanItem": deepcopy(bound_item)}
+        for field in _BIBLE_COLLECTIONS:
+            values = bible_content.get(field)
+            if not isinstance(values, list) or not all(isinstance(item, Mapping) for item in values):
+                raise M6LineageMismatchError("SeriesBible facts are inconsistent")
+            facts[field] = self._stable_ref_facts(values, _BIBLE_COLLECTIONS[field])
+        characters = character_content.get("characters")
+        intervals = character_content.get("stateIntervals")
+        relationships = character_content.get("relationships")
+        if not all(
+            isinstance(values, list) and all(isinstance(item, Mapping) for item in values)
+            for values in (characters, intervals, relationships)
+        ):
+            raise M6LineageMismatchError("CharacterContinuity facts are inconsistent")
+        facts["characters"] = self._stable_ref_facts(characters, "characterRef")
+        facts["stateIntervals"] = self._stable_ref_facts(
+            [item for item in intervals if self._applies(item, position, positions)],
+            "intervalRef",
+        )
+        facts["relationships"] = self._stable_ref_facts(
+            [item for item in relationships if self._applies(item, position, positions)],
+            "relationshipRef",
+        )
+        result = {
+            "schemaVersion": M6_EPISODE_BASELINE_SCHEMA_VERSION,
+            **scope.mapping(),
+            "episodeRef": episode_ref,
+            "episodePlanItemRef": bound_item["episodePlanItemRef"],
+            "m6BaselineSnapshotRef": snapshot["m6BaselineSnapshotRef"],
+            "activationRevision": snapshot["activationRevision"],
+            "m6BaselineCanonicalDigest": snapshot["canonicalDigest"],
+            "seriesPlanVersionRef": snapshot["seriesPlanVersionRef"],
+            "seriesPlanVersionDigest": snapshot["seriesPlanVersionDigest"],
+            "seriesBibleVersionRef": snapshot["seriesBibleVersionRef"],
+            "seriesBibleVersionDigest": snapshot["seriesBibleVersionDigest"],
+            "characterContinuityVersionRef": snapshot[
+                "characterContinuityVersionRef"
+            ],
+            "characterContinuityVersionDigest": snapshot[
+                "characterContinuityVersionDigest"
+            ],
+            "compatibility": "CURRENT",
+            "applicableFacts": facts,
+        }
+        return deepcopy(result)

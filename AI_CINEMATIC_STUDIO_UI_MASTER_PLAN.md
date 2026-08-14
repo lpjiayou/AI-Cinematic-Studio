@@ -14,7 +14,7 @@
 > UI-R1 Accepted SHA:
 > `c9536fc0c745d0bf9e9c3eb543f4ab6c0566798a`
 >
-> Revision: M6-P3-G1 Core-only authorization synchronization; product IA and visual baseline unchanged.
+> Revision: M6-P3-G1 Core-only local candidate synchronization; product IA and visual baseline unchanged.
 >
 > Scope:
 > AI Cinematic Studio Creator / Project Workspace / Production Editors /
@@ -184,8 +184,8 @@ NOT OWNER ACCEPTED`；修正后的 G1-R1 已在
 - ACS-ARCH-R1-V5-TEXT-GENERATION-G1-R1：`OWNER ACCEPTED / COMPLETE /
   REMOTE-VERIFIED AT d44f471c644e319bb4a5bf73707c3274ecbaa426`；
 - Frontend M6 activation：`FROZEN / NOT AUTHORIZED`；
-- M6-P3-G1：`BOUNDED CORE-ONLY IMPLEMENTATION AUTHORIZED / GOVERNANCE REMOTE
-  VERIFICATION REQUIRED BEFORE CODE / NO FRONTEND AUTHORITY / NOT OWNER ACCEPTED`；
+- M6-P3-G1：`CORE-ONLY LOCAL TECHNICAL CANDIDATE / G1 14/14 / FULL CORE 463/463 /
+  REMOTE VERIFICATION PENDING / NO FRONTEND AUTHORITY / NOT OWNER ACCEPTED`；
 - M6-P3 after G1 / M6-P4+：`NOT AUTHORIZED / NOT STARTED`；
 - M7-M19：`NOT STARTED / NOT AUTHORIZED`。
 
