@@ -4,7 +4,7 @@
 
 | Field | Value |
 | --- | --- |
-| Status | `ACCEPTED AS ARCHITECTURE DECISION / B1 ORIGINAL CANDIDATE REVISION REQUIRED / B1-R1 OWNER ACCEPTED AT 5c656992d9fade3683b70e3c57f8b8ba7d26c7f7 / G1 UNAUTHORIZED` |
+| Status | `ACCEPTED AS ARCHITECTURE DECISION / B1 OWNER ACCEPTED THROUGH B1-R1 AT 5c656992d9fade3683b70e3c57f8b8ba7d26c7f7 / G1 BOUNDED IMPLEMENTATION AUTHORIZED / NOT OWNER ACCEPTED` |
 | Created | `2026-08-13` |
 | Author | `Codex architecture proposal under Project Lead G3/P3-G0 authority` |
 | Approval owners | `Project Lead / Architecture Owner — ACCEPTED; M2/M4/M5/M6 Domain Owners — APPROVED FOR B1; other applicable Domain Owners — PENDING FOR FUTURE WORK` |
@@ -57,7 +57,7 @@ The correction is remote-verified at
 
 ## Decision — accepted target architecture
 
-Any future separately authorized implementation shall introduce one internal,
+The separately authorized G1 implementation shall introduce one internal,
 read-only and persistence-neutral `ActiveM6BaselineReader`. The first bounded direct
 consumer would be M3 Script Studio
 through a read-only Episode baseline input. M4 owns Project identity and trusted
@@ -255,7 +255,7 @@ Public HTTP codes, UI wording and external DTOs are intentionally not decided he
   stop at a read-only Episode baseline input and must not write a ScriptVersion or
   produce consistency verdicts.
 
-## Authorized B1 and future separately authorized G1 sequence
+## Authorized B1 and separately authorized G1 sequence
 
 1. Project Lead and Architecture Owner accept this ADR and the normative architecture
    contract in a governance-only checkpoint, push, remote-verify and stop. This step is
@@ -269,22 +269,26 @@ Public HTTP codes, UI wording and external DTOs are intentionally not decided he
    SQLite schema/migration, route/handler/external DTO source-file change, HTTP
    expansion beyond the approved existing workspace versions v2 field pass-through,
    M3/M6 consumer or any unlisted path.
-4. Only then separately authorize `ACS-M6-P3-G1` to implement the read-only M6 reader
-   and exact M3 `get_m6_episode_baseline(...)` surface.
+4. After B1-R1 Owner Acceptance, separately authorize `ACS-M6-P3-G1` to implement the
+   read-only M6 reader and exact M3 `get_m6_episode_baseline(...)` surface. This
+   authorization was granted on `2026-08-14`; its governance checkpoint must be
+   remote-verified before code changes.
 5. Prove InMemory/SQLite parity, cross-Scope isolation, deterministic fact filtering,
    historical immutability and coherent rollover to the new current input after M6
    replacement. Historical ScriptVersion-binding staleness evaluation remains a
    separately accepted later contract and is not part of G1.
 6. Stop for Owner Review. M7 and M9 remain separate tasks.
 
-There is no migration or data write in M6-P3-G0. Existing data is unchanged. B1 alone
-is now authorized within its exact record; G1 remains unauthorized and blocked until
-B1 is independently implemented, tested, remote-verified and Owner Accepted.
+There is no migration or data write in M6-P3-G0. Existing data is unchanged. B1 is
+Owner Accepted through B1-R1. G1 is now authorized only within
+`ACS-M6-P3-G1-EPISODE-BASELINE-CONSUMER` and remains blocked until that record's
+governance-only checkpoint is remote-verified.
 
 ## Explicit exclusions
 
-This decision does not authorize P3-G1 or any B1 path outside the exact authorization
-record. It does not authorize schema/migration, consumer
+This ADR alone does not authorize implementation; the exact G1 record authorizes only
+its bounded read slice and no B1 path outside the accepted record. Neither authorizes
+schema/migration, consumer
 checkpoint storage, Outbox dispatch/acknowledgement, broker integration, any
 route/handler/external DTO source-file change or HTTP expansion beyond the approved
 existing workspace versions v2 field pass-through, Auth/RBAC, Frontend, formal
@@ -300,7 +304,8 @@ V4/V3, Provider, GPU, Worker, ComfyUI, M6-P4+ or Production Ready status.
 | Architecture Owner | `蔺鹏` | `ACCEPTED AS ARCHITECTURE` | `2026-08-13` | Target boundary and two-checkpoint sequence accepted; bounded B1 later approved |
 | Repository Governance Owner | `蔺鹏` | `AUTHORIZED` | `2026-08-13` | Exact B1 governance and technical sequence |
 | M2/M4/M5/M6 Domain Owners | `蔺鹏` | `APPROVED FOR B1` | `2026-08-13` | Bounded binding, trusted-context, lifecycle and M6-source compatibility scope |
-| M3/M7/M9 and other future Domain Owners | `PENDING` | `PENDING FOR FUTURE AFFECTED IMPLEMENTATION` | — | No approval inferred; G1 and later work remain blocked |
+| M3 Domain Owner | `蔺鹏` | `APPROVED FOR BOUNDED G1 READ SURFACE` | `2026-08-14` | Exact `get_m6_episode_baseline(...)` only; no Script write or persistence change |
+| M7/M9 and other future Domain Owners | `PENDING` | `PENDING FOR FUTURE AFFECTED IMPLEMENTATION` | — | No approval inferred; later work remains blocked |
 
 ## Change history
 
@@ -312,3 +317,4 @@ V4/V3, Provider, GPU, Worker, ComfyUI, M6-P4+ or Production Ready status.
 | `2026-08-13` | B1 candidate `8449b521c96bb8340806ecda8649698f4771914a` marked Revision Required for SQLite cross-Series false dependency; bounded B1-R1 correction authorized; G1 remains unauthorized | `Project Lead / Architecture Owner / Repository Governance Owner / M2-M5 Domain Owners` |
 | `2026-08-13` | B1-R1 governance checkpoint remote-verified at `716b4d298173f8123cafd93114dfc67339943ff3`; exact one-production/one-test correction gates pass; technical remote verification and Owner Review remain | `Project Lead / Architecture Owner / Repository Governance Owner / M2-M5 Domain Owners` |
 | `2026-08-14` | B1-R1 correction at `5c656992d9fade3683b70e3c57f8b8ba7d26c7f7` Owner Accepted after independent defect reproduction and complete regression; G1 remains separately gated | `Project Lead / Architecture Owner / Repository Governance Owner / M2-M5 Domain Owners` |
+| `2026-08-14` | Bounded G1 Core-only read consumer separately authorized; governance-only checkpoint must be remote-verified before the exact seven-production/three-new-test implementation | `Project Lead / Architecture Owner / Repository Governance Owner / M2-M3-M4-M5-M6 Domain Owners` |
