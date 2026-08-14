@@ -419,7 +419,7 @@ def validate_manifest_consistency(manifest: dict[str, Any], *, finalized: bool) 
     for run in runs:
         run_id = run.get("runId", "unknown-run")
         seed = run.get("parameters", {}).get("seed")
-        _require(isinstance(seed, int) and seed >= 0, f"{run_id}: exact non-negative seed is required")
+        _require(type(seed) is int and seed >= 0, f"{run_id}: exact non-negative seed is required")
         _require(run.get("runState") == "CAPTURED", f"{run_id}: runState must be CAPTURED")
         output = run.get("output", {})
         _require(isinstance(output.get("sizeBytes"), int) and output["sizeBytes"] > 0, f"{run_id}: positive output sizeBytes is required")
@@ -451,7 +451,7 @@ def build_manifest(
         _require(output_root is not None and output_root.is_dir(), "--output-root must be an existing directory")
         for run in runs:
             seed = run["parameters"].get("seed")
-            _require(isinstance(seed, int) and seed >= 0, f"{run['runId']}: exact non-negative seed is required")
+            _require(type(seed) is int and seed >= 0, f"{run['runId']}: exact non-negative seed is required")
             relative = Path(run["output"]["logicalPath"])
             _require(not relative.is_absolute() and ".." not in relative.parts, f"{run['runId']}: unsafe output path")
             output = output_root / relative

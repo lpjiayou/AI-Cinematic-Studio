@@ -279,6 +279,21 @@ def main() -> int:
             artifact["sizeBytes"] = artifact_path.stat().st_size
             artifact["sha256"] = sha256_file(artifact_path)
 
+        boolean_seed_config = copy.deepcopy(finalized_config)
+        boolean_seed_config["matrices"][0]["fixedParameters"]["seed"] = True
+        boolean_seed_runs = validate_config(boolean_seed_config, "round-3")
+        expect_failure(
+            "boolean seed cannot finalize captured evidence",
+            "exact non-negative seed is required",
+            lambda: build_manifest(
+                boolean_seed_config,
+                boolean_seed_runs,
+                finalized=True,
+                runner_script=ROOT / "scripts" / "ipadapter_pose_test.py",
+                output_root=temp_root,
+            ),
+        )
+
         finalized_config["matrices"][0]["fixedParameters"]["seed"] = 123456
         finalized_runs = validate_config(finalized_config, "round-3")
         output_root = temp_root / "outputs-root"
@@ -302,6 +317,13 @@ def main() -> int:
         if len(architecture_records) != 3 or len(finalized_skeletons) != 5:
             raise AssertionError("finalized evidence manifest lost architecture or skeleton records")
         print("PASS complete Round 3 manifest finalization with three model attestations and five skeleton digests")
+        boolean_seed_manifest = copy.deepcopy(finalized_manifest)
+        boolean_seed_manifest["runs"][0]["parameters"]["seed"] = True
+        expect_failure(
+            "boolean seed cannot pass finalized manifest consistency",
+            "exact non-negative seed is required",
+            lambda: validate_manifest_consistency(boolean_seed_manifest, finalized=True),
+        )
         unlinked_architecture = copy.deepcopy(finalized_manifest)
         unlinked_architecture["models"][0]["architectureEvidence"]["modelSha256"] = "0" * 64
         expect_failure(
