@@ -46,3 +46,23 @@ class InvalidReferenceError(SeriesIntelligenceError):
 
 class IdentityBindingDeniedError(SeriesIntelligenceError):
     code = "identity_binding_denied"
+
+
+class M6BaselineNotAvailableError(SeriesIntelligenceError):
+    code = "m6_baseline_not_available"
+
+
+class M6BaselineStaleError(SeriesIntelligenceError):
+    code = "m6_baseline_stale"
+
+
+class M6LineageMismatchError(SeriesIntelligenceError):
+    code = "m6_lineage_mismatch"
+
+
+class M6ConsumerAuthorityUnavailableError(SeriesIntelligenceError):
+    code = "m6_consumer_authority_unavailable"
+
+
+class M6EpisodeMappingUnavailableError(SeriesIntelligenceError):
+    code = "m6_episode_mapping_unavailable"

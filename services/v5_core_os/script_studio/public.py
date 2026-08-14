@@ -7,8 +7,10 @@ from pathlib import Path
 from typing import Any, Mapping
 
 from services.v5_core_os.lifecycle_integrity.contracts import LifecycleOperation
+from services.v5_core_os.lifecycle_integrity.errors import LifecycleIntegrityError
 
 from services.v5_core_os.series_episode import SeriesEpisodePublicBoundary
+from services.v5_core_os.series_intelligence.errors import SeriesIntelligenceError
 
 from .foundation import (
     DuplicateRecordError,
@@ -39,6 +41,7 @@ class ScriptStudioPublicBoundary:
         self.__lifecycle_state = lifecycle_state
         self.__lifecycle_coordinator = None
         self.__lifecycle_assembly = None
+        self.__m6_episode_baseline_reader = None
 
     def bind_lifecycle(self, coordinator) -> None:
         if self.__lifecycle_coordinator is not None:
@@ -52,6 +55,13 @@ class ScriptStudioPublicBoundary:
 
     def _lifecycle_assembly_or_none(self):
         return self.__lifecycle_assembly
+
+    def _bind_m6_episode_baseline_reader(self, reader) -> None:
+        if self.__m6_episode_baseline_reader is not None:
+            raise RuntimeError("M6 Episode baseline reader is already bound")
+        if reader is None:
+            raise RuntimeError("M6 Episode baseline reader is unavailable")
+        self.__m6_episode_baseline_reader = reader
 
     @staticmethod
     def _error(exc: ScriptStudioError) -> ScriptStudioPublicError:
@@ -75,6 +85,39 @@ class ScriptStudioPublicBoundary:
 
     def get_workspace(self, workspace_ref: str, series_ref: str, episode_ref: str) -> dict[str, Any]:
         return self._invoke(self.__service.get_workspace, workspace_ref, series_ref, episode_ref)
+
+    def get_m6_episode_baseline(
+        self,
+        workspace_ref: str,
+        project_ref: str,
+        series_ref: str,
+        episode_ref: str,
+    ) -> dict[str, Any]:
+        if self.__m6_episode_baseline_reader is None or self.__lifecycle_state is None:
+            raise ScriptStudioPublicError("m6_consumer_authority_unavailable", 503)
+        try:
+            with self.__lifecycle_state.read_snapshot():
+                return self.__m6_episode_baseline_reader.get_active_episode_baseline(
+                    workspace_ref,
+                    project_ref,
+                    series_ref,
+                    episode_ref,
+                )
+        except SeriesIntelligenceError as exc:
+            status = {
+                "m6_baseline_not_available": 404,
+                "m6_episode_mapping_unavailable": 404,
+                "m6_baseline_stale": 409,
+                "m6_lineage_mismatch": 409,
+                "m6_consumer_authority_unavailable": 403,
+            }.get(exc.code, 400)
+            raise ScriptStudioPublicError(exc.code, status) from None
+        except LifecycleIntegrityError:
+            raise ScriptStudioPublicError(
+                "m6_consumer_authority_unavailable", 503
+            ) from None
+        except Exception:
+            raise ScriptStudioPublicError("m6_lineage_mismatch", 409) from None
 
     def create_version(self, command: Mapping[str, Any]) -> dict[str, Any]:
         if self.__lifecycle_coordinator is None:

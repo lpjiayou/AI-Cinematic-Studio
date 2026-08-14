@@ -18,7 +18,7 @@ from .errors import (
     StaleSourceError,
     VersionConflictError,
 )
-from .foundation import SeriesIntelligenceService
+from .foundation import ActiveM6BaselineReader, SeriesIntelligenceService
 
 
 class SeriesIntelligencePublicError(RuntimeError):
@@ -29,15 +29,25 @@ class SeriesIntelligencePublicError(RuntimeError):
 
 
 class SeriesIntelligencePublicBoundary:
-    def __init__(self, service: SeriesIntelligenceService, *, lifecycle_state) -> None:
+    def __init__(
+        self,
+        service: SeriesIntelligenceService,
+        *,
+        lifecycle_state,
+        active_m6_baseline_reader: ActiveM6BaselineReader | None = None,
+    ) -> None:
         self.__service = service
         self.__state = lifecycle_state
         self.__assembly = None
+        self.__active_m6_baseline_reader = active_m6_baseline_reader
 
     def _bind_lifecycle_assembly(self, assembly) -> None:
         if self.__assembly is not None:
             raise RuntimeError("lifecycle assembly is already bound")
         self.__assembly = assembly
+
+    def _active_m6_baseline_reader_or_none(self) -> ActiveM6BaselineReader | None:
+        return self.__active_m6_baseline_reader
 
     @staticmethod
     def _error(exc: SeriesIntelligenceError) -> SeriesIntelligencePublicError:

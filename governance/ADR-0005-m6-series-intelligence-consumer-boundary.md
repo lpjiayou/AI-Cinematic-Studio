@@ -4,7 +4,7 @@
 
 | Field | Value |
 | --- | --- |
-| Status | `ACCEPTED AS ARCHITECTURE DECISION / B1 OWNER ACCEPTED THROUGH B1-R1 AT 5c656992d9fade3683b70e3c57f8b8ba7d26c7f7 / G1 BOUNDED IMPLEMENTATION AUTHORIZED / NOT OWNER ACCEPTED` |
+| Status | `ACCEPTED AS ARCHITECTURE DECISION / B1 OWNER ACCEPTED THROUGH B1-R1 AT 5c656992d9fade3683b70e3c57f8b8ba7d26c7f7 / G1 LOCAL TECHNICAL CANDIDATE / REMOTE VERIFICATION PENDING / NOT OWNER ACCEPTED` |
 | Created | `2026-08-13` |
 | Author | `Codex architecture proposal under Project Lead G3/P3-G0 authority` |
 | Approval owners | `Project Lead / Architecture Owner — ACCEPTED; M2/M4/M5/M6 Domain Owners — APPROVED FOR B1; other applicable Domain Owners — PENDING FOR FUTURE WORK` |
@@ -318,3 +318,4 @@ V4/V3, Provider, GPU, Worker, ComfyUI, M6-P4+ or Production Ready status.
 | `2026-08-13` | B1-R1 governance checkpoint remote-verified at `716b4d298173f8123cafd93114dfc67339943ff3`; exact one-production/one-test correction gates pass; technical remote verification and Owner Review remain | `Project Lead / Architecture Owner / Repository Governance Owner / M2-M5 Domain Owners` |
 | `2026-08-14` | B1-R1 correction at `5c656992d9fade3683b70e3c57f8b8ba7d26c7f7` Owner Accepted after independent defect reproduction and complete regression; G1 remains separately gated | `Project Lead / Architecture Owner / Repository Governance Owner / M2-M5 Domain Owners` |
 | `2026-08-14` | Bounded G1 Core-only read consumer separately authorized; governance-only checkpoint must be remote-verified before the exact seven-production/three-new-test implementation | `Project Lead / Architecture Owner / Repository Governance Owner / M2-M3-M4-M5-M6 Domain Owners` |
+| `2026-08-14` | G1 governance checkpoint remote-verified; exact local technical candidate passes G1 `14/14`, full Core `463/463` and all static/scope gates; technical remote verification and Owner Review remain | `Codex implementation evidence under bounded G1 authority` |

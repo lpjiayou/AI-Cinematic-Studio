@@ -6,14 +6,14 @@
 | --- | --- |
 | Task | `ACS-M6-P3-G1-EPISODE-BASELINE-CONSUMER` |
 | Date | `2026-08-14` |
-| Decision | `AUTHORIZED AFTER GOVERNANCE REMOTE VERIFICATION / NOT YET IMPLEMENTED OR OWNER ACCEPTED` |
+| Decision | `BOUNDED IMPLEMENTATION COMPLETE LOCALLY / ALL GATES PASS / REMOTE VERIFICATION PENDING / NOT OWNER ACCEPTED` |
 | Execution mode | `AUTO-SEQUENTIAL / BOUNDED / FAIL-CLOSED` |
 | Authorized base | `c5485b70b17f9154ff17246f6329a99113a5eaa9` |
 | Accepted technical prerequisite | `M6-P3-B1-R1 OWNER ACCEPTED AT 5c656992d9fade3683b70e3c57f8b8ba7d26c7f7` |
 | Frontend sequence evidence | `main b4997ec6fdaaf9d2874141571163056ba19950ef / TREE 90a4c663ea8fcda5556e4ca3d107ce48d6147bf7 / POST-MERGE CI 31759310779 SUCCESS` |
 | Governance checkpoint | `EIGHT GOVERNANCE PATHS / PRODUCTION AND TEST DIFF ZERO` |
 | Technical allowlist | `SEVEN PRODUCTION PATHS + THREE NEW TEST PATHS` |
-| Final stop | `REMOTE-VERIFIED G1 CHECKPOINT CANDIDATE / PROJECT LEAD OWNER REVIEW REQUIRED` |
+| Final stop | `AFTER TECHNICAL REMOTE VERIFICATION / PROJECT LEAD OWNER REVIEW REQUIRED` |
 
 The Project Lead, Architecture Owner, Repository Governance Owner and affected M2,
 M3, M4, M5 and M6 Domain Owners authorize the bounded Core-only implementation
@@ -154,3 +154,27 @@ M6-P3-G1 REMOTE-VERIFIED CHECKPOINT CANDIDATE
 PROJECT LEAD OWNER REVIEW REQUIRED
 M6-P3 AFTER G1 / M6-P4+ / M7 / M9 NOT AUTHORIZED
 ```
+
+## 9. Technical candidate evidence
+
+The bounded implementation changes exactly the seven production paths and adds
+exactly the three test paths in section 5. It adds no other production or test path.
+The local candidate proves:
+
+```text
+FOCUSED G1: 14/14 PASS — UNIT 5 / CONTRACT 4 / INTEGRATION 5
+FULL CORE: 463/463 PASS — UNIT 252 / CONTRACT 88 / INTEGRATION 123
+NON-TEST PYTHON AST: 63/63 PASS
+MARKDOWN: 88/88 PASS
+LOCAL DOCUMENTATION LINKS: 323/323 PASS
+APPLICATION-TO-V4 ARCHITECTURE GUARD: PASS
+SECRET / __init__ / HTTP / MIGRATION / DDL / DIFF CHECKS: PASS
+```
+
+The evidence includes trusted M4/M2 exact Scope, M5 v2 binding without inference,
+closed-world current input, all five returned G1 error codes, stable fact filtering,
+same-name and real cross-Scope rejection, BusinessDomain/Tenant isolation, read
+determinism and write neutrality, existing Script workspace stability, baseline
+replacement, InMemory/SQLite parity, SQLite restart and coherent-read blocking against
+an M5 write. Remote publication and equality verification remain pending at this
+documented local-candidate timepoint.

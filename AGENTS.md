@@ -411,8 +411,9 @@ Current governance state:
 - M6-P3-B1-R1 evidence: `PRE-FIX SQLITE REGRESSION REPRODUCED 409 / POST-FIX
   SQLITE MODULE 30/30 / ORIGINAL B1 SUITE 174/174 / FULL CORE 449/449 /
   NON-TEST PYTHON AST 63/63`;
-- M6-P3-G1: `BOUNDED CORE-ONLY IMPLEMENTATION AUTHORIZED ON 2026-08-14 /
-  GOVERNANCE REMOTE VERIFICATION REQUIRED BEFORE CODE / NOT OWNER ACCEPTED`;
+- M6-P3-G1: `GOVERNANCE REMOTE-VERIFIED / LOCAL TECHNICAL CANDIDATE /
+  G1 14/14 / FULL CORE 463/463 / REMOTE TECHNICAL VERIFICATION PENDING /
+  NOT OWNER ACCEPTED`;
 - M6-P3 after G1 / M6-P4+: `NOT AUTHORIZED / NOT STARTED`;
 - R-CORE-ARCH-001: `CONFIRMED / HIGH / MONITORING — APPLICATION DIRECT V4
   DEPENDENCY REMEDIATED AT OWNER-ACCEPTED G1-R1`;
@@ -576,6 +577,12 @@ non-force publication, remote verification and STOP for Project Lead Owner Revie
 It authorizes no Schema/Migration, formal port-8765 database access, HTTP route,
 handler or external DTO source-file change, Auth/RBAC, Frontend, M7+, V3, GPU, Worker
 or ComfyUI work.
+
+The bounded G1 local technical candidate changes the exact seven production paths and
+adds the exact three tests in its record. G1 `14/14`, full Core `463/463`, Markdown
+`88/88`, local links `323/323`, non-test Python AST `63/63`, architecture, secret,
+`__init__`, HTTP/Migration/DDL and diff gates pass. Technical non-force publication,
+remote equality verification and the mandatory Owner Review stop remain.
 
 Legacy Phase 0 provenance debt remains `OPEN / NON-BLOCKING` under Owner Gate
 `P3-RV1-003`. This acknowledgement does not silently close the debt or import

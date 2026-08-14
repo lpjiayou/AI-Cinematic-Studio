@@ -186,12 +186,16 @@ class LifecycleAssembly:
         intelligence_boundary = create_in_memory_participant(
             lifecycle_state=state,
             source_reader=planning_boundary,
+            consumer_context_reader=project_boundary,
             scope_authority=m6_scope_authority,
             approval_authority=m6_approval_authority,
             identity_authority=m6_identity_authority,
             ref_factory=ref_factory,
             clock=clock,
             outbox_hook=m6_outbox_hook,
+        )
+        script_boundary._bind_m6_episode_baseline_reader(
+            intelligence_boundary._active_m6_baseline_reader_or_none()
         )
 
         coordinator = LifecycleIntegrityCoordinator(
@@ -302,12 +306,16 @@ class LifecycleAssembly:
             database_path=database_path,
             lifecycle_state=state,
             source_reader=planning_boundary,
+            consumer_context_reader=project_boundary,
             scope_authority=m6_scope_authority,
             approval_authority=m6_approval_authority,
             identity_authority=m6_identity_authority,
             ref_factory=ref_factory,
             clock=clock,
             fault_hook=m6_fault_hook,
+        )
+        script_boundary._bind_m6_episode_baseline_reader(
+            intelligence_boundary._active_m6_baseline_reader_or_none()
         )
         coordinator = LifecycleIntegrityCoordinator(
             state,
