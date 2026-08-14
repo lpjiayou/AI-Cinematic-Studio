@@ -12,8 +12,8 @@ OS、V4 Platform、V3 Render Core、持久化与后端测试；客户 Commercial
 > `e172cc7c…` 已通过 464/464、远端验证和 Owner Review；CCV-R1 seed-type
 > 修正 `0c2552bf…` 已直接 Owner Accepted；Core `main` 已通过 PR #4 rebase
 > 收敛至 `9c13e8f8…`，tree `8ee5c3ba…`，并通过 464/464 与 post-merge CI；
-> Capture G0 `9094a466…` 已直接 Owner Accepted；G1 仅获证据工具闭环授权，
-> 外部 GPU 仍未启动；
+> Capture G0 `9094a466…` 已直接 Owner Accepted；G1 `af34ac07…` 已远端验证、
+> PR #6 CI 通过；G2 已获单窗口只读历史证据采集授权；
 > Production Ready = `NO`。
 
 ## 当前活动工作包
@@ -51,7 +51,8 @@ OS、V4 Platform、V3 Render Core、持久化与后端测试；客户 Commercial
 | CCV-R1 accepted checkpoint | `0c2552bf49923d45c2c5542cdb39f512a7e7d15d / TREE 8ee5c3ba / OWNER ACCEPTED` |
 | CCV-R1 main convergence | `PR #4 REBASE AND MERGE / MAIN 9c13e8f8 / TREE 8ee5c3ba / 464/464 / POST-MERGE CI PASS` |
 | Capture G0 | `OWNER ACCEPTED / REMOTE-VERIFIED AT 9094a466 / TREE d372581f / PR #5 DRAFT / CI PASS` |
-| Current checkpoint | `ACS-CCV-R1-HISTORICAL-EVIDENCE-CAPTURE-G1 / TOOLING CLOSURE ONLY / EXTERNAL GPU NOT STARTED` |
+| Capture G1 | `REMOTE-VERIFIED AT af34ac07 / TREE 0cec29c8 / PR #6 DRAFT / CI PASS / FULL CORE 464/464` |
+| Current checkpoint | `ACS-CCV-R1-HISTORICAL-EVIDENCE-CAPTURE-G2 / ONE-WINDOW READ-ONLY EXTERNAL COLLECTION / NO RERUN` |
 | Character Consistency evidence status | `EXPERIMENT REPORTED / INDEPENDENT REPRODUCTION NOT POSSIBLE / SYNTHETIC_TEST_ONLY / NOT FOR PRODUCTION` |
 | CCV-R2 / Character Visual Identity schema | `NOT AUTHORIZED / NOT STARTED` |
 | M6-P3 after G1 / M6-P4+ | `NOT AUTHORIZED / NOT STARTED` |
