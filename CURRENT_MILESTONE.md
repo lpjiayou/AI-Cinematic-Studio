@@ -2,17 +2,17 @@
 
 > Document: `CURRENT_MILESTONE.md`
 >
-> Execution Mode: `AUTO-SEQUENTIAL / BOUNDED / FAIL-CLOSED`
+> Execution Mode: `MANUAL / GOVERNANCE-ONLY / FAIL-CLOSED`
 >
-> Project Lead Authorization: `M6-P3-B1-R1 SQLITE SERIES ISOLATION CORRECTION AUTHORIZED BY PROJECT LEAD / ARCHITECTURE / REPOSITORY GOVERNANCE / M2-M5 DOMAIN OWNERS ON 2026-08-13`
+> Project Lead Authorization: `M6-P3-B1-R1 OWNER ACCEPTANCE CLOSEOUT DIRECTED BY PROJECT LEAD / ARCHITECTURE / REPOSITORY GOVERNANCE / M2-M5 DOMAIN OWNER ON 2026-08-14`
 >
-> Authorized Wave: `B1-R1 EIGHT-PATH GOVERNANCE CHECKPOINT → REMOTE VERIFY → ONE PRODUCTION + ONE TEST CORRECTION → REMOTE VERIFY → STOP FOR B1-R1 OWNER REVIEW`
+> Authorized Wave: `B1-R1 OWNER REVIEW → GOVERNANCE-ONLY ACCEPTANCE CLOSEOUT → REMOTE VERIFY → STOP`
 >
-> Current Task: `ACS-M6-P3-B1-R1-SQLITE-SERIES-ISOLATION`
+> Current Task: `ACS-M6-P3-B1-R1-OWNER-ACCEPTANCE-CLOSEOUT`
 >
-> Current Work Package: `TECHNICAL CORRECTION CANDIDATE → REMOTE VERIFY → OWNER REVIEW`
+> Current Work Package: `OWNER ACCEPTED RESULT → GOVERNANCE SYNCHRONIZATION → REMOTE VERIFY`
 >
-> M6 Authorization: `P0-P2 OWNER ACCEPTED / P3-G0 OWNER ACCEPTED AS ARCHITECTURE / P3-B1 CANDIDATE REVISION REQUIRED / P3-B1-R1 BOUNDED CORRECTION AUTHORIZED / P3-G1 NOT AUTHORIZED`
+> M6 Authorization: `P0-P2 OWNER ACCEPTED / P3-G0 OWNER ACCEPTED AS ARCHITECTURE / P3-B1 ORIGINAL CANDIDATE REVISION REQUIRED / P3-B1-R1 OWNER ACCEPTED / P3-G1 NOT AUTHORIZED`
 >
 > M7 Authorization: `NOT AUTHORIZED`
 >
@@ -66,15 +66,15 @@ decommission. It is no longer an active Core work package and does not authorize
 
 Current stage:
 
-`M6-P3-B1-R1 SQLite Same-Project Cross-Series Isolation`
+`M6-P3-B1-R1 Owner Acceptance Closeout`
 
 Title:
 
-ACS-M6-P3-B1-R1 SQLite Series Isolation Correction
+ACS-M6-P3-B1-R1 Owner Acceptance Closeout
 
 Status:
 
-`B1 CANDIDATE 8449b521c96bb8340806ecda8649698f4771914a REVISION REQUIRED / B1-R1 GOVERNANCE REMOTE-VERIFIED AT 716b4d298173f8123cafd93114dfc67339943ff3 / TECHNICAL CORRECTION CANDIDATE / GATES PASS / G1 NOT AUTHORIZED`
+`B1 ORIGINAL CANDIDATE 8449b521c96bb8340806ecda8649698f4771914a REVISION REQUIRED / B1-R1 OWNER ACCEPTED AT 5c656992d9fade3683b70e3c57f8b8ba7d26c7f7 / COMPLETE / G1 NOT AUTHORIZED`
 
 Purpose:
 
@@ -335,14 +335,15 @@ ACS-ARCH-R1-V5-TEXT-GENERATION-G1-R1-AUTHORIZATION
 The original G1 remains historical `REVISION REQUIRED / NOT OWNER ACCEPTED` and is
 superseded by the accepted G1-R1 result. B1 candidate
 `8449b521c96bb8340806ecda8649698f4771914a` is also `REVISION REQUIRED / NOT OWNER
-ACCEPTED`. The only current authorized transition is:
+ACCEPTED`. B1-R1 corrected that defect and is Owner Accepted at
+`5c656992d9fade3683b70e3c57f8b8ba7d26c7f7`. The current authorized transition is
+governance-only:
 
 ```text
-B1-R1 GOVERNANCE AUTHORIZATION CHECKPOINT
+B1-R1 OWNER REVIEW PASS
+→ SYNCHRONIZE OWNER ACCEPTANCE IN THE EIGHT GOVERNANCE PATHS
 → COMMIT / NON-FORCE PUSH / REMOTE VERIFY
-→ ONE PRODUCTION + ONE TEST SQLITE ISOLATION CORRECTION
-→ COMMIT / NON-FORCE PUSH / REMOTE VERIFY
-→ STOP FOR PROJECT LEAD B1-R1 OWNER REVIEW
+→ STOP
 ```
 
 No G1 or later milestone may be silently entered.
@@ -354,9 +355,10 @@ No G1 or later milestone may be silently entered.
 M6-P0/P1 and M6-P2-G1 are `OWNER ACCEPTED / COMPLETE / REMOTE-VERIFIED`.
 The Project Lead and Architecture Owner accepted the G3/P3-G0 target architecture,
 ADR-0005 and the M6 consumer contract on `2026-08-13`. M6-P3-G0 is complete only as a
-governance/architecture decision. The later explicit Owner decision authorizes only
-M6-P3-B1 after its governance checkpoint is remote-verified. M6-P3-G1 and all later
-M6 work remain `NOT AUTHORIZED / NOT STARTED`.
+governance/architecture decision. The later explicit Owner decision authorized
+M6-P3-B1, and the corrected B1-R1 checkpoint is now Owner Accepted. M6-P3-G1 and all
+later M6 work remain `NOT AUTHORIZED / NOT STARTED` until their own explicit
+governance authorization.
 
 M6 Character Intelligence must include at least background, motivation, belief,
 conflict, goal, personality, behavior rules, dialogue rules, forbidden behavior,
@@ -399,12 +401,11 @@ future consistency verdicts; M9 remains owner of future AssetRequirement and
 asset-resolution readiness.
 
 Number, title, array position and display name matching are forbidden. The future
-sequence is two independent checkpoints: first P3-B1 implements the accepted target
-M5 v2 binding, then a future separately authorized P3-G1 may implement the read-only
-M6/M3 consumer. The affected M2/M4/M5/M6 Domain Owners approve B1. P3-B1 is now
-authorized within exactly six production, nine test and eight governance paths; it
-must be tested, pushed, remote-verified and Owner Accepted before P3-G1 can be
-authorized.
+sequence is two independent checkpoints: P3-B1 implemented the accepted target M5 v2
+binding and is Owner Accepted through corrected B1-R1; a future separately authorized
+P3-G1 may implement the read-only M6/M3 consumer. The affected M2/M4/M5/M6 Domain
+Owners accepted the bounded binding result. G1 still requires a separate explicit
+authorization.
 
 Initial plan creation stays v1. B1 allows v1→v1, explicit v1→v2 and v2→v2, forbids
 v2→v1 and requires a new explicit v2 version for unbinding. The only new operation is
@@ -436,9 +437,9 @@ capability.
 - RB13-F001: `R1 IMPLEMENTED / INDEPENDENTLY ACCEPTED / CLOSED`
 - ADR-0002 STATUS: `ACCEPTED FOR BOUNDED R2 IMPLEMENTATION`
 - RB13-F002: `REMEDIATED / CLOSED IN CURRENT TESTED CORE BASELINE`
-- EXECUTION MODE: `AUTO-SEQUENTIAL / BOUNDED / FAIL-CLOSED`
-- AUTHORIZED WAVE: `B1-R1 GOVERNANCE CHECKPOINT → REMOTE VERIFY → ONE PRODUCTION + ONE TEST CORRECTION → REMOTE VERIFY → STOP FOR OWNER REVIEW`
-- CURRENT TASK: `ACS-M6-P3-B1-R1-SQLITE-SERIES-ISOLATION`
+- EXECUTION MODE: `MANUAL / GOVERNANCE-ONLY / FAIL-CLOSED`
+- AUTHORIZED WAVE: `B1-R1 OWNER REVIEW → GOVERNANCE ACCEPTANCE CLOSEOUT → REMOTE VERIFY → STOP`
+- CURRENT TASK: `ACS-M6-P3-B1-R1-OWNER-ACCEPTANCE-CLOSEOUT`
 - G0 BASE: `c524486c05c21b270a7dd75e89fae4312430736a`
 - ADR-0006 STATUS: `ACCEPTED FOR BOUNDED G1`
 - V5 TEXT GENERATION CONTRACT: `ACCEPTED FOR BOUNDED G1`
@@ -455,7 +456,7 @@ capability.
 - RB1.3 CLOSEOUT: `FORMALLY CLOSED`
 - ARCHITECTURE REVIEW: `SATISFIED FOR BOUNDED M6-P0/P1 AND M6-P2 LOCAL SQLITE ONLY`
 - M6 PRECONDITIONS: `SATISFIED FOR BOUNDED M6-P0/P1 AND M6-P2 LOCAL SQLITE ONLY`
-- M6: `P0-P2 OWNER ACCEPTED / P3-G0 OWNER ACCEPTED AS ARCHITECTURE / P3-B1 REVISION REQUIRED / P3-B1-R1 BOUNDED CORRECTION AUTHORIZED / P3-G1 AND LATER M6 WORK NOT AUTHORIZED`
+- M6: `P0-P2 OWNER ACCEPTED / P3-G0 OWNER ACCEPTED AS ARCHITECTURE / P3-B1 ORIGINAL CANDIDATE REVISION REQUIRED / P3-B1-R1 OWNER ACCEPTED / P3-G1 AND LATER M6 WORK NOT AUTHORIZED`
 - M6-P0 STATUS: `CONTRACT ACCEPTED / COMPLETE`
 - M6-P1 STATUS: `OWNER ACCEPTED / COMPLETE / REMOTE-VERIFIED AT e38c75aa4ff26bdea80c82d8a24096f799dad860`
 - ADR-0004 STATUS: `ACCEPTED FOR BOUNDED M6-P2 IMPLEMENTATION`
@@ -463,9 +464,9 @@ capability.
 - M6-P2-G1 STATUS: `OWNER ACCEPTED / COMPLETE / REMOTE-VERIFIED AT 8227c6c616140824fd70de920dc6fcf459bb734d`
 - M6-P2-G1-CLOSEOUT-G3 STATUS: `REMOTE-VERIFIED HISTORICAL PROPOSAL CHECKPOINT AT c524486c05c21b270a7dd75e89fae4312430736a / PRESERVED`
 - M6-P3-G0 STATUS: `OWNER ACCEPTED / COMPLETE AS GOVERNANCE-ARCHITECTURE / NO IMPLEMENTATION AUTHORITY`
-- ADR-0005 STATUS: `ACCEPTED AS ARCHITECTURE DECISION / B1 BOUNDED IMPLEMENTATION AUTHORIZED / G1 UNAUTHORIZED`
-- M6 CONSUMER CONTRACT: `ACCEPTED NORMATIVE ARCHITECTURE / B1 BOUNDED IMPLEMENTATION AUTHORIZED / CONSUMER UNIMPLEMENTED`
-- M6-P3-B1 EPISODE-PLAN-ITEM BINDING: `REMOTE-VERIFIED CANDIDATE AT 8449b521c96bb8340806ecda8649698f4771914a / OWNER REVIEW REVISION REQUIRED / NOT OWNER ACCEPTED / BLOCKS M6-P3-G1`
+- ADR-0005 STATUS: `ACCEPTED AS ARCHITECTURE DECISION / B1 OWNER ACCEPTED THROUGH B1-R1 / G1 UNAUTHORIZED`
+- M6 CONSUMER CONTRACT: `ACCEPTED NORMATIVE ARCHITECTURE / B1 OWNER ACCEPTED THROUGH B1-R1 / CONSUMER UNIMPLEMENTED`
+- M6-P3-B1 EPISODE-PLAN-ITEM BINDING: `ORIGINAL CANDIDATE AT 8449b521c96bb8340806ecda8649698f4771914a REVISION REQUIRED / CORRECTED AND OWNER ACCEPTED THROUGH B1-R1 AT 5c656992d9fade3683b70e3c57f8b8ba7d26c7f7`
 - M6-P3-B1 AUTHORIZED BASE: `6bb9d165a693057f38e5789c408293ff0eaf5bcc`
 - M6-P3-B1 DOMAIN OWNERS: `M2 / M4 / M5 / M6 APPROVED`
 - M6-P3-B1 FROZEN SCOPE: `8 GOVERNANCE / 6 PRODUCTION / 9 TEST PATHS`
@@ -473,12 +474,12 @@ capability.
 - M6-P3-B1 CORE OPERATION: `create_episode_plan_item_binding_version / NO ROUTE, HANDLER OR EXTERNAL DTO SOURCE CHANGE`
 - M6-P3-B1 MANUAL V2 RULE: `create_manual_version REJECTS CURRENT V2 WITHOUT WRITE / DEDICATED METHOD ALONE CREATES V2→V2`
 - M6-P3-B1 OWNER HTTP CLARIFICATION: `EXISTING CANONICAL V2 PROJECTION IN WORKSPACE VERSIONS PASSES THROUGH episodePlanItemBindings / MANUAL + BOOTSTRAP V1 BEHAVIOR UNCHANGED / NO OTHER HTTP CONTRACT EXPANSION`
-- M6-P3-B1-F001: `CONFIRMED / BLOCKING / SQLITE SAME-PROJECT CROSS-SERIES FALSE DEPENDENCY`
-- M6-P3-B1-R1 STATUS: `GOVERNANCE REMOTE-VERIFIED AT 716b4d298173f8123cafd93114dfc67339943ff3 / TECHNICAL CORRECTION CANDIDATE / GATES PASS`
+- M6-P3-B1-F001: `CLOSED BY OWNER-ACCEPTED B1-R1 / SQLITE SAME-PROJECT CROSS-SERIES FALSE DEPENDENCY`
+- M6-P3-B1-R1 STATUS: `OWNER ACCEPTED / COMPLETE / REMOTE-VERIFIED AT 5c656992d9fade3683b70e3c57f8b8ba7d26c7f7`
 - M6-P3-B1-R1 AUTHORIZED BASE: `8449b521c96bb8340806ecda8649698f4771914a`
 - M6-P3-B1-R1 SCOPE: `8 GOVERNANCE → 1 PRODUCTION + 1 TEST → REMOTE VERIFY → STOP FOR OWNER REVIEW`
 - M6-P3-B1-R1 EVIDENCE: `PRE-FIX SQLITE 409 REPRODUCED / POST-FIX SQLITE MODULE 30/30 / ORIGINAL B1 174/174 / FULL CORE 449/449 / NON-TEST PYTHON AST 63/63`
-- M6-P3-G1 STATUS: `SEQUENCE DEFINED / BLOCKED UNTIL B1 OWNER ACCEPTED / NOT AUTHORIZED / NOT STARTED`
+- M6-P3-G1 STATUS: `PREREQUISITE SATISFIED / SEPARATE AUTHORIZATION REQUIRED / NOT AUTHORIZED / NOT STARTED`
 - M6-P3 AFTER G1 / M6-P4+ STATUS: `NOT AUTHORIZED / NOT STARTED`
 - M7-M19: `NOT STARTED / NOT AUTHORIZED`
 - FORMAL 8765 DEPLOYMENT: `UNTOUCHED / NOT DEPLOYED`
@@ -498,8 +499,8 @@ and that G0 acceptance remains immutable timepoint evidence. The Project Lead se
 and accepted ADR-0006 and later accepted corrected G1-R1 at
 `d44f471c644e319bb4a5bf73707c3274ecbaa426`. This closes the architecture-remediation
 wave but does not establish Production Ready or authorize formal database deployment,
-Frontend, M6-P3-G1, later M6 work or M7-M19. B1 authority is limited to the explicit
-record and takes effect for technical edits only after governance remote verification.
+Frontend, M6-P3-G1, later M6 work or M7-M19. B1 is accepted only through the explicit
+B1-R1 correction and does not create any later implementation authority.
 
 ---
 
@@ -510,18 +511,17 @@ B1 is remote-verified at `8449b521c96bb8340806ecda8649698f4771914a` but is
 checkpoint was committed and remote-verified at
 `716b4d298173f8123cafd93114dfc67339943ff3` with production and test diff zero.
 
-The B1-R1 correction now passes its frozen one production, one test and eight governance
-path scope, the updated SQLite lifecycle module `30/30`, all original B1 tests
-`174/174`, complete Core regression `449/449` and non-test Python AST `63/63`. It must
-still pass the final Markdown/local-link, secret and `git diff --check` gates, one
-technical commit, non-force remote publication, Local SHA equals Remote SHA,
-ahead/behind `0/0` and clean worktree.
+The B1-R1 correction is remote-verified at
+`5c656992d9fade3683b70e3c57f8b8ba7d26c7f7`. Owner Review independently reproduced
+the original false `409`, confirmed the corrected path, reran SQLite `30/30`, complete
+Core `449/449`, Markdown `87/87`, local links `322/322`, non-test Python AST `63/63`,
+secret, DDL/Migration and `git diff --check` gates, and accepted B1-R1 on
+`2026-08-14`.
 
-After the correction candidate is remote-verified:
+After this governance-only acceptance closeout is remote-verified:
 
 ```text
-STOP — M6-P3-B1-R1 REMOTE-VERIFIED CORRECTION CANDIDATE
-PROJECT LEAD B1-R1 OWNER REVIEW REQUIRED
+STOP — M6-P3-B1-R1 OWNER ACCEPTED / COMPLETE
 M6-P3-G1 NOT AUTHORIZED / NOT STARTED
 NEXT AUTHORIZED MILESTONE: NONE
 ```
@@ -535,11 +535,11 @@ formal database deployment, Auth/RBAC expansion or Frontend work.
 
 # 10. Current Authorized Task
 
-`ACS-M6-P3-B1-R1-SQLITE-SERIES-ISOLATION`
+`ACS-M6-P3-B1-R1-OWNER-ACCEPTANCE-CLOSEOUT`
 
 Status:
 
-`B1 CANDIDATE REVISION REQUIRED / B1-R1 GOVERNANCE REMOTE-VERIFIED AT 716b4d298173f8123cafd93114dfc67339943ff3 / TECHNICAL CORRECTION CANDIDATE / GATES PASS`
+`B1 ORIGINAL CANDIDATE REVISION REQUIRED / B1-R1 OWNER ACCEPTED / COMPLETE / REMOTE-VERIFIED AT 5c656992d9fade3683b70e3c57f8b8ba7d26c7f7`
 
 M6-P0/P1 and bounded M6-P2-G1 remain Owner Accepted at their remote-verified technical
 baselines. G1-R1 is Owner Accepted and complete at
@@ -556,12 +556,12 @@ Creator Application
 ```
 
 The Project Lead, Architecture Owner, Repository Governance Owner and affected M2/M5
-Domain Owners authorized the exact B1-R1 auto-sequential correction recorded in
+Domain Owners accepted the exact B1-R1 correction recorded in
 [`ACS-M6-P3-B1-EPISODE-PLAN-ITEM-BINDING.md`](governance/ACS-M6-P3-B1-EPISODE-PLAN-ITEM-BINDING.md):
 the eight-path governance checkpoint is remote-verified at
 `716b4d298173f8123cafd93114dfc67339943ff3`; the one-production/one-test correction
-passes its test gates. After technical commit and remote verification, STOP for B1-R1
-Owner Review.
+is remote-verified at `5c656992d9fade3683b70e3c57f8b8ba7d26c7f7` and passed
+independent Owner Review. This closeout grants no M6-P3-G1 implementation authority.
 
 Formal port-8765 database access/deployment, HTTP route/handler/external DTO
 source-file changes, HTTP expansion beyond the Owner-approved existing workspace
