@@ -4,17 +4,17 @@
 >
 > Execution Mode: `MANUAL / BOUNDED / FAIL-CLOSED`
 >
-> Project Lead Authorization: `ACS-GOV-POST-M6-P3-G1-CLOSEOUT AND ACS-CCV-R1-EVIDENCE-HARDENING SEPARATELY AUTHORIZED ON 2026-08-14`
+> Project Lead Authorization: `ACS-GOV-POST-M6-P3-G1-CLOSEOUT OWNER ACCEPTED AT 20207e7f; ACS-CCV-R1-EVIDENCE-HARDENING AUTHORIZED ON 2026-08-14`
 >
-> Authorized Wave: `ACS-GOV NINE-PATH GOVERNANCE-ONLY SYNCHRONIZATION → REMOTE VERIFY → STOP FOR OWNER REVIEW`
+> Authorized Wave: `ACS-CCV-R1 EVIDENCE STRUCTURE + REPORT/SCRIPT/MANIFEST HARDENING → REMOTE VERIFY → STOP FOR OWNER REVIEW`
 >
-> Current Task: `ACS-GOV-POST-M6-P3-G1-CLOSEOUT`
+> Current Task: `ACS-CCV-R1-EVIDENCE-HARDENING`
 >
-> Current Work Package: `GOVERNANCE-ONLY OWNER-ACCEPTANCE AND CORE MAIN CONVERGENCE SYNCHRONIZATION`
+> Current Work Package: `EXPERIMENT EVIDENCE HARDENING / NO PRODUCTION OR TEST CHANGE`
 >
 > M6 Authorization: `P0-P2 OWNER ACCEPTED / P3-G0 OWNER ACCEPTED AS ARCHITECTURE / P3-B1 OWNER ACCEPTED THROUGH B1-R1 / P3-G1 OWNER ACCEPTED THROUGH G1-R1 / LATER M6 NOT AUTHORIZED`
 
-> Next Separately Authorized Checkpoint: `ACS-CCV-R1-EVIDENCE-HARDENING / BLOCKED UNTIL ACS-GOV CLOSEOUT OWNER ACCEPTED`
+> Next Checkpoint: `CCV-R2 / NOT AUTHORIZED / NOT STARTED`
 >
 > M7 Authorization: `NOT AUTHORIZED`
 >
@@ -68,34 +68,34 @@ decommission. It is no longer an active Core work package and does not authorize
 
 Current stage:
 
-`Post M6-P3-G1 Governance Closeout`
+`Character Consistency Evidence Hardening`
 
 Title:
 
-ACS-GOV-POST-M6-P3-G1-CLOSEOUT
+ACS-CCV-R1-EVIDENCE-HARDENING
 
 Status:
 
-`G1 ORIGINAL REVISION REQUIRED / G1-R1 OWNER ACCEPTED AT e172cc7c / CORE MAIN CONVERGED AT 5976263f / NINE-PATH GOVERNANCE SYNCHRONIZATION IN PROGRESS`
+`ACS-GOV CLOSEOUT OWNER ACCEPTED AT 20207e7f / CCV-R1 EVIDENCE PACKAGE IN PROGRESS / INDEPENDENT REPRODUCTION NOT POSSIBLE`
 
 Purpose:
 
-1. preserve the original G1 `3696d6af12222d30eb99b65d67e6db18897eb42f` as
-   historical `REVISION REQUIRED / NOT OWNER ACCEPTED / SUPERSEDED`;
-2. record G1-R1 `e172cc7c9bfca04066153d9edad70d9074bb37e5` as Owner
-   Accepted with tree `be7447c3d60510262e428b86cd1a6a83972f64c0` and full Core
-   `464/464`;
-3. record protected Core `main` convergence through PR `#2` using `Rebase and merge`
-   at `5976263f92f7f9cbe9c091719eccb036ee8c0c2d` with the same tree and passing
-   post-merge Repository Validation;
-4. change only the exact nine governance/status paths frozen in
-   `governance/ACS-GOV-POST-M6-P3-G1-CLOSEOUT.md`;
-5. preserve production, tests, HTTP/API, Frontend, schema/migration and event semantics;
-6. test, commit, non-force publish, remote-verify and stop for Owner Review.
+1. preserve `ACS-GOV-POST-M6-P3-G1-CLOSEOUT` as Owner Accepted at
+   `20207e7f2d2123468698f453c70ce725a293976a`, tree
+   `e3638838dd0c79201a1962bb247ec7c773b62ffa`;
+2. correct the Character Consistency report's `40 → 50` accounting and overclaims;
+3. establish `experiments/ccv-r1/` as an evidence-only structure with no generated
+   image or model binary;
+4. provide hardened successor scripts, config-driven parameters, manifest schema and
+   no-GPU fail-closed validation;
+5. record all unavailable historical scripts/workflows/seeds/hashes/logs as pending,
+   without guessing;
+6. preserve production, tests, HTTP/API, Frontend, schema/migration and event semantics;
+7. test, commit, non-force publish, remote-verify, open a Draft PR, observe CI and stop
+   for Owner Review.
 
-The separately authorized `ACS-CCV-R1-EVIDENCE-HARDENING` checkpoint may start only
-after this closeout is Owner Accepted. It authorizes evidence hardening only and no M6
-schema or production implementation.
+This task does not rerun the GPU experiment. It authorizes no CCV-R2, Character Visual
+Identity ADR implementation, M6 schema change or production GPU integration.
 
 ---
 
@@ -337,17 +337,18 @@ superseded by the accepted G1-R1 result. B1 candidate
 `8449b521c96bb8340806ecda8649698f4771914a` is also `REVISION REQUIRED / NOT OWNER
 ACCEPTED`. B1-R1 corrected that defect and is Owner Accepted at
 `5c656992d9fade3683b70e3c57f8b8ba7d26c7f7`. M6-P3-G1 and G1-R1 were later completed
-as recorded below. The current authorized transition is governance-only:
+as recorded below. The governance closeout is now Owner Accepted; the current
+authorized transition is evidence-only:
 
 ```text
-M6-P3-G1-R1 OWNER REVIEW PASS
-→ SYNCHRONIZE OWNER ACCEPTANCE AND CORE MAIN CONVERGENCE IN NINE PATHS
-→ COMMIT / NON-FORCE PUSH / REMOTE VERIFY
+ACS-GOV-POST-M6-P3-G1-CLOSEOUT OWNER ACCEPTED AT 20207e7f
+→ ACS-CCV-R1 EVIDENCE HARDENING
+→ COMMIT / NON-FORCE PUSH / DRAFT PR / CI / REMOTE VERIFY
 → STOP
 ```
 
-No Character Consistency evidence work or later milestone may be silently entered
-before this closeout is Owner Accepted.
+No CCV-R2, schema work or later milestone may be silently entered after this
+checkpoint.
 
 ---
 
@@ -440,8 +441,8 @@ capability.
 - ADR-0002 STATUS: `ACCEPTED FOR BOUNDED R2 IMPLEMENTATION`
 - RB13-F002: `REMEDIATED / CLOSED IN CURRENT TESTED CORE BASELINE`
 - EXECUTION MODE: `MANUAL / BOUNDED / FAIL-CLOSED`
-- AUTHORIZED WAVE: `ACS-GOV NINE-PATH GOVERNANCE-ONLY SYNCHRONIZATION → REMOTE VERIFY → STOP FOR OWNER REVIEW`
-- CURRENT TASK: `ACS-GOV-POST-M6-P3-G1-CLOSEOUT`
+- AUTHORIZED WAVE: `ACS-CCV-R1 EVIDENCE HARDENING → REMOTE VERIFY → DRAFT PR / CI → STOP FOR OWNER REVIEW`
+- CURRENT TASK: `ACS-CCV-R1-EVIDENCE-HARDENING`
 - G0 BASE: `c524486c05c21b270a7dd75e89fae4312430736a`
 - ADR-0006 STATUS: `ACCEPTED FOR BOUNDED G1`
 - V5 TEXT GENERATION CONTRACT: `ACCEPTED FOR BOUNDED G1`
@@ -484,7 +485,9 @@ capability.
 - M6-P3-G1 ORIGINAL STATUS: `REMOTE-VERIFIED AT 3696d6af12222d30eb99b65d67e6db18897eb42f / G1 14/14 / FULL CORE 463/463 / REVISION REQUIRED / NOT OWNER ACCEPTED / SUPERSEDED`
 - M6-P3-G1-R1 STATUS: `OWNER ACCEPTED / COMPLETE / REMOTE-VERIFIED AT e172cc7c9bfca04066153d9edad70d9074bb37e5 / TREE be7447c3d60510262e428b86cd1a6a83972f64c0 / FULL CORE 464/464`
 - CORE MAIN CONVERGENCE: `OWNER ACCEPTED / PR #2 REBASE AND MERGE / MAIN 5976263f92f7f9cbe9c091719eccb036ee8c0c2d / SAME TREE / POST-MERGE CI PASS`
-- NEXT SEPARATELY AUTHORIZED CHECKPOINT: `ACS-CCV-R1-EVIDENCE-HARDENING / BLOCKED UNTIL ACS-GOV CLOSEOUT OWNER ACCEPTED`
+- ACS-GOV-POST-M6-P3-G1-CLOSEOUT: `OWNER ACCEPTED AT 20207e7f2d2123468698f453c70ce725a293976a / TREE e3638838dd0c79201a1962bb247ec7c773b62ffa`
+- ACS-CCV-R1-EVIDENCE-HARDENING: `AUTHORIZED / EXPERIMENT EVIDENCE ONLY / IN PROGRESS`
+- CCV-R2 / CHARACTER VISUAL IDENTITY SCHEMA WORK: `NOT AUTHORIZED / NOT STARTED`
 - M6-P3 AFTER G1 / M6-P4+ STATUS: `NOT AUTHORIZED / NOT STARTED`
 - M7-M19: `NOT STARTED / NOT AUTHORIZED`
 - FORMAL 8765 DEPLOYMENT: `UNTOUCHED / NOT DEPLOYED`
@@ -512,15 +515,15 @@ separately authorized and accepted through G1-R1.
 
 # 9. Stop Rule
 
-The current checkpoint changes exactly the nine governance/status paths in
-[`ACS-GOV-POST-M6-P3-G1-CLOSEOUT.md`](governance/ACS-GOV-POST-M6-P3-G1-CLOSEOUT.md).
-Production and test diff must remain zero. After documentation, regression, commit,
-non-force push, remote equality and CI observation:
+The current checkpoint changes only the allowlist in
+[`ACS-CCV-R1-EVIDENCE-HARDENING.md`](governance/ACS-CCV-R1-EVIDENCE-HARDENING.md).
+Production and test diff must remain zero. After evidence validation, regression,
+commit, non-force push, remote equality, Draft PR and CI observation:
 
 ```text
-ACS-GOV-POST-M6-P3-G1-CLOSEOUT CHECKPOINT CANDIDATE
+ACS-CCV-R1-EVIDENCE-HARDENING CHECKPOINT CANDIDATE
 PROJECT LEAD OWNER REVIEW REQUIRED
-DO NOT ENTER ACS-CCV-R1 UNTIL CLOSEOUT OWNER ACCEPTED
+DO NOT ENTER CCV-R2 OR ANY SCHEMA WORK
 ```
 
 Stop before any production/test change, M6 schema change, DDL/Migration,
@@ -531,11 +534,11 @@ Auth/RBAC, Frontend, GPU, Worker or ComfyUI work.
 
 # 10. Current Authorized Task
 
-`ACS-GOV-POST-M6-P3-G1-CLOSEOUT`
+`ACS-CCV-R1-EVIDENCE-HARDENING`
 
 Status:
 
-`GOVERNANCE-ONLY SYNCHRONIZATION / NINE-PATH ALLOWLIST / OWNER REVIEW REQUIRED`
+`EXPERIMENT EVIDENCE HARDENING / PRODUCTION AND TEST DIFF ZERO / OWNER REVIEW REQUIRED`
 
 Accepted technical evidence:
 
@@ -552,10 +555,10 @@ TREE: be7447c3d60510262e428b86cd1a6a83972f64c0
 STATUS: PR #2 REBASE AND MERGE / POST-MERGE CI PASS / OWNER ACCEPTED
 ```
 
-The next separately authorized checkpoint is `ACS-CCV-R1-EVIDENCE-HARDENING`, but it
-remains blocked until this governance closeout is Owner Accepted. It may revise and
-package experimental Character Consistency evidence only; it may not change M6,
-Identity, Asset, HTTP/API or Frontend production behavior.
+The accepted parent checkpoint is `ACS-GOV-POST-M6-P3-G1-CLOSEOUT` at `20207e7f`.
+The current report remains `EXPERIMENT REPORTED / INDEPENDENT REPRODUCTION NOT
+POSSIBLE`. CCV-R2 and any Identity/Asset/M6/M8/M10 schema or production work remain
+unauthorized.
 
 Formal port-8765 deployment, later M6 work, M7-M19, Schema/Migration, Frontend,
 production GPU/Worker/ComfyUI integration and Production Ready remain unauthorized.

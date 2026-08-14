@@ -1,0 +1,128 @@
+{
+  "configVersion": "1.0",
+  "experimentId": "acs-ccv-r1",
+  "roundId": "round-1",
+  "evidenceStatus": "PENDING_EXTERNAL_EVIDENCE",
+  "rightsLabels": [
+    "SYNTHETIC_TEST_ONLY",
+    "NOT_FOR_PRODUCTION"
+  ],
+  "globalParameters": {
+    "positivePrompt": "a young woman, 20 years old, long straight black hair, brown eyes, red leather jacket, white t-shirt, blue jeans",
+    "negativePrompt": "lowres, bad anatomy, bad hands, blurry, watermark, text, deformed face",
+    "width": 512,
+    "height": 768,
+    "steps": 25,
+    "cfg": 7.0,
+    "sampler": "dpmpp_2m",
+    "scheduler": "karras",
+    "identityMethod": "text-only",
+    "poseControl": "none"
+  },
+  "shots": [
+    {
+      "shotId": "01_medium_front",
+      "description": "medium shot, standing, facing camera, neutral background"
+    },
+    {
+      "shotId": "02_closeup_side",
+      "description": "close-up portrait, side profile view, soft lighting"
+    },
+    {
+      "shotId": "03_full_walking",
+      "description": "full body shot, walking on a street, wide angle"
+    },
+    {
+      "shotId": "04_back_turning",
+      "description": "from behind, turning head back over shoulder"
+    },
+    {
+      "shotId": "05_sitting_high",
+      "description": "sitting on a chair, high angle shot, looking up"
+    }
+  ],
+  "models": [
+    {
+      "role": "base",
+      "logicalName": "sd_xl_base_1.0.safetensors",
+      "filePath": null,
+      "sizeBytes": null,
+      "sha256": null,
+      "modelFamily": "sdxl",
+      "conditioningDimension": 2048,
+      "source": "PENDING_COLLECTION_FROM_EXTERNAL_GPU",
+      "licenseStatus": "PENDING_VERIFICATION"
+    }
+  ],
+  "artifacts": [
+    {
+      "role": "comfyui_workflow",
+      "logicalName": "round-1.api.json",
+      "filePath": null,
+      "sizeBytes": null,
+      "sha256": null
+    },
+    {
+      "role": "historical_run_log",
+      "logicalName": "round-1.log",
+      "filePath": null,
+      "sizeBytes": null,
+      "sha256": null
+    }
+  ],
+  "environment": {
+    "hardware": "NVIDIA A100-PCIE-40GB",
+    "cuda": "12.6",
+    "python": "3.12.7",
+    "pytorch": "2.13.0+cu126",
+    "comfyuiVersionReported": "0.28.0",
+    "comfyuiCommit": null,
+    "customNodes": [],
+    "driver": "560.35.03",
+    "collectionState": "PENDING_EXACT_EXTERNAL_EVIDENCE"
+  },
+  "matrices": [
+    {
+      "batchId": "r1-fixed",
+      "axes": {
+        "shotId": [
+          "01_medium_front",
+          "02_closeup_side",
+          "03_full_walking",
+          "04_back_turning",
+          "05_sitting_high"
+        ]
+      },
+      "fixedParameters": {
+        "seed": 123456,
+        "seedMode": "fixed"
+      },
+      "outputPattern": "outputs/r1-fixed/{shotId}.png"
+    },
+    {
+      "batchId": "r1-varying",
+      "axes": {
+        "shotId": [
+          "01_medium_front",
+          "02_closeup_side",
+          "03_full_walking",
+          "04_back_turning",
+          "05_sitting_high"
+        ]
+      },
+      "fixedParameters": {
+        "seedMode": "per-shot"
+      },
+      "perShotParameters": {
+        "seed": {
+          "01_medium_front": null,
+          "02_closeup_side": null,
+          "03_full_walking": null,
+          "04_back_turning": null,
+          "05_sitting_high": null
+        }
+      },
+      "outputPattern": "outputs/r1-varying/{shotId}.png"
+    }
+  ]
+}

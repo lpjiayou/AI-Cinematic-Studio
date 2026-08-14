@@ -6,13 +6,15 @@
 | --- | --- |
 | Task | `ACS-GOV-POST-M6-P3-G1-CLOSEOUT` |
 | Date | `2026-08-14` |
-| Decision | `GOVERNANCE-ONLY OWNER-ACCEPTANCE SYNCHRONIZATION AUTHORIZED` |
+| Decision | `OWNER ACCEPTED / COMPLETE / REMOTE-VERIFIED` |
 | Execution mode | `MANUAL / BOUNDED / FAIL-CLOSED` |
 | Base branch | `main` |
 | Base SHA | `5976263f92f7f9cbe9c091719eccb036ee8c0c2d` |
 | Base tree | `be7447c3d60510262e428b86cd1a6a83972f64c0` |
 | Production and test diff | `ZERO REQUIRED` |
-| Final stop | `AFTER COMMIT / NON-FORCE PUSH / REMOTE VERIFY / CI OBSERVATION / OWNER REVIEW REQUIRED` |
+| Accepted checkpoint | `20207e7f2d2123468698f453c70ce725a293976a` |
+| Accepted tree | `e3638838dd0c79201a1962bb247ec7c773b62ffa` |
+| Final stop | `SATISFIED / ACS-CCV-R1 SEPARATELY AUTHORIZED` |
 
 The Project Lead has accepted all previously outstanding Owner Reviews and separately
 authorized this governance-only closeout. This record synchronizes the accepted
@@ -119,7 +121,8 @@ The Project Lead has separately authorized:
 ACS-CCV-R1-EVIDENCE-HARDENING
 ```
 
-That checkpoint is independent and remains gated behind Owner Review of this closeout.
+That checkpoint is independent. This closeout passed Owner Review on `2026-08-14`, so
+the gate is satisfied.
 It may harden Character Consistency experimental evidence only. It authorizes no M6
 schema change, Identity authority implementation, Asset implementation, M7-M10,
 HTTP/API, Frontend, Worker, production GPU integration or Production Ready claim.
@@ -130,9 +133,9 @@ After the nine-path governance checkpoint is tested, committed, non-force pushed
 remote-verified:
 
 ```text
-ACS-GOV-POST-M6-P3-G1-CLOSEOUT CHECKPOINT CANDIDATE
-PROJECT LEAD OWNER REVIEW REQUIRED
-DO NOT ENTER ACS-CCV-R1 UNTIL THIS CHECKPOINT IS OWNER ACCEPTED
+ACS-GOV-POST-M6-P3-G1-CLOSEOUT OWNER ACCEPTED
+CHECKPOINT 20207e7f2d2123468698f453c70ce725a293976a
+ACS-CCV-R1 SEPARATELY AUTHORIZED
 M6 AFTER G1 / M6-P4+ / M7-M19 NOT AUTHORIZED
 PRODUCTION READY: NO
 ```
