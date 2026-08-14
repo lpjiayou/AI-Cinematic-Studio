@@ -1,12 +1,12 @@
 # M6 Series Intelligence Consumer and Reconciliation Contract
 
-> Status: `ACCEPTED NORMATIVE ARCHITECTURE / B1 CANDIDATE REVISION REQUIRED / B1-R1 GOVERNANCE REMOTE-VERIFIED AT 716b4d298173f8123cafd93114dfc67339943ff3 / TECHNICAL CORRECTION CANDIDATE / G1 UNAUTHORIZED`
+> Status: `ACCEPTED NORMATIVE ARCHITECTURE / B1 ORIGINAL CANDIDATE REVISION REQUIRED / B1-R1 OWNER ACCEPTED AT 5c656992d9fade3683b70e3c57f8b8ba7d26c7f7 / G1 UNAUTHORIZED`
 >
 > Authority: `ADR-0005 — ACCEPTED AS ARCHITECTURE DECISION`
 >
 > Evidence base: `8227c6c616140824fd70de920dc6fcf459bb734d`; G0 proposal checkpoint `c524486c05c21b270a7dd75e89fae4312430736a`
 >
-> Work package: `ACS-M6-P3-B1-R1-SQLITE-SERIES-ISOLATION`
+> Work package: `ACS-M6-P3-B1-R1-OWNER-ACCEPTANCE-CLOSEOUT`
 >
 > Owner HTTP clarification: `EXISTING CANONICAL V2 PROJECTION RETURNED BY WORKSPACE VERSIONS PASSES THROUGH episodePlanItemBindings / MANUAL AND BOOTSTRAP V1 BEHAVIOR UNCHANGED / NO ROUTE-HANDLER-EXTERNAL-DTO SOURCE CHANGE / NO OTHER HTTP EXPANSION`
 
@@ -619,8 +619,8 @@ M6-P3-G1 NOT AUTHORIZED / NOT STARTED
 NEXT AUTHORIZED MILESTONE: NONE
 ```
 
-B1 is not Owner Accepted by remote verification. G1 requires a new explicit Project
-Lead authorization even after a later B1 Owner Acceptance.
+B1 became Owner Accepted only through the independently reviewed B1-R1 correction.
+G1 still requires a new explicit Project Lead authorization.
 
 ## 16. B1 Owner Review and authorized B1-R1 correction
 
@@ -664,11 +664,14 @@ diff zero and were remote-verified at
 `716b4d298173f8123cafd93114dfc67339943ff3`. The one-production/one-test correction
 then reproduced the pre-fix false `409` and passes the updated SQLite module `30/30`,
 all original B1 tests `174/174`, full Core `449/449` and non-test Python AST `63/63`.
-After the technical commit, non-force remote publication and Local/Remote equality
-verification, stop at:
+The technical commit was non-force published and remote-verified at
+`5c656992d9fade3683b70e3c57f8b8ba7d26c7f7`. Owner Review on `2026-08-14`
+independently reproduced the original false `409`, confirmed the corrected behavior,
+reran the complete `449/449` regression and all static/documentation gates, and
+accepted B1-R1. The final state is:
 
 ```text
-STOP — M6-P3-B1-R1 REMOTE-VERIFIED CORRECTION CANDIDATE
-PROJECT LEAD B1-R1 OWNER REVIEW REQUIRED
+M6-P3-B1-R1 OWNER ACCEPTED / COMPLETE
+REMOTE-VERIFIED AT 5c656992d9fade3683b70e3c57f8b8ba7d26c7f7
 M6-P3-G1 NOT AUTHORIZED / NOT STARTED
 ```

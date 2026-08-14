@@ -4,7 +4,9 @@
 > `8449b521c96bb8340806ecda8649698f4771914a` is `REVISION REQUIRED / NOT OWNER
 > ACCEPTED`. The Project Lead authorized the bounded B1-R1 correction recorded in
 > sections 10–15 on `2026-08-13`; its governance checkpoint is remote-verified at
-> `716b4d298173f8123cafd93114dfc67339943ff3` and its technical gates pass.
+> `716b4d298173f8123cafd93114dfc67339943ff3`. The technical correction is
+> remote-verified and Owner Accepted at
+> `5c656992d9fade3683b70e3c57f8b8ba7d26c7f7`.
 
 ## 1. Record
 
@@ -12,14 +14,14 @@
 | --- | --- |
 | Task | `ACS-M6-P3-B1-EPISODE-PLAN-ITEM-BINDING` |
 | Date | `2026-08-13` |
-| Decision | `GOVERNANCE CHECKPOINT REMOTE-VERIFIED AT ae82ea27b39c44a8b77941f2b43abf7544492765 / BOUNDED IMPLEMENTATION CANDIDATE` |
+| Decision | `ORIGINAL B1 CANDIDATE REVISION REQUIRED / CORRECTED AND OWNER ACCEPTED THROUGH B1-R1 AT 5c656992d9fade3683b70e3c57f8b8ba7d26c7f7` |
 | Execution mode | `AUTO-SEQUENTIAL / BOUNDED / FAIL-CLOSED` |
 | Authorized base | `6bb9d165a693057f38e5789c408293ff0eaf5bcc` |
 | Governance checkpoint | `EIGHT DOCUMENT PATHS / PRODUCTION AND TEST DIFF ZERO` |
 | Technical implementation | `SIX PRODUCTION PATHS + NINE TEST PATHS` |
 | Owner HTTP clarification | `EXISTING CANONICAL V2 PROJECTION RETURNED BY WORKSPACE VERSIONS PASSES THROUGH episodePlanItemBindings / MANUAL AND BOOTSTRAP V1 BEHAVIOR UNCHANGED / NO ROUTE-HANDLER-EXTERNAL-DTO SOURCE CHANGE / NO OTHER HTTP EXPANSION` |
-| M6-P3-G1 | `NOT AUTHORIZED / NOT STARTED / BLOCKED UNTIL B1 OWNER ACCEPTANCE` |
-| Final stop | `B1 REMOTE-VERIFIED CANDIDATE / PROJECT LEAD OWNER REVIEW REQUIRED` |
+| M6-P3-G1 | `PREREQUISITE SATISFIED / SEPARATE AUTHORIZATION REQUIRED / NOT AUTHORIZED / NOT STARTED` |
+| Final stop | `B1-R1 OWNER ACCEPTED / G1 STILL UNAUTHORIZED` |
 
 The Project Lead, Architecture Owner, Repository Governance Owner and the affected
 M2, M4, M5 and M6 Domain Owners approve the bounded M6-P3-B1 implementation review.
@@ -416,3 +418,42 @@ PROJECT LEAD B1-R1 OWNER REVIEW REQUIRED
 M6-P3-G1 NOT AUTHORIZED / NOT STARTED
 NEXT AUTHORIZED MILESTONE: NONE
 ```
+
+## 16. B1-R1 Owner Review result
+
+The Project Lead, Architecture Owner, Repository Governance Owner and affected M2/M5
+Domain Owners completed B1-R1 Owner Review on `2026-08-14` against remote commit
+`5c656992d9fade3683b70e3c57f8b8ba7d26c7f7`.
+
+Independent evidence:
+
+- applying only the new regression test to original B1
+  `8449b521c96bb8340806ecda8649698f4771914a` reproduces
+  `dependent_series_plan_binding_exists / 409`;
+- the corrected SQLite lifecycle module passes `30/30`;
+- the complete Core regression passes `449/449`;
+- tracked Markdown passes `87/87` and local documentation links pass `322/322`;
+- non-test Python AST passes `63/63`;
+- secret scan, `git diff --check`, exact `8 governance + 1 production + 1 test` scope,
+  DDL/Migration diff `0`, Local/Remote equality, ahead/behind `0/0` and clean
+  worktree pass;
+- the correction preserves exact/suspicious fail-closed history while excluding a
+  legitimate same-Project other-Series plan.
+
+Decision:
+
+```text
+M6-P3-B1 ORIGINAL CANDIDATE 8449b521c96bb8340806ecda8649698f4771914a
+REVISION REQUIRED / PRESERVED AS HISTORICAL EVIDENCE
+
+M6-P3-B1-R1 5c656992d9fade3683b70e3c57f8b8ba7d26c7f7
+OWNER ACCEPTED / COMPLETE / REMOTE-VERIFIED
+
+M6-P3-B1-F001 CLOSED
+M6-P3-G1 PREREQUISITE SATISFIED
+M6-P3-G1 NOT AUTHORIZED / NOT STARTED
+```
+
+This acceptance changes no Domain ownership, route, handler, external DTO, schema,
+migration, Frontend or later M6 authority. M6-P3-G1 requires a separate explicit
+Project Lead authorization.

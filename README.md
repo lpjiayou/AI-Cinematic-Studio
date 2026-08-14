@@ -7,7 +7,7 @@ OS、V4 Platform、V3 Render Core、持久化与后端测试；客户 Commercial
 
 > 当前状态：M1–M5 已接受；M6-P0/P1 与 bounded M6-P2 已 Owner Accepted；
 > G1-R1 `d44f471…` 已 Owner Accepted 并关闭 Architecture Remediation R1；
-> M6-P3-G0 已 Owner Accepted；M6-P3-B1 候选 `8449b521…` 已远端验证但 Owner Review 为 `REVISION REQUIRED`；B1-R1 治理检查点 `716b4d2…` 已远端验证，最小 SQLite 跨 Series 修订通过门禁并等待技术远端验证；
+> M6-P3-G0 已 Owner Accepted；M6-P3-B1 原候选 `8449b521…` 的 Owner Review 为 `REVISION REQUIRED`；修正后的 B1-R1 `5c656992…` 已远端验证并于 `2026-08-14` Owner Accepted；
 > M6-P3-G1 继续未授权；
 > Production Ready = `NO`。
 
@@ -27,19 +27,19 @@ OS、V4 Platform、V3 Render Core、持久化与后端测试；客户 Commercial
 | R-CORE-ARCH-001 | `CONFIRMED / HIGH / MONITORING` |
 | R-CORE-GOV-002 | `OPEN / NON-BLOCKING` |
 | M6-P3-G0 | `OWNER ACCEPTED / COMPLETE AS GOVERNANCE-ARCHITECTURE / NO IMPLEMENTATION AUTHORITY` |
-| ADR-0005 / M6 Consumer Contract | `ACCEPTED AS ARCHITECTURE / B1 BOUNDED IMPLEMENTATION AUTHORIZED / G1 UNAUTHORIZED` |
-| M6-P3-B1 EpisodePlanItemBinding | `REMOTE-VERIFIED CANDIDATE AT 8449b521c96bb8340806ecda8649698f4771914a / OWNER REVIEW REVISION REQUIRED / NOT OWNER ACCEPTED / BLOCKS M6-P3-G1` |
+| ADR-0005 / M6 Consumer Contract | `ACCEPTED AS ARCHITECTURE / B1 OWNER ACCEPTED THROUGH B1-R1 / G1 UNAUTHORIZED` |
+| M6-P3-B1 EpisodePlanItemBinding | `ORIGINAL CANDIDATE 8449b521c96bb8340806ecda8649698f4771914a REVISION REQUIRED / CORRECTED AND OWNER ACCEPTED THROUGH B1-R1 AT 5c656992d9fade3683b70e3c57f8b8ba7d26c7f7` |
 | B1 authorized base | `6bb9d165a693057f38e5789c408293ff0eaf5bcc` |
 | B1 scope | `8 GOVERNANCE → 6 PRODUCTION + 9 TESTS → REMOTE VERIFY → STOP FOR OWNER REVIEW` |
 | B1 version policy | `INITIAL V1 / V1→V1 / EXPLICIT V1→V2 / V2→V2 / NO V2→V1 / UNBIND VIA NEW V2` |
 | B1 Core operation | `create_episode_plan_item_binding_version / NO ROUTE, HANDLER OR EXTERNAL DTO SOURCE CHANGE` |
 | B1 Owner HTTP clarification | `EXISTING WORKSPACE VERSIONS V2 RESPONSE PASSES THROUGH episodePlanItemBindings / NO OTHER HTTP EXPANSION` |
-| M6-P3-B1-F001 | `CONFIRMED / BLOCKING / SQLITE SAME-PROJECT CROSS-SERIES FALSE DEPENDENCY` |
-| M6-P3-B1-R1 | `GOVERNANCE REMOTE-VERIFIED AT 716b4d298173f8123cafd93114dfc67339943ff3 / TECHNICAL CORRECTION CANDIDATE / GATES PASS` |
+| M6-P3-B1-F001 | `CLOSED BY OWNER-ACCEPTED B1-R1 / SQLITE SAME-PROJECT CROSS-SERIES FALSE DEPENDENCY` |
+| M6-P3-B1-R1 | `OWNER ACCEPTED / COMPLETE / REMOTE-VERIFIED AT 5c656992d9fade3683b70e3c57f8b8ba7d26c7f7` |
 | B1-R1 base | `8449b521c96bb8340806ecda8649698f4771914a` |
 | B1-R1 scope | `8 GOVERNANCE → 1 PRODUCTION + 1 TEST → REMOTE VERIFY → STOP FOR OWNER REVIEW` |
 | B1-R1 evidence | `PRE-FIX 409 REPRODUCED / SQLITE 30/30 / ORIGINAL B1 174/174 / FULL CORE 449/449 / AST 63/63` |
-| M6-P3-G1 | `SEQUENCE DEFINED / BLOCKED UNTIL B1 OWNER ACCEPTED / NOT AUTHORIZED / NOT STARTED` |
+| M6-P3-G1 | `PREREQUISITE SATISFIED / SEPARATE AUTHORIZATION REQUIRED / NOT AUTHORIZED / NOT STARTED` |
 | M6-P3 after G1 / M6-P4+ | `NOT AUTHORIZED / NOT STARTED` |
 | M7-M19 | `NOT STARTED / NOT AUTHORIZED` |
 | Formal port-8765 database | `UNTOUCHED / NOT DEPLOYED` |
@@ -69,13 +69,13 @@ M2/M4/M5/M6 Domain Owners 已批准精确 B1；其实现候选已在
 `8449b521c96bb8340806ecda8649698f4771914a` 远端验证，但 Owner Review 复现 SQLite
 同一 Project 下跨 Series 的错误依赖并判定 `REVISION REQUIRED`。Project Lead、
 Architecture Owner、Repository Governance Owner 与 affected M2/M5 Domain Owners
-现仅授权 B1-R1；8 路径治理检查点已在
+现有 B1-R1 的 8 路径治理检查点已在
 `716b4d298173f8123cafd93114dfc67339943ff3` 远端验证，随后只修改了
 `services/v5_core_os/series_planning/foundation.py` 和
 `tests/integration/test_creator_lifecycle_sqlite_p2.py`。修订已通过 SQLite `30/30`、
-原 B1 `174/174`、完整 Core `449/449` 与 AST `63/63`；技术远端验证后停止等待
-B1-R1 Owner Review。
-M6-P3-G1 仍未授权、未开始。
+原 B1 `174/174`、完整 Core `449/449` 与 AST `63/63`；技术提交
+`5c656992d9fade3683b70e3c57f8b8ba7d26c7f7` 已远端验证并通过 Owner Review。
+M6-P3-G1 前置条件已满足，但仍未授权、未开始。
 现有 HTTP workspace versions 的 v2 响应允许透传 `episodePlanItemBindings`，但不
 修改 route、handler 或外部 DTO 源文件。除该 Owner 消歧外的 Public HTTP/API 扩张、
 Schema/Migration、正式数据库、Auth/RBAC、Frontend、M6-P3-G1、

@@ -360,7 +360,7 @@ The PRE-M6 route is fixed as:
 → `M6 Preconditions`
 → `M6-P1`
 
-The current phase is `M6-P3-B1-R1 SQLite Same-Project Cross-Series Isolation`.
+The current phase is `M6-P3-B1-R1 Owner Acceptance Closeout`.
 
 Current governance state:
 
@@ -379,7 +379,7 @@ Current governance state:
 - M6 Preconditions: `SATISFIED FOR BOUNDED M6-P0/P1 AND M6-P2 LOCAL SQLITE ONLY`;
 - ACS-M6-P0-P1-R2: `OWNER ACCEPTED / COMPLETE / REMOTE-VERIFIED AT
   e38c75aa4ff26bdea80c82d8a24096f799dad860`;
-- current task: `ACS-M6-P3-B1-R1-SQLITE-SERIES-ISOLATION`;
+- current task: `ACS-M6-P3-B1-R1-OWNER-ACCEPTANCE-CLOSEOUT`;
 - legacy repository capability provenance: `MEDIUM / OPEN / NON-BLOCKING`,
   Owner Gate `P3-RV1-003`;
 - M6-P0: `CONTRACT ACCEPTED / COMPLETE`;
@@ -390,12 +390,11 @@ Current governance state:
   8227c6c616140824fd70de920dc6fcf459bb734d`;
 - M6-P3-G0: `OWNER ACCEPTED / COMPLETE AS GOVERNANCE-ARCHITECTURE / NO
   IMPLEMENTATION AUTHORITY`;
-- ADR-0005 and M6 consumer contract: `ACCEPTED AS ARCHITECTURE / B1 BOUNDED
-  IMPLEMENTATION AUTHORIZED / G1 UNAUTHORIZED`;
-- M6-P3-B1 binding prerequisite: `GOVERNANCE AUTHORIZATION REMOTE-VERIFIED AT
-  ae82ea27b39c44a8b77941f2b43abf7544492765 / IMPLEMENTATION REMOTE-VERIFIED AT
-  8449b521c96bb8340806ecda8649698f4771914a / OWNER REVIEW REVISION REQUIRED /
-  BLOCKS M6-P3-G1`;
+- ADR-0005 and M6 consumer contract: `ACCEPTED AS ARCHITECTURE / B1 OWNER
+  ACCEPTED THROUGH B1-R1 / G1 UNAUTHORIZED`;
+- M6-P3-B1 binding prerequisite: `ORIGINAL CANDIDATE REMOTE-VERIFIED AT
+  8449b521c96bb8340806ecda8649698f4771914a / REVISION REQUIRED / CORRECTED
+  THROUGH B1-R1 / OWNER ACCEPTED AT 5c656992d9fade3683b70e3c57f8b8ba7d26c7f7`;
 - M6-P3-B1 authorized base:
   `6bb9d165a693057f38e5789c408293ff0eaf5bcc`;
 - M6-P3-B1 affected Domain Owners: `M2 / M4 / M5 / M6 APPROVED`;
@@ -403,18 +402,17 @@ Current governance state:
 - M6-P3-B1 implementation candidate: `REMOTE-VERIFIED AT
   8449b521c96bb8340806ecda8649698f4771914a / OWNER REVIEW REVISION REQUIRED /
   NOT OWNER ACCEPTED`;
-- M6-P3-B1-F001: `CONFIRMED / BLOCKING — SQLITE SAME-PROJECT CROSS-SERIES
-  FALSE dependent_series_plan_binding_exists`;
-- M6-P3-B1-R1: `GOVERNANCE REMOTE-VERIFIED AT
-  716b4d298173f8123cafd93114dfc67339943ff3 / ONE PRODUCTION + ONE TEST
-  TECHNICAL CORRECTION CANDIDATE / GATES PASS`;
+- M6-P3-B1-F001: `CLOSED BY OWNER-ACCEPTED B1-R1 — SQLITE SAME-PROJECT
+  CROSS-SERIES FALSE dependent_series_plan_binding_exists`;
+- M6-P3-B1-R1: `OWNER ACCEPTED / COMPLETE / REMOTE-VERIFIED AT
+  5c656992d9fade3683b70e3c57f8b8ba7d26c7f7`;
 - M6-P3-B1-R1 authorized base:
   `8449b521c96bb8340806ecda8649698f4771914a`;
 - M6-P3-B1-R1 evidence: `PRE-FIX SQLITE REGRESSION REPRODUCED 409 / POST-FIX
   SQLITE MODULE 30/30 / ORIGINAL B1 SUITE 174/174 / FULL CORE 449/449 /
   NON-TEST PYTHON AST 63/63`;
-- M6-P3-G1: `SEQUENCE DEFINED / BLOCKED UNTIL B1 OWNER ACCEPTED / NOT
-  AUTHORIZED / NOT STARTED`;
+- M6-P3-G1: `PREREQUISITE SATISFIED / SEPARATE AUTHORIZATION STILL REQUIRED /
+  NOT AUTHORIZED / NOT STARTED`;
 - M6-P3 after G1 / M6-P4+: `NOT AUTHORIZED / NOT STARTED`;
 - R-CORE-ARCH-001: `CONFIRMED / HIGH / MONITORING — APPLICATION DIRECT V4
   DEPENDENCY REMEDIATED AT OWNER-ACCEPTED G1-R1`;
@@ -448,8 +446,11 @@ ACCEPTED` and is superseded by G1-R1. B1 is remote-verified at
 dependency scan crosses legitimate Series histories inside one Project. The B1-R1
 governance checkpoint is remote-verified at
 `716b4d298173f8123cafd93114dfc67339943ff3`; its exact one-production/one-test
-correction passes the frozen gates and is the current technical candidate. After
-technical remote verification, STOP for Project Lead B1-R1 Owner Review.
+correction is remote-verified at
+`5c656992d9fade3683b70e3c57f8b8ba7d26c7f7`. Independent Owner Review reproduced
+the original false `409`, confirmed the correction, reran the complete `449/449`
+regression and accepted B1-R1 on `2026-08-14`. M6-P3-G1 still requires a separate
+explicit authorization.
 
 The M6 gate order is:
 
@@ -519,9 +520,9 @@ Worker execution or cross-repository UI. M6-P0/P1 is `OWNER ACCEPTED / COMPLETE 
 REMOTE-VERIFIED`; ADR-0004 and the M6-P2 SQLite contract are accepted;
 M6-P2-G1 is `OWNER ACCEPTED / COMPLETE / REMOTE-VERIFIED AT
 8227c6c616140824fd70de920dc6fcf459bb734d`; M6-P3-G0 is `OWNER ACCEPTED /
-COMPLETE AS GOVERNANCE-ARCHITECTURE`; M6-P3-B1 is `BOUNDED IMPLEMENTATION
-AUTHORIZED AFTER GOVERNANCE REMOTE VERIFICATION`; M6-P3-G1 and all later M6 work
-remain `NOT AUTHORIZED / NOT STARTED`.
+COMPLETE AS GOVERNANCE-ARCHITECTURE`; M6-P3-B1 is `OWNER ACCEPTED THROUGH B1-R1 AT
+5c656992d9fade3683b70e3c57f8b8ba7d26c7f7`; M6-P3-G1 and all later M6 work remain
+`NOT AUTHORIZED / NOT STARTED`.
 
 The accepted architecture-remediation sequence is:
 
@@ -561,13 +562,16 @@ The accepted architecture-remediation sequence is:
     authorize only `ACS-M6-P3-B1-R1-SQLITE-SERIES-ISOLATION`: the same eight governance
     paths, then `services/v5_core_os/series_planning/foundation.py` and
     `tests/integration/test_creator_lifecycle_sqlite_p2.py`, remote verification and
-    STOP for B1-R1 Owner Review.
+    STOP for B1-R1 Owner Review;
+14. B1-R1 Owner Review independently reproduces the original false `409`, verifies
+    the corrected exact/suspicious-scope selection, reruns `449/449` and accepts the
+    remote technical checkpoint at `5c656992d9fade3683b70e3c57f8b8ba7d26c7f7`.
 
-The current B1-R1 authorization does not authorize Schema/Migration, formal port-8765
-database access, HTTP route/handler/external DTO source-file changes, HTTP expansion
-beyond the approved existing workspace versions v2 field pass-through, Auth/RBAC,
-Frontend, M3/M6 consumer, M6-P3-G1, M7+, V3, GPU, Worker or ComfyUI work. Any unlisted
-path or such need is a Stop Condition.
+The B1-R1 acceptance does not authorize Schema/Migration, formal port-8765 database
+access, HTTP route/handler/external DTO source-file changes, HTTP expansion beyond the
+approved existing workspace versions v2 field pass-through, Auth/RBAC, Frontend,
+M3/M6 consumer, M6-P3-G1, M7+, V3, GPU, Worker or ComfyUI work. G1 requires its own
+explicit governance checkpoint before any implementation path may change.
 
 Legacy Phase 0 provenance debt remains `OPEN / NON-BLOCKING` under Owner Gate
 `P3-RV1-003`. This acknowledgement does not silently close the debt or import
