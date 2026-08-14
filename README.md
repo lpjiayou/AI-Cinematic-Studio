@@ -13,7 +13,8 @@ OS、V4 Platform、V3 Render Core、持久化与后端测试；客户 Commercial
 > 修正 `0c2552bf…` 已直接 Owner Accepted；Core `main` 已通过 PR #4 rebase
 > 收敛至 `9c13e8f8…`，tree `8ee5c3ba…`，并通过 464/464 与 post-merge CI；
 > Capture G0 `9094a466…` 已直接 Owner Accepted；G1 `af34ac07…` 已远端验证、
-> PR #6 CI 通过；G2 已获单窗口只读历史证据采集授权；
+> PR #6 CI 通过；G2 已执行但原 custody PVC 未重新挂载，独立复核受阻；
+> G2-R1 已获同边界重复只读 custody 恢复授权，必须通过持久化与跨实例重挂验证；
 > Production Ready = `NO`。
 
 ## 当前活动工作包
@@ -52,9 +53,10 @@ OS、V4 Platform、V3 Render Core、持久化与后端测试；客户 Commercial
 | CCV-R1 main convergence | `PR #4 REBASE AND MERGE / MAIN 9c13e8f8 / TREE 8ee5c3ba / 464/464 / POST-MERGE CI PASS` |
 | Capture G0 | `OWNER ACCEPTED / REMOTE-VERIFIED AT 9094a466 / TREE d372581f / PR #5 DRAFT / CI PASS` |
 | Capture G1 | `REMOTE-VERIFIED AT af34ac07 / TREE 0cec29c8 / PR #6 DRAFT / CI PASS / FULL CORE 464/464` |
-| Current checkpoint | `ACS-CCV-R1-HISTORICAL-EVIDENCE-CAPTURE-G2 / ONE-WINDOW READ-ONLY EXTERNAL COLLECTION / NO RERUN` |
+| Capture G2 | `EXECUTED / ORIGINAL CUSTODY PVC NOT ATTACHED / INDEPENDENT REVIEW BLOCKED / CHECKPOINT CANDIDATE NOT DECLARED` |
+| Current checkpoint | `ACS-CCV-R1-HISTORICAL-EVIDENCE-CAPTURE-G2-R1 / REPEAT SOURCE-READ-ONLY CUSTODY RECOVERY / PERSISTENCE + REATTACH GATE` |
 | Character Consistency evidence status | `EXPERIMENT REPORTED / INDEPENDENT REPRODUCTION NOT POSSIBLE / SYNTHETIC_TEST_ONLY / NOT FOR PRODUCTION` |
-| CCV-R2 / Character Visual Identity schema | `NOT AUTHORIZED / NOT STARTED` |
+| CCV-R2-G0 | `CONDITIONALLY AUTHORIZED AFTER G2-R1 INDEPENDENT REVIEW PASS / GOVERNANCE + REPRODUCIBLE EXPERIMENT DESIGN ONLY / NOT STARTED`; Character Visual Identity schema implementation `NOT AUTHORIZED` |
 | M6-P3 after G1 / M6-P4+ | `NOT AUTHORIZED / NOT STARTED` |
 | M7-M19 | `NOT STARTED / NOT AUTHORIZED` |
 | Formal port-8765 database | `UNTOUCHED / NOT DEPLOYED` |
