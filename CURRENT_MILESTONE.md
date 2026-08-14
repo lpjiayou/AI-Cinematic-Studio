@@ -4,17 +4,17 @@
 >
 > Execution Mode: `MANUAL / BOUNDED / FAIL-CLOSED`
 >
-> Project Lead Authorization: `G2 EXECUTED BUT ORIGINAL CUSTODY PVC NOT ATTACHED; ACS-CCV-R1-HISTORICAL-EVIDENCE-CAPTURE-G2-R1 OWNER AUTHORIZED ON 2026-08-14; UNPUBLISHED e8b90919 SUPERSEDED BY GITHUB-APP CHECKPOINT; CCV-R2-G0 CONDITIONALLY AUTHORIZED ONLY AFTER INDEPENDENT REVIEW PASS`
+> Project Lead Authorization: `G2-R1 INDEPENDENT REVIEW PASS AND CLOSED AT 4132458d7f92e02dbd2e4be93476294aab825db6; CCV-R2-G0 OWNER AUTHORIZED ON 2026-08-15 FOR GOVERNANCE AND REPRODUCIBLE EXPERIMENT DESIGN ONLY`
 >
-> Authorized Wave: `G2-R1 GOVERNANCE CHECKPOINT → REMOTE VERIFY → REPEAT READ-ONLY CUSTODY CAPTURE → PERSIST → REATTACH VERIFY → INDEPENDENT REVIEW → CONDITIONAL CCV-R2-G0`
+> Authorized Wave: `G2-R1 CLOSEOUT → CCV-R2-G0 GOVERNANCE CHECKPOINT → REPRODUCIBLE EXPERIMENT DESIGN AUTHORING → INDEPENDENT G0 REVIEW → STOP`
 >
-> Current Task: `ACS-CCV-R1-HISTORICAL-EVIDENCE-CAPTURE-G2-R1`
+> Current Task: `ACS-CCV-R2-G0-REPRODUCIBLE-EXPERIMENT-DESIGN`
 >
-> Current Work Package: `REPEAT SOURCE-READ-ONLY CUSTODY RECOVERY / CROSS-INSTANCE PERSISTENCE VERIFICATION / NO PRODUCT OR TEST TREE CHANGE`
+> Current Work Package: `GOVERNANCE + DESIGN AUTHORING / NO GPU / NO PRODUCT, SCHEMA OR PRODUCTION CHANGE`
 >
 > M6 Authorization: `P0-P2 OWNER ACCEPTED / P3-G0 OWNER ACCEPTED AS ARCHITECTURE / P3-B1 OWNER ACCEPTED THROUGH B1-R1 / P3-G1 OWNER ACCEPTED THROUGH G1-R1 / LATER M6 NOT AUTHORIZED`
 
-> Next Checkpoint: `CCV-R2-G0 / CONDITIONALLY AUTHORIZED AFTER G2-R1 INDEPENDENT REVIEW PASS / NOT STARTED`
+> Next Checkpoint: `CCV-R2-G0 DESIGN CHECKPOINT CANDIDATE / INDEPENDENT REVIEW REQUIRED BEFORE ANY G1 OR GPU AUTHORITY`
 >
 > M7 Authorization: `NOT AUTHORIZED`
 >
@@ -68,15 +68,15 @@ decommission. It is no longer an active Core work package and does not authorize
 
 Current stage:
 
-`Character Consistency Evidence Hardening`
+`CCV-R2 Reproducible Experiment Governance`
 
 Title:
 
-ACS-CCV-R1-HISTORICAL-EVIDENCE-CAPTURE-G2-R1
+ACS-CCV-R2-G0-REPRODUCIBLE-EXPERIMENT-DESIGN
 
 Status:
 
-`G2 EXECUTED / ORIGINAL CUSTODY PVC NOT ATTACHED / INDEPENDENT REVIEW BLOCKED / G2-R1 REPEAT SOURCE-READ-ONLY RECOVERY AUTHORIZED`
+`OWNER AUTHORIZED / DESIGN AUTHORING ACTIVE / NO GPU / FAIL-CLOSED`
 
 Purpose:
 
@@ -98,13 +98,13 @@ Purpose:
 10. register the five Round 3 skeleton inputs as five digest-bearing artifacts.
 
 G1 closed the three G0 evidence-tooling blockers and is remote-verified at
-`af34ac074cb8bfbf334e4f56aad0c0d479b741be`. G2 executed, but the original
-custody PVC was not attached after restart, so independent review could not begin.
-G2-R1 authorizes one repeat source-read-only custody recovery using the same frozen
-27-record and 50-run registers. It requires an external persistent copy and a
-successful cross-instance reattach verification before independent review. Only an
-independent-review PASS conditionally authorizes CCV-R2-G0 governance/design work;
-schema, product, GPU generation and production integration remain unauthorized.
+`af34ac074cb8bfbf334e4f56aad0c0d479b741be`. G2-R1 subsequently recovered and
+persisted the bounded custody set. Independent review verified all 69 custody entries,
+both audit metadata files and all six archive volumes across a new instance, then
+closed G2-R1 at `4132458d7f92e02dbd2e4be93476294aab825db6`. The historical manifest
+remains partial and not validation accepted. CCV-R2-G0 is now active only for
+forward-looking governance and reproducible experiment design; schema, product, GPU
+generation and production integration remain unauthorized.
 
 ---
 
@@ -452,8 +452,8 @@ capability.
 - ADR-0002 STATUS: `ACCEPTED FOR BOUNDED R2 IMPLEMENTATION`
 - RB13-F002: `REMEDIATED / CLOSED IN CURRENT TESTED CORE BASELINE`
 - EXECUTION MODE: `MANUAL / BOUNDED / FAIL-CLOSED`
-- AUTHORIZED WAVE: `G2-R1 GOVERNANCE CHECKPOINT → REMOTE VERIFY → REPEAT READ-ONLY CUSTODY CAPTURE → PERSIST → REATTACH VERIFY → INDEPENDENT REVIEW → CONDITIONAL CCV-R2-G0`
-- CURRENT TASK: `ACS-CCV-R1-HISTORICAL-EVIDENCE-CAPTURE-G2-R1`
+- AUTHORIZED WAVE: `G2-R1 CLOSEOUT → CCV-R2-G0 GOVERNANCE CHECKPOINT → DESIGN AUTHORING → INDEPENDENT G0 REVIEW → STOP`
+- CURRENT TASK: `ACS-CCV-R2-G0-REPRODUCIBLE-EXPERIMENT-DESIGN`
 - G0 BASE: `c524486c05c21b270a7dd75e89fae4312430736a`
 - ADR-0006 STATUS: `ACCEPTED FOR BOUNDED G1`
 - V5 TEXT GENERATION CONTRACT: `ACCEPTED FOR BOUNDED G1`
@@ -503,8 +503,8 @@ capability.
 - ACS-CCV-R1-HISTORICAL-EVIDENCE-CAPTURE-G0: `OWNER ACCEPTED / COMPLETE / REMOTE-VERIFIED AT 9094a46615f2be9ca45f95418ac441326d326315 / TREE d372581f0f0f434e10df78542ef4ac9bbefbfb51 / PR #5 DRAFT / CI PASS`
 - ACS-CCV-R1-HISTORICAL-EVIDENCE-CAPTURE-G1: `REMOTE-VERIFIED CHECKPOINT AT af34ac074cb8bfbf334e4f56aad0c0d479b741be / TREE 0cec29c8de8777c5c3dbb824b2a7f421d9cb9c36 / PR #6 DRAFT / CI PASS / FULL CORE 464/464`
 - ACS-CCV-R1-HISTORICAL-EVIDENCE-CAPTURE-G2: `EXECUTED / ORIGINAL CUSTODY PVC NOT ATTACHED / INDEPENDENT REVIEW BLOCKED / CHECKPOINT CANDIDATE NOT DECLARED`
-- ACS-CCV-R1-HISTORICAL-EVIDENCE-CAPTURE-G2-R1: `OWNER AUTHORIZED / REPEAT SOURCE-READ-ONLY CUSTODY RECOVERY / PERSISTENCE AND REATTACH VERIFICATION REQUIRED`
-- CCV-R2-G0: `CONDITIONALLY AUTHORIZED ONLY AFTER G2-R1 INDEPENDENT REVIEW PASS / GOVERNANCE + REPRODUCIBLE EXPERIMENT DESIGN ONLY / NOT STARTED`; Character Visual Identity schema implementation: `NOT AUTHORIZED / NOT STARTED`
+- ACS-CCV-R1-HISTORICAL-EVIDENCE-CAPTURE-G2-R1: `INDEPENDENT REVIEW PASS / CLOSED AT 4132458d7f92e02dbd2e4be93476294aab825db6 / MANIFEST REMAINS PARTIAL NOT VALIDATION ACCEPTED`
+- CCV-R2-G0: `OWNER AUTHORIZED / GOVERNANCE + REPRODUCIBLE EXPERIMENT DESIGN AUTHORING ACTIVE / NO GPU`; Character Visual Identity schema implementation: `NOT AUTHORIZED / NOT STARTED`
 - M6-P3 AFTER G1 / M6-P4+ STATUS: `NOT AUTHORIZED / NOT STARTED`
 - M7-M19: `NOT STARTED / NOT AUTHORIZED`
 - FORMAL 8765 DEPLOYMENT: `UNTOUCHED / NOT DEPLOYED`
@@ -532,33 +532,33 @@ separately authorized and accepted through G1-R1.
 
 # 9. Stop Rule
 
-The current checkpoint changes only the G2-R1 governance allowlist in
-[`ACS-CCV-R1-HISTORICAL-EVIDENCE-CAPTURE-G2-R1.md`](governance/ACS-CCV-R1-HISTORICAL-EVIDENCE-CAPTURE-G2-R1.md).
-Product and existing test-tree diff must remain zero. After repeat source-read-only
-capture, two-inventory agreement, offline fail-closed normalization, persistent-copy
-verification and successful cross-instance reattachment:
+The current checkpoint is governed by
+[`ACS-CCV-R2-G0-REPRODUCIBLE-EXPERIMENT-DESIGN.md`](governance/ACS-CCV-R2-G0-REPRODUCIBLE-EXPERIMENT-DESIGN.md).
+Product and existing test-tree diff must remain zero. G0 may author only the frozen
+forward-looking experiment design and evidence templates defined by that governance
+record.
 
 ```text
-ACS-CCV-R1-HISTORICAL-EVIDENCE-CAPTURE-G2-R1 CHECKPOINT CANDIDATE
-EVIDENCE CAPTURED OR EXPLICITLY MARKED UNAVAILABLE AND PERSISTED
-INDEPENDENT REVIEW REQUIRED
-CCV-R2-G0 MAY START ONLY AFTER INDEPENDENT REVIEW PASS
-PRODUCT SCHEMA AND PRODUCTION WORK REMAIN UNAUTHORIZED
+ACS-CCV-R2-G0 REPRODUCIBLE EXPERIMENT DESIGN AUTHORING ACTIVE
+NO GPU EXECUTION
+NO PRODUCT / SCHEMA / MIGRATION / PRODUCTION CHANGE
+INDEPENDENT G0 REVIEW REQUIRED BEFORE G1
+PRODUCTION READY: NO
 ```
 
-Stop before any production/test change, M6 schema change, DDL/Migration,
-route/handler/external DTO change, Script write, later M6, M7-M19, formal database,
-Auth/RBAC, Frontend, Worker, ComfyUI execution or evidence regeneration.
+Stop before any GPU execution, product/test change, M6 schema change, DDL/Migration,
+route/handler/external DTO change, production Script write, later M6, M7-M19, formal
+database, Auth/RBAC, Frontend, Worker or ComfyUI execution.
 
 ---
 
 # 10. Current Authorized Task
 
-`ACS-CCV-R1-HISTORICAL-EVIDENCE-CAPTURE-G2-R1`
+`ACS-CCV-R2-G0-REPRODUCIBLE-EXPERIMENT-DESIGN`
 
 Status:
 
-`REPEAT SOURCE-READ-ONLY CUSTODY RECOVERY / PRODUCT AND TEST TREE DIFF ZERO / CROSS-INSTANCE PERSISTENCE GATE`
+`OWNER AUTHORIZED / GOVERNANCE + DESIGN AUTHORING / NO GPU / FAIL-CLOSED`
 
 Accepted technical evidence:
 
@@ -579,10 +579,10 @@ STATUS: PR #4 REBASE AND MERGE / FULL CORE 464/464 / POST-MERGE CI PASS
 ```
 
 The accepted parent checkpoint is `ACS-GOV-POST-M6-P3-G1-CLOSEOUT` at `20207e7f`.
-The current report remains `EXPERIMENT REPORTED / INDEPENDENT REPRODUCTION NOT
-POSSIBLE` until G2-R1 independent review passes. A PASS conditionally activates only
-CCV-R2-G0 governance and reproducible-experiment design. Identity/Asset/M6/M8/M10
-schema implementation and production work remain unauthorized.
+The historical report remains `EXPERIMENT REPORTED / INDEPENDENT REPRODUCTION NOT
+POSSIBLE`; G2-R1 PASS did not convert it into validation acceptance. CCV-R2-G0 is now
+active only for governance and reproducible-experiment design. Identity/Asset/M6/M8/M10
+schema implementation, GPU execution and production work remain unauthorized.
 
 Formal port-8765 deployment, later M6 work, M7-M19, Schema/Migration, Frontend,
 production GPU/Worker/ComfyUI integration and Production Ready remain unauthorized.
