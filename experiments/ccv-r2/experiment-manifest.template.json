@@ -1,0 +1,273 @@
+{
+  "schemaVersion": "ACS-CCV-R2-EXPERIMENT-MANIFEST-1",
+  "manifestVersion": "1.0",
+  "experimentId": "acs-ccv-r2",
+  "protocolVersion": "g0-v1",
+  "status": "DESIGN_FROZEN_NOT_EXECUTED",
+  "rightsLabels": [
+    "SYNTHETIC_TEST_ONLY",
+    "NOT_FOR_PRODUCTION",
+    "NO_COMMERCIAL_USE_OF_PARTIAL_PROVENANCE_MODEL_BYTES"
+  ],
+  "parentEvidence": {
+    "governanceCheckpoint": "5522646dd1cd6c0d2688d7adc176407b014c18ba",
+    "g2r1Closeout": "4132458d7f92e02dbd2e4be93476294aab825db6",
+    "manifestStatus": "EVIDENCE_CAPTURE_PARTIAL_NOT_VALIDATION_ACCEPTED",
+    "manifestSha256": "e8dfa407ebe55b190150a6e41c68403f3acbbdffd87876bcbad698e4cfa96fbf",
+    "custodyInventorySha256": "2e00b4250af0a8dee9bbc25c9fcb830f333e61e7f8241abefd3a6afc59e26d95"
+  },
+  "research": {
+    "primaryQuestion": "Does face identity conditioning plus OpenPose improve identity continuity and shot/pose adherence over text-only and face-only controls under common seeds?",
+    "design": "3 arms x 5 shots x 3 common seeds",
+    "expectedRunCount": 45,
+    "primaryArm": "A2_FACE_OPENPOSE",
+    "historicalValidationClaim": false
+  },
+  "environment": {
+    "preflightState": "PENDING_GPU_HOST_PREFLIGHT",
+    "requiredGpuClass": "NVIDIA A100-PCIE-40GB",
+    "expectedComfyUiCommit": "feca51a8544511dd73d43602f387def0cc601a9d",
+    "expectedIpAdapterNodeCommit": "a0f451a5113cf9becb0847b92884cb10cbdec0ef",
+    "observedAt": null,
+    "hostname": null,
+    "gpu": null,
+    "driver": null,
+    "cuda": null,
+    "python": null,
+    "pytorch": null,
+    "comfyUiCommit": null,
+    "customNodeCommits": [],
+    "nodeInventorySha256": null
+  },
+  "models": [
+    {
+      "modelId": "model-sdxl-base",
+      "role": "base",
+      "logicalName": "sd_xl_base_1.0.safetensors",
+      "runtimePath": "/data/models/checkpoints/sd_xl_base_1.0.safetensors",
+      "sizeBytes": 6938078334,
+      "sha256": "31e35c80fc4829d14f90153f4c74cd59c90b779f6afe05a74cd6120b893f7e5b",
+      "modelFamily": "sdxl",
+      "conditioningDimension": 2048,
+      "sourceUrl": "https://huggingface.co/stabilityai/stable-diffusion-xl-base-1.0/blob/main/sd_xl_base_1.0.safetensors",
+      "sourceBindingState": "OFFICIAL_SOURCE_AND_SHA256_MATCH",
+      "license": "CreativeML Open RAIL++-M",
+      "licenseState": "UPSTREAM_LICENSE_IDENTIFIED"
+    },
+    {
+      "modelId": "model-ipadapter-face",
+      "role": "identity_adapter",
+      "logicalName": "ip-adapter-plus-face_sdxl_vit-h.safetensors",
+      "runtimePath": "/data/coding/apps/ComfyUI/models/ipadapter/ip-adapter-plus-face_sdxl_vit-h.safetensors",
+      "sizeBytes": 847517512,
+      "sha256": "677ad8860204f7d0bfba12d29e6c31ded9beefdf3e4bbd102518357d31a292c1",
+      "modelFamily": "sdxl",
+      "conditioningDimension": 2048,
+      "sourceUrl": "https://huggingface.co/h94/IP-Adapter/blob/main/sdxl_models/ip-adapter-plus-face_sdxl_vit-h.safetensors",
+      "sourceBindingState": "OFFICIAL_SOURCE_AND_SHA256_MATCH",
+      "license": "Apache-2.0",
+      "licenseState": "UPSTREAM_LICENSE_IDENTIFIED"
+    },
+    {
+      "modelId": "model-clip-vision",
+      "role": "image_encoder",
+      "logicalName": "CLIP-ViT-H-14-laion2B-s32B-b79K.safetensors",
+      "runtimePath": "/data/coding/apps/ComfyUI/models/clip_vision/CLIP-ViT-H-14-laion2B-s32B-b79K.safetensors",
+      "sizeBytes": 2528373448,
+      "sha256": "6ca9667da1ca9e0b0f75e46bb030f7e011f44f86cbfb8d5a36590fcd7507b030",
+      "modelFamily": "clip-vit-h",
+      "conditioningDimension": 1024,
+      "sourceUrl": "https://huggingface.co/laion/CLIP-ViT-H-14-laion2B-s32B-b79K",
+      "sourceBindingState": "LOGICAL_MODEL_AND_UPSTREAM_LICENSE_IDENTIFIED_EXACT_PACKAGING_SOURCE_NOT_PROVED",
+      "license": "MIT",
+      "licenseState": "UPSTREAM_LICENSE_IDENTIFIED_BYTE_PROVENANCE_PARTIAL"
+    },
+    {
+      "modelId": "model-openpose-sdxl",
+      "role": "pose_control",
+      "logicalName": "controlnet-openpose-sdxl.safetensors",
+      "runtimePath": "/data/coding/apps/ComfyUI/models/controlnet/controlnet-openpose-sdxl.safetensors",
+      "sizeBytes": 2502139104,
+      "sha256": "b8524e557a7df60d081f5d4a0eb109967d107df217943bf88c2d99b9ebcc06c5",
+      "modelFamily": "sdxl",
+      "conditioningDimension": 2048,
+      "sourceUrl": "https://huggingface.co/thibaud/controlnet-openpose-sdxl-1.0",
+      "sourceBindingState": "UPSTREAM_MODEL_FAMILY_AND_LICENSE_IDENTIFIED_EXACT_CONVERTED_BYTE_SOURCE_NOT_PROVED",
+      "license": "OpenRAIL++ per upstream model card",
+      "licenseState": "UPSTREAM_LICENSE_IDENTIFIED_BYTE_PROVENANCE_PARTIAL"
+    }
+  ],
+  "inputs": [
+    {
+      "inputId": "input-reference-full-body",
+      "role": "reference_full_body",
+      "runtimePath": "/data/coding/apps/ComfyUI/input/reference_character.png",
+      "sizeBytes": 588040,
+      "sha256": "68b3e5232718c7e4ca0582db8e9430dd7fc2862d84e11c094655ed1a19110177",
+      "lineageState": "BYTE_IDENTICAL_TO_G2_R1_CUSTODY",
+      "rightsState": "SYNTHETIC_TEST_ONLY"
+    },
+    {
+      "inputId": "input-reference-face",
+      "role": "reference_face",
+      "runtimePath": "/data/coding/apps/ComfyUI/input/reference_face.png",
+      "sizeBytes": 325130,
+      "sha256": "12147633703cbef0fcd1f521265f535c6fc4b97666e7d6dc0e322f38d7162905",
+      "lineageState": "AMBIGUOUS_HISTORICAL_CROP_LINEAGE_BYTES_FIXED_FOR_FORWARD_TEST",
+      "rightsState": "SYNTHETIC_TEST_ONLY"
+    },
+    {
+      "inputId": "input-pose-01",
+      "role": "pose_coco18",
+      "runtimePath": "/data/coding/apps/ComfyUI/input/pose_01_medium_front.png",
+      "sizeBytes": 7040,
+      "sha256": "e88d87bdc900f18f33f7ee6a5f058b6a7918b938568551006d7b5f63f8922e54",
+      "lineageState": "BYTE_IDENTICAL_TO_G2_R1_CUSTODY",
+      "rightsState": "SYNTHETIC_TEST_ONLY"
+    },
+    {
+      "inputId": "input-pose-02",
+      "role": "pose_coco18",
+      "runtimePath": "/data/coding/apps/ComfyUI/input/pose_02_closeup_side.png",
+      "sizeBytes": 6158,
+      "sha256": "9f786e9a74ad3619d454c29cf8f87bcda8916ab8f120c2c2cf4c352a8f4b3575",
+      "lineageState": "BYTE_IDENTICAL_TO_G2_R1_CUSTODY",
+      "rightsState": "SYNTHETIC_TEST_ONLY"
+    },
+    {
+      "inputId": "input-pose-03",
+      "role": "pose_coco18",
+      "runtimePath": "/data/coding/apps/ComfyUI/input/pose_03_full_walking.png",
+      "sizeBytes": 8618,
+      "sha256": "d860ae7f5ff30d7cdcd9a1a04f44ad988b0b6b8aa9408f8c5629a7ffbb613242",
+      "lineageState": "BYTE_IDENTICAL_TO_G2_R1_CUSTODY",
+      "rightsState": "SYNTHETIC_TEST_ONLY"
+    },
+    {
+      "inputId": "input-pose-04",
+      "role": "pose_coco18",
+      "runtimePath": "/data/coding/apps/ComfyUI/input/pose_04_back_turning.png",
+      "sizeBytes": 6269,
+      "sha256": "5b279b5bd1f810072f3e99b5860ffb5d8198790073beaa5cecc03a760dd283a3",
+      "lineageState": "BYTE_IDENTICAL_TO_G2_R1_CUSTODY",
+      "rightsState": "SYNTHETIC_TEST_ONLY"
+    },
+    {
+      "inputId": "input-pose-05",
+      "role": "pose_coco18",
+      "runtimePath": "/data/coding/apps/ComfyUI/input/pose_05_sitting_high.png",
+      "sizeBytes": 9299,
+      "sha256": "ad6463ee95f225f2b3cb5a1c130b91f667322eb797038326410dff2948b7e110",
+      "lineageState": "BYTE_IDENTICAL_TO_G2_R1_CUSTODY",
+      "rightsState": "SYNTHETIC_TEST_ONLY"
+    }
+  ],
+  "parameters": {
+    "positivePrompt": "a young adult woman, 20 years old, long straight black hair, brown eyes, red leather jacket, white t-shirt, blue jeans",
+    "negativePrompt": "lowres, bad anatomy, bad hands, blurry, watermark, text, deformed face",
+    "width": 1024,
+    "height": 1024,
+    "steps": 25,
+    "cfg": 7,
+    "sampler": "dpmpp_2m",
+    "scheduler": "karras",
+    "ipAdapterWeight": 0.6,
+    "ipAdapterWeightType": "linear",
+    "controlNetStrength": 0.8,
+    "controlNetStartPercent": 0,
+    "controlNetEndPercent": 1,
+    "batchSize": 1
+  },
+  "arms": [
+    {
+      "armId": "A0_TEXT_BASELINE",
+      "identityMethod": "text-only",
+      "poseControl": "none",
+      "ipAdapterWeight": null,
+      "controlNetStrength": null,
+      "referenceInputId": null
+    },
+    {
+      "armId": "A1_FACE_IDENTITY",
+      "identityMethod": "ipadapter-plus-face-sdxl-vit-h",
+      "poseControl": "none",
+      "ipAdapterWeight": 0.6,
+      "controlNetStrength": null,
+      "referenceInputId": "input-reference-face"
+    },
+    {
+      "armId": "A2_FACE_OPENPOSE",
+      "identityMethod": "ipadapter-plus-face-sdxl-vit-h",
+      "poseControl": "controlnet-openpose-sdxl",
+      "ipAdapterWeight": 0.6,
+      "controlNetStrength": 0.8,
+      "referenceInputId": "input-reference-face"
+    }
+  ],
+  "shots": [
+    {
+      "shotId": "01_medium_front",
+      "description": "medium shot, standing, facing camera, neutral background",
+      "poseInputId": "input-pose-01"
+    },
+    {
+      "shotId": "02_closeup_side",
+      "description": "close-up portrait, side profile view, soft lighting",
+      "poseInputId": "input-pose-02"
+    },
+    {
+      "shotId": "03_full_walking",
+      "description": "full body shot, walking on a street, wide angle",
+      "poseInputId": "input-pose-03"
+    },
+    {
+      "shotId": "04_back_turning",
+      "description": "from behind, turning head back over shoulder",
+      "poseInputId": "input-pose-04"
+    },
+    {
+      "shotId": "05_sitting_high",
+      "description": "sitting on a chair, high angle shot, looking up",
+      "poseInputId": "input-pose-05"
+    }
+  ],
+  "seeds": [
+    123456,
+    223456,
+    323456
+  ],
+  "workflows": [
+    {
+      "armId": "A0_TEXT_BASELINE",
+      "path": "workflows/a0-text-baseline.api.json",
+      "state": "PENDING_G1_BUILD",
+      "sizeBytes": null,
+      "sha256": null
+    },
+    {
+      "armId": "A1_FACE_IDENTITY",
+      "path": "workflows/a1-face-identity.api.json",
+      "state": "PENDING_G1_BUILD",
+      "sizeBytes": null,
+      "sha256": null
+    },
+    {
+      "armId": "A2_FACE_OPENPOSE",
+      "path": "workflows/a2-face-openpose.api.json",
+      "state": "PENDING_G1_BUILD",
+      "sizeBytes": null,
+      "sha256": null
+    }
+  ],
+  "expectedRunCount": 45,
+  "runRegisterPath": "run-register.template.json",
+  "reviewRubricPath": "review-rubric.template.json",
+  "failureLedgerPath": "failure-ledger.template.json",
+  "claims": {
+    "gpuExecutionAuthorized": false,
+    "gpuExecutionStarted": false,
+    "validationAccepted": false,
+    "productionReady": false,
+    "schemaChangeAuthorized": false
+  }
+}

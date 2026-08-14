@@ -1,0 +1,57 @@
+{
+  "schemaVersion": "ACS-CCV-R2-FAILURE-LEDGER-1",
+  "experimentId": "acs-ccv-r2",
+  "protocolVersion": "g0-v1",
+  "state": "EMPTY_BEFORE_EXECUTION",
+  "allowedStages": [
+    "PREFLIGHT",
+    "MODEL_LOAD",
+    "WORKFLOW_VALIDATION",
+    "QUEUE",
+    "SAMPLING",
+    "SAVE",
+    "DIGEST",
+    "REVIEW"
+  ],
+  "allowedDispositions": [
+    "RETRY_AUTHORIZED",
+    "TERMINAL_FAILED",
+    "RESOLVED_WITHOUT_RETRY"
+  ],
+  "allowedFailureCodes": [
+    "MISSING_INPUT",
+    "DIGEST_MISMATCH",
+    "MODEL_ARCHITECTURE_MISMATCH",
+    "NODE_MISSING",
+    "WORKFLOW_INVALID",
+    "QUEUE_REJECTED",
+    "GPU_OOM",
+    "SAMPLING_ERROR",
+    "OUTPUT_MISSING",
+    "OUTPUT_ZERO_BYTE",
+    "OUTPUT_DIGEST_ERROR",
+    "PROMPT_METADATA_MISSING",
+    "REVIEW_PACKET_ERROR",
+    "OTHER_EXPLICIT"
+  ],
+  "retryPolicy": {
+    "maximumRetriesPerPlannedRun": 1,
+    "retryMustHaveNewRunId": true,
+    "retryMustReferenceOriginal": true,
+    "originalAttemptRemainsInLedger": true,
+    "primaryAnalysisAttemptRule": "first successful attempt; terminal missing output counts as failure",
+    "silentRetryForbidden": true
+  },
+  "eventTemplate": {
+    "eventId": null,
+    "runId": null,
+    "stage": null,
+    "failureCode": null,
+    "message": null,
+    "occurredAt": null,
+    "disposition": null,
+    "retryRunId": null,
+    "evidenceRefs": []
+  },
+  "events": []
+}

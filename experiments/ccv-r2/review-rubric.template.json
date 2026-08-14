@@ -1,0 +1,109 @@
+{
+  "schemaVersion": "ACS-CCV-R2-REVIEW-RUBRIC-1",
+  "experimentId": "acs-ccv-r2",
+  "protocolVersion": "g0-v1",
+  "state": "FROZEN_BEFORE_EXECUTION",
+  "reviewDesign": {
+    "reviewerCount": 3,
+    "reviewerIndependence": "reviewers must not see arm, seed, workflow or blind-label mapping before submission",
+    "scale": {
+      "minimum": 1,
+      "maximum": 5,
+      "anchors": {
+        "1": "unacceptable or clearly failed",
+        "3": "usable with visible defects",
+        "5": "strong target match with no material defect"
+      }
+    },
+    "missingOutputScorePolicy": "no score; retain as terminal operational failure",
+    "adjudication": "median per criterion; no post-hoc criterion deletion"
+  },
+  "criteria": [
+    {
+      "criterionId": "identityContinuity",
+      "weight": 0.4,
+      "question": "Does the person appear to be the same identity as the fixed face reference while respecting viewpoint?",
+      "higherIsBetter": true
+    },
+    {
+      "criterionId": "shotPoseAdherence",
+      "weight": 0.3,
+      "question": "Does framing, viewpoint and body pose match the declared shot and pose input?",
+      "higherIsBetter": true
+    },
+    {
+      "criterionId": "anatomyArtifactFreedom",
+      "weight": 0.2,
+      "question": "Are face, hands, limbs and body free of material generation defects?",
+      "higherIsBetter": true
+    },
+    {
+      "criterionId": "referenceContaminationControl",
+      "weight": 0.1,
+      "question": "Does the output avoid copying unintended background, clothing layout or crop artifacts from the reference?",
+      "higherIsBetter": true
+    }
+  ],
+  "primaryAcceptance": {
+    "armId": "A2_FACE_OPENPOSE",
+    "allMustPass": [
+      {
+        "metric": "medianIdentityContinuity",
+        "operator": ">=",
+        "threshold": 4
+      },
+      {
+        "metric": "medianShotPoseAdherence",
+        "operator": ">=",
+        "threshold": 4
+      },
+      {
+        "metric": "medianWeightedComposite",
+        "operator": ">=",
+        "threshold": 4
+      },
+      {
+        "metric": "fractionOutputsWithAllCriteriaAtLeast3",
+        "operator": ">=",
+        "threshold": 0.8
+      },
+      {
+        "metric": "backTurningMedianShotPoseAdherence",
+        "operator": ">=",
+        "threshold": 3.5
+      },
+      {
+        "metric": "identityDeltaVsA0",
+        "operator": ">=",
+        "threshold": 1
+      },
+      {
+        "metric": "poseDeltaVsA1",
+        "operator": ">=",
+        "threshold": 0.75
+      },
+      {
+        "metric": "terminalFailureRate",
+        "operator": "<=",
+        "threshold": 0.1
+      }
+    ]
+  },
+  "reviewEntryTemplate": {
+    "blindLabel": null,
+    "reviewerId": null,
+    "scores": {
+      "identityContinuity": null,
+      "shotPoseAdherence": null,
+      "anatomyArtifactFreedom": null,
+      "referenceContaminationControl": null
+    },
+    "materialDefects": [],
+    "comment": null,
+    "submittedAt": null
+  },
+  "claims": {
+    "automaticAcceptanceAllowed": false,
+    "reviewRequiredAfterExecution": true
+  }
+}

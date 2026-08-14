@@ -1,0 +1,980 @@
+{
+  "schemaVersion": "ACS-CCV-R2-RUN-REGISTER-1",
+  "experimentId": "acs-ccv-r2",
+  "protocolVersion": "g0-v1",
+  "state": "PLANNED_NOT_EXECUTED",
+  "design": {
+    "arms": [
+      "A0_TEXT_BASELINE",
+      "A1_FACE_IDENTITY",
+      "A2_FACE_OPENPOSE"
+    ],
+    "shots": [
+      "01_medium_front",
+      "02_closeup_side",
+      "03_full_walking",
+      "04_back_turning",
+      "05_sitting_high"
+    ],
+    "seeds": [
+      123456,
+      223456,
+      323456
+    ],
+    "expectedRunCount": 45,
+    "commonRandomNumbers": true
+  },
+  "blinding": {
+    "scheme": "FROZEN_OPAQUE_LABEL_MAP",
+    "mappingVisibility": "CUSTODIAN_ONLY_UNTIL_ALL_REVIEWS_FINAL",
+    "labels": [
+      "B001",
+      "B002",
+      "B003",
+      "B004",
+      "B005",
+      "B006",
+      "B007",
+      "B008",
+      "B009",
+      "B010",
+      "B011",
+      "B012",
+      "B013",
+      "B014",
+      "B015",
+      "B016",
+      "B017",
+      "B018",
+      "B019",
+      "B020",
+      "B021",
+      "B022",
+      "B023",
+      "B024",
+      "B025",
+      "B026",
+      "B027",
+      "B028",
+      "B029",
+      "B030",
+      "B031",
+      "B032",
+      "B033",
+      "B034",
+      "B035",
+      "B036",
+      "B037",
+      "B038",
+      "B039",
+      "B040",
+      "B041",
+      "B042",
+      "B043",
+      "B044",
+      "B045"
+    ]
+  },
+  "runs": [
+    {
+      "runId": "a0_text_baseline__seed-123456__shot-01_medium_front",
+      "blindLabel": "B012",
+      "armId": "A0_TEXT_BASELINE",
+      "shotId": "01_medium_front",
+      "seed": 123456,
+      "attempt": 1,
+      "retryOfRunId": null,
+      "poseInputId": null,
+      "plannedOutputPath": "outputs/a0_text_baseline/seed-123456/01_medium_front.png",
+      "runState": "PLANNED_NOT_EXECUTED",
+      "output": {
+        "sizeBytes": null,
+        "sha256": null,
+        "promptMetadataSha256": null
+      },
+      "failureEventId": null,
+      "excluded": false,
+      "exclusionReason": null
+    },
+    {
+      "runId": "a0_text_baseline__seed-123456__shot-02_closeup_side",
+      "blindLabel": "B029",
+      "armId": "A0_TEXT_BASELINE",
+      "shotId": "02_closeup_side",
+      "seed": 123456,
+      "attempt": 1,
+      "retryOfRunId": null,
+      "poseInputId": null,
+      "plannedOutputPath": "outputs/a0_text_baseline/seed-123456/02_closeup_side.png",
+      "runState": "PLANNED_NOT_EXECUTED",
+      "output": {
+        "sizeBytes": null,
+        "sha256": null,
+        "promptMetadataSha256": null
+      },
+      "failureEventId": null,
+      "excluded": false,
+      "exclusionReason": null
+    },
+    {
+      "runId": "a0_text_baseline__seed-123456__shot-03_full_walking",
+      "blindLabel": "B001",
+      "armId": "A0_TEXT_BASELINE",
+      "shotId": "03_full_walking",
+      "seed": 123456,
+      "attempt": 1,
+      "retryOfRunId": null,
+      "poseInputId": null,
+      "plannedOutputPath": "outputs/a0_text_baseline/seed-123456/03_full_walking.png",
+      "runState": "PLANNED_NOT_EXECUTED",
+      "output": {
+        "sizeBytes": null,
+        "sha256": null,
+        "promptMetadataSha256": null
+      },
+      "failureEventId": null,
+      "excluded": false,
+      "exclusionReason": null
+    },
+    {
+      "runId": "a0_text_baseline__seed-123456__shot-04_back_turning",
+      "blindLabel": "B018",
+      "armId": "A0_TEXT_BASELINE",
+      "shotId": "04_back_turning",
+      "seed": 123456,
+      "attempt": 1,
+      "retryOfRunId": null,
+      "poseInputId": null,
+      "plannedOutputPath": "outputs/a0_text_baseline/seed-123456/04_back_turning.png",
+      "runState": "PLANNED_NOT_EXECUTED",
+      "output": {
+        "sizeBytes": null,
+        "sha256": null,
+        "promptMetadataSha256": null
+      },
+      "failureEventId": null,
+      "excluded": false,
+      "exclusionReason": null
+    },
+    {
+      "runId": "a0_text_baseline__seed-123456__shot-05_sitting_high",
+      "blindLabel": "B035",
+      "armId": "A0_TEXT_BASELINE",
+      "shotId": "05_sitting_high",
+      "seed": 123456,
+      "attempt": 1,
+      "retryOfRunId": null,
+      "poseInputId": null,
+      "plannedOutputPath": "outputs/a0_text_baseline/seed-123456/05_sitting_high.png",
+      "runState": "PLANNED_NOT_EXECUTED",
+      "output": {
+        "sizeBytes": null,
+        "sha256": null,
+        "promptMetadataSha256": null
+      },
+      "failureEventId": null,
+      "excluded": false,
+      "exclusionReason": null
+    },
+    {
+      "runId": "a0_text_baseline__seed-223456__shot-01_medium_front",
+      "blindLabel": "B007",
+      "armId": "A0_TEXT_BASELINE",
+      "shotId": "01_medium_front",
+      "seed": 223456,
+      "attempt": 1,
+      "retryOfRunId": null,
+      "poseInputId": null,
+      "plannedOutputPath": "outputs/a0_text_baseline/seed-223456/01_medium_front.png",
+      "runState": "PLANNED_NOT_EXECUTED",
+      "output": {
+        "sizeBytes": null,
+        "sha256": null,
+        "promptMetadataSha256": null
+      },
+      "failureEventId": null,
+      "excluded": false,
+      "exclusionReason": null
+    },
+    {
+      "runId": "a0_text_baseline__seed-223456__shot-02_closeup_side",
+      "blindLabel": "B024",
+      "armId": "A0_TEXT_BASELINE",
+      "shotId": "02_closeup_side",
+      "seed": 223456,
+      "attempt": 1,
+      "retryOfRunId": null,
+      "poseInputId": null,
+      "plannedOutputPath": "outputs/a0_text_baseline/seed-223456/02_closeup_side.png",
+      "runState": "PLANNED_NOT_EXECUTED",
+      "output": {
+        "sizeBytes": null,
+        "sha256": null,
+        "promptMetadataSha256": null
+      },
+      "failureEventId": null,
+      "excluded": false,
+      "exclusionReason": null
+    },
+    {
+      "runId": "a0_text_baseline__seed-223456__shot-03_full_walking",
+      "blindLabel": "B041",
+      "armId": "A0_TEXT_BASELINE",
+      "shotId": "03_full_walking",
+      "seed": 223456,
+      "attempt": 1,
+      "retryOfRunId": null,
+      "poseInputId": null,
+      "plannedOutputPath": "outputs/a0_text_baseline/seed-223456/03_full_walking.png",
+      "runState": "PLANNED_NOT_EXECUTED",
+      "output": {
+        "sizeBytes": null,
+        "sha256": null,
+        "promptMetadataSha256": null
+      },
+      "failureEventId": null,
+      "excluded": false,
+      "exclusionReason": null
+    },
+    {
+      "runId": "a0_text_baseline__seed-223456__shot-04_back_turning",
+      "blindLabel": "B013",
+      "armId": "A0_TEXT_BASELINE",
+      "shotId": "04_back_turning",
+      "seed": 223456,
+      "attempt": 1,
+      "retryOfRunId": null,
+      "poseInputId": null,
+      "plannedOutputPath": "outputs/a0_text_baseline/seed-223456/04_back_turning.png",
+      "runState": "PLANNED_NOT_EXECUTED",
+      "output": {
+        "sizeBytes": null,
+        "sha256": null,
+        "promptMetadataSha256": null
+      },
+      "failureEventId": null,
+      "excluded": false,
+      "exclusionReason": null
+    },
+    {
+      "runId": "a0_text_baseline__seed-223456__shot-05_sitting_high",
+      "blindLabel": "B030",
+      "armId": "A0_TEXT_BASELINE",
+      "shotId": "05_sitting_high",
+      "seed": 223456,
+      "attempt": 1,
+      "retryOfRunId": null,
+      "poseInputId": null,
+      "plannedOutputPath": "outputs/a0_text_baseline/seed-223456/05_sitting_high.png",
+      "runState": "PLANNED_NOT_EXECUTED",
+      "output": {
+        "sizeBytes": null,
+        "sha256": null,
+        "promptMetadataSha256": null
+      },
+      "failureEventId": null,
+      "excluded": false,
+      "exclusionReason": null
+    },
+    {
+      "runId": "a0_text_baseline__seed-323456__shot-01_medium_front",
+      "blindLabel": "B002",
+      "armId": "A0_TEXT_BASELINE",
+      "shotId": "01_medium_front",
+      "seed": 323456,
+      "attempt": 1,
+      "retryOfRunId": null,
+      "poseInputId": null,
+      "plannedOutputPath": "outputs/a0_text_baseline/seed-323456/01_medium_front.png",
+      "runState": "PLANNED_NOT_EXECUTED",
+      "output": {
+        "sizeBytes": null,
+        "sha256": null,
+        "promptMetadataSha256": null
+      },
+      "failureEventId": null,
+      "excluded": false,
+      "exclusionReason": null
+    },
+    {
+      "runId": "a0_text_baseline__seed-323456__shot-02_closeup_side",
+      "blindLabel": "B019",
+      "armId": "A0_TEXT_BASELINE",
+      "shotId": "02_closeup_side",
+      "seed": 323456,
+      "attempt": 1,
+      "retryOfRunId": null,
+      "poseInputId": null,
+      "plannedOutputPath": "outputs/a0_text_baseline/seed-323456/02_closeup_side.png",
+      "runState": "PLANNED_NOT_EXECUTED",
+      "output": {
+        "sizeBytes": null,
+        "sha256": null,
+        "promptMetadataSha256": null
+      },
+      "failureEventId": null,
+      "excluded": false,
+      "exclusionReason": null
+    },
+    {
+      "runId": "a0_text_baseline__seed-323456__shot-03_full_walking",
+      "blindLabel": "B036",
+      "armId": "A0_TEXT_BASELINE",
+      "shotId": "03_full_walking",
+      "seed": 323456,
+      "attempt": 1,
+      "retryOfRunId": null,
+      "poseInputId": null,
+      "plannedOutputPath": "outputs/a0_text_baseline/seed-323456/03_full_walking.png",
+      "runState": "PLANNED_NOT_EXECUTED",
+      "output": {
+        "sizeBytes": null,
+        "sha256": null,
+        "promptMetadataSha256": null
+      },
+      "failureEventId": null,
+      "excluded": false,
+      "exclusionReason": null
+    },
+    {
+      "runId": "a0_text_baseline__seed-323456__shot-04_back_turning",
+      "blindLabel": "B008",
+      "armId": "A0_TEXT_BASELINE",
+      "shotId": "04_back_turning",
+      "seed": 323456,
+      "attempt": 1,
+      "retryOfRunId": null,
+      "poseInputId": null,
+      "plannedOutputPath": "outputs/a0_text_baseline/seed-323456/04_back_turning.png",
+      "runState": "PLANNED_NOT_EXECUTED",
+      "output": {
+        "sizeBytes": null,
+        "sha256": null,
+        "promptMetadataSha256": null
+      },
+      "failureEventId": null,
+      "excluded": false,
+      "exclusionReason": null
+    },
+    {
+      "runId": "a0_text_baseline__seed-323456__shot-05_sitting_high",
+      "blindLabel": "B025",
+      "armId": "A0_TEXT_BASELINE",
+      "shotId": "05_sitting_high",
+      "seed": 323456,
+      "attempt": 1,
+      "retryOfRunId": null,
+      "poseInputId": null,
+      "plannedOutputPath": "outputs/a0_text_baseline/seed-323456/05_sitting_high.png",
+      "runState": "PLANNED_NOT_EXECUTED",
+      "output": {
+        "sizeBytes": null,
+        "sha256": null,
+        "promptMetadataSha256": null
+      },
+      "failureEventId": null,
+      "excluded": false,
+      "exclusionReason": null
+    },
+    {
+      "runId": "a1_face_identity__seed-123456__shot-01_medium_front",
+      "blindLabel": "B042",
+      "armId": "A1_FACE_IDENTITY",
+      "shotId": "01_medium_front",
+      "seed": 123456,
+      "attempt": 1,
+      "retryOfRunId": null,
+      "poseInputId": null,
+      "plannedOutputPath": "outputs/a1_face_identity/seed-123456/01_medium_front.png",
+      "runState": "PLANNED_NOT_EXECUTED",
+      "output": {
+        "sizeBytes": null,
+        "sha256": null,
+        "promptMetadataSha256": null
+      },
+      "failureEventId": null,
+      "excluded": false,
+      "exclusionReason": null
+    },
+    {
+      "runId": "a1_face_identity__seed-123456__shot-02_closeup_side",
+      "blindLabel": "B014",
+      "armId": "A1_FACE_IDENTITY",
+      "shotId": "02_closeup_side",
+      "seed": 123456,
+      "attempt": 1,
+      "retryOfRunId": null,
+      "poseInputId": null,
+      "plannedOutputPath": "outputs/a1_face_identity/seed-123456/02_closeup_side.png",
+      "runState": "PLANNED_NOT_EXECUTED",
+      "output": {
+        "sizeBytes": null,
+        "sha256": null,
+        "promptMetadataSha256": null
+      },
+      "failureEventId": null,
+      "excluded": false,
+      "exclusionReason": null
+    },
+    {
+      "runId": "a1_face_identity__seed-123456__shot-03_full_walking",
+      "blindLabel": "B031",
+      "armId": "A1_FACE_IDENTITY",
+      "shotId": "03_full_walking",
+      "seed": 123456,
+      "attempt": 1,
+      "retryOfRunId": null,
+      "poseInputId": null,
+      "plannedOutputPath": "outputs/a1_face_identity/seed-123456/03_full_walking.png",
+      "runState": "PLANNED_NOT_EXECUTED",
+      "output": {
+        "sizeBytes": null,
+        "sha256": null,
+        "promptMetadataSha256": null
+      },
+      "failureEventId": null,
+      "excluded": false,
+      "exclusionReason": null
+    },
+    {
+      "runId": "a1_face_identity__seed-123456__shot-04_back_turning",
+      "blindLabel": "B003",
+      "armId": "A1_FACE_IDENTITY",
+      "shotId": "04_back_turning",
+      "seed": 123456,
+      "attempt": 1,
+      "retryOfRunId": null,
+      "poseInputId": null,
+      "plannedOutputPath": "outputs/a1_face_identity/seed-123456/04_back_turning.png",
+      "runState": "PLANNED_NOT_EXECUTED",
+      "output": {
+        "sizeBytes": null,
+        "sha256": null,
+        "promptMetadataSha256": null
+      },
+      "failureEventId": null,
+      "excluded": false,
+      "exclusionReason": null
+    },
+    {
+      "runId": "a1_face_identity__seed-123456__shot-05_sitting_high",
+      "blindLabel": "B020",
+      "armId": "A1_FACE_IDENTITY",
+      "shotId": "05_sitting_high",
+      "seed": 123456,
+      "attempt": 1,
+      "retryOfRunId": null,
+      "poseInputId": null,
+      "plannedOutputPath": "outputs/a1_face_identity/seed-123456/05_sitting_high.png",
+      "runState": "PLANNED_NOT_EXECUTED",
+      "output": {
+        "sizeBytes": null,
+        "sha256": null,
+        "promptMetadataSha256": null
+      },
+      "failureEventId": null,
+      "excluded": false,
+      "exclusionReason": null
+    },
+    {
+      "runId": "a1_face_identity__seed-223456__shot-01_medium_front",
+      "blindLabel": "B037",
+      "armId": "A1_FACE_IDENTITY",
+      "shotId": "01_medium_front",
+      "seed": 223456,
+      "attempt": 1,
+      "retryOfRunId": null,
+      "poseInputId": null,
+      "plannedOutputPath": "outputs/a1_face_identity/seed-223456/01_medium_front.png",
+      "runState": "PLANNED_NOT_EXECUTED",
+      "output": {
+        "sizeBytes": null,
+        "sha256": null,
+        "promptMetadataSha256": null
+      },
+      "failureEventId": null,
+      "excluded": false,
+      "exclusionReason": null
+    },
+    {
+      "runId": "a1_face_identity__seed-223456__shot-02_closeup_side",
+      "blindLabel": "B009",
+      "armId": "A1_FACE_IDENTITY",
+      "shotId": "02_closeup_side",
+      "seed": 223456,
+      "attempt": 1,
+      "retryOfRunId": null,
+      "poseInputId": null,
+      "plannedOutputPath": "outputs/a1_face_identity/seed-223456/02_closeup_side.png",
+      "runState": "PLANNED_NOT_EXECUTED",
+      "output": {
+        "sizeBytes": null,
+        "sha256": null,
+        "promptMetadataSha256": null
+      },
+      "failureEventId": null,
+      "excluded": false,
+      "exclusionReason": null
+    },
+    {
+      "runId": "a1_face_identity__seed-223456__shot-03_full_walking",
+      "blindLabel": "B026",
+      "armId": "A1_FACE_IDENTITY",
+      "shotId": "03_full_walking",
+      "seed": 223456,
+      "attempt": 1,
+      "retryOfRunId": null,
+      "poseInputId": null,
+      "plannedOutputPath": "outputs/a1_face_identity/seed-223456/03_full_walking.png",
+      "runState": "PLANNED_NOT_EXECUTED",
+      "output": {
+        "sizeBytes": null,
+        "sha256": null,
+        "promptMetadataSha256": null
+      },
+      "failureEventId": null,
+      "excluded": false,
+      "exclusionReason": null
+    },
+    {
+      "runId": "a1_face_identity__seed-223456__shot-04_back_turning",
+      "blindLabel": "B043",
+      "armId": "A1_FACE_IDENTITY",
+      "shotId": "04_back_turning",
+      "seed": 223456,
+      "attempt": 1,
+      "retryOfRunId": null,
+      "poseInputId": null,
+      "plannedOutputPath": "outputs/a1_face_identity/seed-223456/04_back_turning.png",
+      "runState": "PLANNED_NOT_EXECUTED",
+      "output": {
+        "sizeBytes": null,
+        "sha256": null,
+        "promptMetadataSha256": null
+      },
+      "failureEventId": null,
+      "excluded": false,
+      "exclusionReason": null
+    },
+    {
+      "runId": "a1_face_identity__seed-223456__shot-05_sitting_high",
+      "blindLabel": "B015",
+      "armId": "A1_FACE_IDENTITY",
+      "shotId": "05_sitting_high",
+      "seed": 223456,
+      "attempt": 1,
+      "retryOfRunId": null,
+      "poseInputId": null,
+      "plannedOutputPath": "outputs/a1_face_identity/seed-223456/05_sitting_high.png",
+      "runState": "PLANNED_NOT_EXECUTED",
+      "output": {
+        "sizeBytes": null,
+        "sha256": null,
+        "promptMetadataSha256": null
+      },
+      "failureEventId": null,
+      "excluded": false,
+      "exclusionReason": null
+    },
+    {
+      "runId": "a1_face_identity__seed-323456__shot-01_medium_front",
+      "blindLabel": "B032",
+      "armId": "A1_FACE_IDENTITY",
+      "shotId": "01_medium_front",
+      "seed": 323456,
+      "attempt": 1,
+      "retryOfRunId": null,
+      "poseInputId": null,
+      "plannedOutputPath": "outputs/a1_face_identity/seed-323456/01_medium_front.png",
+      "runState": "PLANNED_NOT_EXECUTED",
+      "output": {
+        "sizeBytes": null,
+        "sha256": null,
+        "promptMetadataSha256": null
+      },
+      "failureEventId": null,
+      "excluded": false,
+      "exclusionReason": null
+    },
+    {
+      "runId": "a1_face_identity__seed-323456__shot-02_closeup_side",
+      "blindLabel": "B004",
+      "armId": "A1_FACE_IDENTITY",
+      "shotId": "02_closeup_side",
+      "seed": 323456,
+      "attempt": 1,
+      "retryOfRunId": null,
+      "poseInputId": null,
+      "plannedOutputPath": "outputs/a1_face_identity/seed-323456/02_closeup_side.png",
+      "runState": "PLANNED_NOT_EXECUTED",
+      "output": {
+        "sizeBytes": null,
+        "sha256": null,
+        "promptMetadataSha256": null
+      },
+      "failureEventId": null,
+      "excluded": false,
+      "exclusionReason": null
+    },
+    {
+      "runId": "a1_face_identity__seed-323456__shot-03_full_walking",
+      "blindLabel": "B021",
+      "armId": "A1_FACE_IDENTITY",
+      "shotId": "03_full_walking",
+      "seed": 323456,
+      "attempt": 1,
+      "retryOfRunId": null,
+      "poseInputId": null,
+      "plannedOutputPath": "outputs/a1_face_identity/seed-323456/03_full_walking.png",
+      "runState": "PLANNED_NOT_EXECUTED",
+      "output": {
+        "sizeBytes": null,
+        "sha256": null,
+        "promptMetadataSha256": null
+      },
+      "failureEventId": null,
+      "excluded": false,
+      "exclusionReason": null
+    },
+    {
+      "runId": "a1_face_identity__seed-323456__shot-04_back_turning",
+      "blindLabel": "B038",
+      "armId": "A1_FACE_IDENTITY",
+      "shotId": "04_back_turning",
+      "seed": 323456,
+      "attempt": 1,
+      "retryOfRunId": null,
+      "poseInputId": null,
+      "plannedOutputPath": "outputs/a1_face_identity/seed-323456/04_back_turning.png",
+      "runState": "PLANNED_NOT_EXECUTED",
+      "output": {
+        "sizeBytes": null,
+        "sha256": null,
+        "promptMetadataSha256": null
+      },
+      "failureEventId": null,
+      "excluded": false,
+      "exclusionReason": null
+    },
+    {
+      "runId": "a1_face_identity__seed-323456__shot-05_sitting_high",
+      "blindLabel": "B010",
+      "armId": "A1_FACE_IDENTITY",
+      "shotId": "05_sitting_high",
+      "seed": 323456,
+      "attempt": 1,
+      "retryOfRunId": null,
+      "poseInputId": null,
+      "plannedOutputPath": "outputs/a1_face_identity/seed-323456/05_sitting_high.png",
+      "runState": "PLANNED_NOT_EXECUTED",
+      "output": {
+        "sizeBytes": null,
+        "sha256": null,
+        "promptMetadataSha256": null
+      },
+      "failureEventId": null,
+      "excluded": false,
+      "exclusionReason": null
+    },
+    {
+      "runId": "a2_face_openpose__seed-123456__shot-01_medium_front",
+      "blindLabel": "B027",
+      "armId": "A2_FACE_OPENPOSE",
+      "shotId": "01_medium_front",
+      "seed": 123456,
+      "attempt": 1,
+      "retryOfRunId": null,
+      "poseInputId": "input-pose-01",
+      "plannedOutputPath": "outputs/a2_face_openpose/seed-123456/01_medium_front.png",
+      "runState": "PLANNED_NOT_EXECUTED",
+      "output": {
+        "sizeBytes": null,
+        "sha256": null,
+        "promptMetadataSha256": null
+      },
+      "failureEventId": null,
+      "excluded": false,
+      "exclusionReason": null
+    },
+    {
+      "runId": "a2_face_openpose__seed-123456__shot-02_closeup_side",
+      "blindLabel": "B044",
+      "armId": "A2_FACE_OPENPOSE",
+      "shotId": "02_closeup_side",
+      "seed": 123456,
+      "attempt": 1,
+      "retryOfRunId": null,
+      "poseInputId": "input-pose-02",
+      "plannedOutputPath": "outputs/a2_face_openpose/seed-123456/02_closeup_side.png",
+      "runState": "PLANNED_NOT_EXECUTED",
+      "output": {
+        "sizeBytes": null,
+        "sha256": null,
+        "promptMetadataSha256": null
+      },
+      "failureEventId": null,
+      "excluded": false,
+      "exclusionReason": null
+    },
+    {
+      "runId": "a2_face_openpose__seed-123456__shot-03_full_walking",
+      "blindLabel": "B016",
+      "armId": "A2_FACE_OPENPOSE",
+      "shotId": "03_full_walking",
+      "seed": 123456,
+      "attempt": 1,
+      "retryOfRunId": null,
+      "poseInputId": "input-pose-03",
+      "plannedOutputPath": "outputs/a2_face_openpose/seed-123456/03_full_walking.png",
+      "runState": "PLANNED_NOT_EXECUTED",
+      "output": {
+        "sizeBytes": null,
+        "sha256": null,
+        "promptMetadataSha256": null
+      },
+      "failureEventId": null,
+      "excluded": false,
+      "exclusionReason": null
+    },
+    {
+      "runId": "a2_face_openpose__seed-123456__shot-04_back_turning",
+      "blindLabel": "B033",
+      "armId": "A2_FACE_OPENPOSE",
+      "shotId": "04_back_turning",
+      "seed": 123456,
+      "attempt": 1,
+      "retryOfRunId": null,
+      "poseInputId": "input-pose-04",
+      "plannedOutputPath": "outputs/a2_face_openpose/seed-123456/04_back_turning.png",
+      "runState": "PLANNED_NOT_EXECUTED",
+      "output": {
+        "sizeBytes": null,
+        "sha256": null,
+        "promptMetadataSha256": null
+      },
+      "failureEventId": null,
+      "excluded": false,
+      "exclusionReason": null
+    },
+    {
+      "runId": "a2_face_openpose__seed-123456__shot-05_sitting_high",
+      "blindLabel": "B005",
+      "armId": "A2_FACE_OPENPOSE",
+      "shotId": "05_sitting_high",
+      "seed": 123456,
+      "attempt": 1,
+      "retryOfRunId": null,
+      "poseInputId": "input-pose-05",
+      "plannedOutputPath": "outputs/a2_face_openpose/seed-123456/05_sitting_high.png",
+      "runState": "PLANNED_NOT_EXECUTED",
+      "output": {
+        "sizeBytes": null,
+        "sha256": null,
+        "promptMetadataSha256": null
+      },
+      "failureEventId": null,
+      "excluded": false,
+      "exclusionReason": null
+    },
+    {
+      "runId": "a2_face_openpose__seed-223456__shot-01_medium_front",
+      "blindLabel": "B022",
+      "armId": "A2_FACE_OPENPOSE",
+      "shotId": "01_medium_front",
+      "seed": 223456,
+      "attempt": 1,
+      "retryOfRunId": null,
+      "poseInputId": "input-pose-01",
+      "plannedOutputPath": "outputs/a2_face_openpose/seed-223456/01_medium_front.png",
+      "runState": "PLANNED_NOT_EXECUTED",
+      "output": {
+        "sizeBytes": null,
+        "sha256": null,
+        "promptMetadataSha256": null
+      },
+      "failureEventId": null,
+      "excluded": false,
+      "exclusionReason": null
+    },
+    {
+      "runId": "a2_face_openpose__seed-223456__shot-02_closeup_side",
+      "blindLabel": "B039",
+      "armId": "A2_FACE_OPENPOSE",
+      "shotId": "02_closeup_side",
+      "seed": 223456,
+      "attempt": 1,
+      "retryOfRunId": null,
+      "poseInputId": "input-pose-02",
+      "plannedOutputPath": "outputs/a2_face_openpose/seed-223456/02_closeup_side.png",
+      "runState": "PLANNED_NOT_EXECUTED",
+      "output": {
+        "sizeBytes": null,
+        "sha256": null,
+        "promptMetadataSha256": null
+      },
+      "failureEventId": null,
+      "excluded": false,
+      "exclusionReason": null
+    },
+    {
+      "runId": "a2_face_openpose__seed-223456__shot-03_full_walking",
+      "blindLabel": "B011",
+      "armId": "A2_FACE_OPENPOSE",
+      "shotId": "03_full_walking",
+      "seed": 223456,
+      "attempt": 1,
+      "retryOfRunId": null,
+      "poseInputId": "input-pose-03",
+      "plannedOutputPath": "outputs/a2_face_openpose/seed-223456/03_full_walking.png",
+      "runState": "PLANNED_NOT_EXECUTED",
+      "output": {
+        "sizeBytes": null,
+        "sha256": null,
+        "promptMetadataSha256": null
+      },
+      "failureEventId": null,
+      "excluded": false,
+      "exclusionReason": null
+    },
+    {
+      "runId": "a2_face_openpose__seed-223456__shot-04_back_turning",
+      "blindLabel": "B028",
+      "armId": "A2_FACE_OPENPOSE",
+      "shotId": "04_back_turning",
+      "seed": 223456,
+      "attempt": 1,
+      "retryOfRunId": null,
+      "poseInputId": "input-pose-04",
+      "plannedOutputPath": "outputs/a2_face_openpose/seed-223456/04_back_turning.png",
+      "runState": "PLANNED_NOT_EXECUTED",
+      "output": {
+        "sizeBytes": null,
+        "sha256": null,
+        "promptMetadataSha256": null
+      },
+      "failureEventId": null,
+      "excluded": false,
+      "exclusionReason": null
+    },
+    {
+      "runId": "a2_face_openpose__seed-223456__shot-05_sitting_high",
+      "blindLabel": "B045",
+      "armId": "A2_FACE_OPENPOSE",
+      "shotId": "05_sitting_high",
+      "seed": 223456,
+      "attempt": 1,
+      "retryOfRunId": null,
+      "poseInputId": "input-pose-05",
+      "plannedOutputPath": "outputs/a2_face_openpose/seed-223456/05_sitting_high.png",
+      "runState": "PLANNED_NOT_EXECUTED",
+      "output": {
+        "sizeBytes": null,
+        "sha256": null,
+        "promptMetadataSha256": null
+      },
+      "failureEventId": null,
+      "excluded": false,
+      "exclusionReason": null
+    },
+    {
+      "runId": "a2_face_openpose__seed-323456__shot-01_medium_front",
+      "blindLabel": "B017",
+      "armId": "A2_FACE_OPENPOSE",
+      "shotId": "01_medium_front",
+      "seed": 323456,
+      "attempt": 1,
+      "retryOfRunId": null,
+      "poseInputId": "input-pose-01",
+      "plannedOutputPath": "outputs/a2_face_openpose/seed-323456/01_medium_front.png",
+      "runState": "PLANNED_NOT_EXECUTED",
+      "output": {
+        "sizeBytes": null,
+        "sha256": null,
+        "promptMetadataSha256": null
+      },
+      "failureEventId": null,
+      "excluded": false,
+      "exclusionReason": null
+    },
+    {
+      "runId": "a2_face_openpose__seed-323456__shot-02_closeup_side",
+      "blindLabel": "B034",
+      "armId": "A2_FACE_OPENPOSE",
+      "shotId": "02_closeup_side",
+      "seed": 323456,
+      "attempt": 1,
+      "retryOfRunId": null,
+      "poseInputId": "input-pose-02",
+      "plannedOutputPath": "outputs/a2_face_openpose/seed-323456/02_closeup_side.png",
+      "runState": "PLANNED_NOT_EXECUTED",
+      "output": {
+        "sizeBytes": null,
+        "sha256": null,
+        "promptMetadataSha256": null
+      },
+      "failureEventId": null,
+      "excluded": false,
+      "exclusionReason": null
+    },
+    {
+      "runId": "a2_face_openpose__seed-323456__shot-03_full_walking",
+      "blindLabel": "B006",
+      "armId": "A2_FACE_OPENPOSE",
+      "shotId": "03_full_walking",
+      "seed": 323456,
+      "attempt": 1,
+      "retryOfRunId": null,
+      "poseInputId": "input-pose-03",
+      "plannedOutputPath": "outputs/a2_face_openpose/seed-323456/03_full_walking.png",
+      "runState": "PLANNED_NOT_EXECUTED",
+      "output": {
+        "sizeBytes": null,
+        "sha256": null,
+        "promptMetadataSha256": null
+      },
+      "failureEventId": null,
+      "excluded": false,
+      "exclusionReason": null
+    },
+    {
+      "runId": "a2_face_openpose__seed-323456__shot-04_back_turning",
+      "blindLabel": "B023",
+      "armId": "A2_FACE_OPENPOSE",
+      "shotId": "04_back_turning",
+      "seed": 323456,
+      "attempt": 1,
+      "retryOfRunId": null,
+      "poseInputId": "input-pose-04",
+      "plannedOutputPath": "outputs/a2_face_openpose/seed-323456/04_back_turning.png",
+      "runState": "PLANNED_NOT_EXECUTED",
+      "output": {
+        "sizeBytes": null,
+        "sha256": null,
+        "promptMetadataSha256": null
+      },
+      "failureEventId": null,
+      "excluded": false,
+      "exclusionReason": null
+    },
+    {
+      "runId": "a2_face_openpose__seed-323456__shot-05_sitting_high",
+      "blindLabel": "B040",
+      "armId": "A2_FACE_OPENPOSE",
+      "shotId": "05_sitting_high",
+      "seed": 323456,
+      "attempt": 1,
+      "retryOfRunId": null,
+      "poseInputId": "input-pose-05",
+      "plannedOutputPath": "outputs/a2_face_openpose/seed-323456/05_sitting_high.png",
+      "runState": "PLANNED_NOT_EXECUTED",
+      "output": {
+        "sizeBytes": null,
+        "sha256": null,
+        "promptMetadataSha256": null
+      },
+      "failureEventId": null,
+      "excluded": false,
+      "exclusionReason": null
+    }
+  ]
+}
