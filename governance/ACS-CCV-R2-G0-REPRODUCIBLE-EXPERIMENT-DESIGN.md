@@ -6,7 +6,7 @@
 | --- | --- |
 | Task | `ACS-CCV-R2-G0-REPRODUCIBLE-EXPERIMENT-DESIGN` |
 | Date | `2026-08-15` |
-| Decision | `OWNER AUTHORIZED / DESIGN AUTHORING ACTIVE` |
+| Decision | `OWNER-AUTHORIZED AUTOMATED REVIEW PASS / G0 CLOSED` |
 | Execution mode | `GOVERNANCE + DESIGN / NO GPU / FAIL-CLOSED` |
 | Remote parent | `4132458d7f92e02dbd2e4be93476294aab825db6` |
 | Parent decision | `G2-R1 INDEPENDENT REVIEW PASS / CLOSED` |
@@ -173,3 +173,61 @@ PRODUCTION READY: NO
 
 Only an independent G0 `PASS` plus a separate Project Lead authorization may open a
 later execution-preparation gate. G0 itself can never authorize a GPU run.
+
+## 11. Owner-authorized automated review closeout
+
+| Field | Verified value |
+| --- | --- |
+| Review date | `2026-08-15` |
+| Project Lead instruction | `COMPLETE ALL PRE-GPU WORK / NO SEPARATE REVIEW WINDOW` |
+| G0 design commit | `4a8102e29ec3ecc6bf81e3fc1db4b9d429870723` |
+| G0 design tree | `c32c68d4d051279726e86f48489f8781d15f7998` |
+| Review decision | `PASS` |
+| Design artifacts | `5 / 5 PRESENT AND REMOTE-READABLE` |
+| Factor cells | `3 ARMS x 5 SHOTS x 3 SEEDS = 45 / 45` |
+| Unique run IDs | `45 / 45` |
+| Unique output paths | `45 / 45` |
+| Unique blind labels | `45 / 45` |
+| Review criteria | `4 / FROZEN WEIGHT SUM = 1.0` |
+| Failure ledger | `EMPTY BEFORE EXECUTION / EXPLICIT RETRY POLICY` |
+| GPU authorization claims | `false` |
+| Product/test/schema diff | `ZERO` |
+
+Reviewed artifact blobs:
+
+```text
+experiment-design.md
+4a214a93895221db1dd5f4c0ec28d6d52fbc0edc
+
+experiment-manifest.template.json
+d694a2b90ad0c3728f30ab72e644a2d4ec1cd4eb
+
+run-register.template.json
+c63313fdddeac3fb98dfdc266ad650361ce089cf
+
+review-rubric.template.json
+d8ef53b3c51c9a65f0ea7cf21e07ce885b73f7be
+
+failure-ledger.template.json
+94f2f24e559a5f0ed6f52e81eee490bc4e6d1189
+```
+
+The automated review confirmed all ten fail-closed gates in section 8. The design is
+forward-looking and falsifiable; it does not claim historical validation. Missing
+byte provenance remains explicit for the repackaged CLIP Vision and converted
+OpenPose files, restricting their use to internal synthetic evaluation.
+
+The Project Lead explicitly waived a separate review window for this pre-GPU sequence
+and authorized automatic completion. This closes G0 and permits a bounded
+`CCV-R2-G1-GPU-EXECUTION-PREPARATION` checkpoint only. G1 may build and validate
+read-only host preflight tooling, exact workflow payloads, receipts and a dry-run
+execution plan. It may not queue a prompt, start ComfyUI, load a model into GPU memory
+or generate an image.
+
+```text
+ACS-CCV-R2-G0 CLOSED / OWNER-AUTHORIZED AUTOMATED REVIEW PASS
+CCV-R2-G1 GPU EXECUTION PREPARATION MAY START
+GPU EXECUTION: NOT AUTHORIZED / NOT STARTED
+PRODUCTION READY: NO
+```
+
