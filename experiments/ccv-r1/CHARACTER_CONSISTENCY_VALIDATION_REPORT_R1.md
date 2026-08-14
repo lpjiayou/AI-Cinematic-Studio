@@ -149,7 +149,15 @@ The historical report records two faults:
 
 The hardened scripts therefore require exact byte size and SHA-256 for every model
 and artifact, reject zero-byte files, and reject declared model-family or
-conditioning-dimension disagreement. Filename substring matching is not accepted.
+conditioning-dimension disagreement. Finalization additionally parses role-specific
+conditioning tensors from the actual safetensors header, derives `768` or `2048`,
+and binds the resulting header evidence to the full model SHA-256. Arbitrary bytes,
+unknown tensor layouts and declaration-only compatibility are rejected. Filename
+substring matching is not accepted.
+
+Round 3 registers its five COCO-18 skeleton images as five independent artifacts.
+Each run identifies the exact skeleton logical name used for its shot; each skeleton
+must receive its own positive size and SHA-256 before finalization.
 
 The original failed invocations, full stack traces and selection chronology remain
 pending external collection. They must be included rather than discarded as noise.
@@ -247,6 +255,20 @@ files stay outside this repository.
 | F-009 | Withdraws the “464 tests unaffected” claim and names the unvalidated digest/outbox/parity impacts. |
 | F-010 | Limits performance wording to the bounded single-A100 image-validation workload. |
 | F-011 | Replaces cumulative state-drift wording with increasing outlier risk over a broader independent-shot distribution. |
+
+### 10.1 Evidence-validator Owner Review remediation
+
+The first evidence-hardening candidate was held at Owner Review. Its bounded R1
+correction addresses three independently reproduced gaps:
+
+| Review gap | R1 handling |
+| --- | --- |
+| Declaration-only model compatibility | Actual safetensors headers are parsed; recognized conditioning tensor shapes derive the architecture dimension and are tied to model/header SHA-256. |
+| Captured schema allowed null evidence | Captured status conditionally requires finalized model/artifact/output digests, integer seeds, captured run state and exact frozen run counts; runtime consistency checks mirror those rules. |
+| Round 3 aggregate skeleton placeholder | Replaced by five per-shot artifact records, each independently hashed and referenced by every applicable run. |
+
+This correction improves future evidence collection only. It does not recover the
+historical external evidence and does not change the report status.
 
 ## 11. Stop state
 

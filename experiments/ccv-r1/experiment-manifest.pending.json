@@ -33,8 +33,8 @@
     {
       "role": "hardened_successor_script",
       "logicalName": "evidence_common.py",
-      "sizeBytes": 14803,
-      "sha256": "67f09af1d302812cfc5e0ecfd6654a2f1ad5db3a6cbfc8028a98a53f90d67509"
+      "sizeBytes": 27756,
+      "sha256": "42b0337d3fbecf256902b44dde2502fd7c2a9bbd8cda5f8b44c3e8d7425caba2"
     }
   ],
   "environment": {
@@ -247,8 +247,40 @@
     },
     {
       "roundId": "round-3",
-      "role": "pose_skeleton_set",
-      "logicalName": "round-3-coco18-skeletons",
+      "role": "pose_skeleton",
+      "logicalName": "01_medium_front_coco18.png",
+      "filePath": null,
+      "sizeBytes": null,
+      "sha256": null
+    },
+    {
+      "roundId": "round-3",
+      "role": "pose_skeleton",
+      "logicalName": "02_closeup_side_coco18.png",
+      "filePath": null,
+      "sizeBytes": null,
+      "sha256": null
+    },
+    {
+      "roundId": "round-3",
+      "role": "pose_skeleton",
+      "logicalName": "03_full_walking_coco18.png",
+      "filePath": null,
+      "sizeBytes": null,
+      "sha256": null
+    },
+    {
+      "roundId": "round-3",
+      "role": "pose_skeleton",
+      "logicalName": "04_back_turning_coco18.png",
+      "filePath": null,
+      "sizeBytes": null,
+      "sha256": null
+    },
+    {
+      "roundId": "round-3",
+      "role": "pose_skeleton",
+      "logicalName": "05_sitting_high_coco18.png",
       "filePath": null,
       "sizeBytes": null,
       "sha256": null
@@ -1447,7 +1479,8 @@
         "referenceRole": "face_crop_reference",
         "poseSkeletonFormat": "COCO-18",
         "controlNetStrength": 0.6,
-        "shotId": "01_medium_front"
+        "shotId": "01_medium_front",
+        "poseSkeletonLogicalName": "01_medium_front_coco18.png"
       },
       "output": {
         "logicalPath": "outputs/r3-face-pose/cn0p6/01_medium_front.png",
@@ -1483,7 +1516,8 @@
         "referenceRole": "face_crop_reference",
         "poseSkeletonFormat": "COCO-18",
         "controlNetStrength": 0.6,
-        "shotId": "02_closeup_side"
+        "shotId": "02_closeup_side",
+        "poseSkeletonLogicalName": "02_closeup_side_coco18.png"
       },
       "output": {
         "logicalPath": "outputs/r3-face-pose/cn0p6/02_closeup_side.png",
@@ -1519,7 +1553,8 @@
         "referenceRole": "face_crop_reference",
         "poseSkeletonFormat": "COCO-18",
         "controlNetStrength": 0.6,
-        "shotId": "03_full_walking"
+        "shotId": "03_full_walking",
+        "poseSkeletonLogicalName": "03_full_walking_coco18.png"
       },
       "output": {
         "logicalPath": "outputs/r3-face-pose/cn0p6/03_full_walking.png",
@@ -1555,7 +1590,8 @@
         "referenceRole": "face_crop_reference",
         "poseSkeletonFormat": "COCO-18",
         "controlNetStrength": 0.6,
-        "shotId": "04_back_turning"
+        "shotId": "04_back_turning",
+        "poseSkeletonLogicalName": "04_back_turning_coco18.png"
       },
       "output": {
         "logicalPath": "outputs/r3-face-pose/cn0p6/04_back_turning.png",
@@ -1591,7 +1627,8 @@
         "referenceRole": "face_crop_reference",
         "poseSkeletonFormat": "COCO-18",
         "controlNetStrength": 0.6,
-        "shotId": "05_sitting_high"
+        "shotId": "05_sitting_high",
+        "poseSkeletonLogicalName": "05_sitting_high_coco18.png"
       },
       "output": {
         "logicalPath": "outputs/r3-face-pose/cn0p6/05_sitting_high.png",
@@ -1627,7 +1664,8 @@
         "referenceRole": "face_crop_reference",
         "poseSkeletonFormat": "COCO-18",
         "controlNetStrength": 0.8,
-        "shotId": "01_medium_front"
+        "shotId": "01_medium_front",
+        "poseSkeletonLogicalName": "01_medium_front_coco18.png"
       },
       "output": {
         "logicalPath": "outputs/r3-face-pose/cn0p8/01_medium_front.png",
@@ -1663,7 +1701,8 @@
         "referenceRole": "face_crop_reference",
         "poseSkeletonFormat": "COCO-18",
         "controlNetStrength": 0.8,
-        "shotId": "02_closeup_side"
+        "shotId": "02_closeup_side",
+        "poseSkeletonLogicalName": "02_closeup_side_coco18.png"
       },
       "output": {
         "logicalPath": "outputs/r3-face-pose/cn0p8/02_closeup_side.png",
@@ -1699,7 +1738,8 @@
         "referenceRole": "face_crop_reference",
         "poseSkeletonFormat": "COCO-18",
         "controlNetStrength": 0.8,
-        "shotId": "03_full_walking"
+        "shotId": "03_full_walking",
+        "poseSkeletonLogicalName": "03_full_walking_coco18.png"
       },
       "output": {
         "logicalPath": "outputs/r3-face-pose/cn0p8/03_full_walking.png",
@@ -1735,7 +1775,8 @@
         "referenceRole": "face_crop_reference",
         "poseSkeletonFormat": "COCO-18",
         "controlNetStrength": 0.8,
-        "shotId": "04_back_turning"
+        "shotId": "04_back_turning",
+        "poseSkeletonLogicalName": "04_back_turning_coco18.png"
       },
       "output": {
         "logicalPath": "outputs/r3-face-pose/cn0p8/04_back_turning.png",
@@ -1771,7 +1812,8 @@
         "referenceRole": "face_crop_reference",
         "poseSkeletonFormat": "COCO-18",
         "controlNetStrength": 0.8,
-        "shotId": "05_sitting_high"
+        "shotId": "05_sitting_high",
+        "poseSkeletonLogicalName": "05_sitting_high_coco18.png"
       },
       "output": {
         "logicalPath": "outputs/r3-face-pose/cn0p8/05_sitting_high.png",
@@ -1807,7 +1849,8 @@
         "referenceRole": "face_crop_reference",
         "poseSkeletonFormat": "COCO-18",
         "controlNetStrength": 1.0,
-        "shotId": "01_medium_front"
+        "shotId": "01_medium_front",
+        "poseSkeletonLogicalName": "01_medium_front_coco18.png"
       },
       "output": {
         "logicalPath": "outputs/r3-face-pose/cn1/01_medium_front.png",
@@ -1843,7 +1886,8 @@
         "referenceRole": "face_crop_reference",
         "poseSkeletonFormat": "COCO-18",
         "controlNetStrength": 1.0,
-        "shotId": "02_closeup_side"
+        "shotId": "02_closeup_side",
+        "poseSkeletonLogicalName": "02_closeup_side_coco18.png"
       },
       "output": {
         "logicalPath": "outputs/r3-face-pose/cn1/02_closeup_side.png",
@@ -1879,7 +1923,8 @@
         "referenceRole": "face_crop_reference",
         "poseSkeletonFormat": "COCO-18",
         "controlNetStrength": 1.0,
-        "shotId": "03_full_walking"
+        "shotId": "03_full_walking",
+        "poseSkeletonLogicalName": "03_full_walking_coco18.png"
       },
       "output": {
         "logicalPath": "outputs/r3-face-pose/cn1/03_full_walking.png",
@@ -1915,7 +1960,8 @@
         "referenceRole": "face_crop_reference",
         "poseSkeletonFormat": "COCO-18",
         "controlNetStrength": 1.0,
-        "shotId": "04_back_turning"
+        "shotId": "04_back_turning",
+        "poseSkeletonLogicalName": "04_back_turning_coco18.png"
       },
       "output": {
         "logicalPath": "outputs/r3-face-pose/cn1/04_back_turning.png",
@@ -1951,7 +1997,8 @@
         "referenceRole": "face_crop_reference",
         "poseSkeletonFormat": "COCO-18",
         "controlNetStrength": 1.0,
-        "shotId": "05_sitting_high"
+        "shotId": "05_sitting_high",
+        "poseSkeletonLogicalName": "05_sitting_high_coco18.png"
       },
       "output": {
         "logicalPath": "outputs/r3-face-pose/cn1/05_sitting_high.png",

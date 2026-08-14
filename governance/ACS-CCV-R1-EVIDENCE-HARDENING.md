@@ -37,6 +37,23 @@ EXPERIMENT REPORTED / INDEPENDENT REPRODUCTION NOT POSSIBLE
 
 No validation acceptance or schema authority follows from this checkpoint.
 
+## 2.1 Owner Review revision R1
+
+The first remote candidate at
+`57cbbd4959f5f3d50b4d453cb6ae96b225cb7759` passed scope, regression and CI gates
+but is `REVISION REQUIRED / NOT OWNER ACCEPTED`. Independent review reproduced three
+evidence-validator gaps:
+
+1. declaration-only SD1.5/SDXL compatibility did not inspect actual model bytes;
+2. the JSON schema allowed captured status with null digest/size/seed evidence;
+3. Round 3 represented five skeleton files as one aggregate record that the file-only
+   finalizer could not complete.
+
+`ACS-CCV-R1-R1-EVIDENCE-VALIDATOR-HARDENING` is the bounded correction. It may alter
+only the existing CCV-R1 allowlist, must keep `services/`, `apps/` and `tests/` blobs
+unchanged, and must stop again after remote verification and Draft PR CI. It does not
+authorize GPU execution, CCV-R2 or schema/domain implementation.
+
 ## 3. Evidence rules
 
 1. The corrected expected count is `50`: R1 `10`, R2a `15`, R2b `10`, R3 `15`.
@@ -47,6 +64,12 @@ No validation acceptance or schema authority follows from this checkpoint.
 6. Missing, zero-byte or digest-mismatched outputs fail closed.
 7. Failures, retries and exclusions are explicit manifest facts.
 8. Generated images and model binaries never enter this repository.
+9. Final model compatibility is derived from recognized tensors in the actual
+   safetensors header and tied to the full model SHA-256; declarations and filenames
+   alone are insufficient.
+10. Captured status requires non-null finalized evidence and exact frozen run counts.
+11. Round 3 registers and hashes five skeleton files separately and links each run to
+    its per-shot skeleton.
 
 ## 4. Architecture boundary
 
@@ -102,7 +125,7 @@ Any `services/`, `apps/` or `tests/` diff is a hard stop.
 After all gates, commit, non-force publication, Draft PR, CI and remote equality:
 
 ```text
-ACS-CCV-R1-EVIDENCE-HARDENING CHECKPOINT CANDIDATE
+ACS-CCV-R1-R1-EVIDENCE-VALIDATOR-HARDENING CHECKPOINT CANDIDATE
 PROJECT LEAD OWNER REVIEW REQUIRED
 CCV-R2 / SCHEMA WORK NOT AUTHORIZED
 PRODUCTION READY: NO

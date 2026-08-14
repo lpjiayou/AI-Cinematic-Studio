@@ -68,14 +68,24 @@ python experiments/ccv-r1/validation/validate_fail_closed.py
 The final command proves, without GPU dependencies, that:
 
 - the frozen matrix expands to `10 + 25 + 15 = 50` expected outputs;
+- Round 3 registers five separate skeleton files and links each run to its exact
+  skeleton logical name;
 - a zero-byte model file is rejected;
-- an SD1.5 `768`-dimension conditioning model cannot be paired with an SDXL
-  `2048`-dimension base;
+- arbitrary bytes and unrecognized safetensors architectures are rejected;
+- conditioning width is derived from role-specific tensors in the actual
+  safetensors header, so an SD1.5 `768` file cannot masquerade as declared SDXL
+  `2048` metadata;
+- architecture evidence records both the full model SHA-256 and safetensors-header
+  SHA-256;
+- a captured manifest cannot retain null size, digest or seed evidence, and its
+  declared count must match the frozen per-round matrix;
 - a non-empty file must match both its recorded byte size and SHA-256.
 
-The compatibility check is based on explicit model-family and conditioning-dimension
-records. Recovery must supply those records from the actual external environment;
-filename matching is never accepted as architecture evidence.
+Pending configuration validation compares explicit declarations because model bytes
+are not yet available. Finalization does not trust those declarations alone: it
+parses actual safetensors tensor shapes, derives `768` or `2048`, compares that result
+to the declaration and writes digest-tied `architectureEvidence`. Filename matching
+is never accepted as architecture evidence.
 
 ## Pending and finalized manifests
 
@@ -93,8 +103,11 @@ python experiments/ccv-r1/scripts/character_consistency_test.py \
 
 Finalization is fail closed. Before `--finalize-manifest`, replace all pending model,
 artifact and seed fields with values recovered from the external GPU machine. The
-command verifies model/artifact size and SHA-256, verifies exact output count, rejects
-missing or zero-byte outputs, and writes an evidence manifest automatically:
+command verifies model/artifact size and SHA-256, verifies actual safetensors
+architecture, verifies exact output count, requires every captured seed and digest,
+rejects missing or zero-byte outputs, and writes an evidence manifest automatically.
+Round 3 requires five independently hashed skeleton files rather than one directory
+or aggregate placeholder:
 
 ```bash
 python experiments/ccv-r1/scripts/ipadapter_pose_test.py \
