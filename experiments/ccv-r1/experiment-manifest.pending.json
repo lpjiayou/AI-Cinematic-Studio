@@ -33,8 +33,8 @@
     {
       "role": "hardened_successor_script",
       "logicalName": "evidence_common.py",
-      "sizeBytes": 27756,
-      "sha256": "42b0337d3fbecf256902b44dde2502fd7c2a9bbd8cda5f8b44c3e8d7425caba2"
+      "sizeBytes": 27748,
+      "sha256": "f1b76227ceada724b8cfc63b3cfe5e4401f90ed7a0b1024a053b38521c8f0a75"
     }
   ],
   "environment": {
