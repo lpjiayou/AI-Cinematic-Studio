@@ -14,7 +14,7 @@ OS、V4 Platform、V3 Render Core、持久化与后端测试；客户 Commercial
 > 收敛至 `9c13e8f8…`，tree `8ee5c3ba…`，并通过 464/464 与 post-merge CI；
 > Capture G0 `9094a466…` 已直接 Owner Accepted；G1 `af34ac07…` 已远端验证、
 > PR #6 CI 通过；G2-R1 已完成 custody 恢复、六卷跨实例验证和 69/69 归档绑定核验；
-> 独立复核已 `PASS` 并收口于 `4132458d…`；当前进入 `CCV-R2-G0`，仅授权治理与可复现实验设计；
+> 独立复核已 `PASS` 并收口于 `4132458d…`；CCV-R2-G0 已自动复核并收口于 `0376ee3c…`；当前进入 `CCV-R2-G1`，仅授权只读主机预检与离线 45-run 请求物化；
 > 历史 manifest 仍为 partial/not validation accepted；Production Ready = `NO`。
 
 ## 当前活动工作包
@@ -55,9 +55,10 @@ OS、V4 Platform、V3 Render Core、持久化与后端测试；客户 Commercial
 | Capture G1 | `REMOTE-VERIFIED AT af34ac07 / TREE 0cec29c8 / PR #6 DRAFT / CI PASS / FULL CORE 464/464` |
 | Capture G2 | `EXECUTED / ORIGINAL CUSTODY PVC NOT ATTACHED / INDEPENDENT REVIEW BLOCKED / CHECKPOINT CANDIDATE NOT DECLARED` |
 | G2-R1 closeout | `INDEPENDENT REVIEW PASS / CLOSED AT 4132458d / 69/69 CUSTODY + 2/2 AUDIT METADATA + 6/6 ARCHIVE VOLUMES VERIFIED` |
-| Current checkpoint | `ACS-CCV-R2-G0-REPRODUCIBLE-EXPERIMENT-DESIGN / GOVERNANCE + DESIGN AUTHORING / NO GPU` |
+| Current checkpoint | `ACS-CCV-R2-G1-GPU-EXECUTION-PREPARATION / READ-ONLY HOST PREFLIGHT + OFFLINE MATERIALIZATION / NO GPU` |
 | Character Consistency evidence status | `EXPERIMENT REPORTED / INDEPENDENT REPRODUCTION NOT POSSIBLE / SYNTHETIC_TEST_ONLY / NOT FOR PRODUCTION` |
-| CCV-R2-G0 | `OWNER AUTHORIZED / REPRODUCIBLE EXPERIMENT DESIGN AUTHORING ACTIVE / NO GPU`; Character Visual Identity schema implementation `NOT AUTHORIZED` |
+| CCV-R2-G0 | `AUTOMATED REVIEW PASS / CLOSED AT 0376ee3c / 45-RUN DESIGN FROZEN` |
+| CCV-R2-G1 | `OWNER AUTHORIZED / PRE-GPU PREPARATION ACTIVE / NO COMFYUI QUEUE OR CUDA EXECUTION`; Character Visual Identity schema implementation `NOT AUTHORIZED` |
 | M6-P3 after G1 / M6-P4+ | `NOT AUTHORIZED / NOT STARTED` |
 | M7-M19 | `NOT STARTED / NOT AUTHORIZED` |
 | Formal port-8765 database | `UNTOUCHED / NOT DEPLOYED` |
