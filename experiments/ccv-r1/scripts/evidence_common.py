@@ -21,6 +21,32 @@ from typing import Any
 RIGHTS_LABELS = ("SYNTHETIC_TEST_ONLY", "NOT_FOR_PRODUCTION")
 PENDING_STATUS = "EXPERIMENT_REPORTED_INDEPENDENT_REPRODUCTION_NOT_POSSIBLE"
 FINAL_STATUS = "EVIDENCE_CAPTURED_NOT_VALIDATION_ACCEPTED"
+MAX_SAFETENSORS_HEADER_BYTES = 64 * 1024 * 1024
+CONDITIONING_TENSOR_SUFFIXES = {
+    "base": (".attn2.to_k.weight", ".attn2.to_v.weight"),
+    "pose_control": (".attn2.to_k.weight", ".attn2.to_v.weight"),
+    "identity_adapter": (".to_k_ip.weight", ".to_v_ip.weight"),
+}
+SAFETENSORS_DTYPE_BYTES = {
+    "BOOL": 1,
+    "U8": 1,
+    "I8": 1,
+    "F8_E4M3": 1,
+    "F8_E4M3FN": 1,
+    "F8_E4M3FNUZ": 1,
+    "F8_E5M2": 1,
+    "F8_E5M2FNUZ": 1,
+    "I16": 2,
+    "U16": 2,
+    "F16": 2,
+    "BF16": 2,
+    "I32": 4,
+    "U32": 4,
+    "F32": 4,
+    "I64": 8,
+    "U64": 8,
+    "F64": 8,
+}
 
 
 class EvidenceError(ValueError):
@@ -30,6 +56,10 @@ class EvidenceError(ValueError):
 def _require(condition: bool, message: str) -> None:
     if not condition:
         raise EvidenceError(message)
+
+
+def _is_sha256(value: Any) -> bool:
+    return isinstance(value, str) and len(value) == 64 and all(character in "0123456789abcdef" for character in value)
 
 
 def load_json(path: Path) -> dict[str, Any]:
@@ -47,6 +77,111 @@ def sha256_file(path: Path) -> str:
         for block in iter(lambda: stream.read(1024 * 1024), b""):
             digest.update(block)
     return digest.hexdigest()
+
+
+def read_safetensors_header(path: Path, label: str) -> tuple[dict[str, Any], bytes, int, int]:
+    try:
+        file_size = path.stat().st_size
+        with path.open("rb") as stream:
+            prefix = stream.read(8)
+            _require(len(prefix) == 8, f"{label}: invalid safetensors header prefix")
+            header_size = int.from_bytes(prefix, byteorder="little", signed=False)
+            _require(header_size > 1, f"{label}: invalid safetensors header length {header_size}")
+            _require(
+                header_size <= MAX_SAFETENSORS_HEADER_BYTES,
+                f"{label}: safetensors header exceeds {MAX_SAFETENSORS_HEADER_BYTES} bytes",
+            )
+            _require(header_size <= file_size - 8, f"{label}: truncated safetensors header")
+            header_bytes = stream.read(header_size)
+    except OSError as error:
+        raise EvidenceError(f"{label}: cannot inspect safetensors file {path}: {error}") from error
+
+    try:
+        header = json.loads(header_bytes.decode("utf-8"))
+    except (UnicodeDecodeError, json.JSONDecodeError) as error:
+        raise EvidenceError(f"{label}: invalid safetensors header JSON") from error
+    _require(isinstance(header, dict), f"{label}: safetensors header must be an object")
+    return header, header_bytes, header_size, file_size
+
+
+def validate_safetensors_container(path: Path, label: str) -> tuple[dict[str, Any], bytes]:
+    header, header_bytes, header_size, file_size = read_safetensors_header(path, label)
+    tensor_count = 0
+    data_ranges: list[tuple[int, int, str]] = []
+    for tensor_name, tensor in header.items():
+        if tensor_name == "__metadata__":
+            continue
+        tensor_count += 1
+        _require(isinstance(tensor, dict), f"{label}: invalid tensor record {tensor_name}")
+        shape = tensor.get("shape")
+        _require(
+            isinstance(shape, list)
+            and all(isinstance(dimension, int) and dimension >= 0 for dimension in shape),
+            f"{label}: invalid tensor shape for {tensor_name}",
+        )
+        dtype = tensor.get("dtype")
+        offsets = tensor.get("data_offsets")
+        _require(dtype in SAFETENSORS_DTYPE_BYTES, f"{label}: unsupported dtype for {tensor_name}")
+        _require(
+            isinstance(offsets, list)
+            and len(offsets) == 2
+            and all(isinstance(offset, int) and offset >= 0 for offset in offsets)
+            and offsets[0] <= offsets[1],
+            f"{label}: invalid data_offsets for {tensor_name}",
+        )
+        element_count = 1
+        for dimension in shape:
+            element_count *= dimension
+        expected_bytes = element_count * SAFETENSORS_DTYPE_BYTES[dtype]
+        _require(offsets[1] - offsets[0] == expected_bytes, f"{label}: tensor byte length mismatch for {tensor_name}")
+        _require(8 + header_size + offsets[1] <= file_size, f"{label}: truncated tensor data for {tensor_name}")
+        data_ranges.append((offsets[0], offsets[1], tensor_name))
+    _require(tensor_count > 0, f"{label}: safetensors file has no tensors")
+    cursor = 0
+    for start, end, tensor_name in sorted(data_ranges):
+        _require(start == cursor, f"{label}: non-contiguous or overlapping data before {tensor_name}")
+        cursor = end
+    _require(8 + header_size + cursor == file_size, f"{label}: unregistered bytes after safetensors tensor data")
+    return header, header_bytes
+
+
+def inspect_safetensors_architecture(path: Path, role: str, model_sha256: str) -> dict[str, Any]:
+    """Derive conditioning width from the actual safetensors header.
+
+    The declared family and width are not accepted as architecture evidence.  The
+    role-specific tensor suffixes identify the cross-attention inputs whose final
+    shape dimension distinguishes the supported SD1.5 and SDXL families.
+    """
+
+    suffixes = CONDITIONING_TENSOR_SUFFIXES.get(role)
+    _require(suffixes is not None, f"{role}: no safetensors architecture rule")
+    header, header_bytes = validate_safetensors_container(path, role)
+
+    matched: list[tuple[str, int]] = []
+    for tensor_name, tensor in header.items():
+        if tensor_name == "__metadata__" or not any(tensor_name.endswith(suffix) for suffix in suffixes):
+            continue
+        shape = tensor.get("shape")
+        _require(
+            isinstance(shape, list)
+            and shape
+            and all(isinstance(dimension, int) and dimension > 0 for dimension in shape),
+            f"{role}: invalid tensor shape for {tensor_name}",
+        )
+        matched.append((tensor_name, shape[-1]))
+
+    _require(matched, f"{role}: no recognized conditioning tensor in safetensors header")
+    dimensions = {dimension for _, dimension in matched}
+    _require(len(dimensions) == 1, f"{role}: ambiguous conditioning dimensions {sorted(dimensions)}")
+    dimension = next(iter(dimensions))
+    _require(dimension in {768, 2048}, f"{role}: unsupported conditioning dimension {dimension}")
+    return {
+        "format": "safetensors",
+        "modelSha256": model_sha256,
+        "headerSha256": hashlib.sha256(header_bytes).hexdigest(),
+        "conditioningDimension": dimension,
+        "evidenceTensorKeys": [name for name, _ in sorted(matched)],
+    }
 
 
 def validate_config(config: dict[str, Any], expected_round: str) -> list[dict[str, Any]]:
@@ -79,6 +214,22 @@ def validate_config(config: dict[str, Any], expected_round: str) -> list[dict[st
         for key in ("role", "logicalName", "modelFamily", "conditioningDimension", "source", "licenseStatus"):
             _require(key in model, f"models[{index}].{key} is required")
 
+    artifacts = config.get("artifacts", [])
+    _require(isinstance(artifacts, list), "artifacts must be a list")
+    for index, artifact in enumerate(artifacts):
+        _require(isinstance(artifact, dict), f"artifacts[{index}] must be an object")
+        _require(isinstance(artifact.get("role"), str) and artifact["role"], f"artifacts[{index}].role is required")
+        _require(
+            isinstance(artifact.get("logicalName"), str) and artifact["logicalName"],
+            f"artifacts[{index}].logicalName is required",
+        )
+    if expected_round == "round-3":
+        skeletons = [artifact for artifact in artifacts if artifact.get("role") == "pose_skeleton"]
+        _require(len(skeletons) == len(shots), "round-3 requires one pose_skeleton artifact per shot")
+        skeleton_names = [artifact.get("logicalName") for artifact in skeletons]
+        _require(all(isinstance(name, str) and name for name in skeleton_names), "pose_skeleton logicalName is required")
+        _require(len(set(skeleton_names)) == len(skeleton_names), "pose_skeleton logicalName values must be unique")
+
     matrices = config.get("matrices")
     _require(isinstance(matrices, list) and matrices, "matrices must be a non-empty list")
     runs: list[dict[str, Any]] = []
@@ -110,6 +261,9 @@ def validate_config(config: dict[str, Any], expected_round: str) -> list[dict[st
                 _require(isinstance(values_by_shot, dict), f"{batch_id}.{parameter_name} per-shot values must be an object")
                 _require(shot_id in values_by_shot, f"{batch_id}.{parameter_name} missing {shot_id}")
                 run_parameters[parameter_name] = values_by_shot[shot_id]
+            if expected_round == "round-3":
+                skeleton_name = run_parameters.get("poseSkeletonLogicalName")
+                _require(skeleton_name in skeleton_names, f"{batch_id}: unknown pose skeleton {skeleton_name!r}")
             substitutions = {key: _path_token(value) for key, value in run_parameters.items()}
             substitutions["batchId"] = batch_id
             try:
@@ -155,6 +309,8 @@ def _path_token(value: Any) -> str:
 
 
 def validate_model_compatibility(models: list[dict[str, Any]]) -> None:
+    """Validate declaration-to-declaration compatibility before evidence exists."""
+
     conditioning = [model for model in models if model["role"] in {"base", "identity_adapter", "pose_control"}]
     _require(any(model["role"] == "base" for model in conditioning), "one base model is required")
     base = next(model for model in conditioning if model["role"] == "base")
@@ -175,7 +331,7 @@ def verify_file_record(record: dict[str, Any], label: str) -> tuple[int, str]:
     expected_sha = record.get("sha256")
     _require(isinstance(file_path, str) and file_path, f"{label}: filePath is required for finalization")
     _require(isinstance(expected_size, int) and expected_size > 0, f"{label}: positive sizeBytes is required")
-    _require(isinstance(expected_sha, str) and len(expected_sha) == 64, f"{label}: SHA-256 is required")
+    _require(_is_sha256(expected_sha), f"{label}: lowercase SHA-256 is required")
     path = Path(file_path).expanduser()
     _require(path.is_file(), f"{label}: file does not exist: {path}")
     actual_size = path.stat().st_size
@@ -184,6 +340,90 @@ def verify_file_record(record: dict[str, Any], label: str) -> tuple[int, str]:
     actual_sha = sha256_file(path)
     _require(actual_sha == expected_sha.lower(), f"{label}: SHA-256 mismatch")
     return actual_size, actual_sha
+
+
+def verify_model_record(record: dict[str, Any], label: str) -> tuple[int, str, dict[str, Any] | None]:
+    size, digest = verify_file_record(record, label)
+    role = record.get("role")
+    if role not in CONDITIONING_TENSOR_SUFFIXES:
+        validate_safetensors_container(Path(record["filePath"]).expanduser(), str(role))
+        return size, digest, None
+    path = Path(record["filePath"]).expanduser()
+    architecture = inspect_safetensors_architecture(path, role, digest)
+    declared_dimension = record.get("conditioningDimension")
+    actual_dimension = architecture["conditioningDimension"]
+    _require(
+        actual_dimension == declared_dimension,
+        f"{label}: actual conditioning dimension {actual_dimension} does not match declaration {declared_dimension}",
+    )
+    expected_family = "sd15" if actual_dimension == 768 else "sdxl"
+    _require(
+        record.get("modelFamily") == expected_family,
+        f"{label}: actual model family {expected_family} does not match declaration {record.get('modelFamily')}",
+    )
+    return size, digest, architecture
+
+
+def validate_manifest_consistency(manifest: dict[str, Any], *, finalized: bool) -> None:
+    runs = manifest.get("runs")
+    _require(isinstance(runs, list) and runs, "manifest.runs must be a non-empty list")
+    expected = manifest.get("expectedRunCount")
+    _require(expected == len(runs), f"expectedRunCount {expected} does not match runs {len(runs)}")
+    expected_by_round = {"round-1": 10, "round-2": 25, "round-3": 15, "all-rounds": 50}
+    round_id = manifest.get("roundId")
+    _require(expected == expected_by_round.get(round_id), f"{round_id}: expectedRunCount must be {expected_by_round.get(round_id)}")
+
+    run_ids = [run.get("runId") for run in runs]
+    output_paths = [run.get("output", {}).get("logicalPath") for run in runs]
+    _require(len(set(run_ids)) == len(run_ids), "manifest runId values must be unique")
+    _require(len(set(output_paths)) == len(output_paths), "manifest output logicalPath values must be unique")
+    if not finalized:
+        _require(manifest.get("status") == PENDING_STATUS, "pending manifest has an invalid status")
+        return
+
+    _require(manifest.get("status") == FINAL_STATUS, "finalized manifest has an invalid status")
+    created_at = manifest.get("manifestCreatedAt")
+    _require(isinstance(created_at, str) and created_at, "finalized manifestCreatedAt is required")
+    try:
+        parsed_created_at = datetime.fromisoformat(created_at)
+    except ValueError as error:
+        raise EvidenceError("finalized manifestCreatedAt must be an ISO-8601 timestamp") from error
+    _require(parsed_created_at.tzinfo is not None, "finalized manifestCreatedAt must include a timezone")
+    for collection_name in ("hardenedSuccessorScripts", "models", "artifacts"):
+        collection = manifest.get(collection_name)
+        _require(isinstance(collection, list), f"manifest.{collection_name} must be a list")
+        for index, record in enumerate(collection):
+            label = f"{collection_name}[{index}]"
+            _require(isinstance(record.get("sizeBytes"), int) and record["sizeBytes"] > 0, f"{label}: positive sizeBytes is required")
+            _require(_is_sha256(record.get("sha256")), f"{label}: lowercase SHA-256 is required")
+            if collection_name in {"models", "artifacts"}:
+                _require(isinstance(record.get("filePath"), str) and record["filePath"], f"{label}: filePath is required")
+            if collection_name == "models" and record.get("role") in CONDITIONING_TENSOR_SUFFIXES:
+                architecture = record.get("architectureEvidence")
+                _require(isinstance(architecture, dict), f"{label}: architectureEvidence is required")
+                _require(architecture.get("modelSha256") == record["sha256"], f"{label}: architecture evidence is not tied to model SHA-256")
+                _require(_is_sha256(architecture.get("headerSha256")), f"{label}: architecture header SHA-256 is required")
+                _require(architecture.get("format") == "safetensors", f"{label}: architecture format must be safetensors")
+                _require(
+                    architecture.get("conditioningDimension") == record.get("conditioningDimension"),
+                    f"{label}: architecture dimension does not match model record",
+                )
+                evidence_keys = architecture.get("evidenceTensorKeys")
+                _require(
+                    isinstance(evidence_keys, list)
+                    and evidence_keys
+                    and len(set(evidence_keys)) == len(evidence_keys)
+                    and all(isinstance(key, str) and key for key in evidence_keys),
+                    f"{label}: architecture evidence tensor keys are required",
+                )
+    for run in runs:
+        run_id = run.get("runId", "unknown-run")
+        seed = run.get("parameters", {}).get("seed")
+        _require(isinstance(seed, int) and seed >= 0, f"{run_id}: exact non-negative seed is required")
+        _require(run.get("runState") == "CAPTURED", f"{run_id}: runState must be CAPTURED")
+        output = run.get("output", {})
+        _require(isinstance(output.get("sizeBytes"), int) and output["sizeBytes"] > 0, f"{run_id}: positive output sizeBytes is required")
+        _require(_is_sha256(output.get("sha256")), f"{run_id}: lowercase output SHA-256 is required")
 
 
 def build_manifest(
@@ -199,9 +439,11 @@ def build_manifest(
     if finalized:
         validate_model_compatibility(models)
         for index, model in enumerate(models):
-            size, digest = verify_file_record(model, f"models[{index}]/{model['role']}")
+            size, digest, architecture = verify_model_record(model, f"models[{index}]/{model['role']}")
             model["sizeBytes"] = size
             model["sha256"] = digest
+            if architecture is not None:
+                model["architectureEvidence"] = architecture
         for index, artifact in enumerate(artifacts):
             size, digest = verify_file_record(artifact, f"artifacts[{index}]/{artifact.get('role', 'artifact')}")
             artifact["sizeBytes"] = size
@@ -222,7 +464,7 @@ def build_manifest(
     else:
         validate_model_compatibility(models)
 
-    return {
+    manifest = {
         "$schema": "./experiment-manifest.schema.json",
         "manifestVersion": "1.0",
         "experimentId": config["experimentId"],
@@ -252,6 +494,8 @@ def build_manifest(
             "schemaChangeAuthorized": False,
         },
     }
+    validate_manifest_consistency(manifest, finalized=finalized)
+    return manifest
 
 
 def run_cli(expected_round: str, default_config: Path) -> int:

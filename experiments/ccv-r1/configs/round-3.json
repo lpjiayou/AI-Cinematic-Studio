@@ -105,8 +105,36 @@
       "sha256": null
     },
     {
-      "role": "pose_skeleton_set",
-      "logicalName": "round-3-coco18-skeletons",
+      "role": "pose_skeleton",
+      "logicalName": "01_medium_front_coco18.png",
+      "filePath": null,
+      "sizeBytes": null,
+      "sha256": null
+    },
+    {
+      "role": "pose_skeleton",
+      "logicalName": "02_closeup_side_coco18.png",
+      "filePath": null,
+      "sizeBytes": null,
+      "sha256": null
+    },
+    {
+      "role": "pose_skeleton",
+      "logicalName": "03_full_walking_coco18.png",
+      "filePath": null,
+      "sizeBytes": null,
+      "sha256": null
+    },
+    {
+      "role": "pose_skeleton",
+      "logicalName": "04_back_turning_coco18.png",
+      "filePath": null,
+      "sizeBytes": null,
+      "sha256": null
+    },
+    {
+      "role": "pose_skeleton",
+      "logicalName": "05_sitting_high_coco18.png",
       "filePath": null,
       "sizeBytes": null,
       "sha256": null
@@ -153,6 +181,15 @@
         "seedMode": "fixed-pending-collection",
         "referenceRole": "face_crop_reference",
         "poseSkeletonFormat": "COCO-18"
+      },
+      "perShotParameters": {
+        "poseSkeletonLogicalName": {
+          "01_medium_front": "01_medium_front_coco18.png",
+          "02_closeup_side": "02_closeup_side_coco18.png",
+          "03_full_walking": "03_full_walking_coco18.png",
+          "04_back_turning": "04_back_turning_coco18.png",
+          "05_sitting_high": "05_sitting_high_coco18.png"
+        }
       },
       "outputPattern": "outputs/r3-face-pose/cn{controlNetStrength}/{shotId}.png"
     }
