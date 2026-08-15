@@ -8,13 +8,13 @@
 >
 > Authorized Wave: `G3-G0 DESIGN FREEZE → REMOTE VERIFY → G3-G1 NO-GPU PREPARATION TOOLING → STATIC/HOST READINESS VALIDATION → STOP BEFORE GPU`
 >
-> Current Task: `ACS-CCV-R2-G3-G1-NO-GPU-PREPARATION`
+> Current Task: `G3-G1 CLOSED / AWAIT ACS-CCV-R2-G3-G2-GPU-EXECUTION AUTHORIZATION`
 >
-> Current Work Package: `FAIL-CLOSED PREPARATION TOOLING / SAME-IDENTITY CROP CUSTODY / 51 OPAQUE REQUESTS / NO GPU`
+> Current Work Package: `G3-G1 HOST READINESS VERIFIED / 51 REQUESTS LOCKED / NO GPU`
 >
 > M6 Authorization: `P0-P2 OWNER ACCEPTED / P3-G0 OWNER ACCEPTED AS ARCHITECTURE / P3-B1 OWNER ACCEPTED THROUGH B1-R1 / P3-G1 OWNER ACCEPTED THROUGH G1-R1 / LATER M6 NOT AUTHORIZED`
 
-> Next Checkpoint: `HOST M1 CROP BYTE BINDING → G3-G1 READINESS RECEIPT VALIDATION → STOP BEFORE GPU`
+> Next Checkpoint: `SEPARATE G3-G2 GPU AUTHORIZATION BOUND TO READINESS e39ac4a8c3ddbf1f26571b295bcb00da7ff6b499acd49e8ad47291726bbbc5e4`
 >
 > M7 Authorization: `NOT AUTHORIZED`
 >
@@ -72,11 +72,11 @@ Current stage:
 
 Title:
 
-`ACS-CCV-R2-G3-G1-NO-GPU-PREPARATION`
+`ACS-CCV-R2-G3-G1-NO-GPU-PREPARATION-CLOSEOUT`
 
 Status:
 
-`G0 REMOTE-VERIFIED / G1 TOOLING CANDIDATE / HOST READINESS RECEIPT PENDING / NO GPU`
+`HOST VALIDATION PASS / CLOSED / 51 REQUESTS VERIFIED / GPU NOT STARTED`
 
 Purpose:
 
@@ -94,6 +94,14 @@ Purpose:
 G2 remains `PASS_WITH_REMEDIATION_REQUIRED`; `validationAccepted=false` and
 `productionReady=false`. The missing original G2 blind-review lock bytes remain a
 recorded custody gap and must not be reconstructed as originals.
+
+G3-G1 host preparation passed with crop box `[108, 0, 348, 240]`, 51 of 51 opaque
+requests, readiness SHA-256
+`e39ac4a8c3ddbf1f26571b295bcb00da7ff6b499acd49e8ad47291726bbbc5e4` and preparation
+inventory SHA-256
+`20878b06608af6310cc1e60648d5b5e59a05cc6aa43475feb9ff3f9ae1e62845`.
+Both preparation and independent validation report `gpuExecutionStarted=false` and
+`comfyUiQueueTouched=false`.
 
 ---
 
@@ -442,7 +450,7 @@ capability.
 - RB13-F002: `REMEDIATED / CLOSED IN CURRENT TESTED CORE BASELINE`
 - EXECUTION MODE: `AUTO-SEQUENTIAL / BOUNDED G3 PRE-GPU / NO GPU / FAIL-CLOSED`
 - AUTHORIZED WAVE: `G3-G0 DESIGN FREEZE → REMOTE VERIFY → G3-G1 PREPARATION TOOLING → READINESS VALIDATION → STOP BEFORE GPU`
-- CURRENT TASK: `ACS-CCV-R2-G3-G1-NO-GPU-PREPARATION / HOST READINESS PENDING / NO GPU`
+- CURRENT TASK: `G3-G1 CLOSED / AWAIT SEPARATE G3-G2 GPU AUTHORIZATION`
 - G0 BASE: `c524486c05c21b270a7dd75e89fae4312430736a`
 - ADR-0006 STATUS: `ACCEPTED FOR BOUNDED G1`
 - V5 TEXT GENERATION CONTRACT: `ACCEPTED FOR BOUNDED G1`
@@ -497,7 +505,7 @@ capability.
 - CCV-R2-G1: `AUTOMATED PRE-GPU REVIEW PASS / CLOSED AT 1989fd59b16c821e61ec122f89cee42e99ddacdb / 45 OF 45 REQUESTS VERIFIED / RECEIPT 995035ee1169b7335d7c0707ea6adc31e36cd342c2a281f475fd66b7f4952c05 / NO GPU`
 - CCV-R2-G2: `FORMALLY CLOSED AT 6fa0388c86e3720e83fe2db183cc9a2615baf2f6 / PASS WITH REMEDIATION REQUIRED`;
 - CCV-R2-G3-G0: `COMPLETE / REMOTE-VERIFIED AT 41faaadf4c959944da3afd8c1d52b3e2429da68c / NO GPU`;
-- CCV-R2-G3-G1: `NO-GPU TOOLING CANDIDATE IN THIS COMMIT / 10 STATIC AND SYNTHETIC END-TO-END TESTS PASS / HOST CROP BINDING AND READINESS RECEIPT PENDING / NO GPU`;
+- CCV-R2-G3-G1: `HOST VALIDATION PASS / CLOSED / 51 OF 51 REQUESTS VERIFIED / READINESS e39ac4a8c3ddbf1f26571b295bcb00da7ff6b499acd49e8ad47291726bbbc5e4 / INVENTORY 20878b06608af6310cc1e60648d5b5e59a05cc6aa43475feb9ff3f9ae1e62845 / NO GPU`;
 - Character Visual Identity schema implementation: `NOT AUTHORIZED / NOT STARTED`
 - M6-P3 AFTER G1 / M6-P4+ STATUS: `NOT AUTHORIZED / NOT STARTED`
 - M7-M19: `NOT STARTED / NOT AUTHORIZED`
@@ -530,9 +538,11 @@ The current checkpoint is governed by
 [`ACS-CCV-R2-G3-REFERENCE-CONTAMINATION-REMEDIATION.md`](governance/ACS-CCV-R2-G3-REFERENCE-CONTAMINATION-REMEDIATION.md).
 
 ```text
-G3-G0 GOVERNANCE FREEZE ONLY
-G3-G1 MAY PREPARE AND VALIDATE 51 UNIQUE REQUESTS ONLY AFTER G0 REMOTE VERIFICATION
+G3-G1 HOST PREPARATION AND INDEPENDENT VALIDATION PASS / CLOSED
+51 OF 51 OPAQUE REQUESTS MATERIALIZED AND VERIFIED
+READINESS SHA-256: e39ac4a8c3ddbf1f26571b295bcb00da7ff6b499acd49e8ad47291726bbbc5e4
 NO COMFYUI QUEUE / MODEL LOAD / CUDA EXECUTION / IMAGE GENERATION
+G3-G2 GPU EXECUTION NOT AUTHORIZED / NOT STARTED
 NO G2 RESULT OR ARCHIVE MUTATION
 NO PRODUCT / SCHEMA / MIGRATION / PRODUCTION CHANGE
 VALIDATION ACCEPTED: false
@@ -546,24 +556,25 @@ authorization bound to the final G3-G1 preparation receipt.
 
 # 10. Current Authorized Task
 
-`ACS-CCV-R2-G3-G1-NO-GPU-PREPARATION`
+`G3-G1 CLOSED / AWAIT ACS-CCV-R2-G3-G2-GPU-EXECUTION AUTHORIZATION`
 
-G0 is complete and remote-verified at
-`41faaadf4c959944da3afd8c1d52b3e2429da68c`. The exact G1 path set is:
+G0 is remote-verified at `41faaadf4c959944da3afd8c1d52b3e2429da68c` and G1 tooling
+is remote-verified at `d33560a003cde9adc5fe5b4aab42dd2a1844d3da`. Host preparation
+and independent validation both pass:
 
-- `AGENTS.md`;
-- `CURRENT_MILESTONE.md`;
-- `experiments/ccv-r2/g3/README.md`;
-- `experiments/ccv-r2/g3/preflight/g3-readiness.schema.json`;
-- `experiments/ccv-r2/g3/preflight/prepare_g3_execution.py`;
-- `experiments/ccv-r2/g3/preflight/validate_g3_preparation.py`;
-- `experiments/ccv-r2/g3/tests/test_g3_preparation.py`.
+- preparation root: `/data/ccv-r2-2026-08-15-preparation-g3-g1`;
+- exact M1 crop box: `[108, 0, 348, 240]` from the frozen same-identity source;
+- request count: `51`;
+- readiness SHA-256:
+  `e39ac4a8c3ddbf1f26571b295bcb00da7ff6b499acd49e8ad47291726bbbc5e4`;
+- preparation inventory SHA-256:
+  `20878b06608af6310cc1e60648d5b5e59a05cc6aa43475feb9ff3f9ae1e62845`;
+- GPU execution started: `false`;
+- ComfyUI queue touched: `false`.
 
-The tooling compiles and passes 10 static and synthetic end-to-end tests. Host G1 is
-not complete until the exact same-identity collar-free crop and derivation receipt are
-byte-bound, all 51 opaque requests are materialized, the independent validator passes
-and the final readiness receipt SHA-256 is recorded. Nothing in this wave authorizes
-GPU execution or final feature acceptance.
+G3-G1 is technically closed. A separate Project Lead authorization bound to the exact
+readiness SHA-256 is required before any G3-G2 queue submission, model load, CUDA work
+or image generation.
 
 Formal port-8765 deployment, later M6 work, M7-M19, Schema/Migration, Frontend,
 production GPU/Worker/ComfyUI integration and Production Ready remain unauthorized.
