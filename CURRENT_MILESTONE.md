@@ -2,19 +2,19 @@
 
 > Document: `CURRENT_MILESTONE.md`
 >
-> Execution Mode: `MANUAL / BOUNDED GPU / MAXIMUM ONE IN FLIGHT / FAIL-CLOSED`
+> Execution Mode: `AUTO-SEQUENTIAL / BOUNDED G3 PRE-GPU / NO GPU / FAIL-CLOSED`
 >
-> Project Lead Authorization: `ACS-CCV-R2-G2-GPU-EXECUTION OWNER AUTHORIZED ON 2026-08-15; BOUND TO G1 RECEIPT 995035ee1169b7335d7c0707ea6adc31e36cd342c2a281f475fd66b7f4952c05`
+> Project Lead Authorization: `START NEXT STEP ON 2026-08-15; G3-G0 AND BOUNDED G3-G1 PRE-GPU WORK AUTHORIZED WITHOUT REPEATED REVIEW`
 >
-> Authorized Wave: `G2 GOVERNANCE CHECKPOINT → RECEIPT-BOUND SEQUENTIAL 45-RUN GENERATION → RESULT VALIDATION → STOP FOR INDEPENDENT VISUAL REVIEW`
+> Authorized Wave: `G3-G0 DESIGN FREEZE → REMOTE VERIFY → G3-G1 NO-GPU PREPARATION TOOLING → STATIC/HOST READINESS VALIDATION → STOP BEFORE GPU`
 >
-> Current Task: `ACS-CCV-R2-G2-GPU-EXECUTION`
+> Current Task: `ACS-CCV-R2-G3-REFERENCE-CONTAMINATION-REMEDIATION-G0`
 >
-> Current Work Package: `RECEIPT-BOUND 45-RUN GPU GENERATION / RESULT LEDGER / FAILURE STOP`
+> Current Work Package: `G3 SINGLE-VARIABLE DESIGN FREEZE / 51-REQUEST PLAN / NO GPU`
 >
 > M6 Authorization: `P0-P2 OWNER ACCEPTED / P3-G0 OWNER ACCEPTED AS ARCHITECTURE / P3-B1 OWNER ACCEPTED THROUGH B1-R1 / P3-G1 OWNER ACCEPTED THROUGH G1-R1 / LATER M6 NOT AUTHORIZED`
 
-> Next Checkpoint: `CCV-R2-G2 RESULT VALIDATION COMPLETE / INDEPENDENT BLIND VISUAL REVIEW REQUIRED`
+> Next Checkpoint: `G3-G0 REMOTE VERIFIED → G3-G1 PREPARATION RECEIPT → STOP BEFORE GPU`
 >
 > M7 Authorization: `NOT AUTHORIZED`
 >
@@ -68,47 +68,32 @@ decommission. It is no longer an active Core work package and does not authorize
 
 Current stage:
 
-`CCV-R2 Reproducible Experiment Governance`
+`CCV-R2 G3 Reference Contamination Remediation`
 
 Title:
 
-ACS-CCV-R2-G1-GPU-EXECUTION-PREPARATION-CLOSEOUT
+`ACS-CCV-R2-G3-REFERENCE-CONTAMINATION-REMEDIATION-G0`
 
 Status:
 
-`AUTOMATED PRE-GPU REVIEW PASS / CLOSED AT 1989fd59b16c821e61ec122f89cee42e99ddacdb / GPU EXECUTION NOT STARTED`
+`OWNER AUTHORIZED / GOVERNANCE DESIGN FREEZE / NO GPU`
 
 Purpose:
 
-1. preserve `ACS-GOV-POST-M6-P3-G1-CLOSEOUT` as Owner Accepted at
-   `20207e7f2d2123468698f453c70ce725a293976a`, tree
-   `e3638838dd0c79201a1962bb247ec7c773b62ffa`;
-2. correct the Character Consistency report's `40 → 50` accounting and overclaims;
-3. establish `experiments/ccv-r1/` as an evidence-only structure with no generated
-   image or model binary;
-4. provide hardened successor scripts, config-driven parameters, manifest schema and
-   no-GPU fail-closed validation;
-5. record all unavailable historical scripts/workflows/seeds/hashes/logs as pending,
-   without guessing;
-6. preserve production, tests, HTTP/API, Frontend, schema/migration and event semantics;
-7. preserve the Owner-accepted CCV-R1 tree now converged to `main` through PR #4;
-8. derive SD1.5/SDXL conditioning width from actual safetensors headers during
-   finalization rather than trusting declarations;
-9. make captured manifest completeness and exact run counts independently enforceable;
-10. register the five Round 3 skeleton inputs as five digest-bearing artifacts.
+1. preserve G2 formal closeout at
+   `6fa0388c86e3720e83fe2db183cc9a2615baf2f6`;
+2. retain `A2_FACE_OPENPOSE` only as a technical base;
+3. compare the exact G2 face reference with a collar-free crop derived from the same
+   fixed identity source while all other main variables remain fixed;
+4. isolate the external `reference_face_v2.png` as a non-acceptance mechanism probe;
+5. preregister a separate `04_back_turning` IP-Adapter weight sweep;
+6. freeze 45 main requests plus 6 non-duplicate sweep requests;
+7. authorize only bounded no-GPU G1 preparation after G0 remote verification;
+8. stop before ComfyUI queue submission, model load, CUDA work or image generation.
 
-G1 closed the three G0 evidence-tooling blockers and is remote-verified at
-`af34ac074cb8bfbf334e4f56aad0c0d479b741be`. G2-R1 subsequently recovered and
-persisted the bounded custody set. Independent review verified all 69 custody entries,
-both audit metadata files and all six archive volumes across a new instance, then
-closed G2-R1 at `4132458d7f92e02dbd2e4be93476294aab825db6`. The historical manifest
-remains partial and not validation accepted. CCV-R2-G0 passed automated independent
-review and closed at `0376ee3c5b7a4c78735a04578a9a12fa1df6c2a2`. CCV-R2-G1
-materialized and revalidated all 45 frozen requests, then closed at
-`1989fd59b16c821e61ec122f89cee42e99ddacdb`. Receipt
-`995035ee1169b7335d7c0707ea6adc31e36cd342c2a281f475fd66b7f4952c05`
-records `GPU_EXECUTION_STARTED=false` and `COMFYUI_QUEUE_TOUCHED=false`.
-CCV-R2-G2, schema, product, GPU generation and production integration remain unauthorized.
+G2 remains `PASS_WITH_REMEDIATION_REQUIRED`; `validationAccepted=false` and
+`productionReady=false`. The missing original G2 blind-review lock bytes remain a
+recorded custody gap and must not be reconstructed as originals.
 
 ---
 
@@ -455,9 +440,9 @@ capability.
 - RB13-F001: `R1 IMPLEMENTED / INDEPENDENTLY ACCEPTED / CLOSED`
 - ADR-0002 STATUS: `ACCEPTED FOR BOUNDED R2 IMPLEMENTATION`
 - RB13-F002: `REMEDIATED / CLOSED IN CURRENT TESTED CORE BASELINE`
-- EXECUTION MODE: `MANUAL / BOUNDED / FAIL-CLOSED`
-- AUTHORIZED WAVE: `CCV-R2-G0 CLOSEOUT → CCV-R2-G1 PREPARATION → READINESS VALIDATION → G1 CLOSEOUT → STOP BEFORE GPU`
-- CURRENT TASK: `STOP / AWAIT ACS-CCV-R2-G2-GPU-EXECUTION AUTHORIZATION`
+- EXECUTION MODE: `AUTO-SEQUENTIAL / BOUNDED G3 PRE-GPU / NO GPU / FAIL-CLOSED`
+- AUTHORIZED WAVE: `G3-G0 DESIGN FREEZE → REMOTE VERIFY → G3-G1 PREPARATION TOOLING → READINESS VALIDATION → STOP BEFORE GPU`
+- CURRENT TASK: `ACS-CCV-R2-G3-REFERENCE-CONTAMINATION-REMEDIATION-G0 / NO GPU`
 - G0 BASE: `c524486c05c21b270a7dd75e89fae4312430736a`
 - ADR-0006 STATUS: `ACCEPTED FOR BOUNDED G1`
 - V5 TEXT GENERATION CONTRACT: `ACCEPTED FOR BOUNDED G1`
@@ -510,7 +495,9 @@ capability.
 - ACS-CCV-R1-HISTORICAL-EVIDENCE-CAPTURE-G2-R1: `INDEPENDENT REVIEW PASS / CLOSED AT 4132458d7f92e02dbd2e4be93476294aab825db6 / MANIFEST REMAINS PARTIAL NOT VALIDATION ACCEPTED`
 - CCV-R2-G0: `AUTOMATED REVIEW PASS / CLOSED AT 0376ee3c5b7a4c78735a04578a9a12fa1df6c2a2 / 45-RUN DESIGN FROZEN`
 - CCV-R2-G1: `AUTOMATED PRE-GPU REVIEW PASS / CLOSED AT 1989fd59b16c821e61ec122f89cee42e99ddacdb / 45 OF 45 REQUESTS VERIFIED / RECEIPT 995035ee1169b7335d7c0707ea6adc31e36cd342c2a281f475fd66b7f4952c05 / NO GPU`
-- CCV-R2-G2: `OWNER AUTHORIZED ON 2026-08-15 / RECEIPT-BOUND 45-RUN GPU EXECUTION ACTIVE`; Character Visual Identity schema implementation: `NOT AUTHORIZED / NOT STARTED`
+- CCV-R2-G2: `FORMALLY CLOSED AT 6fa0388c86e3720e83fe2db183cc9a2615baf2f6 / PASS WITH REMEDIATION REQUIRED`;
+- CCV-R2-G3-G0: `OWNER AUTHORIZED / DESIGN FREEZE ACTIVE / NO GPU`;
+- Character Visual Identity schema implementation: `NOT AUTHORIZED / NOT STARTED`
 - M6-P3 AFTER G1 / M6-P4+ STATUS: `NOT AUTHORIZED / NOT STARTED`
 - M7-M19: `NOT STARTED / NOT AUTHORIZED`
 - FORMAL 8765 DEPLOYMENT: `UNTOUCHED / NOT DEPLOYED`
@@ -539,60 +526,38 @@ separately authorized and accepted through G1-R1.
 # 9. Stop Rule
 
 The current checkpoint is governed by
-[`ACS-CCV-R2-G1-GPU-EXECUTION-PREPARATION.md`](governance/ACS-CCV-R2-G1-GPU-EXECUTION-PREPARATION.md).
-Product and existing test-tree diff must remain zero. G1 may add only the fail-closed
-preflight, offline request materialization, readiness validation and inert future runner
-defined by that governance record.
+[`ACS-CCV-R2-G3-REFERENCE-CONTAMINATION-REMEDIATION.md`](governance/ACS-CCV-R2-G3-REFERENCE-CONTAMINATION-REMEDIATION.md).
 
 ```text
-CCV-R2-G1 CLOSED / GPU-READY PREPARATION RECEIPT VERIFIED
-45 OF 45 REQUESTS MATERIALIZED AND VALIDATED
+G3-G0 GOVERNANCE FREEZE ONLY
+G3-G1 MAY PREPARE AND VALIDATE 51 UNIQUE REQUESTS ONLY AFTER G0 REMOTE VERIFICATION
 NO COMFYUI QUEUE / MODEL LOAD / CUDA EXECUTION / IMAGE GENERATION
-CCV-R2-G2 GPU EXECUTION NOT AUTHORIZED / NOT STARTED
+NO G2 RESULT OR ARCHIVE MUTATION
 NO PRODUCT / SCHEMA / MIGRATION / PRODUCTION CHANGE
+VALIDATION ACCEPTED: false
 PRODUCTION READY: NO
 ```
 
-Stop before any GPU execution, product/test change, M6 schema change, DDL/Migration,
-route/handler/external DTO change, production Script write, later M6, M7-M19, formal
-database, Auth/RBAC, Frontend, Worker or ComfyUI execution.
+Stop before GPU execution. The GPU gate requires a separate Project Lead
+authorization bound to the final G3-G1 preparation receipt.
 
 ---
 
 # 10. Current Authorized Task
 
-`CCV-R2-G1 CLOSED / AWAIT ACS-CCV-R2-G2-GPU-EXECUTION AUTHORIZATION`
+`ACS-CCV-R2-G3-REFERENCE-CONTAMINATION-REMEDIATION-G0`
 
-Status:
+The exact G0 path set is:
 
-`GPU-READY PREPARATION COMPLETE / NO GPU EXECUTION / FAIL-CLOSED STOP`
+- `AGENTS.md`;
+- `CURRENT_MILESTONE.md`;
+- `governance/ACS-CCV-R2-G3-REFERENCE-CONTAMINATION-REMEDIATION.md`;
+- `experiments/ccv-r2/g3/experiment-design.md`;
+- `experiments/ccv-r2/g3/protocol.template.json`.
 
-Accepted technical evidence:
-
-```text
-ORIGINAL M6-P3-G1: 3696d6af12222d30eb99b65d67e6db18897eb42f
-STATUS: REVISION REQUIRED / NOT OWNER ACCEPTED / SUPERSEDED
-
-M6-P3-G1-R1: e172cc7c9bfca04066153d9edad70d9074bb37e5
-TREE: be7447c3d60510262e428b86cd1a6a83972f64c0
-STATUS: OWNER ACCEPTED / COMPLETE / REMOTE-VERIFIED / FULL CORE 464/464
-
-CCV-R1 OWNER ACCEPTED: 0c2552bf49923d45c2c5542cdb39f512a7e7d15d
-TREE: 8ee5c3ba7ef214bfa3e56ca97cee0b73a3666bb4
-
-CURRENT CORE MAIN: 9c13e8f8d7ccef079dd382fe11b1d173fdef13d7
-TREE: 8ee5c3ba7ef214bfa3e56ca97cee0b73a3666bb4
-STATUS: PR #4 REBASE AND MERGE / FULL CORE 464/464 / POST-MERGE CI PASS
-```
-
-The accepted parent checkpoint is `ACS-GOV-POST-M6-P3-G1-CLOSEOUT` at `20207e7f`.
-The historical report remains `EXPERIMENT REPORTED / INDEPENDENT REPRODUCTION NOT
-POSSIBLE`; G2-R1 PASS did not convert it into validation acceptance. CCV-R2-G0 closed
-at `0376ee3c5b7a4c78735a04578a9a12fa1df6c2a2`. CCV-R2-G1 completed exact-byte
-preflight, materialized and revalidated 45/45 requests, and closed at
-`1989fd59b16c821e61ec122f89cee42e99ddacdb`. Identity/Asset/M6/M8/M10 schema
-implementation, ComfyUI queue submission, model execution, CUDA work and production
-work remain unauthorized.
+After G0 commit, non-force publication, CI and remote verification pass, the listed
+bounded G3-G1 no-GPU preparation paths may be implemented automatically. Nothing in
+this wave authorizes GPU execution or final feature acceptance.
 
 Formal port-8765 deployment, later M6 work, M7-M19, Schema/Migration, Frontend,
 production GPU/Worker/ComfyUI integration and Production Ready remain unauthorized.

@@ -1,0 +1,107 @@
+{
+  "schemaVersion": "ACS-CCV-R2-G3-PROTOCOL-1",
+  "experimentId": "acs-ccv-r2",
+  "protocolVersion": "g3-rcr-v1",
+  "state": "G0_FROZEN_NO_GPU",
+  "parentCloseoutCommit": "6fa0388c86e3720e83fe2db183cc9a2615baf2f6",
+  "parentControls": {
+    "resultInventorySha256": "704451a5133c00b29e73eeb756e738646a812ab71ce7f77d0a17ccc20f7705f9",
+    "authorizationSha256": "3a63a2234c2c18fde58d46c1aa3f02bb991c9730d915e61719d5fded1dbb1958",
+    "formalCloseoutManifestSha256": "2736472ad7279179f793924349372d4066ca2e6746bd18e412c976bf0e245272"
+  },
+  "rightsLabels": [
+    "SYNTHETIC_TEST_ONLY",
+    "NOT_FOR_PRODUCTION",
+    "PARTIAL_MODEL_BYTE_PROVENANCE"
+  ],
+  "fixedParameters": {
+    "checkpoint": "sd_xl_base_1.0.safetensors",
+    "checkpointSha256": "31e35c80fc4829d14f90153f4c74cd59c90b779f6afe05a74cd6120b893f7e5b",
+    "ipAdapter": "ip-adapter-plus-face_sdxl_vit-h.safetensors",
+    "ipAdapterSha256": "677ad8860204f7d0bfba12d29e6c31ded9beefdf3e4bbd102518357d31a292c1",
+    "clipVision": "CLIP-ViT-H-14-laion2B-s32B-b79K.safetensors",
+    "clipVisionSha256": "6ca9667da1ca9e0b0f75e46bb030f7e011f44f86cbfb8d5a36590fcd7507b030",
+    "controlNet": "controlnet-openpose-sdxl.safetensors",
+    "controlNetSha256": "b8524e557a7df60d081f5d4a0eb109967d107df217943bf88c2d99b9ebcc06c5",
+    "ipAdapterWeight": 0.6,
+    "ipAdapterWeightType": "linear",
+    "controlNetStrength": 0.8,
+    "controlNetStartPercent": 0.0,
+    "controlNetEndPercent": 1.0,
+    "width": 1024,
+    "height": 1024,
+    "steps": 25,
+    "cfg": 7.0,
+    "sampler": "dpmpp_2m",
+    "scheduler": "karras",
+    "batchSize": 1,
+    "maximumInFlight": 1,
+    "automaticRetry": false
+  },
+  "references": [
+    {
+      "armId": "G3_M0_G2_REFERENCE_CONTROL",
+      "role": "PRIMARY_CONTROL",
+      "runtimePath": "/data/coding/apps/ComfyUI/input/reference_face.png",
+      "sha256": "12147633703cbef0fcd1f521265f535c6fc4b97666e7d6dc0e322f38d7162905",
+      "primaryAcceptanceEligible": true
+    },
+    {
+      "armId": "G3_M1_SAME_IDENTITY_COLLAR_FREE",
+      "role": "PRIMARY_REMEDIATION",
+      "runtimePath": "/data/coding/apps/ComfyUI/input/ccv-r2-g3-reference-face-collar-free.png",
+      "sha256": null,
+      "sourcePath": "/data/coding/apps/ComfyUI/input/reference_character.png",
+      "sourceSha256": "68b3e5232718c7e4ca0582db8e9430dd7fc2862d84e11c094655ed1a19110177",
+      "derivationReceiptState": "PENDING_G3_G1_BYTE_BINDING",
+      "primaryAcceptanceEligible": true
+    },
+    {
+      "armId": "G3_P0_EXTERNAL_REFERENCE_PROBE",
+      "role": "SECONDARY_MECHANISM_PROBE",
+      "runtimePath": "/data/ccv-r5-clean-reference/reference_face_v2.png",
+      "sha256": "407656b3c56560103171b57d286b1392b306d548e236136f7648446eabb92aba",
+      "identityLineageState": "UNPROVEN_TO_ORIGINAL_CCV_TARGET",
+      "primaryAcceptanceEligible": false
+    }
+  ],
+  "shots": [
+    "01_medium_front",
+    "02_closeup_side",
+    "03_full_walking",
+    "04_back_turning",
+    "05_sitting_high"
+  ],
+  "seeds": [123456, 223456, 323456],
+  "mainMatrix": {
+    "arms": 3,
+    "shots": 5,
+    "seeds": 3,
+    "requestCount": 45,
+    "primaryComparisonArms": [
+      "G3_M0_G2_REFERENCE_CONTROL",
+      "G3_M1_SAME_IDENTITY_COLLAR_FREE"
+    ],
+    "probeArmExcludedFromAcceptance": "G3_P0_EXTERNAL_REFERENCE_PROBE"
+  },
+  "backTurningSweep": {
+    "armId": "G3_M1_SAME_IDENTITY_COLLAR_FREE",
+    "shotId": "04_back_turning",
+    "ipAdapterWeights": [0.3, 0.45, 0.6],
+    "controlNetStrength": 0.8,
+    "reuseMainRowsAtWeight": 0.6,
+    "additionalRequestCount": 6
+  },
+  "expectedUniqueRequestCount": 51,
+  "claims": {
+    "gpuExecutionAuthorized": false,
+    "gpuExecutionStarted": false,
+    "comfyUiQueueTouched": false,
+    "modelLoaded": false,
+    "imageGenerated": false,
+    "validationAccepted": false,
+    "productionReady": false,
+    "productCodeChanged": false,
+    "schemaChanged": false
+  }
+}
