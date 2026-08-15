@@ -8,13 +8,13 @@
 >
 > Authorized Wave: `G3-G0 DESIGN FREEZE → REMOTE VERIFY → G3-G1 NO-GPU PREPARATION TOOLING → STATIC/HOST READINESS VALIDATION → STOP BEFORE GPU`
 >
-> Current Task: `ACS-CCV-R2-G3-REFERENCE-CONTAMINATION-REMEDIATION-G0`
+> Current Task: `ACS-CCV-R2-G3-G1-NO-GPU-PREPARATION`
 >
-> Current Work Package: `G3 SINGLE-VARIABLE DESIGN FREEZE / 51-REQUEST PLAN / NO GPU`
+> Current Work Package: `FAIL-CLOSED PREPARATION TOOLING / SAME-IDENTITY CROP CUSTODY / 51 OPAQUE REQUESTS / NO GPU`
 >
 > M6 Authorization: `P0-P2 OWNER ACCEPTED / P3-G0 OWNER ACCEPTED AS ARCHITECTURE / P3-B1 OWNER ACCEPTED THROUGH B1-R1 / P3-G1 OWNER ACCEPTED THROUGH G1-R1 / LATER M6 NOT AUTHORIZED`
 
-> Next Checkpoint: `G3-G0 REMOTE VERIFIED → G3-G1 PREPARATION RECEIPT → STOP BEFORE GPU`
+> Next Checkpoint: `HOST M1 CROP BYTE BINDING → G3-G1 READINESS RECEIPT VALIDATION → STOP BEFORE GPU`
 >
 > M7 Authorization: `NOT AUTHORIZED`
 >
@@ -72,11 +72,11 @@ Current stage:
 
 Title:
 
-`ACS-CCV-R2-G3-REFERENCE-CONTAMINATION-REMEDIATION-G0`
+`ACS-CCV-R2-G3-G1-NO-GPU-PREPARATION`
 
 Status:
 
-`OWNER AUTHORIZED / GOVERNANCE DESIGN FREEZE / NO GPU`
+`G0 REMOTE-VERIFIED / G1 TOOLING CANDIDATE / HOST READINESS RECEIPT PENDING / NO GPU`
 
 Purpose:
 
@@ -442,7 +442,7 @@ capability.
 - RB13-F002: `REMEDIATED / CLOSED IN CURRENT TESTED CORE BASELINE`
 - EXECUTION MODE: `AUTO-SEQUENTIAL / BOUNDED G3 PRE-GPU / NO GPU / FAIL-CLOSED`
 - AUTHORIZED WAVE: `G3-G0 DESIGN FREEZE → REMOTE VERIFY → G3-G1 PREPARATION TOOLING → READINESS VALIDATION → STOP BEFORE GPU`
-- CURRENT TASK: `ACS-CCV-R2-G3-REFERENCE-CONTAMINATION-REMEDIATION-G0 / NO GPU`
+- CURRENT TASK: `ACS-CCV-R2-G3-G1-NO-GPU-PREPARATION / HOST READINESS PENDING / NO GPU`
 - G0 BASE: `c524486c05c21b270a7dd75e89fae4312430736a`
 - ADR-0006 STATUS: `ACCEPTED FOR BOUNDED G1`
 - V5 TEXT GENERATION CONTRACT: `ACCEPTED FOR BOUNDED G1`
@@ -496,7 +496,8 @@ capability.
 - CCV-R2-G0: `AUTOMATED REVIEW PASS / CLOSED AT 0376ee3c5b7a4c78735a04578a9a12fa1df6c2a2 / 45-RUN DESIGN FROZEN`
 - CCV-R2-G1: `AUTOMATED PRE-GPU REVIEW PASS / CLOSED AT 1989fd59b16c821e61ec122f89cee42e99ddacdb / 45 OF 45 REQUESTS VERIFIED / RECEIPT 995035ee1169b7335d7c0707ea6adc31e36cd342c2a281f475fd66b7f4952c05 / NO GPU`
 - CCV-R2-G2: `FORMALLY CLOSED AT 6fa0388c86e3720e83fe2db183cc9a2615baf2f6 / PASS WITH REMEDIATION REQUIRED`;
-- CCV-R2-G3-G0: `OWNER AUTHORIZED / DESIGN FREEZE ACTIVE / NO GPU`;
+- CCV-R2-G3-G0: `COMPLETE / REMOTE-VERIFIED AT 41faaadf4c959944da3afd8c1d52b3e2429da68c / NO GPU`;
+- CCV-R2-G3-G1: `NO-GPU TOOLING CANDIDATE IN THIS COMMIT / 10 STATIC AND SYNTHETIC END-TO-END TESTS PASS / HOST CROP BINDING AND READINESS RECEIPT PENDING / NO GPU`;
 - Character Visual Identity schema implementation: `NOT AUTHORIZED / NOT STARTED`
 - M6-P3 AFTER G1 / M6-P4+ STATUS: `NOT AUTHORIZED / NOT STARTED`
 - M7-M19: `NOT STARTED / NOT AUTHORIZED`
@@ -545,19 +546,24 @@ authorization bound to the final G3-G1 preparation receipt.
 
 # 10. Current Authorized Task
 
-`ACS-CCV-R2-G3-REFERENCE-CONTAMINATION-REMEDIATION-G0`
+`ACS-CCV-R2-G3-G1-NO-GPU-PREPARATION`
 
-The exact G0 path set is:
+G0 is complete and remote-verified at
+`41faaadf4c959944da3afd8c1d52b3e2429da68c`. The exact G1 path set is:
 
 - `AGENTS.md`;
 - `CURRENT_MILESTONE.md`;
-- `governance/ACS-CCV-R2-G3-REFERENCE-CONTAMINATION-REMEDIATION.md`;
-- `experiments/ccv-r2/g3/experiment-design.md`;
-- `experiments/ccv-r2/g3/protocol.template.json`.
+- `experiments/ccv-r2/g3/README.md`;
+- `experiments/ccv-r2/g3/preflight/g3-readiness.schema.json`;
+- `experiments/ccv-r2/g3/preflight/prepare_g3_execution.py`;
+- `experiments/ccv-r2/g3/preflight/validate_g3_preparation.py`;
+- `experiments/ccv-r2/g3/tests/test_g3_preparation.py`.
 
-After G0 commit, non-force publication, CI and remote verification pass, the listed
-bounded G3-G1 no-GPU preparation paths may be implemented automatically. Nothing in
-this wave authorizes GPU execution or final feature acceptance.
+The tooling compiles and passes 10 static and synthetic end-to-end tests. Host G1 is
+not complete until the exact same-identity collar-free crop and derivation receipt are
+byte-bound, all 51 opaque requests are materialized, the independent validator passes
+and the final readiness receipt SHA-256 is recorded. Nothing in this wave authorizes
+GPU execution or final feature acceptance.
 
 Formal port-8765 deployment, later M6 work, M7-M19, Schema/Migration, Frontend,
 production GPU/Worker/ComfyUI integration and Production Ready remain unauthorized.

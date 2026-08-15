@@ -1,0 +1,60 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ai-cinematic-studio.local/schemas/ccv-r2-g3-readiness-1.json",
+  "title": "CCV-R2 G3 no-GPU readiness receipt",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "experimentId",
+    "protocolVersion",
+    "state",
+    "governanceCheckpoint",
+    "g0Commit",
+    "createdAt",
+    "host",
+    "parentControls",
+    "verifiedG2Assets",
+    "references",
+    "cropDerivation",
+    "baseWorkflow",
+    "requests",
+    "counts",
+    "technicalMapLock",
+    "reviewTemplateLock",
+    "claims"
+  ],
+  "properties": {
+    "schemaVersion": {"const": "ACS-CCV-R2-G3-READINESS-1"},
+    "experimentId": {"const": "acs-ccv-r2"},
+    "protocolVersion": {"const": "g3-rcr-v1"},
+    "state": {"const": "G3_GPU_READY_PREPARATION_COMPLETE_NO_GPU_EXECUTION"},
+    "governanceCheckpoint": {"const": "ACS-CCV-R2-G3-G1-NO-GPU-PREPARATION"},
+    "g0Commit": {"const": "41faaadf4c959944da3afd8c1d52b3e2429da68c"},
+    "createdAt": {"type": "string", "format": "date-time"},
+    "host": {"type": "object"},
+    "parentControls": {"type": "object"},
+    "verifiedG2Assets": {"type": "array", "minItems": 11},
+    "references": {"type": "array", "minItems": 3, "maxItems": 3},
+    "cropDerivation": {"type": "object"},
+    "baseWorkflow": {"type": "object"},
+    "requests": {"type": "array", "minItems": 51, "maxItems": 51},
+    "counts": {
+      "const": {"main": 45, "additionalSweep": 6, "uniqueRequests": 51}
+    },
+    "technicalMapLock": {"type": "object"},
+    "reviewTemplateLock": {"type": "object"},
+    "claims": {
+      "const": {
+        "gpuExecutionAuthorized": false,
+        "gpuExecutionStarted": false,
+        "comfyUiQueueTouched": false,
+        "modelLoaded": false,
+        "imageGenerated": false,
+        "validationAccepted": false,
+        "productionReady": false
+      }
+    }
+  }
+}
+
