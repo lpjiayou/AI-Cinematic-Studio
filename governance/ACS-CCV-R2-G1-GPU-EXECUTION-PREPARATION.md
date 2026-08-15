@@ -6,7 +6,7 @@
 >
 > Parent checkpoint: `0376ee3c5b7a4c78735a04578a9a12fa1df6c2a2`
 >
-> Decision: `OWNER AUTHORIZED / AUTOMATIC PRE-GPU COMPLETION`
+> Decision: `OWNER-AUTHORIZED AUTOMATED PRE-GPU REVIEW PASS / G1 CLOSED`
 >
 > Execution boundary: `READ-ONLY HOST PREFLIGHT + OFFLINE PROMPT MATERIALIZATION / NO GPU`
 >
@@ -114,3 +114,55 @@ The stage can close only when all of the following are true:
 
 The next state is `GPU_READY_PREPARATION_COMPLETE / AWAIT EXPLICIT GPU EXECUTION
 CHECKPOINT`. G1 itself grants no GPU execution authority.
+
+
+## 8. Automated host-preparation closeout
+
+The Project Lead authorized automatic completion of all pre-GPU work without a
+separate review window. The attached FunHPC host produced and independently revalidated
+the following preparation result on `2026-08-15`:
+
+| Field | Verified value |
+| --- | --- |
+| Host | `kcfwwnuqlfbiblsx-make-79bbf844c7-nxflh` |
+| Tooling source | `f7a7a177965f57bb79fd9ce608344054fab18816` |
+| Preparation root | `/data/ccv-r2-2026-08-15-preparation-g1` |
+| Immutable controls | `2 / 2 BYTE-VERIFIED` |
+| Model artifacts | `4 / 4 SIZE + SHA-256 VERIFIED` |
+| Runtime inputs | `7 / 7 SIZE + SHA-256 VERIFIED` |
+| Historical prompt sources | `3 / 3 SIZE + SHA-256 + ARM SEMANTICS VERIFIED` |
+| Request materialization | `45 / 45` |
+| Request validation | `45 / 45` |
+| Runner mode | `VALIDATE_ONLY_PASS` |
+| Receipt SHA-256 | `995035ee1169b7335d7c0707ea6adc31e36cd342c2a281f475fd66b7f4952c05` |
+| Inventory SHA-256 | `95e1257003b28aced87719d31b4caba2eabc5a18995d2d9b98dbfb20157db40a` |
+| GPU execution started | `false` |
+| ComfyUI queue touched | `false` |
+
+The verified model digests are the frozen G0 values for SDXL base, IPAdapter face,
+CLIP Vision and OpenPose ControlNet. The verified inputs are the two references and
+five pose PNGs. The two immutable control digests remain the accepted G2-R1 manifest
+and custody inventory digests.
+
+The materializer emitted three arm workflows and the complete
+`A0/A1/A2 × 5 shots × 3 seeds` request matrix. The standalone validator then
+re-read every request and its inventory binding. The inert runner performed the same
+validation and exited with `CCV_R2_RUNNER=VALIDATE_ONLY_PASS`.
+
+No ComfyUI process was started by this stage, no prompt was queued, no model was loaded,
+no CUDA execution occurred and no image was generated. The historical evidence and
+archive roots remained read-only.
+
+```text
+CCV_R2_G1_PREPARATION=PASS
+CCV_R2_G1_PREPARATION_VALIDATION=PASS
+REQUEST_COUNT=45
+PRE_GPU_SETUP=COMPLETE
+GPU_EXECUTION_STARTED=false
+COMFYUI_QUEUE_TOUCHED=false
+```
+
+This closes G1. The next possible checkpoint is
+`ACS-CCV-R2-G2-GPU-EXECUTION`, which remains `NOT AUTHORIZED / NOT STARTED`.
+A separate Project Lead authorization is required before starting ComfyUI, loading a
+model, touching the prompt queue or executing CUDA work.
