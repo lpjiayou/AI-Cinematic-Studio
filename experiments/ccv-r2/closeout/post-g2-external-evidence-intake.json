@@ -1,0 +1,53 @@
+{
+  "schemaVersion": "ACS-CCV-R2-POST-G2-EXTERNAL-EVIDENCE-GITHUB-INTAKE-1",
+  "date": "2026-08-15",
+  "state": "REGISTERED_AS_EXTERNAL_DESIGN_INPUT_NOT_VALIDATION_EVIDENCE",
+  "classification": [
+    "EXTERNAL_PRE_G3_EVIDENCE",
+    "TWO_VARIABLES_CONFOUNDED",
+    "NOT_SINGLE_VARIABLE_ATTRIBUTION",
+    "NOT_VALIDATION_ACCEPTED"
+  ],
+  "handoverDocumentSha256": "9361e35e0d107ffb1dd6adb3926d4e127ed5538e80f0aaec2f434b1dd3cab2b0",
+  "archive": {
+    "sha256": "e106864ed035d1b32d6b31c71113184df7bce203da010194950dec00975d9f5f",
+    "bytes": 11080721,
+    "intakeSha256": "4ebe17ba6cd0aca4ebe48a465ad57201e5332b1629b30a9f755c1607c1749b38",
+    "custodyInventorySha256": "c73fb2a8c0b759072ff6838d9a30f68388ef627b0be88ab433899ddcf226ab10"
+  },
+  "artifactRoot": "/data/ccv-r5-clean-reference",
+  "fileCount": 13,
+  "zeroByteFileCount": 0,
+  "files": [
+    {"path": "SHA256SUMS.txt", "bytes": 1122, "sha256": "94a69cbf53de2a43b467caeb5cdea0285d78f0fdf84641f0326d8ceba130f417"},
+    {"path": "checkpoint_comparison_test.py", "bytes": 12539, "sha256": "6d5f51db4e1cc52a0a9405105ab2c05955cb81088dcf5e06cc38d76c57465ce2"},
+    {"path": "clean_01_medium_front_00001_.png", "bytes": 1044837, "sha256": "2ded57b1dd6fb0a7ada44754538981dac6e8775bb9bb36e240c9c7ddc3cb4aad"},
+    {"path": "clean_02_closeup_side_00001_.png", "bytes": 1083617, "sha256": "98ac39aaca8ef016e83f4f04eca5dd1363813671c82a70430415cc043e377ac3"},
+    {"path": "clean_03_full_walking_00001_.png", "bytes": 1245229, "sha256": "08360fe950d292deaa4d32abe7e753facebd9025a4b70b401036b33e466de1dd"},
+    {"path": "clean_04_back_turning_00001_.png", "bytes": 1063679, "sha256": "a0643bab9798b539e74c7e4bcf7db9ae4ed1252209b3ed9f0c334d4e1bff0d3f"},
+    {"path": "clean_05_sitting_high_00001_.png", "bytes": 1176653, "sha256": "a6a2fe555fffb781744c48c6d52453b6c245ec60a803d6d1a695e6be88166e32"},
+    {"path": "clean_reference_rerun.py", "bytes": 16585, "sha256": "0884d7696f6f8a5d76834417a1bfe657a9befe166a09ec7d37b698b543c9126f"},
+    {"path": "refcand_01_00001_.png", "bytes": 1395849, "sha256": "23e73c3e0918903106448cd9ccb692db703baeb69fcc5251455cc805a7574742"},
+    {"path": "refcand_02_00001_.png", "bytes": 1243800, "sha256": "c973b1dbebaadff2557f924191c914e24f523a232dd58cd8ec5e1d53a9da722e"},
+    {"path": "refcand_03_00001_.png", "bytes": 1265063, "sha256": "7bc29305d8cafa4c6c085d0319abac3e9d9939ad66351e30038e666294210e3a"},
+    {"path": "refcand_04_00001_.png", "bytes": 1266442, "sha256": "e66bd95fab85292899fd6afdb075084acea472bbf9633f04301efc2ca2813f8f"},
+    {"path": "reference_face_v2.png", "bytes": 295248, "sha256": "407656b3c56560103171b57d286b1392b306d548e236136f7648446eabb92aba"}
+  ],
+  "auditDecision": "CONDITIONALLY_ADMISSIBLE_FOR_G3_DESIGN_ONLY",
+  "blockingFindings": [
+    "reference_face_v2 identity lineage to the original CCV target is unproven",
+    "R5 changed checkpoint and reference image simultaneously",
+    "04_back_turning regressed to a front-facing composition",
+    "R4 and R5 lack original CCV custody and fail-closed validation"
+  ],
+  "allowedUse": [
+    "mechanism probe",
+    "G3 design input",
+    "candidate asset pending identity-lineage classification"
+  ],
+  "prohibitedUse": [
+    "validation acceptance",
+    "production readiness claim",
+    "closing original-character identity lock without further evidence"
+  ]
+}

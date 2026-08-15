@@ -1,0 +1,61 @@
+{
+  "schemaVersion": "ACS-CCV-R2-G2-GITHUB-CLOSEOUT-1",
+  "date": "2026-08-15",
+  "state": "GITHUB_GOVERNANCE_COMPLETE_WHEN_COMMITTED_TO_PR_7_HEAD",
+  "source": {
+    "repository": "lpjiayou/AI-Cinematic-Studio",
+    "branch": "agent/acs-ccv-r1-historical-evidence-capture-g2",
+    "parentCommit": "4d2e3732d2f96eac418b216c0d470971e0d1af66",
+    "pullRequest": 7,
+    "pullRequestRemainsDraft": true,
+    "gpuSnapshotGitMetadataPresent": false,
+    "gpuSnapshotLabel": "4d2e3732"
+  },
+  "execution": {
+    "state": "PASS",
+    "outputCount": 45,
+    "armCounts": {
+      "a0_text_baseline": 15,
+      "a1_face_identity": 15,
+      "a2_face_openpose": 15
+    },
+    "officialPostExperimentRevalidation": "PASS",
+    "resultInventorySha256": "704451a5133c00b29e73eeb756e738646a812ab71ce7f77d0a17ccc20f7705f9",
+    "authorizationSha256": "3a63a2234c2c18fde58d46c1aa3f02bb991c9730d915e61719d5fded1dbb1958",
+    "blindArchiveSha256": "a6ae805df744e2e87276de6d1585739b49eee8ad7f36d40ef89d6cf3b7a0c7d3"
+  },
+  "review": {
+    "state": "COMPLETE_WITH_ORIGINAL_LOCK_CUSTODY_GAP",
+    "originalTechnicalLockPresent": false,
+    "expectedTechnicalLockSha256": "f75956bb81a8ef8dcf482f0defadf26975852941f06115da4571759cf09bf6db",
+    "originalCohortScoreLockPresent": false,
+    "expectedCohortScoreLockSha256": "48d0159109431d242836c5bb8ba88f8e7121f374a4a396800708aa306b44c08c",
+    "reconstructedReviewRecordSha256": "3c10e5e1deb3d940f42a68944602cdc0df4df69fa2b11b174d387f72b7f99e20",
+    "selectedTechnicalBase": "A2_FACE_OPENPOSE",
+    "hypothesis": "PARTIAL_PASS"
+  },
+  "closeout": {
+    "decision": "PASS_WITH_REMEDIATION_REQUIRED",
+    "validationAccepted": false,
+    "productionReady": false,
+    "nextGate": "ACS-CCV-R2-G3-REFERENCE-CONTAMINATION-REMEDIATION"
+  },
+  "localCustody": {
+    "formalCloseoutManifestSha256": "2736472ad7279179f793924349372d4066ca2e6746bd18e412c976bf0e245272",
+    "custodyInventorySha256": "36d980f2be829568bc9a392fa231b563d6f761e9d7b12274507f67663df4545d",
+    "archiveSha256": "03c3ea8bb5a3e9a523a2e3c7f4d3f3048697e8185e4147286ac20962598b5f90",
+    "archiveBytes": 106647445,
+    "archivePath": "/data/ccv-r2-2026-08-15-formal-closeout-g2-archive/ccv-r2-g2-formal-closeout.tar.gz",
+    "crossInstanceVerificationPerformed": false,
+    "offHostBackupVerified": false
+  },
+  "postG2ExternalEvidence": {
+    "includedInSealedG2Protocol": false,
+    "archiveSha256": "e106864ed035d1b32d6b31c71113184df7bce203da010194950dec00975d9f5f",
+    "archiveBytes": 11080721,
+    "intakeSha256": "4ebe17ba6cd0aca4ebe48a465ad57201e5332b1629b30a9f755c1607c1749b38",
+    "custodyInventorySha256": "c73fb2a8c0b759072ff6838d9a30f68388ef627b0be88ab433899ddcf226ab10",
+    "validationAccepted": false
+  }
+}
+
