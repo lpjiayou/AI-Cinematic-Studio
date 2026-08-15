@@ -63,3 +63,13 @@ authorization bound to the final readiness receipt SHA-256.
 ```bash
 python3 -m unittest -v experiments/ccv-r2/g3/tests/test_g3_preparation.py
 ```
+
+## G3-G2 authorization
+
+G3-G1 closed with 51 requests and readiness SHA-256
+`e39ac4a8c3ddbf1f26571b295bcb00da7ff6b499acd49e8ad47291726bbbc5e4`.
+The Project Lead separately authorized G3-G2 on 2026-08-15. The bounded executor,
+authorization lock and independent validator are in [`gpu/`](gpu/README.md).
+
+The authorization does not imply visual acceptance or production readiness. Generation
+must stop on the first terminal failure and must not retry automatically.

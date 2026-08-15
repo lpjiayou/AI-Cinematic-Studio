@@ -1,0 +1,29 @@
+{
+  "schemaVersion": "ACS-CCV-R2-G3-G2-EXECUTION-AUTHORIZATION-1",
+  "governanceCheckpoint": "ACS-CCV-R2-G3-G2-GPU-EXECUTION",
+  "authorizedBy": "PROJECT_LEAD",
+  "authorizedAt": "2026-08-15",
+  "gpuExecutionAuthorized": true,
+  "preparationRoot": "/data/ccv-r2-2026-08-15-preparation-g3-g1",
+  "readinessSha256": "e39ac4a8c3ddbf1f26571b295bcb00da7ff6b499acd49e8ad47291726bbbc5e4",
+  "preparationInventorySha256": "20878b06608af6310cc1e60648d5b5e59a05cc6aa43475feb9ff3f9ae1e62845",
+  "expectedRunCount": 51,
+  "maximumQueueCount": 51,
+  "maximumInFlight": 1,
+  "automaticRetryAuthorized": false,
+  "resultRoot": "/data/ccv-r2-2026-08-15-results-g3-g2",
+  "comfyUiServer": "http://127.0.0.1:8188",
+  "comfyUiOutputRoot": "/data/coding/apps/ComfyUI/output",
+  "historyTimeoutSeconds": 1800,
+  "pollIntervalSeconds": 2,
+  "rightsLabels": [
+    "SYNTHETIC_TEST_ONLY",
+    "NOT_FOR_PRODUCTION",
+    "NO_COMMERCIAL_USE_OF_PARTIAL_PROVENANCE_MODEL_BYTES"
+  ],
+  "claims": {
+    "validationAccepted": false,
+    "productionReady": false
+  }
+}
+

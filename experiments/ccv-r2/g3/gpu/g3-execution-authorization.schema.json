@@ -1,0 +1,116 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ai-cinematic-studio.local/schemas/ccv-r2-g3-g2-execution-authorization.schema.json",
+  "title": "ACS CCV-R2 G3-G2 Execution Authorization",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "governanceCheckpoint",
+    "authorizedBy",
+    "authorizedAt",
+    "gpuExecutionAuthorized",
+    "preparationRoot",
+    "readinessSha256",
+    "preparationInventorySha256",
+    "expectedRunCount",
+    "maximumQueueCount",
+    "maximumInFlight",
+    "automaticRetryAuthorized",
+    "resultRoot",
+    "comfyUiServer",
+    "comfyUiOutputRoot",
+    "historyTimeoutSeconds",
+    "pollIntervalSeconds",
+    "rightsLabels",
+    "claims"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": "ACS-CCV-R2-G3-G2-EXECUTION-AUTHORIZATION-1"
+    },
+    "governanceCheckpoint": {
+      "const": "ACS-CCV-R2-G3-G2-GPU-EXECUTION"
+    },
+    "authorizedBy": {
+      "const": "PROJECT_LEAD"
+    },
+    "authorizedAt": {
+      "type": "string",
+      "format": "date"
+    },
+    "gpuExecutionAuthorized": {
+      "const": true
+    },
+    "preparationRoot": {
+      "const": "/data/ccv-r2-2026-08-15-preparation-g3-g1"
+    },
+    "readinessSha256": {
+      "const": "e39ac4a8c3ddbf1f26571b295bcb00da7ff6b499acd49e8ad47291726bbbc5e4"
+    },
+    "preparationInventorySha256": {
+      "const": "20878b06608af6310cc1e60648d5b5e59a05cc6aa43475feb9ff3f9ae1e62845"
+    },
+    "expectedRunCount": {
+      "const": 51
+    },
+    "maximumQueueCount": {
+      "const": 51
+    },
+    "maximumInFlight": {
+      "const": 1
+    },
+    "automaticRetryAuthorized": {
+      "const": false
+    },
+    "resultRoot": {
+      "const": "/data/ccv-r2-2026-08-15-results-g3-g2"
+    },
+    "comfyUiServer": {
+      "enum": [
+        "http://127.0.0.1:8188",
+        "http://localhost:8188"
+      ]
+    },
+    "comfyUiOutputRoot": {
+      "const": "/data/coding/apps/ComfyUI/output"
+    },
+    "historyTimeoutSeconds": {
+      "type": "integer",
+      "minimum": 60,
+      "maximum": 7200
+    },
+    "pollIntervalSeconds": {
+      "type": "number",
+      "minimum": 0.25,
+      "maximum": 10
+    },
+    "rightsLabels": {
+      "type": "array",
+      "uniqueItems": true,
+      "contains": {
+        "const": "SYNTHETIC_TEST_ONLY"
+      },
+      "items": {
+        "type": "string"
+      }
+    },
+    "claims": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "validationAccepted",
+        "productionReady"
+      ],
+      "properties": {
+        "validationAccepted": {
+          "const": false
+        },
+        "productionReady": {
+          "const": false
+        }
+      }
+    }
+  }
+}
+
