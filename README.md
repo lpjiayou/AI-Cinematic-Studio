@@ -14,7 +14,7 @@ OS、V4 Platform、V3 Render Core、持久化与后端测试；客户 Commercial
 > 收敛至 `9c13e8f8…`，tree `8ee5c3ba…`，并通过 464/464 与 post-merge CI；
 > Capture G0 `9094a466…` 已直接 Owner Accepted；G1 `af34ac07…` 已远端验证、
 > PR #6 CI 通过；G2-R1 已完成 custody 恢复、六卷跨实例验证和 69/69 归档绑定核验；
-> 独立复核已 `PASS` 并收口于 `4132458d…`；CCV-R2-G0 已自动复核并收口于 `0376ee3c…`；CCV-R2-G1 已完成 45/45 请求物化与复验并收口于 `1989fd59…`；当前停在 GPU 执行前，等待单独的 G2 授权；
+> 独立复核已 `PASS` 并收口于 `4132458d…`；CCV-R2-G0 已自动复核并收口于 `0376ee3c…`；CCV-R2-G1 已完成 45/45 请求物化与复验并收口于 `1989fd59…`；`ACS-CCV-R2-G2-GPU-EXECUTION` 已由 Project Lead 于 2026-08-15 授权，限定执行 receipt 绑定的 45-run 矩阵；
 > 历史 manifest 仍为 partial/not validation accepted；Production Ready = `NO`。
 
 ## 当前活动工作包
@@ -55,11 +55,11 @@ OS、V4 Platform、V3 Render Core、持久化与后端测试；客户 Commercial
 | Capture G1 | `REMOTE-VERIFIED AT af34ac07 / TREE 0cec29c8 / PR #6 DRAFT / CI PASS / FULL CORE 464/464` |
 | Capture G2 | `EXECUTED / ORIGINAL CUSTODY PVC NOT ATTACHED / INDEPENDENT REVIEW BLOCKED / CHECKPOINT CANDIDATE NOT DECLARED` |
 | G2-R1 closeout | `INDEPENDENT REVIEW PASS / CLOSED AT 4132458d / 69/69 CUSTODY + 2/2 AUDIT METADATA + 6/6 ARCHIVE VOLUMES VERIFIED` |
-| Current checkpoint | `CCV-R2-G1 CLOSED / GPU-READY RECEIPT VERIFIED / AWAIT G2 AUTHORIZATION / NO GPU` |
+| Current checkpoint | `ACS-CCV-R2-G2-GPU-EXECUTION / OWNER AUTHORIZED / RECEIPT-BOUND / ACTIVE` |
 | Character Consistency evidence status | `EXPERIMENT REPORTED / INDEPENDENT REPRODUCTION NOT POSSIBLE / SYNTHETIC_TEST_ONLY / NOT FOR PRODUCTION` |
 | CCV-R2-G0 | `AUTOMATED REVIEW PASS / CLOSED AT 0376ee3c / 45-RUN DESIGN FROZEN` |
 | CCV-R2-G1 | `AUTOMATED PRE-GPU REVIEW PASS / CLOSED AT 1989fd59 / 45 OF 45 REQUESTS VERIFIED / RECEIPT 995035ee… / NO GPU` |
-| CCV-R2-G2 | `GPU EXECUTION NOT AUTHORIZED / NOT STARTED`; Character Visual Identity schema implementation `NOT AUTHORIZED` |
+| CCV-R2-G2 | `OWNER AUTHORIZED / 45-RUN GPU EXECUTION ONLY / MAXIMUM ONE IN FLIGHT / FAIL-CLOSED`; Character Visual Identity schema implementation `NOT AUTHORIZED` |
 | M6-P3 after G1 / M6-P4+ | `NOT AUTHORIZED / NOT STARTED` |
 | M7-M19 | `NOT STARTED / NOT AUTHORIZED` |
 | Formal port-8765 database | `UNTOUCHED / NOT DEPLOYED` |
