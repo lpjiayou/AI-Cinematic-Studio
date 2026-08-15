@@ -1,0 +1,177 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ai-cinematic-studio.local/schemas/ccv-r2-g2-result-ledger.schema.json",
+  "title": "ACS CCV-R2 G2 Result Ledger",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "experimentId",
+    "state",
+    "governanceCheckpoint",
+    "preparationRoot",
+    "preparationReceiptSha256",
+    "authorizationSha256",
+    "resultRoot",
+    "createdAt",
+    "updatedAt",
+    "counts",
+    "claims",
+    "runs"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": "ACS-CCV-R2-G2-RESULT-LEDGER-1"
+    },
+    "experimentId": {
+      "const": "acs-ccv-r2"
+    },
+    "state": {
+      "enum": [
+        "GPU_EXECUTION_ACTIVE",
+        "FAIL_CLOSED",
+        "GPU_GENERATION_COMPLETE_AWAITING_INDEPENDENT_REVIEW"
+      ]
+    },
+    "governanceCheckpoint": {
+      "const": "ACS-CCV-R2-G2-GPU-EXECUTION"
+    },
+    "preparationRoot": {
+      "type": "string"
+    },
+    "preparationReceiptSha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "authorizationSha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "resultRoot": {
+      "type": "string"
+    },
+    "createdAt": {
+      "type": "string"
+    },
+    "updatedAt": {
+      "type": "string"
+    },
+    "counts": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "expected",
+        "queued",
+        "succeeded",
+        "failed"
+      ],
+      "properties": {
+        "expected": {
+          "const": 45
+        },
+        "queued": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 45
+        },
+        "succeeded": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 45
+        },
+        "failed": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1
+        }
+      }
+    },
+    "claims": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "gpuExecutionAuthorized",
+        "gpuExecutionStarted",
+        "comfyUiQueueTouched",
+        "imageGenerated",
+        "validationAccepted",
+        "productionReady"
+      ],
+      "properties": {
+        "gpuExecutionAuthorized": {
+          "const": true
+        },
+        "gpuExecutionStarted": {
+          "type": "boolean"
+        },
+        "comfyUiQueueTouched": {
+          "type": "boolean"
+        },
+        "imageGenerated": {
+          "type": "boolean"
+        },
+        "validationAccepted": {
+          "const": false
+        },
+        "productionReady": {
+          "const": false
+        }
+      }
+    },
+    "runs": {
+      "type": "array",
+      "maxItems": 45,
+      "items": {
+        "type": "object",
+        "required": [
+          "runId",
+          "blindLabel",
+          "armId",
+          "shotId",
+          "seed",
+          "plannedOutputPath",
+          "state",
+          "promptId"
+        ],
+        "properties": {
+          "runId": {
+            "type": "string"
+          },
+          "blindLabel": {
+            "type": "string"
+          },
+          "armId": {
+            "enum": [
+              "A0_TEXT_BASELINE",
+              "A1_FACE_IDENTITY",
+              "A2_FACE_OPENPOSE"
+            ]
+          },
+          "shotId": {
+            "type": "string"
+          },
+          "seed": {
+            "type": "integer"
+          },
+          "plannedOutputPath": {
+            "type": "string",
+            "pattern": "^outputs/"
+          },
+          "state": {
+            "enum": [
+              "QUEUED",
+              "COMPLETE",
+              "FAILED"
+            ]
+          },
+          "promptId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      }
+    }
+  }
+}
