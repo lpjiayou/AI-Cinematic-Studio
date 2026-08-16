@@ -2,572 +2,266 @@
 
 > Document: `CURRENT_MILESTONE.md`
 >
-> Execution Mode: `MANUAL / BOUNDED / FAIL-CLOSED`
+> Execution Mode: `AUTO-SEQUENTIAL / CONTRACT-FIRST / FAIL-CLOSED`
 >
-> Project Lead Authorization: `ACS-GOV-POST-M6-P3-G1-CLOSEOUT OWNER ACCEPTED AT 20207e7f; ACS-CCV-R1-EVIDENCE-HARDENING AUTHORIZED; ACS-CCV-R1-R1-EVIDENCE-VALIDATOR-HARDENING AUTHORIZED ON 2026-08-14`
+> Project Lead Authorization: `FRONTEND ↔ CORE ACCURATE MAPPING AUTHORIZED ON 2026-08-17`
 >
-> Authorized Wave: `ACS-CCV-R1-R1 EVIDENCE VALIDATOR CORRECTION → REMOTE VERIFY → STOP FOR OWNER REVIEW`
+> Authorized Wave: `ACS-XR1-G0 → G1 → G2 → G3 → REMOTE VERIFY`
 >
-> Current Task: `ACS-CCV-R1-R1-EVIDENCE-VALIDATOR-HARDENING`
+> Current Task: `ACS-XR1-GATE-C-CLOSEOUT`
 >
-> Current Work Package: `EXPERIMENT EVIDENCE VALIDATOR CORRECTION / NO PRODUCTION OR TEST CHANGE`
+> Current Work Package: `LOCAL COMPLETE / REMOTE BRANCH VERIFY PENDING`
 >
-> M6 Authorization: `P0-P2 OWNER ACCEPTED / P3-G0 OWNER ACCEPTED AS ARCHITECTURE / P3-B1 OWNER ACCEPTED THROUGH B1-R1 / P3-G1 OWNER ACCEPTED THROUGH G1-R1 / LATER M6 NOT AUTHORIZED`
-
-> Next Checkpoint: `CCV-R2 / NOT AUTHORIZED / NOT STARTED`
+> M6 Authorization: `ACCEPTED P0-P3 G1-R1 SURFACES ONLY / LATER M6 NOT AUTHORIZED`
 >
-> M7 Authorization: `NOT AUTHORIZED`
+> M7–M19 Authorization: `STATUS MAPPING ONLY / IMPLEMENTATION NOT AUTHORIZED`
 >
-> Production Ready: `NO`
+> Integration Gate: `LOCAL PASS — CORE 471 / FRONTEND 108 / BUILD / TWO-PROCESS SMOKE`
+>
+> Production Ready: `NO — M6 EXTERNAL AUTHORITIES AND M7–M19 REMAIN OUTSIDE THIS WAVE`
 
 ---
 
-# 0. Canonical Baseline
+## 0. Accepted baselines
 
-Canonical Workspace:
+Core accepted baseline:
 
-`D:\Codex使用\AI CINEMATIC STUDIO`
+- branch source: `origin/main`
+- commit: `9c13e8f8d7ccef079dd382fe11b1d173fdef13d7`
+- accepted backend suite: `464 / 464`
 
-Pre-Rebaseline Accepted HEAD:
+Frontend accepted integration baseline:
 
-`602a78fe68fc5c69ecc31d9436ee166f5dff8a64`
+- repository: `lpjiayou/AI-Cinematic-Studio-Frontend`
+- branch: `feat/fe-g5-production-workspace-v2`
+- commit: `efaaa2546c37ed7c514f10b3bec2fb9893009260`
 
-Pre-Rebaseline Branch:
+Accepted capability state:
 
-`codex/creator-ui-r2a-layout-freeze`
+- M1 AI Director: accepted and verified;
+- M2 Series + Episode Foundation: accepted and verified;
+- M3 Script Studio: accepted and verified;
+- M4 Project Context: accepted and verified;
+- M5 Series Planning + Series Director: accepted and verified;
+- M6 Series Intelligence: accepted only through the owner-accepted P0–P3 G1-R1
+  surfaces already present on the Core baseline;
+- M7–M19: not started or not authorized as production capability.
 
-RB1.1 Accepted Checkpoint:
-
-`00793953e71711ab95724353d97d3a913be2b853`
-
-RB1.1 Local / Remote Verification:
-
-`PASS`
-
-Accepted milestones and integration checkpoints:
-
-- M1 — AI Director Core — ACCEPTED
-- M2 — Series + Episode Foundation — ACCEPTED
-- M3 — Script Studio — ACCEPTED
-- M3-H — Script Candidate Robustness — ACCEPTED
-- Story Projection — ACCEPTED
-- UI-R1 — Enterprise Cinematic UI — ACCEPTED HISTORY
-- M4 — Project Context Foundation — ACCEPTED
-- M5 — Series Planning + Series Director — ACCEPTED
-- UI-R2 — Professional Workspace Layout Optimization — ACCEPTED HISTORY
-- UI-R2A — Product acceptance status — NO SEPARATE ACCEPTANCE EVIDENCE / CANDIDATE
-- UI-R2A — Remote verification status — PASS AT `602a78fe68fc5c69ecc31d9436ee166f5dff8a64`
-- UI-R2A — Active architecture status — SUPERSEDED AS CURRENT TASK
-
-UI-R2A remains historical implementation evidence after the legacy Core browser UI
-decommission. It is no longer an active Core work package and does not authorize M6.
+Historical CCV evidence branches remain preserved. XR1 does not rewrite their evidence,
+generated artifacts, validators or conclusions.
 
 ---
 
-# 1. Current Control Stage
+## 1. Purpose
 
-Current stage:
+XR1 connects the closed Frontend page baseline to the accepted Core capability baseline
+without inventing a second domain model or presenting unavailable capability as real.
 
-`Character Consistency Evidence Hardening`
-
-Title:
-
-ACS-CCV-R1-R1-EVIDENCE-VALIDATOR-HARDENING
-
-Status:
-
-`ORIGINAL CCV-R1 CANDIDATE 57cbbd49 REVISION REQUIRED / R1 VALIDATOR CORRECTION IN PROGRESS / INDEPENDENT REPRODUCTION NOT POSSIBLE`
-
-Purpose:
-
-1. preserve `ACS-GOV-POST-M6-P3-G1-CLOSEOUT` as Owner Accepted at
-   `20207e7f2d2123468698f453c70ce725a293976a`, tree
-   `e3638838dd0c79201a1962bb247ec7c773b62ffa`;
-2. correct the Character Consistency report's `40 → 50` accounting and overclaims;
-3. establish `experiments/ccv-r1/` as an evidence-only structure with no generated
-   image or model binary;
-4. provide hardened successor scripts, config-driven parameters, manifest schema and
-   no-GPU fail-closed validation;
-5. record all unavailable historical scripts/workflows/seeds/hashes/logs as pending,
-   without guessing;
-6. preserve production, tests, HTTP/API, Frontend, schema/migration and event semantics;
-7. test, commit, non-force publish, remote-verify, open a Draft PR, observe CI and stop
-   for Owner Review.
-8. derive SD1.5/SDXL conditioning width from actual safetensors headers during
-   finalization rather than trusting declarations;
-9. make captured manifest completeness and exact run counts independently enforceable;
-10. register the five Round 3 skeleton inputs as five digest-bearing artifacts.
-
-This task does not rerun the GPU experiment. It authorizes no CCV-R2, Character Visual
-Identity ADR implementation, M6 schema change or production GPU integration.
-
----
-
-# 2. Accepted Responsibility Contract
-
-ONE CREATOR UI remains mandatory.
-
-ADR-0001 is `Accepted`, and the RB1.1 governance baseline is remote-verified at
-`00793953e71711ab95724353d97d3a913be2b853`. The current interpretation is:
-
-ONE CREATOR UI
-=
-the customer-facing Commercial Frontend in the separate
-`AI-Cinematic-Studio-Frontend` repository.
-
-Core repository responsibility:
-
-- Creator Server Runtime;
-- Creator Public HTTP/API;
-- Creator Application commands, queries, DTOs and services;
-- authorization and tenant/workspace enforcement;
-- Domain and V5 Core OS;
-- V4 Platform;
-- V3 Render Core;
-- Compute/Foundation integration;
-- persistence, migrations and infrastructure;
-- backend/application/domain/contract/integration tests.
-
-Frontend repository responsibility:
-
-- customer-facing Commercial SaaS pages and routes;
-- experience adapters;
-- frontend state and presentation;
-- responsive/accessibility/visual behavior;
-- customer workflow browser validation.
-
-Accepted cross-repository dependency chain:
+The only accepted runtime chain is:
 
 ```text
 Commercial Frontend
-↓
-Frontend Experience Adapter
-↓
-Creator Public HTTP/API
-↓
-Creator Application
-↓
-V5
-↓
-V4
-↓
-V3
-↓
-Compute/Foundation
+→ Frontend Experience Adapter
+→ Creator Public HTTP/API
+→ Creator Application
+→ V5 Core OS
+→ V4 Platform
+→ V3 Render Core
+→ Compute/Foundation
 ```
 
-Canonical form:
-`Commercial Frontend → Frontend Experience Adapter → Creator Public HTTP/API → Creator Application → V5 → V4 → V3 → Compute/Foundation`
-
-The Frontend Experience Adapter belongs to the Frontend repository and may consume
-only Creator Public HTTP/API. The two repositories do not share customer UI source.
-
-Forbidden:
-
-- Frontend → Core source imports;
-- Frontend → Creator Application direct calls;
-- Frontend → Domain direct calls;
-- Frontend → SQL, Persistence or persistence adapters;
-- Frontend → Provider;
-- Frontend → private V5 adapters;
-- Frontend → GPU, Worker or ComfyUI;
-- Core → second customer-facing Commercial SaaS UI.
+The Frontend must not import Core source, call Application/Domain objects, access SQL,
+or contact model providers, workers, GPU services or private/internal HTTP routes.
 
 ---
 
-# 3. PRE-M6 Closeout Record
+## 2. Authorized scope
 
-Decision date: `2026-08-13`.
+### G0 — governance and contract freeze
 
-PRE-M6-RB1.3-R2-P1 is `ACCEPTED`. PRE-M6-RB1.3-R2-P2 is `OWNER ACCEPTED /
-COMPLETE / REMOTE-VERIFIED` at
-`0aa14b4e426a3d968ec314029d60a47ea30cbc4d`. RB13-F001 and RB13-F002 are
-closed in the current tested Core baseline. PRE-M6-RB1.3 is `REMEDIATION COMPLETE /
-FORMALLY CLOSED BY PROJECT LEAD OWNER REVIEW`.
+- publish the M1–M19 capability mapping matrix;
+- freeze Creator Public HTTP/API v1 resource names, envelopes and error semantics;
+- preserve existing `/creator/internal/*` routes as compatibility-only surfaces;
+- define the Frontend Experience Adapter boundary and runtime configuration;
+- define connected, disconnected, unavailable and local-demo states.
 
-At the G1 closeout recorded below, Architecture Review and M6 Preconditions were
-satisfied only for bounded InMemory M6-P0/P1. That historical decision is preserved;
-the later ADR-0004 decision separately extends the active authorization to bounded
-M6-P2 local-development SQLite. Formal 8765 deployment remains unperformed and
-unauthorized. The Frontend remains frozen and untouched. `P3-RV1-003` remains open
-and non-blocking.
+### G1 — Creator Public HTTP/API
 
-PRE-M6-RB1.3-CLOSEOUT-G1-R1 is `OWNER ACCEPTED / COMPLETE / REMOTE-VERIFIED`
-at `dc9ab881b9f82ecd4a5927c456d5fe531f6850fa`. ADR-0003 is
-`ACCEPTED FOR BOUNDED M6-P1 IMPLEMENTATION`. P1 authority comes from G1-R1; P0
-records its bounded design and does not create a new authorization.
+- add versioned `/creator/api/v1/*` routes over accepted Creator Application/V5 public
+  boundaries only;
+- expose M1–M5 commands and queries already supported by the accepted Core;
+- expose only the accepted M6 workspace/command surfaces and preserve external
+  authority fail-closed behavior;
+- expose a truthful capability projection for M1–M19;
+- retain stable JSON envelopes, request-size limits, no-store responses and sanitized
+  errors;
+- add public HTTP contract and integration tests.
 
-`ACS-M6-P0-P1-R2` is `OWNER ACCEPTED / COMPLETE / REMOTE-VERIFIED` at
-`e38c75aa4ff26bdea80c82d8a24096f799dad860`. The accepted full Core result is
-`332/332 PASS`; targeted M6 is `44/44 PASS`. ADR-0004 and
-`M6_SERIES_INTELLIGENCE_SQLITE_CONTRACT.md` are accepted for bounded M6-P2 local
-development implementation only.
+### G2 — Frontend Experience Adapter
 
----
+- add a server-only adapter using `CREATOR_CORE_BASE_URL`;
+- proxy browser mutations through same-origin Next Route Handlers;
+- inject the configured workspace scope server-side;
+- validate and normalize Core envelopes before they enter presentation state;
+- connect the existing Project, AI Director, Series Planning, Script Studio and accepted
+  M6 entry surfaces to public v1 routes;
+- keep `LOCAL_FIXTURE` only as an explicit, visibly labelled local-demo mode;
+- render missing authority, disconnected Core and not-open capability as product states,
+  never as fabricated records.
 
-# 4. Legacy Core Creator UI Status
+### G3 — Gate C and closeout
 
-`apps/creator-workspace-mvp` is `DECOMMISSIONED / CLOSED / REMOTE-VERIFIED`.
-
-Repository dependency analysis classified all 98 tracked files under the hyphenated
-`apps/creator-workspace-mvp` path as customer UI-only. They were removed without
-removing the underscore package `apps/creator_workspace_mvp`, which continues to own
-Creator Server public HTTP/API and Application runtime responsibilities.
-
-Removed after UI-only classification:
-
-- customer-facing pages and routes;
-- dashboard/workspace presentation;
-- page components and page-only CSS;
-- page-only visual evidence/assets;
-- UI-only browser tests;
-- presentation-only client state.
-
-Must be preserved:
-
-- Creator Server Runtime;
-- HTTP/API handlers;
-- Application services;
-- commands, queries and public DTO/contracts;
-- auth and tenant/workspace enforcement;
-- Domain, V5/V4/V3, ports and adapters;
-- persistence and migrations;
-- backend/application/domain tests.
-
-Mixed UI/server files are `AMBIGUOUS_SHARED_FILE` until classified. Whole-directory
-deletion is not authorized.
+- run Core unit/contract/integration tests;
+- run Frontend lint, typecheck, unit tests and production build;
+- run a real two-process smoke flow through
+  `Browser/HTTP → Experience Adapter → Creator Public API → Core`;
+- verify error, timeout, scope, version-conflict and unavailable-authority behavior;
+- verify local and remote commit equality and clean worktrees.
 
 ---
 
-# 5. Replacement Gate Model
+## 3. Explicit non-scope
 
-## Gate A — Frontend Experience Gate
+XR1 does not authorize:
 
-Owner: separate Frontend repository.
+- M7 Narrative Review implementation;
+- M8 Storyboard or Shot Designer implementation;
+- M9 Asset Requirement implementation;
+- M10 Image Studio implementation;
+- M11–M19 implementation;
+- new Core domain facts, schema migrations or event families;
+- direct Frontend access to `/creator/internal/*`;
+- fake `projectRef`, `seriesRef`, `episodeRef`, `scriptRef`, `scriptVersionRef`,
+  `characterRef`, `versionRef` or provider/job identifiers;
+- treating AI candidates as confirmed facts;
+- production provider calls, production database writes, GPU execution or deployment;
+- removal of historical evidence or accepted tests.
 
-Covers frontend tests, build, browser QA, responsive behavior, accessibility, visual
-quality and customer workflows.
-
-## Gate B — Core HTTP Runtime Gate
-
-Owner: Core repository.
-
-Covers Creator Server startup, public HTTP/API contracts, Application commands and
-queries, authorization, tenant/workspace, persistence, idempotency, application
-integration and error contracts.
-
-## Gate C — Cross-Repo Integration Gate
-
-Future gate validating:
-
-```text
-Commercial Frontend
-↓
-Frontend Experience Adapter
-↓
-Creator Public HTTP/API
-↓
-Creator Application
-↓
-V5
-↓
-V4
-↓
-V3
-↓
-Compute/Foundation
-```
-
-The Frontend Experience Adapter belongs to Frontend and may consume only Creator
-Public HTTP/API. Gate C must validate public contracts rather than shared source
-imports. Gate C is not implemented by this documentation work package.
+M7–M19 may appear only in the capability projection with an explicit `not_open` state,
+accepted dependency explanation and no executable control.
 
 ---
 
-# 6. Accepted Route and Current Transition
+## 4. Truth and data rules
 
-Strict order:
-
-`PRE-M6-RB1.1 Source-of-Truth Rebaseline`
-→ `PRE-M6-RB1.2 Legacy UI Decommission`
-→ `PRE-M6-RB1.3 Full Core Current-State Audit`
-→ `Architecture Review`
-→ `M6 Preconditions`
-→ `M6-P1`
-
-`PRE-M6-RB1.1`, `PRE-M6-RB1.2` and `PRE-M6-RB1.3` are closed. R2-P1 and R2-P2
-are accepted, and R2-P2 is remote-verified at
-`0aa14b4e426a3d968ec314029d60a47ea30cbc4d`.
-
-`ACS-M6-P0-P1-R2` is `OWNER ACCEPTED / COMPLETE / REMOTE-VERIFIED` at
-`e38c75aa4ff26bdea80c82d8a24096f799dad860`. ADR-0004 and the M6 SQLite
-contract are accepted. `ACS-M6-P2-G1` is now `OWNER ACCEPTED / COMPLETE /
-REMOTE-VERIFIED` at `8227c6c616140824fd70de920dc6fcf459bb734d`.
-
-The G3/P3-G0 proposal is remote-verified at
-`c524486c05c21b270a7dd75e89fae4312430736a`; its later review-open state is preserved
-at `dec102b2d70b95d6b69a96ae98d768a32723d4ba`. The Project Lead and Architecture
-Owner have now accepted ADR-0005 and the M6 Consumer Contract as architecture only.
-That architecture checkpoint is remote-verified at
-`6bb9d165a693057f38e5789c408293ff0eaf5bcc`. The Project Lead, Architecture Owner,
-Repository Governance Owner and affected M2/M4/M5/M6 Domain Owners now authorize the
-bounded B1 sequence recorded in
-[`ACS-M6-P3-B1-EPISODE-PLAN-ITEM-BINDING.md`](governance/ACS-M6-P3-B1-EPISODE-PLAN-ITEM-BINDING.md).
-
-The completed architecture-remediation transition is:
-
-```text
-ACS-ARCH-R1-V5-TEXT-GENERATION-G0
-→ ACS-ARCH-R1-V5-TEXT-GENERATION-G1
-→ STOP FOR PROJECT LEAD OWNER REVIEW
-```
-
-G0 is remote-verified at `92d1f3ac9e08c71458af04514baa659555fc55a7` and G1 is
-remote-verified at `0c283eb653e74784301620bdaf64bf451bb687dd`. Independent
-review then confirmed that the production migration is intact but the guard can miss
-programmatic-import aliases. The original G1 candidate is therefore `REVISION
-REQUIRED / NOT OWNER ACCEPTED`.
-
-The corrected remediation transition is complete:
-
-```text
-ACS-ARCH-R1-V5-TEXT-GENERATION-G1-R1-AUTHORIZATION
-→ G1-R1 TEST-ONLY GUARD CORRECTION
-→ OWNER ACCEPTED AT d44f471c644e319bb4a5bf73707c3274ecbaa426
-```
-
-The original G1 remains historical `REVISION REQUIRED / NOT OWNER ACCEPTED` and is
-superseded by the accepted G1-R1 result. B1 candidate
-`8449b521c96bb8340806ecda8649698f4771914a` is also `REVISION REQUIRED / NOT OWNER
-ACCEPTED`. B1-R1 corrected that defect and is Owner Accepted at
-`5c656992d9fade3683b70e3c57f8b8ba7d26c7f7`. M6-P3-G1 and G1-R1 were later completed
-as recorded below. The governance closeout is now Owner Accepted; the current
-authorized transition is evidence-only:
-
-```text
-ACS-GOV-POST-M6-P3-G1-CLOSEOUT OWNER ACCEPTED AT 20207e7f
-→ ACS-CCV-R1 EVIDENCE HARDENING
-→ ORIGINAL CANDIDATE 57cbbd49 REVISION REQUIRED
-→ ACS-CCV-R1-R1 EVIDENCE VALIDATOR CORRECTION
-→ COMMIT / NON-FORCE PUSH / DRAFT PR / CI / REMOTE VERIFY
-→ STOP
-```
-
-No CCV-R2, schema work or later milestone may be silently entered after this
-checkpoint.
+1. Core owns authoritative references, versions, lifecycle and persistence.
+2. Frontend owns client-only presentation keys and UI state.
+3. A client key must never be upgraded to a Core reference by naming convention.
+4. AI output remains a candidate until the corresponding Core confirmation command
+   succeeds.
+5. `LOCAL_FIXTURE` data is non-authoritative and must remain visibly identified.
+6. When Core is unreachable, the Frontend reports `disconnected`; it does not silently
+   substitute demo data.
+7. When an accepted boundary lacks external authority, the result is `unavailable`, not
+   an empty successful workspace.
+8. Public responses must not leak provider credentials, internal diagnostics, SQL
+   details or raw exceptions.
 
 ---
 
-# 7. Authorized M6-P3-B1 Binding Prerequisite
+## 5. Public API acceptance rules
 
-M6-P0/P1 and M6-P2-G1 are `OWNER ACCEPTED / COMPLETE / REMOTE-VERIFIED`.
-The Project Lead and Architecture Owner accepted the G3/P3-G0 target architecture,
-ADR-0005 and the M6 consumer contract on `2026-08-13`. M6-P3-G0 is complete only as a
-governance/architecture decision. The later explicit Owner decision authorized
-M6-P3-B1, and the corrected B1-R1 checkpoint is Owner Accepted. M6-P3-G1 was later
-separately authorized and is Owner Accepted only through G1-R1 at
-`e172cc7c9bfca04066153d9edad70d9074bb37e5`. All work after G1 remains
-`NOT AUTHORIZED / NOT STARTED` until its own explicit governance authorization.
+The v1 API is an adapter over accepted boundaries, not a new domain layer.
 
-M6 Character Intelligence must include at least background, motivation, belief,
-conflict, goal, personality, behavior rules, dialogue rules, forbidden behavior,
-visual identity rules, `CharacterState`, `RelationshipContext`, timeline and
-continuity.
+- prefix: `/creator/api/v1`;
+- success envelope: `{ "ok": true, ... }`;
+- error envelope: `{ "ok": false, "error": { "code": string, "message": string } }`;
+- media type for commands: `application/json`;
+- maximum body: `512000` bytes;
+- cache policy: `no-store`;
+- unknown route: HTTP `404 / not_found`;
+- invalid JSON or shape: HTTP `400 / invalid_request`;
+- unsupported media type: HTTP `415 / unsupported_media_type`;
+- public DTOs may include accepted Core references required for subsequent commands,
+  but may not expose adapters, repositories, provider transports or private diagnostics.
 
-`M6 ≠ V5 Identity Lock`. M6 does not implement M7, GPU Render, ComfyUI, Worker or
-cross-repository UI.
-
-The completed P0/P1 gate order is:
-
-1. R1 implementation completes and passes independent review;
-2. R2 deletion lifecycle remediation completes;
-3. InMemory/SQLite consistency, concurrency and TOCTOU validation pass;
-4. the RB1.3 full regression passes;
-5. RB1.3 is formally closed;
-6. Architecture Review passes;
-7. all M6 Preconditions are satisfied;
-8. the Project Lead separately authorizes M6-P1.
-
-All eight gates are satisfied for bounded M6-P0/P1. The accepted M6-P2 gate order was:
-
-1. use only temporary file SQLite databases;
-2. preserve the accepted M6 domain and full Scope authority;
-3. migrate fresh/V2/no-op atomically and fail closed on invalid input;
-4. persist M6 facts, operations and Outbox in one lifecycle transaction;
-5. pass restart, rollback, commit-uncertainty, delete and cross-Assembly concurrency;
-6. pass InMemory/SQLite contract parity and the complete Core regression;
-7. commit, push, fetch and verify Local SHA equals Remote SHA;
-8. report a checkpoint candidate and stop.
-
-All M6-P2 gates passed and the Project Lead accepted the remote technical baseline.
-
-The accepted M6-P3-G0 target defines a future internal, read-only, persistence-neutral
-M6 Episode baseline consumer for M3 Script Studio. M4 owns trusted Project-to-Series
-context; M2 owns Series/Episode identity and membership. The accepted records have no
-shared stable key, so ADR-0005 requires a future immutable M5 EpisodePlanItemBinding
-inside a new exact SeriesPlanVersion. M6 keeps its existing facts; M7 remains owner of
-future consistency verdicts; M9 remains owner of future AssetRequirement and
-asset-resolution readiness.
-
-Number, title, array position and display name matching are forbidden. The future
-sequence is two independent checkpoints: P3-B1 implemented the accepted target M5 v2
-binding and is Owner Accepted through corrected B1-R1; separately authorized P3-G1
-may implement the read-only M6/M3 consumer. The affected M2/M4/M5/M6 Domain
-Owners accepted the bounded binding result. The separate G1 authorization was granted
-on `2026-08-14` and remains gated by governance remote verification.
-
-Initial plan creation stays v1. B1 allows v1→v1, explicit v1→v2 and v2→v2, forbids
-v2→v1 and requires a new explicit v2 version for unbinding. The only new operation is
-Core-only `create_episode_plan_item_binding_version`.
-
-The G1 authorization record alone authorizes its bounded Core-only read slice. It does
-not authorize M7-M19, formal database deployment, DDL/Migration, HTTP route/handler/
-external DTO source-file changes, any HTTP contract expansion, Auth/RBAC or Frontend
-implementation.
-
-Legacy repository capability provenance remains `MEDIUM / OPEN / NON-BLOCKING` under
-Owner Gate `P3-RV1-003`. Old-repository implementation is not current Core production
-capability.
+Existing internal endpoints remain covered by their historical contract tests and are
+not the Frontend integration surface.
 
 ---
 
-# 8. Current Work Package Gates
+## 6. Frontend Experience Adapter acceptance rules
 
-- PRE-M6-RB1.1: `CLOSED`
-- RB1.1 CHECKPOINT: `00793953e71711ab95724353d97d3a913be2b853`
-- RB1.1 LOCAL / REMOTE VERIFICATION: `PASS`
-- ADR-0001 STATUS: `Accepted`
-- PRE-M6-RB1.2: `CLOSED WITH REMOTE-VERIFIED CHECKPOINT`
-- PRE-M6-RB1.3: `REMEDIATION COMPLETE / FORMALLY CLOSED BY PROJECT LEAD OWNER REVIEW`
-- PRE-M6-RB1.3-IR1: `COMPLETED`
-- FULL CORE AUDIT REPORT v1.2 ACCEPTANCE LABEL: `PRESERVED`; REPOSITORY PROVENANCE:
-  `R-CORE-GOV-002 / OPEN / NON-BLOCKING / NOT IMPLEMENTATION AUTHORITY`
-- PRE-M6-RB1.3-R1-RV1: `INDEPENDENTLY ACCEPTED`
-- RB13-F001: `R1 IMPLEMENTED / INDEPENDENTLY ACCEPTED / CLOSED`
-- ADR-0002 STATUS: `ACCEPTED FOR BOUNDED R2 IMPLEMENTATION`
-- RB13-F002: `REMEDIATED / CLOSED IN CURRENT TESTED CORE BASELINE`
-- EXECUTION MODE: `MANUAL / BOUNDED / FAIL-CLOSED`
-- AUTHORIZED WAVE: `ACS-CCV-R1-R1 VALIDATOR CORRECTION → REMOTE VERIFY → DRAFT PR / CI → STOP FOR OWNER REVIEW`
-- CURRENT TASK: `ACS-CCV-R1-R1-EVIDENCE-VALIDATOR-HARDENING`
-- G0 BASE: `c524486c05c21b270a7dd75e89fae4312430736a`
-- ADR-0006 STATUS: `ACCEPTED FOR BOUNDED G1`
-- V5 TEXT GENERATION CONTRACT: `ACCEPTED FOR BOUNDED G1`
-- R-CORE-ARCH-001: `CONFIRMED / HIGH / MONITORING / G1-R1 OWNER ACCEPTED`
-- R-CORE-GOV-002: `OPEN / NON-BLOCKING`
-- G0 STATUS: `COMPLETE / REMOTE-VERIFIED AT 92d1f3ac9e08c71458af04514baa659555fc55a7`
-- G1 STATUS: `REMOTE-VERIFIED CANDIDATE AT 0c283eb653e74784301620bdaf64bf451bb687dd / REVISION REQUIRED / NOT OWNER ACCEPTED / SUPERSEDED BY G1-R1`
-- G1-R1 STATUS: `OWNER ACCEPTED / COMPLETE / REMOTE-VERIFIED AT d44f471c644e319bb4a5bf73707c3274ecbaa426`
-- ACS-M6-P0-P1-R2: `OWNER ACCEPTED / COMPLETE / REMOTE-VERIFIED AT e38c75aa4ff26bdea80c82d8a24096f799dad860`
-- R2-P1 STATUS: `ACCEPTED`
-- R2-P2 STATUS: `OWNER ACCEPTED / COMPLETE / REMOTE-VERIFIED AT 0aa14b4e426a3d968ec314029d60a47ea30cbc4d`
-- LEGACY REPOSITORY CAPABILITY PROVENANCE: `MEDIUM / OPEN / NON-BLOCKING`
-- P3-RV1-003: `OWNER GATE / OPEN / NON-BLOCKING EOL AUDIT DEBT`
-- RB1.3 CLOSEOUT: `FORMALLY CLOSED`
-- ARCHITECTURE REVIEW: `SATISFIED FOR BOUNDED M6-P0/P1 AND M6-P2 LOCAL SQLITE ONLY`
-- M6 PRECONDITIONS: `SATISFIED FOR BOUNDED M6-P0/P1 AND M6-P2 LOCAL SQLITE ONLY`
-- M6: `P0-P2 OWNER ACCEPTED / P3-G0 OWNER ACCEPTED AS ARCHITECTURE / P3-B1 OWNER ACCEPTED THROUGH B1-R1 / P3-G1 OWNER ACCEPTED THROUGH G1-R1 / LATER M6 WORK NOT AUTHORIZED`
-- M6-P0 STATUS: `CONTRACT ACCEPTED / COMPLETE`
-- M6-P1 STATUS: `OWNER ACCEPTED / COMPLETE / REMOTE-VERIFIED AT e38c75aa4ff26bdea80c82d8a24096f799dad860`
-- ADR-0004 STATUS: `ACCEPTED FOR BOUNDED M6-P2 IMPLEMENTATION`
-- M6-P2-G0 STATUS: `CONTRACT ACCEPTED / COMPLETE`
-- M6-P2-G1 STATUS: `OWNER ACCEPTED / COMPLETE / REMOTE-VERIFIED AT 8227c6c616140824fd70de920dc6fcf459bb734d`
-- M6-P2-G1-CLOSEOUT-G3 STATUS: `REMOTE-VERIFIED HISTORICAL PROPOSAL CHECKPOINT AT c524486c05c21b270a7dd75e89fae4312430736a / PRESERVED`
-- M6-P3-G0 STATUS: `OWNER ACCEPTED / COMPLETE AS GOVERNANCE-ARCHITECTURE / NO IMPLEMENTATION AUTHORITY`
-- ADR-0005 STATUS: `ACCEPTED AS ARCHITECTURE DECISION / B1 OWNER ACCEPTED THROUGH B1-R1 / G1 OWNER ACCEPTED THROUGH G1-R1`
-- M6 CONSUMER CONTRACT: `ACCEPTED NORMATIVE ARCHITECTURE / B1 OWNER ACCEPTED THROUGH B1-R1 / G1 OWNER ACCEPTED THROUGH G1-R1`
-- M6-P3-B1 EPISODE-PLAN-ITEM BINDING: `ORIGINAL CANDIDATE AT 8449b521c96bb8340806ecda8649698f4771914a REVISION REQUIRED / CORRECTED AND OWNER ACCEPTED THROUGH B1-R1 AT 5c656992d9fade3683b70e3c57f8b8ba7d26c7f7`
-- M6-P3-B1 AUTHORIZED BASE: `6bb9d165a693057f38e5789c408293ff0eaf5bcc`
-- M6-P3-B1 DOMAIN OWNERS: `M2 / M4 / M5 / M6 APPROVED`
-- M6-P3-B1 FROZEN SCOPE: `8 GOVERNANCE / 6 PRODUCTION / 9 TEST PATHS`
-- M6-P3-B1 VERSION POLICY: `INITIAL V1 / V1→V1 / EXPLICIT V1→V2 / V2→V2 / V2→V1 FORBIDDEN / UNBIND VIA NEW V2`
-- M6-P3-B1 CORE OPERATION: `create_episode_plan_item_binding_version / NO ROUTE, HANDLER OR EXTERNAL DTO SOURCE CHANGE`
-- M6-P3-B1 MANUAL V2 RULE: `create_manual_version REJECTS CURRENT V2 WITHOUT WRITE / DEDICATED METHOD ALONE CREATES V2→V2`
-- M6-P3-B1 OWNER HTTP CLARIFICATION: `EXISTING CANONICAL V2 PROJECTION IN WORKSPACE VERSIONS PASSES THROUGH episodePlanItemBindings / MANUAL + BOOTSTRAP V1 BEHAVIOR UNCHANGED / NO OTHER HTTP CONTRACT EXPANSION`
-- M6-P3-B1-F001: `CLOSED BY OWNER-ACCEPTED B1-R1 / SQLITE SAME-PROJECT CROSS-SERIES FALSE DEPENDENCY`
-- M6-P3-B1-R1 STATUS: `OWNER ACCEPTED / COMPLETE / REMOTE-VERIFIED AT 5c656992d9fade3683b70e3c57f8b8ba7d26c7f7`
-- M6-P3-B1-R1 AUTHORIZED BASE: `8449b521c96bb8340806ecda8649698f4771914a`
-- M6-P3-B1-R1 SCOPE: `8 GOVERNANCE → 1 PRODUCTION + 1 TEST → REMOTE VERIFY → STOP FOR OWNER REVIEW`
-- M6-P3-B1-R1 EVIDENCE: `PRE-FIX SQLITE 409 REPRODUCED / POST-FIX SQLITE MODULE 30/30 / ORIGINAL B1 174/174 / FULL CORE 449/449 / NON-TEST PYTHON AST 63/63`
-- M6-P3-G1 ORIGINAL STATUS: `REMOTE-VERIFIED AT 3696d6af12222d30eb99b65d67e6db18897eb42f / G1 14/14 / FULL CORE 463/463 / REVISION REQUIRED / NOT OWNER ACCEPTED / SUPERSEDED`
-- M6-P3-G1-R1 STATUS: `OWNER ACCEPTED / COMPLETE / REMOTE-VERIFIED AT e172cc7c9bfca04066153d9edad70d9074bb37e5 / TREE be7447c3d60510262e428b86cd1a6a83972f64c0 / FULL CORE 464/464`
-- CORE MAIN CONVERGENCE: `OWNER ACCEPTED / PR #2 REBASE AND MERGE / MAIN 5976263f92f7f9cbe9c091719eccb036ee8c0c2d / SAME TREE / POST-MERGE CI PASS`
-- ACS-GOV-POST-M6-P3-G1-CLOSEOUT: `OWNER ACCEPTED AT 20207e7f2d2123468698f453c70ce725a293976a / TREE e3638838dd0c79201a1962bb247ec7c773b62ffa`
-- ACS-CCV-R1-EVIDENCE-HARDENING: `REMOTE CANDIDATE 57cbbd49 / REVISION REQUIRED / NOT OWNER ACCEPTED`
-- ACS-CCV-R1-R1-EVIDENCE-VALIDATOR-HARDENING: `AUTHORIZED / EXPERIMENT EVIDENCE ONLY / IN PROGRESS`
-- CCV-R2 / CHARACTER VISUAL IDENTITY SCHEMA WORK: `NOT AUTHORIZED / NOT STARTED`
-- M6-P3 AFTER G1 / M6-P4+ STATUS: `NOT AUTHORIZED / NOT STARTED`
-- M7-M19: `NOT STARTED / NOT AUTHORIZED`
-- FORMAL 8765 DEPLOYMENT: `UNTOUCHED / NOT DEPLOYED`
-- FRONTEND: `FROZEN / UNTOUCHED`
-- PRODUCTION READY: `NO`
-- PRODUCTION CODE CHANGED BY G1-R1: `NO`
-- TEST CODE CHANGED BY G1-R1: `ONE AUTHORIZED CONTRACT TEST FILE`
-- G1-R1 ACCEPTED EVIDENCE: `TARGETED 124/124 / FULL CORE 404/404 — UNIT 226 /
-  CONTRACT 81 / INTEGRATION 97 / M6-P2 STRICT 52/52 / LIFECYCLE 31/31 /
-  PYTHON AST 63/63 / APPLICATION V4 IMPORTS 0 / LOCAL=REMOTE / OWNER ACCEPTED`.
-
-The Project Lead acceptance of bounded M6-P2-G1 at
-`8227c6c616140824fd70de920dc6fcf459bb734d` remains unchanged. The later c524
-G3/P3-G0 proposal and dec102 review-open checkpoint remain preserved historical
-evidence. ADR-0005 and the M6 Consumer Contract are now accepted as architecture only,
-and that G0 acceptance remains immutable timepoint evidence. The Project Lead selected
-and accepted ADR-0006 and later accepted corrected G1-R1 at
-`d44f471c644e319bb4a5bf73707c3274ecbaa426`. This closes the architecture-remediation
-wave but does not establish Production Ready or authorize formal database deployment,
-Frontend, later M6 work or M7-M19. B1 is accepted only through the explicit B1-R1
-correction and did not itself create G1 implementation authority; G1 was later
-separately authorized and accepted through G1-R1.
+- `CREATOR_CORE_BASE_URL` is server-only and defaults to `http://127.0.0.1:8765` for
+  local development;
+- `CREATOR_WORKSPACE_REF` and `CREATOR_CONTENT_PROFILE_REF` are server-owned scope
+  configuration;
+- browser code calls only `/api/creator/*` on the Frontend origin;
+- the adapter uses bounded timeouts and returns stable disconnected/error states;
+- incoming mutation bodies are size-limited and JSON-validated;
+- Core response status and stable product errors are preserved;
+- redirect targets are created only from references returned by successful Core
+  commands;
+- no `NEXT_PUBLIC_*` variable may expose the Core origin or server scope.
 
 ---
 
-# 9. Stop Rule
+## 7. Stop conditions
 
-The current checkpoint changes only the allowlist in
-[`ACS-CCV-R1-EVIDENCE-HARDENING.md`](governance/ACS-CCV-R1-EVIDENCE-HARDENING.md).
-Production and test diff must remain zero. After evidence validation, regression,
-commit, non-force push, remote equality, Draft PR and CI observation:
+XR1 must fail closed if any of the following occurs:
 
-```text
-ACS-CCV-R1-R1-EVIDENCE-VALIDATOR-HARDENING CHECKPOINT CANDIDATE
-PROJECT LEAD OWNER REVIEW REQUIRED
-DO NOT ENTER CCV-R2 OR ANY SCHEMA WORK
-```
+- a required UI action has no accepted Core public boundary;
+- a command would require a guessed reference or version;
+- a proposed route bypasses Creator Application/V5 public boundaries;
+- M7–M19 implementation becomes necessary;
+- a test requires a real provider secret, production database or GPU;
+- scope isolation, lifecycle protection or confirmation semantics regress;
+- the Frontend silently falls back to fixtures after a Core error;
+- local and remote trees cannot be proven equal.
 
-Stop before any production/test change, M6 schema change, DDL/Migration,
-route/handler/external DTO change, Script write, later M6, M7-M19, formal database,
-Auth/RBAC, Frontend, GPU, Worker or ComfyUI work.
+In a stop condition, preserve the truthful unavailable/not-open UI state and continue
+with other independently authorized mappings.
 
 ---
 
-# 10. Current Authorized Task
+## 8. Definition of done
 
-`ACS-CCV-R1-R1-EVIDENCE-VALIDATOR-HARDENING`
+XR1 is complete only when:
 
-Status:
+1. the M1–M19 mapping matrix is committed in both responsibility context and executable
+   Frontend capability state;
+2. public v1 routes are covered by Core contract/integration tests;
+3. Frontend code contains a server-only Experience Adapter and no calls to internal
+   Core routes;
+4. accepted M1–M6 surfaces either execute against Core or expose an exact unavailable
+   reason;
+5. M7–M19 remain non-executable and truthfully labelled;
+6. local-demo fixtures are opt-in and visibly non-authoritative;
+7. all Core and Frontend checks pass;
+8. Gate C proves at least one real Project-first vertical flow through both processes;
+9. both repository branches are pushed without force, remote-verified and clean.
 
-`EXPERIMENT EVIDENCE VALIDATOR CORRECTION / PRODUCTION AND TEST DIFF ZERO / OWNER REVIEW REQUIRED`
+---
 
-Accepted technical evidence:
+## 9. Local closeout evidence — 2026-08-17
 
-```text
-ORIGINAL M6-P3-G1: 3696d6af12222d30eb99b65d67e6db18897eb42f
-STATUS: REVISION REQUIRED / NOT OWNER ACCEPTED / SUPERSEDED
+Implementation commits:
 
-M6-P3-G1-R1: e172cc7c9bfca04066153d9edad70d9074bb37e5
-TREE: be7447c3d60510262e428b86cd1a6a83972f64c0
-STATUS: OWNER ACCEPTED / COMPLETE / REMOTE-VERIFIED / FULL CORE 464/464
+- Core public contract and routes: `cc284d3`;
+- Core public candidate lineage and final error-contract fix: `9199b4b`;
+- Frontend Experience Adapter and connected Creator pages: `bb47914`.
 
-CORE MAIN: 5976263f92f7f9cbe9c091719eccb036ee8c0c2d
-TREE: be7447c3d60510262e428b86cd1a6a83972f64c0
-STATUS: PR #2 REBASE AND MERGE / POST-MERGE CI PASS / OWNER ACCEPTED
-```
+Local validation:
 
-The accepted parent checkpoint is `ACS-GOV-POST-M6-P3-G1-CLOSEOUT` at `20207e7f`.
-The current report remains `EXPERIMENT REPORTED / INDEPENDENT REPRODUCTION NOT
-POSSIBLE`. CCV-R2 and any Identity/Asset/M6/M8/M10 schema or production work remain
-unauthorized.
+- Core: `471 / 471` tests passed with the repository full-suite command;
+- Frontend: `108 / 108` tests passed across `23` test files;
+- Frontend: TypeScript, ESLint and Next.js production build passed;
+- build contains the same-origin dynamic `/api/creator/[...path]` route and connected
+  Project, Story World, Character and Script routes.
 
-Formal port-8765 deployment, later M6 work, M7-M19, Schema/Migration, Frontend,
-production GPU/Worker/ComfyUI integration and Production Ready remain unauthorized.
+Gate C ran a real Core process on `127.0.0.1:8765` and a production Next.js process on
+`127.0.0.1:3100`, then executed the project-first flow through the Frontend origin.
+Observed results:
 
-# End of CURRENT_MILESTONE.md
+- capability projection: `19` items — `5 available`, `1 authority_required`,
+  `13 not_open`;
+- adapter response origin: `CORE`;
+- browser-supplied workspace/profile claims were replaced by server configuration;
+- Series and Project received Core-issued references and were returned by list/detail;
+- direct read of the forged workspace returned zero projects;
+- missing text provider failed closed as `provider_unavailable`;
+- missing M6 external authority failed closed as `authority_unavailable`.
+
+The local integration gate is closed. Force push remains forbidden. Remote SHA equality
+and clean worktrees are the remaining publication checks; neither changes the accepted
+capability scope.

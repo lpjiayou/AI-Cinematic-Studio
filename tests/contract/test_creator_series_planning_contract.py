@@ -205,7 +205,7 @@ class CreatorSeriesPlanningContractTests(unittest.TestCase):
         self.assertEqual(tuple(signature.parameters), ("self", "command"))
         self.assertEqual(
             hashlib.sha256(SERVER.read_bytes()).hexdigest(),
-            "03dee2dc8a290884d022aa073f391f67ac7c72b1a153585c20f87f5534d6a9fc",
+            "88ef53d7c182028987eb996cef886a0e5a2aeb8e679ae20855540e712da6c1d4",
         )
         server_source = SERVER.read_text(encoding="utf-8")
         endpoint_names = {

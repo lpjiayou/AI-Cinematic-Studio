@@ -8,6 +8,7 @@ import json
 import sys
 from typing import Any
 from urllib.parse import parse_qs, unquote, urlsplit
+from uuid import uuid4
 
 from apps.creator_workspace_mvp.ai_director import (
     AiDirectorService,
@@ -32,6 +33,36 @@ from apps.creator_workspace_mvp.series_director import (
     SeriesDirectorGenerationError,
     SeriesPlanCandidateError,
 )
+from apps.creator_workspace_mvp.public_contract import (
+    CAPABILITIES_ENDPOINT,
+    PUBLIC_AI_DIRECTOR_ENDPOINT,
+    PUBLIC_CONFIRM_PLAN_ENDPOINT,
+    PUBLIC_EPISODES_ENDPOINT,
+    PUBLIC_M6_BASELINE_ACTIVATE_ENDPOINT,
+    PUBLIC_M6_BIBLE_CANDIDATE_ENDPOINT,
+    PUBLIC_M6_BIBLE_CONFIRM_ENDPOINT,
+    PUBLIC_M6_BIBLE_VERSION_ENDPOINT,
+    PUBLIC_M6_CHARACTER_CANDIDATE_ENDPOINT,
+    PUBLIC_M6_CHARACTER_CONFIRM_ENDPOINT,
+    PUBLIC_M6_CHARACTER_VERSION_ENDPOINT,
+    PUBLIC_PROJECT_CONTEXT_ENDPOINT,
+    PUBLIC_PROJECTS_ENDPOINT,
+    PUBLIC_SCRIPT_CONFIRM_ENDPOINT,
+    PUBLIC_SCRIPT_GENERATE_ENDPOINT,
+    PUBLIC_SCRIPT_MANUAL_VERSION_ENDPOINT,
+    PUBLIC_SCRIPT_REWRITE_ENDPOINT,
+    PUBLIC_SCRIPT_WORKSPACE_ENDPOINT,
+    PUBLIC_SERIES_ENDPOINT,
+    PUBLIC_SERIES_INTELLIGENCE_WORKSPACE_ENDPOINT,
+    PUBLIC_SERIES_PLANNING_CONFIRM_ENDPOINT,
+    PUBLIC_SERIES_PLANNING_CONFIRM_VERSION_ENDPOINT,
+    PUBLIC_SERIES_PLANNING_ENDPOINT,
+    PUBLIC_SERIES_PLANNING_GENERATE_ENDPOINT,
+    PUBLIC_SERIES_PLANNING_M6_BOOTSTRAP_ENDPOINT,
+    PUBLIC_SERIES_PLANNING_MANUAL_VERSION_ENDPOINT,
+    PUBLIC_STORYBOARD_BOOTSTRAP_ENDPOINT,
+    capability_payload,
+)
 from services.v5_core_os.project_engine import (
     ProjectPublicBoundary,
     ProjectPublicError,
@@ -46,6 +77,10 @@ from services.v5_core_os.series_planning import (
     SeriesPlanningPublicBoundary,
     SeriesPlanningPublicError,
     create_in_memory_boundary as create_in_memory_series_planning_boundary,
+)
+from services.v5_core_os.series_intelligence.public import (
+    SeriesIntelligencePublicBoundary,
+    SeriesIntelligencePublicError,
 )
 from services.v5_core_os.text_generation import (
     create_text_generation_capability_from_environment,
@@ -74,6 +109,54 @@ SERIES_PLANNING_M6_BOOTSTRAP_ENDPOINT = f"{SERIES_PLANNING_ENDPOINT}/m6-bootstra
 MAX_REQUEST_BYTES = 512_000
 
 
+PUBLIC_EXACT_ALIASES = {
+    PUBLIC_AI_DIRECTOR_ENDPOINT: AI_DIRECTOR_ENDPOINT,
+    PUBLIC_CONFIRM_PLAN_ENDPOINT: CONFIRM_PLAN_ENDPOINT,
+    PUBLIC_SERIES_ENDPOINT: SERIES_ENDPOINT,
+    PUBLIC_PROJECTS_ENDPOINT: PROJECTS_ENDPOINT,
+    PUBLIC_PROJECT_CONTEXT_ENDPOINT: PROJECT_CONTEXT_ENDPOINT,
+    PUBLIC_EPISODES_ENDPOINT: EPISODES_ENDPOINT,
+    PUBLIC_SCRIPT_WORKSPACE_ENDPOINT: SCRIPT_WORKSPACE_ENDPOINT,
+    PUBLIC_SCRIPT_GENERATE_ENDPOINT: SCRIPT_GENERATE_ENDPOINT,
+    PUBLIC_SCRIPT_MANUAL_VERSION_ENDPOINT: SCRIPT_MANUAL_VERSION_ENDPOINT,
+    PUBLIC_SCRIPT_REWRITE_ENDPOINT: SCRIPT_REWRITE_ENDPOINT,
+    PUBLIC_SCRIPT_CONFIRM_ENDPOINT: SCRIPT_CONFIRM_ENDPOINT,
+    PUBLIC_STORYBOARD_BOOTSTRAP_ENDPOINT: STORYBOARD_BOOTSTRAP_ENDPOINT,
+    PUBLIC_SERIES_PLANNING_ENDPOINT: SERIES_PLANNING_ENDPOINT,
+    PUBLIC_SERIES_PLANNING_GENERATE_ENDPOINT: SERIES_PLANNING_GENERATE_ENDPOINT,
+    PUBLIC_SERIES_PLANNING_CONFIRM_ENDPOINT: SERIES_PLANNING_CONFIRM_ENDPOINT,
+    PUBLIC_SERIES_PLANNING_MANUAL_VERSION_ENDPOINT: SERIES_PLANNING_MANUAL_VERSION_ENDPOINT,
+    PUBLIC_SERIES_PLANNING_CONFIRM_VERSION_ENDPOINT: SERIES_PLANNING_CONFIRM_VERSION_ENDPOINT,
+    PUBLIC_SERIES_PLANNING_M6_BOOTSTRAP_ENDPOINT: SERIES_PLANNING_M6_BOOTSTRAP_ENDPOINT,
+}
+
+PUBLIC_PREFIX_ALIASES = (
+    (PUBLIC_PROJECTS_ENDPOINT, PROJECTS_ENDPOINT),
+    (PUBLIC_SERIES_ENDPOINT, SERIES_ENDPOINT),
+    (PUBLIC_EPISODES_ENDPOINT, EPISODES_ENDPOINT),
+)
+
+PUBLIC_M6_COMMAND_ENDPOINTS = {
+    PUBLIC_M6_BIBLE_VERSION_ENDPOINT,
+    PUBLIC_M6_BIBLE_CANDIDATE_ENDPOINT,
+    PUBLIC_M6_BIBLE_CONFIRM_ENDPOINT,
+    PUBLIC_M6_CHARACTER_VERSION_ENDPOINT,
+    PUBLIC_M6_CHARACTER_CANDIDATE_ENDPOINT,
+    PUBLIC_M6_CHARACTER_CONFIRM_ENDPOINT,
+    PUBLIC_M6_BASELINE_ACTIVATE_ENDPOINT,
+}
+
+
+def _normalize_public_path(path: str) -> str:
+    exact = PUBLIC_EXACT_ALIASES.get(path)
+    if exact is not None:
+        return exact
+    for public_prefix, internal_prefix in PUBLIC_PREFIX_ALIASES:
+        if path.startswith(f"{public_prefix}/"):
+            return f"{internal_prefix}{path[len(public_prefix):]}"
+    return path
+
+
 class CreatorRequestHandler(BaseHTTPRequestHandler):
     server_version = "CreatorCore/1.0"
 
@@ -85,6 +168,7 @@ class CreatorRequestHandler(BaseHTTPRequestHandler):
         project_boundary: ProjectPublicBoundary,
         series_director_service: SeriesDirectorApplicationService,
         series_planning_boundary: SeriesPlanningPublicBoundary,
+        series_intelligence_boundary: SeriesIntelligencePublicBoundary | None,
         script_studio_service: ScriptStudioApplicationService,
         script_studio_boundary: ScriptStudioPublicBoundary,
         **kwargs: Any,
@@ -94,12 +178,14 @@ class CreatorRequestHandler(BaseHTTPRequestHandler):
         self.project_boundary = project_boundary
         self.series_director_service = series_director_service
         self.series_planning_boundary = series_planning_boundary
+        self.series_intelligence_boundary = series_intelligence_boundary
         self.script_studio_service = script_studio_service
         self.script_studio_boundary = script_studio_boundary
         super().__init__(*args, **kwargs)
 
     def do_POST(self) -> None:
-        path = urlsplit(self.path).path
+        requested_path = urlsplit(self.path).path
+        path = _normalize_public_path(requested_path)
         if path not in {
             AI_DIRECTOR_ENDPOINT,
             SERIES_ENDPOINT,
@@ -114,8 +200,8 @@ class CreatorRequestHandler(BaseHTTPRequestHandler):
             SERIES_PLANNING_CONFIRM_ENDPOINT,
             SERIES_PLANNING_MANUAL_VERSION_ENDPOINT,
             SERIES_PLANNING_CONFIRM_VERSION_ENDPOINT,
-        }:
-            self._send_json(404, {"ok": False, "error": {"code": "not_found"}})
+        } and requested_path not in PUBLIC_M6_COMMAND_ENDPOINTS:
+            self._send_application_error(404, "not_found")
             return
         if self.headers.get_content_type() != "application/json":
             self._send_product_error(415, "unsupported_media_type")
@@ -134,6 +220,9 @@ class CreatorRequestHandler(BaseHTTPRequestHandler):
             return
         if not isinstance(payload, dict):
             self._send_application_error(400, "invalid_request")
+            return
+        if requested_path in PUBLIC_M6_COMMAND_ENDPOINTS:
+            self._handle_series_intelligence_post(requested_path, payload)
             return
         if path.startswith(SCRIPT_WORKSPACE_ENDPOINT):
             self._handle_script_post(path, payload)
@@ -166,19 +255,24 @@ class CreatorRequestHandler(BaseHTTPRequestHandler):
             self._log_provider_error(exc)
             self._send_product_error(200, exc.code)
             return
-        self._send_json(
-            200,
-            {
-                "ok": True,
-                "kind": "candidate-creative-plan",
-                "confirmationRequired": True,
-                "plan": plan,
-            },
-        )
+        response = {
+            "ok": True,
+            "kind": "candidate-creative-plan",
+            "confirmationRequired": True,
+            "plan": plan,
+        }
+        if requested_path == PUBLIC_AI_DIRECTOR_ENDPOINT:
+            response.update(
+                {
+                    "sourcePlanRef": f"ai-director-candidate-{uuid4().hex}",
+                    "sourcePlanVersion": 1,
+                }
+            )
+        self._send_json(200, response)
 
     def do_DELETE(self) -> None:
         parsed = urlsplit(self.path)
-        path = parsed.path
+        path = _normalize_public_path(parsed.path)
         query = parse_qs(parsed.query)
         workspace_ref = query.get("workspaceRef", [""])[0]
         series_ref = query.get("seriesRef", [""])[0]
@@ -243,12 +337,31 @@ class CreatorRequestHandler(BaseHTTPRequestHandler):
 
     def do_GET(self) -> None:
         parsed = urlsplit(self.path)
-        path = parsed.path
+        requested_path = parsed.path
+        path = _normalize_public_path(requested_path)
         query = parse_qs(parsed.query)
         workspace_ref = query.get("workspaceRef", [""])[0]
         series_ref = query.get("seriesRef", [""])[0]
         episode_ref = query.get("episodeRef", [""])[0]
+        if requested_path == CAPABILITIES_ENDPOINT:
+            self._send_json(200, capability_payload())
+            return
         try:
+            if requested_path == PUBLIC_SERIES_INTELLIGENCE_WORKSPACE_ENDPOINT:
+                if self.series_intelligence_boundary is None:
+                    self._send_application_error(503, "authority_unavailable")
+                    return
+                project_ref = query.get("projectRef", [""])[0]
+                self._send_json(
+                    200,
+                    {
+                        "ok": True,
+                        "workspace": self.series_intelligence_boundary.get_workspace(
+                            workspace_ref, project_ref, series_ref
+                        ),
+                    },
+                )
+                return
             if path == SCRIPT_WORKSPACE_ENDPOINT:
                 self._send_json(
                     200,
@@ -361,7 +474,35 @@ class CreatorRequestHandler(BaseHTTPRequestHandler):
         except SeriesPlanningPublicError as exc:
             self._send_series_planning_error(exc)
             return
+        except SeriesIntelligencePublicError as exc:
+            self._send_series_intelligence_error(exc)
+            return
         self._send_application_error(404, "not_found")
+
+    def _handle_series_intelligence_post(
+        self, path: str, payload: MappingLike
+    ) -> None:
+        if self.series_intelligence_boundary is None:
+            self._send_application_error(503, "authority_unavailable")
+            return
+        operations = {
+            PUBLIC_M6_BIBLE_VERSION_ENDPOINT: self.series_intelligence_boundary.create_bible_version,
+            PUBLIC_M6_BIBLE_CANDIDATE_ENDPOINT: self.series_intelligence_boundary.submit_bible_candidate,
+            PUBLIC_M6_BIBLE_CONFIRM_ENDPOINT: self.series_intelligence_boundary.confirm_bible_version,
+            PUBLIC_M6_CHARACTER_VERSION_ENDPOINT: self.series_intelligence_boundary.create_character_version,
+            PUBLIC_M6_CHARACTER_CANDIDATE_ENDPOINT: self.series_intelligence_boundary.submit_character_candidate,
+            PUBLIC_M6_CHARACTER_CONFIRM_ENDPOINT: self.series_intelligence_boundary.confirm_character_version,
+            PUBLIC_M6_BASELINE_ACTIVATE_ENDPOINT: self.series_intelligence_boundary.activate_baseline,
+        }
+        try:
+            result = operations[path](payload)
+        except SeriesIntelligencePublicError as exc:
+            self._send_series_intelligence_error(exc)
+            return
+        except Exception:
+            self._send_application_error(500, "application_error")
+            return
+        self._send_json(201, {"ok": True, "result": result})
 
     def _handle_series_planning_post(self, path: str, payload: MappingLike) -> None:
         try:
@@ -561,6 +702,11 @@ class CreatorRequestHandler(BaseHTTPRequestHandler):
     def _send_series_planning_error(self, exc: SeriesPlanningPublicError) -> None:
         self._send_application_error(exc.status, exc.code)
 
+    def _send_series_intelligence_error(
+        self, exc: SeriesIntelligencePublicError
+    ) -> None:
+        self._send_application_error(exc.status, exc.code)
+
     def _send_application_error(self, status: int, code: str) -> None:
         messages = {
             "invalid_request": "请检查输入后重试。",
@@ -575,6 +721,13 @@ class CreatorRequestHandler(BaseHTTPRequestHandler):
             "dependent_script_exists": "该内容已有剧本版本，为保护制作链路暂不能删除。",
             "invalid_series_plan_candidate": "系列规划候选未通过本地结构校验。",
             "series_plan_not_confirmed": "请先完成人工确认。",
+            "authority_unavailable": "当前工作区尚未连接 M6 权限与身份授权。",
+            "identity_binding_denied": "当前身份不能绑定这组系列智能数据。",
+            "idempotency_conflict": "相同操作标识对应了不同内容，请刷新后重试。",
+            "confirmation_required": "请先完成人工确认。",
+            "stale_source": "上游系列规划已更新，请刷新后重新确认。",
+            "invalid_reference": "内容引用无效，请刷新后重试。",
+            "lifecycle_unavailable": "内容生命周期服务暂时不可用。",
             "application_error": "暂时无法完成操作，请稍后重试。",
         }
         self._send_json(status, {"ok": False, "error": {"code": code, "message": messages.get(code, messages["application_error"])}})
@@ -681,6 +834,7 @@ def create_server(
     project_boundary: ProjectPublicBoundary | None = None,
     series_director_service: SeriesDirectorApplicationService | None = None,
     series_planning_boundary: SeriesPlanningPublicBoundary | None = None,
+    series_intelligence_boundary: SeriesIntelligencePublicBoundary | None = None,
     script_studio_service: ScriptStudioApplicationService | None = None,
     script_studio_boundary: ScriptStudioPublicBoundary | None = None,
 ) -> ThreadingHTTPServer:
@@ -696,6 +850,7 @@ def create_server(
         series_director_service=series_director_service
         or SeriesDirectorApplicationService(default_text_generation),
         series_planning_boundary=planning,
+        series_intelligence_boundary=series_intelligence_boundary,
         script_studio_service=script_studio_service
         or ScriptStudioApplicationService(default_text_generation),
         script_studio_boundary=script_studio_boundary or create_in_memory_script_boundary(series_boundary),
@@ -739,6 +894,7 @@ def main() -> None:
         project_boundary=project_boundary,
         series_director_service=series_director_service,
         series_planning_boundary=series_planning_boundary,
+        series_intelligence_boundary=assembly.series_intelligence,
         script_studio_service=script_service,
         script_studio_boundary=assembly.script_studio,
     )
