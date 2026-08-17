@@ -4,21 +4,23 @@
 >
 > Execution Mode: `AUTO-SEQUENTIAL / CONTRACT-FIRST / FAIL-CLOSED`
 >
-> Project Lead Authorization: `AUTHENTICATED FRONTEND ↔ CORE WORKSPACE ISOLATION AUTHORIZED ON 2026-08-17`
+> Project Lead Authorization: `K2 SINGLE-EPISODE G0 → G7 AUTO-SEQUENTIAL WAVE AUTHORIZED ON 2026-08-17`
 >
-> Authorized Wave: `ACS-AUTH-W1-G0 → G1 → G2 → G3 → GATE C → REMOTE VERIFY`
+> Authorized Wave: `ACS-K2-G0 → G1 → G2 → G3 → G4 → G5 → G6 → G7 → REMOTE VERIFY`
 >
-> Current Task: `ACS-AUTH-W1-REMOTE-VERIFIED-CLOSEOUT`
+> Current Task: `ACS-K2-G0-FACTS-AND-CONTRACT-FREEZE`
 >
-> Current Work Package: `G0–G3 + GATE C COMPLETE / REMOTE TREES VERIFIED`
+> Current Work Package: `G0 FACTS BASELINE / ADR-0008 / DELIVERY CONTRACT`
 >
-> M6 Authorization: `ACCEPTED P0-P3 G1-R1 SURFACES ONLY / LATER M6 NOT AUTHORIZED`
+> M6 Authorization: `ACCEPTED SURFACES + K2 EXTERNAL AUTHORITY CONNECTION / NO M6 SCHEMA EXPANSION`
 >
-> M7–M19 Authorization: `STATUS MAPPING ONLY / IMPLEMENTATION NOT AUTHORIZED`
+> M7–M15 Authorization: `K2 SINGLE-EPISODE CLOSURE ONLY / GATE-BY-GATE`
 >
-> Integration Gate: `AUTH-W1 PASS — CORE 480 / FRONTEND 112 / BUILD / TWO-PROCESS SECURITY SMOKE`
+> M16–M19 Authorization: `NOT AUTHORIZED`
 >
-> Production Ready: `NO — M6 EXTERNAL AUTHORITIES AND M7–M19 REMAIN OUTSIDE THIS WAVE`
+> Integration Baseline: `AUTH-W1 PRESERVED — CORE 480 / FRONTEND 112 / BUILD / SECURITY SMOKE`
+>
+> Production Ready: `NO — K2 CLOSURE DOES NOT PROVE LIVE MODEL, GPU, RIGHTS OR PUBLICATION READINESS`
 
 ---
 
@@ -405,3 +407,51 @@ This evidence closes AUTH-W1 G1–G3, Gate C and implementation publication. No 
 expansion, M7–M19 opening, provider/GPU readiness, production multi-tenancy or feature
 acceptance is claimed. `R-CORE-SEC-003` moves to monitoring rather than closure because
 credential rotation, user/RBAC policy and production operations remain future work.
+
+## 15. K2 G0 → G7 automatic delivery wave — 2026-08-17
+
+The Project Lead has explicitly authorized the following fail-closed sequence without
+interim review requests:
+
+```text
+G0  Facts Baseline
+→ G1  K2 Golden Episode
+→ G2  M6 Authority + V5 Identity Lock
+→ G3  Confirmed Script → Executable Shot Graph
+→ G4  Asset Resolution + Media Generation
+→ G5  V4 Dispatch + Single-Episode Worker
+→ G6  Composition + QC + Explicit Approval + Episode Master
+→ G7  Connected Frontend Production Workspace
+→ Remote Verify
+```
+
+Normative documents:
+
+- [`AI_CINEMATIC_STUDIO_DELIVERY_GOVERNANCE_PACKAGE_V1.md`](governance/AI_CINEMATIC_STUDIO_DELIVERY_GOVERNANCE_PACKAGE_V1.md)
+- [`ADR-0008-k2-single-episode-production-closure.md`](governance/ADR-0008-k2-single-episode-production-closure.md)
+- [`K2_GOLDEN_EPISODE_PRODUCTION_CONTRACT.md`](architecture/K2_GOLDEN_EPISODE_PRODUCTION_CONTRACT.md)
+
+Wave facts and boundaries:
+
+- Core starts from `79eda3c0bc3d20b97fdca3751a9c5e6247303962` with
+  `480 / 480` tests passing;
+- Frontend starts from `05c3647b1f1fa76d6d67da90cab297ea029fd27d` with
+  `112 / 112` tests passing;
+- AUTH-W1 authentication, principal-derived workspace isolation and public-only
+  deployment topology remain mandatory;
+- M6 may supply the K2 external-authority decision, but Identity Lock remains a
+  separate V5 identity/asset fact and M6 schemas are not expanded;
+- FFmpeg and ffprobe are available for real deterministic local composition evidence;
+- when a live provider/GPU is unavailable, a real playable deterministic adapter may
+  be used only when every result is visibly `LOCAL_EVIDENCE`, follows the same V4
+  worker/artifact contract and leaves publication disabled;
+- G5 is limited to one episode and does not open M16 batch production;
+- creative, identity, QC and final-master approvals remain separate explicit records;
+- K2 technical closure does not establish live model quality, GPU throughput, rights,
+  publication, commercial release or production readiness.
+
+G0 is documentation and contract freeze only. G1 begins only after the G0 checkpoint
+is committed, published without force, fetched and remote-verified. Thereafter a gate
+may advance automatically only when its required tests and evidence pass. Any contract
+stop condition, security regression, unresolved lineage ambiguity, failing required
+test or remote-integrity failure stops the wave.
