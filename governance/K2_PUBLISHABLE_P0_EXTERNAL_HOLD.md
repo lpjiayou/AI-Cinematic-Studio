@@ -42,6 +42,18 @@ Same-tree verification completed with Core `528 / 528`, Frontend `119 / 119` acr
 24 files, TypeScript, ESLint, Next.js production build, targeted public HTTP tests,
 Python compilation and whitespace validation all passing.
 
+The committed Core `eba265322f66ff5e3e7aabb215e57e7f4d54d278` and Frontend
+`ca3af84b406815df73989498d7f2963e261f354d` trees also passed a real two-process
+HTTP gate through `Next Experience Adapter → authenticated Creator Public API →
+Application/V5`: all 19 capabilities and the readiness projection came from Core,
+browser policy write returned `404 / not_found`, a direct forged `actorRef` returned
+`400 / invalid_request`, and an unauthenticated read returned
+`401 / authentication_required`.
+
+The separate real-browser visual gate remains an environment hold: this checkout has
+neither the declared Playwright package nor a usable browser binary. No HTTP-only
+result is represented as browser evidence.
+
 ## Observed environment facts
 
 The execution environment was probed without reading or printing secret values:

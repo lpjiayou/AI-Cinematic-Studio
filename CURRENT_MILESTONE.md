@@ -821,4 +821,9 @@ Same-tree verification before publication of this checkpoint:
 - Core complete regression: `528 / 528`;
 - Frontend complete suite: `119 / 119` across `24` files;
 - Frontend TypeScript, ESLint and Next.js `16.3.0` production build: passed;
-- Python compile, targeted public HTTP/integration tests and `git diff --check`: passed.
+- Python compile, targeted public HTTP/integration tests and `git diff --check`: passed;
+- committed Core `eba265322f66ff5e3e7aabb215e57e7f4d54d278` plus Frontend
+  `ca3af84b406815df73989498d7f2963e261f354d` passed the two-process P0 HTTP Gate C;
+- real-browser visual Gate C remains an explicit environment hold because this
+  checkout lacks both the Playwright package and a usable browser binary; HTTP
+  evidence is not being substituted for browser evidence.
