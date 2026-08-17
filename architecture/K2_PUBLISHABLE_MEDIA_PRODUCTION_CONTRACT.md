@@ -75,6 +75,11 @@ Carries allowed media type/provider/model/region combinations, approved endpoint
 class, safety policy, privacy/retention choice, maximum attempts, timeouts, cost cap,
 seed policy and whether GPU/runtime attestation is required.
 
+When GPU/runtime attestation is required, the external provider-policy authority must
+also return the exact opaque runtime-attestation ref and SHA-256 digest. Both are
+recorded in the immutable provider policy and must match the V4 worker configuration
+and returned runtime facts before provider submission or candidate acceptance.
+
 Every selected provider/model/region combination is resolved through an injected
 provider-policy authority. The recorded fact carries only opaque safe references to
 the approved capability, credential source, usage terms and budget authority plus an

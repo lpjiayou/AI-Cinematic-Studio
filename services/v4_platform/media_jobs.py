@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from copy import deepcopy
+from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from hashlib import sha256
 import json
@@ -48,7 +49,22 @@ class MediaGenerationAdapter(Protocol):
     adapter_identity: str
     provenance: str
 
-    def generate(self, request: Mapping[str, Any], candidate_path: Path) -> Path: ...
+    def generate(
+        self, request: Mapping[str, Any], candidate_path: Path
+    ) -> Path | "MediaAdapterResult": ...
+
+
+@dataclass(frozen=True, slots=True)
+class MediaAdapterResult:
+    """Provider-neutral V4 candidate plus safe execution evidence.
+
+    Provider credentials and private endpoints are deliberately absent.  The result
+    is still untrusted: ``MediaJobCoordinator`` probes the file independently before
+    it can become a V4 artifact handoff.
+    """
+
+    path: Path
+    execution: Mapping[str, Any]
 
 
 def _canonical(value: Mapping[str, Any]) -> bytes:
@@ -59,6 +75,19 @@ def _canonical(value: Mapping[str, Any]) -> bytes:
 
 def _digest(value: Mapping[str, Any]) -> str:
     return sha256(_canonical(value)).hexdigest()
+
+
+def _file_digest_and_size(path: Path) -> tuple[str, int]:
+    digest = sha256()
+    size = 0
+    with path.open("rb") as source:
+        while True:
+            chunk = source.read(1024 * 1024)
+            if not chunk:
+                break
+            size += len(chunk)
+            digest.update(chunk)
+    return digest.hexdigest(), size
 
 
 def _parse_time(value: str) -> datetime:
@@ -83,11 +112,12 @@ def _validate_request(request: Mapping[str, Any]) -> None:
         "adapterCapability", "parameters", "state", "requestedProvenance",
         "publicationAllowed",
     }
+    if not isinstance(request, Mapping):
+        raise MediaJobError("invalid V5 generation request")
+    provenance = request.get("requestedProvenance")
     if (
-        not isinstance(request, Mapping)
-        or not required.issubset(request)
+        not required.issubset(request)
         or request.get("state") != "READY_FOR_DISPATCH"
-        or request.get("requestedProvenance") != "LOCAL_EVIDENCE"
         or request.get("publicationAllowed") is not False
         or request.get("mediaKind") not in {"video", "audio"}
         or not isinstance(request.get("parameters"), Mapping)
@@ -95,6 +125,140 @@ def _validate_request(request: Mapping[str, Any]) -> None:
         != request.get("payloadDigest")
     ):
         raise MediaJobError("invalid V5 generation request")
+    if provenance == "LOCAL_EVIDENCE":
+        return
+    if provenance != "LIVE_PROVIDER":
+        raise MediaJobError("generation request provenance is unsupported")
+    provider = request.get("providerSelection")
+    if (
+        request.get("mediaKind") != "video"
+        or request.get("adapterCapability") != "comfyui-wan22-ti2v-v1"
+        or not isinstance(provider, Mapping)
+        or set(provider)
+        != {
+            "providerId", "modelId", "region", "endpointClass",
+            "providerCapabilityRef", "providerExecutionPolicyRef",
+            "providerExecutionPolicyDigest", "rightsManifestRef",
+            "rightsManifestDigest", "productionPolicyRef",
+            "productionPolicyDigest", "credentialSourceRef",
+            "usageTermsRef", "budgetAuthorityRef", "runtimeAttestationRef",
+            "runtimeAttestationDigest", "costCurrency", "maxCostMinor",
+            "timeoutSeconds",
+        }
+        or not all(
+            isinstance(provider.get(field), str) and provider[field]
+            for field in provider
+            if not field.endswith("Digest")
+            and field not in {"maxCostMinor", "timeoutSeconds"}
+        )
+        or any(
+            not isinstance(provider.get(field), str)
+            or len(provider[field]) != 64
+            or any(character not in "0123456789abcdef" for character in provider[field])
+            for field in (
+                "providerExecutionPolicyDigest", "rightsManifestDigest",
+                "productionPolicyDigest", "runtimeAttestationDigest",
+            )
+        )
+        or not isinstance(provider.get("costCurrency"), str)
+        or len(provider["costCurrency"]) != 3
+        or provider["costCurrency"] != provider["costCurrency"].upper()
+        or isinstance(provider.get("maxCostMinor"), bool)
+        or not isinstance(provider.get("maxCostMinor"), int)
+        or provider["maxCostMinor"] < 0
+        or isinstance(provider.get("timeoutSeconds"), bool)
+        or not isinstance(provider.get("timeoutSeconds"), int)
+        or provider["timeoutSeconds"] < 1
+    ):
+        raise MediaJobError("live provider request authority is incomplete")
+    parameters = request["parameters"]
+    live_fields = {
+        "durationFrames", "frameRate", "width", "height", "prompt",
+        "negativePrompt", "seed", "steps", "cfg", "samplerName",
+        "scheduler", "modelShift",
+    }
+    if (
+        set(parameters) != live_fields
+        or not isinstance(parameters.get("prompt"), str)
+        or not parameters["prompt"].strip()
+        or len(parameters["prompt"]) > 4000
+        or not isinstance(parameters.get("negativePrompt"), str)
+        or len(parameters["negativePrompt"]) > 4000
+        or any(
+            isinstance(parameters.get(field), bool)
+            or not isinstance(parameters.get(field), int)
+            for field in (
+                "durationFrames", "frameRate", "width", "height", "seed", "steps"
+            )
+        )
+        or parameters["durationFrames"] < 1
+        or parameters["durationFrames"] % 4 != 1
+        or parameters["frameRate"] < 1
+        or parameters["width"] < 32
+        or parameters["width"] % 32 != 0
+        or parameters["height"] < 32
+        or parameters["height"] % 32 != 0
+        or parameters["steps"] < 1
+        or not isinstance(parameters.get("cfg"), (int, float))
+        or isinstance(parameters.get("cfg"), bool)
+        or not isinstance(parameters.get("modelShift"), (int, float))
+        or isinstance(parameters.get("modelShift"), bool)
+        or parameters.get("samplerName") not in {"uni_pc", "uni_pc_bh2"}
+        or parameters.get("scheduler") != "simple"
+    ):
+        raise MediaJobError("live provider request parameters are invalid")
+
+
+def _validate_live_execution(
+    execution: Mapping[str, Any], request: Mapping[str, Any]
+) -> dict[str, Any]:
+    required = {
+        "providerId", "modelId", "region", "endpointClass",
+        "providerRequestRef", "latencyMs", "costCurrency", "costMinor",
+        "seed", "executionDevice", "gpuUsed", "runtimeFacts",
+        "runtimeFactsDigest",
+    }
+    provider = request["providerSelection"]
+    runtime_facts = execution.get("runtimeFacts") if isinstance(
+        execution, Mapping
+    ) else None
+    if (
+        not isinstance(execution, Mapping)
+        or set(execution) != required
+        or any(
+            execution.get(field) != provider.get(field)
+            for field in ("providerId", "modelId", "region", "endpointClass")
+        )
+        or not isinstance(execution.get("providerRequestRef"), str)
+        or not execution["providerRequestRef"]
+        or isinstance(execution.get("latencyMs"), bool)
+        or not isinstance(execution.get("latencyMs"), int)
+        or execution["latencyMs"] < 0
+        or not isinstance(execution.get("costCurrency"), str)
+        or len(execution["costCurrency"]) != 3
+        or execution["costCurrency"] != execution["costCurrency"].upper()
+        or isinstance(execution.get("costMinor"), bool)
+        or not isinstance(execution.get("costMinor"), int)
+        or execution["costMinor"] < 0
+        or execution.get("seed") != request["parameters"]["seed"]
+        or not isinstance(execution.get("executionDevice"), str)
+        or not execution["executionDevice"]
+        or execution.get("gpuUsed") is not True
+        or not isinstance(runtime_facts, Mapping)
+        or execution.get("runtimeFactsDigest") != _digest(runtime_facts)
+        or any(
+            runtime_facts.get(field) != provider.get(field)
+            for field in ("providerId", "modelId", "region", "endpointClass")
+        )
+        or runtime_facts.get("runtimeAttestationRef")
+        != provider.get("runtimeAttestationRef")
+        or runtime_facts.get("runtimeAttestationDigest")
+        != provider.get("runtimeAttestationDigest")
+        or runtime_facts.get("deviceType") != "cuda"
+        or runtime_facts.get("deviceName") != execution.get("executionDevice")
+    ):
+        raise ArtifactVerificationError("live provider execution evidence is invalid")
+    return deepcopy(dict(execution))
 
 
 def _validate_job(job: Mapping[str, Any]) -> None:
@@ -619,6 +783,11 @@ class MediaJobCoordinator:
             or current.get("lease", {}).get("workerRef") != worker_ref
         ):
             raise MediaJobStateError("valid worker lease is required")
+        request = current["request"]
+        if self.adapter.provenance != request["requestedProvenance"]:
+            raise MediaJobStateError(
+                "worker adapter provenance does not match the generation request"
+            )
         expected = current["revision"]
         attempt_number = len(current["attempts"]) + 1
         attempt = {
@@ -632,7 +801,6 @@ class MediaJobCoordinator:
         current["attempts"].append(attempt)
         current.update({"state": "RUNNING", "updatedAt": self._clock()})
         current = self.repository.save(current, expected)
-        request = current["request"]
         extension = ".mp4" if request["mediaKind"] == "video" else ".wav"
         run_root = self._run_root(current["workspaceRef"], current["productionRunRef"])
         request_hash = sha256(request["generationRequestRef"].encode()).hexdigest()[:20]
@@ -641,8 +809,23 @@ class MediaJobCoordinator:
         candidate_path = directory / f"attempt-{attempt_number}.part{extension}"
         try:
             produced = self.adapter.generate(request, candidate_path)
+            execution: dict[str, Any] | None = None
+            if isinstance(produced, MediaAdapterResult):
+                produced_value = produced.path
+                if request["requestedProvenance"] != "LIVE_PROVIDER":
+                    raise ArtifactVerificationError(
+                        "local request returned live provider execution evidence"
+                    )
+                execution = _validate_live_execution(produced.execution, request)
+            else:
+                produced_value = produced
+                if request["requestedProvenance"] != "LOCAL_EVIDENCE":
+                    raise ArtifactVerificationError(
+                        "live provider request omitted execution evidence"
+                    )
             produced_path = self._safe_path(
-                current["workspaceRef"], current["productionRunRef"], Path(produced)
+                current["workspaceRef"], current["productionRunRef"],
+                Path(produced_value),
             )
             if produced_path != candidate_path.resolve() or not produced_path.is_file():
                 raise ArtifactVerificationError("adapter returned an unexpected artifact")
@@ -652,7 +835,8 @@ class MediaJobCoordinator:
             safe_final = self._safe_path(
                 current["workspaceRef"], current["productionRunRef"], final_path
             )
-            content = safe_final.read_bytes()
+            content_digest, content_size = _file_digest_and_size(safe_final)
+            provenance = request["requestedProvenance"]
             artifact = {
                 "schemaVersion": ARTIFACT_SCHEMA_VERSION,
                 "workspaceRef": current["workspaceRef"],
@@ -666,20 +850,30 @@ class MediaJobCoordinator:
                 "mediaType": request["mediaType"],
                 "internalPath": str(safe_final),
                 "storageKey": str(safe_final.relative_to(self.artifact_root)),
-                "byteSize": len(content),
-                "sha256": sha256(content).hexdigest(),
+                "byteSize": content_size,
+                "sha256": content_digest,
                 "probe": probe,
                 "adapterIdentity": self.adapter.adapter_identity,
-                "provenance": self.adapter.provenance,
-                "executionDevice": "CPU_FFMPEG",
-                "gpuUsed": False,
+                "provenance": provenance,
+                "executionDevice": (
+                    execution["executionDevice"] if execution is not None
+                    else "CPU_FFMPEG"
+                ),
+                "gpuUsed": execution is not None,
                 "publicationAllowed": False,
                 "createdAt": self._clock(),
             }
+            if execution is not None:
+                artifact["providerExecution"] = deepcopy(execution)
             expected = current["revision"]
-            current["attempts"][-1].update(
-                {"state": "SUCCEEDED", "finishedAt": self._clock(), "artifactSha256": artifact["sha256"]}
-            )
+            attempt_result = {
+                "state": "SUCCEEDED",
+                "finishedAt": self._clock(),
+                "artifactSha256": artifact["sha256"],
+            }
+            if execution is not None:
+                attempt_result["providerExecution"] = deepcopy(execution)
+            current["attempts"][-1].update(attempt_result)
             current.update(
                 {"state": "SUCCEEDED", "lease": None, "artifact": artifact, "updatedAt": self._clock()}
             )
@@ -721,7 +915,10 @@ class MediaJobCoordinator:
                     }
                 ),
             )
-        worker_ref = "v4-k2-local-worker"
+        worker_ref = (
+            "v4-media-worker-"
+            + sha256(self.adapter.adapter_identity.encode("utf-8")).hexdigest()[:16]
+        )
         while True:
             leased = self.lease_next(workspace_ref, run_ref, worker_ref)
             if leased is None:
@@ -737,7 +934,19 @@ class MediaJobCoordinator:
             job for job in jobs
             if job["request"]["generationRequestRef"] in relevant
         ]
-        if len(selected) != len(requests) or any(job["state"] != "SUCCEEDED" for job in selected):
+        if len(selected) != len(requests):
+            raise MediaAdapterUnavailableError("media batch did not complete")
+        failed = [job for job in selected if job["state"] != "SUCCEEDED"]
+        if failed:
+            if any(
+                job.get("attempts")
+                and job["attempts"][-1].get("errorCode")
+                == ArtifactVerificationError.code
+                for job in failed
+            ):
+                raise ArtifactVerificationError(
+                    "media batch candidate verification failed"
+                )
             raise MediaAdapterUnavailableError("media batch did not complete")
         return sorted(
             selected, key=lambda item: item["request"]["ordinal"]

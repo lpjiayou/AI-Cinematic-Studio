@@ -1,6 +1,6 @@
 # Creator Public HTTP/API v1
 
-Status: `XR1 FROZEN / AUTH-W1 SECURITY AMENDMENT`
+Status: `XR1 FROZEN / AUTH-W1 SECURITY AMENDMENT / K2 P0-P1 BOUNDED EXTENSION`
 
 This contract is the only browser-facing Core HTTP surface for the separate Commercial
 Frontend. Existing `/creator/internal/*` endpoints remain compatibility-only and must
@@ -23,7 +23,14 @@ Commercial Frontend → Frontend Experience Adapter → /creator/api/v1
 | M4 | `/projects`, `/project-contexts` | Project Context public boundary |
 | M5 | `/series-planning-workspaces`, `/series-plan-*` | Series Planning + Series Director boundaries |
 | M6 | `/series-intelligence-workspaces`, `/series-intelligence/*` | accepted Series Intelligence public boundary |
-| M7–M19 | `/capabilities` status only | not authorized / not open |
+| M7–M8 | `/episode-production-runs/{runRef}/shot-graph` | bounded K2 V5 Shot Graph service |
+| M9 | `/episode-production-runs/{runRef}/assets` | bounded K2 V5 Asset Pipeline service |
+| M10 | `/episode-production-runs/{runRef}/production-readiness` | bounded K2 V5 policy/rights authority |
+| M11 | `/episode-production-runs/{runRef}/provider-experiments`, `/media` | bounded K2 V5 experiment/media services over V4 |
+| M12 | `/episode-production-runs/{runRef}/production-readiness`, `/media` | bounded K2 V5 media service; live audio remains blocked |
+| M13–M14 | `/episode-production-runs/{runRef}/preview`, `/finalize` | bounded K2 V5 delivery service over V4/V3 |
+| M15 | `/episode-production-runs/{runRef}/delivery`, preview/export content | bounded K2 V5 delivery authority |
+| M16–M19 | `/capabilities` status only | not open at the current gate |
 
 ## Envelopes and transport
 
@@ -43,6 +50,24 @@ specific confirmation route. The Experience Adapter must preserve
 response. The M1 candidate response also carries the Core-issued opaque
 `sourcePlanRef` and `sourcePlanVersion`; browser code must return those exact values on
 confirmation and must not mint or infer a source-plan reference.
+
+## K2 provider experiment semantics
+
+`POST /episode-production-runs/{runRef}/provider-experiments` accepts exactly
+`idempotencyKey`, `sourceGenerationRequestRef` and `providerCapabilityRef` after the
+authenticated server injects workspace and run scope. It can execute only an existing
+M9 video GenerationRequest against one exact current rights/policy bundle through V4.
+
+A successful response is deliberately an untrusted, unselected, non-admitted
+candidate. It exposes safe provider/model/region, attempt, cost, latency, GPU/runtime,
+digest and probe facts, but no credential source ref, internal path or storage key. It
+does not create an AssetVersion, advance the K2 media gate, satisfy approval or allow
+publication. `GET` returns only candidates whose stored artifact and digest can still
+be independently verified; missing policy remains a fail-closed product error.
+When GPU attestation is required, the immutable provider policy, V5 request, V4 worker
+configuration and returned runtime facts must carry the same authority-approved
+runtime-attestation ref and digest; a mismatch fails before provider submission or
+candidate admission.
 
 ## Capability states
 

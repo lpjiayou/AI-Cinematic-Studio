@@ -8,9 +8,9 @@
 >
 > Authorized Wave: `ACS-K2-P0 → P1 → P2 → P3 → P4 → P5 → P6 → P7 → P8 → P9 → GATE A/B/C → P10`
 >
-> Current Task: `ACS-K2-PUBLISHABLE-P0-FACTS-RIGHTS-PROVIDER-EVIDENCE`
+> Current Task: `ACS-K2-PUBLISHABLE-P0-EXTERNAL-AUTHORITY + P1-VIDEO-SAFE-PREREQUISITE`
 >
-> Current Work Package: `P0 SAFE IMPLEMENTATION COMPLETE / EXTERNAL RIGHTS + PROVIDER AUTHORITY HOLD`
+> Current Work Package: `P1 VIDEO SAFE IMPLEMENTATION COMPLETE / P0→P1 EXTERNAL RIGHTS + PROVIDER AUTHORITY HOLD`
 >
 > M6 Authorization: `ACCEPTED SURFACES + K2 EXTERNAL AUTHORITY CONNECTION / NO M6 SCHEMA EXPANSION`
 >
@@ -22,7 +22,7 @@
 >
 > Integration Baseline: `K2 G0→G7 PRESERVED — CORE 518 / FRONTEND 118 / LOCAL PLAYABLE EVIDENCE`
 >
-> Production Ready: `NO — P0 CODE AND CONTRACTS VERIFIED; P0→P1 BLOCKED BY EXTERNAL RIGHTS/PROVIDER FACTS`
+> Production Ready: `NO — P1 VIDEO PREREQUISITE VERIFIED; P0→P1 BLOCKED BY EXTERNAL RIGHTS/PROVIDER FACTS`
 
 ---
 
@@ -810,9 +810,10 @@ video baseline cannot become an implicit provider input.
 
 The current local K2 facts remain blocked because its identity references are
 `LOCAL_EVIDENCE`, no rights-evidence/provider-policy authorities are configured, no
-rights-cleared live image/video/audio provider execution exists, and no GPU/runtime or
-publication authority is present. P1 has therefore not started and no downstream
-publishable claim is made. See
+rights-cleared live image/video/audio provider execution exists, and no
+authority-approved GPU/runtime attestation or publication authority is present.
+Governed P1 execution has therefore not started and no downstream publishable claim
+is made. See
 `governance/K2_PUBLISHABLE_P0_EXTERNAL_HOLD.md` for the exact evidence and required
 external inputs.
 
@@ -827,3 +828,49 @@ Same-tree verification before publication of this checkpoint:
 - real-browser visual Gate C remains an explicit environment hold because this
   checkout lacks both the Playwright package and a usable browser binary; HTTP
   evidence is not being substituted for browser evidence.
+
+### P1 bounded video safe prerequisite — 2026-08-18
+
+Independent safe implementation has now closed the video-only P1 dispatch prerequisite
+without advancing the blocked gate:
+
+- V4 has a fail-closed `ComfyUIWan22VideoAdapter` behind the existing media-job
+  contract; it probes exact native nodes, model names, one CUDA device and the approved
+  endpoint class before dispatch;
+- the approved Provider Policy, V5 request, V4 worker configuration and returned
+  runtime facts must carry one identical external-authority runtime-attestation ref and
+  digest; mismatch, unsafe redirects, wrong output identity, path escape, cost overflow,
+  timeout or media-probe failure is rejected;
+- V5 derives one fixed 49-frame experiment from an existing current M9 video
+  `GenerationRequest` and verifies the current K2 root, M6 authority/Identity Lock,
+  M9 plan, Rights Manifest and Provider Policy before calling V4;
+- a successful result remains `UNTRUSTED_PROVIDER_CANDIDATE / UNSELECTED /
+  NOT_ADMITTED`, is stored separately from AssetVersions and cannot advance G5, satisfy
+  an approval or set publication eligibility;
+- the authenticated Public API exposes only the bounded POST/GET
+  `provider-experiments` subresource and strips credential-source refs, internal paths
+  and storage keys;
+- the operator attestation utility hashes the three files actually present on the
+  compute host, probes ComfyUI and emits a secret-free technical record for external
+  authority review.
+
+A separate operator-controlled A100/ComfyUI smoke produced a real 49-frame MP4. Its
+independent probe and digest are recorded in
+`governance/K2_PUBLISHABLE_P0_EXTERNAL_HOLD.md`. It is deliberately classified as
+`OUT_OF_LINEAGE_OPERATOR_SMOKE / TECHNICAL_EVIDENCE_ONLY`, not as a governed provider
+attempt or production asset.
+
+Same-tree verification for this prerequisite:
+
+- bounded P0/P1 policy, V4, V5 and HTTP regression: `34 / 34`;
+- complete Core regression: `541 / 541`;
+- Python compile and `git diff --check`: passed;
+- sample MP4 SHA-256 and full ffprobe facts: independently reproduced;
+- repository secret/endpoint scan: passed; no credential, SSH destination or private
+  endpoint was added.
+
+P1 is still `NOT PASSED`. The default Rights and Provider authorities remain rejecting,
+no governed same-lineage live call has run, image/audio experiments and explicit
+candidate selection are absent, and P2 production persistence/object storage/secret
+injection/recovery has not started. Automatic gate progression therefore remains
+stopped at P0→P1 while independent safe prerequisites may continue.

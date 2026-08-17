@@ -99,4 +99,7 @@ Every checkpoint must satisfy the architecture contract, targeted tests, complet
 regression, secret scan, remote SHA/tree equality and a clean worktree. Live evidence
 must additionally record provider/model/region, request and attempt refs, parameters,
 latency, cost units, seed where supported, output digest, probe facts, rights refs and
-GPU/runtime facts. Absence is a blocked gate, never a synthetic success.
+GPU/runtime facts. When attestation is required, the authority-approved attestation
+ref/digest must match the immutable provider policy, V5 request, V4 configuration and
+returned runtime facts. Absence or mismatch is a blocked gate, never a synthetic
+success.

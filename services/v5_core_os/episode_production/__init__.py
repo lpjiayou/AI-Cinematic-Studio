@@ -36,6 +36,13 @@ from .production_policy import (
     StaticProviderPolicyAuthority,
     StaticRightsEvidenceAuthority,
 )
+from .provider_experiments import (
+    InMemoryProviderExperimentAdapter,
+    K2ProviderExperimentService,
+    ProviderCandidateRejectedError,
+    ProviderExperimentUnavailableError,
+    SqliteProviderExperimentAdapter,
+)
 
 __all__ = [
     "EpisodeProductionPublicBoundary",
@@ -59,6 +66,11 @@ __all__ = [
     "SqliteProductionPolicyAdapter",
     "StaticProviderPolicyAuthority",
     "StaticRightsEvidenceAuthority",
+    "InMemoryProviderExperimentAdapter",
+    "K2ProviderExperimentService",
+    "ProviderCandidateRejectedError",
+    "ProviderExperimentUnavailableError",
+    "SqliteProviderExperimentAdapter",
     "create_in_memory_boundary",
     "create_local_development_boundary",
     "create_local_development_boundary_from_environment",

@@ -125,6 +125,7 @@ HEALTH_ENDPOINT = "/health"
 EPISODE_PRODUCTION_SUBRESOURCES = {
     "authority-identity",
     "production-readiness",
+    "provider-experiments",
     "shot-graph",
     "assets",
     "media",
@@ -347,6 +348,10 @@ class CreatorRequestHandler(BaseHTTPRequestHandler):
                     result = self.episode_production_boundary.record_production_policy(
                         command
                     )
+                elif resource == "provider-experiments":
+                    result = self.episode_production_boundary.run_provider_experiment(
+                        command
+                    )
                 elif resource == "shot-graph":
                     result = self.episode_production_boundary.compile_shot_graph(
                         command
@@ -544,6 +549,10 @@ class CreatorRequestHandler(BaseHTTPRequestHandler):
                         )
                     elif resource == "production-readiness":
                         result = self.episode_production_boundary.get_production_readiness(
+                            workspace_ref, run_ref
+                        )
+                    elif resource == "provider-experiments":
+                        result = self.episode_production_boundary.list_provider_experiments(
                             workspace_ref, run_ref
                         )
                     elif resource == "shot-graph":
