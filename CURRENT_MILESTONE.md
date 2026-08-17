@@ -4,19 +4,19 @@
 >
 > Execution Mode: `AUTO-SEQUENTIAL / CONTRACT-FIRST / FAIL-CLOSED`
 >
-> Project Lead Authorization: `FRONTEND ↔ CORE ACCURATE MAPPING AUTHORIZED ON 2026-08-17`
+> Project Lead Authorization: `AUTHENTICATED FRONTEND ↔ CORE WORKSPACE ISOLATION AUTHORIZED ON 2026-08-17`
 >
-> Authorized Wave: `ACS-XR1-G0 → G1 → G2 → G3 → REMOTE VERIFY`
+> Authorized Wave: `ACS-AUTH-W1-G0 → G1 → G2 → G3 → GATE C → REMOTE VERIFY`
 >
-> Current Task: `ACS-XR1-GATE-C-CLOSEOUT`
+> Current Task: `ACS-AUTH-W1-G0-CONTRACT-FREEZE`
 >
-> Current Work Package: `LOCAL COMPLETE / REMOTE BRANCH VERIFY PENDING`
+> Current Work Package: `G0 FACT AUDIT COMPLETE / GOVERNANCE PUBLICATION IN PROGRESS`
 >
 > M6 Authorization: `ACCEPTED P0-P3 G1-R1 SURFACES ONLY / LATER M6 NOT AUTHORIZED`
 >
 > M7–M19 Authorization: `STATUS MAPPING ONLY / IMPLEMENTATION NOT AUTHORIZED`
 >
-> Integration Gate: `LOCAL PASS — CORE 471 / FRONTEND 108 / BUILD / TWO-PROCESS SMOKE`
+> Integration Gate: `XR1 BASELINE PASS — CORE 471 / FRONTEND 109; AUTH-W1 GATE C PENDING`
 >
 > Production Ready: `NO — M6 EXTERNAL AUTHORITIES AND M7–M19 REMAIN OUTSIDE THIS WAVE`
 
@@ -265,3 +265,69 @@ Observed results:
 The local integration gate is closed. Force push remains forbidden. Remote SHA equality
 and clean worktrees are the remaining publication checks; neither changes the accepted
 capability scope.
+
+---
+
+## 10. AUTH-W1 accepted baseline and fact audit — 2026-08-17
+
+AUTH-W1 branches from the remote-verified XR1 Core commit
+`b7cfe40e3ff35514ef9a0b8bca8c91c2ff010d74` and the Frontend remote fluid-layout
+commit `95dc3f6b20ed679db6bc3da55906be94f6963630`. Local Frontend commit
+`0420b64caf7cab6e83b045cf8ea018e603609159` has the same tree and parent as the remote
+commit; it is preserved as duplicate publication history and is not treated as a code
+conflict.
+
+Verified baseline evidence:
+
+- Core full suite: `471 / 471` passed;
+- Frontend unit/component suite: `109 / 109` passed across `23` files;
+- Core public contract declares 27 endpoint constants under `/creator/api/v1`;
+- Core has no bearer authentication and accepts request `workspaceRef` in query/body;
+- server composition is hard-coded to `127.0.0.1:8765`;
+- Frontend removes browser scope claims, but currently injects `workspaceRef` from
+  server configuration and has no credential with which Core can identify it;
+- Core has no CORS implementation, which is correct for the accepted same-origin
+  Browser → Frontend Adapter → Core topology.
+
+The fact audit rejects the submitted draft's claims that CORS, a browser token, full
+M19 multi-tenancy or “the only remaining production blocker” are part of this wave.
+AUTH-W1 is bounded public-boundary hardening only. Production Ready remains `NO`.
+
+## 11. AUTH-W1 automatic execution contract
+
+Project Lead instruction on `2026-08-17` authorizes the following contract-first,
+fail-closed automatic sequence after the G0 checkpoint is committed, pushed and
+remote-verified:
+
+```text
+G0  ADR-0007 + normative contract + API amendment + risk registration
+ ↓
+G1  Core bearer authentication + principal workspace injection
+ ↓
+G2  host/port/config composition + non-loopback public-only route exposure
+ ↓
+G3  Frontend server-only token + removal of Frontend workspace forwarding
+ ↓
+Gate C  full suites + production build + real two-process isolation/security smoke
+ ↓
+Remote Verify  no-force push + SHA equality + ahead/behind 0/0 + clean worktrees
+```
+
+The sequence stops only on a contract stop condition, failing test, credential leak,
+required M6/M7–M19 expansion, persistent-schema requirement, or inability to prove
+remote integrity. Routine transition between these listed gates requires no additional
+interim review. This is execution authorization, not final feature acceptance.
+
+## 12. AUTH-W1 definition of done
+
+1. every `/creator/api/v1/*` route is authenticated and `/health` is liveness-only;
+2. public clients cannot send `workspaceRef`; Core derives it from the credential;
+3. `CREATOR_CORE_TOKEN` remains Frontend-server-only and is absent from browser assets;
+4. non-loopback composition refuses invalid/missing auth configuration and exposes no
+   internal compatibility routes;
+5. Core remains no-CORS and browser code remains same-origin;
+6. 401 authentication and existing 403 application-authority semantics stay distinct;
+7. complete Core and Frontend suites, build, Gate C and secret scans pass;
+8. both repositories are pushed without force and remotely verified.
+
+AUTH-W1 does not change M6 authorization and does not open M7–M19.

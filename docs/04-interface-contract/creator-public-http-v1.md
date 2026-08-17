@@ -1,6 +1,6 @@
 # Creator Public HTTP/API v1
 
-Status: `XR1 FROZEN`
+Status: `XR1 FROZEN / AUTH-W1 SECURITY AMENDMENT`
 
 This contract is the only browser-facing Core HTTP surface for the separate Commercial
 Frontend. Existing `/creator/internal/*` endpoints remain compatibility-only and must
@@ -59,3 +59,25 @@ The public v1 handler delegates to the same accepted Application/V5 methods as t
 historical internal handler. It may normalize route names and stable envelopes, but it
 may not add domain facts, weaken scope checks, bypass lifecycle leases or translate an
 error into success.
+
+## Authentication and workspace scope
+
+The security amendment in
+[`ADR-0007`](../../governance/ADR-0007-creator-public-api-authentication-and-workspace-isolation.md)
+and its
+[`normative contract`](../../architecture/CREATOR_PUBLIC_API_AUTHENTICATION_AND_WORKSPACE_ISOLATION_CONTRACT.md)
+applies to the complete public v1 prefix:
+
+- every `/creator/api/v1/*` request requires a server-to-server bearer credential;
+- `/health` is the only unauthenticated liveness route;
+- the authenticated credential selects exactly one `workspaceRef`;
+- public query strings and command bodies must not contain `workspaceRef`;
+- Core injects the authenticated workspace before calling accepted boundaries;
+- browser code calls only the same-origin Frontend Adapter and never receives the Core
+  token or origin;
+- Core remains a no-CORS server API;
+- non-loopback listeners expose no `/creator/internal/*` compatibility routes.
+
+Authentication failure is `401 / authentication_required`. Attempted client workspace
+selection is `400 / client_workspace_scope_forbidden`. Existing application-level
+`403` errors, including `authority_unavailable`, keep their accepted meaning.
