@@ -800,6 +800,42 @@ class K2DeliveryService:
             )
         return result
 
+    def get_preview_file(
+        self, workspace_ref: str, run_ref: str
+    ) -> dict[str, Any]:
+        _, _, preview, _ = self._verified_preview_qc(workspace_ref, run_ref)
+        artifact = {
+            "internalPath": str(
+                (
+                    Path(self.composition.artifact_root)
+                    / preview["storageKey"]
+                ).resolve()
+            ),
+            **{
+                key: preview[key]
+                for key in (
+                    "storageKey",
+                    "byteSize",
+                    "sha256",
+                    "probe",
+                    "provenance",
+                    "gpuUsed",
+                    "publicationAllowed",
+                )
+            },
+        }
+        path, _ = self._verify_artifact(
+            artifact, expected_sha=preview["sha256"]
+        )
+        return {
+            "path": path,
+            "fileName": f"preview-{run_ref}.mp4",
+            "mediaType": preview["mediaType"],
+            "byteSize": preview["byteSize"],
+            "sha256": preview["sha256"],
+            "contentDisposition": "inline",
+        }
+
     def get_export_file(
         self, workspace_ref: str, run_ref: str, export_ref: str
     ) -> dict[str, Any]:

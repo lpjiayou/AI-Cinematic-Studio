@@ -208,6 +208,19 @@ def _episode_export_content(path: str) -> tuple[str, str] | None:
     return run_ref, export_ref
 
 
+def _episode_preview_content(path: str) -> str | None:
+    prefix = f"{PUBLIC_EPISODE_PRODUCTION_RUNS_ENDPOINT}/"
+    if not path.startswith(prefix):
+        return None
+    parts = path[len(prefix):].split("/")
+    if len(parts) != 3 or parts[1:] != ["preview", "content"]:
+        return None
+    run_ref = unquote(parts[0])
+    if not run_ref or "/" in run_ref:
+        return None
+    return run_ref
+
+
 class CreatorRequestHandler(BaseHTTPRequestHandler):
     server_version = "CreatorCore/1.0"
 
@@ -486,6 +499,13 @@ class CreatorRequestHandler(BaseHTTPRequestHandler):
                 )
                 return
             if requested_path.startswith(f"{PUBLIC_EPISODE_PRODUCTION_RUNS_ENDPOINT}/"):
+                preview_run_ref = _episode_preview_content(requested_path)
+                if preview_run_ref is not None:
+                    result = self.episode_production_boundary.get_preview_file(
+                        workspace_ref, preview_run_ref
+                    )
+                    self._send_file(result)
+                    return
                 export_content = _episode_export_content(requested_path)
                 if export_content is not None:
                     run_ref, export_ref = export_content
@@ -1113,7 +1133,14 @@ class CreatorRequestHandler(BaseHTTPRequestHandler):
         self.send_response(200)
         self.send_header("Content-Type", str(artifact.get("mediaType", "video/mp4")))
         self.send_header("Content-Length", str(len(body)))
-        self.send_header("Content-Disposition", f'attachment; filename="{file_name}"')
+        disposition = (
+            "inline"
+            if artifact.get("contentDisposition") == "inline"
+            else "attachment"
+        )
+        self.send_header(
+            "Content-Disposition", f'{disposition}; filename="{file_name}"'
+        )
         self.send_header("Cache-Control", "private, no-store")
         self.send_header("X-Content-Type-Options", "nosniff")
         self.end_headers()

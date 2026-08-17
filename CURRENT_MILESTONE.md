@@ -8,9 +8,9 @@
 >
 > Authorized Wave: `ACS-K2-G0 → G1 → G2 → G3 → G4 → G5 → G6 → G7 → REMOTE VERIFY`
 >
-> Current Task: `ACS-K2-G6-COMPOSITION-QC-APPROVAL-MASTER`
+> Current Task: `ACS-K2-G7-CONNECTED-FRONTEND-PRODUCTION-WORKSPACE`
 >
-> Current Work Package: `G6 DETERMINISTIC COMPOSITION / MACHINE QC / EXPLICIT APPROVALS / IMMUTABLE MASTER`
+> Current Work Package: `G7 EXPERIENCE ADAPTER / PREVIEW PLAYBACK / EXPLICIT APPROVAL UI / DELIVERY`
 >
 > M6 Authorization: `ACCEPTED SURFACES + K2 EXTERNAL AUTHORITY CONNECTION / NO M6 SCHEMA EXPANSION`
 >
@@ -661,3 +661,56 @@ media may enter G6 composition.
 G6 remains a local technical checkpoint until this exact tree is committed, published
 without force, fetched and proven equal to the remote branch. G7 may consume only the
 authenticated public preview, delivery and export contracts from that verified tree.
+
+### G6 remote verification
+
+- branch: `feature/acs-k2-golden-episode`;
+- remote commit: `ace668f13a30d964a4b4978a04d4fe1e2795ade2`;
+- remote tree: `0ab80e38d593bbe580817fdaf1f25a0d3b31ac87`;
+- fetched local and remote trees matched, ahead/behind was `0 / 0`, and the worktree
+  was clean before G7 implementation began.
+
+### G7 local implementation evidence
+
+- Core exposes an authenticated, principal-scoped preview-content route in addition
+  to the existing delivery/export route; it re-verifies the preview digest and media
+  probe before serving `video/mp4` inline and never returns an internal path;
+- the Frontend Experience Adapter allowlists only the bounded K2 collection, run,
+  stage, delivery, preview-content and export-content routes, strips browser run/scope
+  claims, retains server-only bearer authentication, and streams only verified video
+  response types with safe headers;
+- project-level `制作 / 后期 / 交付` routes now form one state-driven workspace with
+  a left run/gate navigator, central shot/asset/review/delivery canvas and right
+  current-state/next-action inspector; the page root remains viewport-fluid rather
+  than introducing a narrow centered shell;
+- the UI maps exact Core `projectRef`, immutable refs, versions, digests and state;
+  local fixtures cannot become production runs, unknown routes fail before Core and
+  browser input cannot create workspace or run authority;
+- preview playback is available before approval; six machine QC checks remain
+  evidence only; four approval kinds require separate external approval and actor
+  refs plus an explicit acknowledgement, and no field or decision is automatically
+  supplied by the UI;
+- the master/export view retains `LOCAL_EVIDENCE`, `gpuUsed=false` and
+  `publicationAllowed=false`, provides authenticated playback/download, and exposes
+  no publication control;
+- Core full regression: `518 / 518`;
+- Frontend: TypeScript and ESLint passed, `118 / 118` tests passed across `24` files,
+  and the Next.js `16.3.0` production build passed with all three dynamic project
+  workspace routes and the same-origin adapter route;
+- a real two-process HTTP gate exercised
+  `Node HTTP → Next Experience Adapter → authenticated Creator Public API →
+  Application → V5 → V4 → V3`: four shots, eight media jobs, six QC checks and four
+  externally verified `HUMAN` decisions advanced one run from `MEDIA_READY` to
+  `MASTER_READY`; the inline preview and attachment export were both real
+  `526636`-byte MP4 files with SHA-256
+  `5377f6147a7f02c3c1d181372e85d3fe8f7a3dec5274773bc30e5786853f881a`;
+- publication remained disabled and GPU usage remained false throughout the gate.
+
+The real-browser portion of Gate C is `ENVIRONMENT HOLD`, not passed: this execution
+environment contains the Playwright API but no local Chromium executable, while the
+approved Cloud Browser security policy blocks localhost/private-network URLs and
+explicitly forbids CDP or alternate-surface circumvention. No jsdom, static parsing or
+HTTP-only result is being represented as browser evidence. G7 is therefore an
+`IMPLEMENTED TECHNICAL CANDIDATE / BROWSER GATE HOLD`; final browser console, page
+error, horizontal-overflow and visual checks remain required in an approved Chrome
+environment that can reach the two local processes.

@@ -1305,6 +1305,15 @@ class EpisodeProductionG6DeliveryTests(unittest.TestCase):
         self.assertEqual(len(preview["qcReport"]["checks"]), 6)
         self.assertEqual(preview["previewCandidate"]["provenance"], "LOCAL_EVIDENCE")
         self.assertFalse(preview["previewCandidate"]["publicationAllowed"])
+        preview_file = self.boundary.get_preview_file(
+            WORKSPACE, self.run["productionRunRef"]
+        )
+        self.assertTrue(preview_file["path"].is_file())
+        self.assertEqual(preview_file["mediaType"], "video/mp4")
+        self.assertEqual(
+            sha256(preview_file["path"].read_bytes()).hexdigest(),
+            preview["previewCandidate"]["sha256"],
+        )
 
         finalized = self.boundary.approve_and_finalize(
             g6_finalize_command(self.run)

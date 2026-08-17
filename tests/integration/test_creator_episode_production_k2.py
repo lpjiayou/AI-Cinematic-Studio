@@ -431,6 +431,16 @@ class CreatorEpisodeProductionK2HttpTests(unittest.TestCase):
         self.assertEqual(status, 201)
         self.assertEqual(preview["state"], "QC_READY")
         self.assertEqual(preview["qcReport"]["result"], "PASS")
+        status, headers, preview_content = self.get_bytes(
+            f"{base}/preview/content"
+        )
+        self.assertEqual(status, 200)
+        self.assertEqual(headers.get_content_type(), "video/mp4")
+        self.assertEqual(headers.get_content_disposition(), "inline")
+        self.assertEqual(
+            sha256(preview_content).hexdigest(),
+            preview["previewCandidate"]["sha256"],
+        )
 
         finalize_command = {
             key: value for key, value in g6_finalize_command(run).items()

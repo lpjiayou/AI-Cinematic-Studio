@@ -173,6 +173,13 @@ class EpisodeProductionPublicBoundary:
             self.__delivery.get_delivery_bundle, workspace_ref, run_ref
         )
 
+    def get_preview_file(
+        self, workspace_ref: str, run_ref: str
+    ) -> dict[str, Any]:
+        return self._invoke(
+            self.__delivery.get_preview_file, workspace_ref, run_ref
+        )
+
     def get_export_file(
         self, workspace_ref: str, run_ref: str, export_ref: str
     ) -> dict[str, Any]:
