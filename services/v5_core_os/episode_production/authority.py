@@ -186,6 +186,88 @@ class K2AuthorityIdentityService:
             },
         }
 
+    def verify_authority_identity_current(
+        self, workspace_ref: str, production_run_ref: str
+    ) -> dict[str, Any]:
+        root = self.root_service.verify_run_current(
+            workspace_ref, production_run_ref
+        )
+        bundle = self.get_authority_identity(workspace_ref, production_run_ref)
+        authority = bundle["authorityDecision"]
+        identity = bundle["identityLock"]
+        baseline = _m6_baseline(
+            lambda: self.m6_reader.get_m6_episode_baseline(
+                workspace_ref,
+                root["projectRef"],
+                root["seriesRef"],
+                root["episodeRef"],
+            )
+        )
+        expected_scope = (
+            workspace_ref,
+            root["projectRef"],
+            root["seriesRef"],
+            root["episodeRef"],
+            root["episodePlanItemRef"],
+            root["seriesPlanVersionRef"],
+        )
+        actual_scope = tuple(
+            baseline.get(field)
+            for field in (
+                "workspaceRef", "projectRef", "seriesRef", "episodeRef",
+                "episodePlanItemRef", "seriesPlanVersionRef",
+            )
+        )
+        if actual_scope != expected_scope or baseline.get("compatibility") != "CURRENT":
+            raise StaleInputError("M6 authority no longer matches K2 roots")
+        lineage_pairs = (
+            ("m6BaselineSnapshotRef", "m6BaselineSnapshotRef"),
+            ("activationRevision", "activationRevision"),
+            ("m6BaselineCanonicalDigest", "m6BaselineCanonicalDigest"),
+            ("seriesPlanVersionRef", "seriesPlanVersionRef"),
+            ("seriesPlanVersionDigest", "seriesPlanVersionDigest"),
+            ("seriesBibleVersionRef", "seriesBibleVersionRef"),
+            ("seriesBibleVersionDigest", "seriesBibleVersionDigest"),
+            ("characterContinuityVersionRef", "characterContinuityVersionRef"),
+            (
+                "characterContinuityVersionDigest",
+                "characterContinuityVersionDigest",
+            ),
+        )
+        if any(
+            authority.get(authority_field) != baseline.get(baseline_field)
+            for authority_field, baseline_field in lineage_pairs
+        ):
+            raise StaleInputError("recorded M6 authority is stale")
+        if (
+            authority.get("rootPayloadDigest") != root["payloadDigest"]
+            or authority.get("scriptVersionRef") != root["scriptVersionRef"]
+            or identity.get("rootPayloadDigest") != root["payloadDigest"]
+            or identity.get("authorityDecisionRef")
+            != authority.get("authorityDecisionRef")
+            or identity.get("authorityDecisionDigest")
+            != authority.get("payloadDigest")
+            or identity.get("state") != "LOCKED"
+            or identity.get("publicationAllowed") is not False
+        ):
+            raise StaleInputError("identity lock lineage is stale or inconsistent")
+        identities = identity.get("identities")
+        locked_names = (
+            [item.get("scriptCharacterName") for item in identities]
+            if isinstance(identities, list)
+            and all(isinstance(item, Mapping) for item in identities)
+            else []
+        )
+        if (
+            not isinstance(identities, list)
+            or not all(isinstance(item, Mapping) for item in identities)
+            or not all(isinstance(name, str) for name in locked_names)
+            or sorted(locked_names)
+            != sorted(root["manifest"]["requiredCharacterNames"])
+        ):
+            raise StaleInputError("identity lock does not cover the frozen manifest")
+        return {"root": root, **bundle, "m6Baseline": deepcopy(dict(baseline))}
+
     def authorize_and_lock(self, command: Mapping[str, Any]) -> dict[str, Any]:
         if not isinstance(command, Mapping):
             raise EpisodeProductionError("command must be an object")

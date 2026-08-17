@@ -16,6 +16,7 @@ from tests.unit.test_episode_production_k2 import (
     WORKSPACE,
     activate_k2_m6_baseline,
     g2_command,
+    g3_command,
     k2_identity_authority,
     run_command,
     seed_k2_roots,
@@ -227,6 +228,55 @@ class CreatorEpisodeProductionK2HttpTests(unittest.TestCase):
             )
         self.assertEqual(forbidden_run.exception.code, 400)
         payload = json.loads(forbidden_run.exception.read().decode("utf-8"))
+        self.assertEqual(payload["error"]["code"], "invalid_request")
+
+    def test_public_g3_shot_graph_route_is_scoped_and_replay_safe(self):
+        public_run = {
+            key: value
+            for key, value in run_command(
+                self.project, self.series, self.episode
+            ).items()
+            if key != "workspaceRef"
+        }
+        _, created = self.post(PUBLIC_EPISODE_PRODUCTION_RUNS_ENDPOINT, public_run)
+        run = created["run"]
+        authority_endpoint = (
+            f"{PUBLIC_EPISODE_PRODUCTION_RUNS_ENDPOINT}/"
+            f"{parse.quote(run['productionRunRef'])}/authority-identity"
+        )
+        authority_command = {
+            key: value for key, value in g2_command(run).items()
+            if key not in {"workspaceRef", "productionRunRef"}
+        }
+        self.post(authority_endpoint, authority_command)
+
+        endpoint = (
+            f"{PUBLIC_EPISODE_PRODUCTION_RUNS_ENDPOINT}/"
+            f"{parse.quote(run['productionRunRef'])}/shot-graph"
+        )
+        command = {
+            key: value for key, value in g3_command(run).items()
+            if key not in {"workspaceRef", "productionRunRef"}
+        }
+        status, result = self.post(endpoint, command)
+        self.assertEqual(status, 201)
+        self.assertEqual(result["state"], "SHOTS_COMPILED")
+        self.assertEqual(result["executableShotGraph"]["output"]["totalFrames"], 720)
+
+        status, replay = self.post(endpoint, command)
+        self.assertEqual(status, 200)
+        self.assertTrue(replay["idempotentReplay"])
+        status, restored = self.get(endpoint)
+        self.assertEqual(status, 200)
+        self.assertEqual(
+            restored["executableShotGraph"]["payloadDigest"],
+            result["executableShotGraph"]["payloadDigest"],
+        )
+
+        with self.assertRaises(error.HTTPError) as caught:
+            self.post(endpoint, {**command, "productionRunRef": run["productionRunRef"]})
+        self.assertEqual(caught.exception.code, 400)
+        payload = json.loads(caught.exception.read().decode("utf-8"))
         self.assertEqual(payload["error"]["code"], "invalid_request")
 
 

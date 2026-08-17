@@ -135,6 +135,43 @@ def _validate_gate(gate: GateAppend) -> None:
             raise EpisodeProductionError("fact payload digest is invalid")
 
 
+def _gate_from_mapping(value: Mapping[str, Any]) -> GateAppend:
+    facts = value.get("facts")
+    if not isinstance(facts, list):
+        raise RepositoryUnavailableError("episode evidence facts are invalid")
+    try:
+        gate = GateAppend(
+            workspaceRef=value["workspaceRef"],
+            productionRunRef=value["productionRunRef"],
+            gateName=value["gateName"],
+            idempotencyKey=value["idempotencyKey"],
+            rootPayloadDigest=value["rootPayloadDigest"],
+            requestDigest=value["requestDigest"],
+            fromState=value["fromState"],
+            toState=value["toState"],
+            createdAt=value["createdAt"],
+            facts=tuple(
+                EvidenceFact(
+                    factKind=fact["factKind"],
+                    factRef=fact["factRef"],
+                    factVersion=fact["factVersion"],
+                    payload=fact["payload"],
+                    payloadDigest=fact["payloadDigest"],
+                )
+                for fact in facts
+                if isinstance(fact, Mapping)
+            ),
+        )
+        if len(gate.facts) != len(facts):
+            raise KeyError("fact")
+        _validate_gate(gate)
+        return gate
+    except (KeyError, TypeError, EpisodeProductionError) as exc:
+        raise RepositoryUnavailableError(
+            "episode evidence digest verification failed"
+        ) from exc
+
+
 class InMemoryEpisodeProductionEvidenceAdapter:
     def __init__(self) -> None:
         self._gates: dict[tuple[str, str, str], GateAppend] = {}
@@ -347,7 +384,26 @@ class SqliteEpisodeProductionEvidenceAdapter:
             "AND production_run_ref=? AND gate_name=? ORDER BY fact_kind",
             (row["workspace_ref"], row["production_run_ref"], row["gate_name"]),
         ).fetchall()
-        return {
+        decoded_facts: list[dict[str, Any]] = []
+        try:
+            for fact in facts:
+                payload = json.loads(fact["payload_json"])
+                if not isinstance(payload, dict):
+                    raise ValueError("fact payload must be an object")
+                decoded_facts.append(
+                    {
+                        "factKind": fact["fact_kind"],
+                        "factRef": fact["fact_ref"],
+                        "factVersion": fact["fact_version"],
+                        "payload": payload,
+                        "payloadDigest": fact["payload_digest"],
+                    }
+                )
+        except (json.JSONDecodeError, TypeError, ValueError) as exc:
+            raise RepositoryUnavailableError(
+                "episode evidence payload is invalid"
+            ) from exc
+        value = {
             "workspaceRef": row["workspace_ref"],
             "productionRunRef": row["production_run_ref"],
             "gateName": row["gate_name"],
@@ -357,17 +413,10 @@ class SqliteEpisodeProductionEvidenceAdapter:
             "fromState": row["from_state"],
             "toState": row["to_state"],
             "createdAt": row["created_at"],
-            "facts": [
-                {
-                    "factKind": fact["fact_kind"],
-                    "factRef": fact["fact_ref"],
-                    "factVersion": fact["fact_version"],
-                    "payload": json.loads(fact["payload_json"]),
-                    "payloadDigest": fact["payload_digest"],
-                }
-                for fact in facts
-            ],
+            "facts": decoded_facts,
         }
+        _gate_from_mapping(value)
+        return value
 
     def current_state(self, workspace_ref: str, run_ref: str) -> str:
         connection = self._connect()

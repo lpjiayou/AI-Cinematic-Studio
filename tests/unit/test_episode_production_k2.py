@@ -9,6 +9,7 @@ from services.v5_core_os.episode_production import (
     StaticIdentityReferenceAuthority,
     create_in_memory_boundary,
     create_local_development_boundary,
+    validate_executable_shot_graph,
 )
 from services.v5_core_os.lifecycle_integrity import LifecycleAssembly
 from services.v5_core_os.series_intelligence import M6Scope, VerifiedApproval
@@ -402,6 +403,23 @@ def g2_command(run, **extra):
     }
 
 
+def g3_command(run, **extra):
+    return {
+        "workspaceRef": WORKSPACE,
+        "productionRunRef": run["productionRunRef"],
+        "idempotencyKey": "k2-shot-graph-v1",
+        "sceneBindings": [
+            {
+                "scriptSceneRef": budget["scriptSceneRef"],
+                "locationRef": "location-archive-city",
+                "propRefs": ["prop-memory-chip"],
+            }
+            for budget in run["manifest"]["sceneBudgets"]
+        ],
+        **extra,
+    }
+
+
 def create_boundary(
     assembly,
     refs,
@@ -763,6 +781,165 @@ class EpisodeProductionG2AuthorityIdentityTests(unittest.TestCase):
             self.assertEqual(
                 {row[0] for row in sqlite_tables(database)},
                 {"v5_episode_production_schema", "v5_episode_production_runs"},
+            )
+
+
+class EpisodeProductionG3ShotGraphTests(unittest.TestCase):
+    def setUp(self):
+        (
+            self.assembly,
+            self.refs,
+            self.project,
+            self.series,
+            self.episode,
+            self.generated,
+        ) = seed_k2_roots(with_m6_authority=True)
+        activate_k2_m6_baseline(self.assembly, self.project, self.series)
+
+    def boundary(self, **kwargs):
+        return create_boundary(
+            self.assembly,
+            self.refs,
+            identity_reference_authority=k2_identity_authority(),
+            **kwargs,
+        )
+
+    def prepared(self, boundary):
+        run = boundary.create_run(run_command(self.project, self.series, self.episode))
+        boundary.authorize_and_lock(g2_command(run))
+        return run
+
+    def test_compiles_exact_executable_graph_with_authoritative_lineage(self):
+        boundary = self.boundary()
+        run = self.prepared(boundary)
+        result = boundary.compile_shot_graph(g3_command(run))
+
+        graph = result["executableShotGraph"]
+        shots = result["creativeShotVersions"]
+        self.assertEqual(result["state"], "SHOTS_COMPILED")
+        self.assertFalse(result["idempotentReplay"])
+        self.assertEqual(len(result["storyboardVersion"]["scenes"]), 2)
+        self.assertEqual(len(shots), 4)
+        self.assertEqual(graph["output"]["frameRate"], 24)
+        self.assertEqual(graph["output"]["totalFrames"], 720)
+        self.assertEqual(sum(shot["durationFrames"] for shot in shots[:2]), 336)
+        self.assertEqual(sum(shot["durationFrames"] for shot in shots[2:]), 384)
+        self.assertEqual(
+            [shot["globalOrder"] for shot in shots], [1, 2, 3, 4]
+        )
+        self.assertEqual(
+            {
+                identity["characterRef"]
+                for shot in shots
+                for identity in shot["requiredCharacterIdentityLocks"]
+            },
+            {"character-lin", "character-gu"},
+        )
+        for shot in shots:
+            self.assertTrue(shot["sourceScriptSpans"])
+            self.assertEqual(
+                {
+                    seed["requirementType"]
+                    for seed in shot["assetRequirementSeeds"]
+                },
+                {"character-identity", "location", "prop", "visual-style"},
+            )
+        validate_executable_shot_graph(graph)
+        projected = boundary.get_run(WORKSPACE, run["productionRunRef"])
+        self.assertEqual(projected["state"], "SHOTS_COMPILED")
+        self.assertEqual(
+            projected["completedGates"],
+            ["G2_AUTHORITY_IDENTITY", "G3_SCRIPT_VALIDATION", "G3_SHOT_GRAPH"],
+        )
+
+    def test_replay_is_stable_and_scene_bindings_fail_closed(self):
+        boundary = self.boundary()
+        run = self.prepared(boundary)
+        first = boundary.compile_shot_graph(g3_command(run))
+        replay = boundary.compile_shot_graph(g3_command(run))
+        self.assertTrue(replay["idempotentReplay"])
+        self.assertEqual(replay["executableShotGraph"], first["executableShotGraph"])
+
+        second_boundary = self.boundary()
+        second_run = self.prepared(second_boundary)
+        invalid = g3_command(second_run)
+        invalid["sceneBindings"] = invalid["sceneBindings"][:1]
+        with self.assertRaises(EpisodeProductionPublicError) as caught:
+            second_boundary.compile_shot_graph(invalid)
+        self.assertEqual(
+            (caught.exception.status, caught.exception.code),
+            (400, "validation_failed"),
+        )
+
+        invalid = g3_command(second_run)
+        invalid["idempotencyKey"] = "g3-invalid-authority-ref"
+        invalid["sceneBindings"][0]["locationRef"] = "location-invented"
+        with self.assertRaises(EpisodeProductionPublicError) as caught:
+            second_boundary.compile_shot_graph(invalid)
+        self.assertEqual(
+            (caught.exception.status, caught.exception.code),
+            (400, "validation_failed"),
+        )
+
+    def test_graph_validator_rejects_structural_tampering_and_cycles(self):
+        boundary = self.boundary()
+        run = self.prepared(boundary)
+        graph = boundary.compile_shot_graph(g3_command(run))["executableShotGraph"]
+
+        duplicate = json.loads(json.dumps(graph, ensure_ascii=False))
+        duplicate["shots"][1]["creativeShotRef"] = duplicate["shots"][0]["creativeShotRef"]
+        with self.assertRaisesRegex(Exception, "duplicate shot refs"):
+            validate_executable_shot_graph(duplicate)
+
+        unresolved = json.loads(json.dumps(graph, ensure_ascii=False))
+        unresolved["shots"][0]["assetRequirementSeeds"] = []
+        with self.assertRaisesRegex(Exception, "asset requirement"):
+            validate_executable_shot_graph(unresolved)
+
+        cycle = json.loads(json.dumps(graph, ensure_ascii=False))
+        cycle["edges"].append(
+            {
+                "edgeRef": "shot-edge-cycle",
+                "edgeType": "continuity",
+                "fromShotRef": cycle["shots"][-1]["creativeShotRef"],
+                "toShotRef": cycle["shots"][0]["creativeShotRef"],
+            }
+        )
+        with self.assertRaisesRegex(Exception, "cycle"):
+            validate_executable_shot_graph(cycle)
+
+    def test_shot_graph_is_workspace_isolated_and_survives_sqlite_restart(self):
+        with tempfile.TemporaryDirectory() as directory:
+            database = Path(directory) / "episode-production.sqlite3"
+            evidence = Path(directory) / "episode-evidence.sqlite3"
+            first = create_boundary(
+                self.assembly,
+                None,
+                database=database,
+                evidence_database=evidence,
+                identity_reference_authority=k2_identity_authority(),
+            )
+            run = self.prepared(first)
+            compiled = first.compile_shot_graph(g3_command(run))
+            second = create_boundary(
+                self.assembly,
+                None,
+                database=database,
+                evidence_database=evidence,
+                identity_reference_authority=k2_identity_authority(),
+            )
+            restored = second.get_shot_graph_bundle(
+                WORKSPACE, run["productionRunRef"]
+            )
+            self.assertEqual(
+                restored["executableShotGraph"], compiled["executableShotGraph"]
+            )
+            with self.assertRaises(EpisodeProductionPublicError) as caught:
+                second.get_shot_graph_bundle(
+                    "workspace-other", run["productionRunRef"]
+                )
+            self.assertEqual(
+                (caught.exception.status, caught.exception.code), (404, "not_found")
             )
 
 

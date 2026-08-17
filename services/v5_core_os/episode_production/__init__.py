@@ -18,6 +18,7 @@ from .public import (
     create_local_development_boundary,
     create_local_development_boundary_from_environment,
 )
+from .shot_graph import validate_executable_shot_graph
 
 __all__ = [
     "EpisodeProductionPublicBoundary",
@@ -31,4 +32,5 @@ __all__ = [
     "create_in_memory_boundary",
     "create_local_development_boundary",
     "create_local_development_boundary_from_environment",
+    "validate_executable_shot_graph",
 ]

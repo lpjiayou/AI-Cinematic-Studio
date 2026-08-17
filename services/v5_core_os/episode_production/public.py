@@ -31,6 +31,7 @@ from .foundation import (
     UpstreamNotReadyError,
     _utc_now,
 )
+from .shot_graph import K2ShotGraphService, ValidationFailedError
 
 
 class EpisodeProductionPublicError(RuntimeError):
@@ -45,15 +46,19 @@ class EpisodeProductionPublicBoundary:
         self,
         service: EpisodeProductionService,
         authority_identity: K2AuthorityIdentityService,
+        shot_graph: K2ShotGraphService,
     ) -> None:
         self.__service = service
         self.__authority_identity = authority_identity
+        self.__shot_graph = shot_graph
 
     @staticmethod
     def _error(exc: EpisodeProductionError) -> EpisodeProductionPublicError:
         if isinstance(exc, RecordNotFoundError):
             return EpisodeProductionPublicError(exc.code, 404)
         if isinstance(exc, ScopeMismatchError):
+            return EpisodeProductionPublicError(exc.code, 400)
+        if isinstance(exc, ValidationFailedError):
             return EpisodeProductionPublicError(exc.code, 400)
         if isinstance(exc, AuthorityRequiredError):
             return EpisodeProductionPublicError(exc.code, 403)
@@ -99,6 +104,16 @@ class EpisodeProductionPublicBoundary:
             self.__authority_identity.get_authority_identity, workspace_ref, run_ref
         )
 
+    def compile_shot_graph(self, command: Mapping[str, Any]) -> dict[str, Any]:
+        return self._invoke(self.__shot_graph.compile_shot_graph, command)
+
+    def get_shot_graph_bundle(
+        self, workspace_ref: str, run_ref: str
+    ) -> dict[str, Any]:
+        return self._invoke(
+            self.__shot_graph.get_shot_graph_bundle, workspace_ref, run_ref
+        )
+
 
 def _services(
     repository,
@@ -111,7 +126,11 @@ def _services(
     identity_reference_authority=None,
     ref_factory=None,
     clock=None,
-) -> tuple[EpisodeProductionService, K2AuthorityIdentityService]:
+) -> tuple[
+    EpisodeProductionService,
+    K2AuthorityIdentityService,
+    K2ShotGraphService,
+]:
     selected_ref_factory = ref_factory or (
         lambda prefix: f"{prefix}-{uuid4().hex}"
     )
@@ -135,7 +154,15 @@ def _services(
         ref_factory=selected_ref_factory,
         clock=selected_clock,
     )
-    return service, authority_identity
+    shot_graph = K2ShotGraphService(
+        service,
+        authority_identity,
+        evidence_repository,
+        script_reader=script_studio_boundary,
+        ref_factory=selected_ref_factory,
+        clock=selected_clock,
+    )
+    return service, authority_identity, shot_graph
 
 
 def create_in_memory_boundary(
@@ -148,7 +175,7 @@ def create_in_memory_boundary(
     ref_factory=None,
     clock=None,
 ) -> EpisodeProductionPublicBoundary:
-    service, authority_identity = _services(
+    service, authority_identity, shot_graph = _services(
         InMemoryEpisodeProductionAdapter(),
         InMemoryEpisodeProductionEvidenceAdapter(),
         project_boundary=project_boundary,
@@ -159,7 +186,7 @@ def create_in_memory_boundary(
         ref_factory=ref_factory,
         clock=clock,
     )
-    return EpisodeProductionPublicBoundary(service, authority_identity)
+    return EpisodeProductionPublicBoundary(service, authority_identity, shot_graph)
 
 
 def create_local_development_boundary(
@@ -178,7 +205,7 @@ def create_local_development_boundary(
         if evidence_database_path is not None
         else Path(f"{database_path}.evidence.sqlite3")
     )
-    service, authority_identity = _services(
+    service, authority_identity, shot_graph = _services(
         SqliteEpisodeProductionAdapter(
             database_path, initialize_if_missing=initialize_if_missing
         ),
@@ -191,7 +218,7 @@ def create_local_development_boundary(
         script_studio_boundary=script_studio_boundary,
         identity_reference_authority=identity_reference_authority,
     )
-    return EpisodeProductionPublicBoundary(service, authority_identity)
+    return EpisodeProductionPublicBoundary(service, authority_identity, shot_graph)
 
 
 def create_local_development_boundary_from_environment(

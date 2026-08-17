@@ -121,6 +121,10 @@ SERIES_PLANNING_CONFIRM_VERSION_ENDPOINT = f"{SERIES_PLANNING_ENDPOINT}/confirm-
 SERIES_PLANNING_M6_BOOTSTRAP_ENDPOINT = f"{SERIES_PLANNING_ENDPOINT}/m6-bootstrap"
 MAX_REQUEST_BYTES = 512_000
 HEALTH_ENDPOINT = "/health"
+EPISODE_PRODUCTION_SUBRESOURCES = {
+    "authority-identity",
+    "shot-graph",
+}
 
 
 PUBLIC_EXACT_ALIASES = {
@@ -171,6 +175,20 @@ def _normalize_public_path(path: str) -> str:
     return path
 
 
+def _episode_production_subresource(path: str) -> tuple[str, str] | None:
+    prefix = f"{PUBLIC_EPISODE_PRODUCTION_RUNS_ENDPOINT}/"
+    if not path.startswith(prefix):
+        return None
+    relative = path[len(prefix):]
+    encoded_run_ref, separator, resource = relative.rpartition("/")
+    if not separator or resource not in EPISODE_PRODUCTION_SUBRESOURCES:
+        return None
+    run_ref = unquote(encoded_run_ref)
+    if not run_ref or "/" in run_ref:
+        return None
+    return run_ref, resource
+
+
 class CreatorRequestHandler(BaseHTTPRequestHandler):
     server_version = "CreatorCore/1.0"
 
@@ -209,13 +227,7 @@ class CreatorRequestHandler(BaseHTTPRequestHandler):
         if not self._authorize_route_class(requested_path):
             return
         path = _normalize_public_path(requested_path)
-        production_authority_prefix = f"{PUBLIC_EPISODE_PRODUCTION_RUNS_ENDPOINT}/"
-        production_authority_suffix = "/authority-identity"
-        is_production_authority = (
-            requested_path.startswith(production_authority_prefix)
-            and requested_path.endswith(production_authority_suffix)
-            and len(requested_path) > len(production_authority_prefix + production_authority_suffix)
-        )
+        production_subresource = _episode_production_subresource(requested_path)
         if path not in {
             AI_DIRECTOR_ENDPOINT,
             SERIES_ENDPOINT,
@@ -231,7 +243,7 @@ class CreatorRequestHandler(BaseHTTPRequestHandler):
             SERIES_PLANNING_MANUAL_VERSION_ENDPOINT,
             SERIES_PLANNING_CONFIRM_VERSION_ENDPOINT,
             PUBLIC_EPISODE_PRODUCTION_RUNS_ENDPOINT,
-        } and requested_path not in PUBLIC_M6_COMMAND_ENDPOINTS and not is_production_authority:
+        } and requested_path not in PUBLIC_M6_COMMAND_ENDPOINTS and production_subresource is None:
             self._send_application_error(404, "not_found")
             return
         if self.headers.get_content_type() != "application/json":
@@ -258,7 +270,7 @@ class CreatorRequestHandler(BaseHTTPRequestHandler):
                     400, "client_workspace_scope_forbidden"
                 )
                 return
-            if is_production_authority and "productionRunRef" in payload:
+            if production_subresource is not None and "productionRunRef" in payload:
                 self._send_application_error(400, "invalid_request")
                 return
             payload = {
@@ -279,19 +291,18 @@ class CreatorRequestHandler(BaseHTTPRequestHandler):
                 {"ok": True, "run": result},
             )
             return
-        if is_production_authority:
-            run_ref = unquote(
-                requested_path[
-                    len(production_authority_prefix) : -len(production_authority_suffix)
-                ]
-            )
-            if not run_ref or "/" in run_ref:
-                self._send_application_error(404, "not_found")
-                return
+        if production_subresource is not None:
+            run_ref, resource = production_subresource
             try:
-                result = self.episode_production_boundary.authorize_and_lock(
-                    {**payload, "productionRunRef": run_ref}
-                )
+                command = {**payload, "productionRunRef": run_ref}
+                if resource == "authority-identity":
+                    result = self.episode_production_boundary.authorize_and_lock(
+                        command
+                    )
+                else:
+                    result = self.episode_production_boundary.compile_shot_graph(
+                        command
+                    )
             except EpisodeProductionPublicError as exc:
                 self._send_episode_production_error(exc)
                 return
@@ -447,20 +458,21 @@ class CreatorRequestHandler(BaseHTTPRequestHandler):
                 relative = requested_path[
                     len(PUBLIC_EPISODE_PRODUCTION_RUNS_ENDPOINT) + 1 :
                 ]
-                authority_suffix = "/authority-identity"
-                if relative.endswith(authority_suffix):
-                    run_ref = unquote(relative[: -len(authority_suffix)])
-                    if run_ref and "/" not in run_ref:
-                        self._send_json(
-                            200,
-                            {
-                                "ok": True,
-                                **self.episode_production_boundary.get_authority_identity(
-                                    workspace_ref, run_ref
-                                ),
-                            },
+                production_subresource = _episode_production_subresource(
+                    requested_path
+                )
+                if production_subresource is not None:
+                    run_ref, resource = production_subresource
+                    if resource == "authority-identity":
+                        result = self.episode_production_boundary.get_authority_identity(
+                            workspace_ref, run_ref
                         )
-                        return
+                    else:
+                        result = self.episode_production_boundary.get_shot_graph_bundle(
+                            workspace_ref, run_ref
+                        )
+                    self._send_json(200, {"ok": True, **result})
+                    return
                 run_ref = unquote(relative)
                 if run_ref and "/" not in run_ref:
                     self._send_json(

@@ -517,6 +517,38 @@ test or remote-integrity failure stops the wave.
 - targeted G1/G2 unit and HTTP integration gate: `17 / 17`;
 - complete Core regression: `497 / 497`.
 
-G2 remains a local technical checkpoint until this exact tree is committed, published
+### G2 remote verification
+
+- branch: `feature/acs-k2-golden-episode`;
+- remote commit: `fcb604ec7a8706c6283c684bbe44db7575f87989`;
+- remote tree: `bbe54ee113afc5296072f57fe6c0dcde1fc54db9`;
+- fetched local and remote trees matched, ahead/behind was `0 / 0`, and the worktree
+  was clean before G3 implementation began.
+
+### G3 implementation evidence
+
+- the compiler re-reads the confirmed ScriptVersion, frozen G1 root, current M6
+  authority baseline and G2 Identity Lock before compiling; drift fails closed as
+  `stale_input`;
+- every Script scene requires an explicit binding to accepted M6 location and prop
+  refs; missing, duplicate, invented or partial authority refs fail validation and
+  no name-based Core ref inference is permitted;
+- consistency validation uses exact integer-frame accounting at the frozen frame rate;
+  the K2 30-second episode compiles to exactly `720` frames and four versioned shots;
+- immutable StoryboardVersion, CreativeShotVersion and ExecutableShotGraph facts carry
+  stable refs, canonical digests, source Script JSON pointers, camera/action/audio
+  instructions, identity locks, asset requirement seeds and complete G1/G2 lineage;
+- chronology is complete and contiguous, continuity edges are explicit, and the graph
+  validator rejects duplicate refs/orders, non-positive durations, unresolved identity
+  or asset requirements, inconsistent frame totals and cycles;
+- append-only evidence records
+  `AUTHORITY_READY → SCRIPT_VALIDATED → SHOTS_COMPILED`; reads remain workspace-isolated
+  and SQLite restart-safe without adding or changing M3/M5/M6 schemas;
+- authenticated public compile/read routes derive workspace scope from the bearer
+  principal, reject client-supplied run/workspace scope and preserve replay semantics;
+- targeted G1–G3 unit and HTTP integration gate: `22 / 22`;
+- complete Core regression: `502 / 502`.
+
+G3 remains a local technical checkpoint until this exact tree is committed, published
 without force, fetched and proven equal to the remote branch. Only that evidence
-authorizes automatic entry into G3.
+authorizes automatic entry into G4.
