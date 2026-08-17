@@ -4,23 +4,25 @@
 >
 > Execution Mode: `AUTO-SEQUENTIAL / CONTRACT-FIRST / FAIL-CLOSED`
 >
-> Project Lead Authorization: `K2 SINGLE-EPISODE G0 → G7 AUTO-SEQUENTIAL WAVE AUTHORIZED ON 2026-08-17`
+> Project Lead Authorization: `K2 PUBLISHABLE PRODUCTION P0 → P10 AUTO-SEQUENTIAL WAVE AUTHORIZED ON 2026-08-17`
 >
-> Authorized Wave: `ACS-K2-G0 → G1 → G2 → G3 → G4 → G5 → G6 → G7 → REMOTE VERIFY`
+> Authorized Wave: `ACS-K2-P0 → P1 → P2 → P3 → P4 → P5 → P6 → P7 → P8 → P9 → GATE A/B/C → P10`
 >
-> Current Task: `ACS-K2-G7-CONNECTED-FRONTEND-PRODUCTION-WORKSPACE`
+> Current Task: `ACS-K2-PUBLISHABLE-P0-FACTS-RIGHTS-PROVIDER-EVIDENCE`
 >
-> Current Work Package: `G7 EXPERIENCE ADAPTER / PREVIEW PLAYBACK / EXPLICIT APPROVAL UI / DELIVERY`
+> Current Work Package: `P0 SAFE IMPLEMENTATION COMPLETE / EXTERNAL RIGHTS + PROVIDER AUTHORITY HOLD`
 >
 > M6 Authorization: `ACCEPTED SURFACES + K2 EXTERNAL AUTHORITY CONNECTION / NO M6 SCHEMA EXPANSION`
 >
-> M7–M15 Authorization: `K2 SINGLE-EPISODE CLOSURE ONLY / GATE-BY-GATE`
+> M7–M15 Authorization: `K2 PUBLISHABLE SINGLE-EPISODE SLICE ONLY / GATE-BY-GATE`
 >
-> M16–M19 Authorization: `NOT AUTHORIZED`
+> M16 Authorization: `BOUNDED 1 → 3 → 10 → 30 ONLY AFTER P9 + GATE A/B/C`
 >
-> Integration Baseline: `AUTH-W1 PRESERVED — CORE 480 / FRONTEND 112 / BUILD / SECURITY SMOKE`
+> M17–M19 Authorization: `NOT AUTHORIZED`
 >
-> Production Ready: `NO — K2 CLOSURE DOES NOT PROVE LIVE MODEL, GPU, RIGHTS OR PUBLICATION READINESS`
+> Integration Baseline: `K2 G0→G7 PRESERVED — CORE 518 / FRONTEND 118 / LOCAL PLAYABLE EVIDENCE`
+>
+> Production Ready: `NO — P0 CODE AND CONTRACTS VERIFIED; P0→P1 BLOCKED BY EXTERNAL RIGHTS/PROVIDER FACTS`
 
 ---
 
@@ -122,15 +124,17 @@ or contact model providers, workers, GPU services or private/internal HTTP route
 
 ---
 
-## 3. Explicit non-scope
+## 3. Historical XR1 explicit non-scope
 
-XR1 does not authorize:
+This section records the completed XR1 connection package and is superseded for the
+new K2 publishable-production wave only by section 16. It remains binding for any
+work outside that exact K2 wave.
 
-- M7 Narrative Review implementation;
-- M8 Storyboard or Shot Designer implementation;
-- M9 Asset Requirement implementation;
-- M10 Image Studio implementation;
-- M11–M19 implementation;
+XR1 did not authorize:
+
+- M7–M15 implementation outside the subsequently authorized K2 single-episode slice;
+- M16 outside the subsequently authorized bounded `1 → 3 → 10 → 30` sequence;
+- M17–M19 implementation;
 - new Core domain facts, schema migrations or event families;
 - direct Frontend access to `/creator/internal/*`;
 - fake `projectRef`, `seriesRef`, `episodeRef`, `scriptRef`, `scriptVersionRef`,
@@ -714,3 +718,107 @@ HTTP-only result is being represented as browser evidence. G7 is therefore an
 `IMPLEMENTED TECHNICAL CANDIDATE / BROWSER GATE HOLD`; final browser console, page
 error, horizontal-overflow and visual checks remain required in an approved Chrome
 environment that can reach the two local processes.
+
+---
+
+## 16. K2 publishable-production automatic wave — 2026-08-17
+
+The Project Lead has authorized automatic execution of the next bounded wave. This
+authorization extends ADR-0008; it does not convert local evidence into production
+evidence and does not waive rights, credentials, budget, validation, selection or
+human approval gates.
+
+The one accepted chain remains:
+
+```text
+existing K2 Project / Series / Episode / Script / M6 authority / Identity Lock
+→ M7 narrative closure
+→ M8 executable Shot Graph
+→ M9 asset requirements
+→ M10 live image candidates
+→ M11 live video candidates
+→ M12 live audio candidates
+→ M13 deterministic composition
+→ M14 machine QC + local regeneration + separate human decisions
+→ M15 immutable master + publication eligibility
+→ Gate A / Gate B / Gate C
+→ M16 bounded 1 → 3 → 10 → 30 production evidence
+```
+
+No parallel project, character identity, shot model, asset registry, queue, timeline,
+approval model, publication flag or frontend data source may be introduced. All work
+must extend the existing Creator Public API → Application → V5 → V4 → V3 → Compute
+chain and preserve exact refs, versions, digests, workspace scope and upstream lineage.
+
+### Authorized checkpoints
+
+| Checkpoint | Required outcome | Automatic progression rule |
+| --- | --- | --- |
+| P0 | freeze target, rights manifest, production policy and provider/GPU evidence contract | machine-verifiable contract and tests pass |
+| P1 | execute rights-cleared provider experiments through V4 adapters | real provider facts, cost/latency/provenance and reproducible artifacts exist |
+| P2 | production runtime, durable persistence, object storage, secret injection and recovery | restart, retry, isolation and failure-injection gates pass |
+| P3 | close K2 M7–M9 facts on the existing lineage | narrative, shot and requirement gates pass without stale or unresolved refs |
+| P4 | generate and select M10 image assets | candidates are validated and explicitly selected before V5 admission |
+| P5 | generate and select M11 video shots | identity, motion, duration and continuity evidence pass |
+| P6 | generate and select M12 dialogue, ambience, effects and music | rights, loudness, sync and stem lineage pass |
+| P7 | compose M13 timeline and preview through V3 | deterministic A/V render and exact timeline evidence pass |
+| P8 | perform M14 QC, local regeneration and separate approvals | machine QC and human decisions remain distinct and exact-version scoped |
+| P9 | create M15 immutable master and publication-eligibility decision | publication remains blocked until every required fact is true |
+| Gate A/B/C | contract, integration, browser and evidence validation | all gates pass against the same committed tree |
+| P10 | run M16 at 1, then 3, then 10, then 30 | each size must pass before the next; no jump and no 100-run authorization |
+
+### Non-waivable stop conditions
+
+Automatic progression stops truthfully when any of the following is absent or
+ambiguous:
+
+- rights-cleared source/reference material or a versioned rights decision;
+- approved provider/GPU credentials, endpoint, budget or usage terms;
+- required human creative, identity, technical or final-master decision;
+- publication rights, release destination or publication authority;
+- safe migration, recovery or object-retention evidence;
+- exact upstream lineage, digest, workspace isolation or provider provenance;
+- a non-destructive resolution to a remote-history or architecture conflict.
+
+Missing external authority is a blocked production gate, not permission to fabricate
+a provider result, approval, rights state, GPU execution or publishable master.
+
+The normative package for this wave is:
+
+- `governance/ADR-0009-k2-publishable-media-production.md`;
+- `architecture/K2_PUBLISHABLE_MEDIA_PRODUCTION_CONTRACT.md`;
+- `governance/K2_PUBLISHABLE_PRODUCTION_EXECUTION_PACKAGE.md`;
+- `governance/RISK_REGISTER.md` entries `R-K2-LIVE-006` through `R-K2-PUB-010`.
+
+### P0 implementation and external hold
+
+The same existing K2 `EpisodeProductionRun` now exposes an immutable, additive
+`ProductionPolicyVersion + RightsManifestVersion + ProviderExecutionPolicyVersion`
+bundle and a read-only production-readiness projection through the authenticated
+Creator Public API. The Frontend reads that projection through the same Experience
+Adapter and displays exact blockers alongside the existing production workspace.
+
+P0 does not trust request-body declarations as authority. Exact rights grants must be
+resolved through an injected rights-evidence authority; provider/model/region
+selections must be resolved through an injected provider-policy authority that returns
+safe refs for the capability, credential source, usage terms and budget authority.
+The default runtime rejects both. The Frontend projection is read-only, and any
+server-side policy write derives its actor from the authenticated credential rather
+than accepting a caller-supplied `actorRef`. Reference video, identity, voice, music or other
+inputs can enter only as exact digest-bound rights entries, so the reviewed reference
+video baseline cannot become an implicit provider input.
+
+The current local K2 facts remain blocked because its identity references are
+`LOCAL_EVIDENCE`, no rights-evidence/provider-policy authorities are configured, no
+rights-cleared live image/video/audio provider execution exists, and no GPU/runtime or
+publication authority is present. P1 has therefore not started and no downstream
+publishable claim is made. See
+`governance/K2_PUBLISHABLE_P0_EXTERNAL_HOLD.md` for the exact evidence and required
+external inputs.
+
+Same-tree verification before publication of this checkpoint:
+
+- Core complete regression: `528 / 528`;
+- Frontend complete suite: `119 / 119` across `24` files;
+- Frontend TypeScript, ESLint and Next.js `16.3.0` production build: passed;
+- Python compile, targeted public HTTP/integration tests and `git diff --check`: passed.
