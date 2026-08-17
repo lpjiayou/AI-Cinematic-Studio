@@ -108,7 +108,11 @@ CAPABILITY_PROJECTION: Final = (
     },
     {
         "id": "M11", "name": "Video Production", "state": "production_policy_required",
-        "publicResources": ["episode-production-runs/production-readiness", "episode-production-runs/media"],
+        "publicResources": [
+            "episode-production-runs/production-readiness",
+            "episode-production-runs/provider-experiments",
+            "episode-production-runs/media",
+        ],
         "requirements": ["M10", "rights_manifest", "live_video_provider"],
     },
     {

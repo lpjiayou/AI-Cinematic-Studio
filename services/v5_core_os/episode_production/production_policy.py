@@ -544,6 +544,19 @@ def _validate_provider_policy(
                 "authorityValidUntil": authority.get("validUntil"),
             }
         )
+        if execution["gpuAttestationRequired"]:
+            normalized_execution.update(
+                {
+                    "runtimeAttestationRef": _required_ref(
+                        authority.get("runtimeAttestationRef"),
+                        "runtimeAttestationRef",
+                    ),
+                    "runtimeAttestationDigest": _sha256(
+                        authority.get("runtimeAttestationDigest"),
+                        "runtimeAttestationDigest",
+                    ),
+                }
+            )
         normalized.append(normalized_execution)
     if media_kinds != set(REQUIRED_MEDIA_KINDS):
         raise ProductionPolicyRequiredError("image, video and audio provider policies are required")
@@ -977,11 +990,37 @@ class K2ProductionPolicyService:
                     "publicationAllowed": False,
                 },
             }
+        bundle = self.verify_policy_current(workspace, production_run)
+        return self._projection(bundle)
+
+    def verify_policy_current(
+        self, workspace_ref: str, run_ref: str
+    ) -> dict[str, Any]:
+        """Return the complete server-side policy bundle after lineage checks.
+
+        This method is intentionally not a browser projection: provider credential
+        *source refs* are needed by server-side V5 orchestration to bind a V4
+        dispatch, while secret values remain outside the bundle and V5.
+        """
+
+        workspace = _required_ref(workspace_ref, "workspaceRef")
+        production_run = _required_ref(run_ref, "productionRunRef")
+        root = self.root_service.verify_run_current(workspace, production_run)
+        authority = self.authority_identity.verify_authority_identity_current(
+            workspace, production_run
+        )
+        record = self.repository.get(workspace, production_run)
+        if record is None:
+            raise ProductionPolicyRequiredError(
+                "production policy bundle is not recorded"
+            )
         bundle = self._decode(record)
         if (
             bundle.get("rootPayloadDigest") != root["payloadDigest"]
-            or authority is None
             or bundle.get("identityLockDigest") != authority["identityLock"]["payloadDigest"]
+            or bundle.get("rightsManifest", {}).get("state") != "RIGHTS_CLEARED"
+            or bundle.get("providerExecutionPolicy", {}).get("state")
+            != "POLICY_RECORDED"
         ):
             raise StaleInputError("production policy bundle lineage is stale")
-        return self._projection(bundle)
+        return bundle

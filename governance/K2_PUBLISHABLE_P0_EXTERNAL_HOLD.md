@@ -56,10 +56,11 @@ result is represented as browser evidence.
 
 ## Observed environment facts
 
-The execution environment was probed without reading or printing secret values:
+The repository validation container was probed without reading or printing secret
+values:
 
 - `ffmpeg` and `ffprobe` are installed for deterministic local evidence;
-- no NVIDIA device or `nvidia-smi` runtime is present;
+- no NVIDIA device or `nvidia-smi` runtime is present in that container;
 - no approved live image, video or audio provider credential source was discoverable;
 - no injected rights-evidence authority or provider-policy authority is configured;
 - the current K2 identity references remain non-authoritative local evidence;
@@ -67,6 +68,22 @@ The execution environment was probed without reading or printing secret values:
   publication authority is configured for this wave.
 
 These are blockers, not inferred failures of any named commercial provider.
+
+On `2026-08-18`, a separate operator-controlled compute runtime supplied technical
+smoke evidence for ComfyUI `0.28.0` on one NVIDIA A100 40GB device. The three Wan2.2
+model names were recognized and their operator-reported file SHA-256 values were:
+
+- UNET `456f901338bd9eadbded3828b819109a9b68e8a525ca5cf8d0049a69fcfeca1e`;
+- text encoder `c3355d30191f1f066b26d93fba017ae9809dce6c627dda5f6a66eaa651204f68`;
+- VAE `e40321bd36b9709991dae2530eb4ac303dd168276980d3e9bc4b6e2b75fed156`.
+
+The resulting MP4 was independently probed as H.264/yuv420p, `640×352`, `24 fps`,
+`49` frames, `2.041667 s`, `133257` bytes, with SHA-256
+`1c3a8359d63eafbc733367331d85d1e5f5d4c4334d17deb3447dabd009d00cdd` and no audio
+stream. This is `OUT_OF_LINEAGE_OPERATOR_SMOKE / TECHNICAL_EVIDENCE_ONLY`: it was not
+dispatched by the authenticated Creator Public API, was not bound to a current K2
+Rights Manifest or Provider Policy, and is not an AssetVersion, approval, master or
+publishable result.
 
 ## Hard blockers before P1
 
@@ -81,14 +98,18 @@ external facts:
    policy and expiry facts (never secret values in Git or browser state);
 4. an explicit currency/cost ceiling and budget-authority ref;
 5. target release destination and territories compatible with every grant;
-6. a production runtime choice capable of recording real execution-device/GPU facts.
+6. the observed runtime attestation reviewed by the provider-policy authority and
+   entered as its exact opaque ref plus SHA-256 digest; technical reachability alone
+   does not authorize dispatch.
 
 Later P8/P9 still require separate human decision and publication-authority facts;
 they cannot be supplied in advance by P0 or inferred from machine QC.
 
 ## Stop decision
 
-Automatic progression stops at the P0→P1 transition. No live provider call, GPU claim,
-rights-cleared assertion, provider success, production asset, publishable master or M16
-scale run has been generated. Independent safe implementation may resume only after
-the missing authorities are connected to this same lineage.
+Automatic progression stops at the P0→P1 transition. A bounded P1 video adapter and
+candidate-recording path now exist, and the separate operator smoke above proves only
+technical capability. No governed same-lineage live provider call, rights-cleared
+provider success, production asset, publishable master or M16 scale run has been
+generated. Independent safe implementation may continue, but P1 cannot pass until the
+missing authorities are connected to this same lineage.

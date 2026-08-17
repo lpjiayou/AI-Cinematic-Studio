@@ -55,7 +55,7 @@ class TestProviderPolicyAuthority:
 
     def verify_execution(self, execution):
         media_kind = execution["mediaKind"]
-        return {
+        authority = {
             "enabled": True,
             "endpointClass": execution["endpointClass"],
             "safetyPolicyRef": execution["safetyPolicyRef"],
@@ -68,6 +68,14 @@ class TestProviderPolicyAuthority:
             "validUntil": "2027-01-01T00:00:00Z",
             "evidenceDigest": canonical_digest(execution),
         }
+        if execution["gpuAttestationRequired"]:
+            authority.update(
+                {
+                    "runtimeAttestationRef": "runtime-attestation-a100-v1",
+                    "runtimeAttestationDigest": "4" * 64,
+                }
+            )
+        return authority
 
 
 def approved_identity_authority():
@@ -321,6 +329,8 @@ class K2ProductionPolicyTests(unittest.TestCase):
             "budgetAuthorityRef": "budget-authority-k2-v1",
             "validUntil": "2027-01-01T00:00:00Z",
             "evidenceDigest": canonical_digest(execution),
+            "runtimeAttestationRef": "runtime-attestation-a100-v1",
+            "runtimeAttestationDigest": "4" * 64,
         }
         providers = StaticProviderPolicyAuthority(
             {("video", "provider-video", "model-video-v1", "approved-region-1"): capability}

@@ -12,9 +12,12 @@ OS、V4 Platform、V3 Render Core、持久化与后端测试；客户 Commercial
 > live provider、GPU、版权或发布就绪。当前已由 Project Lead 授权 K2
 > `P0→P10` 可发布生产波次：M7–M15 仅限同一 K2 单集纵切，M16 仅允许在 P9
 > 与 Gate A/B/C 通过后按 `1→3→10→30` 推进，M17–M19 未授权。
-> P0 的合同、权威端口、持久化与前端阻断映射已经实现；当前真实 K2 输入仍
-> 缺少可核验版权证据、已批准供应商/凭据/条款/预算权威及 GPU/生产运行时，
-> 因此 P0→P1 处于外部事实阻断，未发起任何 live provider 任务。
+> P0 的合同、权威端口、持久化与前端阻断映射已经实现；P1 的受控 Wan2.2
+> 视频候选适配器、V4 作业回传、V5 lineage 校验和只读实验接口也已完成安全
+> 前置实现。独立 A100/ComfyUI 操作烟测证明了技术运行时与模型可用，但它不在
+> 受治理的 K2 请求 lineage 内。当前仍缺可核验版权事实及已批准的供应商、凭据、
+> 条款、预算和精确运行证明权威，因此 P0→P1 仍处于外部事实阻断；尚未通过
+> Core 链路发起受权 live provider 任务。
 >
 > 历史状态：M1–M5 已接受；M6-P0/P1 与 bounded M6-P2 已 Owner Accepted；
 > G1-R1 `d44f471…` 已 Owner Accepted 并关闭 Architecture Remediation R1；
@@ -56,7 +59,7 @@ OS、V4 Platform、V3 Render Core、持久化与后端测试；客户 Commercial
 | Core main convergence | `OWNER ACCEPTED / PR #2 REBASE AND MERGE / MAIN 5976263f / TREE be7447c3 / POST-MERGE CI PASS` |
 | Accepted governance checkpoint | `ACS-GOV-POST-M6-P3-G1-CLOSEOUT / OWNER ACCEPTED AT 20207e7f / TREE e3638838` |
 | Original CCV-R1 candidate | `57cbbd4959f5f3d50b4d453cb6ae96b225cb7759 / REVISION REQUIRED / NOT OWNER ACCEPTED` |
-| Current checkpoint | `ACS-K2-PUBLISHABLE-P0 / SAFE IMPLEMENTATION VERIFIED / EXTERNAL FACT HOLD / NOT PASSED` |
+| Current checkpoint | `ACS-K2-PUBLISHABLE-P0 HOLD + P1 VIDEO SAFE PREREQUISITE / EXTERNAL AUTHORITY REQUIRED / NOT PASSED` |
 | Character Consistency evidence status | `EXPERIMENT REPORTED / INDEPENDENT REPRODUCTION NOT POSSIBLE / SYNTHETIC_TEST_ONLY / NOT FOR PRODUCTION` |
 | CCV-R2 / Character Visual Identity schema | `NOT AUTHORIZED / NOT STARTED` |
 | M6-P3 after G1 / M6-P4+ | `NOT AUTHORIZED / NOT STARTED` |
@@ -110,9 +113,10 @@ Acceptance。受保护的 `main` 通过 PR `#2` 以 `Rebase and merge` 收敛至
 `5976263f92f7f9cbe9c091719eccb036ee8c0c2d`，tree 与 G1-R1 相同，post-merge
 Repository Validation 通过。
 现有 HTTP workspace versions 的 v2 响应允许透传 `episodePlanItemBindings`，但不
-修改 route、handler 或外部 DTO 源文件。除该 Owner 消歧外的 Public HTTP/API 扩张、
-Schema/Migration、正式数据库、Auth/RBAC、Frontend、G1 之后的 M6 工作、
-M7+、V3、GPU、Worker 和 ComfyUI 不在当前授权范围内。
+修改 route、handler 或外部 DTO 源文件。在该历史 M6-P3-G1 授权中，除 Owner
+消歧外的 Public HTTP/API 扩张、Schema/Migration、正式数据库、Auth/RBAC、
+Frontend、G1 之后的 M6 工作、M7+、V3、GPU、Worker 和 ComfyUI 均不在范围内；
+其后的 K2 P0→P10 有界授权仅以 `CURRENT_MILESTONE.md` 第 16 节为准。
 
 权威执行状态见 [CURRENT_MILESTONE.md](CURRENT_MILESTONE.md)。
 
@@ -235,6 +239,9 @@ PYTHONDONTWRITEBYTECODE=1 python -m unittest discover -s tests -p 'test_*.py' -q
 - [System Master Plan](AI_CINEMATIC_STUDIO_SYSTEM_MASTER_PLAN.md)
 - [UI Master Plan](AI_CINEMATIC_STUDIO_UI_MASTER_PLAN.md)
 - [Current Milestone](CURRENT_MILESTONE.md)
+- [K2 Publishable Media Production Contract](architecture/K2_PUBLISHABLE_MEDIA_PRODUCTION_CONTRACT.md)
+- [K2 P0 External Hold](governance/K2_PUBLISHABLE_P0_EXTERNAL_HOLD.md)
+- [K2 ComfyUI / Wan2.2 Operator Runbook](docs/08-compute/k2-comfyui-wan22-operator-runbook.md)
 - [V5 Text Generation Capability Contract](architecture/V5_TEXT_GENERATION_CAPABILITY_CONTRACT.md)
 - [ADR-0006 — V5 Text Generation Capability Boundary](governance/ADR-0006-v5-text-generation-capability-boundary.md)
 - [ACS-ARCH-R1 G0 Record](governance/ACS-ARCH-R1-V5-TEXT-GENERATION-G0.md)

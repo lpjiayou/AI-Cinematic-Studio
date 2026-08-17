@@ -34,8 +34,9 @@ No checkpoint may be skipped, combined by claim, or satisfied by old local evide
 ## 3. Hard transition rules
 
 - P0→P1 requires valid rights-cleared inputs, accepted provider usage terms, an
-  approved endpoint/credential source and an explicit cost ceiling. All of these are
-  resolved by external authority ports; caller-supplied claims cannot satisfy P0.
+  approved endpoint/credential source, an explicit cost ceiling and—when required—an
+  exact authority-approved runtime-attestation ref/digest. All of these are resolved
+  by external authority ports; caller-supplied claims cannot satisfy P0.
 - P1→P2 requires at least one real image, video and audio attempt or a documented
   blocked media type; a blocked type prevents downstream publication.
 - P2→P3 requires durable recovery and isolation evidence.

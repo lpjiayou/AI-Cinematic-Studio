@@ -12,6 +12,7 @@ from services.v4_platform import (
     MediaJobCoordinator,
     SqliteMediaJobAdapter,
     V4CompositionExecutor,
+    create_comfyui_wan22_adapter_from_environment,
 )
 
 from .authority import (
@@ -60,6 +61,13 @@ from .production_policy import (
     RejectingRightsEvidenceAuthority,
     SqliteProductionPolicyAdapter,
 )
+from .provider_experiments import (
+    InMemoryProviderExperimentAdapter,
+    K2ProviderExperimentService,
+    ProviderCandidateRejectedError,
+    ProviderExperimentUnavailableError,
+    SqliteProviderExperimentAdapter,
+)
 
 
 class EpisodeProductionPublicError(RuntimeError):
@@ -75,6 +83,7 @@ class EpisodeProductionPublicBoundary:
         service: EpisodeProductionService,
         authority_identity: K2AuthorityIdentityService,
         production_policy: K2ProductionPolicyService,
+        provider_experiments: K2ProviderExperimentService,
         shot_graph: K2ShotGraphService,
         assets: K2AssetPipelineService,
         media: K2MediaExecutionService,
@@ -83,6 +92,7 @@ class EpisodeProductionPublicBoundary:
         self.__service = service
         self.__authority_identity = authority_identity
         self.__production_policy = production_policy
+        self.__provider_experiments = provider_experiments
         self.__shot_graph = shot_graph
         self.__assets = assets
         self.__media = media
@@ -106,7 +116,11 @@ class EpisodeProductionPublicBoundary:
             return EpisodeProductionPublicError(exc.code, 409)
         if isinstance(exc, ArtifactRejectedError):
             return EpisodeProductionPublicError(exc.code, 422)
+        if isinstance(exc, ProviderCandidateRejectedError):
+            return EpisodeProductionPublicError(exc.code, 422)
         if isinstance(exc, WorkerUnavailableError):
+            return EpisodeProductionPublicError(exc.code, 503)
+        if isinstance(exc, ProviderExperimentUnavailableError):
             return EpisodeProductionPublicError(exc.code, 503)
         if isinstance(
             exc,
@@ -158,6 +172,22 @@ class EpisodeProductionPublicBoundary:
     ) -> dict[str, Any]:
         return self._invoke(
             self.__production_policy.get_readiness, workspace_ref, run_ref
+        )
+
+    def run_provider_experiment(
+        self, command: Mapping[str, Any]
+    ) -> dict[str, Any]:
+        return self._invoke(
+            self.__provider_experiments.run_video_experiment, command
+        )
+
+    def list_provider_experiments(
+        self, workspace_ref: str, run_ref: str
+    ) -> dict[str, Any]:
+        return self._invoke(
+            self.__provider_experiments.list_experiments,
+            workspace_ref,
+            run_ref,
         )
 
     def compile_shot_graph(self, command: Mapping[str, Any]) -> dict[str, Any]:
@@ -214,6 +244,7 @@ def _services(
     repository,
     evidence_repository,
     production_policy_repository,
+    provider_experiment_repository,
     *,
     project_boundary,
     series_episode_boundary,
@@ -222,6 +253,7 @@ def _services(
     identity_reference_authority=None,
     rights_evidence_authority=None,
     provider_policy_authority=None,
+    provider_experiment_execution=None,
     media_execution=None,
     composition_execution=None,
     approval_authority=None,
@@ -231,6 +263,7 @@ def _services(
     EpisodeProductionService,
     K2AuthorityIdentityService,
     K2ProductionPolicyService,
+    K2ProviderExperimentService,
     K2ShotGraphService,
     K2AssetPipelineService,
     K2MediaExecutionService,
@@ -282,6 +315,14 @@ def _services(
         ref_factory=selected_ref_factory,
         clock=selected_clock,
     )
+    provider_experiments = K2ProviderExperimentService(
+        assets,
+        production_policy,
+        provider_experiment_repository,
+        provider_experiment_execution,
+        ref_factory=selected_ref_factory,
+        clock=selected_clock,
+    )
     media = K2MediaExecutionService(
         assets,
         evidence_repository,
@@ -301,6 +342,7 @@ def _services(
         service,
         authority_identity,
         production_policy,
+        provider_experiments,
         shot_graph,
         assets,
         media,
@@ -317,6 +359,7 @@ def create_in_memory_boundary(
     identity_reference_authority=None,
     rights_evidence_authority=None,
     provider_policy_authority=None,
+    provider_experiment_execution=None,
     media_execution=None,
     composition_execution=None,
     approval_authority=None,
@@ -327,6 +370,7 @@ def create_in_memory_boundary(
         service,
         authority_identity,
         production_policy,
+        provider_experiments,
         shot_graph,
         assets,
         media,
@@ -335,6 +379,7 @@ def create_in_memory_boundary(
         InMemoryEpisodeProductionAdapter(),
         InMemoryEpisodeProductionEvidenceAdapter(),
         InMemoryProductionPolicyAdapter(),
+        InMemoryProviderExperimentAdapter(),
         project_boundary=project_boundary,
         series_episode_boundary=series_episode_boundary,
         series_planning_boundary=series_planning_boundary,
@@ -342,6 +387,7 @@ def create_in_memory_boundary(
         identity_reference_authority=identity_reference_authority,
         rights_evidence_authority=rights_evidence_authority,
         provider_policy_authority=provider_policy_authority,
+        provider_experiment_execution=provider_experiment_execution,
         media_execution=media_execution,
         composition_execution=composition_execution,
         approval_authority=approval_authority,
@@ -352,6 +398,7 @@ def create_in_memory_boundary(
         service,
         authority_identity,
         production_policy,
+        provider_experiments,
         shot_graph,
         assets,
         media,
@@ -368,9 +415,11 @@ def create_local_development_boundary(
     script_studio_boundary,
     evidence_database_path: Path | str | None = None,
     production_policy_database_path: Path | str | None = None,
+    provider_experiment_database_path: Path | str | None = None,
     identity_reference_authority=None,
     rights_evidence_authority=None,
     provider_policy_authority=None,
+    provider_experiment_execution=None,
     media_execution=None,
     composition_execution=None,
     approval_authority=None,
@@ -388,10 +437,16 @@ def create_local_development_boundary(
         if production_policy_database_path is not None
         else Path(f"{database_path}.production-policy.sqlite3")
     )
+    provider_experiment_path = (
+        Path(provider_experiment_database_path)
+        if provider_experiment_database_path is not None
+        else Path(f"{database_path}.provider-experiments.sqlite3")
+    )
     (
         service,
         authority_identity,
         production_policy,
+        provider_experiments,
         shot_graph,
         assets,
         media,
@@ -406,6 +461,10 @@ def create_local_development_boundary(
         SqliteProductionPolicyAdapter(
             production_policy_path, initialize_if_missing=initialize_if_missing
         ),
+        SqliteProviderExperimentAdapter(
+            provider_experiment_path,
+            initialize_if_missing=initialize_if_missing,
+        ),
         project_boundary=project_boundary,
         series_episode_boundary=series_episode_boundary,
         series_planning_boundary=series_planning_boundary,
@@ -413,6 +472,7 @@ def create_local_development_boundary(
         identity_reference_authority=identity_reference_authority,
         rights_evidence_authority=rights_evidence_authority,
         provider_policy_authority=provider_policy_authority,
+        provider_experiment_execution=provider_experiment_execution,
         media_execution=media_execution,
         composition_execution=composition_execution,
         approval_authority=approval_authority,
@@ -423,6 +483,7 @@ def create_local_development_boundary(
         service,
         authority_identity,
         production_policy,
+        provider_experiments,
         shot_graph,
         assets,
         media,
@@ -462,6 +523,33 @@ def create_local_development_boundary_from_environment(
         str(values.get("CREATOR_PRODUCTION_POLICY_DATA_PATH", "")).strip()
         or f"{path}.production-policy.sqlite3"
     )
+    provider_experiment_execution = None
+    comfyui_configured = any(
+        key.startswith("COMFYUI_") and str(value).strip()
+        for key, value in values.items()
+    )
+    if comfyui_configured:
+        provider_adapter = create_comfyui_wan22_adapter_from_environment(values)
+        provider_job_path = Path(
+            str(
+                values.get("CREATOR_PROVIDER_EXPERIMENT_JOB_DATA_PATH", "")
+            ).strip()
+            or f"{path}.provider-media-jobs.sqlite3"
+        )
+        provider_artifact_root = Path(
+            str(
+                values.get("CREATOR_PROVIDER_EXPERIMENT_ARTIFACT_ROOT", "")
+            ).strip()
+            or f"{path}.provider-artifacts"
+        )
+        provider_experiment_execution = MediaJobCoordinator(
+            SqliteMediaJobAdapter(provider_job_path),
+            provider_adapter,
+            provider_artifact_root,
+            ref_factory=lambda prefix: f"{prefix}-{uuid4().hex}",
+            clock=_utc_now,
+            max_attempts=1,
+        )
     execution = MediaJobCoordinator(
         SqliteMediaJobAdapter(job_path),
         DeterministicLocalFfmpegAdapter(),
@@ -476,6 +564,7 @@ def create_local_development_boundary_from_environment(
         series_planning_boundary=series_planning_boundary,
         script_studio_boundary=script_studio_boundary,
         production_policy_database_path=production_policy_path,
+        provider_experiment_execution=provider_experiment_execution,
         media_execution=execution,
         composition_execution=V4CompositionExecutor.from_artifact_root(artifact_root),
         initialize_if_missing=True,

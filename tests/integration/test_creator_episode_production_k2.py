@@ -424,6 +424,31 @@ class CreatorEpisodeProductionK2HttpTests(unittest.TestCase):
             result["assetResolutionManifest"]["payloadDigest"],
         )
 
+        video_request = next(
+            item for item in result["generationRequests"]
+            if item["mediaKind"] == "video"
+        )
+        experiment_endpoint = f"{base}/provider-experiments"
+        with self.assertRaises(error.HTTPError) as blocked:
+            self.post(
+                experiment_endpoint,
+                {
+                    "idempotencyKey": "blocked-provider-experiment-v1",
+                    "sourceGenerationRequestRef": video_request[
+                        "generationRequestRef"
+                    ],
+                    "providerCapabilityRef": "untrusted-browser-capability",
+                },
+            )
+        self.assertEqual(blocked.exception.code, 409)
+        blocked_payload = json.loads(blocked.exception.read().decode("utf-8"))
+        self.assertEqual(
+            blocked_payload["error"]["code"], "production_policy_required"
+        )
+        with self.assertRaises(error.HTTPError) as blocked_get:
+            self.get(experiment_endpoint)
+        self.assertEqual(blocked_get.exception.code, 409)
+
     def test_public_g5_executes_real_local_evidence_without_exposing_paths(self):
         public_run = {
             key: value for key, value in run_command(
