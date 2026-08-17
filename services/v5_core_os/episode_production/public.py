@@ -12,6 +12,7 @@ from .authority import (
     K2AuthorityIdentityService,
     RejectingIdentityReferenceAuthority,
 )
+from .assets import K2AssetPipelineService
 from .evidence import (
     InMemoryEpisodeProductionEvidenceAdapter,
     InvalidStateTransitionError,
@@ -47,10 +48,12 @@ class EpisodeProductionPublicBoundary:
         service: EpisodeProductionService,
         authority_identity: K2AuthorityIdentityService,
         shot_graph: K2ShotGraphService,
+        assets: K2AssetPipelineService,
     ) -> None:
         self.__service = service
         self.__authority_identity = authority_identity
         self.__shot_graph = shot_graph
+        self.__assets = assets
 
     @staticmethod
     def _error(exc: EpisodeProductionError) -> EpisodeProductionPublicError:
@@ -114,6 +117,12 @@ class EpisodeProductionPublicBoundary:
             self.__shot_graph.get_shot_graph_bundle, workspace_ref, run_ref
         )
 
+    def resolve_assets(self, command: Mapping[str, Any]) -> dict[str, Any]:
+        return self._invoke(self.__assets.resolve_assets, command)
+
+    def get_asset_plan(self, workspace_ref: str, run_ref: str) -> dict[str, Any]:
+        return self._invoke(self.__assets.get_asset_plan, workspace_ref, run_ref)
+
 
 def _services(
     repository,
@@ -130,6 +139,7 @@ def _services(
     EpisodeProductionService,
     K2AuthorityIdentityService,
     K2ShotGraphService,
+    K2AssetPipelineService,
 ]:
     selected_ref_factory = ref_factory or (
         lambda prefix: f"{prefix}-{uuid4().hex}"
@@ -162,7 +172,13 @@ def _services(
         ref_factory=selected_ref_factory,
         clock=selected_clock,
     )
-    return service, authority_identity, shot_graph
+    assets = K2AssetPipelineService(
+        shot_graph,
+        evidence_repository,
+        ref_factory=selected_ref_factory,
+        clock=selected_clock,
+    )
+    return service, authority_identity, shot_graph, assets
 
 
 def create_in_memory_boundary(
@@ -175,7 +191,7 @@ def create_in_memory_boundary(
     ref_factory=None,
     clock=None,
 ) -> EpisodeProductionPublicBoundary:
-    service, authority_identity, shot_graph = _services(
+    service, authority_identity, shot_graph, assets = _services(
         InMemoryEpisodeProductionAdapter(),
         InMemoryEpisodeProductionEvidenceAdapter(),
         project_boundary=project_boundary,
@@ -186,7 +202,9 @@ def create_in_memory_boundary(
         ref_factory=ref_factory,
         clock=clock,
     )
-    return EpisodeProductionPublicBoundary(service, authority_identity, shot_graph)
+    return EpisodeProductionPublicBoundary(
+        service, authority_identity, shot_graph, assets
+    )
 
 
 def create_local_development_boundary(
@@ -205,7 +223,7 @@ def create_local_development_boundary(
         if evidence_database_path is not None
         else Path(f"{database_path}.evidence.sqlite3")
     )
-    service, authority_identity, shot_graph = _services(
+    service, authority_identity, shot_graph, assets = _services(
         SqliteEpisodeProductionAdapter(
             database_path, initialize_if_missing=initialize_if_missing
         ),
@@ -218,7 +236,9 @@ def create_local_development_boundary(
         script_studio_boundary=script_studio_boundary,
         identity_reference_authority=identity_reference_authority,
     )
-    return EpisodeProductionPublicBoundary(service, authority_identity, shot_graph)
+    return EpisodeProductionPublicBoundary(
+        service, authority_identity, shot_graph, assets
+    )
 
 
 def create_local_development_boundary_from_environment(

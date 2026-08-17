@@ -549,6 +549,34 @@ test or remote-integrity failure stops the wave.
 - targeted G1–G3 unit and HTTP integration gate: `22 / 22`;
 - complete Core regression: `502 / 502`.
 
-G3 remains a local technical checkpoint until this exact tree is committed, published
-without force, fetched and proven equal to the remote branch. Only that evidence
-authorizes automatic entry into G4.
+### G3 remote verification
+
+- branch: `feature/acs-k2-golden-episode`;
+- remote commit: `885245146cb497710fbaa616e0b16b1413f119dd`;
+- remote tree: `0419b486a6f43de9ff70afb10616b158696ba766`;
+- fetched local and remote trees matched, ahead/behind was `0 / 0`, and the worktree
+  was clean before G4 implementation began.
+
+### G4 implementation evidence
+
+- G4 re-verifies current G1 roots, confirmed script, M6 authority, G2 Identity Lock
+  and the complete validated G3 Shot Graph before resolving any requirement;
+- five deduplicated semantic requirements bind immutable character/location/prop/style
+  authority refs, versions and digests; conflicting reuse of a requirement key fails;
+- every one of four K2 shots receives separate versioned video and audio requirements
+  plus provider-neutral GenerationRequests, giving 13 requirements and 8 dispatchable
+  requests with no blocked or silently omitted requirement;
+- requests carry exact dimensions, frames, frame rate, codec/container or audio sample
+  parameters, shot/version/digest lineage and deterministic adapter capability, while
+  provider selection remains honestly `UNSELECTED` until V4 dispatch;
+- all local-evidence requests retain `rightsState=LOCAL_EVIDENCE_ONLY` and
+  `publicationAllowed=false`; G4 creates no path-only asset, fabricated provider result
+  or GPU-success claim;
+- append-only evidence records `SHOTS_COMPILED → ASSETS_READY`; authenticated public
+  create/read routes remain principal-scoped, replay-safe and workspace-isolated;
+- targeted G1–G4 unit and HTTP integration gate: `26 / 26`;
+- complete Core regression: `506 / 506`.
+
+G4 remains a local technical checkpoint until this exact tree is committed, published
+without force, fetched and proven equal to the remote branch. Actual adapter execution
+and immutable verified media registration occur only through the G5 V4 worker gate.

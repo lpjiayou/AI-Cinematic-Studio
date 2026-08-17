@@ -124,6 +124,7 @@ HEALTH_ENDPOINT = "/health"
 EPISODE_PRODUCTION_SUBRESOURCES = {
     "authority-identity",
     "shot-graph",
+    "assets",
 }
 
 
@@ -299,10 +300,12 @@ class CreatorRequestHandler(BaseHTTPRequestHandler):
                     result = self.episode_production_boundary.authorize_and_lock(
                         command
                     )
-                else:
+                elif resource == "shot-graph":
                     result = self.episode_production_boundary.compile_shot_graph(
                         command
                     )
+                else:
+                    result = self.episode_production_boundary.resolve_assets(command)
             except EpisodeProductionPublicError as exc:
                 self._send_episode_production_error(exc)
                 return
@@ -467,8 +470,12 @@ class CreatorRequestHandler(BaseHTTPRequestHandler):
                         result = self.episode_production_boundary.get_authority_identity(
                             workspace_ref, run_ref
                         )
-                    else:
+                    elif resource == "shot-graph":
                         result = self.episode_production_boundary.get_shot_graph_bundle(
+                            workspace_ref, run_ref
+                        )
+                    else:
+                        result = self.episode_production_boundary.get_asset_plan(
                             workspace_ref, run_ref
                         )
                     self._send_json(200, {"ok": True, **result})

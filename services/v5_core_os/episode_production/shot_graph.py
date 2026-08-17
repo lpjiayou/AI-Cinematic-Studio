@@ -994,3 +994,42 @@ class K2ShotGraphService:
             ),
             "state": compile_gate["toState"],
         }
+
+    def verify_shot_graph_current(
+        self, workspace_ref: str, production_run_ref: str
+    ) -> dict[str, Any]:
+        verified = self.authority_identity.verify_authority_identity_current(
+            workspace_ref, production_run_ref
+        )
+        root = verified["root"]
+        self._script_version(root)
+        bundle = self.get_shot_graph_bundle(workspace_ref, production_run_ref)
+        validation = bundle["consistencyValidation"]
+        storyboard = bundle["storyboardVersion"]
+        shots = bundle["creativeShotVersions"]
+        graph = bundle["executableShotGraph"]
+        if (
+            graph.get("rootPayloadDigest") != root["payloadDigest"]
+            or graph.get("scriptVersionRef") != root["scriptVersionRef"]
+            or graph.get("authorityDecisionDigest")
+            != verified["authorityDecision"]["payloadDigest"]
+            or graph.get("identityLockDigest")
+            != verified["identityLock"]["payloadDigest"]
+            or graph.get("consistencyValidationDigest")
+            != validation.get("payloadDigest")
+            or graph.get("storyboardDigest") != storyboard.get("payloadDigest")
+            or len(shots) != root["manifest"]["expectedShotCount"]
+        ):
+            raise StaleInputError("G3 Shot Graph lineage is stale")
+        shot_digests = {
+            shot.get("creativeShotVersionRef"): shot.get("payloadDigest")
+            for shot in shots
+        }
+        if len(shot_digests) != len(shots) or any(
+            shot_digests.get(node.get("creativeShotVersionRef"))
+            != node.get("payloadDigest")
+            for node in graph.get("shots", [])
+        ):
+            raise StaleInputError("G3 CreativeShot lineage is stale")
+        validate_executable_shot_graph(graph)
+        return {**verified, **bundle}

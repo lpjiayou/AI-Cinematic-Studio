@@ -420,6 +420,15 @@ def g3_command(run, **extra):
     }
 
 
+def g4_command(run, **extra):
+    return {
+        "workspaceRef": WORKSPACE,
+        "productionRunRef": run["productionRunRef"],
+        "idempotencyKey": "k2-asset-resolution-v1",
+        **extra,
+    }
+
+
 def create_boundary(
     assembly,
     refs,
@@ -941,6 +950,109 @@ class EpisodeProductionG3ShotGraphTests(unittest.TestCase):
             self.assertEqual(
                 (caught.exception.status, caught.exception.code), (404, "not_found")
             )
+
+
+class EpisodeProductionG4AssetResolutionTests(unittest.TestCase):
+    def setUp(self):
+        (
+            self.assembly,
+            self.refs,
+            self.project,
+            self.series,
+            self.episode,
+            _,
+        ) = seed_k2_roots(with_m6_authority=True)
+        activate_k2_m6_baseline(self.assembly, self.project, self.series)
+        self.boundary = create_boundary(
+            self.assembly,
+            self.refs,
+            identity_reference_authority=k2_identity_authority(),
+        )
+        self.run = self.boundary.create_run(
+            run_command(self.project, self.series, self.episode)
+        )
+        self.boundary.authorize_and_lock(g2_command(self.run))
+        self.boundary.compile_shot_graph(g3_command(self.run))
+
+    def test_resolves_all_authority_requirements_and_emits_provider_neutral_requests(self):
+        result = self.boundary.resolve_assets(g4_command(self.run))
+        manifest = result["assetResolutionManifest"]
+        requirements = result["assetRequirements"]
+        requests = result["generationRequests"]
+
+        self.assertEqual(result["state"], "ASSETS_READY")
+        self.assertFalse(result["idempotentReplay"])
+        self.assertEqual(manifest["summary"], {
+            "requirements": 13,
+            "resolvedAuthority": 5,
+            "generationRequested": 8,
+            "blocked": 0,
+            "generationRequests": 8,
+        })
+        self.assertEqual(len(requirements), 13)
+        self.assertEqual(len(requests), 8)
+        self.assertEqual(
+            {item["resolutionState"] for item in requirements},
+            {"RESOLVED_AUTHORITY", "GENERATION_REQUESTED"},
+        )
+        self.assertEqual(
+            {(item["creativeShotRef"], item["mediaKind"]) for item in requests},
+            {
+                (shot["creativeShotRef"], kind)
+                for shot in self.boundary.get_shot_graph_bundle(
+                    WORKSPACE, self.run["productionRunRef"]
+                )["creativeShotVersions"]
+                for kind in ("video", "audio")
+            },
+        )
+        for item in requests:
+            self.assertEqual(item["providerSelection"], "UNSELECTED")
+            self.assertEqual(item["requestedProvenance"], "LOCAL_EVIDENCE")
+            self.assertFalse(item["publicationAllowed"])
+            self.assertIn(item["adapterCapability"], {
+                "deterministic-local-video-v1",
+                "deterministic-local-audio-v1",
+            })
+            self.assertNotIn("path", json.dumps(item).lower())
+        projected = self.boundary.get_run(
+            WORKSPACE, self.run["productionRunRef"]
+        )
+        self.assertEqual(projected["state"], "ASSETS_READY")
+        self.assertEqual(projected["completedGates"][-1], "G4_ASSET_RESOLUTION")
+
+    def test_replay_is_stable_and_g4_cannot_skip_g3(self):
+        first = self.boundary.resolve_assets(g4_command(self.run))
+        replay = self.boundary.resolve_assets(g4_command(self.run))
+        self.assertTrue(replay["idempotentReplay"])
+        self.assertEqual(replay["assetResolutionManifest"], first["assetResolutionManifest"])
+
+        assembly, refs, project, series, episode, _ = seed_k2_roots(
+            with_m6_authority=True
+        )
+        activate_k2_m6_baseline(assembly, project, series)
+        boundary = create_boundary(
+            assembly,
+            refs,
+            identity_reference_authority=k2_identity_authority(),
+        )
+        run = boundary.create_run(run_command(project, series, episode))
+        boundary.authorize_and_lock(g2_command(run))
+        with self.assertRaises(EpisodeProductionPublicError) as caught:
+            boundary.resolve_assets(g4_command(run))
+        self.assertEqual(
+            (caught.exception.status, caught.exception.code),
+            (409, "upstream_not_confirmed"),
+        )
+
+    def test_g4_plan_is_workspace_isolated(self):
+        self.boundary.resolve_assets(g4_command(self.run))
+        with self.assertRaises(EpisodeProductionPublicError) as caught:
+            self.boundary.get_asset_plan(
+                "workspace-other", self.run["productionRunRef"]
+            )
+        self.assertEqual(
+            (caught.exception.status, caught.exception.code), (404, "not_found")
+        )
 
 
 def sqlite_tables(path):

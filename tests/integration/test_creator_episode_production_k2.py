@@ -17,6 +17,7 @@ from tests.unit.test_episode_production_k2 import (
     activate_k2_m6_baseline,
     g2_command,
     g3_command,
+    g4_command,
     k2_identity_authority,
     run_command,
     seed_k2_roots,
@@ -278,6 +279,47 @@ class CreatorEpisodeProductionK2HttpTests(unittest.TestCase):
         self.assertEqual(caught.exception.code, 400)
         payload = json.loads(caught.exception.read().decode("utf-8"))
         self.assertEqual(payload["error"]["code"], "invalid_request")
+
+    def test_public_g4_asset_plan_has_no_fabricated_provider_success(self):
+        public_run = {
+            key: value for key, value in run_command(
+                self.project, self.series, self.episode
+            ).items() if key != "workspaceRef"
+        }
+        _, created = self.post(PUBLIC_EPISODE_PRODUCTION_RUNS_ENDPOINT, public_run)
+        run = created["run"]
+        base = (
+            f"{PUBLIC_EPISODE_PRODUCTION_RUNS_ENDPOINT}/"
+            f"{parse.quote(run['productionRunRef'])}"
+        )
+        self.post(
+            f"{base}/authority-identity",
+            {key: value for key, value in g2_command(run).items()
+             if key not in {"workspaceRef", "productionRunRef"}},
+        )
+        self.post(
+            f"{base}/shot-graph",
+            {key: value for key, value in g3_command(run).items()
+             if key not in {"workspaceRef", "productionRunRef"}},
+        )
+        command = {
+            key: value for key, value in g4_command(run).items()
+            if key not in {"workspaceRef", "productionRunRef"}
+        }
+        status, result = self.post(f"{base}/assets", command)
+        self.assertEqual(status, 201)
+        self.assertEqual(result["state"], "ASSETS_READY")
+        self.assertEqual(len(result["generationRequests"]), 8)
+        self.assertTrue(all(
+            item["providerSelection"] == "UNSELECTED"
+            for item in result["generationRequests"]
+        ))
+        status, restored = self.get(f"{base}/assets")
+        self.assertEqual(status, 200)
+        self.assertEqual(
+            restored["assetResolutionManifest"]["payloadDigest"],
+            result["assetResolutionManifest"]["payloadDigest"],
+        )
 
 
 if __name__ == "__main__":
