@@ -29,10 +29,23 @@ class CreatorPublicHttpV1ContractTests(unittest.TestCase):
         )
         self.assertEqual(capabilities[5]["state"], "authority_required")
         self.assertEqual(
-            {item["state"] for item in capabilities[6:]},
+            {item["state"] for item in capabilities[6:9]},
+            {"local_evidence_only"},
+        )
+        self.assertEqual(
+            {item["state"] for item in capabilities[9:12]},
+            {"production_policy_required"},
+        )
+        self.assertEqual(
+            {item["state"] for item in capabilities[12:15]},
+            {"local_evidence_only"},
+        )
+        self.assertEqual(
+            {item["state"] for item in capabilities[15:]},
             {"not_open"},
         )
-        self.assertTrue(all(not item["publicResources"] for item in capabilities[6:]))
+        self.assertTrue(all(item["publicResources"] for item in capabilities[6:15]))
+        self.assertTrue(all(not item["publicResources"] for item in capabilities[15:]))
 
     def test_capability_payload_is_detached_from_frozen_projection(self):
         first = public_contract.capability_payload()

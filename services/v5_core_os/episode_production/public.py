@@ -52,6 +52,14 @@ from .delivery import (
     K2DeliveryService,
     RejectingApprovalAuthority,
 )
+from .production_policy import (
+    InMemoryProductionPolicyAdapter,
+    K2ProductionPolicyService,
+    ProductionPolicyRequiredError,
+    RejectingProviderPolicyAuthority,
+    RejectingRightsEvidenceAuthority,
+    SqliteProductionPolicyAdapter,
+)
 
 
 class EpisodeProductionPublicError(RuntimeError):
@@ -66,6 +74,7 @@ class EpisodeProductionPublicBoundary:
         self,
         service: EpisodeProductionService,
         authority_identity: K2AuthorityIdentityService,
+        production_policy: K2ProductionPolicyService,
         shot_graph: K2ShotGraphService,
         assets: K2AssetPipelineService,
         media: K2MediaExecutionService,
@@ -73,6 +82,7 @@ class EpisodeProductionPublicBoundary:
     ) -> None:
         self.__service = service
         self.__authority_identity = authority_identity
+        self.__production_policy = production_policy
         self.__shot_graph = shot_graph
         self.__assets = assets
         self.__media = media
@@ -91,6 +101,8 @@ class EpisodeProductionPublicBoundary:
         if isinstance(exc, ApprovalRequiredError):
             return EpisodeProductionPublicError(exc.code, 403)
         if isinstance(exc, ApprovalRejectedError):
+            return EpisodeProductionPublicError(exc.code, 409)
+        if isinstance(exc, ProductionPolicyRequiredError):
             return EpisodeProductionPublicError(exc.code, 409)
         if isinstance(exc, ArtifactRejectedError):
             return EpisodeProductionPublicError(exc.code, 422)
@@ -136,6 +148,16 @@ class EpisodeProductionPublicBoundary:
     ) -> dict[str, Any]:
         return self._invoke(
             self.__authority_identity.get_authority_identity, workspace_ref, run_ref
+        )
+
+    def record_production_policy(self, command: Mapping[str, Any]) -> dict[str, Any]:
+        return self._invoke(self.__production_policy.record_bundle, command)
+
+    def get_production_readiness(
+        self, workspace_ref: str, run_ref: str
+    ) -> dict[str, Any]:
+        return self._invoke(
+            self.__production_policy.get_readiness, workspace_ref, run_ref
         )
 
     def compile_shot_graph(self, command: Mapping[str, Any]) -> dict[str, Any]:
@@ -191,12 +213,15 @@ class EpisodeProductionPublicBoundary:
 def _services(
     repository,
     evidence_repository,
+    production_policy_repository,
     *,
     project_boundary,
     series_episode_boundary,
     series_planning_boundary,
     script_studio_boundary,
     identity_reference_authority=None,
+    rights_evidence_authority=None,
+    provider_policy_authority=None,
     media_execution=None,
     composition_execution=None,
     approval_authority=None,
@@ -205,6 +230,7 @@ def _services(
 ) -> tuple[
     EpisodeProductionService,
     K2AuthorityIdentityService,
+    K2ProductionPolicyService,
     K2ShotGraphService,
     K2AssetPipelineService,
     K2MediaExecutionService,
@@ -230,6 +256,15 @@ def _services(
         identity_reference_authority=(
             identity_reference_authority or RejectingIdentityReferenceAuthority()
         ),
+        ref_factory=selected_ref_factory,
+        clock=selected_clock,
+    )
+    production_policy = K2ProductionPolicyService(
+        service,
+        authority_identity,
+        production_policy_repository,
+        rights_evidence_authority or RejectingRightsEvidenceAuthority(),
+        provider_policy_authority or RejectingProviderPolicyAuthority(),
         ref_factory=selected_ref_factory,
         clock=selected_clock,
     )
@@ -262,7 +297,15 @@ def _services(
         ref_factory=selected_ref_factory,
         clock=selected_clock,
     )
-    return service, authority_identity, shot_graph, assets, media, delivery
+    return (
+        service,
+        authority_identity,
+        production_policy,
+        shot_graph,
+        assets,
+        media,
+        delivery,
+    )
 
 
 def create_in_memory_boundary(
@@ -272,20 +315,33 @@ def create_in_memory_boundary(
     series_planning_boundary,
     script_studio_boundary,
     identity_reference_authority=None,
+    rights_evidence_authority=None,
+    provider_policy_authority=None,
     media_execution=None,
     composition_execution=None,
     approval_authority=None,
     ref_factory=None,
     clock=None,
 ) -> EpisodeProductionPublicBoundary:
-    service, authority_identity, shot_graph, assets, media, delivery = _services(
+    (
+        service,
+        authority_identity,
+        production_policy,
+        shot_graph,
+        assets,
+        media,
+        delivery,
+    ) = _services(
         InMemoryEpisodeProductionAdapter(),
         InMemoryEpisodeProductionEvidenceAdapter(),
+        InMemoryProductionPolicyAdapter(),
         project_boundary=project_boundary,
         series_episode_boundary=series_episode_boundary,
         series_planning_boundary=series_planning_boundary,
         script_studio_boundary=script_studio_boundary,
         identity_reference_authority=identity_reference_authority,
+        rights_evidence_authority=rights_evidence_authority,
+        provider_policy_authority=provider_policy_authority,
         media_execution=media_execution,
         composition_execution=composition_execution,
         approval_authority=approval_authority,
@@ -293,7 +349,13 @@ def create_in_memory_boundary(
         clock=clock,
     )
     return EpisodeProductionPublicBoundary(
-        service, authority_identity, shot_graph, assets, media, delivery
+        service,
+        authority_identity,
+        production_policy,
+        shot_graph,
+        assets,
+        media,
+        delivery,
     )
 
 
@@ -305,7 +367,10 @@ def create_local_development_boundary(
     series_planning_boundary,
     script_studio_boundary,
     evidence_database_path: Path | str | None = None,
+    production_policy_database_path: Path | str | None = None,
     identity_reference_authority=None,
+    rights_evidence_authority=None,
+    provider_policy_authority=None,
     media_execution=None,
     composition_execution=None,
     approval_authority=None,
@@ -318,18 +383,36 @@ def create_local_development_boundary(
         if evidence_database_path is not None
         else Path(f"{database_path}.evidence.sqlite3")
     )
-    service, authority_identity, shot_graph, assets, media, delivery = _services(
+    production_policy_path = (
+        Path(production_policy_database_path)
+        if production_policy_database_path is not None
+        else Path(f"{database_path}.production-policy.sqlite3")
+    )
+    (
+        service,
+        authority_identity,
+        production_policy,
+        shot_graph,
+        assets,
+        media,
+        delivery,
+    ) = _services(
         SqliteEpisodeProductionAdapter(
             database_path, initialize_if_missing=initialize_if_missing
         ),
         SqliteEpisodeProductionEvidenceAdapter(
             evidence_path, initialize_if_missing=initialize_if_missing
         ),
+        SqliteProductionPolicyAdapter(
+            production_policy_path, initialize_if_missing=initialize_if_missing
+        ),
         project_boundary=project_boundary,
         series_episode_boundary=series_episode_boundary,
         series_planning_boundary=series_planning_boundary,
         script_studio_boundary=script_studio_boundary,
         identity_reference_authority=identity_reference_authority,
+        rights_evidence_authority=rights_evidence_authority,
+        provider_policy_authority=provider_policy_authority,
         media_execution=media_execution,
         composition_execution=composition_execution,
         approval_authority=approval_authority,
@@ -337,7 +420,13 @@ def create_local_development_boundary(
         clock=clock,
     )
     return EpisodeProductionPublicBoundary(
-        service, authority_identity, shot_graph, assets, media, delivery
+        service,
+        authority_identity,
+        production_policy,
+        shot_graph,
+        assets,
+        media,
+        delivery,
     )
 
 
@@ -369,6 +458,10 @@ def create_local_development_boundary_from_environment(
         str(values.get("CREATOR_MEDIA_ARTIFACT_ROOT", "")).strip()
         or f"{path}.artifacts"
     )
+    production_policy_path = Path(
+        str(values.get("CREATOR_PRODUCTION_POLICY_DATA_PATH", "")).strip()
+        or f"{path}.production-policy.sqlite3"
+    )
     execution = MediaJobCoordinator(
         SqliteMediaJobAdapter(job_path),
         DeterministicLocalFfmpegAdapter(),
@@ -382,6 +475,7 @@ def create_local_development_boundary_from_environment(
         series_episode_boundary=series_episode_boundary,
         series_planning_boundary=series_planning_boundary,
         script_studio_boundary=script_studio_boundary,
+        production_policy_database_path=production_policy_path,
         media_execution=execution,
         composition_execution=V4CompositionExecutor.from_artifact_root(artifact_root),
         initialize_if_missing=True,

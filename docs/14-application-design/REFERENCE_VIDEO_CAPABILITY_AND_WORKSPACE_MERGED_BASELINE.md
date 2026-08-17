@@ -10,6 +10,9 @@
 >
 > Future capability authority: `M7–M19 NOT OPEN; EXPERIMENT AND ADR REQUIRED`
 
+> Superseding production authority: `ADR-0009 + ACS-K2-P0→P10`; this file remains the
+> reference-video evidence/layout baseline and does not itself authorize an input.
+
 ## 0. Purpose and disposition
 
 This document is the repository-resident, reviewed successor to the local merged draft
@@ -109,6 +112,9 @@ forbidden without independent evidence:
 
 The video itself is not committed by this baseline. Rights and provenance must be
 approved before it is used as a model/provider input or distributed test asset.
+Under the authorized K2 P0→P10 wave, selecting it would require its exact digest and a
+resolvable `RightsManifestVersion` grant through the rights-evidence authority. Until
+that exists, it remains excluded from provider dispatch and publication lineage.
 
 ## 2. Workspace layout contract
 

@@ -124,6 +124,7 @@ MAX_REQUEST_BYTES = 512_000
 HEALTH_ENDPOINT = "/health"
 EPISODE_PRODUCTION_SUBRESOURCES = {
     "authority-identity",
+    "production-readiness",
     "shot-graph",
     "assets",
     "media",
@@ -305,6 +306,17 @@ class CreatorRequestHandler(BaseHTTPRequestHandler):
             if production_subresource is not None and "productionRunRef" in payload:
                 self._send_application_error(400, "invalid_request")
                 return
+            if (
+                production_subresource is not None
+                and production_subresource[1] == "production-readiness"
+            ):
+                if "actorRef" in payload:
+                    self._send_application_error(400, "invalid_request")
+                    return
+                payload = {
+                    **payload,
+                    "actorRef": self._authenticated_credential_ref(),
+                }
             payload = {
                 **payload,
                 "workspaceRef": self._authenticated_workspace_ref(),
@@ -329,6 +341,10 @@ class CreatorRequestHandler(BaseHTTPRequestHandler):
                 command = {**payload, "productionRunRef": run_ref}
                 if resource == "authority-identity":
                     result = self.episode_production_boundary.authorize_and_lock(
+                        command
+                    )
+                elif resource == "production-readiness":
+                    result = self.episode_production_boundary.record_production_policy(
                         command
                     )
                 elif resource == "shot-graph":
@@ -524,6 +540,10 @@ class CreatorRequestHandler(BaseHTTPRequestHandler):
                     run_ref, resource = production_subresource
                     if resource == "authority-identity":
                         result = self.episode_production_boundary.get_authority_identity(
+                            workspace_ref, run_ref
+                        )
+                    elif resource == "production-readiness":
+                        result = self.episode_production_boundary.get_production_readiness(
                             workspace_ref, run_ref
                         )
                     elif resource == "shot-graph":
@@ -730,6 +750,11 @@ class CreatorRequestHandler(BaseHTTPRequestHandler):
         if self.authenticated_principal is None:
             raise RuntimeError("Authenticated public principal is required")
         return self.authenticated_principal.workspace_ref
+
+    def _authenticated_credential_ref(self) -> str:
+        if self.authenticated_principal is None:
+            raise RuntimeError("Authenticated public principal is required")
+        return self.authenticated_principal.credential_ref
 
     def _workspace_from_query(
         self, path: str, query: dict[str, list[str]]

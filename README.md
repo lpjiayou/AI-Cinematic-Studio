@@ -5,7 +5,18 @@ AI 影视生产系统。Core 仓库负责 Creator Server/Public API/Application�
 OS、V4 Platform、V3 Render Core、持久化与后端测试；客户 Commercial SaaS UI
 由独立 `AI-Cinematic-Studio-Frontend` 仓库承载。
 
-> 当前状态：M1–M5 已接受；M6-P0/P1 与 bounded M6-P2 已 Owner Accepted；
+> 当前主线基线：Core `main` 已在 `8d9ce52166cec27d2fefaa86548016130babdfff`
+> 合并 K2 G0→G7，Frontend `main` 已在
+> `277754a6e61e86bb1ed8109570aa19e4214f0d60` 合并连接式生产工作区。该基线
+> 仅为 `LOCAL_EVIDENCE`，`gpuUsed=false`、`publicationAllowed=false`，不代表
+> live provider、GPU、版权或发布就绪。当前已由 Project Lead 授权 K2
+> `P0→P10` 可发布生产波次：M7–M15 仅限同一 K2 单集纵切，M16 仅允许在 P9
+> 与 Gate A/B/C 通过后按 `1→3→10→30` 推进，M17–M19 未授权。
+> P0 的合同、权威端口、持久化与前端阻断映射已经实现；当前真实 K2 输入仍
+> 缺少可核验版权证据、已批准供应商/凭据/条款/预算权威及 GPU/生产运行时，
+> 因此 P0→P1 处于外部事实阻断，未发起任何 live provider 任务。
+>
+> 历史状态：M1–M5 已接受；M6-P0/P1 与 bounded M6-P2 已 Owner Accepted；
 > G1-R1 `d44f471…` 已 Owner Accepted 并关闭 Architecture Remediation R1；
 > M6-P3-G0 已 Owner Accepted；M6-P3-B1 原候选 `8449b521…` 的 Owner Review 为 `REVISION REQUIRED`；修正后的 B1-R1 `5c656992…` 已远端验证并于 `2026-08-14` Owner Accepted；
 > M6-P3-G1 原候选 `3696d6af…` 为 `REVISION REQUIRED`；G1-R1
@@ -45,13 +56,16 @@ OS、V4 Platform、V3 Render Core、持久化与后端测试；客户 Commercial
 | Core main convergence | `OWNER ACCEPTED / PR #2 REBASE AND MERGE / MAIN 5976263f / TREE be7447c3 / POST-MERGE CI PASS` |
 | Accepted governance checkpoint | `ACS-GOV-POST-M6-P3-G1-CLOSEOUT / OWNER ACCEPTED AT 20207e7f / TREE e3638838` |
 | Original CCV-R1 candidate | `57cbbd4959f5f3d50b4d453cb6ae96b225cb7759 / REVISION REQUIRED / NOT OWNER ACCEPTED` |
-| Current checkpoint | `ACS-CCV-R1-R1-EVIDENCE-VALIDATOR-HARDENING / EXPERIMENT EVIDENCE ONLY / IN PROGRESS` |
+| Current checkpoint | `ACS-K2-PUBLISHABLE-P0 / SAFE IMPLEMENTATION VERIFIED / EXTERNAL FACT HOLD / NOT PASSED` |
 | Character Consistency evidence status | `EXPERIMENT REPORTED / INDEPENDENT REPRODUCTION NOT POSSIBLE / SYNTHETIC_TEST_ONLY / NOT FOR PRODUCTION` |
 | CCV-R2 / Character Visual Identity schema | `NOT AUTHORIZED / NOT STARTED` |
 | M6-P3 after G1 / M6-P4+ | `NOT AUTHORIZED / NOT STARTED` |
-| M7-M19 | `NOT STARTED / NOT AUTHORIZED` |
+| K2 G0→G7 | `MERGED TO CORE MAIN / LOCAL_EVIDENCE ONLY / NOT PUBLISHABLE` |
+| K2 M7–M15 | `P0→P9 AUTHORIZED AS ONE PUBLISHABLE SINGLE-EPISODE SLICE / GATE-BY-GATE` |
+| M16 | `P10 BOUNDED 1→3→10→30 ONLY AFTER P9 + GATE A/B/C` |
+| M17–M19 | `NOT AUTHORIZED` |
 | Formal port-8765 database | `UNTOUCHED / NOT DEPLOYED` |
-| Frontend | `FROZEN / UNTOUCHED` |
+| Frontend | `CONNECTED BASELINE + P0 PRODUCTION-READINESS MAPPING / PUBLISHABLE ACTIONS BLOCKED BY CORE FACTS` |
 | Production Ready | `NO` |
 
 当前修复恢复既有 V2.3 相邻层方向：

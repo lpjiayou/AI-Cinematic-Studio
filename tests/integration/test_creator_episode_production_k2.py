@@ -271,6 +271,69 @@ class CreatorEpisodeProductionK2HttpTests(unittest.TestCase):
         payload = json.loads(forbidden_run.exception.read().decode("utf-8"))
         self.assertEqual(payload["error"]["code"], "invalid_request")
 
+    def test_public_production_readiness_reports_real_policy_and_rights_blockers(self):
+        public_run_command = {
+            key: value
+            for key, value in run_command(
+                self.project, self.series, self.episode
+            ).items()
+            if key != "workspaceRef"
+        }
+        _, created = self.post(
+            PUBLIC_EPISODE_PRODUCTION_RUNS_ENDPOINT, public_run_command
+        )
+        run = created["run"]
+        authority_command = {
+            key: value
+            for key, value in g2_command(run).items()
+            if key not in {"workspaceRef", "productionRunRef"}
+        }
+        self.post(
+            f"{PUBLIC_EPISODE_PRODUCTION_RUNS_ENDPOINT}/"
+            f"{parse.quote(run['productionRunRef'])}/authority-identity",
+            authority_command,
+        )
+
+        status, payload = self.get(
+            f"{PUBLIC_EPISODE_PRODUCTION_RUNS_ENDPOINT}/"
+            f"{parse.quote(run['productionRunRef'])}/production-readiness"
+        )
+
+        self.assertEqual(status, 200)
+        self.assertEqual(payload["readiness"]["state"], "BLOCKED_POLICY")
+        self.assertIn(
+            "identity_reference_rights_not_approved",
+            payload["readiness"]["blockers"],
+        )
+        self.assertIn(
+            "live_provider_evidence_missing", payload["readiness"]["blockers"]
+        )
+        self.assertIn(
+            "rights_evidence_authority_missing",
+            payload["readiness"]["blockers"],
+        )
+        self.assertIn(
+            "provider_policy_authority_missing",
+            payload["readiness"]["blockers"],
+        )
+        self.assertFalse(payload["readiness"]["publicationAllowed"])
+
+        with self.assertRaises(error.HTTPError) as forged_actor:
+            self.post(
+                f"{PUBLIC_EPISODE_PRODUCTION_RUNS_ENDPOINT}/"
+                f"{parse.quote(run['productionRunRef'])}/production-readiness",
+                {
+                    "idempotencyKey": "forged-production-policy-actor",
+                    "actorRef": "browser-forged-actor",
+                    "productionPolicy": {},
+                    "rightsManifest": {},
+                    "providerExecutionPolicy": {},
+                },
+            )
+        self.assertEqual(forged_actor.exception.code, 400)
+        forged_payload = json.loads(forged_actor.exception.read().decode("utf-8"))
+        self.assertEqual(forged_payload["error"]["code"], "invalid_request")
+
     def test_public_g3_shot_graph_route_is_scoped_and_replay_safe(self):
         public_run = {
             key: value

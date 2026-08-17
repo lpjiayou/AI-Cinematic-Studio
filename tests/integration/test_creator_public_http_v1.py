@@ -88,7 +88,13 @@ class CreatorPublicHttpV1IntegrationTests(unittest.TestCase):
         self.assertEqual(payload["schemaVersion"], "creator.public.capabilities.v1")
         self.assertEqual(len(payload["capabilities"]), 19)
         self.assertEqual(payload["capabilities"][5]["state"], "authority_required")
-        self.assertEqual(payload["capabilities"][6]["state"], "not_open")
+        self.assertEqual(
+            payload["capabilities"][6]["state"], "local_evidence_only"
+        )
+        self.assertEqual(
+            payload["capabilities"][9]["state"], "production_policy_required"
+        )
+        self.assertEqual(payload["capabilities"][15]["state"], "not_open")
 
     def test_m1_candidate_and_m2_m4_project_flow_use_public_routes(self):
         status, candidate = self.post(
