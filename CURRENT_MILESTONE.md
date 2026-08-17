@@ -580,3 +580,41 @@ test or remote-integrity failure stops the wave.
 G4 remains a local technical checkpoint until this exact tree is committed, published
 without force, fetched and proven equal to the remote branch. Actual adapter execution
 and immutable verified media registration occur only through the G5 V4 worker gate.
+
+### G4 remote verification
+
+- branch: `feature/acs-k2-golden-episode`;
+- remote commit: `2841526a7d505b2fca7722a24392dc48d0558283`;
+- remote tree: `3dbd58d685579353c26e2f9ed357ec01d9a33f11`;
+- fetched local and remote trees matched, ahead/behind was `0 / 0`, and the worktree
+  was clean before G5 implementation began.
+
+### G5 implementation evidence
+
+- V4 now owns a bounded single-episode job lifecycle with `QUEUED`, `LEASED`,
+  `RUNNING`, `FAILED`, `RETRYING`, `SUCCEEDED` and `CANCELLED` states, optimistic
+  revisions, scoped idempotency, expiring leases and crash recovery;
+- InMemory and exact-schema SQLite adapters preserve jobs across restart without
+  changing V5 or accepted lifecycle databases; retries create distinct attempts and
+  do not duplicate the accepted artifact;
+- all artifact directories are derived from workspace/run hashes beneath one configured
+  root; traversal and adapter path escape fail, incomplete temporary artifacts are
+  quarantined, and accepted paths are never exposed by the public API;
+- the deterministic local FFmpeg adapter produces eight real K2 files—four exact-frame
+  H.264 video segments and four 48 kHz stereo WAV tracks—and ffprobe validates duration,
+  frame count, dimensions, channels and sample rate;
+- V5 independently re-hashes, re-probes and checks every V4 handoff before recording
+  immutable GenerationResult and AssetVersion facts with request/shot lineage,
+  parameters, byte size, SHA-256, adapter identity, rights and provenance;
+- all evidence remains explicitly `LOCAL_EVIDENCE`, `CPU_FFMPEG`, `gpuUsed=false`,
+  `publicationAllowed=false`; no GPU, provider quality or production readiness is
+  claimed, and an unconfigured worker fails `503 / worker_unavailable`;
+- the append-only gate records `ASSETS_READY → MEDIA_READY`; the public media command
+  is authenticated, workspace-derived, replay-safe, and changed replay keys do not
+  trigger duplicate execution;
+- targeted G1–G5/V4/public integration gate: `33 / 33`;
+- complete Core regression: `513 / 513`.
+
+G5 remains a local technical checkpoint until this exact tree is committed, published
+without force, fetched and proven equal to the remote branch. Only verified immutable
+media may enter G6 composition.

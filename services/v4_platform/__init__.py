@@ -13,6 +13,18 @@ from .text_generation import (
     TextProviderError,
     create_text_provider_from_environment,
 )
+from .media_jobs import (
+    ArtifactVerificationError,
+    DeterministicLocalFfmpegAdapter,
+    InMemoryMediaJobAdapter,
+    MediaAdapterUnavailableError,
+    MediaJobCoordinator,
+    MediaJobError,
+    MediaJobStateError,
+    SqliteMediaJobAdapter,
+    probe_media,
+    verify_media_against_request,
+)
 
 __all__ = [
     "DeepSeekTextProvider",
@@ -26,4 +38,14 @@ __all__ = [
     "TextProvider",
     "TextProviderError",
     "create_text_provider_from_environment",
+    "ArtifactVerificationError",
+    "DeterministicLocalFfmpegAdapter",
+    "InMemoryMediaJobAdapter",
+    "MediaAdapterUnavailableError",
+    "MediaJobCoordinator",
+    "MediaJobError",
+    "MediaJobStateError",
+    "SqliteMediaJobAdapter",
+    "probe_media",
+    "verify_media_against_request",
 ]

@@ -125,6 +125,7 @@ EPISODE_PRODUCTION_SUBRESOURCES = {
     "authority-identity",
     "shot-graph",
     "assets",
+    "media",
 }
 
 
@@ -304,8 +305,10 @@ class CreatorRequestHandler(BaseHTTPRequestHandler):
                     result = self.episode_production_boundary.compile_shot_graph(
                         command
                     )
-                else:
+                elif resource == "assets":
                     result = self.episode_production_boundary.resolve_assets(command)
+                else:
+                    result = self.episode_production_boundary.execute_media(command)
             except EpisodeProductionPublicError as exc:
                 self._send_episode_production_error(exc)
                 return
@@ -474,8 +477,12 @@ class CreatorRequestHandler(BaseHTTPRequestHandler):
                         result = self.episode_production_boundary.get_shot_graph_bundle(
                             workspace_ref, run_ref
                         )
-                    else:
+                    elif resource == "assets":
                         result = self.episode_production_boundary.get_asset_plan(
+                            workspace_ref, run_ref
+                        )
+                    else:
+                        result = self.episode_production_boundary.get_media_bundle(
                             workspace_ref, run_ref
                         )
                     self._send_json(200, {"ok": True, **result})

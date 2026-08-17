@@ -4,6 +4,12 @@ from pathlib import Path
 import tempfile
 import unittest
 
+from services.v4_platform import (
+    DeterministicLocalFfmpegAdapter,
+    InMemoryMediaJobAdapter,
+    MediaJobCoordinator,
+)
+
 from services.v5_core_os.episode_production import (
     EpisodeProductionPublicError,
     StaticIdentityReferenceAuthority,
@@ -425,6 +431,15 @@ def g4_command(run, **extra):
         "workspaceRef": WORKSPACE,
         "productionRunRef": run["productionRunRef"],
         "idempotencyKey": "k2-asset-resolution-v1",
+        **extra,
+    }
+
+
+def g5_command(run, **extra):
+    return {
+        "workspaceRef": WORKSPACE,
+        "productionRunRef": run["productionRunRef"],
+        "idempotencyKey": "k2-media-execution-v1",
         **extra,
     }
 
@@ -1052,6 +1067,124 @@ class EpisodeProductionG4AssetResolutionTests(unittest.TestCase):
             )
         self.assertEqual(
             (caught.exception.status, caught.exception.code), (404, "not_found")
+        )
+
+
+class EpisodeProductionG5MediaExecutionTests(unittest.TestCase):
+    def setUp(self):
+        self.directory = tempfile.TemporaryDirectory()
+        (
+            self.assembly,
+            self.refs,
+            self.project,
+            self.series,
+            self.episode,
+            _,
+        ) = seed_k2_roots(with_m6_authority=True)
+        activate_k2_m6_baseline(self.assembly, self.project, self.series)
+        self.execution = MediaJobCoordinator(
+            InMemoryMediaJobAdapter(),
+            DeterministicLocalFfmpegAdapter(),
+            Path(self.directory.name) / "artifacts",
+            ref_factory=self.refs,
+            clock=lambda: "2026-08-17T01:00:00Z",
+        )
+        self.boundary = create_in_memory_boundary(
+            project_boundary=self.assembly.project_context,
+            series_episode_boundary=self.assembly.series_episode,
+            series_planning_boundary=self.assembly.series_planning,
+            script_studio_boundary=self.assembly.script_studio,
+            identity_reference_authority=k2_identity_authority(),
+            media_execution=self.execution,
+            ref_factory=self.refs,
+            clock=lambda: "2026-08-17T01:00:00Z",
+        )
+        self.run = self.boundary.create_run(
+            run_command(self.project, self.series, self.episode)
+        )
+        self.boundary.authorize_and_lock(g2_command(self.run))
+        self.boundary.compile_shot_graph(g3_command(self.run))
+        self.boundary.resolve_assets(g4_command(self.run))
+
+    def tearDown(self):
+        self.directory.cleanup()
+
+    def test_executes_real_local_media_and_registers_verified_immutable_assets(self):
+        result = self.boundary.execute_media(g5_command(self.run))
+        self.assertEqual(result["state"], "MEDIA_READY")
+        self.assertFalse(result["idempotentReplay"])
+        self.assertEqual(result["mediaManifest"]["summary"], {
+            "requested": 8,
+            "verifiedResults": 8,
+            "registeredAssets": 8,
+            "videoAssets": 4,
+            "audioAssets": 4,
+            "failed": 0,
+        })
+        self.assertEqual(len(result["assetVersions"]), 8)
+        self.assertEqual(len(result["generationResults"]), 8)
+        self.assertTrue(all(job["state"] == "SUCCEEDED" for job in result["jobs"]))
+        self.assertTrue(all(job["gpuUsed"] is False for job in result["jobs"]))
+        self.assertNotIn("internalPath", json.dumps(result, ensure_ascii=False))
+        root = self.execution.artifact_root.resolve()
+        for asset in result["assetVersions"]:
+            path = (root / asset["storageKey"]).resolve()
+            self.assertIn(root, path.parents)
+            self.assertTrue(path.is_file())
+            self.assertGreater(asset["byteSize"], 0)
+            self.assertEqual(len(asset["sha256"]), 64)
+            self.assertEqual(asset["provenance"], "LOCAL_EVIDENCE")
+            self.assertEqual(asset["rightsState"], "LOCAL_EVIDENCE_ONLY")
+            self.assertFalse(asset["publicationAllowed"])
+
+        replay = self.boundary.execute_media(g5_command(self.run))
+        self.assertTrue(replay["idempotentReplay"])
+        self.assertEqual(
+            [item["assetVersionRef"] for item in replay["assetVersions"]],
+            [item["assetVersionRef"] for item in result["assetVersions"]],
+        )
+        self.assertTrue(all(len(job["attempts"]) == 1 for job in replay["jobs"]))
+        with self.assertRaises(EpisodeProductionPublicError) as caught:
+            self.boundary.execute_media(
+                g5_command(self.run, idempotencyKey="changed-g5-command")
+            )
+        self.assertEqual(
+            (caught.exception.status, caught.exception.code),
+            (409, "idempotency_conflict"),
+        )
+        self.assertEqual(
+            len(self.execution.list_jobs(WORKSPACE, self.run["productionRunRef"])),
+            8,
+        )
+
+    def test_unconfigured_worker_fails_closed(self):
+        boundary = create_boundary(
+            self.assembly,
+            self.refs,
+            identity_reference_authority=k2_identity_authority(),
+        )
+        run = boundary.create_run(
+            run_command(
+                self.project, self.series, self.episode,
+                idempotencyKey="g5-unconfigured-run",
+            )
+        )
+        boundary.authorize_and_lock(
+            g2_command(run, idempotencyKey="g5-unconfigured-g2")
+        )
+        boundary.compile_shot_graph(
+            g3_command(run, idempotencyKey="g5-unconfigured-g3")
+        )
+        boundary.resolve_assets(
+            g4_command(run, idempotencyKey="g5-unconfigured-g4")
+        )
+        with self.assertRaises(EpisodeProductionPublicError) as caught:
+            boundary.execute_media(
+                g5_command(run, idempotencyKey="g5-unconfigured-media")
+            )
+        self.assertEqual(
+            (caught.exception.status, caught.exception.code),
+            (503, "worker_unavailable"),
         )
 
 

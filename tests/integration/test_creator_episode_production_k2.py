@@ -4,6 +4,9 @@ import threading
 import unittest
 from urllib import error, parse, request
 
+from pathlib import Path
+import tempfile
+
 from apps.creator_workspace_mvp.ai_director import AiDirectorService
 from apps.creator_workspace_mvp.public_auth import PublicApiAuthenticator
 from apps.creator_workspace_mvp.public_contract import (
@@ -11,6 +14,11 @@ from apps.creator_workspace_mvp.public_contract import (
 )
 from apps.creator_workspace_mvp.server import create_server
 from services.v5_core_os.episode_production import create_in_memory_boundary
+from services.v4_platform import (
+    DeterministicLocalFfmpegAdapter,
+    InMemoryMediaJobAdapter,
+    MediaJobCoordinator,
+)
 from services.v5_core_os.text_generation.testing import FakeTextGenerationCapability
 from tests.unit.test_episode_production_k2 import (
     WORKSPACE,
@@ -18,6 +26,7 @@ from tests.unit.test_episode_production_k2 import (
     g2_command,
     g3_command,
     g4_command,
+    g5_command,
     k2_identity_authority,
     run_command,
     seed_k2_roots,
@@ -26,6 +35,7 @@ from tests.unit.test_episode_production_k2 import (
 
 class CreatorEpisodeProductionK2HttpTests(unittest.TestCase):
     def setUp(self):
+        self.artifacts = tempfile.TemporaryDirectory()
         (
             self.assembly,
             self.refs,
@@ -37,12 +47,20 @@ class CreatorEpisodeProductionK2HttpTests(unittest.TestCase):
         activate_k2_m6_baseline(
             self.assembly, self.project, self.series
         )
+        self.media_execution = MediaJobCoordinator(
+            InMemoryMediaJobAdapter(),
+            DeterministicLocalFfmpegAdapter(),
+            Path(self.artifacts.name),
+            ref_factory=self.refs,
+            clock=lambda: "2026-08-17T01:00:00Z",
+        )
         self.production = create_in_memory_boundary(
             project_boundary=self.assembly.project_context,
             series_episode_boundary=self.assembly.series_episode,
             series_planning_boundary=self.assembly.series_planning,
             script_studio_boundary=self.assembly.script_studio,
             identity_reference_authority=k2_identity_authority(),
+            media_execution=self.media_execution,
             ref_factory=self.refs,
             clock=lambda: "2026-08-17T00:05:00Z",
         )
@@ -69,6 +87,7 @@ class CreatorEpisodeProductionK2HttpTests(unittest.TestCase):
         self.server.shutdown()
         self.server.server_close()
         self.thread.join(timeout=5)
+        self.artifacts.cleanup()
 
     def post(self, path, payload, *, token=None):
         body = json.dumps(payload, ensure_ascii=False).encode("utf-8")
@@ -319,6 +338,45 @@ class CreatorEpisodeProductionK2HttpTests(unittest.TestCase):
         self.assertEqual(
             restored["assetResolutionManifest"]["payloadDigest"],
             result["assetResolutionManifest"]["payloadDigest"],
+        )
+
+    def test_public_g5_executes_real_local_evidence_without_exposing_paths(self):
+        public_run = {
+            key: value for key, value in run_command(
+                self.project, self.series, self.episode
+            ).items() if key != "workspaceRef"
+        }
+        _, created = self.post(PUBLIC_EPISODE_PRODUCTION_RUNS_ENDPOINT, public_run)
+        run = created["run"]
+        base = (
+            f"{PUBLIC_EPISODE_PRODUCTION_RUNS_ENDPOINT}/"
+            f"{parse.quote(run['productionRunRef'])}"
+        )
+        for resource, command in (
+            ("authority-identity", g2_command(run)),
+            ("shot-graph", g3_command(run)),
+            ("assets", g4_command(run)),
+        ):
+            self.post(
+                f"{base}/{resource}",
+                {key: value for key, value in command.items()
+                 if key not in {"workspaceRef", "productionRunRef"}},
+            )
+        command = {
+            key: value for key, value in g5_command(run).items()
+            if key not in {"workspaceRef", "productionRunRef"}
+        }
+        status, result = self.post(f"{base}/media", command)
+        self.assertEqual(status, 201)
+        self.assertEqual(result["state"], "MEDIA_READY")
+        self.assertEqual(len(result["assetVersions"]), 8)
+        self.assertNotIn("internalPath", json.dumps(result, ensure_ascii=False))
+        self.assertTrue(all(job["gpuUsed"] is False for job in result["jobs"]))
+        status, restored = self.get(f"{base}/media")
+        self.assertEqual(status, 200)
+        self.assertEqual(
+            restored["mediaManifest"]["payloadDigest"],
+            result["mediaManifest"]["payloadDigest"],
         )
 
 
