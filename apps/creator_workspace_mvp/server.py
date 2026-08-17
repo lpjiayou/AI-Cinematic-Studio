@@ -209,6 +209,13 @@ class CreatorRequestHandler(BaseHTTPRequestHandler):
         if not self._authorize_route_class(requested_path):
             return
         path = _normalize_public_path(requested_path)
+        production_authority_prefix = f"{PUBLIC_EPISODE_PRODUCTION_RUNS_ENDPOINT}/"
+        production_authority_suffix = "/authority-identity"
+        is_production_authority = (
+            requested_path.startswith(production_authority_prefix)
+            and requested_path.endswith(production_authority_suffix)
+            and len(requested_path) > len(production_authority_prefix + production_authority_suffix)
+        )
         if path not in {
             AI_DIRECTOR_ENDPOINT,
             SERIES_ENDPOINT,
@@ -224,7 +231,7 @@ class CreatorRequestHandler(BaseHTTPRequestHandler):
             SERIES_PLANNING_MANUAL_VERSION_ENDPOINT,
             SERIES_PLANNING_CONFIRM_VERSION_ENDPOINT,
             PUBLIC_EPISODE_PRODUCTION_RUNS_ENDPOINT,
-        } and requested_path not in PUBLIC_M6_COMMAND_ENDPOINTS:
+        } and requested_path not in PUBLIC_M6_COMMAND_ENDPOINTS and not is_production_authority:
             self._send_application_error(404, "not_found")
             return
         if self.headers.get_content_type() != "application/json":
@@ -251,6 +258,9 @@ class CreatorRequestHandler(BaseHTTPRequestHandler):
                     400, "client_workspace_scope_forbidden"
                 )
                 return
+            if is_production_authority and "productionRunRef" in payload:
+                self._send_application_error(400, "invalid_request")
+                return
             payload = {
                 **payload,
                 "workspaceRef": self._authenticated_workspace_ref(),
@@ -267,6 +277,27 @@ class CreatorRequestHandler(BaseHTTPRequestHandler):
             self._send_json(
                 200 if result["idempotentReplay"] else 201,
                 {"ok": True, "run": result},
+            )
+            return
+        if is_production_authority:
+            run_ref = unquote(
+                requested_path[
+                    len(production_authority_prefix) : -len(production_authority_suffix)
+                ]
+            )
+            if not run_ref or "/" in run_ref:
+                self._send_application_error(404, "not_found")
+                return
+            try:
+                result = self.episode_production_boundary.authorize_and_lock(
+                    {**payload, "productionRunRef": run_ref}
+                )
+            except EpisodeProductionPublicError as exc:
+                self._send_episode_production_error(exc)
+                return
+            self._send_json(
+                200 if result["idempotentReplay"] else 201,
+                {"ok": True, **result},
             )
             return
         if path.startswith(SCRIPT_WORKSPACE_ENDPOINT):
@@ -413,9 +444,24 @@ class CreatorRequestHandler(BaseHTTPRequestHandler):
                 )
                 return
             if requested_path.startswith(f"{PUBLIC_EPISODE_PRODUCTION_RUNS_ENDPOINT}/"):
-                run_ref = unquote(
-                    requested_path[len(PUBLIC_EPISODE_PRODUCTION_RUNS_ENDPOINT) + 1 :]
-                )
+                relative = requested_path[
+                    len(PUBLIC_EPISODE_PRODUCTION_RUNS_ENDPOINT) + 1 :
+                ]
+                authority_suffix = "/authority-identity"
+                if relative.endswith(authority_suffix):
+                    run_ref = unquote(relative[: -len(authority_suffix)])
+                    if run_ref and "/" not in run_ref:
+                        self._send_json(
+                            200,
+                            {
+                                "ok": True,
+                                **self.episode_production_boundary.get_authority_identity(
+                                    workspace_ref, run_ref
+                                ),
+                            },
+                        )
+                        return
+                run_ref = unquote(relative)
                 if run_ref and "/" not in run_ref:
                     self._send_json(
                         200,
@@ -868,6 +914,9 @@ class CreatorRequestHandler(BaseHTTPRequestHandler):
             "invalid_reference": "内容引用无效，请刷新后重试。",
             "lifecycle_unavailable": "内容生命周期服务暂时不可用。",
             "upstream_not_confirmed": "请先确认系列规划、集数绑定和剧本版本。",
+            "authority_required": "请先连接并完成 M6 权威与身份参考授权。",
+            "invalid_state_transition": "当前制作状态不能执行该操作，请刷新后重试。",
+            "stale_input": "上游权威版本已变化，请重新建立本次单集制作链。",
             "episode_production_unavailable": "单集制作根服务暂时不可用。",
             "application_error": "暂时无法完成操作，请稍后重试。",
         }

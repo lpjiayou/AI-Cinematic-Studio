@@ -43,6 +43,10 @@ class IdempotencyConflictError(EpisodeProductionError):
     code = "idempotency_conflict"
 
 
+class StaleInputError(EpisodeProductionError):
+    code = "stale_input"
+
+
 class RepositoryUnavailableError(EpisodeProductionError):
     code = "episode_production_unavailable"
 
@@ -701,6 +705,36 @@ class EpisodeProductionService:
         if record is None:
             raise RecordNotFoundError("EpisodeProductionRun was not found")
         return self._mapping(record)
+
+    def verify_run_current(self, workspace_ref: str, run_ref: str) -> dict[str, Any]:
+        current = self.get_run(workspace_ref, run_ref)
+        manifest = current.get("manifest")
+        budgets = manifest.get("sceneBudgets") if isinstance(manifest, Mapping) else None
+        if not isinstance(budgets, list) or not budgets:
+            raise RepositoryUnavailableError("stored K2 manifest is incomplete")
+        command = {
+            "workspaceRef": current["workspaceRef"],
+            "projectRef": current["projectRef"],
+            "seriesRef": current["seriesRef"],
+            "episodeRef": current["episodeRef"],
+            "idempotencyKey": current["idempotencyKey"],
+            "shotsPerScene": [item.get("shotCount") for item in budgets],
+        }
+        resolved_manifest, upstream = self._resolve(command)
+        upstream_digest = _digest(upstream)
+        payload_digest = _digest(
+            {
+                "workspaceRef": current["workspaceRef"],
+                "projectRef": current["projectRef"],
+                "seriesRef": current["seriesRef"],
+                "episodeRef": current["episodeRef"],
+                "manifest": resolved_manifest,
+                "upstreamDigest": upstream_digest,
+            }
+        )
+        if payload_digest != current["payloadDigest"]:
+            raise StaleInputError("frozen K2 roots no longer match authoritative inputs")
+        return current
 
     def list_runs(self, workspace_ref: str) -> list[dict[str, Any]]:
         workspace = _required_ref(workspace_ref, "workspaceRef")

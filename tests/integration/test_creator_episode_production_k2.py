@@ -14,6 +14,9 @@ from services.v5_core_os.episode_production import create_in_memory_boundary
 from services.v5_core_os.text_generation.testing import FakeTextGenerationCapability
 from tests.unit.test_episode_production_k2 import (
     WORKSPACE,
+    activate_k2_m6_baseline,
+    g2_command,
+    k2_identity_authority,
     run_command,
     seed_k2_roots,
 )
@@ -28,12 +31,16 @@ class CreatorEpisodeProductionK2HttpTests(unittest.TestCase):
             self.series,
             self.episode,
             _,
-        ) = seed_k2_roots()
+        ) = seed_k2_roots(with_m6_authority=True)
+        activate_k2_m6_baseline(
+            self.assembly, self.project, self.series
+        )
         self.production = create_in_memory_boundary(
             project_boundary=self.assembly.project_context,
             series_episode_boundary=self.assembly.series_episode,
             series_planning_boundary=self.assembly.series_planning,
             script_studio_boundary=self.assembly.script_studio,
+            identity_reference_authority=k2_identity_authority(),
             ref_factory=self.refs,
             clock=lambda: "2026-08-17T00:05:00Z",
         )
@@ -157,6 +164,70 @@ class CreatorEpisodeProductionK2HttpTests(unittest.TestCase):
         self.assertEqual(caught.exception.code, 409)
         payload = json.loads(caught.exception.read().decode("utf-8"))
         self.assertEqual(payload["error"]["code"], "upstream_not_confirmed")
+
+    def test_public_g2_authority_identity_route_is_scoped_and_replay_safe(self):
+        public_run_command = {
+            key: value
+            for key, value in run_command(
+                self.project, self.series, self.episode
+            ).items()
+            if key != "workspaceRef"
+        }
+        _, created = self.post(
+            PUBLIC_EPISODE_PRODUCTION_RUNS_ENDPOINT, public_run_command
+        )
+        run = created["run"]
+        public_g2_command = {
+            key: value
+            for key, value in g2_command(run).items()
+            if key not in {"workspaceRef", "productionRunRef"}
+        }
+        endpoint = (
+            f"{PUBLIC_EPISODE_PRODUCTION_RUNS_ENDPOINT}/"
+            f"{parse.quote(run['productionRunRef'])}/authority-identity"
+        )
+        status, result = self.post(endpoint, public_g2_command)
+        self.assertEqual(status, 201)
+        self.assertEqual(result["state"], "AUTHORITY_READY")
+        self.assertFalse(result["idempotentReplay"])
+        self.assertEqual(result["authorityDecision"]["decision"], "AUTHORIZED")
+        self.assertEqual(result["identityLock"]["state"], "LOCKED")
+
+        status, replay = self.post(endpoint, public_g2_command)
+        self.assertEqual(status, 200)
+        self.assertTrue(replay["idempotentReplay"])
+        self.assertEqual(
+            replay["identityLock"]["identityLockRef"],
+            result["identityLock"]["identityLockRef"],
+        )
+
+        status, detail = self.get(endpoint)
+        self.assertEqual(status, 200)
+        self.assertEqual(
+            detail["authorityDecision"]["authorityDecisionRef"],
+            result["authorityDecision"]["authorityDecisionRef"],
+        )
+        status, projected = self.get(
+            f"{PUBLIC_EPISODE_PRODUCTION_RUNS_ENDPOINT}/"
+            f"{parse.quote(run['productionRunRef'])}"
+        )
+        self.assertEqual(status, 200)
+        self.assertEqual(projected["run"]["state"], "AUTHORITY_READY")
+
+        with self.assertRaises(error.HTTPError) as forbidden_scope:
+            self.post(endpoint, {**public_g2_command, "workspaceRef": WORKSPACE})
+        self.assertEqual(forbidden_scope.exception.code, 400)
+        payload = json.loads(forbidden_scope.exception.read().decode("utf-8"))
+        self.assertEqual(payload["error"]["code"], "client_workspace_scope_forbidden")
+
+        with self.assertRaises(error.HTTPError) as forbidden_run:
+            self.post(
+                endpoint,
+                {**public_g2_command, "productionRunRef": run["productionRunRef"]},
+            )
+        self.assertEqual(forbidden_run.exception.code, 400)
+        payload = json.loads(forbidden_run.exception.read().decode("utf-8"))
+        self.assertEqual(payload["error"]["code"], "invalid_request")
 
 
 if __name__ == "__main__":

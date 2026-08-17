@@ -5,6 +5,18 @@ from __future__ import annotations
 import os
 from pathlib import Path
 from typing import Any, Mapping
+from uuid import uuid4
+
+from .authority import (
+    AuthorityRequiredError,
+    K2AuthorityIdentityService,
+    RejectingIdentityReferenceAuthority,
+)
+from .evidence import (
+    InMemoryEpisodeProductionEvidenceAdapter,
+    InvalidStateTransitionError,
+    SqliteEpisodeProductionEvidenceAdapter,
+)
 
 from .foundation import (
     EpisodeProductionError,
@@ -15,7 +27,9 @@ from .foundation import (
     RepositoryUnavailableError,
     ScopeMismatchError,
     SqliteEpisodeProductionAdapter,
+    StaleInputError,
     UpstreamNotReadyError,
+    _utc_now,
 )
 
 
@@ -27,8 +41,13 @@ class EpisodeProductionPublicError(RuntimeError):
 
 
 class EpisodeProductionPublicBoundary:
-    def __init__(self, service: EpisodeProductionService) -> None:
+    def __init__(
+        self,
+        service: EpisodeProductionService,
+        authority_identity: K2AuthorityIdentityService,
+    ) -> None:
         self.__service = service
+        self.__authority_identity = authority_identity
 
     @staticmethod
     def _error(exc: EpisodeProductionError) -> EpisodeProductionPublicError:
@@ -36,7 +55,17 @@ class EpisodeProductionPublicBoundary:
             return EpisodeProductionPublicError(exc.code, 404)
         if isinstance(exc, ScopeMismatchError):
             return EpisodeProductionPublicError(exc.code, 400)
-        if isinstance(exc, (UpstreamNotReadyError, IdempotencyConflictError)):
+        if isinstance(exc, AuthorityRequiredError):
+            return EpisodeProductionPublicError(exc.code, 403)
+        if isinstance(
+            exc,
+            (
+                UpstreamNotReadyError,
+                IdempotencyConflictError,
+                InvalidStateTransitionError,
+                StaleInputError,
+            ),
+        ):
             return EpisodeProductionPublicError(exc.code, 409)
         if isinstance(exc, RepositoryUnavailableError):
             return EpisodeProductionPublicError(exc.code, 503)
@@ -49,38 +78,64 @@ class EpisodeProductionPublicBoundary:
             raise self._error(exc) from None
 
     def create_run(self, command: Mapping[str, Any]) -> dict[str, Any]:
-        return self._invoke(self.__service.create_run, command)
+        run = self._invoke(self.__service.create_run, command)
+        return self._invoke(self.__authority_identity.project_run, run)
 
     def get_run(self, workspace_ref: str, run_ref: str) -> dict[str, Any]:
-        return self._invoke(self.__service.get_run, workspace_ref, run_ref)
+        run = self._invoke(self.__service.get_run, workspace_ref, run_ref)
+        return self._invoke(self.__authority_identity.project_run, run)
 
     def list_runs(self, workspace_ref: str) -> list[dict[str, Any]]:
-        return self._invoke(self.__service.list_runs, workspace_ref)
+        runs = self._invoke(self.__service.list_runs, workspace_ref)
+        return [self._invoke(self.__authority_identity.project_run, run) for run in runs]
+
+    def authorize_and_lock(self, command: Mapping[str, Any]) -> dict[str, Any]:
+        return self._invoke(self.__authority_identity.authorize_and_lock, command)
+
+    def get_authority_identity(
+        self, workspace_ref: str, run_ref: str
+    ) -> dict[str, Any]:
+        return self._invoke(
+            self.__authority_identity.get_authority_identity, workspace_ref, run_ref
+        )
 
 
-def _service(
+def _services(
     repository,
+    evidence_repository,
     *,
     project_boundary,
     series_episode_boundary,
     series_planning_boundary,
     script_studio_boundary,
+    identity_reference_authority=None,
     ref_factory=None,
     clock=None,
-) -> EpisodeProductionService:
-    kwargs = {}
-    if ref_factory is not None:
-        kwargs["ref_factory"] = ref_factory
-    if clock is not None:
-        kwargs["clock"] = clock
-    return EpisodeProductionService(
+) -> tuple[EpisodeProductionService, K2AuthorityIdentityService]:
+    selected_ref_factory = ref_factory or (
+        lambda prefix: f"{prefix}-{uuid4().hex}"
+    )
+    selected_clock = clock or _utc_now
+    service = EpisodeProductionService(
         repository,
         project_reader=project_boundary,
         series_reader=series_episode_boundary,
         planning_reader=series_planning_boundary,
         script_reader=script_studio_boundary,
-        **kwargs,
+        ref_factory=selected_ref_factory,
+        clock=selected_clock,
     )
+    authority_identity = K2AuthorityIdentityService(
+        service,
+        evidence_repository,
+        m6_reader=script_studio_boundary,
+        identity_reference_authority=(
+            identity_reference_authority or RejectingIdentityReferenceAuthority()
+        ),
+        ref_factory=selected_ref_factory,
+        clock=selected_clock,
+    )
+    return service, authority_identity
 
 
 def create_in_memory_boundary(
@@ -89,20 +144,22 @@ def create_in_memory_boundary(
     series_episode_boundary,
     series_planning_boundary,
     script_studio_boundary,
+    identity_reference_authority=None,
     ref_factory=None,
     clock=None,
 ) -> EpisodeProductionPublicBoundary:
-    return EpisodeProductionPublicBoundary(
-        _service(
-            InMemoryEpisodeProductionAdapter(),
-            project_boundary=project_boundary,
-            series_episode_boundary=series_episode_boundary,
-            series_planning_boundary=series_planning_boundary,
-            script_studio_boundary=script_studio_boundary,
-            ref_factory=ref_factory,
-            clock=clock,
-        )
+    service, authority_identity = _services(
+        InMemoryEpisodeProductionAdapter(),
+        InMemoryEpisodeProductionEvidenceAdapter(),
+        project_boundary=project_boundary,
+        series_episode_boundary=series_episode_boundary,
+        series_planning_boundary=series_planning_boundary,
+        script_studio_boundary=script_studio_boundary,
+        identity_reference_authority=identity_reference_authority,
+        ref_factory=ref_factory,
+        clock=clock,
     )
+    return EpisodeProductionPublicBoundary(service, authority_identity)
 
 
 def create_local_development_boundary(
@@ -112,19 +169,29 @@ def create_local_development_boundary(
     series_episode_boundary,
     series_planning_boundary,
     script_studio_boundary,
+    evidence_database_path: Path | str | None = None,
+    identity_reference_authority=None,
     initialize_if_missing: bool = True,
 ) -> EpisodeProductionPublicBoundary:
-    return EpisodeProductionPublicBoundary(
-        _service(
-            SqliteEpisodeProductionAdapter(
-                database_path, initialize_if_missing=initialize_if_missing
-            ),
-            project_boundary=project_boundary,
-            series_episode_boundary=series_episode_boundary,
-            series_planning_boundary=series_planning_boundary,
-            script_studio_boundary=script_studio_boundary,
-        )
+    evidence_path = (
+        Path(evidence_database_path)
+        if evidence_database_path is not None
+        else Path(f"{database_path}.evidence.sqlite3")
     )
+    service, authority_identity = _services(
+        SqliteEpisodeProductionAdapter(
+            database_path, initialize_if_missing=initialize_if_missing
+        ),
+        SqliteEpisodeProductionEvidenceAdapter(
+            evidence_path, initialize_if_missing=initialize_if_missing
+        ),
+        project_boundary=project_boundary,
+        series_episode_boundary=series_episode_boundary,
+        series_planning_boundary=series_planning_boundary,
+        script_studio_boundary=script_studio_boundary,
+        identity_reference_authority=identity_reference_authority,
+    )
+    return EpisodeProductionPublicBoundary(service, authority_identity)
 
 
 def create_local_development_boundary_from_environment(

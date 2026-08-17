@@ -8,9 +8,9 @@
 >
 > Authorized Wave: `ACS-K2-G0 → G1 → G2 → G3 → G4 → G5 → G6 → G7 → REMOTE VERIFY`
 >
-> Current Task: `ACS-K2-G1-GOLDEN-EPISODE-ROOTS`
+> Current Task: `ACS-K2-G2-M6-AUTHORITY-V5-IDENTITY-LOCK`
 >
-> Current Work Package: `G1 AUTHORITATIVE EPISODE PRODUCTION ROOT / FROZEN MANIFEST`
+> Current Work Package: `G2 EXPLICIT M6 AUTHORITY DECISION / SEPARATE V5 IDENTITY LOCK`
 >
 > M6 Authorization: `ACCEPTED SURFACES + K2 EXTERNAL AUTHORITY CONNECTION / NO M6 SCHEMA EXPANSION`
 >
@@ -486,6 +486,37 @@ test or remote-integrity failure stops the wave.
 - targeted contract/public integration gate: `20 / 20`;
 - complete Core regression after the final G1 boundary hardening: `489 / 489`.
 
-G1 remains a local technical checkpoint until its own commit is published without
-force, fetched and proven equal to the remote branch. Only that evidence authorizes
-automatic entry into G2.
+### G1 remote verification
+
+- branch: `feature/acs-k2-golden-episode`;
+- remote commit: `9aec2a478d3b13a5d3b55e6cd97527800f09ad2b`;
+- remote tree: `828124f934af7a1ed17f1f1662691bff2d97e227`;
+- fetched local and remote trees matched, ahead/behind was `0 / 0`, and the worktree
+  was clean before G2 implementation began.
+
+### G2 implementation evidence
+
+- the accepted M6 read-only Episode baseline is resolved through the existing Script
+  Studio boundary; missing scope/approval authority remains fail-closed;
+- `M6AuthorityDecision` and `IdentityLock` are two separate immutable V5 facts with
+  distinct refs, versions, canonical digests, creators and complete root/M5/M6/M3
+  version lineage;
+- Script character names are never converted into Core refs by convention: the G2
+  command requires an explicit one-to-one mapping covering the frozen manifest;
+- every identity reference carries an independently authorized ref/version, SHA-256,
+  media type, rights state, provenance and approval ref; the default runtime authority
+  rejects all references;
+- current G1 roots and current M6 baseline are re-read before the append-only state
+  transition, and changed inputs fail `409 / stale_input`;
+- a dedicated additive evidence journal records exact gate facts and
+  `ROOTS_READY → AUTHORITY_READY`; its InMemory and SQLite implementations preserve
+  workspace isolation, idempotency and ordered transitions without changing accepted
+  lifecycle or M6 schemas;
+- authenticated public create/read routes derive workspace scope from the bearer
+  principal and reject client-supplied workspace or run scope;
+- targeted G1/G2 unit and HTTP integration gate: `17 / 17`;
+- complete Core regression: `497 / 497`.
+
+G2 remains a local technical checkpoint until this exact tree is committed, published
+without force, fetched and proven equal to the remote branch. Only that evidence
+authorizes automatic entry into G3.
