@@ -19,6 +19,11 @@ from .public import (
     create_local_development_boundary_from_environment,
 )
 from .shot_graph import validate_executable_shot_graph
+from .delivery import (
+    ApprovalAuthorityPort,
+    RejectingApprovalAuthority,
+    StaticApprovalAuthority,
+)
 
 __all__ = [
     "EpisodeProductionPublicBoundary",
@@ -29,6 +34,9 @@ __all__ = [
     "RejectingIdentityReferenceAuthority",
     "SqliteEpisodeProductionAdapter",
     "StaticIdentityReferenceAuthority",
+    "ApprovalAuthorityPort",
+    "RejectingApprovalAuthority",
+    "StaticApprovalAuthority",
     "create_in_memory_boundary",
     "create_local_development_boundary",
     "create_local_development_boundary_from_environment",

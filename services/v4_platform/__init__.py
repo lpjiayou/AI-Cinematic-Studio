@@ -25,6 +25,7 @@ from .media_jobs import (
     probe_media,
     verify_media_against_request,
 )
+from .composition import CompositionExecutionError, V4CompositionExecutor
 
 __all__ = [
     "DeepSeekTextProvider",
@@ -48,4 +49,6 @@ __all__ = [
     "SqliteMediaJobAdapter",
     "probe_media",
     "verify_media_against_request",
+    "CompositionExecutionError",
+    "V4CompositionExecutor",
 ]

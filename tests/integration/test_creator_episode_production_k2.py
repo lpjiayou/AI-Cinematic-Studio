@@ -1,4 +1,5 @@
 import json
+from hashlib import sha256
 import secrets
 import threading
 import unittest
@@ -13,11 +14,14 @@ from apps.creator_workspace_mvp.public_contract import (
     PUBLIC_EPISODE_PRODUCTION_RUNS_ENDPOINT,
 )
 from apps.creator_workspace_mvp.server import create_server
-from services.v5_core_os.episode_production import create_in_memory_boundary
+from services.v5_core_os.episode_production import (
+    create_in_memory_boundary,
+)
 from services.v4_platform import (
     DeterministicLocalFfmpegAdapter,
     InMemoryMediaJobAdapter,
     MediaJobCoordinator,
+    V4CompositionExecutor,
 )
 from services.v5_core_os.text_generation.testing import FakeTextGenerationCapability
 from tests.unit.test_episode_production_k2 import (
@@ -27,6 +31,9 @@ from tests.unit.test_episode_production_k2 import (
     g3_command,
     g4_command,
     g5_command,
+    g6_approval_authority,
+    g6_finalize_command,
+    g6_preview_command,
     k2_identity_authority,
     run_command,
     seed_k2_roots,
@@ -61,6 +68,12 @@ class CreatorEpisodeProductionK2HttpTests(unittest.TestCase):
             script_studio_boundary=self.assembly.script_studio,
             identity_reference_authority=k2_identity_authority(),
             media_execution=self.media_execution,
+            composition_execution=V4CompositionExecutor.from_artifact_root(
+                Path(self.artifacts.name)
+            ),
+            approval_authority=g6_approval_authority(
+                "episode-production-run-k2-1"
+            ),
             ref_factory=self.refs,
             clock=lambda: "2026-08-17T00:05:00Z",
         )
@@ -111,6 +124,14 @@ class CreatorEpisodeProductionK2HttpTests(unittest.TestCase):
         )
         with request.urlopen(req, timeout=5) as response:
             return response.status, json.loads(response.read().decode("utf-8"))
+
+    def get_bytes(self, path):
+        req = request.Request(
+            f"{self.base}{path}",
+            headers={"Authorization": f"Bearer {self.token}"},
+        )
+        with request.urlopen(req, timeout=10) as response:
+            return response.status, response.headers, response.read()
 
     def test_public_run_create_replay_list_and_detail(self):
         public_command = {
@@ -377,6 +398,68 @@ class CreatorEpisodeProductionK2HttpTests(unittest.TestCase):
         self.assertEqual(
             restored["mediaManifest"]["payloadDigest"],
             result["mediaManifest"]["payloadDigest"],
+        )
+
+    def test_public_g6_preview_qc_approval_master_and_download_are_scoped(self):
+        public_run = {
+            key: value for key, value in run_command(
+                self.project, self.series, self.episode
+            ).items() if key != "workspaceRef"
+        }
+        _, created = self.post(PUBLIC_EPISODE_PRODUCTION_RUNS_ENDPOINT, public_run)
+        run = created["run"]
+        base = (
+            f"{PUBLIC_EPISODE_PRODUCTION_RUNS_ENDPOINT}/"
+            f"{parse.quote(run['productionRunRef'])}"
+        )
+        for resource, command in (
+            ("authority-identity", g2_command(run)),
+            ("shot-graph", g3_command(run)),
+            ("assets", g4_command(run)),
+            ("media", g5_command(run)),
+        ):
+            self.post(
+                f"{base}/{resource}",
+                {key: value for key, value in command.items()
+                 if key not in {"workspaceRef", "productionRunRef"}},
+            )
+        preview_command = {
+            key: value for key, value in g6_preview_command(run).items()
+            if key not in {"workspaceRef", "productionRunRef"}
+        }
+        status, preview = self.post(f"{base}/preview", preview_command)
+        self.assertEqual(status, 201)
+        self.assertEqual(preview["state"], "QC_READY")
+        self.assertEqual(preview["qcReport"]["result"], "PASS")
+
+        finalize_command = {
+            key: value for key, value in g6_finalize_command(run).items()
+            if key not in {"workspaceRef", "productionRunRef"}
+        }
+        status, final = self.post(f"{base}/finalize", finalize_command)
+        self.assertEqual(status, 201)
+        self.assertEqual(final["state"], "MASTER_READY")
+        self.assertNotIn("internalPath", json.dumps(final, ensure_ascii=False))
+
+        status, delivery = self.get(f"{base}/delivery")
+        self.assertEqual(status, 200)
+        self.assertEqual(delivery["state"], "MASTER_READY")
+        export = delivery["exportArtifact"]
+        download = (
+            f"{base}/exports/{parse.quote(export['exportArtifactRef'])}/content"
+        )
+        status, headers, content = self.get_bytes(download)
+        self.assertEqual(status, 200)
+        self.assertEqual(headers.get_content_type(), "video/mp4")
+        self.assertEqual(len(content), export["byteSize"])
+        self.assertEqual(sha256(content).hexdigest(), export["sha256"])
+
+        with self.assertRaises(error.HTTPError) as caught:
+            self.get(download, workspaceRef=WORKSPACE)
+        self.assertEqual(caught.exception.code, 400)
+        payload = json.loads(caught.exception.read().decode("utf-8"))
+        self.assertEqual(
+            payload["error"]["code"], "client_workspace_scope_forbidden"
         )
 
 

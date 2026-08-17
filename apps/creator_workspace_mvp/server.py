@@ -7,6 +7,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import json
 import sys
 from typing import Any
+from pathlib import Path
 from urllib.parse import parse_qs, unquote, urlsplit
 from uuid import uuid4
 
@@ -126,6 +127,9 @@ EPISODE_PRODUCTION_SUBRESOURCES = {
     "shot-graph",
     "assets",
     "media",
+    "preview",
+    "finalize",
+    "delivery",
 }
 
 
@@ -189,6 +193,19 @@ def _episode_production_subresource(path: str) -> tuple[str, str] | None:
     if not run_ref or "/" in run_ref:
         return None
     return run_ref, resource
+
+
+def _episode_export_content(path: str) -> tuple[str, str] | None:
+    prefix = f"{PUBLIC_EPISODE_PRODUCTION_RUNS_ENDPOINT}/"
+    if not path.startswith(prefix):
+        return None
+    parts = path[len(prefix):].split("/")
+    if len(parts) != 4 or parts[1] != "exports" or parts[3] != "content":
+        return None
+    run_ref, export_ref = unquote(parts[0]), unquote(parts[2])
+    if not run_ref or not export_ref or "/" in run_ref or "/" in export_ref:
+        return None
+    return run_ref, export_ref
 
 
 class CreatorRequestHandler(BaseHTTPRequestHandler):
@@ -307,8 +324,16 @@ class CreatorRequestHandler(BaseHTTPRequestHandler):
                     )
                 elif resource == "assets":
                     result = self.episode_production_boundary.resolve_assets(command)
-                else:
+                elif resource == "media":
                     result = self.episode_production_boundary.execute_media(command)
+                elif resource == "preview":
+                    result = self.episode_production_boundary.compose_and_qc(command)
+                elif resource == "finalize":
+                    result = self.episode_production_boundary.approve_and_finalize(
+                        command
+                    )
+                else:
+                    raise EpisodeProductionPublicError("invalid_request", 400)
             except EpisodeProductionPublicError as exc:
                 self._send_episode_production_error(exc)
                 return
@@ -461,6 +486,14 @@ class CreatorRequestHandler(BaseHTTPRequestHandler):
                 )
                 return
             if requested_path.startswith(f"{PUBLIC_EPISODE_PRODUCTION_RUNS_ENDPOINT}/"):
+                export_content = _episode_export_content(requested_path)
+                if export_content is not None:
+                    run_ref, export_ref = export_content
+                    result = self.episode_production_boundary.get_export_file(
+                        workspace_ref, run_ref, export_ref
+                    )
+                    self._send_file(result)
+                    return
                 relative = requested_path[
                     len(PUBLIC_EPISODE_PRODUCTION_RUNS_ENDPOINT) + 1 :
                 ]
@@ -481,10 +514,16 @@ class CreatorRequestHandler(BaseHTTPRequestHandler):
                         result = self.episode_production_boundary.get_asset_plan(
                             workspace_ref, run_ref
                         )
-                    else:
+                    elif resource == "media":
                         result = self.episode_production_boundary.get_media_bundle(
                             workspace_ref, run_ref
                         )
+                    elif resource in {"preview", "finalize", "delivery"}:
+                        result = self.episode_production_boundary.get_delivery_bundle(
+                            workspace_ref, run_ref
+                        )
+                    else:
+                        raise EpisodeProductionPublicError("invalid_request", 400)
                     self._send_json(200, {"ok": True, **result})
                     return
                 run_ref = unquote(relative)
@@ -922,6 +961,7 @@ class CreatorRequestHandler(BaseHTTPRequestHandler):
             "invalid_request": "请检查输入后重试。",
             "client_workspace_scope_forbidden": "工作区由服务身份确定，客户端不能指定。",
             "not_found": "没有找到对应内容。",
+            "resource_not_found": "没有找到对应内容。",
             "duplicate_record": "该集数已经存在，请检查后重试。",
             "creative_plan_not_confirmed": "请先完成人工确认。",
             "scope_mismatch": "当前工作区与内容引用不匹配。",
@@ -944,6 +984,10 @@ class CreatorRequestHandler(BaseHTTPRequestHandler):
             "invalid_state_transition": "当前制作状态不能执行该操作，请刷新后重试。",
             "stale_input": "上游权威版本已变化，请重新建立本次单集制作链。",
             "episode_production_unavailable": "单集制作根服务暂时不可用。",
+            "approval_required": "请先通过已连接的外部审批权限完成四项显式审批。",
+            "approval_rejected": "存在未通过的审批决定，当前候选不能形成成片。",
+            "worker_unavailable": "制作执行服务暂时不可用。",
+            "artifact_verification_failed": "媒体文件未通过完整性与可播放性校验。",
             "application_error": "暂时无法完成操作，请稍后重试。",
         }
         self._send_json(status, {"ok": False, "error": {"code": code, "message": messages.get(code, messages["application_error"])}})
@@ -1053,6 +1097,25 @@ class CreatorRequestHandler(BaseHTTPRequestHandler):
         self.send_header("Cache-Control", "no-store")
         for name, value in (extra_headers or {}).items():
             self.send_header(str(name), str(value))
+        self.end_headers()
+        self.wfile.write(body)
+
+    def _send_file(self, artifact: MappingLike) -> None:
+        path = artifact.get("path")
+        if not isinstance(path, Path) or not path.is_file():
+            self._send_application_error(404, "resource_not_found")
+            return
+        body = path.read_bytes()
+        if len(body) != artifact.get("byteSize"):
+            self._send_application_error(422, "artifact_verification_failed")
+            return
+        file_name = str(artifact.get("fileName", "episode.mp4")).replace('"', "")
+        self.send_response(200)
+        self.send_header("Content-Type", str(artifact.get("mediaType", "video/mp4")))
+        self.send_header("Content-Length", str(len(body)))
+        self.send_header("Content-Disposition", f'attachment; filename="{file_name}"')
+        self.send_header("Cache-Control", "private, no-store")
+        self.send_header("X-Content-Type-Options", "nosniff")
         self.end_headers()
         self.wfile.write(body)
 

@@ -8,9 +8,9 @@
 >
 > Authorized Wave: `ACS-K2-G0 → G1 → G2 → G3 → G4 → G5 → G6 → G7 → REMOTE VERIFY`
 >
-> Current Task: `ACS-K2-G2-M6-AUTHORITY-V5-IDENTITY-LOCK`
+> Current Task: `ACS-K2-G6-COMPOSITION-QC-APPROVAL-MASTER`
 >
-> Current Work Package: `G2 EXPLICIT M6 AUTHORITY DECISION / SEPARATE V5 IDENTITY LOCK`
+> Current Work Package: `G6 DETERMINISTIC COMPOSITION / MACHINE QC / EXPLICIT APPROVALS / IMMUTABLE MASTER`
 >
 > M6 Authorization: `ACCEPTED SURFACES + K2 EXTERNAL AUTHORITY CONNECTION / NO M6 SCHEMA EXPANSION`
 >
@@ -618,3 +618,46 @@ and immutable verified media registration occur only through the G5 V4 worker ga
 G5 remains a local technical checkpoint until this exact tree is committed, published
 without force, fetched and proven equal to the remote branch. Only verified immutable
 media may enter G6 composition.
+
+### G5 remote verification
+
+- branch: `feature/acs-k2-golden-episode`;
+- remote commit: `5af806bb909ac50fc770f2b696cce03635c12ae0`;
+- remote tree: `f080936c7767719ff33afda56fac9e3d214750c0`;
+- fetched local and remote trees matched, ahead/behind was `0 / 0`, and the worktree
+  was clean before G6 implementation began.
+
+### G6 implementation evidence
+
+- V5 creates one immutable `TimelineVersion` mapping the exact four Creative Shot
+  versions to four verified video and four verified audio AssetVersions; frame ranges
+  are contiguous and total exactly `720` frames at the frozen `24 fps` output contract;
+- V4 owns the composition execution boundary and delegates deterministic audiovisual
+  composition to V3; V3 uses FFmpeg to produce a real H.264/AAC MP4 and ffprobe proves
+  one video stream, one 48 kHz stereo audio stream, exact dimensions and exact frame
+  count;
+- V5 independently re-hashes and re-probes the composed artifact before appending a
+  versioned `PreviewCandidate`; all storage remains run-scoped and path-escape checks
+  remain active;
+- the machine `QCReport` records six separate checks for artifact integrity, video,
+  audio, timeline continuity, identity-lock lineage and the local-evidence publication
+  lock; machine `PASS` does not create an approval;
+- creative direction, identity continuity, technical QC and final master remain four
+  separate append-only `ApprovalDecision` facts tied to the exact preview, timeline and
+  QC digests; the default authority rejects, a rejected decision blocks finalization,
+  and only an explicitly injected authority can validate external approval refs;
+- finalization copies the exact accepted preview into one immutable `EpisodeMaster`
+  and versioned `ExportArtifact`; the authenticated download route re-verifies digest,
+  probe and complete decision lineage before serving the playable MP4;
+- all output remains `LOCAL_EVIDENCE / LOCAL_EVIDENCE_ONLY`, `gpuUsed=false` and
+  `publicationAllowed=false`; no human, live-provider, GPU, rights or publication
+  readiness is inferred from automatic gate progression;
+- InMemory and additive SQLite evidence survive restart; replay preserves refs and
+  creates no duplicate master, while preview tampering fails
+  `422 / artifact_verification_failed`;
+- targeted K2/V4/public integration gate: `38 / 38`;
+- complete Core regression: `518 / 518`.
+
+G6 remains a local technical checkpoint until this exact tree is committed, published
+without force, fetched and proven equal to the remote branch. G7 may consume only the
+authenticated public preview, delivery and export contracts from that verified tree.

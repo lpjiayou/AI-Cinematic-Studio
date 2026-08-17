@@ -8,10 +8,14 @@ from services.v4_platform import (
     DeterministicLocalFfmpegAdapter,
     InMemoryMediaJobAdapter,
     MediaJobCoordinator,
+    SqliteMediaJobAdapter,
+    V4CompositionExecutor,
 )
 
 from services.v5_core_os.episode_production import (
     EpisodeProductionPublicError,
+    RejectingApprovalAuthority,
+    StaticApprovalAuthority,
     StaticIdentityReferenceAuthority,
     create_in_memory_boundary,
     create_local_development_boundary,
@@ -440,6 +444,57 @@ def g5_command(run, **extra):
         "workspaceRef": WORKSPACE,
         "productionRunRef": run["productionRunRef"],
         "idempotencyKey": "k2-media-execution-v1",
+        **extra,
+    }
+
+
+def g6_preview_command(run, **extra):
+    return {
+        "workspaceRef": WORKSPACE,
+        "productionRunRef": run["productionRunRef"],
+        "idempotencyKey": "k2-preview-qc-v1",
+        **extra,
+    }
+
+
+def g6_decisions(run):
+    return [
+        {
+            "kind": kind,
+            "decision": "ACCEPT",
+            "approvalRef": f"approval-{kind.lower().replace('_', '-')}",
+            "actorRef": "actor-project-lead",
+        }
+        for kind in (
+            "CREATIVE_DIRECTION",
+            "IDENTITY_CONTINUITY",
+            "TECHNICAL_QC",
+            "FINAL_MASTER",
+        )
+    ]
+
+
+def g6_approval_authority(run_ref):
+    return StaticApprovalAuthority(
+        {
+            item["approvalRef"]: {
+                "workspaceRef": WORKSPACE,
+                "productionRunRef": run_ref,
+                "kind": item["kind"],
+                "actorRef": item["actorRef"],
+                "authorityType": "HUMAN",
+            }
+            for item in g6_decisions({"productionRunRef": run_ref})
+        }
+    )
+
+
+def g6_finalize_command(run, **extra):
+    return {
+        "workspaceRef": WORKSPACE,
+        "productionRunRef": run["productionRunRef"],
+        "idempotencyKey": "k2-approval-master-v1",
+        "decisions": g6_decisions(run),
         **extra,
     }
 
@@ -1186,6 +1241,233 @@ class EpisodeProductionG5MediaExecutionTests(unittest.TestCase):
             (caught.exception.status, caught.exception.code),
             (503, "worker_unavailable"),
         )
+
+
+class EpisodeProductionG6DeliveryTests(unittest.TestCase):
+    def setUp(self):
+        self.directory = tempfile.TemporaryDirectory()
+        (
+            self.assembly,
+            self.refs,
+            self.project,
+            self.series,
+            self.episode,
+            _,
+        ) = seed_k2_roots(with_m6_authority=True)
+        activate_k2_m6_baseline(self.assembly, self.project, self.series)
+        artifact_root = Path(self.directory.name) / "artifacts"
+        self.execution = MediaJobCoordinator(
+            InMemoryMediaJobAdapter(),
+            DeterministicLocalFfmpegAdapter(),
+            artifact_root,
+            ref_factory=self.refs,
+            clock=lambda: "2026-08-17T02:00:00Z",
+        )
+        expected_run_ref = "episode-production-run-k2-1"
+        self.boundary = create_in_memory_boundary(
+            project_boundary=self.assembly.project_context,
+            series_episode_boundary=self.assembly.series_episode,
+            series_planning_boundary=self.assembly.series_planning,
+            script_studio_boundary=self.assembly.script_studio,
+            identity_reference_authority=k2_identity_authority(),
+            media_execution=self.execution,
+            composition_execution=V4CompositionExecutor.from_artifact_root(
+                artifact_root
+            ),
+            approval_authority=g6_approval_authority(expected_run_ref),
+            ref_factory=self.refs,
+            clock=lambda: "2026-08-17T02:00:00Z",
+        )
+        self.run = self.boundary.create_run(
+            run_command(self.project, self.series, self.episode)
+        )
+        self.assertEqual(self.run["productionRunRef"], expected_run_ref)
+        self.boundary.authorize_and_lock(g2_command(self.run))
+        self.boundary.compile_shot_graph(g3_command(self.run))
+        self.boundary.resolve_assets(g4_command(self.run))
+        self.boundary.execute_media(g5_command(self.run))
+
+    def tearDown(self):
+        self.directory.cleanup()
+
+    def test_composes_playable_preview_qc_and_explicitly_approved_master(self):
+        preview = self.boundary.compose_and_qc(g6_preview_command(self.run))
+        self.assertEqual(preview["state"], "QC_READY")
+        self.assertEqual(len(preview["timelineVersion"]["items"]), 4)
+        self.assertEqual(
+            preview["timelineVersion"]["items"][-1]["endFrameExclusive"], 720
+        )
+        self.assertEqual(preview["qcReport"]["result"], "PASS")
+        self.assertEqual(
+            {item["status"] for item in preview["qcReport"]["checks"]},
+            {"PASSED"},
+        )
+        self.assertEqual(len(preview["qcReport"]["checks"]), 6)
+        self.assertEqual(preview["previewCandidate"]["provenance"], "LOCAL_EVIDENCE")
+        self.assertFalse(preview["previewCandidate"]["publicationAllowed"])
+
+        finalized = self.boundary.approve_and_finalize(
+            g6_finalize_command(self.run)
+        )
+        self.assertEqual(finalized["state"], "MASTER_READY")
+        self.assertEqual(
+            [item["kind"] for item in finalized["approvalDecisions"]],
+            [
+                "CREATIVE_DIRECTION",
+                "IDENTITY_CONTINUITY",
+                "TECHNICAL_QC",
+                "FINAL_MASTER",
+            ],
+        )
+        self.assertTrue(
+            all(item["decision"] == "ACCEPT" for item in finalized["approvalDecisions"])
+        )
+        master = finalized["episodeMaster"]
+        export = finalized["exportArtifact"]
+        self.assertEqual(master["state"], "IMMUTABLE_MASTER")
+        self.assertEqual(master["sha256"], export["sha256"])
+        self.assertEqual(export["state"], "PLAYABLE_LOCAL_EVIDENCE")
+        self.assertFalse(export["publicationAllowed"])
+        artifact = self.boundary.get_export_file(
+            WORKSPACE, self.run["productionRunRef"], export["exportArtifactRef"]
+        )
+        self.assertTrue(artifact["path"].is_file())
+        self.assertEqual(
+            sha256(artifact["path"].read_bytes()).hexdigest(), export["sha256"]
+        )
+
+        replay_preview = self.boundary.compose_and_qc(g6_preview_command(self.run))
+        replay_master = self.boundary.approve_and_finalize(
+            g6_finalize_command(self.run)
+        )
+        self.assertTrue(replay_preview["idempotentReplay"])
+        self.assertTrue(replay_master["idempotentReplay"])
+        self.assertEqual(
+            replay_master["episodeMaster"]["episodeMasterVersionRef"],
+            master["episodeMasterVersionRef"],
+        )
+
+    def test_rejected_or_unverified_approval_cannot_finalize(self):
+        self.boundary.compose_and_qc(g6_preview_command(self.run))
+        rejected = g6_finalize_command(self.run)
+        rejected["decisions"][0]["decision"] = "REJECT"
+        with self.assertRaises(EpisodeProductionPublicError) as caught:
+            self.boundary.approve_and_finalize(rejected)
+        self.assertEqual(
+            (caught.exception.status, caught.exception.code),
+            (409, "approval_rejected"),
+        )
+
+        delivery = self.boundary._EpisodeProductionPublicBoundary__delivery
+        delivery.approval_authority = RejectingApprovalAuthority()
+        with self.assertRaises(EpisodeProductionPublicError) as caught:
+            self.boundary.approve_and_finalize(g6_finalize_command(self.run))
+        self.assertEqual(
+            (caught.exception.status, caught.exception.code),
+            (403, "approval_required"),
+        )
+        bundle = self.boundary.get_delivery_bundle(
+            WORKSPACE, self.run["productionRunRef"]
+        )
+        self.assertEqual(bundle["state"], "QC_READY")
+        self.assertNotIn("episodeMaster", bundle)
+
+    def test_preview_tampering_is_rejected_before_finalization(self):
+        preview = self.boundary.compose_and_qc(g6_preview_command(self.run))
+        path = self.execution.artifact_root / preview["previewCandidate"]["storageKey"]
+        path.write_bytes(path.read_bytes() + b"tamper")
+        with self.assertRaises(EpisodeProductionPublicError) as caught:
+            self.boundary.approve_and_finalize(g6_finalize_command(self.run))
+        self.assertEqual(
+            (caught.exception.status, caught.exception.code),
+            (422, "artifact_verification_failed"),
+        )
+
+    def test_sqlite_restart_preserves_master_lineage_and_playable_export(self):
+        database = Path(self.directory.name) / "episode.sqlite3"
+        evidence = Path(self.directory.name) / "evidence.sqlite3"
+        jobs = Path(self.directory.name) / "jobs.sqlite3"
+        artifacts = Path(self.directory.name) / "durable-artifacts"
+        refs = Refs()
+        execution = MediaJobCoordinator(
+            SqliteMediaJobAdapter(jobs),
+            DeterministicLocalFfmpegAdapter(),
+            artifacts,
+            ref_factory=refs,
+            clock=lambda: "2026-08-17T02:30:00Z",
+        )
+        kwargs = {
+            "project_boundary": self.assembly.project_context,
+            "series_episode_boundary": self.assembly.series_episode,
+            "series_planning_boundary": self.assembly.series_planning,
+            "script_studio_boundary": self.assembly.script_studio,
+            "evidence_database_path": evidence,
+            "identity_reference_authority": k2_identity_authority(),
+            "media_execution": execution,
+            "composition_execution": V4CompositionExecutor.from_artifact_root(
+                artifacts
+            ),
+            "approval_authority": g6_approval_authority(
+                "episode-production-run-k2-1"
+            ),
+            "ref_factory": refs,
+            "clock": lambda: "2026-08-17T02:30:00Z",
+        }
+        first = create_local_development_boundary(database, **kwargs)
+        run = first.create_run(
+            run_command(
+                self.project,
+                self.series,
+                self.episode,
+                idempotencyKey="g6-durable-run",
+            )
+        )
+        first.authorize_and_lock(
+            g2_command(run, idempotencyKey="g6-durable-authority")
+        )
+        first.compile_shot_graph(
+            g3_command(run, idempotencyKey="g6-durable-shots")
+        )
+        first.resolve_assets(
+            g4_command(run, idempotencyKey="g6-durable-assets")
+        )
+        first.execute_media(
+            g5_command(run, idempotencyKey="g6-durable-media")
+        )
+        first.compose_and_qc(
+            g6_preview_command(run, idempotencyKey="g6-durable-preview")
+        )
+        final = first.approve_and_finalize(
+            g6_finalize_command(run, idempotencyKey="g6-durable-final")
+        )
+
+        restored_execution = MediaJobCoordinator(
+            SqliteMediaJobAdapter(jobs, initialize_if_missing=False),
+            DeterministicLocalFfmpegAdapter(),
+            artifacts,
+            ref_factory=refs,
+            clock=lambda: "2026-08-17T02:31:00Z",
+        )
+        restored = create_local_development_boundary(
+            database,
+            **{
+                **kwargs,
+                "media_execution": restored_execution,
+                "initialize_if_missing": False,
+            },
+        )
+        bundle = restored.get_delivery_bundle(WORKSPACE, run["productionRunRef"])
+        self.assertEqual(bundle["state"], "MASTER_READY")
+        self.assertEqual(
+            bundle["episodeMaster"]["payloadDigest"],
+            final["episodeMaster"]["payloadDigest"],
+        )
+        artifact = restored.get_export_file(
+            WORKSPACE,
+            run["productionRunRef"],
+            bundle["exportArtifact"]["exportArtifactRef"],
+        )
+        self.assertTrue(artifact["path"].is_file())
 
 
 def sqlite_tables(path):
