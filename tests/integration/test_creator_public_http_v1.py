@@ -1,4 +1,5 @@
 import json
+import secrets
 import threading
 import unittest
 from urllib import error, parse, request
@@ -14,6 +15,8 @@ from apps.creator_workspace_mvp.public_contract import (
     PUBLIC_SERIES_ENDPOINT,
     PUBLIC_SERIES_INTELLIGENCE_WORKSPACE_ENDPOINT,
 )
+from apps.creator_workspace_mvp import public_contract
+from apps.creator_workspace_mvp.public_auth import PublicApiAuthenticator
 from apps.creator_workspace_mvp.script_studio import ScriptStudioApplicationService
 from apps.creator_workspace_mvp.series_director import SeriesDirectorApplicationService
 from apps.creator_workspace_mvp.server import create_server
@@ -32,6 +35,7 @@ class CreatorPublicHttpV1IntegrationTests(unittest.TestCase):
         capability = FakeTextGenerationCapability(
             [json.dumps(valid_plan(), ensure_ascii=False)]
         )
+        self.token = secrets.token_urlsafe(48)
         self.server = create_server(
             ("127.0.0.1", 0),
             AiDirectorService(capability),
@@ -42,6 +46,10 @@ class CreatorPublicHttpV1IntegrationTests(unittest.TestCase):
             series_intelligence_boundary=self.assembly.series_intelligence,
             script_studio_service=ScriptStudioApplicationService(capability),
             script_studio_boundary=self.assembly.script_studio,
+            public_authenticator=PublicApiAuthenticator.for_token(
+                self.token, WORKSPACE
+            ),
+            allow_internal_routes=False,
         )
         self.thread = threading.Thread(target=self.server.serve_forever, daemon=True)
         self.thread.start()
@@ -51,7 +59,11 @@ class CreatorPublicHttpV1IntegrationTests(unittest.TestCase):
 
     def get(self, path, **query):
         suffix = f"?{parse.urlencode(query)}" if query else ""
-        with request.urlopen(f"{self.base_url}{path}{suffix}", timeout=5) as response:
+        req = request.Request(
+            f"{self.base_url}{path}{suffix}",
+            headers={"Authorization": f"Bearer {self.token}"},
+        )
+        with request.urlopen(req, timeout=5) as response:
             return response.status, json.loads(response.read().decode("utf-8"))
 
     def post(self, path, payload):
@@ -61,7 +73,10 @@ class CreatorPublicHttpV1IntegrationTests(unittest.TestCase):
                 f"{self.base_url}{path}",
                 data=body,
                 method="POST",
-                headers={"Content-Type": "application/json"},
+                headers={
+                    "Content-Type": "application/json",
+                    "Authorization": f"Bearer {self.token}",
+                },
             ),
             timeout=5,
         ) as response:
@@ -91,7 +106,6 @@ class CreatorPublicHttpV1IntegrationTests(unittest.TestCase):
         status, series_payload = self.post(
             PUBLIC_SERIES_ENDPOINT,
             {
-                "workspaceRef": WORKSPACE,
                 "contentProfileRef": PROFILE,
                 "title": "Public Series",
                 "description": "Created through public v1",
@@ -104,7 +118,6 @@ class CreatorPublicHttpV1IntegrationTests(unittest.TestCase):
         status, confirmation_payload = self.post(
             PUBLIC_CONFIRM_PLAN_ENDPOINT,
             {
-                "workspaceRef": WORKSPACE,
                 "humanConfirmed": True,
                 "brief": valid_brief(),
                 "plan": candidate["plan"],
@@ -121,7 +134,6 @@ class CreatorPublicHttpV1IntegrationTests(unittest.TestCase):
         status, episode_payload = self.post(
             PUBLIC_EPISODES_ENDPOINT,
             {
-                "workspaceRef": WORKSPACE,
                 "seriesRef": series["seriesRef"],
                 "creativePlanRef": confirmed_plan["creativePlanRef"],
                 "episodeNumber": 1,
@@ -139,7 +151,6 @@ class CreatorPublicHttpV1IntegrationTests(unittest.TestCase):
         status, project_payload = self.post(
             PUBLIC_PROJECTS_ENDPOINT,
             {
-                "workspaceRef": WORKSPACE,
                 "contentProfileRef": PROFILE,
                 "projectType": "series",
                 "seriesRef": series["seriesRef"],
@@ -152,13 +163,12 @@ class CreatorPublicHttpV1IntegrationTests(unittest.TestCase):
         )
         self.assertEqual(status, 201)
         project = project_payload["project"]
-        status, listed = self.get(PUBLIC_PROJECTS_ENDPOINT, workspaceRef=WORKSPACE)
+        status, listed = self.get(PUBLIC_PROJECTS_ENDPOINT)
         self.assertEqual(status, 200)
         self.assertEqual(listed["projects"][0]["projectRef"], project["projectRef"])
 
         status, detail = self.get(
             f"{PUBLIC_PROJECTS_ENDPOINT}/{parse.quote(project['projectRef'])}",
-            workspaceRef=WORKSPACE,
         )
         self.assertEqual(status, 200)
         self.assertEqual(detail["project"]["seriesRefs"], [series["seriesRef"]])
@@ -171,7 +181,6 @@ class CreatorPublicHttpV1IntegrationTests(unittest.TestCase):
                 + "?"
                 + parse.urlencode(
                     {
-                        "workspaceRef": WORKSPACE,
                         "projectRef": "project-missing",
                         "seriesRef": "series-missing",
                     }
@@ -182,7 +191,6 @@ class CreatorPublicHttpV1IntegrationTests(unittest.TestCase):
                 "POST",
                 PUBLIC_M6_BIBLE_VERSION_ENDPOINT,
                 {
-                    "workspaceRef": WORKSPACE,
                     "projectRef": "project-missing",
                     "seriesRef": "series-missing",
                     "operationRef": "m6-public-test",
@@ -200,7 +208,10 @@ class CreatorPublicHttpV1IntegrationTests(unittest.TestCase):
                 f"{self.base_url}{path}",
                 data=body,
                 method=method,
-                headers={"Content-Type": "application/json"} if body else {},
+                headers={
+                    **({"Content-Type": "application/json"} if body else {}),
+                    "Authorization": f"Bearer {self.token}",
+                },
             )
             with self.subTest(method=method), self.assertRaises(error.HTTPError) as caught:
                 request.urlopen(req, timeout=5)
@@ -216,6 +227,92 @@ class CreatorPublicHttpV1IntegrationTests(unittest.TestCase):
         self.assertEqual(payload["error"]["code"], "not_found")
         self.assertIsInstance(payload["error"]["message"], str)
         self.assertTrue(payload["error"]["message"])
+
+    def test_every_declared_public_endpoint_requires_authentication(self):
+        declared = sorted(
+            {
+                value
+                for name, value in vars(public_contract).items()
+                if isinstance(value, str)
+                and (
+                    name == "CAPABILITIES_ENDPOINT"
+                    or (name.startswith("PUBLIC_") and name.endswith("_ENDPOINT"))
+                )
+            }
+        )
+        self.assertEqual(len(declared), 27)
+        for path in declared:
+            with self.subTest(path=path), self.assertRaises(error.HTTPError) as caught:
+                request.urlopen(f"{self.base_url}{path}", timeout=5)
+            self.assertEqual(caught.exception.code, 401)
+            self.assertEqual(caught.exception.headers["WWW-Authenticate"], "Bearer")
+            payload = json.loads(caught.exception.read().decode("utf-8"))
+            self.assertEqual(payload["error"]["code"], "authentication_required")
+
+    def test_invalid_token_is_indistinguishable_from_missing_token(self):
+        errors = []
+        for headers in ({}, {"Authorization": "Bearer invalid-runtime-token"}):
+            req = request.Request(
+                f"{self.base_url}{CAPABILITIES_ENDPOINT}", headers=headers
+            )
+            with self.assertRaises(error.HTTPError) as caught:
+                request.urlopen(req, timeout=5)
+            errors.append(
+                (
+                    caught.exception.code,
+                    json.loads(caught.exception.read().decode("utf-8")),
+                )
+            )
+        self.assertEqual(errors[0], errors[1])
+
+    def test_public_clients_cannot_supply_workspace_scope(self):
+        req = request.Request(
+            f"{self.base_url}{PUBLIC_PROJECTS_ENDPOINT}?workspaceRef=forged",
+            headers={"Authorization": f"Bearer {self.token}"},
+        )
+        with self.assertRaises(error.HTTPError) as caught:
+            request.urlopen(req, timeout=5)
+        self.assertEqual(caught.exception.code, 400)
+        payload = json.loads(caught.exception.read().decode("utf-8"))
+        self.assertEqual(
+            payload["error"]["code"], "client_workspace_scope_forbidden"
+        )
+
+        with self.assertRaises(error.HTTPError) as caught:
+            self.post(
+                PUBLIC_PROJECTS_ENDPOINT,
+                {
+                    "workspaceRef": "forged",
+                    "contentProfileRef": PROFILE,
+                    "projectType": "series",
+                },
+            )
+        self.assertEqual(caught.exception.code, 400)
+        payload = json.loads(caught.exception.read().decode("utf-8"))
+        self.assertEqual(
+            payload["error"]["code"], "client_workspace_scope_forbidden"
+        )
+
+    def test_health_is_liveness_only_and_core_remains_no_cors(self):
+        with request.urlopen(f"{self.base_url}/health", timeout=5) as response:
+            self.assertEqual(response.status, 200)
+            self.assertIsNone(response.headers.get("Access-Control-Allow-Origin"))
+            self.assertEqual(
+                json.loads(response.read().decode("utf-8")),
+                {"ok": True, "status": "alive"},
+            )
+
+        status, _ = self.get(CAPABILITIES_ENDPOINT)
+        self.assertEqual(status, 200)
+
+    def test_public_only_server_hides_internal_compatibility_routes(self):
+        req = request.Request(
+            f"{self.base_url}/creator/internal/projects?workspaceRef={WORKSPACE}",
+            headers={"Authorization": f"Bearer {self.token}"},
+        )
+        with self.assertRaises(error.HTTPError) as caught:
+            request.urlopen(req, timeout=5)
+        self.assertEqual(caught.exception.code, 404)
 
 
 if __name__ == "__main__":

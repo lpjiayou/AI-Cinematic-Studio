@@ -35,6 +35,7 @@ from apps.creator_workspace_mvp.series_director import (
 )
 from apps.creator_workspace_mvp.public_contract import (
     CAPABILITIES_ENDPOINT,
+    PUBLIC_API_PREFIX,
     PUBLIC_AI_DIRECTOR_ENDPOINT,
     PUBLIC_CONFIRM_PLAN_ENDPOINT,
     PUBLIC_EPISODES_ENDPOINT,
@@ -62,6 +63,11 @@ from apps.creator_workspace_mvp.public_contract import (
     PUBLIC_SERIES_PLANNING_MANUAL_VERSION_ENDPOINT,
     PUBLIC_STORYBOARD_BOOTSTRAP_ENDPOINT,
     capability_payload,
+)
+from apps.creator_workspace_mvp.public_auth import (
+    PublicApiAuthenticator,
+    PublicApiPrincipal,
+    public_server_configuration_from_environment,
 )
 from services.v5_core_os.project_engine import (
     ProjectPublicBoundary,
@@ -107,6 +113,7 @@ SERIES_PLANNING_MANUAL_VERSION_ENDPOINT = f"{SERIES_PLANNING_ENDPOINT}/manual-ve
 SERIES_PLANNING_CONFIRM_VERSION_ENDPOINT = f"{SERIES_PLANNING_ENDPOINT}/confirm-version"
 SERIES_PLANNING_M6_BOOTSTRAP_ENDPOINT = f"{SERIES_PLANNING_ENDPOINT}/m6-bootstrap"
 MAX_REQUEST_BYTES = 512_000
+HEALTH_ENDPOINT = "/health"
 
 
 PUBLIC_EXACT_ALIASES = {
@@ -171,6 +178,8 @@ class CreatorRequestHandler(BaseHTTPRequestHandler):
         series_intelligence_boundary: SeriesIntelligencePublicBoundary | None,
         script_studio_service: ScriptStudioApplicationService,
         script_studio_boundary: ScriptStudioPublicBoundary,
+        public_authenticator: PublicApiAuthenticator | None,
+        allow_internal_routes: bool,
         **kwargs: Any,
     ) -> None:
         self.ai_director_service = ai_director_service
@@ -181,10 +190,15 @@ class CreatorRequestHandler(BaseHTTPRequestHandler):
         self.series_intelligence_boundary = series_intelligence_boundary
         self.script_studio_service = script_studio_service
         self.script_studio_boundary = script_studio_boundary
+        self.public_authenticator = public_authenticator
+        self.allow_internal_routes = allow_internal_routes
+        self.authenticated_principal: PublicApiPrincipal | None = None
         super().__init__(*args, **kwargs)
 
     def do_POST(self) -> None:
         requested_path = urlsplit(self.path).path
+        if not self._authorize_route_class(requested_path):
+            return
         path = _normalize_public_path(requested_path)
         if path not in {
             AI_DIRECTOR_ENDPOINT,
@@ -221,6 +235,16 @@ class CreatorRequestHandler(BaseHTTPRequestHandler):
         if not isinstance(payload, dict):
             self._send_application_error(400, "invalid_request")
             return
+        if self._is_public_path(requested_path):
+            if "workspaceRef" in payload:
+                self._send_application_error(
+                    400, "client_workspace_scope_forbidden"
+                )
+                return
+            payload = {
+                **payload,
+                "workspaceRef": self._authenticated_workspace_ref(),
+            }
         if requested_path in PUBLIC_M6_COMMAND_ENDPOINTS:
             self._handle_series_intelligence_post(requested_path, payload)
             return
@@ -272,9 +296,13 @@ class CreatorRequestHandler(BaseHTTPRequestHandler):
 
     def do_DELETE(self) -> None:
         parsed = urlsplit(self.path)
+        if not self._authorize_route_class(parsed.path):
+            return
         path = _normalize_public_path(parsed.path)
-        query = parse_qs(parsed.query)
-        workspace_ref = query.get("workspaceRef", [""])[0]
+        query = parse_qs(parsed.query, keep_blank_values=True)
+        workspace_ref = self._workspace_from_query(parsed.path, query)
+        if workspace_ref is None:
+            return
         series_ref = query.get("seriesRef", [""])[0]
         try:
             if path.startswith(f"{EPISODES_ENDPOINT}/"):
@@ -338,9 +366,16 @@ class CreatorRequestHandler(BaseHTTPRequestHandler):
     def do_GET(self) -> None:
         parsed = urlsplit(self.path)
         requested_path = parsed.path
+        if not self._authorize_route_class(requested_path):
+            return
+        if requested_path == HEALTH_ENDPOINT:
+            self._send_json(200, {"ok": True, "status": "alive"})
+            return
         path = _normalize_public_path(requested_path)
-        query = parse_qs(parsed.query)
-        workspace_ref = query.get("workspaceRef", [""])[0]
+        query = parse_qs(parsed.query, keep_blank_values=True)
+        workspace_ref = self._workspace_from_query(requested_path, query)
+        if workspace_ref is None:
+            return
         series_ref = query.get("seriesRef", [""])[0]
         episode_ref = query.get("episodeRef", [""])[0]
         if requested_path == CAPABILITIES_ENDPOINT:
@@ -349,7 +384,7 @@ class CreatorRequestHandler(BaseHTTPRequestHandler):
         try:
             if requested_path == PUBLIC_SERIES_INTELLIGENCE_WORKSPACE_ENDPOINT:
                 if self.series_intelligence_boundary is None:
-                    self._send_application_error(503, "authority_unavailable")
+                    self._send_application_error(403, "authority_unavailable")
                     return
                 project_ref = query.get("projectRef", [""])[0]
                 self._send_json(
@@ -479,11 +514,61 @@ class CreatorRequestHandler(BaseHTTPRequestHandler):
             return
         self._send_application_error(404, "not_found")
 
+    def do_OPTIONS(self) -> None:
+        requested_path = urlsplit(self.path).path
+        if not self._authorize_route_class(requested_path):
+            return
+        self._send_application_error(404, "not_found")
+
+    @staticmethod
+    def _is_public_path(path: str) -> bool:
+        return path == PUBLIC_API_PREFIX or path.startswith(f"{PUBLIC_API_PREFIX}/")
+
+    @staticmethod
+    def _is_internal_path(path: str) -> bool:
+        return path == "/creator/internal" or path.startswith("/creator/internal/")
+
+    def _authorize_route_class(self, path: str) -> bool:
+        self.authenticated_principal = None
+        if self._is_internal_path(path) and not self.allow_internal_routes:
+            self._send_application_error(404, "not_found")
+            return False
+        if not self._is_public_path(path):
+            return True
+        values = self.headers.get_all("Authorization", failobj=[])
+        principal = (
+            self.public_authenticator.authenticate(values)
+            if self.public_authenticator is not None
+            else None
+        )
+        if principal is None:
+            self._send_authentication_error()
+            return False
+        self.authenticated_principal = principal
+        return True
+
+    def _authenticated_workspace_ref(self) -> str:
+        if self.authenticated_principal is None:
+            raise RuntimeError("Authenticated public principal is required")
+        return self.authenticated_principal.workspace_ref
+
+    def _workspace_from_query(
+        self, path: str, query: dict[str, list[str]]
+    ) -> str | None:
+        if self._is_public_path(path):
+            if "workspaceRef" in query:
+                self._send_application_error(
+                    400, "client_workspace_scope_forbidden"
+                )
+                return None
+            return self._authenticated_workspace_ref()
+        return query.get("workspaceRef", [""])[0]
+
     def _handle_series_intelligence_post(
         self, path: str, payload: MappingLike
     ) -> None:
         if self.series_intelligence_boundary is None:
-            self._send_application_error(503, "authority_unavailable")
+            self._send_application_error(403, "authority_unavailable")
             return
         operations = {
             PUBLIC_M6_BIBLE_VERSION_ENDPOINT: self.series_intelligence_boundary.create_bible_version,
@@ -710,6 +795,7 @@ class CreatorRequestHandler(BaseHTTPRequestHandler):
     def _send_application_error(self, status: int, code: str) -> None:
         messages = {
             "invalid_request": "请检查输入后重试。",
+            "client_workspace_scope_forbidden": "工作区由服务身份确定，客户端不能指定。",
             "not_found": "没有找到对应内容。",
             "duplicate_record": "该集数已经存在，请检查后重试。",
             "creative_plan_not_confirmed": "请先完成人工确认。",
@@ -731,6 +817,19 @@ class CreatorRequestHandler(BaseHTTPRequestHandler):
             "application_error": "暂时无法完成操作，请稍后重试。",
         }
         self._send_json(status, {"ok": False, "error": {"code": code, "message": messages.get(code, messages["application_error"])}})
+
+    def _send_authentication_error(self) -> None:
+        self._send_json(
+            401,
+            {
+                "ok": False,
+                "error": {
+                    "code": "authentication_required",
+                    "message": "Creator Core 身份验证失败。",
+                },
+            },
+            extra_headers={"WWW-Authenticate": "Bearer"},
+        )
 
     @staticmethod
     def _log_series_director_error(exc: SeriesDirectorGenerationError) -> None:
@@ -810,12 +909,20 @@ class CreatorRequestHandler(BaseHTTPRequestHandler):
             flush=True,
         )
 
-    def _send_json(self, status: int, payload: MappingLike) -> None:
+    def _send_json(
+        self,
+        status: int,
+        payload: MappingLike,
+        *,
+        extra_headers: MappingLike | None = None,
+    ) -> None:
         body = json.dumps(payload, ensure_ascii=False).encode("utf-8")
         self.send_response(status)
         self.send_header("Content-Type", "application/json; charset=utf-8")
         self.send_header("Content-Length", str(len(body)))
         self.send_header("Cache-Control", "no-store")
+        for name, value in (extra_headers or {}).items():
+            self.send_header(str(name), str(value))
         self.end_headers()
         self.wfile.write(body)
 
@@ -837,6 +944,8 @@ def create_server(
     series_intelligence_boundary: SeriesIntelligencePublicBoundary | None = None,
     script_studio_service: ScriptStudioApplicationService | None = None,
     script_studio_boundary: ScriptStudioPublicBoundary | None = None,
+    public_authenticator: PublicApiAuthenticator | None = None,
+    allow_internal_routes: bool = True,
 ) -> ThreadingHTTPServer:
     series_boundary = series_episode_boundary or create_in_memory_series_boundary()
     projects = project_boundary or create_in_memory_project_boundary(series_boundary)
@@ -854,6 +963,8 @@ def create_server(
         script_studio_service=script_studio_service
         or ScriptStudioApplicationService(default_text_generation),
         script_studio_boundary=script_studio_boundary or create_in_memory_script_boundary(series_boundary),
+        public_authenticator=public_authenticator,
+        allow_internal_routes=allow_internal_routes,
     )
     server = ThreadingHTTPServer(address, handler)
     server.daemon_threads = True
@@ -880,6 +991,9 @@ def capability_services_from_environment() -> tuple[AiDirectorService, ScriptStu
 
 
 def main() -> None:
+    host, port, public_authenticator, allow_internal_routes = (
+        public_server_configuration_from_environment()
+    )
     series_boundary = series_episode_boundary_from_environment()
     assembly = series_boundary._lifecycle_assembly_or_none()
     if assembly is None:
@@ -888,7 +1002,7 @@ def main() -> None:
     ai_director_service, script_service, series_director_service = capability_services_from_environment()
     series_planning_boundary = assembly.series_planning
     server = create_server(
-        ("127.0.0.1", 8765),
+        (host, port),
         ai_director_service,
         series_episode_boundary=series_boundary,
         project_boundary=project_boundary,
@@ -897,8 +1011,11 @@ def main() -> None:
         series_intelligence_boundary=assembly.series_intelligence,
         script_studio_service=script_service,
         script_studio_boundary=assembly.script_studio,
+        public_authenticator=public_authenticator,
+        allow_internal_routes=allow_internal_routes,
     )
-    print("Creator Core API available at http://127.0.0.1:8765")
+    route_mode = "loopback-compatible" if allow_internal_routes else "public-only"
+    print(f"Creator Core API available at http://{host}:{port} ({route_mode})")
     try:
         server.serve_forever()
     except KeyboardInterrupt:

@@ -184,15 +184,19 @@ not the Frontend integration surface.
 
 - `CREATOR_CORE_BASE_URL` is server-only and defaults to `http://127.0.0.1:8765` for
   local development;
-- `CREATOR_WORKSPACE_REF` and `CREATOR_CONTENT_PROFILE_REF` are server-owned scope
-  configuration;
+- required `CREATOR_CORE_TOKEN` is server-only and maps to exactly one Core-owned
+  workspace through the digest-only credential registry;
+- `CREATOR_WORKSPACE_REF` is removed; the adapter must never forward a browser or
+  Frontend-configured workspace claim;
+- `CREATOR_CONTENT_PROFILE_REF` remains server-owned creation configuration only;
 - browser code calls only `/api/creator/*` on the Frontend origin;
 - the adapter uses bounded timeouts and returns stable disconnected/error states;
 - incoming mutation bodies are size-limited and JSON-validated;
 - Core response status and stable product errors are preserved;
+- `401 / authentication_required` and `403 / authority_unavailable` remain distinct;
 - redirect targets are created only from references returned by successful Core
   commands;
-- no `NEXT_PUBLIC_*` variable may expose the Core origin or server scope.
+- no `NEXT_PUBLIC_*` variable may expose the Core origin, bearer credential or scope.
 
 ---
 
@@ -331,3 +335,61 @@ interim review. This is execution authorization, not final feature acceptance.
 8. both repositories are pushed without force and remotely verified.
 
 AUTH-W1 does not change M6 authorization and does not open M7–M19.
+
+## 13. Reference-video merged baseline disposition
+
+The reviewed
+[`REFERENCE_VIDEO_CAPABILITY_AND_WORKSPACE_MERGED_BASELINE.md`](docs/14-application-design/REFERENCE_VIDEO_CAPABILITY_AND_WORKSPACE_MERGED_BASELINE.md)
+is part of the local cross-repository work and is now repository-resident. Its scope is
+partitioned:
+
+- implemented Frontend layout rules and stale documentation are current closeout work;
+- reference-video and multi-character decomposition is a design/evidence baseline;
+- M6 expansion is rejected;
+- M7–M16 implementation and provider/GPU experiments remain outside AUTH-W1 and require
+  separate rights, budget, ADR and milestone authorization.
+
+The file must not be cited as evidence that reference-video generation is implemented.
+
+## 14. AUTH-W1 local implementation and Gate C evidence — 2026-08-17
+
+Implemented boundaries:
+
+- Core protects all 27 declared public endpoint constants with a digest-backed bearer
+  principal and exposes only unauthenticated liveness at `/health`;
+- public query/body `workspaceRef` is rejected and the principal workspace is injected
+  before existing Application/V5 dispatch;
+- host, port and credential registry are validated before listening; non-loopback
+  composition disables the complete internal route class;
+- Frontend holds `CREATOR_CORE_TOKEN` only in the server adapter, sends no
+  `workspaceRef`, and injects only the configured content profile for Series/Project
+  creation;
+- the canonical layout document now matches the fluid implementation tokens.
+
+Local verification:
+
+- Core full suite: `480 / 480` passed;
+- Frontend suite: `112 / 112` passed across `23` files;
+- Frontend TypeScript, ESLint and Next.js production build passed;
+- built browser assets contain neither the runtime test token nor
+  `CREATOR_CORE_TOKEN`;
+- `git diff --check` passed in both repositories.
+
+Gate C used a runtime-generated raw token, a digest-only Core registry, fresh migrated
+SQLite lifecycle storage, one Core process and one production Next.js process. It
+proved:
+
+- exact capability state `5 available / 1 authority_required / 13 not_open`;
+- browser claims cannot select a workspace and authoritative Series/Project references
+  complete a create/list/detail round trip;
+- an authenticated direct workspace claim fails `400 /
+  client_workspace_scope_forbidden`;
+- a missing credential fails `401 / authentication_required`;
+- the authenticated M6 authority boundary remains distinct at `403 /
+  authority_unavailable`;
+- an absent text provider remains fail-closed as `provider_unavailable`.
+
+The runtime token, registry, logs and temporary SQLite evidence database were deleted
+after the gate. This evidence closes local G1–G3 and Gate C only. No M6 expansion,
+M7–M19 opening, provider/GPU readiness, production multi-tenancy or feature acceptance
+is claimed; publication and remote verification remain the final AUTH-W1 checkpoint.

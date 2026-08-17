@@ -203,9 +203,12 @@ class CreatorSeriesPlanningContractTests(unittest.TestCase):
             SeriesPlanningPublicBoundary.create_episode_plan_item_binding_version
         )
         self.assertEqual(tuple(signature.parameters), ("self", "command"))
+        # AUTH-W1 intentionally hardens the shared HTTP server boundary. The
+        # semantic assertions below still prove that no Series Planning route or
+        # application DTO was added by the binding-version work.
         self.assertEqual(
             hashlib.sha256(SERVER.read_bytes()).hexdigest(),
-            "88ef53d7c182028987eb996cef886a0e5a2aeb8e679ae20855540e712da6c1d4",
+            "acdbe8e248abaaa068316ec90b8e33e34bfd5d971cce861393453d0eb13fb2ca",
         )
         server_source = SERVER.read_text(encoding="utf-8")
         endpoint_names = {
