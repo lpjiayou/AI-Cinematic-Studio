@@ -203,6 +203,14 @@ jobs:
         with:
           python-version: "3.12"
 
+      - name: Install deterministic media runtime
+        shell: bash
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes ffmpeg
+          ffmpeg -version
+          ffprobe -version
+
       - name: Run unit tests
         shell: bash
         run: |
@@ -259,6 +267,50 @@ jobs:
               raise SystemExit("No contract tests were discovered; validation cannot pass.")
 
           print(f"Discovered {count} contract tests.")
+          result = unittest.TextTestRunner(verbosity=2).run(suite)
+          raise SystemExit(0 if result.wasSuccessful() else 1)
+          PY
+
+  integration-tests:
+    name: Integration Tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install deterministic media runtime
+        shell: bash
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes ffmpeg
+          ffmpeg -version
+          ffprobe -version
+
+      - name: Run integration tests
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import unittest
+
+          start_directory = Path("tests/integration")
+          if not start_directory.is_dir():
+              raise SystemExit("tests/integration does not exist in the repository checkout.")
+
+          suite = unittest.defaultTestLoader.discover(
+              str(start_directory),
+              pattern="test_*.py",
+          )
+          count = suite.countTestCases()
+          if count == 0:
+              raise SystemExit("No integration tests were discovered; validation cannot pass.")
+
+          print(f"Discovered {count} integration tests.")
           result = unittest.TextTestRunner(verbosity=2).run(suite)
           raise SystemExit(0 if result.wasSuccessful() else 1)
           PY

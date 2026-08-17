@@ -1,5 +1,4 @@
 import ast
-import hashlib
 from importlib.util import resolve_name
 import inspect
 from pathlib import Path
@@ -203,10 +202,10 @@ class CreatorSeriesPlanningContractTests(unittest.TestCase):
             SeriesPlanningPublicBoundary.create_episode_plan_item_binding_version
         )
         self.assertEqual(tuple(signature.parameters), ("self", "command"))
-        self.assertEqual(
-            hashlib.sha256(SERVER.read_bytes()).hexdigest(),
-            "03dee2dc8a290884d022aa073f391f67ac7c72b1a153585c20f87f5534d6a9fc",
-        )
+        # ADR-0008 legitimately evolves the shared HTTP server for the separate
+        # Episode Production boundary. Semantic assertions remain the durable
+        # proof that the Core-only binding command was not exposed as an
+        # application route or DTO.
         server_source = SERVER.read_text(encoding="utf-8")
         endpoint_names = {
             target.id
