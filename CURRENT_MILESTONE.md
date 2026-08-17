@@ -8,15 +8,15 @@
 >
 > Authorized Wave: `ACS-AUTH-W1-G0 → G1 → G2 → G3 → GATE C → REMOTE VERIFY`
 >
-> Current Task: `ACS-AUTH-W1-G0-CONTRACT-FREEZE`
+> Current Task: `ACS-AUTH-W1-REMOTE-VERIFIED-CLOSEOUT`
 >
-> Current Work Package: `G0 FACT AUDIT COMPLETE / GOVERNANCE PUBLICATION IN PROGRESS`
+> Current Work Package: `G0–G3 + GATE C COMPLETE / REMOTE TREES VERIFIED`
 >
 > M6 Authorization: `ACCEPTED P0-P3 G1-R1 SURFACES ONLY / LATER M6 NOT AUTHORIZED`
 >
 > M7–M19 Authorization: `STATUS MAPPING ONLY / IMPLEMENTATION NOT AUTHORIZED`
 >
-> Integration Gate: `XR1 BASELINE PASS — CORE 471 / FRONTEND 109; AUTH-W1 GATE C PENDING`
+> Integration Gate: `AUTH-W1 PASS — CORE 480 / FRONTEND 112 / BUILD / TWO-PROCESS SECURITY SMOKE`
 >
 > Production Ready: `NO — M6 EXTERNAL AUTHORITIES AND M7–M19 REMAIN OUTSIDE THIS WAVE`
 
@@ -390,6 +390,18 @@ proved:
 - an absent text provider remains fail-closed as `provider_unavailable`.
 
 The runtime token, registry, logs and temporary SQLite evidence database were deleted
-after the gate. This evidence closes local G1–G3 and Gate C only. No M6 expansion,
-M7–M19 opening, provider/GPU readiness, production multi-tenancy or feature acceptance
-is claimed; publication and remote verification remain the final AUTH-W1 checkpoint.
+after the gate. Initial implementation publication and verification evidence is:
+
+- Core remote branch `feat/acs-auth-workspace-isolation`, implementation commit
+  `a2297d952fa726e2d093f24869c9f0be0e417963`, tree
+  `d52fe5b9b2f2abf577298687c97ec31537b37026`;
+- Frontend remote branch `feat/fe-auth-workspace-isolation`, commit
+  `05c3647b1f1fa76d6d67da90cab297ea029fd27d`, tree
+  `27a82cc0bbc3c873435a52e3a6add888982f81dc`;
+- both remote refs were fetched after no-force publication and their trees matched the
+  corresponding local commits exactly.
+
+This evidence closes AUTH-W1 G1–G3, Gate C and implementation publication. No M6
+expansion, M7–M19 opening, provider/GPU readiness, production multi-tenancy or feature
+acceptance is claimed. `R-CORE-SEC-003` moves to monitoring rather than closure because
+credential rotation, user/RBAC policy and production operations remain future work.
