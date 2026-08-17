@@ -8,9 +8,9 @@
 >
 > Authorized Wave: `ACS-K2-G0 → G1 → G2 → G3 → G4 → G5 → G6 → G7 → REMOTE VERIFY`
 >
-> Current Task: `ACS-K2-G0-FACTS-AND-CONTRACT-FREEZE`
+> Current Task: `ACS-K2-G1-GOLDEN-EPISODE-ROOTS`
 >
-> Current Work Package: `G0 FACTS BASELINE / ADR-0008 / DELIVERY CONTRACT`
+> Current Work Package: `G1 AUTHORITATIVE EPISODE PRODUCTION ROOT / FROZEN MANIFEST`
 >
 > M6 Authorization: `ACCEPTED SURFACES + K2 EXTERNAL AUTHORITY CONNECTION / NO M6 SCHEMA EXPANSION`
 >
@@ -455,3 +455,37 @@ is committed, published without force, fetched and remote-verified. Thereafter a
 may advance automatically only when its required tests and evidence pass. Any contract
 stop condition, security regression, unresolved lineage ambiguity, failing required
 test or remote-integrity failure stops the wave.
+
+### G0 remote verification
+
+- branch: `feature/acs-k2-golden-episode`;
+- remote commit: `fe56986eabccd30e79e749e38314633f20e03341`;
+- remote tree: `2a15e59943ef1423ff53ce6e2abdf5fa3bd02900`;
+- local and fetched remote trees matched, ahead/behind was `0 / 0`, and the worktree
+  was clean before G1 implementation began.
+
+### G1 implementation evidence
+
+- V5 owns a new immutable `EpisodeProductionRun`; Creator Application and public HTTP
+  use only its public boundary;
+- creation resolves Project, Series, Episode, confirmed SeriesPlanVersion with its
+  Core-only EpisodePlanItem binding, and confirmed ScriptVersion through existing
+  accepted boundaries;
+- the frozen manifest records exact scene/shot counts, output dimensions, frame rate,
+  named characters and `LOCAL_EVIDENCE / publicationAllowed=false`;
+- every run stores canonical upstream and payload SHA-256 digests and complete stable
+  refs/version lineage;
+- bearer authentication and principal-derived workspace scope apply to create, list
+  and detail routes; body/query `workspaceRef` remains forbidden and foreign-workspace
+  refs remain hidden;
+- idempotent replay is stable while the same key with different content fails `409`;
+- the durable local adapter uses a dedicated additive SQLite file and exact schema,
+  survives restart and does not modify the accepted lifecycle/M6 database;
+- no public binding command was added: EpisodePlanItem binding remains Core-only as
+  required by the accepted M5/M6 contract;
+- targeted contract/public integration gate: `20 / 20`;
+- complete Core regression after the final G1 boundary hardening: `489 / 489`.
+
+G1 remains a local technical checkpoint until its own commit is published without
+force, fetched and proven equal to the remote branch. Only that evidence authorizes
+automatic entry into G2.

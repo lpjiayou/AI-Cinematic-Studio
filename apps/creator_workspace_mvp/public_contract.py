@@ -40,6 +40,9 @@ PUBLIC_M6_CHARACTER_VERSION_ENDPOINT: Final = f"{PUBLIC_API_PREFIX}/series-intel
 PUBLIC_M6_CHARACTER_CANDIDATE_ENDPOINT: Final = f"{PUBLIC_API_PREFIX}/series-intelligence/character-candidates"
 PUBLIC_M6_CHARACTER_CONFIRM_ENDPOINT: Final = f"{PUBLIC_API_PREFIX}/series-intelligence/character-confirmations"
 PUBLIC_M6_BASELINE_ACTIVATE_ENDPOINT: Final = f"{PUBLIC_API_PREFIX}/series-intelligence/baseline-activations"
+PUBLIC_EPISODE_PRODUCTION_RUNS_ENDPOINT: Final = (
+    f"{PUBLIC_API_PREFIX}/episode-production-runs"
+)
 
 
 CAPABILITY_PROJECTION: Final = (

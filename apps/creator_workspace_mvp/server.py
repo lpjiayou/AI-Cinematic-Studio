@@ -28,6 +28,12 @@ from services.v5_core_os.series_episode import (
     SeriesEpisodePublicError,
     create_in_memory_boundary as create_in_memory_series_boundary,
 )
+from services.v5_core_os.episode_production import (
+    EpisodeProductionPublicBoundary,
+    EpisodeProductionPublicError,
+    create_in_memory_boundary as create_in_memory_episode_production_boundary,
+    create_local_development_boundary_from_environment as create_episode_production_boundary_from_environment,
+)
 from apps.creator_workspace_mvp.series_director import (
     SeriesDirectorApplicationService,
     SeriesDirectorGenerationError,
@@ -39,6 +45,7 @@ from apps.creator_workspace_mvp.public_contract import (
     PUBLIC_AI_DIRECTOR_ENDPOINT,
     PUBLIC_CONFIRM_PLAN_ENDPOINT,
     PUBLIC_EPISODES_ENDPOINT,
+    PUBLIC_EPISODE_PRODUCTION_RUNS_ENDPOINT,
     PUBLIC_M6_BASELINE_ACTIVATE_ENDPOINT,
     PUBLIC_M6_BIBLE_CANDIDATE_ENDPOINT,
     PUBLIC_M6_BIBLE_CONFIRM_ENDPOINT,
@@ -178,6 +185,7 @@ class CreatorRequestHandler(BaseHTTPRequestHandler):
         series_intelligence_boundary: SeriesIntelligencePublicBoundary | None,
         script_studio_service: ScriptStudioApplicationService,
         script_studio_boundary: ScriptStudioPublicBoundary,
+        episode_production_boundary: EpisodeProductionPublicBoundary,
         public_authenticator: PublicApiAuthenticator | None,
         allow_internal_routes: bool,
         **kwargs: Any,
@@ -190,6 +198,7 @@ class CreatorRequestHandler(BaseHTTPRequestHandler):
         self.series_intelligence_boundary = series_intelligence_boundary
         self.script_studio_service = script_studio_service
         self.script_studio_boundary = script_studio_boundary
+        self.episode_production_boundary = episode_production_boundary
         self.public_authenticator = public_authenticator
         self.allow_internal_routes = allow_internal_routes
         self.authenticated_principal: PublicApiPrincipal | None = None
@@ -214,6 +223,7 @@ class CreatorRequestHandler(BaseHTTPRequestHandler):
             SERIES_PLANNING_CONFIRM_ENDPOINT,
             SERIES_PLANNING_MANUAL_VERSION_ENDPOINT,
             SERIES_PLANNING_CONFIRM_VERSION_ENDPOINT,
+            PUBLIC_EPISODE_PRODUCTION_RUNS_ENDPOINT,
         } and requested_path not in PUBLIC_M6_COMMAND_ENDPOINTS:
             self._send_application_error(404, "not_found")
             return
@@ -247,6 +257,17 @@ class CreatorRequestHandler(BaseHTTPRequestHandler):
             }
         if requested_path in PUBLIC_M6_COMMAND_ENDPOINTS:
             self._handle_series_intelligence_post(requested_path, payload)
+            return
+        if requested_path == PUBLIC_EPISODE_PRODUCTION_RUNS_ENDPOINT:
+            try:
+                result = self.episode_production_boundary.create_run(payload)
+            except EpisodeProductionPublicError as exc:
+                self._send_episode_production_error(exc)
+                return
+            self._send_json(
+                200 if result["idempotentReplay"] else 201,
+                {"ok": True, "run": result},
+            )
             return
         if path.startswith(SCRIPT_WORKSPACE_ENDPOINT):
             self._handle_script_post(path, payload)
@@ -382,6 +403,30 @@ class CreatorRequestHandler(BaseHTTPRequestHandler):
             self._send_json(200, capability_payload())
             return
         try:
+            if requested_path == PUBLIC_EPISODE_PRODUCTION_RUNS_ENDPOINT:
+                self._send_json(
+                    200,
+                    {
+                        "ok": True,
+                        "runs": self.episode_production_boundary.list_runs(workspace_ref),
+                    },
+                )
+                return
+            if requested_path.startswith(f"{PUBLIC_EPISODE_PRODUCTION_RUNS_ENDPOINT}/"):
+                run_ref = unquote(
+                    requested_path[len(PUBLIC_EPISODE_PRODUCTION_RUNS_ENDPOINT) + 1 :]
+                )
+                if run_ref and "/" not in run_ref:
+                    self._send_json(
+                        200,
+                        {
+                            "ok": True,
+                            "run": self.episode_production_boundary.get_run(
+                                workspace_ref, run_ref
+                            ),
+                        },
+                    )
+                    return
             if requested_path == PUBLIC_SERIES_INTELLIGENCE_WORKSPACE_ENDPOINT:
                 if self.series_intelligence_boundary is None:
                     self._send_application_error(403, "authority_unavailable")
@@ -511,6 +556,9 @@ class CreatorRequestHandler(BaseHTTPRequestHandler):
             return
         except SeriesIntelligencePublicError as exc:
             self._send_series_intelligence_error(exc)
+            return
+        except EpisodeProductionPublicError as exc:
+            self._send_episode_production_error(exc)
             return
         self._send_application_error(404, "not_found")
 
@@ -792,6 +840,11 @@ class CreatorRequestHandler(BaseHTTPRequestHandler):
     ) -> None:
         self._send_application_error(exc.status, exc.code)
 
+    def _send_episode_production_error(
+        self, exc: EpisodeProductionPublicError
+    ) -> None:
+        self._send_application_error(exc.status, exc.code)
+
     def _send_application_error(self, status: int, code: str) -> None:
         messages = {
             "invalid_request": "请检查输入后重试。",
@@ -814,6 +867,8 @@ class CreatorRequestHandler(BaseHTTPRequestHandler):
             "stale_source": "上游系列规划已更新，请刷新后重新确认。",
             "invalid_reference": "内容引用无效，请刷新后重试。",
             "lifecycle_unavailable": "内容生命周期服务暂时不可用。",
+            "upstream_not_confirmed": "请先确认系列规划、集数绑定和剧本版本。",
+            "episode_production_unavailable": "单集制作根服务暂时不可用。",
             "application_error": "暂时无法完成操作，请稍后重试。",
         }
         self._send_json(status, {"ok": False, "error": {"code": code, "message": messages.get(code, messages["application_error"])}})
@@ -944,12 +999,20 @@ def create_server(
     series_intelligence_boundary: SeriesIntelligencePublicBoundary | None = None,
     script_studio_service: ScriptStudioApplicationService | None = None,
     script_studio_boundary: ScriptStudioPublicBoundary | None = None,
+    episode_production_boundary: EpisodeProductionPublicBoundary | None = None,
     public_authenticator: PublicApiAuthenticator | None = None,
     allow_internal_routes: bool = True,
 ) -> ThreadingHTTPServer:
     series_boundary = series_episode_boundary or create_in_memory_series_boundary()
     projects = project_boundary or create_in_memory_project_boundary(series_boundary)
     planning = series_planning_boundary or create_in_memory_series_planning_boundary(projects)
+    scripts = script_studio_boundary or create_in_memory_script_boundary(series_boundary)
+    production = episode_production_boundary or create_in_memory_episode_production_boundary(
+        project_boundary=projects,
+        series_episode_boundary=series_boundary,
+        series_planning_boundary=planning,
+        script_studio_boundary=scripts,
+    )
     default_text_generation = create_unconfigured_text_generation_capability()
     handler = partial(
         CreatorRequestHandler,
@@ -962,7 +1025,8 @@ def create_server(
         series_intelligence_boundary=series_intelligence_boundary,
         script_studio_service=script_studio_service
         or ScriptStudioApplicationService(default_text_generation),
-        script_studio_boundary=script_studio_boundary or create_in_memory_script_boundary(series_boundary),
+        script_studio_boundary=scripts,
+        episode_production_boundary=production,
         public_authenticator=public_authenticator,
         allow_internal_routes=allow_internal_routes,
     )
@@ -1001,6 +1065,12 @@ def main() -> None:
     project_boundary = assembly.project_context
     ai_director_service, script_service, series_director_service = capability_services_from_environment()
     series_planning_boundary = assembly.series_planning
+    episode_production_boundary = create_episode_production_boundary_from_environment(
+        project_boundary=project_boundary,
+        series_episode_boundary=series_boundary,
+        series_planning_boundary=series_planning_boundary,
+        script_studio_boundary=assembly.script_studio,
+    )
     server = create_server(
         (host, port),
         ai_director_service,
@@ -1011,6 +1081,7 @@ def main() -> None:
         series_intelligence_boundary=assembly.series_intelligence,
         script_studio_service=script_service,
         script_studio_boundary=assembly.script_studio,
+        episode_production_boundary=episode_production_boundary,
         public_authenticator=public_authenticator,
         allow_internal_routes=allow_internal_routes,
     )

@@ -240,7 +240,7 @@ class CreatorPublicHttpV1IntegrationTests(unittest.TestCase):
                 )
             }
         )
-        self.assertEqual(len(declared), 27)
+        self.assertEqual(len(declared), 28)
         for path in declared:
             with self.subTest(path=path), self.assertRaises(error.HTTPError) as caught:
                 request.urlopen(f"{self.base_url}{path}", timeout=5)

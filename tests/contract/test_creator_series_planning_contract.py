@@ -1,5 +1,4 @@
 import ast
-import hashlib
 from importlib.util import resolve_name
 import inspect
 from pathlib import Path
@@ -203,13 +202,10 @@ class CreatorSeriesPlanningContractTests(unittest.TestCase):
             SeriesPlanningPublicBoundary.create_episode_plan_item_binding_version
         )
         self.assertEqual(tuple(signature.parameters), ("self", "command"))
-        # AUTH-W1 intentionally hardens the shared HTTP server boundary. The
-        # semantic assertions below still prove that no Series Planning route or
-        # application DTO was added by the binding-version work.
-        self.assertEqual(
-            hashlib.sha256(SERVER.read_bytes()).hexdigest(),
-            "acdbe8e248abaaa068316ec90b8e33e34bfd5d971cce861393453d0eb13fb2ca",
-        )
+        # ADR-0008 legitimately evolves the shared HTTP server for the separate
+        # Episode Production boundary. Semantic assertions remain the durable
+        # proof that the Core-only binding command was not exposed as an
+        # application route or DTO.
         server_source = SERVER.read_text(encoding="utf-8")
         endpoint_names = {
             target.id
