@@ -360,9 +360,13 @@ The PRE-M6 route is fixed as:
 → `M6 Preconditions`
 → `M6-P1`
 
-The current phase is `ACS-CCV-R1-R1-EVIDENCE-VALIDATOR-HARDENING`.
+The current phase is the authorized `ACS-K2-PUBLISHABLE-P0 → P10`
+auto-sequential wave defined by `CURRENT_MILESTONE.md`. Execution is currently
+stopped at the `P0→P1` external-rights/provider-authority gate; the bounded P1
+video safe prerequisite is implemented and verified, but P1 is not passed.
 
-Current governance state:
+Current and historical governance state (historical entries do not override the
+current K2 authorization above):
 
 - PRE-M6-RB1.3-R2-P1: `ACCEPTED`;
 - PRE-M6-RB1.3-R2-P2: `OWNER ACCEPTED / COMPLETE / REMOTE-VERIFIED AT
@@ -379,7 +383,8 @@ Current governance state:
 - M6 Preconditions: `SATISFIED FOR BOUNDED M6-P0/P1 AND M6-P2 LOCAL SQLITE ONLY`;
 - ACS-M6-P0-P1-R2: `OWNER ACCEPTED / COMPLETE / REMOTE-VERIFIED AT
   e38c75aa4ff26bdea80c82d8a24096f799dad860`;
-- current task: `ACS-CCV-R1-R1-EVIDENCE-VALIDATOR-HARDENING`;
+- current task: `ACS-K2-PUBLISHABLE-P0-EXTERNAL-AUTHORITY +
+  P1-VIDEO-SAFE-PREREQUISITE`;
 - legacy repository capability provenance: `MEDIUM / OPEN / NON-BLOCKING`,
   Owner Gate `P3-RV1-003`;
 - M6-P0: `CONTRACT ACCEPTED / COMPLETE`;
@@ -426,8 +431,8 @@ Current governance state:
 - ACS-CCV-R1-EVIDENCE-HARDENING: `REMOTE CANDIDATE AT
   57cbbd4959f5f3d50b4d453cb6ae96b225cb7759 / REVISION REQUIRED / NOT OWNER
   ACCEPTED`;
-- ACS-CCV-R1-R1-EVIDENCE-VALIDATOR-HARDENING: `AUTHORIZED / EXPERIMENT EVIDENCE
-  ONLY / INDEPENDENT REPRODUCTION NOT POSSIBLE / IN PROGRESS`;
+- ACS-CCV-R1-R1-EVIDENCE-VALIDATOR-HARDENING: `HISTORICAL EVIDENCE-HARDENING
+  CHECKPOINT / SUPERSEDED AS CURRENT TASK BY THE AUTHORIZED K2 WAVE`;
 - CCV-R2 and Character Visual Identity Schema/ADR implementation: `NOT AUTHORIZED /
   NOT STARTED`;
 - M6-P3 after G1 / M6-P4+: `NOT AUTHORIZED / NOT STARTED`;
@@ -443,10 +448,16 @@ Current governance state:
 - ACS-ARCH-R1-V5-TEXT-GENERATION-G1-R1: `OWNER ACCEPTED / COMPLETE /
   REMOTE-VERIFIED AT d44f471c644e319bb4a5bf73707c3274ecbaa426`;
 - R-CORE-GOV-002 audit-report provenance: `OPEN / NON-BLOCKING`;
-- M7-M19: `NOT STARTED / NOT AUTHORIZED`;
+- M7-M15: `AUTHORIZED ONLY FOR THE K2 PUBLISHABLE SINGLE-EPISODE SLICE /
+  GATE-BY-GATE UNDER CURRENT_MILESTONE.md`;
+- M16: `AUTHORIZED ONLY FOR BOUNDED 1 → 3 → 10 → 30 AFTER P9 AND
+  GATE A/B/C`;
+- M17-M19: `NOT AUTHORIZED`;
 - Formal 8765 Deployment: `UNTOUCHED / NOT DEPLOYED`;
-- Frontend: `FROZEN / UNTOUCHED`;
-- Production Ready: `NO`.
+- Frontend: `K2 CONNECTED PRODUCTION WORKSPACE IMPLEMENTED / CURRENT P0
+  READINESS PROJECTION CONNECTED / REAL-BROWSER GATE REMAINS ON ENVIRONMENT HOLD`;
+- Production Ready: `NO — P1 VIDEO PREREQUISITE VERIFIED; P0→P1 BLOCKED BY
+  EXTERNAL RIGHTS/PROVIDER FACTS`.
 
 Legacy repository implementation must not be counted as current Core production
 capability. RB13-F001 and RB13-F002 are closed in the accepted current tested Core
