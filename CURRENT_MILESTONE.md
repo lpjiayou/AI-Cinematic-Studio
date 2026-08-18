@@ -898,8 +898,9 @@ environment declarations as authority:
 Verification on the implementation tree:
 
 - P1-A focused authority tests: `5 / 5`;
+- operator script import/bootstrap tests: `2 / 2`;
 - bounded P0/P1/V4/Public HTTP regression: `34 / 34`;
-- complete Core regression: `546 / 546`;
+- complete Core regression: `548 / 548`;
 - Python compile, whitespace validation and repository diff secret scan: passed.
 
 This is an independent safe prerequisite, not a P1 pass. No real authority bundle was
