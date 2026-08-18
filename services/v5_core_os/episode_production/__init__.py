@@ -43,6 +43,10 @@ from .provider_experiments import (
     ProviderExperimentUnavailableError,
     SqliteProviderExperimentAdapter,
 )
+from .external_authority import (
+    ExternalAuthorityConfigurationError,
+    external_authorities_from_environment,
+)
 
 __all__ = [
     "EpisodeProductionPublicBoundary",
@@ -71,6 +75,8 @@ __all__ = [
     "ProviderCandidateRejectedError",
     "ProviderExperimentUnavailableError",
     "SqliteProviderExperimentAdapter",
+    "ExternalAuthorityConfigurationError",
+    "external_authorities_from_environment",
     "create_in_memory_boundary",
     "create_local_development_boundary",
     "create_local_development_boundary_from_environment",

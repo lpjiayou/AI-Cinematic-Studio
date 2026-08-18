@@ -85,6 +85,16 @@ provider-policy authority. The recorded fact carries only opaque safe references
 the approved capability, credential source, usage terms and budget authority plus an
 authority-evidence digest and expiry. No secret value enters V5 or the browser.
 
+For the bounded P1 activation, the Creator runtime may load the two external
+authority decisions only from operator-managed absolute file paths whose exact
+SHA-256 digests are injected separately. Activation is atomic: the rights path,
+rights digest, provider path and provider digest must all be present and valid, or
+both authorities remain unavailable and startup fails closed. The provider bundle
+has a closed field set and permits only an opaque `credentialSourceRef`; bearer
+tokens, API keys and endpoint credentials are not authority facts and must remain in
+the server/worker secret mechanism. These external files are runtime inputs and must
+never be committed as production evidence merely because their schema validates.
+
 All three are immutable and selected explicitly. Changing one stales later execution.
 
 The browser projection of `production-readiness` is read-only. A production-policy
