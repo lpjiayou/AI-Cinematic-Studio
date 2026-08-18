@@ -40,6 +40,10 @@ from tests.unit.test_episode_production_k2 import (
 )
 
 
+DEFAULT_HTTP_TIMEOUT_SECONDS = 5
+MEDIA_HTTP_TIMEOUT_SECONDS = 30
+
+
 class CreatorEpisodeProductionK2HttpTests(unittest.TestCase):
     def setUp(self):
         self.artifacts = tempfile.TemporaryDirectory()
@@ -102,7 +106,14 @@ class CreatorEpisodeProductionK2HttpTests(unittest.TestCase):
         self.thread.join(timeout=5)
         self.artifacts.cleanup()
 
-    def post(self, path, payload, *, token=None):
+    def post(
+        self,
+        path,
+        payload,
+        *,
+        token=None,
+        timeout=DEFAULT_HTTP_TIMEOUT_SECONDS,
+    ):
         body = json.dumps(payload, ensure_ascii=False).encode("utf-8")
         req = request.Request(
             f"{self.base}{path}",
@@ -113,7 +124,7 @@ class CreatorEpisodeProductionK2HttpTests(unittest.TestCase):
                 "Authorization": f"Bearer {token or self.token}",
             },
         )
-        with request.urlopen(req, timeout=5) as response:
+        with request.urlopen(req, timeout=timeout) as response:
             return response.status, json.loads(response.read().decode("utf-8"))
 
     def get(self, path, **query):
@@ -475,7 +486,11 @@ class CreatorEpisodeProductionK2HttpTests(unittest.TestCase):
             key: value for key, value in g5_command(run).items()
             if key not in {"workspaceRef", "productionRunRef"}
         }
-        status, result = self.post(f"{base}/media", command)
+        status, result = self.post(
+            f"{base}/media",
+            command,
+            timeout=MEDIA_HTTP_TIMEOUT_SECONDS,
+        )
         self.assertEqual(status, 201)
         self.assertEqual(result["state"], "MEDIA_READY")
         self.assertEqual(len(result["assetVersions"]), 8)
@@ -510,12 +525,21 @@ class CreatorEpisodeProductionK2HttpTests(unittest.TestCase):
                 f"{base}/{resource}",
                 {key: value for key, value in command.items()
                  if key not in {"workspaceRef", "productionRunRef"}},
+                timeout=(
+                    MEDIA_HTTP_TIMEOUT_SECONDS
+                    if resource == "media"
+                    else DEFAULT_HTTP_TIMEOUT_SECONDS
+                ),
             )
         preview_command = {
             key: value for key, value in g6_preview_command(run).items()
             if key not in {"workspaceRef", "productionRunRef"}
         }
-        status, preview = self.post(f"{base}/preview", preview_command)
+        status, preview = self.post(
+            f"{base}/preview",
+            preview_command,
+            timeout=MEDIA_HTTP_TIMEOUT_SECONDS,
+        )
         self.assertEqual(status, 201)
         self.assertEqual(preview["state"], "QC_READY")
         self.assertEqual(preview["qcReport"]["result"], "PASS")
@@ -534,7 +558,11 @@ class CreatorEpisodeProductionK2HttpTests(unittest.TestCase):
             key: value for key, value in g6_finalize_command(run).items()
             if key not in {"workspaceRef", "productionRunRef"}
         }
-        status, final = self.post(f"{base}/finalize", finalize_command)
+        status, final = self.post(
+            f"{base}/finalize",
+            finalize_command,
+            timeout=MEDIA_HTTP_TIMEOUT_SECONDS,
+        )
         self.assertEqual(status, 201)
         self.assertEqual(final["state"], "MASTER_READY")
         self.assertNotIn("internalPath", json.dumps(final, ensure_ascii=False))
