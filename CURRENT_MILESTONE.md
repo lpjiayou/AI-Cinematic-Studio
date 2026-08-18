@@ -874,3 +874,35 @@ no governed same-lineage live call has run, image/audio experiments and explicit
 candidate selection are absent, and P2 production persistence/object storage/secret
 injection/recovery has not started. Automatic gate progression therefore remains
 stopped at P0→P1 while independent safe prerequisites may continue.
+
+### P1-A external-authority activation prerequisite — 2026-08-18
+
+The Creator server can now connect the existing Rights Evidence and Provider Policy
+ports to operator-managed authority bundles without accepting request-body or plain
+environment declarations as authority:
+
+- both external JSON files require absolute paths plus independently injected exact
+  SHA-256 digests, and activation is all-or-nothing;
+- duplicate JSON keys, partial configuration, digest mismatch, unknown fields and
+  secret-shaped provider fields fail startup closed;
+- V5 receives only canonical rights facts and opaque provider refs, including a
+  `credentialSourceRef`; actual credentials remain in the worker secret environment;
+- no configuration preserves the existing rejecting authorities;
+- the Creator environment factory injects both validated authorities into the
+  existing K2 production boundary, while the existing V4 ComfyUI adapter remains the
+  only live video execution path;
+- `scripts/k2_external_authority_activate.py` validates operator-supplied bundles and
+  prints four secret-free, digest-pinned environment assignments; it never authors or
+  approves the underlying facts.
+
+Verification on the implementation tree:
+
+- P1-A focused authority tests: `5 / 5`;
+- bounded P0/P1/V4/Public HTTP regression: `34 / 34`;
+- complete Core regression: `546 / 546`;
+- Python compile, whitespace validation and repository diff secret scan: passed.
+
+This is an independent safe prerequisite, not a P1 pass. No real authority bundle was
+created, no credential was injected, no governed same-lineage provider call ran, and
+no candidate or AssetVersion was admitted. P0→P1 remains blocked on the external
+facts listed in `governance/K2_PUBLISHABLE_P0_EXTERNAL_HOLD.md`.

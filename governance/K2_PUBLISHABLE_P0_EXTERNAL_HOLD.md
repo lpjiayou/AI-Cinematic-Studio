@@ -105,6 +105,25 @@ external facts:
 Later P8/P9 still require separate human decision and publication-authority facts;
 they cannot be supplied in advance by P0 or inferred from machine QC.
 
+## P1-A external-authority activation prerequisite
+
+The Creator runtime now has a fail-closed operator connection for the two existing
+authority ports. Rights and provider decisions remain external JSON files and are
+loaded only when all four of the following are injected together:
+
+- `CREATOR_RIGHTS_AUTHORITY_BUNDLE_PATH`;
+- `CREATOR_RIGHTS_AUTHORITY_BUNDLE_SHA256`;
+- `CREATOR_PROVIDER_AUTHORITY_BUNDLE_PATH`;
+- `CREATOR_PROVIDER_AUTHORITY_BUNDLE_SHA256`.
+
+The paths must be absolute, the bytes must match the independently injected digests,
+the schemas and field sets are closed, duplicate JSON keys are rejected, and provider
+files cannot contain a bearer token, API key or other credential value. The only
+credential fact visible to V5 is an opaque `credentialSourceRef`; the actual secret
+remains in the worker environment. `scripts/k2_external_authority_activate.py`
+validates operator-supplied files and prints the four secret-free assignments. It
+does not create a grant, approve a provider, or advance P1.
+
 ## Stop decision
 
 Automatic progression stops at the P0→P1 transition. A bounded P1 video adapter and

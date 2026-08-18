@@ -68,6 +68,7 @@ from .provider_experiments import (
     ProviderExperimentUnavailableError,
     SqliteProviderExperimentAdapter,
 )
+from .external_authority import external_authorities_from_environment
 
 
 class EpisodeProductionPublicError(RuntimeError):
@@ -500,6 +501,7 @@ def create_local_development_boundary_from_environment(
     environ: Mapping[str, str] | None = None,
 ) -> EpisodeProductionPublicBoundary:
     values = os.environ if environ is None else environ
+    rights_authority, provider_authority = external_authorities_from_environment(values)
     configured = str(values.get("CREATOR_EPISODE_PRODUCTION_DATA_PATH", "")).strip()
     if configured:
         path = Path(configured)
@@ -564,6 +566,8 @@ def create_local_development_boundary_from_environment(
         series_planning_boundary=series_planning_boundary,
         script_studio_boundary=script_studio_boundary,
         production_policy_database_path=production_policy_path,
+        rights_evidence_authority=rights_authority,
+        provider_policy_authority=provider_authority,
         provider_experiment_execution=provider_experiment_execution,
         media_execution=execution,
         composition_execution=V4CompositionExecutor.from_artifact_root(artifact_root),
