@@ -14,6 +14,10 @@ from pathlib import Path
 import shlex
 import sys
 
+REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
+if str(REPOSITORY_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPOSITORY_ROOT))
+
 from services.v5_core_os.episode_production import (
     ExternalAuthorityConfigurationError,
     external_authorities_from_environment,
