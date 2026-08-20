@@ -10,7 +10,7 @@
 >
 > Current Task: `ACS-K2-PUBLISHABLE-P0-EXTERNAL-AUTHORITY + P1-VIDEO-SAFE-PREREQUISITE`
 >
-> Current Work Package: `P1 VIDEO SAFE IMPLEMENTATION COMPLETE / P0→P1 EXTERNAL RIGHTS + PROVIDER AUTHORITY HOLD`
+> Current Work Package: `P1 VIDEO RUNTIME TECHNICAL EVIDENCE CAPTURED / P0→P1 EXTERNAL RIGHTS + PROVIDER AUTHORITY HOLD`
 >
 > M6 Authorization: `ACCEPTED SURFACES + K2 EXTERNAL AUTHORITY CONNECTION / NO M6 SCHEMA EXPANSION`
 >
@@ -22,7 +22,7 @@
 >
 > Integration Baseline: `K2 G0→G7 PRESERVED — CORE 518 / FRONTEND 118 / LOCAL PLAYABLE EVIDENCE`
 >
-> Production Ready: `NO — P1 VIDEO PREREQUISITE VERIFIED; P0→P1 BLOCKED BY EXTERNAL RIGHTS/PROVIDER FACTS`
+> Production Ready: `NO — P1 VIDEO TECHNICAL EVIDENCE VERIFIED; P0→P1 BLOCKED BY EXTERNAL RIGHTS/PROVIDER FACTS`
 
 ---
 
@@ -907,3 +907,51 @@ This is an independent safe prerequisite, not a P1 pass. No real authority bundl
 created, no credential was injected, no governed same-lineage provider call ran, and
 no candidate or AssetVersion was admitted. P0→P1 remains blocked on the external
 facts listed in `governance/K2_PUBLISHABLE_P0_EXTERNAL_HOLD.md`.
+
+### P1-B runtime technical-evidence closeout — 2026-08-20
+
+The operator started the current ComfyUI runtime on one A100 40GB device, verified
+the exact three Wan2.2 model files against the previously recorded SHA-256 values,
+and successfully generated a schema `v4.comfyui-runtime-attestation.v1` record. The
+record carries all ten required native nodes, PyTorch `2.11.0+cu126`, one CUDA device,
+`LOCAL_FILE_SHA256_VERIFIED`, exact object-info/facts/payload digests,
+`authorityState=TECHNICAL_EVIDENCE_ONLY` and `publicationAllowed=false`.
+
+The operator then archived the attestation, model digest list, `system_stats` and
+`object_info` before shutting down the GPU. The external archive
+`k2-runtime-evidence-20260820T142014Z.tar.gz` has SHA-256
+`c3701a1877cd9e715dcadbca93fc24eb38221f8e2c7a9f758cd978308c0b9f09`. Its exact
+attestation and digest facts are recorded in
+`governance/K2_PUBLISHABLE_P0_EXTERNAL_HOLD.md`. On `2026-08-21`, an
+operator-downloaded copy plus sidecar was imported into a controlled audit workspace
+outside Git. Its outer digest, safe member types and paths, original internal manifest
+and all four evidence payloads were independently verified. The repository utility
+then produced byte-identical normalized archives at SHA-256
+`282bbd955022d47ece4f696704e97d4a12b04e2e140bea21e49390ca6b890022`, with local
+model paths removed. Neither source nor normalized evidence is repository-resident.
+
+The operator flow is hardened on the implementation tree without changing authority:
+
+- runtime-attestation missing-value errors now name the actual CLI option instead of
+  an environment-derived non-existent option;
+- a portable evidence-archive utility verifies the attestation facts/payload digests,
+  normalized model digests, runtime versions, exact CUDA device and full object-info
+  digest before emitting a deterministic archive and SHA-256 sidecar;
+- the archive utility rejects relative paths, cross-file tampering, unsafe authority
+  state, publication claims and overwrite attempts, and removes model-local paths from
+  its normalized archive payload;
+- the runbook now requires one exact Python interpreter across dependency install,
+  ComfyUI startup and evidence capture, and preserves an undisclosed provider region
+  as a blocker rather than inferring geography.
+
+Verification on the implementation tree:
+
+- operator utility tests: `8 / 8`;
+- complete Core regression: `554 / 554`;
+- Python compile, `git diff --check`, Markdown validation, local documentation-link
+  validation and repository-diff secret scan: passed.
+
+P1 remains `NOT PASSED`. The runtime records `region=provider-not-disclosed`, no
+external Provider Authority has reviewed and accepted the exact attestation ref plus
+payload digest, no Rights Authority bundle exists, and no governed same-lineage live
+image/video/audio experiment has run. P2 remains out of sequence.

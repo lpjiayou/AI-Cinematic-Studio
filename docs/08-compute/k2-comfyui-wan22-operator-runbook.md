@@ -45,6 +45,10 @@ NOT_ADMITTED`。本工作包不会创建 `AssetVersion`、推进现有 G5 `MEDIA
 计算 SHA-256，并通过 ComfyUI API 核对节点、模型名称和唯一 CUDA 设备。输出不包含
 Base URL、Bearer Token 或模型本地路径。
 
+安装依赖、启动 ComfyUI 和运行操作脚本必须使用同一个绝对 Python 解释器。另一个
+Conda/venv 中的 `pip check` 或导入成功不能证明 ComfyUI 进程使用了相同依赖。可从
+ComfyUI PID 的 `/proc/<pid>/cmdline` 第一项复核实际解释器，再用该路径运行以下脚本。
+
 先设置非秘密配置；秘密仅允许通过进程环境注入，禁止写入 Git：
 
 ```bash
@@ -74,6 +78,28 @@ PYTHONPATH=. python scripts/k2_comfyui_runtime_attestation.py \
 `authorityState=TECHNICAL_EVIDENCE_ONLY` 与 `publicationAllowed=false` 是固定事实；
 该文件还必须由外部 provider-policy authority 审核后，才能把这两个精确值写入
 生产策略。Core、V5 请求、V4 配置和运行回传任一处不一致都会 fail closed。
+
+若算力平台没有披露实例地域，不得根据公司地址、域名或机型猜测地域。操作员可以
+使用明确的 `provider-not-disclosed` 生成一份仅供外部审核的技术记录，但该值不能
+自行解除 P0→P1 的 region/provider-policy 门禁；外部 authority 必须明确接受该值，
+或在取得真实地域后重新生成证明。
+
+证明生成后，先保存同一运行时返回的 `/system_stats` 与 `/object_info`，再使用仓库
+工具交叉验证并生成确定性归档：
+
+```bash
+PYTHONPATH=. python scripts/k2_comfyui_runtime_evidence_archive.py \
+  --attestation /absolute/evidence/runtime-attestation.json \
+  --model-digests /absolute/evidence/model-files.sha256 \
+  --system-stats /absolute/evidence/comfyui-system-stats.json \
+  --object-info /absolute/evidence/comfyui-object-info.json \
+  --output /absolute/evidence/k2-runtime-evidence.tar.gz
+```
+
+归档工具会复核 attestation 的 `factsDigest/payloadDigest`、三份模型摘要、Python /
+PyTorch / CUDA 设备事实与完整 `objectInfoDigest`，然后输出归档 SHA-256 sidecar。
+它拒绝相对路径、跨文件篡改、非技术证明、`publicationAllowed=true` 和覆盖已有归档；
+归档成功仍不构成 Rights、Provider、Budget 或 Publication Authority。
 
 ## 4. 配置 Creator Core 的 V4 Worker
 
