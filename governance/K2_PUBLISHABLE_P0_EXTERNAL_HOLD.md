@@ -85,6 +85,48 @@ dispatched by the authenticated Creator Public API, was not bound to a current K
 Rights Manifest or Provider Policy, and is not an AssetVersion, approval, master or
 publishable result.
 
+On `2026-08-20`, the operator produced a fresh schema
+`v4.comfyui-runtime-attestation.v1` record from the live loopback ComfyUI runtime.
+The record has attestation ref
+`technical-k2-funhpc-a100-20260820T141317Z`, observed timestamp
+`2026-08-20T14:17:08.319411Z`, PyTorch `2.11.0+cu126`, Python `3.12.7`, one
+`NVIDIA A100-PCIE-40GB` CUDA device with `42405855232` total VRAM bytes, all ten
+required native nodes, and `LOCAL_FILE_SHA256_VERIFIED` for the same three model
+digests above. Its exact safe digests are:
+
+- object-info digest
+  `df3dace362f18e7b35fdea119959cc12e879d9535844cba3d926624e3ecf988a`;
+- facts digest
+  `0c065fe83f542dd2870c1cd2577a2ddd52d31a912ddfaf9b71fbdd640a68a6a6`;
+- attestation payload digest
+  `3a0ad8e839545390b3baaf3de57903f57f0c40c5bcaa117cd9990cd616c1bec2`.
+
+The operator archived the attestation, model digest list, `system_stats` and
+`object_info` as `k2-runtime-evidence-20260820T142014Z.tar.gz`, SHA-256
+`c3701a1877cd9e715dcadbca93fc24eb38221f8e2c7a9f758cd978308c0b9f09`, on the
+persistent compute data volume before shutting down the GPU.
+
+On `2026-08-21`, an operator-downloaded copy and its SHA-256 sidecar were imported
+into a controlled audit workspace outside Git. Independent verification established:
+
+- the recomputed outer archive digest exactly matches the sidecar and the value above;
+- all five archive entries are regular, relative files with no traversal, link or
+  device entry;
+- the original internal manifest verifies the attestation, model digest list,
+  `system_stats` and `object_info` bytes without error;
+- the repository archive utility cross-validates the attestation schema, closed fact
+  set, ten exact native nodes, three model digests, Python/PyTorch/CUDA facts and full
+  object-info digest;
+- two independent normalized builds are byte-identical at SHA-256
+  `282bbd955022d47ece4f696704e97d4a12b04e2e140bea21e49390ca6b890022`, and the
+  normalized model digest member contains filenames only, with no compute-host path.
+
+The imported source and normalized evidence remain external audit artifacts rather
+than repository content. This closes the byte-custody and reproducibility gap only;
+it does not add authority. The runtime honestly records `region=provider-not-disclosed`,
+`authorityState=TECHNICAL_EVIDENCE_ONLY` and `publicationAllowed=false`; therefore it
+does not clear the missing-region or external provider-policy review blockers.
+
 ## Hard blockers before P1
 
 P1 may not execute until the Project Lead supplies or connects all of the following as

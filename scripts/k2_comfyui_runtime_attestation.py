@@ -29,14 +29,12 @@ from services.v4_platform import (
 def _value(
     parser: argparse.ArgumentParser,
     supplied: str | None,
+    option_name: str,
     environment_name: str,
 ) -> str:
     value = supplied or os.environ.get(environment_name, "")
     if not value.strip():
-        parser.error(
-            f"--{environment_name.lower().replace('_', '-')} or "
-            f"{environment_name} is required"
-        )
+        parser.error(f"{option_name} or {environment_name} is required")
     return value.strip()
 
 
@@ -62,21 +60,34 @@ def _arguments() -> argparse.Namespace:
     parser.add_argument("--model-root", required=True)
     parser.add_argument("--output")
     args = parser.parse_args()
-    for attribute, environment_name in (
-        ("base_url", "COMFYUI_BASE_URL"),
-        ("provider_id", "COMFYUI_PROVIDER_ID"),
-        ("model_id", "COMFYUI_MODEL_ID"),
-        ("region", "COMFYUI_REGION"),
-        ("endpoint_class", "COMFYUI_ENDPOINT_CLASS"),
-        ("unet_name", "COMFYUI_UNET_NAME"),
-        ("unet_sha256", "COMFYUI_UNET_SHA256"),
-        ("clip_name", "COMFYUI_CLIP_NAME"),
-        ("clip_sha256", "COMFYUI_CLIP_SHA256"),
-        ("vae_name", "COMFYUI_VAE_NAME"),
-        ("vae_sha256", "COMFYUI_VAE_SHA256"),
-        ("attestation_ref", "COMFYUI_RUNTIME_ATTESTATION_REF"),
+    for attribute, option_name, environment_name in (
+        ("base_url", "--base-url", "COMFYUI_BASE_URL"),
+        ("provider_id", "--provider-id", "COMFYUI_PROVIDER_ID"),
+        ("model_id", "--model-id", "COMFYUI_MODEL_ID"),
+        ("region", "--region", "COMFYUI_REGION"),
+        ("endpoint_class", "--endpoint-class", "COMFYUI_ENDPOINT_CLASS"),
+        ("unet_name", "--unet-name", "COMFYUI_UNET_NAME"),
+        ("unet_sha256", "--unet-sha256", "COMFYUI_UNET_SHA256"),
+        ("clip_name", "--clip-name", "COMFYUI_CLIP_NAME"),
+        ("clip_sha256", "--clip-sha256", "COMFYUI_CLIP_SHA256"),
+        ("vae_name", "--vae-name", "COMFYUI_VAE_NAME"),
+        ("vae_sha256", "--vae-sha256", "COMFYUI_VAE_SHA256"),
+        (
+            "attestation_ref",
+            "--attestation-ref",
+            "COMFYUI_RUNTIME_ATTESTATION_REF",
+        ),
     ):
-        setattr(args, attribute, _value(parser, getattr(args, attribute), environment_name))
+        setattr(
+            args,
+            attribute,
+            _value(
+                parser,
+                getattr(args, attribute),
+                option_name,
+                environment_name,
+            ),
+        )
     return args
 
 
