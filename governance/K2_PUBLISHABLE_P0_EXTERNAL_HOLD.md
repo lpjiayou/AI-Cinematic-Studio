@@ -127,6 +127,38 @@ it does not add authority. The runtime honestly records `region=provider-not-dis
 `authorityState=TECHNICAL_EVIDENCE_ONLY` and `publicationAllowed=false`; therefore it
 does not clear the missing-region or external provider-policy review blockers.
 
+On `2026-08-21`, the operator restarted the bounded runtime and produced the current
+schema record `technical-k2-funhpc-a100-20260821T130634Z`, observed at
+`2026-08-21T13:07:19.528120Z`. It reports ComfyUI `0.28.0`, Python `3.12.7`, PyTorch
+`2.11.0+cu126`, one `NVIDIA A100-PCIE-40GB` CUDA device with `42409000960` total VRAM
+bytes, all ten required nodes and the same three verified model file digests. Its
+exact safe digests are:
+
+- object-info canonical digest
+  `df3dace362f18e7b35fdea119959cc12e879d9535844cba3d926624e3ecf988a`;
+- facts digest
+  `d845c4c24fa0108f7574a028cce40eb6253c68c078b6cb99c4c82c6d201b8fba`;
+- attestation payload digest
+  `be03a079d17cad524b5e2e061e0c651a8f41f6f5221dfe80a8244398817ded53`;
+- attestation file SHA-256
+  `bd6ee9390e9733b68722ca19895836e823e264c9d9ab867ed78cc7c3ffe31fed`.
+
+The current deterministic archive
+`k2-runtime-evidence-20260821T130634Z.tar.gz` has SHA-256
+`77348f23aebcd2f4029c20f4d05cb910c726dbfbb7eaf9757ac44c4cf6a2e24a`.
+An operator-downloaded copy and sidecar were independently verified outside Git. All
+five members are safe regular relative files, the internal manifest verifies every
+payload, the repository utility validates every cross-file fact, and an independent
+rebuild is byte-identical at the same archive digest. A structural scan of 29,573 JSON
+string values found no recognized credential pattern, credentialized URL, sensitive
+query, host absolute path or populated sensitive scalar field.
+
+This refresh supersedes the `2026-08-20` attestation only as the current-boot technical
+pair; it does not erase that historical evidence. The current record still states
+`region=provider-not-disclosed`, `authorityState=TECHNICAL_EVIDENCE_ONLY` and
+`publicationAllowed=false`, so all external-authority and same-lineage blockers below
+remain in force.
+
 ## Hard blockers before P1
 
 P1 may not execute until the Project Lead supplies or connects all of the following as

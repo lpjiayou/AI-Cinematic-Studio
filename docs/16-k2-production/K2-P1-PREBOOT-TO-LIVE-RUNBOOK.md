@@ -9,6 +9,7 @@
 ## 1. 现在即可执行：离线总检
 
 ```bash
+set -o pipefail
 cd /absolute/path/to/AI-Cinematic-Studio
 
 python scripts/k2_preboot_validate.py \
@@ -32,6 +33,22 @@ PUBLICATION_ALLOWED=false
 ## 2. 开机后的第一个动作：重建当前血缘
 
 不要沿用文档中的 `K2-001-SH-*` 候选键作为 Core ref。先确认：
+
+```bash
+cd /absolute/path/to/AI-Cinematic-Studio
+
+python scripts/k2_readonly_lineage_scan.py \
+  --root /data \
+  --max-depth 6 \
+  --max-rows 200 \
+  | tee /data/k2-authority/k2-readonly-lineage-scan.txt
+```
+
+该工具只以 SQLite `mode=ro + query_only` 打开既有文件，只输出已知表的计数、稳定
+Ref、version、state 和 digest。它不选择 payload JSON、创作正文、idempotency key 或
+credential 字段，也不会初始化数据库。期望最终输出
+`K2_CURRENT_LINEAGE_STATUS=FOUND_READ_ONLY`；如果是 `NOT_FOUND`，不得启动 Creator
+server，因为默认路径可能创建一套新的空数据库。
 
 1. 当前仓库分支、commit 与干净工作树；
 2. authenticated Creator Public API 可达；
@@ -86,8 +103,10 @@ exact UNET / TEXT_ENCODER / VAE names and SHA-256
 runtime attestation ref/digest equals approved Provider Policy
 ```
 
-已有 2026-08-20 attestation 是关机前技术证据。新实例启动后应重新取证；旧证据不能证明
-新进程、依赖或设备状态相同。
+`2026-08-21` 当前启动已重新生成并独立验证 attestation
+`technical-k2-funhpc-a100-20260821T130634Z`，payload digest 为
+`be03a079d17cad524b5e2e061e0c651a8f41f6f5221dfe80a8244398817ded53`。它仍必须被
+Provider Authority 精确接受；`2026-08-20` 记录只保留为历史技术证据。
 
 ## 5. 三媒体实验顺序
 

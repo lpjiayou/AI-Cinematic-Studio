@@ -4,7 +4,7 @@
 >
 > 盘点日期：`2026-08-21`
 >
-> 本次更新：`K2 P1 PREBOOT OFFLINE PACKAGE`
+> 本次更新：`K2 P1 PREBOOT OFFLINE PACKAGE + CURRENT-BOOT TECHNICAL EVIDENCE REFRESH`
 
 ## 1. 报告边界
 
@@ -23,7 +23,7 @@
 
 | 仓库 | 默认分支事实快照 | 阶段候选 |
 | --- | --- | --- |
-| Core | `origin/main` @ `8d9ce52166cec27d2fefaa86548016130babdfff` | `feature/k2-publishable-production`，PR #9；本次包基于 `edbc973f8f1888f58b5d82f211a333321c2b1101` 继续 |
+| Core | `origin/main` @ `8d9ce52166cec27d2fefaa86548016130babdfff` | `feature/k2-publishable-production`，PR #9；本轮证据更新输入基线 `b35e183d07083c28b7f5f70c156cb0bc8a2e3e09`，tree `b88c5958791ffb42b09f1e6b93bd40778877b952` |
 | Frontend | `origin/main` @ `277754a6e61e86bb1ed8109570aa19e4214f0d60` | `feature/k2-publishable-production-ui` @ `23d5df154053c486863a18cf902f714d45801f24`，PR #8；本次未改动 |
 
 本报告不把候选分支写成默认分支能力。最终远端 commit 由 GitHub PR 记录；
@@ -72,33 +72,39 @@ Core 候选已增加：
 - `UNTRUSTED_PROVIDER_CANDIDATE / UNSELECTED / NOT_ADMITTED /
   publicationAllowed=false` 的 fail-closed 候选边界。
 
-上一已公布候选树的可重复验证为：Core `554 / 554`、K2 操作工具
-`8 / 8`、Python compile、Markdown、本地链接、diff 和 secret 检查全部通过；
-Repository Validation #40 为 5/5 jobs 通过。
+本轮输入基线的可重复验证为：Core `566 / 566`、开机前聚焦测试 `12 / 12`、
+Python compile、Markdown、本地链接、diff 和 secret 检查全部通过；
+Repository Validation #41 为 5/5 jobs 通过。
+
+本次当前启动证据刷新及只读血缘工具完成后，证据/开机前/操作工具聚焦测试为
+`23 / 23 PASS`，完整 Core 回归为 `569 / 569 PASS`。
 
 ## 5. A100 / ComfyUI 技术证据
 
-### 5.1 原始归档
+### 5.1 当前启动归档
 
 | 项目 | 核对结果 |
 | --- | --- |
-| 归档 | `k2-runtime-evidence-20260820T142014Z.tar.gz` |
-| 外层 SHA-256 | `c3701a1877cd9e715dcadbca93fc24eb38221f8e2c7a9f758cd978308c0b9f09` |
+| 归档 | `k2-runtime-evidence-20260821T130634Z.tar.gz` |
+| 外层 SHA-256 | `77348f23aebcd2f4029c20f4d05cb910c726dbfbb7eaf9757ac44c4cf6a2e24a` |
 | sidecar | 与重算摘要完全一致 |
 | tar 安全性 | 5 个相对路径普通文件；无绝对路径、`..`、链接或设备项 |
 | 内部 manifest | 4 个 payload 全部 SHA-256 校验通过 |
+| 确定性重建 | 与上传归档逐字节一致，SHA-256 相同 |
+| 敏感信息扫描 | 29,573 个 JSON 字符串值；已识别凭据、敏感 URL/查询、宿主绝对路径和非空敏感字段均为 0 |
 
 ### 5.2 语义事实
 
 - schema：`v4.comfyui-runtime-attestation.v1`；
-- attestation ref：`technical-k2-funhpc-a100-20260820T141317Z`；
+- attestation ref：`technical-k2-funhpc-a100-20260821T130634Z`；
+- observed at：`2026-08-21T13:07:19.528120Z`；
 - provider/model：`self-hosted-comfyui / wan2.2-ti2v-5b-fp16`；
 - region/endpoint：`provider-not-disclosed / local-loopback`；
 - Python/PyTorch：`3.12.7 / 2.11.0+cu126`；
-- device：1 × `NVIDIA A100-PCIE-40GB`，42,405,855,232 VRAM bytes；
+- device：1 × `NVIDIA A100-PCIE-40GB`，42,409,000,960 VRAM bytes；
 - 必需原生节点：10/10；
 - attestation payload digest：
-  `3a0ad8e839545390b3baaf3de57903f57f0c40c5bcaa117cd9990cd616c1bec2`；
+  `be03a079d17cad524b5e2e061e0c651a8f41f6f5221dfe80a8244398817ded53`；
 - 权威状态：`TECHNICAL_EVIDENCE_ONLY / publicationAllowed=false`。
 
 模型摘要：
@@ -109,15 +115,21 @@ Repository Validation #40 为 5/5 jobs 通过。
 | TEXT_ENCODER | `umt5_xxl_fp8_e4m3fn_scaled.safetensors` | `c3355d30191f1f066b26d93fba017ae9809dce6c627dda5f6a66eaa651204f68` |
 | VAE | `wan2.2_vae.safetensors` | `e40321bd36b9709991dae2530eb4ac303dd168276980d3e9bc4b6e2b75fed156` |
 
-### 5.3 规范化证据
+### 5.3 摘要链与历史证据
 
-确定性规范化归档 SHA-256：
+当前事实摘要为
+`d845c4c24fa0108f7574a028cce40eb6253c68c078b6cb99c4c82c6d201b8fba`，
+object-info 规范摘要为
+`df3dace362f18e7b35fdea119959cc12e879d9535844cba3d926624e3ecf988a`，
+attestation 文件 SHA-256 为
+`bd6ee9390e9733b68722ca19895836e823e264c9d9ab867ed78cc7c3ffe31fed`。
 
-`282bbd955022d47ece4f696704e97d4a12b04e2e140bea21e49390ca6b890022`
-
-两次独立构建逐字节一致，模型清单只保留文件名，不保留 `/data/...` 等主机
-路径。原归档和规范化归档都是外部审计资产，不进入 Git，也不授予 Rights、
-Provider、Budget 或 Publication Authority。
+`2026-08-20` 的 attestation
+`technical-k2-funhpc-a100-20260820T141317Z`、payload digest
+`3a0ad8e839545390b3baaf3de57903f57f0c40c5bcaa117cd9990cd616c1bec2` 和归档
+SHA-256 `c3701a1877cd9e715dcadbca93fc24eb38221f8e2c7a9f758cd978308c0b9f09`
+保留为历史证据，不再作为当前启动钉扎值。所有归档仍是外部审计资产，不进入
+Git，也不授予 Rights、Provider、Budget 或 Publication Authority。
 
 ## 6. 本次开机前新增资产
 
@@ -137,18 +149,22 @@ Provider、Budget 或 Publication Authority。
 ### 6.2 机器可读与治理资产
 
 - `k2.preboot-candidate.v1` 清单；
+- 当前清单规范 SHA-256
+  `ca79c442f9d9998c8a214412bc78a09650e6585f955eda22ea9c9ca209947cca`；
 - CNY `100000` minor 的硬上限、已承诺支出 `0`、禁止当前付费调用；
 - video/audio 从当前 G4 `GenerationRequest` 解析，image 因当前 G4 不存在对应 request
   而保持 blocker 的同源实验矩阵；
 - Rights/Provider 字段检查模板，故意不是可激活 Authority bundle；
 - 从离线总检、重建当前血缘、Authority 激活、runtime 核验、预算熔断到
   secret-free 证据收口的运行手册；
-- fail-closed 校验器与 12 个篡改/越权测试。
+- SQLite `mode=ro + query_only` 的 K2 血缘定位工具；只输出安全 Ref、version、state、
+  digest 和计数，不选择 payload、创作正文、idempotency key 或 credential 字段；
+- fail-closed 校验器与 12 个篡改/越权测试，以及 3 个只读/脱敏/行数边界测试。
 
 本次候选树的完整 Core 回归为 `566 / 566 PASS`，其中新增开机前聚焦测试
 `12 / 12 PASS`。
 
-### 6.3 本轮没有发生的事项
+### 6.3 离线工作包内没有发生的事项
 
 - GPU/ComfyUI 启动：0；
 - Provider 网络调用：0；
@@ -201,9 +217,12 @@ P1 依然是 `NOT PASSED`。视频技术证据或离线创作完成不能替代�
 现有 K2 血缘、创作候选、预算约束和三媒体退出条件收进同一个
 fail-closed 工作包。
 
-当前最合理的下一个生产动作不是盲目开机，而是获取并审查 Rights、Provider 与
-Budget Authority。三者完整且当前血缘未 stale 后，才按“image 低成本 identity
-preflight → SH-010 49-frame video → 两句 neutral TTS”的小步顺序进行真实实验。
+当前运行时已经完成技术证据刷新，但还没有解析出本次启动对应的真实 K2
+持久化血缘。下一个动作是只读定位现有 K2 SQLite 数据库和当前
+`EpisodeProductionRun / CreativeShotVersion / GenerationRequest`，再生成供外部
+审阅的 Rights/Provider Authority 候选。Authority 完整且血缘未 stale 后，才按
+“image 低成本 identity preflight → SH-010 49-frame video → 两句 neutral TTS”
+的小步顺序进行真实实验。
 
 ## 10. 可复核入口
 
