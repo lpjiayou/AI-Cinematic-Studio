@@ -8,9 +8,9 @@
 >
 > Authorized Wave: `ACS-K2-P0 → P1 → P2 → P3 → P4 → P5 → P6 → P7 → P8 → P9 → GATE A/B/C → P10`
 >
-> Current Task: `ACS-K2-PUBLISHABLE-P0-EXTERNAL-AUTHORITY + P1-VIDEO-SAFE-PREREQUISITE`
+> Current Task: `ACS-K2-PUBLISHABLE-P0-EXTERNAL-AUTHORITY + P1-SAFE-PREREQUISITES`
 >
-> Current Work Package: `P1 VIDEO RUNTIME TECHNICAL EVIDENCE CAPTURED / P0→P1 EXTERNAL RIGHTS + PROVIDER AUTHORITY HOLD`
+> Current Work Package: `P1 PREBOOT CREATIVE/OPERATIONS PACKAGE READY / P0→P1 EXTERNAL RIGHTS + PROVIDER + BUDGET AUTHORITY HOLD`
 >
 > M6 Authorization: `ACCEPTED SURFACES + K2 EXTERNAL AUTHORITY CONNECTION / NO M6 SCHEMA EXPANSION`
 >
@@ -955,3 +955,40 @@ P1 remains `NOT PASSED`. The runtime records `region=provider-not-disclosed`, no
 external Provider Authority has reviewed and accepted the exact attestation ref plus
 payload digest, no Rights Authority bundle exists, and no governed same-lineage live
 image/video/audio experiment has run. P2 remains out of sequence.
+
+### P1-C offline preboot package — 2026-08-21
+
+While the GPU instance remains shut down, an independent safe prerequisite now turns
+the existing K2 local-evidence target into a fail-closed offline creative and operator
+candidate package:
+
+- the Project Lead's current K2 single-episode hard ceiling is recorded as
+  `currency=CNY / maxTotalCostMinor=100000`, with zero committed spend, no provider
+  sub-allocation and no implied `budgetAuthorityRef` or paid-call authorization;
+- K2-001 《记忆回声》 remains the current 30-second, 24-fps, two-scene, four-shot
+  local-evidence target, with the exact `168 + 168 + 192 + 192 = 720` frame sequence;
+- script, storyboard, shot description, performance, continuity, image preflight,
+  four Wan2.2 prompt pairs, audio cue sheet and two eight-view character-turnaround
+  designs are documented as `DRAFT / CANDIDATE / NOT DOMAIN FACT`;
+- audio is text-only neutral TTS planning with no real-person imitation, voice cloning,
+  external audio or P1 music; no media was generated;
+- a machine-readable manifest binds the candidate to the exact three reviewed model
+  digests and the technical attestation ref/digest while preserving
+  `TECHNICAL_EVIDENCE_ONLY / publicationAllowed=false`;
+- video/audio experiment plans require runtime resolution from the existing current
+  G4 `GenerationRequest` lineage; G4 has no image request, so image remains explicitly
+  blocked pending an authorized same-lineage contract extension, and human-readable
+  `K2-001-SH-*` design keys cannot be promoted to Core refs;
+- the offline validator rejects budget expansion or spend claims, missing character
+  angles, external audio, voice cloning, secret-shaped fields, model/attestation
+  tampering, frame discontinuity, domain admission and publication claims;
+- the operator runbook reconnects the package to the existing Creator Public API →
+  Application → V5 → V4 → V3 → Compute chain and stops truthfully where image/audio
+  adapters or external authority remain unavailable.
+
+Focused preboot validation passes `12 / 12` and the complete Core regression passes
+`566 / 566` without GPU, provider credentials or paid calls. This work does not create
+a Rights or Provider bundle, credential, MediaJob, ProviderAttempt, AssetVersion,
+Identity Lock, approval, master or export.
+P1 remains `NOT PASSED`; P2/P3 remain out of sequence until the external facts and all
+three governed same-lineage media experiments exist.

@@ -138,7 +138,8 @@ external facts:
 2. approved image, video and audio provider/model/region capabilities;
 3. server/worker credential-source refs, accepted usage-terms refs, safety/privacy
    policy and expiry facts (never secret values in Git or browser state);
-4. an explicit currency/cost ceiling and budget-authority ref;
+4. an external budget-authority ref plus exact image/video/audio sub-caps whose sum
+   does not exceed the Project Lead's recorded `CNY 100000` minor hard ceiling;
 5. target release destination and territories compatible with every grant;
 6. the observed runtime attestation reviewed by the provider-policy authority and
    entered as its exact opaque ref plus SHA-256 digest; technical reachability alone
@@ -165,6 +166,26 @@ credential fact visible to V5 is an opaque `credentialSourceRef`; the actual sec
 remains in the worker environment. `scripts/k2_external_authority_activate.py`
 validates operator-supplied files and prints the four secret-free assignments. It
 does not create a grant, approve a provider, or advance P1.
+
+## P1-C offline preboot prerequisite
+
+On `2026-08-21`, while the compute instance remained shut down, the Project Lead set
+the current K2 single-episode experiment hard ceiling to CNY 1,000 and confirmed that
+no external audio should be used. The implementation records this as
+`currency=CNY / maxTotalCostMinor=100000 / committedSpendMinor=0` without inventing a
+`budgetAuthorityRef`, allocating provider sub-caps or authorizing a paid call.
+
+The offline package adds a non-authoritative K2-001 script/storyboard/shot/Wan2.2/audio
+candidate, two eight-view character-turnaround designs, a three-media same-lineage
+experiment plan, an operator runbook and a fail-closed validator. Audio remains a
+text-only neutral-TTS plan with no real-person imitation, voice cloning, external
+audio or P1 music. No GPU, provider, domain admission, candidate selection or
+publication action occurred.
+
+Focused validation passes `12 / 12` and the complete Core regression passes
+`566 / 566`. Every creative item remains `DRAFT / CANDIDATE / NOT DOMAIN FACT`; the
+human-readable shot design keys are not Core references. This prerequisite therefore
+reduces operator ambiguity but supplies none of the missing external facts.
 
 ## Stop decision
 
