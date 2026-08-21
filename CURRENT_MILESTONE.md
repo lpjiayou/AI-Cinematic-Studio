@@ -8,9 +8,9 @@
 >
 > Authorized Wave: `ACS-K2-P0 → P1 → P2 → P3 → P4 → P5 → P6 → P7 → P8 → P9 → GATE A/B/C → P10`
 >
-> Current Task: `ACS-K2-CANONICAL-LINEAGE-BOOTSTRAP-G1 → HOST APPLY`
+> Current Task: `ACS-K2-G2 → M6 AUTHORITY + V5 IDENTITY LOCK PREPARATION`
 >
-> Current Work Package: `BOOTSTRAP IMPLEMENTED / CANONICAL HOST DIRECTORY NOT YET CREATED / M6 + IDENTITY + P0→P1 HOLD`
+> Current Work Package: `CANONICAL ROOT G1 HOST-VERIFIED / M6 + IDENTITY NOT CREATED / P0→P1 HOLD`
 >
 > M6 Authorization: `ACCEPTED SURFACES + K2 EXTERNAL AUTHORITY CONNECTION / NO M6 SCHEMA EXPANSION`
 >
@@ -1082,9 +1082,21 @@ The final local checkpoint regression passes `587 / 587`: Unit `356 / 356`,
 Contract `91 / 91`, Integration `140 / 140`; the bootstrap/API-focused subset passes
 `18 / 18`.
 
-That temporary test is not the formal K2 lineage. No canonical directory has yet been
-published under `/data`, no stable production refs from such a directory exist, and
-formal authenticated Creator Public API verification evidence is pending. The next
-authorized action is remote verification of this implementation, followed by exactly
-one host apply and seven-resource authenticated verification at the explicit runbook
-paths.
+The implementation was remote-verified at commit
+`57ce3d0bf3e5772f57cea7a8a79726237ef366ba`, tree
+`a3eece796fafcaeead8b525cbe039a69782602c3`; Repository Validation #44 passed all
+five jobs. The formal host then completed one write-free validation, one acknowledged
+apply, inventory verification, SQLite quick checks and an independent read-only scan.
+The scan found five databases, one production database and exactly one production run
+at `ROOTS_READY`.
+
+Authenticated loopback Creator Public API verification passed exact matching for all
+seven required resources. The secret-free verification receipt SHA-256 is
+`d4c2a52d1c141ed5f0b8b24a13a985e47e38b3b78eac27eb5d59b452c18ca8a6`; the
+bootstrap receipt SHA-256 is
+`94fad69a2fdffe50e599c08fdc0e7c94aa3a381a30d1515b126a1f8b88076234`.
+Canonical G1 is therefore host-verified and no longer blocks on missing lineage.
+M6 Authority and Identity Lock remain `NOT_CREATED`; P1 remains `NOT_PASSED` and
+publication remains disabled. The next valid transition is same-lineage G2 preparation,
+not provider dispatch. See
+[`K2_CANONICAL_LINEAGE_G1_HOST_CLOSEOUT_2026-08-21.md`](governance/K2_CANONICAL_LINEAGE_G1_HOST_CLOSEOUT_2026-08-21.md).

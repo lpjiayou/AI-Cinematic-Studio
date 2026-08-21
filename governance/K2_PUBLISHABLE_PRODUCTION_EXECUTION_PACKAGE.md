@@ -39,6 +39,22 @@ as satisfaction of M6, Identity Lock, P0→P1 or publication gates.
 | A/B/C | contracts, integration, security, browser workflow and evidence audit | same-tree pass with no secret or lineage leak |
 | P10 | M16 runs at 1, 3, 10 and 30 | per-size quality, cost, throughput and recovery evidence |
 
+### K2 root G1 closeout — 2026-08-21
+
+K2 root G1 is complete on the formal host. Implementation commit
+`57ce3d0bf3e5772f57cea7a8a79726237ef366ba` was remote-verified before apply. The
+operator produced exactly one durable run at `ROOTS_READY`; five SQLite databases
+passed quick checks and inventory verification; the independent read-only scan found
+one production database and one production run; the authenticated loopback Public API
+returned exact matches for seven resources.
+
+Bootstrap receipt SHA-256 is
+`94fad69a2fdffe50e599c08fdc0e7c94aa3a381a30d1515b126a1f8b88076234`; API
+verification receipt SHA-256 is
+`d4c2a52d1c141ed5f0b8b24a13a985e47e38b3b78eac27eb5d59b452c18ca8a6`.
+This closes only the missing-lineage prerequisite. M6 Authority, Identity Lock and
+all P0→P1 authority facts remain absent.
+
 No checkpoint may be skipped, combined by claim, or satisfied by old local evidence.
 K2 root G1 is a prerequisite for the current P0→P1 work; it supplies none of P0's
 external authority facts.

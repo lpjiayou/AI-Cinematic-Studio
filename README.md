@@ -15,7 +15,9 @@ OS、V4 Platform、V3 Render Core、持久化与后端测试；客户 Commercial
 > P0 的合同、权威端口、持久化与前端阻断映射已经实现；P1 的受控 Wan2.2
 > 视频候选适配器、V4 作业回传、V5 lineage 校验和只读实验接口也已完成安全
 > 前置实现。独立 A100/ComfyUI 操作烟测证明了技术运行时与模型可用，但它不在
-> 受治理的 K2 请求 lineage 内。当前仍缺可核验版权事实及已批准的供应商、凭据、
+> 受治理的 K2 请求 lineage 内。新的 canonical K2 root 已经完成正式主机 apply、
+> 独立只读扫描和 authenticated API 七资源 exact-match，并严格停在 `ROOTS_READY`。
+> 当前仍缺 M6 Authority、Identity Lock、可核验版权事实及已批准的供应商、凭据、
 > 条款、预算和精确运行证明权威，因此 P0→P1 仍处于外部事实阻断；尚未通过
 > Core 链路发起受权 live provider 任务。
 >

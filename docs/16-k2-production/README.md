@@ -25,9 +25,13 @@ Creator Public API → Application → V5 → V4 → V3 → Compute 主链。
 - `experiments/k2-001-canonical-bootstrap/k2-001-canonical-bootstrap.v1.json`；
 - `scripts/k2_canonical_lineage_bootstrap.py`；
 - `scripts/k2_canonical_lineage_api_verify.py`（apply 后的 authenticated GET-only
-  exact-match 与 secret-free receipt）。
+  exact-match 与 secret-free receipt）；
+- [`K2 Canonical Lineage G1 正式主机收口记录`](../../governance/K2_CANONICAL_LINEAGE_G1_HOST_CLOSEOUT_2026-08-21.md)。
 
-它们只允许建立一个 `ROOTS_READY` 根；主机正式 apply 之前仍不存在新的生产 Ref。
+它们只允许建立一个 `ROOTS_READY` 根。正式主机已在实现 commit `57ce3d0b…` 上完成
+唯一一次 apply、独立只读扫描和七资源 authenticated API exact-match；该 root 的真实
+Ref 只能从 secret-free receipt 或 authenticated API 读取。M6 Authority、Identity Lock、
+P1 与发布均未随 bootstrap 自动推进。
 
 离线校验：
 

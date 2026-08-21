@@ -1,6 +1,6 @@
 # ADR-0010 — K2 Canonical Lineage Bootstrap After Missing Durable State
 
-- Status: `ACCEPTED / G0 REMOTE-VERIFIED / G1 IMPLEMENTED / HOST APPLY PENDING`
+- Status: `ACCEPTED / G0 REMOTE-VERIFIED / G1 HOST-VERIFIED / CLOSED`
 - Date: `2026-08-21`
 - Decision owners: Project Lead / Architecture Owner `蔺鹏`
 - Extends: `ADR-0009-k2-publishable-media-production.md`
@@ -123,9 +123,23 @@ refusal, byte-preserving repeated apply, exact seven-resource API projection,
 real authenticated loopback HTTP, extra-run rejection, API digest mismatch, on-disk
 database tamper rejection, GET-only/dependency enforcement and credential
 non-disclosure. These tests use temporary directories and do not establish the formal
-K2 lineage. Host apply,
-authenticated Creator API exact-match execution, implementation remote verification
-and full checkpoint closeout remain pending.
+K2 lineage.
+
+Implementation commit `57ce3d0bf3e5772f57cea7a8a79726237ef366ba`, tree
+`a3eece796fafcaeead8b525cbe039a69782602c3`, was remote-verified by Repository
+Validation #44 with all five jobs successful. The formal host subsequently completed
+one dry-run, one acknowledged apply, restart/inventory validation, five SQLite quick
+checks, an independent read-only scan and authenticated seven-resource Public API
+exact-match. It found exactly one production run at `ROOTS_READY`. Bootstrap receipt
+SHA-256 is
+`94fad69a2fdffe50e599c08fdc0e7c94aa3a381a30d1515b126a1f8b88076234` and API
+verification receipt SHA-256 is
+`d4c2a52d1c141ed5f0b8b24a13a985e47e38b3b78eac27eb5d59b452c18ca8a6`.
+
+The formal evidence is recorded in
+[`K2_CANONICAL_LINEAGE_G1_HOST_CLOSEOUT_2026-08-21.md`](K2_CANONICAL_LINEAGE_G1_HOST_CLOSEOUT_2026-08-21.md).
+ADR-0010 is closed at its bounded `ROOTS_READY` exit. M6 Authority, Identity Lock,
+P0→P1 and publication gates remain outside this decision and remain fail closed.
 
 The final local complete Core regression passes `587 / 587`: Unit `356 / 356`,
 Contract `91 / 91` and Integration `140 / 140`.
