@@ -2,7 +2,7 @@
 
 - Status: `AUTHORIZED / AUTO-SEQUENTIAL / FAIL-CLOSED`
 - Date: `2026-08-17`
-- Architecture decision: `ADR-0009`
+- Architecture decisions: `ADR-0009 + ADR-0010`
 - Contract: `K2_PUBLISHABLE_MEDIA_PRODUCTION_CONTRACT.md`
 
 ## 1. Fixed target
@@ -11,6 +11,14 @@ Extend the existing K2 Golden Episode into one rights-cleared publishable audiov
 master. P0 retains the current 30-second, four-shot, two-character target so live
 quality and lineage can be compared with G0→G7 evidence. Any later expansion must be
 a new versioned production-policy fact; it cannot silently change the target.
+
+The `2026-08-21` read-only location audit did not find a durable instance of that
+lineage on the current compute host or inside its archives. The phrase "existing K2"
+therefore names the accepted logical target, not a currently recovered database.
+The Project Lead explicitly authorized a new canonical bootstrap on `2026-08-21`.
+ADR-0010 now governs that bounded prerequisite. It creates only a new durable
+`ROOTS_READY` root and must not be represented as recovery of the missing lineage or
+as satisfaction of M6, Identity Lock, P0→P1 or publication gates.
 
 ## 2. Execution order
 

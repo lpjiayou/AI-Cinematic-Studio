@@ -30,7 +30,7 @@ PUBLICATION_ALLOWED=false
 
 这一步不需要网络、GPU、Provider 凭据或外部音频。
 
-## 2. 开机后的第一个动作：重建当前血缘
+## 2. 开机后的第一个动作：只读定位当前血缘
 
 不要沿用文档中的 `K2-001-SH-*` 候选键作为 Core ref。先确认：
 
@@ -49,6 +49,33 @@ Ref、version、state 和 digest。它不选择 payload JSON、创作正文、id
 credential 字段，也不会初始化数据库。期望最终输出
 `K2_CURRENT_LINEAGE_STATUS=FOUND_READ_ONLY`；如果是 `NOT_FOUND`，不得启动 Creator
 server，因为默认路径可能创建一套新的空数据库。
+
+`2026-08-21` 的扩展只读定位已经覆盖 `/data`、`/root`、`/home` 与 `/tmp`：
+
+- 只发现两个 ComfyUI 自身 SQLite 文件；它们不包含已知 K2 Core 表；
+- 15 个归档中没有数据库成员；
+- `K2_PRODUCTION_DATABASES_FOUND=0`、`K2_PRODUCTION_RUNS_FOUND=0`；
+- 定位审计文件 SHA-256 为
+  `7aaa36333f08be3bdfd09c6b4632804f3b7bf14a0bd1bc35f359df0391fa167b`。
+
+因此当前状态是 `K2_CURRENT_LINEAGE_STATUS=NOT_FOUND`，不是待修复的路径问题，也
+不能用测试中的固定 Ref、文档候选键或文件名重建。后续只能二选一：
+
+1. 从当前存储之外取得可校验的原始 K2 Core 数据库或受控快照，并再次只读扫描；
+2. 由 Project Lead 明确批准建立一条新的 canonical K2 lineage。
+
+第二种路径属于重新引导，不是恢复。它必须经现有 Creator Public API 和已接受的
+Application → V5 边界创建，使用显式持久化路径、初始化前空目录检查、初始化后只读
+复核与数据库摘要；不得直接写 SQLite，也不得把旧的技术证据描述成新血缘上的生产
+事实。在作出该决定之前保持 Creator 停止、`P1 NOT PASSED` 和
+`publicationAllowed=false`。
+
+Project Lead 已于 `2026-08-21` 选择并授权第二种路径。ADR-0010 冻结的引导上限是
+新建一个 `ROOTS_READY` root；M6 Authority、Identity Lock、Rights/Provider/budget、
+live media 与 publication 均不随该授权产生。正式 apply 命令必须等待治理检查点与
+实现检查点远端验证后，由本手册后续版本给出。
+
+仅当结果为 `FOUND_READ_ONLY` 时，才继续核对：
 
 1. 当前仓库分支、commit 与干净工作树；
 2. authenticated Creator Public API 可达；

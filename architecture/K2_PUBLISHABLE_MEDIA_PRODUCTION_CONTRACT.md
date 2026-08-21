@@ -2,7 +2,12 @@
 
 > Status: `Normative for ACS-K2-P0 → P10`
 >
-> Scope: the existing K2 workspace, project, series, episode and production run
+> Scope: the K2 canonical workspace, project, series, episode and production run
+
+`2026-08-21` addendum: the previous durable instance was not found. ADR-0010 and the
+K2 Canonical Lineage Bootstrap Contract govern establishment of one replacement
+`ROOTS_READY` root. After that root is verified, this contract governs all downstream
+facts unchanged. Historical refs/evidence are not silently attached to the new run.
 
 ## 1. Definition of publishable
 
@@ -21,7 +26,7 @@ publishable.
 
 ## 2. Frozen upstream lineage
 
-The production extension consumes the existing K2 refs:
+The production extension consumes the verified canonical K2 refs:
 
 ```text
 Workspace → ContentProfile → Project → Series → Episode
