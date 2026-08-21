@@ -28,8 +28,8 @@
     "shotCount": 4
   },
   "technicalEvidence": {
-    "attestationRef": "technical-k2-funhpc-a100-20260820T141317Z",
-    "attestationPayloadDigest": "3a0ad8e839545390b3baaf3de57903f57f0c40c5bcaa117cd9990cd616c1bec2",
+    "attestationRef": "technical-k2-funhpc-a100-20260821T130634Z",
+    "attestationPayloadDigest": "be03a079d17cad524b5e2e061e0c651a8f41f6f5221dfe80a8244398817ded53",
     "authorityState": "TECHNICAL_EVIDENCE_ONLY",
     "providerAuthorityAccepted": false,
     "publicationAllowed": false

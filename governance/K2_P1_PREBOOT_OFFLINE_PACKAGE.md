@@ -105,10 +105,14 @@ reference video、voice、music、font、brand 和任何其他输入的精确摘
 
 ```text
 runtimeAttestationRef:
-  technical-k2-funhpc-a100-20260820T141317Z
+  technical-k2-funhpc-a100-20260821T130634Z
 runtimeAttestationDigest:
-  3a0ad8e839545390b3baaf3de57903f57f0c40c5bcaa117cd9990cd616c1bec2
+  be03a079d17cad524b5e2e061e0c651a8f41f6f5221dfe80a8244398817ded53
 ```
+
+该精确对来自 `2026-08-21` 当前启动，并已通过上传归档外层摘要、内部 manifest、
+跨文件语义、敏感信息扫描和确定性逐字节重建。`2026-08-20` 的 attestation 仅作为
+历史技术证据保留，不再作为本清单的当前运行时钉扎值。
 
 `region=provider-not-disclosed` 必须被真实 Provider Authority 显式接受，或由其提供
 真实 region；代码和操作者不得根据域名、GPU 型号或机房猜测。

@@ -224,12 +224,12 @@ def _validate_technical_evidence(value: Any) -> None:
         },
         "technicalEvidence",
     )
-    if evidence["attestationRef"] != "technical-k2-funhpc-a100-20260820T141317Z":
+    if evidence["attestationRef"] != "technical-k2-funhpc-a100-20260821T130634Z":
         raise PrebootValidationError("technicalEvidence.attestationRef is invalid")
     if _sha256(
         evidence["attestationPayloadDigest"],
         "technicalEvidence.attestationPayloadDigest",
-    ) != "3a0ad8e839545390b3baaf3de57903f57f0c40c5bcaa117cd9990cd616c1bec2":
+    ) != "be03a079d17cad524b5e2e061e0c651a8f41f6f5221dfe80a8244398817ded53":
         raise PrebootValidationError("technicalEvidence digest does not match the reviewed artifact")
     if evidence["authorityState"] != "TECHNICAL_EVIDENCE_ONLY":
         raise PrebootValidationError("technicalEvidence.authorityState is invalid")

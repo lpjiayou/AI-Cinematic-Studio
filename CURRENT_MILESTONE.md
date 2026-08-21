@@ -992,3 +992,40 @@ a Rights or Provider bundle, credential, MediaJob, ProviderAttempt, AssetVersion
 Identity Lock, approval, master or export.
 P1 remains `NOT PASSED`; P2/P3 remain out of sequence until the external facts and all
 three governed same-lineage media experiments exist.
+
+### P1-D current-boot technical-evidence refresh — 2026-08-21
+
+The operator restarted the same bounded A100/ComfyUI technical runtime and completed
+the Stage-1 gate again with the repository's exact interpreter, CUDA contract and
+three reviewed Wan2.2 model digests. The current attestation is
+`technical-k2-funhpc-a100-20260821T130634Z`, observed at
+`2026-08-21T13:07:19.528120Z`, with payload digest
+`be03a079d17cad524b5e2e061e0c651a8f41f6f5221dfe80a8244398817ded53`.
+
+The uploaded deterministic archive
+`k2-runtime-evidence-20260821T130634Z.tar.gz` was independently audited outside Git:
+
+- its SHA-256 and sidecar both resolve to
+  `77348f23aebcd2f4029c20f4d05cb910c726dbfbb7eaf9757ac44c4cf6a2e24a`;
+- all five members are regular relative files with no traversal, links or device
+  entries, and all four payloads match the internal manifest;
+- the facts and payload digests, one exact CUDA device, Python/PyTorch versions,
+  all ten required nodes, three model digests and canonical full-object-info digest
+  cross-validate through the repository archive utility;
+- an independent deterministic rebuild is byte-identical to the upload at the same
+  archive SHA-256;
+- 29,573 JSON string values contain no recognized credential, bearer/JWT, credentialized
+  URL, sensitive query, host absolute path or non-empty sensitive scalar field.
+
+A new operator utility now locates existing K2 SQLite lineage with
+`mode=ro + query_only`, selects no payload, creative text, idempotency or credential
+field, and returns `NOT_FOUND` without initializing a database. Its three focused
+no-write/redaction/bounds tests pass, the combined evidence/preboot/operator focus is
+`23 / 23`, and the complete Core regression is `569 / 569`.
+
+The current record remains `TECHNICAL_EVIDENCE_ONLY /
+publicationAllowed=false / region=provider-not-disclosed`. The `2026-08-20` record is
+preserved as historical evidence. No external Provider Authority has accepted the
+current ref/digest, no Rights Authority bundle has been activated, and no current K2
+same-lineage provider attempt or asset admission occurred. P1 therefore remains
+`NOT PASSED`, and P2 remains out of sequence.
