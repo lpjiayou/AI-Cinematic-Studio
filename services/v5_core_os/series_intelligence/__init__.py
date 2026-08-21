@@ -8,6 +8,10 @@ from .contracts import (
     VerifiedApproval,
 )
 from .public import SeriesIntelligencePublicBoundary, SeriesIntelligencePublicError
+from .external_authority import (
+    M6ExternalAuthorityConfigurationError,
+    m6_external_authorities_from_environment,
+)
 
 __all__ = [
     "M6Scope",
@@ -17,4 +21,6 @@ __all__ = [
     "StaticScopeAuthority",
     "VerifiedApproval",
     "VerifiedActorContext",
+    "M6ExternalAuthorityConfigurationError",
+    "m6_external_authorities_from_environment",
 ]

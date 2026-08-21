@@ -15,6 +15,7 @@ Creator Public API → Application → V5 → V4 → V3 → Compute 主链。
 
 - [K2-001 剧本、分镜、镜头、Wan2.2 与角色多角度候选](K2-001-PREPRODUCTION-CANDIDATE.md)
 - [P1 开机前到受治理实验运行手册](K2-P1-PREBOOT-TO-LIVE-RUNBOOK.md)
+- [G2 M6 Authority 与 Identity Lock 准备运行手册](K2-G2-AUTHORITY-PREPARATION-RUNBOOK.md)
 
 对应机器可读清单：
 

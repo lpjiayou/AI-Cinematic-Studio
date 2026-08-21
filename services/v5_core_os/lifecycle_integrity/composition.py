@@ -41,6 +41,9 @@ from services.v5_core_os.series_intelligence.composition import (
     create_sqlite_participant,
 )
 from services.v5_core_os.series_intelligence.errors import SeriesIntelligenceError
+from services.v5_core_os.series_intelligence.external_authority import (
+    m6_external_authorities_from_environment,
+)
 
 from .contracts import BackendKind, LifecycleAssemblyIdentity
 from .coordinator import LifecycleIntegrityCoordinator
@@ -370,6 +373,9 @@ class LifecycleAssembly:
     @classmethod
     def sqlite_from_environment(cls, environ=None) -> "LifecycleAssembly":
         values = os.environ if environ is None else environ
+        m6_scope_authority, m6_approval_authority = (
+            m6_external_authorities_from_environment(values)
+        )
         configured_path = str(values.get("CREATOR_DATA_PATH", "")).strip()
         if configured_path:
             database_path = Path(configured_path)
@@ -377,7 +383,11 @@ class LifecycleAssembly:
             local_app_data = str(values.get("LOCALAPPDATA", "")).strip()
             root = Path(local_app_data) if local_app_data else Path.home() / ".ai-cinematic-studio"
             database_path = root / "AI Cinematic Studio" / "creator-workspace.sqlite3"
-        return cls.sqlite(database_path)
+        return cls.sqlite(
+            database_path,
+            m6_scope_authority=m6_scope_authority,
+            m6_approval_authority=m6_approval_authority,
+        )
 
     def diagnostic_snapshot(self) -> dict[str, Any]:
         return self.state.diagnostic_snapshot()
