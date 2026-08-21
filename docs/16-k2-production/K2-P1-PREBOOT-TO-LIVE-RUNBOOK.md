@@ -1,6 +1,6 @@
 # K2 P1 从离线候选到受治理实验运行手册
 
-> 当前状态：`CANONICAL BOOTSTRAP IMPLEMENTED / HOST APPLY PENDING / P1 NOT PASSED`
+> 当前状态：`CANONICAL ROOT G1 HOST-VERIFIED / M6 + IDENTITY NOT CREATED / P1 NOT PASSED`
 
 本手册把已完成的开机前资料接回现有主链。它不绕过
 `docs/08-compute/k2-comfyui-wan22-operator-runbook.md`，也不把 image/audio 缺口
@@ -305,6 +305,20 @@ Project、Episode、Series Plan workspace、Script workspace、run detail 与 ru
 不要设置任何 `COMFYUI_*` 或外部 Authority 环境变量，直到该 exact-match receipt 已
 生成。runtime job/artifact 路径放在 canonical 目录之外，避免把后续运行文件混入根
 数据库 inventory。
+
+### 2.5 正式主机 G1 收口记录
+
+`2026-08-21T15:24:43Z`，正式主机在实现 commit
+`57ce3d0bf3e5772f57cea7a8a79726237ef366ba` 上完成唯一一次 acknowledged apply。
+独立只读扫描得到五个数据库、一个 production database、一个 production run；七个
+authenticated Public API 投影全部 exact-match。bootstrap receipt SHA-256 为
+`94fad69a2fdffe50e599c08fdc0e7c94aa3a381a30d1515b126a1f8b88076234`，API verification
+receipt SHA-256 为
+`d4c2a52d1c141ed5f0b8b24a13a985e47e38b3b78eac27eb5d59b452c18ca8a6`。
+
+G1 的正式状态为 `ROOTS_READY / COMPLETE`；M6 Authority、Identity Lock、P1 与发布
+均未随 bootstrap 自动推进。完整记录见
+[`K2_CANONICAL_LINEAGE_G1_HOST_CLOSEOUT_2026-08-21.md`](../../governance/K2_CANONICAL_LINEAGE_G1_HOST_CLOSEOUT_2026-08-21.md)。
 
 仅当结果为 `FOUND_READ_ONLY` 时，才继续核对：
 
