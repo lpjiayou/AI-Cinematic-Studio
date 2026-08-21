@@ -46,6 +46,7 @@ from .provider_experiments import (
 from .external_authority import (
     ExternalAuthorityConfigurationError,
     external_authorities_from_environment,
+    identity_reference_authority_from_environment,
 )
 
 __all__ = [
@@ -77,6 +78,7 @@ __all__ = [
     "SqliteProviderExperimentAdapter",
     "ExternalAuthorityConfigurationError",
     "external_authorities_from_environment",
+    "identity_reference_authority_from_environment",
     "create_in_memory_boundary",
     "create_local_development_boundary",
     "create_local_development_boundary_from_environment",

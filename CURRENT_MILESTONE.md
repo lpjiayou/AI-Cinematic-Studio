@@ -1100,3 +1100,46 @@ M6 Authority and Identity Lock remain `NOT_CREATED`; P1 remains `NOT_PASSED` and
 publication remains disabled. The next valid transition is same-lineage G2 preparation,
 not provider dispatch. See
 [`K2_CANONICAL_LINEAGE_G1_HOST_CLOSEOUT_2026-08-21.md`](governance/K2_CANONICAL_LINEAGE_G1_HOST_CLOSEOUT_2026-08-21.md).
+
+### G2 external-authority preparation checkpoint — 2026-08-22
+
+The repository now connects the existing accepted M6 and EpisodeProduction authority
+ports to operator-managed, digest-pinned external facts without changing an M6 domain
+schema, HTTP route or external Creator DTO:
+
+- one closed-world `v5.external-m6-authority-bundle.v1` binds trusted
+  business/tenant/workspace/project/series scope plus each exact M6 action and human
+  approval; approval refs cannot be reused and AI/Provider actor kinds fail closed;
+- one closed-world `v5.external-identity-reference-authority-bundle.v1` binds each
+  immutable reference decision to one exact
+  `workspaceRef + productionRunRef + characterRef`; cross-run, cross-workspace and
+  cross-character lookup fails closed;
+- both loaders require an absolute operator-managed file and an independently injected
+  exact SHA-256 digest, reject partial configuration, duplicate JSON keys, unknown
+  fields, invalid refs, oversized files and inconsistent identity rights/provenance,
+  and preserve the existing rejecting authorities when absent;
+- the Lifecycle environment composition injects only the validated M6 scope/approval
+  authorities, while the EpisodeProduction environment composition injects only the
+  validated identity-reference authority into the existing G2 boundary;
+- `scripts/k2_g2_external_authority_activate.py` is validate-only and prints two M6
+  assignments during scope-only draft preparation or four assignments once an
+  Identity bundle is supplied; it cannot create M6 facts, select identity, approve
+  decisions, call Creator writes or advance the production run;
+- `K2-G2-AUTHORITY-PREPARATION-RUNBOOK.md` freezes the two external bundle shapes,
+  non-inference rules, activation sequence and authenticated post-write verification
+  boundary.
+
+Verification on the implementation tree:
+
+- combined G2/legacy external-authority/operator focus: `25 / 25`;
+- complete repository regression: `599 / 599` — Unit `368 / 368`, Contract `91 / 91`,
+  Integration `140 / 140`;
+- Python compile, whitespace validation and Markdown structure validation: passed.
+
+This checkpoint creates connection capability only. No production M6 bundle, identity
+bundle, approval, SeriesBibleVersion, CharacterContinuityVersion, M6 baseline,
+`M6AuthorityDecision` or `IdentityLock` was authored. The canonical K2 run therefore
+remains `ROOTS_READY`; M6 and Identity Lock remain `NOT_CREATED`; G2 and P1 remain
+`NOT_PASSED`; `publicationAllowed=false`. The next host action requires the exact
+canonical refs, three real human M6 approvals and one approved immutable identity
+reference decision for each required character before the existing commands may run.
