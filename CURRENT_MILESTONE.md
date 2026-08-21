@@ -8,9 +8,9 @@
 >
 > Authorized Wave: `ACS-K2-P0 → P1 → P2 → P3 → P4 → P5 → P6 → P7 → P8 → P9 → GATE A/B/C → P10`
 >
-> Current Task: `ACS-K2-PUBLISHABLE-P0-EXTERNAL-AUTHORITY + P1-SAFE-PREREQUISITES`
+> Current Task: `ACS-K2-CANONICAL-LINEAGE-BOOTSTRAP-G0 → G1`
 >
-> Current Work Package: `P1 PREBOOT CREATIVE/OPERATIONS PACKAGE READY / P0→P1 EXTERNAL RIGHTS + PROVIDER + BUDGET AUTHORITY HOLD`
+> Current Work Package: `NEW CANONICAL ROOT AUTHORIZED / ROOTS_READY MAXIMUM / M6 + IDENTITY + P0→P1 HOLD`
 >
 > M6 Authorization: `ACCEPTED SURFACES + K2 EXTERNAL AUTHORITY CONNECTION / NO M6 SCHEMA EXPANSION`
 >
@@ -731,7 +731,7 @@ human approval gates.
 The one accepted chain remains:
 
 ```text
-existing K2 Project / Series / Episode / Script / M6 authority / Identity Lock
+verified canonical K2 Project / Series / Episode / Script / M6 authority / Identity Lock
 → M7 narrative closure
 → M8 executable Shot Graph
 → M9 asset requirements
@@ -749,6 +749,13 @@ No parallel project, character identity, shot model, asset registry, queue, time
 approval model, publication flag or frontend data source may be introduced. All work
 must extend the existing Creator Public API → Application → V5 → V4 → V3 → Compute
 chain and preserve exact refs, versions, digests, workspace scope and upstream lineage.
+
+The previous durable K2 instance was not found. On `2026-08-21`, the Project Lead and
+Architecture Owner authorized ADR-0010: one replacement canonical lineage may be
+created through a bounded Operator Application over existing V5 public boundaries.
+This is not a second active project and not recovery. Until its receipt and read-only
+verification exist, the chain above has no current durable root. The bootstrap stops
+at `ROOTS_READY`; M6, Identity Lock and all P0→P1 external gates remain separate.
 
 ### Authorized checkpoints
 
@@ -1023,9 +1030,37 @@ field, and returns `NOT_FOUND` without initializing a database. Its three focuse
 no-write/redaction/bounds tests pass, the combined evidence/preboot/operator focus is
 `23 / 23`, and the complete Core regression is `569 / 569`.
 
+The subsequent `2026-08-21` location audit covered `/data`, `/root`, `/home` and
+`/tmp`, plus 15 archives. The only two SQLite candidates were ComfyUI databases;
+neither contained known K2 Core tables, and no archive contained a database member.
+The audit digest is
+`7aaa36333f08be3bdfd09c6b4632804f3b7bf14a0bd1bc35f359df0391fa167b`.
+The current durable K2 lineage status is therefore `NOT_FOUND`. Test fixture refs and
+historical local evidence are not recoverable production lineage. Creator remains
+stopped because its default environment path would initialize a new empty database.
+The next transition requires either an exact external database/snapshot or an
+explicit Project Lead decision to establish a new canonical lineage; the latter is a
+new bootstrap, not restoration.
+
 The current record remains `TECHNICAL_EVIDENCE_ONLY /
 publicationAllowed=false / region=provider-not-disclosed`. The `2026-08-20` record is
 preserved as historical evidence. No external Provider Authority has accepted the
 current ref/digest, no Rights Authority bundle has been activated, and no current K2
 same-lineage provider attempt or asset admission occurred. P1 therefore remains
 `NOT PASSED`, and P2 remains out of sequence.
+
+### Canonical lineage bootstrap authorization — 2026-08-21
+
+The Project Lead explicitly authorized establishment of a new canonical K2 lineage
+after the read-only location audit proved the previous durable instance unavailable.
+ADR-0010 and `K2_CANONICAL_LINEAGE_BOOTSTRAP_CONTRACT.md` freeze the replacement path.
+
+The authorized implementation may add one checked-in K2-001 bootstrap specification,
+one validator/operator utility and focused tests. It must use existing V5 public
+boundaries, may invoke the existing Core-only M5 EpisodePlanItemBinding operation,
+must not add an HTTP route or import tests, and must publish a new canonical directory
+only after staging, restart, receipt and read-only lineage verification pass.
+
+The maximum checkpoint result is one `EpisodeProductionRun` at `ROOTS_READY` with
+`publicationAllowed=false`. M6 Authority, Identity Lock, Rights/Provider/budget
+authority, live provider execution, asset admission and publication remain absent.

@@ -240,6 +240,8 @@ PYTHONDONTWRITEBYTECODE=1 python -m unittest discover -s tests -p 'test_*.py' -q
 - [UI Master Plan](AI_CINEMATIC_STUDIO_UI_MASTER_PLAN.md)
 - [Current Milestone](CURRENT_MILESTONE.md)
 - [K2 Publishable Media Production Contract](architecture/K2_PUBLISHABLE_MEDIA_PRODUCTION_CONTRACT.md)
+- [K2 Canonical Lineage Bootstrap Contract](architecture/K2_CANONICAL_LINEAGE_BOOTSTRAP_CONTRACT.md)
+- [ADR-0010 — K2 Canonical Lineage Bootstrap](governance/ADR-0010-k2-canonical-lineage-bootstrap.md)
 - [K2 P0 External Hold](governance/K2_PUBLISHABLE_P0_EXTERNAL_HOLD.md)
 - [K2 ComfyUI / Wan2.2 Operator Runbook](docs/08-compute/k2-comfyui-wan22-operator-runbook.md)
 - [V5 Text Generation Capability Contract](architecture/V5_TEXT_GENERATION_CAPABILITY_CONTRACT.md)

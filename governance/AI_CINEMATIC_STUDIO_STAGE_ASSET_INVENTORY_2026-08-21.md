@@ -213,16 +213,20 @@ P1 依然是 `NOT PASSED`。视频技术证据或离线创作完成不能替代�
 
 ## 9. 阶段结论
 
-方向正确：当前工作没有继续“为运行而修依赖”，而是把已证明的技术运行时、
-现有 K2 血缘、创作候选、预算约束和三媒体退出条件收进同一个
-fail-closed 工作包。
+方向需要按新证据收窄：当前工作没有继续“为运行而修依赖”，而是把已证明的技术
+运行时、创作候选、预算约束和三媒体退出条件收进同一个 fail-closed 工作包；但
+`2026-08-21` 对 `/data`、`/root`、`/home`、`/tmp` 及 15 个归档的只读定位没有找到
+可恢复的 K2 Core 生产血缘。两个 SQLite 候选均为 ComfyUI 自身数据库，归档中没有
+数据库成员。定位审计 SHA-256 为
+`7aaa36333f08be3bdfd09c6b4632804f3b7bf14a0bd1bc35f359df0391fa167b`。
 
-当前运行时已经完成技术证据刷新，但还没有解析出本次启动对应的真实 K2
-持久化血缘。下一个动作是只读定位现有 K2 SQLite 数据库和当前
-`EpisodeProductionRun / CreativeShotVersion / GenerationRequest`，再生成供外部
-审阅的 Rights/Provider Authority 候选。Authority 完整且血缘未 stale 后，才按
-“image 低成本 identity preflight → SH-010 49-frame video → 两句 neutral TTS”
-的小步顺序进行真实实验。
+当前运行时已经完成技术证据刷新，但当前存储不存在可供解析的真实 K2 持久化血缘。
+测试夹具、`K2-001-SH-*` 文档键和历史技术证明都不能替代
+`EpisodeProductionRun / CreativeShotVersion / GenerationRequest` 的正式 Ref、version
+与 digest。下一步必须先取得外部原始数据库/快照，或由 Project Lead 明确批准建立
+新的 canonical K2 lineage；后者只能描述为重新引导，不能描述为恢复。完成该决定、
+持久化与只读复核之前，不生成 Rights/Provider Authority 候选，不启动 Creator，
+也不执行 image/video/audio 真实实验。
 
 ## 10. 可复核入口
 

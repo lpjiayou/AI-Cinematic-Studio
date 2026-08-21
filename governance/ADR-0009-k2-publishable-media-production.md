@@ -5,6 +5,12 @@
 - Decision owners: Project Lead / Architecture Owner
 - Extends: `ADR-0008-k2-single-episode-production-closure.md`
 
+> `2026-08-21` lineage addendum: the durable instance assumed below was not found.
+> `ADR-0010-k2-canonical-lineage-bootstrap.md` authorizes one new canonical
+> `ROOTS_READY` lineage and supersedes only ADR-0009's requirement to reopen that
+> missing instance. All downstream rights/provider/selection/publication gates remain
+> unchanged.
+
 ## Context
 
 ADR-0008 proved one real, playable, deterministic audiovisual chain through the
@@ -22,8 +28,10 @@ extended in place.
 Implement the P0→P10 wave frozen in
 `K2_PUBLISHABLE_PRODUCTION_EXECUTION_PACKAGE.md` under these decisions:
 
-1. The current K2 production run and its upstream refs remain the lineage root. A live
-   adapter may not invent a parallel project, character identity or shot model.
+1. The K2 production run and its upstream refs remain the lineage root. When the
+   original durable instance is unavailable, only the ADR-0010 controlled bootstrap
+   may establish its replacement root. A live adapter may not invent another project,
+   character identity or shot model.
 2. A versioned `ProductionPolicyVersion`, `RightsManifestVersion` and
    `ProviderExecutionPolicyVersion` are required before live dispatch.
 3. Rights are facts about exact source/reference and output versions. A missing,
