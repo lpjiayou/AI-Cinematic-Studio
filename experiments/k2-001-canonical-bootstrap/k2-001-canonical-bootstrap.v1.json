@@ -1,0 +1,313 @@
+{
+  "schemaVersion": "k2.canonical-lineage-bootstrap.v1",
+  "packageId": "k2-001-canonical-root-v1",
+  "payload": {
+    "authorization": {
+      "decision": "NEW_CANONICAL_K2_LINEAGE_AUTHORIZED",
+      "decisionDate": "2026-08-21",
+      "priorLineageStatus": "NOT_FOUND",
+      "locationAuditSha256": "7aaa36333f08be3bdfd09c6b4632804f3b7bf14a0bd1bc35f359df0391fa167b",
+      "recoveryClaimed": false,
+      "historicalEvidenceAttached": false
+    },
+    "scope": {
+      "workspaceRef": "workspace-6c2c70926cf64cd68435537ffd4de92d",
+      "contentProfileRef": "content-profile-22d02f0a71ee4583ba513bc0cce1cdc9"
+    },
+    "series": {
+      "title": "未来之城",
+      "description": "K2-001 新 canonical 单集根血缘",
+      "plannedEpisodeCount": 1
+    },
+    "creativePlan": {
+      "humanConfirmed": true,
+      "sourcePlanRef": "source-plan-439b030cdf0347e986ce098b3a8f0b84",
+      "sourcePlanSchemaVersion": "creator.ai-director.plan.v1",
+      "sourcePlanVersion": 1,
+      "brief": {
+        "topic": "被抹去的共同记忆",
+        "theme": "记忆权利与有限信任",
+        "audience": "科幻短片观众",
+        "duration": "30秒",
+        "platform": "16:9 技术验证短片",
+        "style": "克制的现实主义科幻、冷蓝雨夜与琥珀实景光",
+        "character": "林澈、顾言"
+      },
+      "sourcePlan": {
+        "schemaVersion": "creator.ai-director.plan.v1",
+        "creativeInterpretation": {
+          "logline": "林澈与顾言在封存档案前确认一段被系统抹去的共同记忆。",
+          "coreTheme": "被删除的记录仍需要被诚实见证",
+          "targetEmotion": "克制的不安转为有限信任",
+          "narrativeArc": "发现异常、共同校验、分别留存证据"
+        },
+        "storyDirection": {
+          "title": "记忆回声",
+          "synopsis": "雨夜的中央记忆档案城中，林澈与顾言追索同一段异常影像，并决定分别保存校验摘要。",
+          "keyBeats": [
+            "异常记忆片进入校验台",
+            "被判定不存在的童年影像重现",
+            "两人分别保存同一份校验摘要"
+          ]
+        },
+        "scriptDraft": {
+          "opening": "冷蓝雨夜中，异常记忆片进入琥珀色校验台。",
+          "development": "顾言切断外部检索，两人只保留眼前可核验的影像。",
+          "climax": "系统声称影像不存在，画面却继续在廊桥上播放。",
+          "ending": "两台终端写入同一摘要，林澈收起记忆片。",
+          "captionsOrDialogue": [
+            "从现在起，只相信我们亲眼看到的。",
+            "它被删掉了，但没有消失。"
+          ]
+        },
+        "storyboardPlan": [
+          {
+            "shotNo": 1,
+            "durationSec": 7,
+            "shotSize": "广角全景",
+            "cameraMovement": "缓慢前移",
+            "visualDescription": "雨夜校验台前，林澈放入异常记忆片，顾言封锁检索通道。",
+            "narrativePurpose": "建立空间、人物与共同规则"
+          },
+          {
+            "shotNo": 2,
+            "durationSec": 7,
+            "shotSize": "中近景",
+            "cameraMovement": "固定",
+            "visualDescription": "被抹除的童年影像投出，两人的视线在屏幕与记忆片之间交汇。",
+            "narrativePurpose": "显露异常并推动共同校验"
+          },
+          {
+            "shotNo": 3,
+            "durationSec": 8,
+            "shotSize": "广角全景",
+            "cameraMovement": "缓慢前移",
+            "visualDescription": "外环廊桥斜雨中，两人并肩观看被系统判定为不存在的影像。",
+            "narrativePurpose": "扩大风险并完成事实确认"
+          },
+          {
+            "shotNo": 4,
+            "durationSec": 8,
+            "shotSize": "中近景",
+            "cameraMovement": "固定",
+            "visualDescription": "两台终端分别写入同一摘要，林澈将记忆片收进掌心。",
+            "narrativePurpose": "建立有限信任并结束单集"
+          }
+        ],
+        "visualStyle": {
+          "lighting": "冷蓝环境光与受控琥珀实景光",
+          "palette": "深蓝、炭灰与低饱和琥珀",
+          "composition": "稳定轴线、克制留白、人物关系优先",
+          "atmosphere": "雨夜、低动态、现实质感科幻",
+          "continuityRules": [
+            "林澈右袖银灰粉尘位置固定",
+            "顾言胸前琥珀身份灯位置固定",
+            "雨向固定为画面左上至右下",
+            "记忆片编号与插入方向连续"
+          ]
+        },
+        "productionPlan": {
+          "shotCount": 4,
+          "characters": [
+            "林澈",
+            "顾言"
+          ],
+          "scenes": [
+            "中央记忆档案城·校验台",
+            "中央记忆档案城·外环廊桥"
+          ],
+          "visualAssets": [
+            "两名角色多角度候选",
+            "异常记忆片候选",
+            "校验台与廊桥环境候选"
+          ],
+          "audioNeeds": [
+            "两句中性合成对白候选，不模仿真人",
+            "权利明确的内部环境声候选"
+          ],
+          "productionNotes": [
+            "本阶段只建立 ROOTS_READY 根血缘",
+            "所有媒体结果仍需后续权威门禁与人工决定"
+          ]
+        }
+      }
+    },
+    "project": {
+      "projectType": "series",
+      "title": "未来之城 K2",
+      "description": "K2-001 受治理单集制作",
+      "targetPlatform": "technical-evidence",
+      "aspectRatio": "16:9",
+      "defaultDurationSec": 30,
+      "plannedEpisodeCount": 1
+    },
+    "episode": {
+      "episodeNumber": 1,
+      "seasonNumber": 1,
+      "volumeNumber": 1,
+      "title": "记忆回声"
+    },
+    "seriesPlan": {
+      "humanConfirmed": true,
+      "candidate": {
+        "schemaVersion": "creator.series-plan.candidate.v1",
+        "seriesConcept": "围绕记忆权利与可核验事实展开的单集科幻短片。",
+        "premise": "被系统删除的记录仍可能通过独立校验留下可审计痕迹。",
+        "logline": "两名立场不同的档案调查者为同一段被抹去的记忆建立双份证据。",
+        "mainNarrativeDirection": "从互相防备走向只对可验证事实建立有限信任。",
+        "mainArcs": [
+          {
+            "arcNumber": 1,
+            "title": "共同校验",
+            "episodeStart": 1,
+            "episodeEnd": 1,
+            "objective": "确认异常影像并保留独立证据。",
+            "turningPoint": "系统否认影像存在，但两台终端得到相同摘要。"
+          }
+        ],
+        "subArcs": [
+          {
+            "title": "有限信任",
+            "episodeStart": 1,
+            "episodeEnd": 1,
+            "purpose": "让两人只在可核验事实范围内形成合作。"
+          }
+        ],
+        "characterArcIntents": [
+          {
+            "roleLabel": "林澈",
+            "startingState": "坚持追查但不信任制度",
+            "developmentIntent": "把个人直觉转换为可复核证据",
+            "destination": "保留证据并接受有限协作"
+          },
+          {
+            "roleLabel": "顾言",
+            "startingState": "审慎执行档案规则",
+            "developmentIntent": "在制度判断与亲眼事实冲突时选择校验",
+            "destination": "独立保存摘要并承担见证责任"
+          }
+        ],
+        "episodePlanItems": [
+          {
+            "episodeNumber": 1,
+            "title": "记忆回声",
+            "logline": "林澈与顾言在封存前为一段被抹去的共同记忆建立双份校验证据。",
+            "arcNumber": 1,
+            "narrativePurpose": "完成发现、校验与证据留存的闭环。",
+            "continuityNotes": [
+              "林澈右袖粉尘、顾言身份灯和记忆片编号保持连续",
+              "雨向与冷蓝琥珀双色关系保持一致"
+            ],
+            "foreshadowing": [
+              "两份摘要将在后续权威门禁建立后才可进入进一步生产"
+            ]
+          }
+        ],
+        "narrativeRhythm": "前十四秒发现异常，后十六秒完成校验与留存。",
+        "worldIntent": "近未来档案城市以可验证摘要管理记忆记录。",
+        "continuityIntent": [
+          "所有后续镜头继承同一角色与道具锚点",
+          "历史技术证据不自动附着到新 run"
+        ],
+        "foreshadowingContext": [
+          "新 canonical root 只为后续 M6 与身份权威准备输入"
+        ],
+        "productionAssumptions": [
+          "单集30秒、16:9、两场四镜",
+          "无外部音频、无真人声纹克隆",
+          "P1 与 publication 在本阶段保持关闭"
+        ]
+      }
+    },
+    "script": {
+      "humanConfirmed": true,
+      "candidate": {
+        "schemaVersion": "creator.script-studio.script-candidate.v1",
+        "title": "记忆回声",
+        "logline": "林澈与顾言在封存档案前确认一段被抹去的共同记忆。",
+        "synopsis": "两人在中央记忆档案城追索同一段异常影像，并决定分别保存一份校验摘要。",
+        "targetDurationSec": 30,
+        "scenes": [
+          {
+            "sceneNumber": 1,
+            "heading": "中央记忆档案城·校验台",
+            "location": "中央记忆档案城",
+            "timeOfDay": "雨夜",
+            "characters": [
+              "林澈",
+              "顾言"
+            ],
+            "action": "林澈将异常记忆片放入校验台，顾言封锁外部检索通道。",
+            "dialogue": [
+              {
+                "speaker": "顾言",
+                "text": "从现在起，只相信我们亲眼看到的。",
+                "emotion": "克制"
+              }
+            ],
+            "narration": [],
+            "subtitleText": [
+              "只相信亲眼看到的"
+            ],
+            "estimatedDurationSec": 14,
+            "scenePurpose": "建立共同目标与外部压力",
+            "continuityNotes": [
+              "林澈右袖银灰粉尘保持一致"
+            ],
+            "productionNotes": [
+              "冷蓝环境，校验台使用琥珀色实景光"
+            ]
+          },
+          {
+            "sceneNumber": 2,
+            "heading": "中央记忆档案城·外环廊桥",
+            "location": "外环廊桥",
+            "timeOfDay": "雨夜",
+            "characters": [
+              "林澈",
+              "顾言"
+            ],
+            "action": "两人看见被系统判定为不存在的童年影像，并分别保存一份校验摘要。",
+            "dialogue": [
+              {
+                "speaker": "林澈",
+                "text": "它被删掉了，但没有消失。",
+                "emotion": "坚定"
+              }
+            ],
+            "narration": [],
+            "subtitleText": [
+              "被删掉，不等于消失"
+            ],
+            "estimatedDurationSec": 16,
+            "scenePurpose": "完成证据确认并建立有限信任",
+            "continuityNotes": [
+              "两人衣着、雨向与记忆片编号连续"
+            ],
+            "productionNotes": [
+              "远景建立城市尺度，结尾停留两秒"
+            ]
+          }
+        ]
+      }
+    },
+    "productionRun": {
+      "idempotencyKey": "k2-001-canonical-root-bootstrap-v1",
+      "shotsPerScene": [
+        2,
+        2
+      ]
+    },
+    "exitState": {
+      "canonicalRootStatus": "ROOTS_READY",
+      "m6AuthorityStatus": "NOT_CREATED",
+      "identityLockStatus": "NOT_CREATED",
+      "rightsAuthorityStatus": "NOT_CONNECTED",
+      "providerAuthorityStatus": "NOT_CONNECTED",
+      "budgetAuthorityStatus": "NOT_CONNECTED",
+      "p1Gate": "NOT_PASSED",
+      "publicationAllowed": false
+    }
+  },
+  "payloadSha256": "0dfa64aa23e7120415a58b48eb00bb5d92274518d16051f2cb419525ea3b364c"
+}

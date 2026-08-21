@@ -20,6 +20,15 @@ Creator Public API → Application → V5 → V4 → V3 → Compute 主链。
 
 `experiments/k2-001-preboot/k2-001-preproduction-candidate.v1.json`
 
+新的 canonical root 规范与 Operator Application 分别位于：
+
+- `experiments/k2-001-canonical-bootstrap/k2-001-canonical-bootstrap.v1.json`；
+- `scripts/k2_canonical_lineage_bootstrap.py`；
+- `scripts/k2_canonical_lineage_api_verify.py`（apply 后的 authenticated GET-only
+  exact-match 与 secret-free receipt）。
+
+它们只允许建立一个 `ROOTS_READY` 根；主机正式 apply 之前仍不存在新的生产 Ref。
+
 离线校验：
 
 ```bash

@@ -1,6 +1,6 @@
 # K2 P1 从离线候选到受治理实验运行手册
 
-> 当前状态：`PREBOOT READY / LIVE DISPATCH BLOCKED / P1 NOT PASSED`
+> 当前状态：`CANONICAL BOOTSTRAP IMPLEMENTED / HOST APPLY PENDING / P1 NOT PASSED`
 
 本手册把已完成的开机前资料接回现有主链。它不绕过
 `docs/08-compute/k2-comfyui-wan22-operator-runbook.md`，也不把 image/audio 缺口
@@ -72,8 +72,239 @@ Application → V5 边界创建，使用显式持久化路径、初始化前空�
 
 Project Lead 已于 `2026-08-21` 选择并授权第二种路径。ADR-0010 冻结的引导上限是
 新建一个 `ROOTS_READY` root；M6 Authority、Identity Lock、Rights/Provider/budget、
-live media 与 publication 均不随该授权产生。正式 apply 命令必须等待治理检查点与
-实现检查点远端验证后，由本手册后续版本给出。
+live media 与 publication 均不随该授权产生。治理检查点已在 PR #9 的
+`976416bdd1a5a93001e1f271d406ed41e1415208` 通过 Repository Validation #43 的
+5/5 作业。正式 apply 只能在本轮实现 checkpoint 也完成远端验证后执行。
+
+### 2.1 无写 dry-run
+
+以下命令不需要 GPU、模型加载、Provider 凭据或外部音频。它会校验精确规范、目标
+安全性和 fail-closed 退出状态，但不会创建 canonical 目录：
+
+```bash
+set -euo pipefail
+cd /data/coding/AI-Cinematic-Studio
+
+SPEC="$PWD/experiments/k2-001-canonical-bootstrap/k2-001-canonical-bootstrap.v1.json"
+CANONICAL_PARENT=/data/k2-core
+CANONICAL_TARGET="$CANONICAL_PARENT/k2-001-canonical-v1"
+
+test -z "$(git status --porcelain --untracked-files=all)"
+test ! -e "$CANONICAL_TARGET"
+install -d -m 700 "$CANONICAL_PARENT"
+
+python scripts/k2_canonical_lineage_bootstrap.py \
+  --spec "$SPEC" \
+  --target-dir "$CANONICAL_TARGET" \
+  | tee /data/k2-authority/k2-canonical-bootstrap-dry-run.txt
+
+test ! -e "$CANONICAL_TARGET"
+```
+
+期望摘要：
+
+```text
+K2_CANONICAL_BOOTSTRAP_VALIDATION=PASS
+SPECIFICATION_SHA256=3b4d77b371cb23e2acf5420d74ded9d890a877f9555d781bc7842d0b715eb0ee
+PAYLOAD_SHA256=0dfa64aa23e7120415a58b48eb00bb5d92274518d16051f2cb419525ea3b364c
+K2_CANONICAL_BOOTSTRAP_MODE=DRY_RUN_NO_WRITE
+K2_CANONICAL_ROOT_STATUS=NOT_CREATED
+P1_GATE=NOT_PASSED
+PUBLICATION_ALLOWED=false
+```
+
+### 2.2 唯一正式 apply
+
+只在实现 commit、远端 tree 与 CI 已由本工作包复核后执行一次。不要提供
+`--repository-commit`；脚本会从干净 checkout 解析真实 HEAD 并写入 receipt：
+
+```bash
+python scripts/k2_canonical_lineage_bootstrap.py \
+  --spec "$SPEC" \
+  --target-dir "$CANONICAL_TARGET" \
+  --apply \
+  --acknowledge-new-lineage NEW_CANONICAL_K2_LINEAGE_NOT_RECOVERY \
+  | tee /data/k2-authority/k2-canonical-bootstrap-apply.txt
+```
+
+期望最终状态只能是：
+
+```text
+K2_CANONICAL_BOOTSTRAP=PASS
+K2_CANONICAL_ROOT_STATUS=ROOTS_READY
+M6_AUTHORITY_STATUS=NOT_CREATED
+IDENTITY_LOCK_STATUS=NOT_CREATED
+P1_GATE=NOT_PASSED
+PUBLICATION_ALLOWED=false
+```
+
+脚本在同盘私有 staging 中通过 V5 创建根链，重启并调用现有 read-only scanner，要求
+恰好一个 production run，然后以 no-replace 原子 rename 发布。失败会清除 staging；
+目标已存在、确认短语不精确、checkout 非干净或扫描不一致都会停止。不要自动重试或
+删除目标。
+
+### 2.3 apply 后的独立文件与只读复核
+
+```bash
+(
+  cd "$CANONICAL_TARGET"
+  sha256sum -c k2-canonical-bootstrap-inventory.sha256
+)
+
+python scripts/k2_readonly_lineage_scan.py \
+  --root "$CANONICAL_TARGET" \
+  --max-depth 1 \
+  --max-rows 20 \
+  | tee /data/k2-authority/k2-canonical-bootstrap-readonly-scan.txt
+```
+
+必须得到 `K2_PRODUCTION_DATABASES_FOUND=1`、
+`K2_PRODUCTION_RUNS_FOUND=1` 和
+`K2_CURRENT_LINEAGE_STATUS=FOUND_READ_ONLY`。将 apply 输出、receipt、inventory 和
+独立 scan 的 SHA-256 保存到 `/data/k2-authority`，但不要把数据库、创作正文或宿主
+绝对路径提交到 Git。
+
+### 2.4 authenticated Public API exact-match
+
+Creator authenticated API 核对时必须显式注入固定数据库路径；不要让 Creator 回退到
+默认空库：
+
+```bash
+export CREATOR_DATA_PATH="$CANONICAL_TARGET/creator-workspace.sqlite3"
+export CREATOR_EPISODE_PRODUCTION_DATA_PATH="$CANONICAL_TARGET/episode-production.sqlite3"
+export CREATOR_PRODUCTION_POLICY_DATA_PATH="$CANONICAL_TARGET/episode-production.sqlite3.production-policy.sqlite3"
+export CREATOR_MEDIA_JOB_DATA_PATH=/data/k2-runtime/k2-001/media-jobs.sqlite3
+export CREATOR_MEDIA_ARTIFACT_ROOT=/data/k2-runtime/k2-001/artifacts
+```
+
+使用一次性随机 server-to-server bearer。原始值只保留在当前 shell 环境，配置文件只写
+SHA-256；不要把原始值粘贴到命令行参数、日志、Git 或证据文件：
+
+```bash
+set -euo pipefail
+install -d -m 700 /data/k2-runtime/k2-001 /data/k2-authority/evidence
+
+export K2_WORKSPACE_REF="$(
+  python - "$CANONICAL_TARGET/k2-canonical-bootstrap-receipt.v1.json" <<'PY'
+import json
+import sys
+
+with open(sys.argv[1], encoding="utf-8") as handle:
+    print(json.load(handle)["lineage"]["workspaceRef"])
+PY
+)"
+export K2_CREATOR_API_BEARER_TOKEN="$(
+  python - <<'PY'
+import secrets
+print(secrets.token_urlsafe(48))
+PY
+)"
+export K2_CREATOR_API_TOKEN_SHA256="$(
+  printf '%s' "$K2_CREATOR_API_BEARER_TOKEN" | sha256sum | awk '{print $1}'
+)"
+export CREATOR_PUBLIC_API_TOKEN_CONFIG=/data/k2-runtime/k2-001/creator-public-auth.v1.json
+
+python - <<'PY'
+import json
+import os
+from pathlib import Path
+import tempfile
+
+target = Path(os.environ["CREATOR_PUBLIC_API_TOKEN_CONFIG"])
+value = {
+    "schemaVersion": "creator.public-auth.v1",
+    "credentials": [
+        {
+            "credentialRef": "k2-canonical-verifier-v1",
+            "workspaceRef": os.environ["K2_WORKSPACE_REF"],
+            "tokenSha256": os.environ["K2_CREATOR_API_TOKEN_SHA256"],
+            "enabled": True,
+        }
+    ],
+}
+descriptor, temporary = tempfile.mkstemp(prefix=".creator-auth-", dir=target.parent)
+try:
+    with os.fdopen(descriptor, "w", encoding="utf-8") as handle:
+        json.dump(value, handle, sort_keys=True, separators=(",", ":"))
+        handle.write("\n")
+        handle.flush()
+        os.fsync(handle.fileno())
+    os.chmod(temporary, 0o600)
+    os.replace(temporary, target)
+finally:
+    if os.path.exists(temporary):
+        os.unlink(temporary)
+PY
+
+unset K2_CREATOR_API_TOKEN_SHA256
+export CREATOR_PUBLIC_API_HOST=127.0.0.1
+export CREATOR_PUBLIC_API_PORT=8765
+
+while IFS= read -r NAME; do unset "$NAME"; done < <(compgen -A variable COMFYUI_)
+unset CREATOR_RIGHTS_AUTHORITY_BUNDLE_PATH \
+  CREATOR_RIGHTS_AUTHORITY_BUNDLE_SHA256 \
+  CREATOR_PROVIDER_AUTHORITY_BUNDLE_PATH \
+  CREATOR_PROVIDER_AUTHORITY_BUNDLE_SHA256
+```
+
+短暂启动 loopback Creator，仅执行认证 GET 核对。清理函数会停止进程并清除当前 shell
+中的原始 bearer：
+
+```bash
+CREATOR_LOG=/data/k2-authority/k2-canonical-creator-readonly-verification.log
+CREATOR_PID=""
+cleanup_k2_api_verify() {
+  if [ -n "$CREATOR_PID" ]; then
+    kill "$CREATOR_PID" 2>/dev/null || true
+    wait "$CREATOR_PID" 2>/dev/null || true
+  fi
+  unset K2_CREATOR_API_BEARER_TOKEN K2_WORKSPACE_REF
+}
+trap cleanup_k2_api_verify EXIT
+
+python -m apps.creator_workspace_mvp.server >"$CREATOR_LOG" 2>&1 &
+CREATOR_PID=$!
+
+CREATOR_READY=0
+for _ in $(seq 1 30); do
+  if ! kill -0 "$CREATOR_PID" 2>/dev/null; then
+    break
+  fi
+  if curl -fsS --max-time 2 http://127.0.0.1:8765/health >/dev/null; then
+    CREATOR_READY=1
+    break
+  fi
+  sleep 1
+done
+test "$CREATOR_READY" = 1
+
+VERIFY_TIME="$(date -u +%Y%m%dT%H%M%SZ)"
+VERIFY_OUTPUT="/data/k2-authority/evidence/k2-canonical-public-api-verification-$VERIFY_TIME.json"
+python scripts/k2_canonical_lineage_api_verify.py \
+  --canonical-root "$CANONICAL_TARGET" \
+  --base-url http://127.0.0.1:8765 \
+  --output "$VERIFY_OUTPUT" \
+  | tee /data/k2-authority/k2-canonical-public-api-verification.txt
+
+sha256sum "$VERIFY_OUTPUT" | tee "$VERIFY_OUTPUT.sha256"
+(
+  cd "$CANONICAL_TARGET"
+  sha256sum -c k2-canonical-bootstrap-inventory.sha256
+)
+
+cleanup_k2_api_verify
+trap - EXIT
+```
+
+必须得到 `K2_CANONICAL_PUBLIC_API_VERIFICATION=PASS`、
+`VERIFIED_RESOURCE_COUNT=7`、`CANONICAL_ROOT_STATUS=ROOTS_READY`、
+`P1_GATE=NOT_PASSED` 和 `PUBLICATION_ALLOWED=false`。核验器不跟随 redirect；Series、
+Project、Episode、Series Plan workspace、Script workspace、run detail 与 run list 的
+任一 ref/version/digest 不一致、run 数量不是 1 或 API 非 loopback 都会 fail closed。
+
+不要设置任何 `COMFYUI_*` 或外部 Authority 环境变量，直到该 exact-match receipt 已
+生成。runtime job/artifact 路径放在 canonical 目录之外，避免把后续运行文件混入根
+数据库 inventory。
 
 仅当结果为 `FOUND_READ_ONLY` 时，才继续核对：
 

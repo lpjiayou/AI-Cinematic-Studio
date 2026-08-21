@@ -4,7 +4,7 @@
 >
 > 盘点日期：`2026-08-21`
 >
-> 本次更新：`K2 P1 PREBOOT OFFLINE PACKAGE + CURRENT-BOOT TECHNICAL EVIDENCE REFRESH`
+> 本次更新：`K2 P1 PREBOOT + RUNTIME EVIDENCE + CANONICAL BOOTSTRAP G0/G1`
 
 ## 1. 报告边界
 
@@ -23,7 +23,7 @@
 
 | 仓库 | 默认分支事实快照 | 阶段候选 |
 | --- | --- | --- |
-| Core | `origin/main` @ `8d9ce52166cec27d2fefaa86548016130babdfff` | `feature/k2-publishable-production`，PR #9；本轮证据更新输入基线 `b35e183d07083c28b7f5f70c156cb0bc8a2e3e09`，tree `b88c5958791ffb42b09f1e6b93bd40778877b952` |
+| Core | `origin/main` @ `8d9ce52166cec27d2fefaa86548016130babdfff` | `feature/k2-publishable-production`，PR #9；canonical bootstrap 治理检查点 `976416bdd1a5a93001e1f271d406ed41e1415208`，tree `99fd75de064a6d93077667d7e427f440bfb90b19`；G1 实现工作树等待本轮提交/远端验证 |
 | Frontend | `origin/main` @ `277754a6e61e86bb1ed8109570aa19e4214f0d60` | `feature/k2-publishable-production-ui` @ `23d5df154053c486863a18cf902f714d45801f24`，PR #8；本次未改动 |
 
 本报告不把候选分支写成默认分支能力。最终远端 commit 由 GitHub PR 记录；
@@ -78,6 +78,11 @@ Repository Validation #41 为 5/5 jobs 通过。
 
 本次当前启动证据刷新及只读血缘工具完成后，证据/开机前/操作工具聚焦测试为
 `23 / 23 PASS`，完整 Core 回归为 `569 / 569 PASS`。
+
+原 durable lineage 的扩展位置审计结论为 `NOT_FOUND`。Project Lead 随后授权新的
+canonical bootstrap；其 G0 治理检查点在 Repository Validation #43 获得 5/5 jobs
+成功。G1 当前本地实现聚焦测试为 `18 / 18 PASS`；正式 `/data` canonical 目录、主机
+receipt 与 authenticated API exact-match 仍未产生，因此不列为已有生产资产。
 
 ## 5. A100 / ComfyUI 技术证据
 
@@ -161,8 +166,27 @@ Git，也不授予 Rights、Provider、Budget 或 Publication Authority。
   digest 和计数，不选择 payload、创作正文、idempotency key 或 credential 字段；
 - fail-closed 校验器与 12 个篡改/越权测试，以及 3 个只读/脱敏/行数边界测试。
 
-本次候选树的完整 Core 回归为 `566 / 566 PASS`，其中新增开机前聚焦测试
-`12 / 12 PASS`。
+新的 canonical bootstrap 资产包括：
+
+- ADR-0010 与 `K2_CANONICAL_LINEAGE_BOOTSTRAP_CONTRACT.md`；
+- 精确 `k2.canonical-lineage-bootstrap.v1` 规范，payload SHA-256
+  `0dfa64aa23e7120415a58b48eb00bb5d92274518d16051f2cb419525ea3b364c`，完整规范
+  SHA-256
+  `3b4d77b371cb23e2acf5420d74ded9d890a877f9555d781bc7842d0b715eb0ee`；
+- 默认无写、显式确认后才 apply 的 V5-only Operator Application；
+- 同盘私有 staging、重启、只读 scanner、secret-free receipt、相对数据库
+  inventory、no-replace 原子发布与重复 apply 拒绝；
+- authenticated GET-only Public API exact-match verifier；只允许 loopback，凭据只从
+  环境变量读取，不跟随 redirect，并生成 canonical root 之外的 secret-free receipt；
+- 18 个规范、dry-run、权限、失败清理、并发目标、重复 apply、篡改、真实 loopback
+  authenticated HTTP/API exact-match、多 run/API digest/落盘数据库篡改拒绝、
+  GET-only、凭据非披露与依赖边界测试。
+
+临时目录测试建立的 run 会随测试目录删除，仅证明工具行为，不是正式 K2 lineage。
+
+本次 canonical bootstrap G1 候选树的完整 Core 回归为 `587 / 587 PASS`：Unit
+`356 / 356`、Contract `91 / 91`、Integration `140 / 140`；bootstrap/API 聚焦测试
+为 `18 / 18 PASS`。早先开机前候选包的独立聚焦基线仍为 `12 / 12 PASS`。
 
 ### 6.3 离线工作包内没有发生的事项
 
@@ -173,6 +197,7 @@ Git，也不授予 Rights、Provider、Budget 或 Publication Authority。
 - 真人声纹克隆：0；
 - 生成图片/视频/音频：0；
 - 新 Identity Lock、AssetVersion、Approval、Master 或 Export：0；
+- `/data` 下正式 canonical `EpisodeProductionRun`：0；
 - P1/P2/P3 门禁推进：0。
 
 ## 7. 预算与 AI 音频决定
@@ -193,14 +218,17 @@ AI 音频工作需要保留，但限定为最小范围：
 
 ### P1 阻断项
 
-1. Rights Authority bundle；
-2. image/video/audio 的 Provider Authority bundle；
-3. 真实 region，或对 `provider-not-disclosed` 的外部显式接受；
-4. `budgetAuthorityRef` 与三媒体子上限；
-5. 当前 attestation ref/digest 的 Provider Authority 接受；
-6. 获批的同源 image GenerationRequest 合同扩展与 V4 image/audio live adapters；
-7. 当前 K2 lineage 下的受治理 image/video/audio 真实尝试；
-8. 候选验证、显式选择与 V5 admission。
+1. 新 canonical root 的正式主机 apply、receipt、独立只读 scan 与 authenticated API
+   exact-match；
+2. M6 Authority 与 Identity Lock；
+3. Rights Authority bundle；
+4. image/video/audio 的 Provider Authority bundle；
+5. 真实 region，或对 `provider-not-disclosed` 的外部显式接受；
+6. `budgetAuthorityRef` 与三媒体子上限；
+7. 当前 attestation ref/digest 的 Provider Authority 接受；
+8. 获批的同源 image GenerationRequest 合同扩展与 V4 image/audio live adapters；
+9. 当前 K2 lineage 下的受治理 image/video/audio 真实尝试；
+10. 候选验证、显式选择与 V5 admission。
 
 P1 依然是 `NOT PASSED`。视频技术证据或离线创作完成不能替代上述任一项。
 
@@ -223,10 +251,14 @@ P1 依然是 `NOT PASSED`。视频技术证据或离线创作完成不能替代�
 当前运行时已经完成技术证据刷新，但当前存储不存在可供解析的真实 K2 持久化血缘。
 测试夹具、`K2-001-SH-*` 文档键和历史技术证明都不能替代
 `EpisodeProductionRun / CreativeShotVersion / GenerationRequest` 的正式 Ref、version
-与 digest。下一步必须先取得外部原始数据库/快照，或由 Project Lead 明确批准建立
-新的 canonical K2 lineage；后者只能描述为重新引导，不能描述为恢复。完成该决定、
-持久化与只读复核之前，不生成 Rights/Provider Authority 候选，不启动 Creator，
-也不执行 image/video/audio 真实实验。
+与 digest。Project Lead 已明确批准建立新的 canonical K2 lineage；治理检查点已远端
+通过，G1 规范、Operator Application、Public API verifier 和 18 个聚焦测试已本地
+完成。该路径只描述为重新引导，不描述为恢复。
+
+当前正确的下一步是先完成 G1 完整回归和远端同树验证，再在主机显式新目录执行一次
+dry-run 与一次 acknowledged apply，保存 receipt/inventory 并独立只读复核。完成主机
+持久化与 authenticated API exact-match 之前，不生成 Rights/Provider Authority
+候选，不执行 image/video/audio 真实实验，也不宣称新的生产 root 已存在。
 
 ## 10. 可复核入口
 
@@ -234,6 +266,13 @@ P1 依然是 `NOT PASSED`。视频技术证据或离线创作完成不能替代�
 python scripts/k2_preboot_validate.py \
   --manifest "$PWD/experiments/k2-001-preboot/k2-001-preproduction-candidate.v1.json"
 
+python scripts/k2_canonical_lineage_bootstrap.py \
+  --spec "$PWD/experiments/k2-001-canonical-bootstrap/k2-001-canonical-bootstrap.v1.json" \
+  --target-dir /absolute/nonexistent/canonical-target
+
+python -m unittest \
+  tests.unit.test_k2_canonical_lineage_bootstrap \
+  tests.unit.test_k2_canonical_lineage_api_verify -v
 python -m unittest tests.unit.test_k2_preboot_package -v
 python -m unittest discover -s tests -p 'test_*.py' -q
 python -m compileall -q apps services scripts tests

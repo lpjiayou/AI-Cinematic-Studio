@@ -8,9 +8,9 @@
 >
 > Authorized Wave: `ACS-K2-P0 → P1 → P2 → P3 → P4 → P5 → P6 → P7 → P8 → P9 → GATE A/B/C → P10`
 >
-> Current Task: `ACS-K2-CANONICAL-LINEAGE-BOOTSTRAP-G0 → G1`
+> Current Task: `ACS-K2-CANONICAL-LINEAGE-BOOTSTRAP-G1 → HOST APPLY`
 >
-> Current Work Package: `NEW CANONICAL ROOT AUTHORIZED / ROOTS_READY MAXIMUM / M6 + IDENTITY + P0→P1 HOLD`
+> Current Work Package: `BOOTSTRAP IMPLEMENTED / CANONICAL HOST DIRECTORY NOT YET CREATED / M6 + IDENTITY + P0→P1 HOLD`
 >
 > M6 Authorization: `ACCEPTED SURFACES + K2 EXTERNAL AUTHORITY CONNECTION / NO M6 SCHEMA EXPANSION`
 >
@@ -1064,3 +1064,27 @@ only after staging, restart, receipt and read-only lineage verification pass.
 The maximum checkpoint result is one `EpisodeProductionRun` at `ROOTS_READY` with
 `publicationAllowed=false`. M6 Authority, Identity Lock, Rights/Provider/budget
 authority, live provider execution, asset admission and publication remain absent.
+
+The governance checkpoint is remote-verified at PR #9 head
+`976416bdd1a5a93001e1f271d406ed41e1415208`, tree
+`99fd75de064a6d93077667d7e427f440bfb90b19`; Repository Validation #43 completed
+with all five jobs successful.
+
+The G1 implementation now includes the exact
+`k2.canonical-lineage-bootstrap.v1` specification, payload SHA-256
+`0dfa64aa23e7120415a58b48eb00bb5d92274518d16051f2cb419525ea3b364c`,
+the write-free/default plus explicitly acknowledged apply utility, an authenticated
+GET-only Public API exact-match verifier, and eighteen focused tests. A local temporary
+apply proved staging, V5-only root creation, restart,
+idempotent replay, exact read-only scanner projection, private receipt/inventory,
+no-replace atomic publish, failure cleanup and repeated-apply refusal.
+The final local checkpoint regression passes `587 / 587`: Unit `356 / 356`,
+Contract `91 / 91`, Integration `140 / 140`; the bootstrap/API-focused subset passes
+`18 / 18`.
+
+That temporary test is not the formal K2 lineage. No canonical directory has yet been
+published under `/data`, no stable production refs from such a directory exist, and
+formal authenticated Creator Public API verification evidence is pending. The next
+authorized action is remote verification of this implementation, followed by exactly
+one host apply and seven-resource authenticated verification at the explicit runbook
+paths.

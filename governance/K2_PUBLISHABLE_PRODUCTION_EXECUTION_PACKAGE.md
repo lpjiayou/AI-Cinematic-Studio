@@ -24,6 +24,8 @@ as satisfaction of M6, Identity Lock, P0→P1 or publication gates.
 
 | Gate | Work | Exit evidence |
 | --- | --- | --- |
+| K2 root G0 | freeze the missing-lineage decision and bounded replacement contract | ADR-0010 and contract remote-verified with no production write |
+| K2 root G1 | validate and atomically establish exactly one new canonical root | private receipt/inventory, restart match, one read-only-scanned `ROOTS_READY` run and authenticated API match |
 | P0 | target, rights, production and provider-policy contracts; capability probe | immutable policy facts, validation and fail-closed tests |
 | P1 | rights-cleared provider/GPU experiments via V4 | real attempts/artifacts, provenance, cost, latency and runtime facts |
 | P2 | durable DB/job state, object store, secrets, observability and recovery | restart/isolation/idempotency/failure-injection tests |
@@ -38,6 +40,8 @@ as satisfaction of M6, Identity Lock, P0→P1 or publication gates.
 | P10 | M16 runs at 1, 3, 10 and 30 | per-size quality, cost, throughput and recovery evidence |
 
 No checkpoint may be skipped, combined by claim, or satisfied by old local evidence.
+K2 root G1 is a prerequisite for the current P0→P1 work; it supplies none of P0's
+external authority facts.
 
 ## 3. Hard transition rules
 
