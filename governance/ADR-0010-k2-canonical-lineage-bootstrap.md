@@ -1,6 +1,6 @@
 # ADR-0010 — K2 Canonical Lineage Bootstrap After Missing Durable State
 
-- Status: `ACCEPTED / BOUNDED BOOTSTRAP AUTHORIZED`
+- Status: `ACCEPTED / G0 REMOTE-VERIFIED / G1 IMPLEMENTED / HOST APPLY PENDING`
 - Date: `2026-08-21`
 - Decision owners: Project Lead / Architecture Owner `蔺鹏`
 - Extends: `ADR-0009-k2-publishable-media-production.md`
@@ -100,3 +100,32 @@ PUBLICATION_ALLOWED=false
 
 It may not report `FEATURE ACCEPTED`, P1 pass, production readiness or publication
 eligibility.
+
+## Implementation checkpoint — 2026-08-21
+
+The governance checkpoint is remote-verified on PR #9 at commit
+`976416bdd1a5a93001e1f271d406ed41e1415208`, tree
+`99fd75de064a6d93077667d7e427f440bfb90b19`; Repository Validation #43 passed all
+five jobs.
+
+G1 adds one exact specification and one Operator Application. The specification
+payload SHA-256 is
+`0dfa64aa23e7120415a58b48eb00bb5d92274518d16051f2cb419525ea3b364c`.
+The operator defaults to write-free validation, requires the exact
+`NEW_CANONICAL_K2_LINEAGE_NOT_RECOVERY` acknowledgement for apply, rejects an
+existing/symlink/unsafe target, writes only through accepted V5 boundaries, performs
+restart and read-only scanner verification, emits a secret-free receipt and relative
+SHA-256 inventory, and uses Linux no-replace atomic rename.
+
+Eighteen focused tests pass across the bootstrap operator and authenticated Public API
+verifier, including injected pre-publication failure cleanup, competing-target
+refusal, byte-preserving repeated apply, exact seven-resource API projection,
+real authenticated loopback HTTP, extra-run rejection, API digest mismatch, on-disk
+database tamper rejection, GET-only/dependency enforcement and credential
+non-disclosure. These tests use temporary directories and do not establish the formal
+K2 lineage. Host apply,
+authenticated Creator API exact-match execution, implementation remote verification
+and full checkpoint closeout remain pending.
+
+The final local complete Core regression passes `587 / 587`: Unit `356 / 356`,
+Contract `91 / 91` and Integration `140 / 140`.
