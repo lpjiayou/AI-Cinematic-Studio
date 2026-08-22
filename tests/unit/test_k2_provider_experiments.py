@@ -13,6 +13,7 @@ from services.v4_platform import (
 )
 from services.v5_core_os.episode_production import (
     EpisodeProductionPublicError,
+    K2InternalExecutionGrant,
     create_in_memory_boundary,
 )
 from tests.unit.test_episode_production_k2 import (
@@ -154,7 +155,47 @@ class K2ProviderExperimentTests(unittest.TestCase):
             clock=lambda: NOW,
         )
 
-    def prepare(self, boundary, *, record_policy=True):
+    def internal_boundary(
+        self,
+        adapter,
+        *,
+        production_run_ref="episode-production-run-k2-1",
+        max_cost_minor=100,
+    ):
+        execution = MediaJobCoordinator(
+            InMemoryMediaJobAdapter(),
+            adapter,
+            Path(self.directory.name) / "internal-provider-artifacts",
+            ref_factory=self.refs,
+            clock=lambda: NOW,
+            max_attempts=1,
+        )
+        grant = K2InternalExecutionGrant.create(
+            workspace_ref=WORKSPACE,
+            production_run_ref=production_run_ref,
+            provider_id="provider-video",
+            model_id="model-video-v1",
+            region="approved-region-1",
+            endpoint_class="server-side-managed",
+            runtime_attestation_ref="runtime-attestation-a100-v1",
+            runtime_attestation_digest="4" * 64,
+            cost_currency="USD",
+            max_cost_minor=max_cost_minor,
+            timeout_seconds=1800,
+        )
+        return create_in_memory_boundary(
+            project_boundary=self.assembly.project_context,
+            series_episode_boundary=self.assembly.series_episode,
+            series_planning_boundary=self.assembly.series_planning,
+            script_studio_boundary=self.assembly.script_studio,
+            identity_reference_authority=approved_identity_authority(),
+            provider_experiment_execution=execution,
+            internal_execution_grant=grant,
+            ref_factory=self.refs,
+            clock=lambda: NOW,
+        )
+
+    def prepare(self, boundary, *, record_policy=True, internal=False):
         run = boundary.create_run(
             run_command(self.project, self.series, self.episode)
         )
@@ -173,9 +214,130 @@ class K2ProviderExperimentTests(unittest.TestCase):
             "productionRunRef": run["productionRunRef"],
             "idempotencyKey": "k2-provider-video-experiment-v1",
             "sourceGenerationRequestRef": source["generationRequestRef"],
-            "providerCapabilityRef": "provider-capability-video-v1",
         }
+        if not internal:
+            command["providerCapabilityRef"] = "provider-capability-video-v1"
         return run, command
+
+    def test_internal_exact_scope_passes_p1_without_external_policy_bundle(self):
+        adapter = StubLiveVideoAdapter()
+        boundary = self.internal_boundary(adapter)
+        run, command = self.prepare(
+            boundary, record_policy=False, internal=True
+        )
+
+        readiness = boundary.get_production_readiness(
+            WORKSPACE, run["productionRunRef"]
+        )
+        result = boundary.run_provider_experiment(command)
+        listed = boundary.list_provider_experiments(
+            WORKSPACE, run["productionRunRef"]
+        )
+
+        self.assertEqual(
+            readiness["readiness"]["state"], "READY_INTERNAL_EXECUTION"
+        )
+        self.assertEqual(
+            readiness["readiness"]["rightsState"],
+            "NOT_REQUIRED_INTERNAL",
+        )
+        candidate = result["candidate"]
+        self.assertEqual(candidate["state"], "UNSELECTED_INTERNAL_CANDIDATE")
+        self.assertEqual(candidate["provenance"], "SELF_HOSTED_AI_GENERATED")
+        self.assertEqual(candidate["selectionState"], "UNSELECTED")
+        self.assertEqual(candidate["admissionState"], "NOT_ADMITTED")
+        self.assertEqual(candidate["rightsState"], "NOT_REQUIRED_INTERNAL")
+        self.assertFalse(candidate["publicationAllowed"])
+        serialized = json.dumps(candidate, ensure_ascii=False)
+        for forbidden in (
+            "productionPolicyBundleRef",
+            "rightsManifestRef",
+            "providerExecutionPolicyRef",
+            "providerCapabilityRef",
+            "credentialSourceRef",
+            "usageTermsRef",
+            "budgetAuthorityRef",
+        ):
+            self.assertNotIn(forbidden, serialized)
+        self.assertEqual(
+            result["readiness"]["state"],
+            "PASSED_INTERNAL_VIDEO_EXECUTION",
+        )
+        self.assertEqual(result["readiness"]["blockers"], [])
+        self.assertEqual(len(adapter.calls), 1)
+        request_selection = adapter.calls[0]["providerSelection"]
+        self.assertEqual(
+            request_selection["executionMode"], "INTERNAL_SELF_HOSTED"
+        )
+        self.assertNotIn("budgetAuthorityRef", request_selection)
+        self.assertEqual(len(listed["candidates"]), 1)
+        self.assertEqual(
+            listed["readiness"]["state"],
+            "PASSED_INTERNAL_VIDEO_EXECUTION",
+        )
+
+    def test_internal_runtime_attestation_mismatch_still_fails_closed(self):
+        adapter = StubLiveVideoAdapter(runtime_attestation_digest="9" * 64)
+        boundary = self.internal_boundary(adapter)
+        _, command = self.prepare(
+            boundary, record_policy=False, internal=True
+        )
+
+        with self.assertRaises(EpisodeProductionPublicError) as caught:
+            boundary.run_provider_experiment(command)
+
+        self.assertEqual(
+            (caught.exception.status, caught.exception.code),
+            (422, "artifact_verification_failed"),
+        )
+
+    def test_internal_operational_cost_limit_still_fails_closed(self):
+        adapter = StubLiveVideoAdapter(cost_minor=101)
+        boundary = self.internal_boundary(adapter, max_cost_minor=100)
+        _, command = self.prepare(
+            boundary, record_policy=False, internal=True
+        )
+
+        with self.assertRaises(EpisodeProductionPublicError) as caught:
+            boundary.run_provider_experiment(command)
+
+        self.assertEqual(
+            (caught.exception.status, caught.exception.code),
+            (422, "artifact_verification_failed"),
+        )
+
+    def test_internal_grant_is_exact_run_scoped_and_legacy_remains_closed(self):
+        adapter = StubLiveVideoAdapter()
+        boundary = self.internal_boundary(
+            adapter, production_run_ref="episode-production-run-other"
+        )
+        _, command = self.prepare(boundary, record_policy=False)
+
+        with self.assertRaises(EpisodeProductionPublicError) as caught:
+            boundary.run_provider_experiment(command)
+
+        self.assertEqual(
+            (caught.exception.status, caught.exception.code),
+            (409, "production_policy_required"),
+        )
+        self.assertEqual(adapter.calls, [])
+
+    def test_internal_client_cannot_select_a_provider_capability(self):
+        adapter = StubLiveVideoAdapter()
+        boundary = self.internal_boundary(adapter)
+        _, command = self.prepare(
+            boundary, record_policy=False, internal=True
+        )
+        command["providerCapabilityRef"] = "browser-selected-provider"
+
+        with self.assertRaises(EpisodeProductionPublicError) as caught:
+            boundary.run_provider_experiment(command)
+
+        self.assertEqual(
+            (caught.exception.status, caught.exception.code),
+            (400, "invalid_request"),
+        )
+        self.assertEqual(adapter.calls, [])
 
     def test_records_a_safe_untrusted_candidate_without_advancing_g5(self):
         adapter = StubLiveVideoAdapter()

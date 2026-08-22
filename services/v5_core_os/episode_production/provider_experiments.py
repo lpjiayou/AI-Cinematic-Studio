@@ -1,9 +1,10 @@
-"""P1 live-provider experiments on the existing K2 production lineage.
+"""P1 live-adapter experiments on the existing K2 production lineage.
 
-The service binds a current V5 rights/policy bundle and an existing M9 generation
-request to the existing V4 job boundary.  A successful provider response remains an
-untrusted, unselected candidate.  It cannot create an AssetVersion, advance the K2
-gate journal, satisfy a human decision or allow publication.
+The legacy mode binds a current V5 rights/policy bundle. The exact K2 internal mode
+instead binds a server-held self-hosted execution grant. Both modes bind an existing
+M9 generation request to the existing V4 job boundary. A successful response remains
+an unselected, non-admitted candidate. It cannot create an AssetVersion, advance the
+K2 gate journal, satisfy a human decision or allow publication.
 """
 
 from __future__ import annotations
@@ -38,6 +39,10 @@ from .foundation import (
     _required_ref,
 )
 from .media import MediaExecutionPort, RejectingMediaExecution
+from .internal_execution import (
+    INTERNAL_EXECUTION_MODE,
+    K2InternalExecutionGrant,
+)
 from .production_policy import (
     K2ProductionPolicyService,
     ProductionPolicyRequiredError,
@@ -48,6 +53,13 @@ EXPERIMENT_REQUEST_SCHEMA_VERSION = "v5.provider-experiment-request.v1"
 EXPERIMENT_CANDIDATE_SCHEMA_VERSION = "v5.provider-experiment-candidate.v1"
 EXPERIMENT_PROFILE_ID = "k2.wan22-ti2v.p1-smoke.v1"
 EXPERIMENT_SERVICE_ID = "v5.k2.provider-experiment.v1"
+INTERNAL_EXPERIMENT_REQUEST_SCHEMA_VERSION = (
+    "v5.k2-internal-self-hosted-experiment-request.v1"
+)
+INTERNAL_EXPERIMENT_CANDIDATE_SCHEMA_VERSION = (
+    "v5.k2-internal-self-hosted-experiment-candidate.v1"
+)
+INTERNAL_EXPERIMENT_SERVICE_ID = "v5.k2.internal-self-hosted-experiment.v1"
 
 
 class ProviderExperimentUnavailableError(EpisodeProductionError):
@@ -313,6 +325,7 @@ class K2ProviderExperimentService:
         repository: ProviderExperimentRepository,
         execution: MediaExecutionPort | None,
         *,
+        internal_execution_grant: K2InternalExecutionGrant | None = None,
         ref_factory: Callable[[str], str],
         clock: Callable[[], str],
     ) -> None:
@@ -320,6 +333,7 @@ class K2ProviderExperimentService:
         self.production_policy = production_policy
         self.repository = repository
         self.execution = execution or RejectingMediaExecution()
+        self.internal_execution_grant = internal_execution_grant
         self._ref_factory = ref_factory
         self._clock = clock
 
@@ -539,12 +553,62 @@ class K2ProviderExperimentService:
             }
         )
 
+    def _internal_request(
+        self,
+        *,
+        verified: Mapping[str, Any],
+        source: Mapping[str, Any],
+        shot: Mapping[str, Any],
+        grant: K2InternalExecutionGrant,
+        request_fingerprint: str,
+    ) -> dict[str, Any]:
+        profile = self._profile(source["parameters"], source)
+        parameters = {
+            key: value for key, value in profile.items() if key != "profileId"
+        }
+        parameters["prompt"] = self._prompt(shot)
+        request_ref = f"internal-generation-request-{request_fingerprint[:32]}"
+        return _sealed(
+            {
+                "schemaVersion": INTERNAL_EXPERIMENT_REQUEST_SCHEMA_VERSION,
+                "workspaceRef": source["workspaceRef"],
+                "productionRunRef": source["productionRunRef"],
+                "generationRequestRef": request_ref,
+                "generationRequestVersionRef": f"{request_ref}-v1",
+                "version": 1,
+                "ordinal": 1,
+                "sourceGenerationRequestRef": source["generationRequestRef"],
+                "sourceGenerationRequestDigest": source["payloadDigest"],
+                "assetRequirementRef": source["assetRequirementRef"],
+                "assetRequirementDigest": source["assetRequirementDigest"],
+                "creativeShotRef": source["creativeShotRef"],
+                "creativeShotVersionRef": source["creativeShotVersionRef"],
+                "creativeShotDigest": source["creativeShotDigest"],
+                "assetResolutionManifestDigest": verified[
+                    "assetResolutionManifest"
+                ]["payloadDigest"],
+                "executionMode": INTERNAL_EXECUTION_MODE,
+                "executionGrantRef": grant.execution_grant_ref,
+                "executionGrantDigest": grant.execution_grant_digest,
+                "mediaKind": "video",
+                "mediaType": "video/mp4",
+                "adapterCapability": COMFYUI_CAPABILITY,
+                "providerSelection": grant.provider_selection(),
+                "parameters": parameters,
+                "experimentProfileId": profile["profileId"],
+                "state": "READY_FOR_DISPATCH",
+                "requestedProvenance": "LIVE_PROVIDER",
+                "experimentOnly": True,
+                "publicationAllowed": False,
+            }
+        )
+
     def _verify_job(
         self,
         job: Mapping[str, Any],
         request: Mapping[str, Any],
         provider: Mapping[str, Any],
-        production_policy: Mapping[str, Any],
+        production_policy: Mapping[str, Any] | None,
     ) -> tuple[dict[str, Any], Mapping[str, Any]]:
         artifact = job.get("artifact")
         if (
@@ -595,7 +659,7 @@ class K2ProviderExperimentService:
             for field in ("providerId", "modelId", "region", "endpointClass")
         ):
             raise ProviderCandidateRejectedError(
-                "provider execution does not match the approved policy"
+                "provider execution does not match the bound execution profile"
             )
         runtime_facts = execution.get("runtimeFacts")
         if (
@@ -606,19 +670,29 @@ class K2ProviderExperimentService:
             != provider["runtimeAttestationDigest"]
         ):
             raise ProviderCandidateRejectedError(
-                "provider runtime attestation does not match the approved policy"
+                "provider runtime attestation does not match the bound execution profile"
             )
+        expected_cost_currency = (
+            production_policy["currency"]
+            if production_policy is not None
+            else provider["costCurrency"]
+        )
         if (
-            execution.get("costCurrency") != production_policy["currency"]
+            execution.get("costCurrency") != expected_cost_currency
             or execution.get("costMinor", provider["maxCostMinor"] + 1)
             > provider["maxCostMinor"]
-            or execution.get("costMinor", production_policy["maxTotalCostMinor"] + 1)
-            > production_policy["maxTotalCostMinor"]
             or execution.get("latencyMs", provider["timeoutSeconds"] * 1000 + 1)
             > provider["timeoutSeconds"] * 1000
+            or (
+                production_policy is not None
+                and execution.get(
+                    "costMinor", production_policy["maxTotalCostMinor"] + 1
+                )
+                > production_policy["maxTotalCostMinor"]
+            )
         ):
             raise ProviderCandidateRejectedError(
-                "provider execution exceeded the approved budget"
+                "provider execution exceeded the bound execution limits"
             )
         try:
             probe = verify_media_against_request(path, request)
@@ -643,10 +717,7 @@ class K2ProviderExperimentService:
         return deepcopy(dict(artifact)), attempts[-1]
 
     def run_video_experiment(self, command: Mapping[str, Any]) -> dict[str, Any]:
-        if not isinstance(command, Mapping) or set(command) != {
-            "workspaceRef", "productionRunRef", "idempotencyKey",
-            "sourceGenerationRequestRef", "providerCapabilityRef",
-        }:
+        if not isinstance(command, Mapping):
             raise EpisodeProductionError(
                 "command fields do not match the provider experiment contract"
             )
@@ -654,37 +725,72 @@ class K2ProviderExperimentService:
         run_ref = _required_ref(
             command.get("productionRunRef"), "productionRunRef"
         )
+        grant = self.internal_execution_grant
+        internal = grant is not None and grant.matches(workspace, run_ref)
+        expected_fields = {
+            "workspaceRef", "productionRunRef", "idempotencyKey",
+            "sourceGenerationRequestRef",
+        }
+        if not internal:
+            expected_fields.add("providerCapabilityRef")
+        if set(command) != expected_fields:
+            raise EpisodeProductionError(
+                "command fields do not match the provider experiment contract"
+            )
         idempotency_key = _idempotency_key(command.get("idempotencyKey"))
         source_ref = _required_ref(
             command.get("sourceGenerationRequestRef"),
             "sourceGenerationRequestRef",
         )
-        capability_ref = _required_ref(
-            command.get("providerCapabilityRef"), "providerCapabilityRef"
-        )
         verified = self.assets.verify_asset_plan_current(workspace, run_ref)
-        policy = self.production_policy.verify_policy_current(workspace, run_ref)
         source, shot = self._select_source(verified, source_ref)
-        provider = self._select_provider(policy, capability_ref)
-        profile = self._profile(policy["productionPolicy"], source)
-        request_fingerprint = _digest(
-            {
-                "workspaceRef": workspace,
-                "productionRunRef": run_ref,
-                "sourceGenerationRequestDigest": source["payloadDigest"],
-                "creativeShotDigest": shot["payloadDigest"],
-                "assetResolutionManifestDigest": verified[
-                    "assetResolutionManifest"
-                ]["payloadDigest"],
-                "productionPolicyBundleDigest": policy["payloadDigest"],
-                "providerCapabilityRef": capability_ref,
-                "providerPolicyDigest": policy["providerExecutionPolicy"][
-                    "payloadDigest"
-                ],
-                "experimentProfile": profile,
-                "serviceId": EXPERIMENT_SERVICE_ID,
-            }
-        )
+        if internal:
+            assert grant is not None
+            policy = None
+            provider = grant.provider_selection()
+            profile = self._profile(source["parameters"], source)
+            request_fingerprint = _digest(
+                {
+                    "workspaceRef": workspace,
+                    "productionRunRef": run_ref,
+                    "sourceGenerationRequestDigest": source["payloadDigest"],
+                    "creativeShotDigest": shot["payloadDigest"],
+                    "assetResolutionManifestDigest": verified[
+                        "assetResolutionManifest"
+                    ]["payloadDigest"],
+                    "executionMode": INTERNAL_EXECUTION_MODE,
+                    "executionGrantDigest": grant.execution_grant_digest,
+                    "experimentProfile": profile,
+                    "serviceId": INTERNAL_EXPERIMENT_SERVICE_ID,
+                }
+            )
+        else:
+            capability_ref = _required_ref(
+                command.get("providerCapabilityRef"), "providerCapabilityRef"
+            )
+            policy = self.production_policy.verify_policy_current(
+                workspace, run_ref
+            )
+            provider = self._select_provider(policy, capability_ref)
+            profile = self._profile(policy["productionPolicy"], source)
+            request_fingerprint = _digest(
+                {
+                    "workspaceRef": workspace,
+                    "productionRunRef": run_ref,
+                    "sourceGenerationRequestDigest": source["payloadDigest"],
+                    "creativeShotDigest": shot["payloadDigest"],
+                    "assetResolutionManifestDigest": verified[
+                        "assetResolutionManifest"
+                    ]["payloadDigest"],
+                    "productionPolicyBundleDigest": policy["payloadDigest"],
+                    "providerCapabilityRef": capability_ref,
+                    "providerPolicyDigest": policy[
+                        "providerExecutionPolicy"
+                    ]["payloadDigest"],
+                    "experimentProfile": profile,
+                    "serviceId": EXPERIMENT_SERVICE_ID,
+                }
+            )
         existing = self.repository.get_by_idempotency(
             workspace, run_ref, idempotency_key
         )
@@ -696,17 +802,28 @@ class K2ProviderExperimentService:
             candidate = self._decode(existing)
             return {
                 "candidate": self._public(candidate),
-                "readiness": self._readiness([candidate]),
+                "readiness": self._readiness([candidate], internal=internal),
                 "idempotentReplay": True,
             }
-        request = self._request(
-            verified=verified,
-            policy=policy,
-            source=source,
-            shot=shot,
-            provider=provider,
-            request_fingerprint=request_fingerprint,
-        )
+        if internal:
+            assert grant is not None
+            request = self._internal_request(
+                verified=verified,
+                source=source,
+                shot=shot,
+                grant=grant,
+                request_fingerprint=request_fingerprint,
+            )
+        else:
+            assert policy is not None
+            request = self._request(
+                verified=verified,
+                policy=policy,
+                source=source,
+                shot=shot,
+                provider=provider,
+                request_fingerprint=request_fingerprint,
+            )
         try:
             jobs = self.execution.execute_batch(
                 workspace,
@@ -727,36 +844,96 @@ class K2ProviderExperimentService:
                 "V4 returned an incomplete provider experiment"
             )
         artifact, attempt = self._verify_job(
-            jobs[0], request, provider, policy["productionPolicy"]
+            jobs[0],
+            request,
+            provider,
+            None if policy is None else policy["productionPolicy"],
         )
         execution = deepcopy(dict(artifact["providerExecution"]))
         now = self._clock()
-        candidate = _sealed(
-            {
-                "schemaVersion": EXPERIMENT_CANDIDATE_SCHEMA_VERSION,
-                "workspaceRef": workspace,
-                "productionRunRef": run_ref,
-                "experimentRef": _required_ref(
-                    self._ref_factory("provider-experiment"), "experimentRef"
-                ),
-                "candidateRef": _required_ref(
-                    self._ref_factory("provider-candidate"), "candidateRef"
-                ),
-                "candidateVersionRef": _required_ref(
-                    self._ref_factory("provider-candidate-version"),
-                    "candidateVersionRef",
-                ),
-                "version": 1,
-                "sourceGenerationRequestRef": source["generationRequestRef"],
-                "sourceGenerationRequestDigest": source["payloadDigest"],
-                "generationRequestRef": request["generationRequestRef"],
-                "generationRequestDigest": request["payloadDigest"],
-                "creativeShotRef": source["creativeShotRef"],
-                "creativeShotVersionRef": source["creativeShotVersionRef"],
-                "creativeShotDigest": source["creativeShotDigest"],
-                "assetResolutionManifestDigest": verified[
-                    "assetResolutionManifest"
-                ]["payloadDigest"],
+        candidate_base = {
+            "schemaVersion": (
+                INTERNAL_EXPERIMENT_CANDIDATE_SCHEMA_VERSION
+                if internal
+                else EXPERIMENT_CANDIDATE_SCHEMA_VERSION
+            ),
+            "workspaceRef": workspace,
+            "productionRunRef": run_ref,
+            "experimentRef": _required_ref(
+                self._ref_factory("provider-experiment"), "experimentRef"
+            ),
+            "candidateRef": _required_ref(
+                self._ref_factory("provider-candidate"), "candidateRef"
+            ),
+            "candidateVersionRef": _required_ref(
+                self._ref_factory("provider-candidate-version"),
+                "candidateVersionRef",
+            ),
+            "version": 1,
+            "sourceGenerationRequestRef": source["generationRequestRef"],
+            "sourceGenerationRequestDigest": source["payloadDigest"],
+            "generationRequestRef": request["generationRequestRef"],
+            "generationRequestDigest": request["payloadDigest"],
+            "creativeShotRef": source["creativeShotRef"],
+            "creativeShotVersionRef": source["creativeShotVersionRef"],
+            "creativeShotDigest": source["creativeShotDigest"],
+            "assetResolutionManifestDigest": verified[
+                "assetResolutionManifest"
+            ]["payloadDigest"],
+            "jobRef": jobs[0]["jobRef"],
+            "attemptRef": attempt["attemptRef"],
+            "attemptNumber": attempt["attemptNumber"],
+            "adapterIdentity": artifact["adapterIdentity"],
+            "providerExecution": execution,
+            "parameters": deepcopy(request["parameters"]),
+            "mediaKind": "video",
+            "mediaType": "video/mp4",
+            "artifactStorageKey": artifact["storageKey"],
+            "artifactStoreRef": sha256(
+                str(Path(self.execution.artifact_root).resolve()).encode(
+                    "utf-8"
+                )
+            ).hexdigest(),
+            "artifactSha256": artifact["sha256"],
+            "artifactByteSize": artifact["byteSize"],
+            "probe": deepcopy(artifact["probe"]),
+            "validationState": "TECHNICALLY_VERIFIED",
+            "selectionState": "UNSELECTED",
+            "admissionState": "NOT_ADMITTED",
+            "gpuUsed": True,
+            "experimentOnly": True,
+            "publicationAllowed": False,
+            "createdAt": now,
+        }
+        if internal:
+            assert grant is not None
+            candidate_base.update(
+                {
+                    "executionMode": INTERNAL_EXECUTION_MODE,
+                    "executionGrantRef": grant.execution_grant_ref,
+                    "executionGrantDigest": grant.execution_grant_digest,
+                    "providerSelection": {
+                        "providerId": provider["providerId"],
+                        "modelId": provider["modelId"],
+                        "region": provider["region"],
+                        "endpointClass": provider["endpointClass"],
+                        "runtimeAttestationRef": provider[
+                            "runtimeAttestationRef"
+                        ],
+                        "runtimeAttestationDigest": provider[
+                            "runtimeAttestationDigest"
+                        ],
+                    },
+                    "state": "UNSELECTED_INTERNAL_CANDIDATE",
+                    "rightsState": "NOT_REQUIRED_INTERNAL",
+                    "provenance": "SELF_HOSTED_AI_GENERATED",
+                    "createdBy": INTERNAL_EXPERIMENT_SERVICE_ID,
+                }
+            )
+        else:
+            assert policy is not None
+            candidate_base.update(
+                {
                 "productionPolicyBundleRef": policy[
                     "productionPolicyBundleRef"
                 ],
@@ -783,36 +960,13 @@ class K2ProviderExperimentService:
                     "budgetAuthorityRef": provider["budgetAuthorityRef"],
                     "credentialConfigured": True,
                 },
-                "jobRef": jobs[0]["jobRef"],
-                "attemptRef": attempt["attemptRef"],
-                "attemptNumber": attempt["attemptNumber"],
-                "adapterIdentity": artifact["adapterIdentity"],
-                "providerExecution": execution,
-                "parameters": deepcopy(request["parameters"]),
-                "mediaKind": "video",
-                "mediaType": "video/mp4",
-                "artifactStorageKey": artifact["storageKey"],
-                "artifactStoreRef": sha256(
-                    str(Path(self.execution.artifact_root).resolve()).encode(
-                        "utf-8"
-                    )
-                ).hexdigest(),
-                "artifactSha256": artifact["sha256"],
-                "artifactByteSize": artifact["byteSize"],
-                "probe": deepcopy(artifact["probe"]),
                 "state": "UNTRUSTED_PROVIDER_CANDIDATE",
-                "validationState": "TECHNICALLY_VERIFIED",
-                "selectionState": "UNSELECTED",
-                "admissionState": "NOT_ADMITTED",
                 "rightsState": "BOUND_TO_RECORDED_MANIFEST",
                 "provenance": "LIVE_PROVIDER",
-                "gpuUsed": True,
-                "experimentOnly": True,
-                "publicationAllowed": False,
                 "createdBy": EXPERIMENT_SERVICE_ID,
-                "createdAt": now,
-            }
-        )
+                }
+            )
+        candidate = _sealed(candidate_base)
         record = ProviderExperimentRecord(
             workspace,
             run_ref,
@@ -834,24 +988,56 @@ class K2ProviderExperimentService:
             candidate = self._decode(replay)
             return {
                 "candidate": self._public(candidate),
-                "readiness": self._readiness([candidate]),
+                "readiness": self._readiness([candidate], internal=internal),
                 "idempotentReplay": True,
             }
         candidate = self._decode(stored)
         return {
             "candidate": self._public(candidate),
-            "readiness": self._readiness([candidate]),
+            "readiness": self._readiness([candidate], internal=internal),
             "idempotentReplay": False,
         }
 
     @staticmethod
-    def _readiness(candidates: list[Mapping[str, Any]]) -> dict[str, Any]:
+    def _readiness(
+        candidates: list[Mapping[str, Any]], *, internal: bool
+    ) -> dict[str, Any]:
         video_count = sum(
             item.get("mediaKind") == "video"
             and item.get("validationState") == "TECHNICALLY_VERIFIED"
             and item.get("gpuUsed") is True
+            and (
+                not internal
+                or item.get("executionMode") == INTERNAL_EXECUTION_MODE
+            )
             for item in candidates
         )
+        if internal:
+            return {
+                "checkpoint": "P1",
+                "state": (
+                    "PASSED_INTERNAL_VIDEO_EXECUTION"
+                    if video_count
+                    else "READY_INTERNAL_EXECUTION"
+                ),
+                "executionMode": INTERNAL_EXECUTION_MODE,
+                "verifiedVideoExperiments": video_count,
+                "rightsState": "NOT_REQUIRED_INTERNAL",
+                "providerPolicyState": "NOT_REQUIRED_SELF_HOSTED",
+                "budgetAuthorityState": "NOT_REQUIRED_INTERNAL",
+                "blockers": [] if video_count else [
+                    "internal_video_execution_missing"
+                ],
+                "nextActions": (
+                    [
+                        "candidate_selection_not_started",
+                        "p2_full_shot_production_not_started",
+                    ]
+                    if video_count
+                    else ["run_one_same_lineage_video_smoke"]
+                ),
+                "publicationAllowed": False,
+            }
         return {
             "checkpoint": "P1",
             "state": "PARTIAL_EXPERIMENT_EVIDENCE" if video_count else "BLOCKED",
@@ -873,8 +1059,14 @@ class K2ProviderExperimentService:
         workspace = _required_ref(workspace_ref, "workspaceRef")
         production_run = _required_ref(run_ref, "productionRunRef")
         verified = self.assets.verify_asset_plan_current(workspace, production_run)
-        policy = self.production_policy.verify_policy_current(
-            workspace, production_run
+        grant = self.internal_execution_grant
+        internal = grant is not None and grant.matches(workspace, production_run)
+        policy = (
+            None
+            if internal
+            else self.production_policy.verify_policy_current(
+                workspace, production_run
+            )
         )
         source_digests = {
             item["generationRequestRef"]: item["payloadDigest"]
@@ -885,9 +1077,26 @@ class K2ProviderExperimentService:
             for record in self.repository.list(workspace, production_run)
         ]
         for candidate in candidates:
+            if internal:
+                authority_current = (
+                    candidate.get("executionMode")
+                    == INTERNAL_EXECUTION_MODE
+                    and grant is not None
+                    and candidate.get("executionGrantRef")
+                    == grant.execution_grant_ref
+                    and candidate.get("executionGrantDigest")
+                    == grant.execution_grant_digest
+                    and candidate.get("provenance")
+                    == "SELF_HOSTED_AI_GENERATED"
+                )
+            else:
+                authority_current = (
+                    policy is not None
+                    and candidate.get("productionPolicyBundleDigest")
+                    == policy["payloadDigest"]
+                )
             if (
-                candidate.get("productionPolicyBundleDigest")
-                != policy["payloadDigest"]
+                not authority_current
                 or source_digests.get(candidate.get("sourceGenerationRequestRef"))
                 != candidate.get("sourceGenerationRequestDigest")
                 or candidate.get("assetResolutionManifestDigest")
@@ -924,6 +1133,6 @@ class K2ProviderExperimentService:
                 )
         return {
             "candidates": [self._public(item) for item in candidates],
-            "readiness": self._readiness(candidates),
+            "readiness": self._readiness(candidates, internal=internal),
             "persistenceClass": self.repository.persistence_class,
         }

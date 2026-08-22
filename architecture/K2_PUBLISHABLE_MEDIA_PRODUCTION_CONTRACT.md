@@ -9,6 +9,10 @@ K2 Canonical Lineage Bootstrap Contract govern establishment of one replacement
 `ROOTS_READY` root. After that root is verified, this contract governs all downstream
 facts unchanged. Historical refs/evidence are not silently attached to the new run.
 
+`2026-08-22` scope note: this contract remains normative for commercial/publication
+execution. The exact K2 Internal Content Lab P1 exception is governed by ADR-0011 and
+`K2_INTERNAL_SELF_HOSTED_P1_CONTRACT.md`; it does not weaken this publication contract.
+
 ## 1. Definition of publishable
 
 A K2 master is publishable only when all of the following refer to the same exact,

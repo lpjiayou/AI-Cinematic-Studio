@@ -53,10 +53,21 @@ confirmation and must not mint or infer a source-plan reference.
 
 ## K2 provider experiment semantics
 
-`POST /episode-production-runs/{runRef}/provider-experiments` accepts exactly
-`idempotencyKey`, `sourceGenerationRequestRef` and `providerCapabilityRef` after the
-authenticated server injects workspace and run scope. It can execute only an existing
-M9 video GenerationRequest against one exact current rights/policy bundle through V4.
+`POST /episode-production-runs/{runRef}/provider-experiments` has two server-selected
+modes. The client cannot choose the mode.
+
+In the legacy commercial/publication mode it accepts exactly `idempotencyKey`,
+`sourceGenerationRequestRef` and `providerCapabilityRef` after the authenticated
+server injects workspace and run scope. It can execute only an existing M9 video
+GenerationRequest against one exact current rights/policy bundle through V4.
+
+For one exact server-configured K2 `INTERNAL_SELF_HOSTED` workspace/run it accepts
+exactly `idempotencyKey` and `sourceGenerationRequestRef`. Provider/model/runtime facts
+come from the validated V4 adapter configuration. Browser-supplied provider capability,
+policy, rights, credential, usage, budget, attestation and publication fields are
+rejected. The internal request and candidate contain no Rights Manifest, Provider
+Policy or Budget Authority refs. A wrong workspace/run falls back to the unchanged
+legacy fail-closed mode.
 
 A successful response is deliberately an untrusted, unselected, non-admitted
 candidate. It exposes safe provider/model/region, attempt, cost, latency, GPU/runtime,
@@ -68,6 +79,13 @@ When GPU attestation is required, the immutable provider policy, V5 request, V4 
 configuration and returned runtime facts must carry the same authority-approved
 runtime-attestation ref and digest; a mismatch fails before provider submission or
 candidate admission.
+
+An internal candidate is `SELF_HOSTED_AI_GENERATED`, technically verified,
+unselected, non-admitted and publication-disabled. One verified same-lineage internal
+video candidate satisfies the bounded P1 state
+`PASSED_INTERNAL_VIDEO_EXECUTION`; image/audio provider experiments and external
+Rights/Provider/Budget authorities are not blockers for that internal P1 checkpoint.
+This does not create an AssetVersion, Master, export, approval or publication fact.
 
 ## Capability states
 

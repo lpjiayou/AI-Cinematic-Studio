@@ -2,6 +2,10 @@
 
 > 当前状态：`CANONICAL ROOT G1 HOST-VERIFIED / M6 + IDENTITY NOT CREATED / P1 NOT PASSED`
 
+> `2026-08-22` 范围说明：本手册保留为商业发布治理路径。当前 K2 内部自托管 P1
+> 使用 `K2-INTERNAL-SELF-HOSTED-P1-RUNBOOK.md`；不得再把外部 Rights、Provider、
+> Budget Authority 当作该内部 P1 的阻塞项。
+
 本手册把已完成的开机前资料接回现有主链。它不绕过
 `docs/08-compute/k2-comfyui-wan22-operator-runbook.md`，也不把 image/audio 缺口
 伪装成可执行能力。

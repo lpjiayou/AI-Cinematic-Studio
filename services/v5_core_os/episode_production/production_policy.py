@@ -23,6 +23,7 @@ from .foundation import (
     _idempotency_key,
     _required_ref,
 )
+from .internal_execution import K2InternalExecutionGrant
 
 
 POLICY_BUNDLE_SCHEMA_VERSION = "v5.k2-production-policy-bundle.v1"
@@ -747,6 +748,7 @@ class K2ProductionPolicyService:
         rights_authority: RightsEvidenceAuthorityPort,
         provider_authority: ProviderPolicyAuthorityPort,
         *,
+        internal_execution_grant: K2InternalExecutionGrant | None = None,
         ref_factory: Callable[[str], str],
         clock: Callable[[], str],
     ) -> None:
@@ -755,6 +757,7 @@ class K2ProductionPolicyService:
         self.repository = repository
         self.rights_authority = rights_authority
         self.provider_authority = provider_authority
+        self.internal_execution_grant = internal_execution_grant
         self._ref_factory = ref_factory
         self._clock = clock
 
@@ -948,6 +951,30 @@ class K2ProductionPolicyService:
             )
         except EpisodeProductionError:
             authority = None
+        grant = self.internal_execution_grant
+        if grant is not None and grant.matches(workspace, production_run):
+            blockers = [] if authority is not None else ["identity_lock_missing"]
+            return {
+                "policyBundle": None,
+                "executionGrant": grant.public_projection(),
+                "readiness": {
+                    "state": (
+                        "READY_INTERNAL_EXECUTION"
+                        if authority is not None
+                        else "BLOCKED_IDENTITY"
+                    ),
+                    "executionMode": "INTERNAL_SELF_HOSTED",
+                    "policyRecorded": False,
+                    "rightsState": "NOT_REQUIRED_INTERNAL",
+                    "providerPolicyState": "NOT_REQUIRED_SELF_HOSTED",
+                    "budgetAuthorityState": "NOT_REQUIRED_INTERNAL",
+                    "runtimeAttestationState": "TECHNICAL_EVIDENCE_REQUIRED",
+                    "persistenceClass": self.repository.persistence_class,
+                    "rootPayloadDigest": root["payloadDigest"],
+                    "blockers": blockers,
+                    "publicationAllowed": False,
+                },
+            }
         identity_publishable = False
         if authority is not None:
             identities = authority["identityLock"].get("identities")

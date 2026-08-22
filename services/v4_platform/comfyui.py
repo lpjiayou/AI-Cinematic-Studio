@@ -1,9 +1,10 @@
 """Fail-closed ComfyUI/Wan2.2 video adapter for the existing V4 media job.
 
-The adapter owns provider transport and workflow details.  It receives a V5-issued
-live generation request carrying opaque policy/rights references, and returns only a
-candidate plus safe execution evidence to ``MediaJobCoordinator``.  It never creates
-an AssetVersion, approval or publication fact.
+The adapter owns provider transport and workflow details. It receives a V5-issued
+live generation request carrying either the legacy opaque policy/rights references
+or an exact internal self-hosted execution grant, and returns only a candidate plus
+safe execution evidence to ``MediaJobCoordinator``. It never creates an AssetVersion,
+approval or publication fact.
 """
 
 from __future__ import annotations
@@ -605,7 +606,7 @@ class ComfyUIWan22VideoAdapter:
             > provider.get("maxCostMinor", -1)
         ):
             raise ComfyUIConfigurationError(
-                "live request does not match the configured provider capability"
+                "live request does not match the configured execution profile"
             )
         runtime_facts = self.probe_capability()
         workflow = self.build_workflow(generation_request)

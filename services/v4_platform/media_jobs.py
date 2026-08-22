@@ -130,35 +130,52 @@ def _validate_request(request: Mapping[str, Any]) -> None:
     if provenance != "LIVE_PROVIDER":
         raise MediaJobError("generation request provenance is unsupported")
     provider = request.get("providerSelection")
+    legacy_provider_fields = {
+        "providerId", "modelId", "region", "endpointClass",
+        "providerCapabilityRef", "providerExecutionPolicyRef",
+        "providerExecutionPolicyDigest", "rightsManifestRef",
+        "rightsManifestDigest", "productionPolicyRef",
+        "productionPolicyDigest", "credentialSourceRef",
+        "usageTermsRef", "budgetAuthorityRef", "runtimeAttestationRef",
+        "runtimeAttestationDigest", "costCurrency", "maxCostMinor",
+        "timeoutSeconds",
+    }
+    internal_provider_fields = {
+        "executionMode", "executionGrantRef", "executionGrantDigest",
+        "providerId", "modelId", "region", "endpointClass",
+        "runtimeAttestationRef", "runtimeAttestationDigest",
+        "costCurrency", "maxCostMinor", "timeoutSeconds",
+    }
+    provider_fields = set(provider) if isinstance(provider, Mapping) else set()
+    if provider_fields == legacy_provider_fields:
+        digest_fields = {
+            "providerExecutionPolicyDigest", "rightsManifestDigest",
+            "productionPolicyDigest", "runtimeAttestationDigest",
+        }
+    elif (
+        provider_fields == internal_provider_fields
+        and provider.get("executionMode") == "INTERNAL_SELF_HOSTED"
+    ):
+        digest_fields = {
+            "executionGrantDigest", "runtimeAttestationDigest",
+        }
+    else:
+        raise MediaJobError("live provider request authority is incomplete")
     if (
         request.get("mediaKind") != "video"
         or request.get("adapterCapability") != "comfyui-wan22-ti2v-v1"
         or not isinstance(provider, Mapping)
-        or set(provider)
-        != {
-            "providerId", "modelId", "region", "endpointClass",
-            "providerCapabilityRef", "providerExecutionPolicyRef",
-            "providerExecutionPolicyDigest", "rightsManifestRef",
-            "rightsManifestDigest", "productionPolicyRef",
-            "productionPolicyDigest", "credentialSourceRef",
-            "usageTermsRef", "budgetAuthorityRef", "runtimeAttestationRef",
-            "runtimeAttestationDigest", "costCurrency", "maxCostMinor",
-            "timeoutSeconds",
-        }
         or not all(
             isinstance(provider.get(field), str) and provider[field]
             for field in provider
-            if not field.endswith("Digest")
+            if field not in digest_fields
             and field not in {"maxCostMinor", "timeoutSeconds"}
         )
         or any(
             not isinstance(provider.get(field), str)
             or len(provider[field]) != 64
             or any(character not in "0123456789abcdef" for character in provider[field])
-            for field in (
-                "providerExecutionPolicyDigest", "rightsManifestDigest",
-                "productionPolicyDigest", "runtimeAttestationDigest",
-            )
+            for field in digest_fields
         )
         or not isinstance(provider.get("costCurrency"), str)
         or len(provider["costCurrency"]) != 3
