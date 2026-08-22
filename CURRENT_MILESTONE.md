@@ -1170,6 +1170,41 @@ canonical host has inherited it yet, and no M6 write occurred. SeriesBibleVersio
 CharacterContinuityVersion, M6 baseline, M6AuthorityDecision and IdentityLock all
 remain `NOT_CREATED`; the run remains `ROOTS_READY`; G2 and P1 remain `NOT_PASSED`;
 `publicationAllowed=false`. The next host transition is limited to deploying this
-exact digest-pinned scope bundle and authoring M6 drafts for human review. Confirmation
-and baseline activation remain prohibited until their three exact human approvals
-exist.
+exact digest-pinned scope bundle and authoring one Series Bible candidate for human
+review. Confirmation and baseline activation remain prohibited until their exact
+human approvals exist.
+
+### G2 M6 staged-draft operator checkpoint — 2026-08-22
+
+Contract review corrected the previously over-broad scope-only sequence. The existing
+M6 service requires Character Continuity creation to reference a `CONFIRMED`
+SeriesBibleVersion. An empty-approval scope bundle can therefore create only the
+Series Bible candidate; it cannot create both M6 candidates in one stage.
+
+The repository now contains one explicit K2-001 operator-input candidate and a narrow
+authenticated loopback utility that:
+
+- validates the exact designated authority ref, bundle SHA-256 and canonical
+  business/tenant/workspace/project/series scope before any API request;
+- defaults to read-only preflight and requires explicit `--apply` plus a new absolute
+  receipt path for one candidate write;
+- creates or exactly verifies a Bible candidate while the scope-only bundle remains
+  approval-empty;
+- refuses the Character phase until an immutable Bible version is independently
+  `CONFIRMED` with a non-empty approval ref, then resolves the real M5
+  `episodePlanItemRef` from authenticated bootstrap data rather than human-readable
+  design keys;
+- never calls confirmation, baseline activation, Identity, G2, Provider or publication
+  endpoints, never accepts a command-line token and writes only a mode-`0600`
+  secret-free receipt;
+- keeps `identityBindings=[]`, `G2 NOT PASSED`, `P1 NOT PASSED` and
+  `publicationAllowed=false`.
+
+This is an offline repository checkpoint only. No Creator process on the canonical
+host has used the tool and no Bible/Character version, baseline, authority decision or
+Identity Lock was created. The next host action is bounded to scope-bundle deployment,
+Bible-candidate preflight and one Bible-candidate apply. A real human Bible review and
+a newly digest-pinned approval bundle are mandatory before the Character stage.
+
+Focused operator verification passes `6 / 6`. The complete repository regression
+passes `605 / 605` — Unit `374 / 374`, Contract `91 / 91`, Integration `140 / 140`.

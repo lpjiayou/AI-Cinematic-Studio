@@ -21,6 +21,9 @@ class K2OperatorScriptTests(unittest.TestCase):
     def test_g2_external_authority_script_resolves_repository_imports(self):
         self._assert_help("k2_g2_external_authority_activate.py")
 
+    def test_m6_draft_operator_resolves_repository_imports(self):
+        self._assert_help("k2_m6_draft_operator.py")
+
     def test_runtime_attestation_script_resolves_repository_imports(self):
         self._assert_help("k2_comfyui_runtime_attestation.py")
 

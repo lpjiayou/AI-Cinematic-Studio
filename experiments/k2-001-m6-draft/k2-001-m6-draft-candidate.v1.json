@@ -1,0 +1,263 @@
+{
+  "schemaVersion": "k2.m6-draft-candidate.v1",
+  "packageId": "k2-001-m6-draft-v1",
+  "authorityRef": "m6-scope-authority-k2-001-v1",
+  "authorityBundleSha256": "d4f4fcb0a71cc734c06478e80ef8ce09c188d5be46a9e741472b7673959554e7",
+  "scope": {
+    "businessDomain": "series-production",
+    "tenantId": "tenant-k2-001-canonical",
+    "workspaceRef": "workspace-6c2c70926cf64cd68435537ffd4de92d",
+    "projectRef": "project-00482509a3a14837be7f29f1467c0ced",
+    "seriesRef": "series-c0a74d5580b44aeea75747ad1d33438a"
+  },
+  "bibleCandidate": {
+    "operationRef": "k2-001-m6-bible-candidate-v1",
+    "idempotencyKey": "k2-001-m6-bible-candidate-v1",
+    "content": {
+      "worldRules": [
+        {
+          "worldRuleRef": "world-rule-independent-memory-verification",
+          "statement": "记忆档案的存在性判断不能替代独立校验；判断冲突时必须保存可复核摘要。"
+        },
+        {
+          "worldRuleRef": "world-rule-residual-verification-trace",
+          "statement": "可见记录被删除后仍可能保留校验痕迹；校验痕迹必须与原始内容分别表述。"
+        }
+      ],
+      "glossaryTerms": [
+        {
+          "glossaryTermRef": "glossary-term-anomalous-memory-shard",
+          "term": "异常记忆片",
+          "definition": "保存异常影像及其校验脉冲的半透明档案载体。"
+        },
+        {
+          "glossaryTermRef": "glossary-term-verification-summary",
+          "term": "校验摘要",
+          "definition": "由独立终端对同一输入生成、用于比对而不替代原始内容的摘要。"
+        }
+      ],
+      "locations": [
+        {
+          "locationRef": "location-central-memory-archive-outer-bridge",
+          "name": "中央记忆档案城·外环廊桥",
+          "continuity": "雨向固定为画面左上至右下，冷蓝雾层中仅保留稀疏琥珀反光。"
+        },
+        {
+          "locationRef": "location-central-memory-archive-verification-bay",
+          "name": "中央记忆档案城·校验台",
+          "continuity": "冷蓝环境光为主，校验台琥珀实景光只照亮手部、道具与下颌轮廓。"
+        }
+      ],
+      "factions": [
+        {
+          "factionRef": "faction-central-memory-archive",
+          "name": "中央记忆档案城",
+          "description": "负责保存、检索与校验记忆档案的制度机构。"
+        }
+      ],
+      "props": [
+        {
+          "propRef": "prop-anomalous-memory-shard",
+          "name": "异常记忆片",
+          "continuity": "同一枚半透明记忆片；编号区域、插入方向以及回到林澈掌心的运动连续。"
+        },
+        {
+          "propRef": "prop-verification-terminal",
+          "name": "独立校验终端",
+          "continuity": "两台终端必须分别写入同一校验摘要，不显示未经 Core 提供的可读字符串。"
+        }
+      ],
+      "timelineEvents": [
+        {
+          "timelineEventRef": "timeline-event-k2-001-dual-summary",
+          "summary": "林澈与顾言分别保存同一异常记忆片的校验摘要，并把合作限制在可核验事实范围内。",
+          "locationRef": "location-central-memory-archive-outer-bridge",
+          "factionRefs": [
+            "faction-central-memory-archive"
+          ],
+          "propRefs": [
+            "prop-anomalous-memory-shard",
+            "prop-verification-terminal"
+          ]
+        }
+      ],
+      "visualConstraints": [
+        {
+          "visualConstraintRef": "visual-constraint-cold-blue-controlled-amber",
+          "rule": "冷蓝环境光为主；琥珀光只用于校验台、顾言身份灯与摘要提示。"
+        },
+        {
+          "visualConstraintRef": "visual-constraint-fixed-screen-axis",
+          "rule": "场一双人站位与视线轴不跨越，场二并肩方向不反转。"
+        },
+        {
+          "visualConstraintRef": "visual-constraint-no-unapproved-readable-ui",
+          "rule": "不得生成未经 Core 提供的可读界面文本、标志或水印。"
+        },
+        {
+          "visualConstraintRef": "visual-constraint-rain-direction",
+          "rule": "外环廊桥雨向固定为画面左上至右下。"
+        }
+      ],
+      "prohibitedNarrativePatterns": [
+        {
+          "prohibitedNarrativePatternRef": "prohibited-pattern-instant-total-trust",
+          "rule": "两人不得因一次校验直接形成无条件信任、拥抱或宣誓。"
+        },
+        {
+          "prohibitedNarrativePatternRef": "prohibited-pattern-memory-system-personification",
+          "rule": "记忆系统不得被赋予未经确认的人格、声音或自主意图。"
+        },
+        {
+          "prohibitedNarrativePatternRef": "prohibited-pattern-unapproved-memory-face",
+          "rule": "童年影像不得出现可识别且未经身份决定批准的人脸。"
+        }
+      ]
+    }
+  },
+  "characterCandidate": {
+    "operationRef": "k2-001-m6-character-candidate-v1",
+    "idempotencyKey": "k2-001-m6-character-candidate-v1",
+    "contentTemplate": {
+      "characters": [
+        {
+          "characterRef": "character-gu-yan-k2-001",
+          "name": "顾言",
+          "background": "中央记忆档案城的监察人员，长期负责高风险档案的检索与封存。",
+          "motivation": "在制度流程失效时仍控制证据外泄并确认异常来源。",
+          "belief": "只有能够被独立复核的事实才值得承担责任。",
+          "conflict": "职责要求服从档案系统，但亲眼所见与系统判断发生冲突。",
+          "goal": "切断外部检索并保存一份可独立验证的摘要。",
+          "personality": "审慎、克制、果断，行动先于解释。",
+          "behaviorRules": [
+            "先建立安全边界，再提供有限信息",
+            "关键动作简短明确，不做多余展示"
+          ],
+          "dialogueRules": [
+            "使用短句，语速稳定，避免情绪宣泄",
+            "只陈述可执行规则或已经核验的事实"
+          ],
+          "forbiddenBehavior": [
+            "不得在没有证据时无条件相信林澈",
+            "不得用夸张肢体动作或高声威胁替代判断"
+          ],
+          "visualIdentityRules": [
+            "灰白短发，发际线与轮廓固定",
+            "深灰监察制服",
+            "胸前上部一枚小型琥珀身份灯，位置不得漂移"
+          ],
+          "locationRefs": [
+            "location-central-memory-archive-outer-bridge",
+            "location-central-memory-archive-verification-bay"
+          ],
+          "propRefs": [
+            "prop-anomalous-memory-shard",
+            "prop-verification-terminal"
+          ],
+          "timelineEventRefs": [
+            "timeline-event-k2-001-dual-summary"
+          ]
+        },
+        {
+          "characterRef": "character-lin-che-k2-001",
+          "name": "林澈",
+          "background": "负责异常记忆片校验的档案工程人员，习惯把直觉转换成可复核证据。",
+          "motivation": "确认被系统抹去的影像并保留其校验痕迹。",
+          "belief": "删除记录不等于事实从未发生，判断必须留下独立证据。",
+          "conflict": "她不信任制度结论，却必须使用制度工具完成可审计校验。",
+          "goal": "验证异常记忆片并保存一份不依赖单一系统的摘要。",
+          "personality": "克制、敏锐、耐心，先观察后下结论。",
+          "behaviorRules": [
+            "先检查校验脉冲再表达判断",
+            "动作保持节制，不用惊叫或大幅退让表达异常"
+          ],
+          "dialogueRules": [
+            "只在证据足够时说出结论",
+            "语言简短、具体，不把推测表述为事实"
+          ],
+          "forbiddenBehavior": [
+            "不得凭直觉直接指控顾言或档案系统",
+            "不得无缘由放弃或毁坏异常记忆片"
+          ],
+          "visualIdentityRules": [
+            "黑色短发，轮廓固定",
+            "深炭色低反光功能风衣",
+            "银灰粉尘只位于右袖且不得换侧或消失"
+          ],
+          "locationRefs": [
+            "location-central-memory-archive-outer-bridge",
+            "location-central-memory-archive-verification-bay"
+          ],
+          "propRefs": [
+            "prop-anomalous-memory-shard",
+            "prop-verification-terminal"
+          ],
+          "timelineEventRefs": [
+            "timeline-event-k2-001-dual-summary"
+          ]
+        }
+      ],
+      "stateIntervals": [
+        {
+          "intervalRef": "character-state-gu-yan-appearance-k2-001",
+          "characterRef": "character-gu-yan-k2-001",
+          "category": "Appearance",
+          "startEpisodePlanItemOrdinal": 1,
+          "endEpisodePlanItemOrdinal": null,
+          "valueRef": "appearance-gu-yan-k2-001"
+        },
+        {
+          "intervalRef": "character-state-gu-yan-goal-k2-001",
+          "characterRef": "character-gu-yan-k2-001",
+          "category": "PrimaryGoal",
+          "startEpisodePlanItemOrdinal": 1,
+          "endEpisodePlanItemOrdinal": null,
+          "valueRef": "goal-gu-yan-preserve-independent-summary"
+        },
+        {
+          "intervalRef": "character-state-lin-che-appearance-k2-001",
+          "characterRef": "character-lin-che-k2-001",
+          "category": "Appearance",
+          "startEpisodePlanItemOrdinal": 1,
+          "endEpisodePlanItemOrdinal": null,
+          "valueRef": "appearance-lin-che-k2-001"
+        },
+        {
+          "intervalRef": "character-state-lin-che-goal-k2-001",
+          "characterRef": "character-lin-che-k2-001",
+          "category": "PrimaryGoal",
+          "startEpisodePlanItemOrdinal": 1,
+          "endEpisodePlanItemOrdinal": null,
+          "valueRef": "goal-lin-che-verify-anomalous-memory"
+        }
+      ],
+      "relationships": [
+        {
+          "relationshipRef": "relationship-gu-yan-to-lin-che-evidence-bound-cooperation",
+          "fromCharacterRef": "character-gu-yan-k2-001",
+          "toCharacterRef": "character-lin-che-k2-001",
+          "relationshipType": "evidence-bound-cooperation",
+          "startEpisodePlanItemOrdinal": 1,
+          "endEpisodePlanItemOrdinal": null
+        },
+        {
+          "relationshipRef": "relationship-lin-che-to-gu-yan-limited-trust",
+          "fromCharacterRef": "character-lin-che-k2-001",
+          "toCharacterRef": "character-gu-yan-k2-001",
+          "relationshipType": "limited-trust",
+          "startEpisodePlanItemOrdinal": 1,
+          "endEpisodePlanItemOrdinal": null
+        }
+      ],
+      "identityBindings": []
+    }
+  },
+  "exitState": {
+    "domainFact": false,
+    "humanApprovalRequired": true,
+    "identityLockStatus": "NOT_CREATED",
+    "g2Gate": "NOT_PASSED",
+    "p1Gate": "NOT_PASSED",
+    "publicationAllowed": false
+  }
+}

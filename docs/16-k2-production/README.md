@@ -16,10 +16,18 @@ Creator Public API → Application → V5 → V4 → V3 → Compute 主链。
 - [K2-001 剧本、分镜、镜头、Wan2.2 与角色多角度候选](K2-001-PREPRODUCTION-CANDIDATE.md)
 - [P1 开机前到受治理实验运行手册](K2-P1-PREBOOT-TO-LIVE-RUNBOOK.md)
 - [G2 M6 Authority 与 Identity Lock 准备运行手册](K2-G2-AUTHORITY-PREPARATION-RUNBOOK.md)
+- [K2-001 M6 分阶段候选与 Operator 说明](../../experiments/k2-001-m6-draft/README.md)
 
 对应机器可读清单：
 
 `experiments/k2-001-preboot/k2-001-preproduction-candidate.v1.json`
+
+M6 的机器可读候选输入位于：
+
+`experiments/k2-001-m6-draft/k2-001-m6-draft-candidate.v1.json`
+
+它固定为 `NOT DOMAIN FACT`，只允许先创建 Bible candidate；Character candidate 必须
+等待该 Bible 经真实人工批准并确认后，再使用同一精确 scope-only 输入执行。
 
 新的 canonical root 规范与 Operator Application 分别位于：
 
