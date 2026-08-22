@@ -10,7 +10,7 @@
 >
 > Current Task: `ACS-K2-G2 → M6 AUTHORITY + V5 IDENTITY LOCK PREPARATION`
 >
-> Current Work Package: `CANONICAL ROOT G1 HOST-VERIFIED / M6 + IDENTITY NOT CREATED / P0→P1 HOLD`
+> Current Work Package: `CANONICAL ROOT G1 HOST-VERIFIED / M6 SCOPE AUTHORITY READY / M6 DRAFT + IDENTITY NOT CREATED / P0→P1 HOLD`
 >
 > M6 Authorization: `ACCEPTED SURFACES + K2 EXTERNAL AUTHORITY CONNECTION / NO M6 SCHEMA EXPANSION`
 >
@@ -1140,6 +1140,36 @@ This checkpoint creates connection capability only. No production M6 bundle, ide
 bundle, approval, SeriesBibleVersion, CharacterContinuityVersion, M6 baseline,
 `M6AuthorityDecision` or `IdentityLock` was authored. The canonical K2 run therefore
 remains `ROOTS_READY`; M6 and Identity Lock remain `NOT_CREATED`; G2 and P1 remain
-`NOT_PASSED`; `publicationAllowed=false`. The next host action requires the exact
-canonical refs, three real human M6 approvals and one approved immutable identity
-reference decision for each required character before the existing commands may run.
+`NOT_PASSED`; `publicationAllowed=false`. Full M6 confirmation/baseline activation and
+the existing G2 authorize-and-lock command require the exact canonical refs, three
+real human M6 approvals and one approved immutable identity-reference decision for
+each required character.
+
+### G2 scope-authority designation checkpoint — 2026-08-22
+
+The Project Lead explicitly designated the first same-lineage trusted M6 draft scope:
+
+- `businessDomain=series-production`;
+- `tenantId=tenant-k2-001-canonical`;
+- `workspaceRef=workspace-6c2c70926cf64cd68435537ffd4de92d`;
+- `projectRef=project-00482509a3a14837be7f29f1467c0ced`;
+- `seriesRef=series-c0a74d5580b44aeea75747ad1d33438a`;
+- `authorityRef=m6-scope-authority-k2-001-v1`.
+
+An operator-controlled scope-only bundle was prepared outside Git using
+`v5.external-m6-authority-bundle.v1`. Its exact SHA-256 is
+`d4f4fcb0a71cc734c06478e80ef8ce09c188d5be46a9e741472b7673959554e7`.
+The independently re-extracted operator package SHA-256 is
+`02fddbfa68ba16f8faccb054d7b61328053ef5738d199beaff0adc6b9d2e111b`.
+The repository validator resolved the exact canonical scope and emitted the two
+digest-pinned M6 environment assignments. Independent negative verification confirmed
+that approval lookup still fails closed.
+
+The bundle intentionally contains `approvals: []`. No Creator process on the
+canonical host has inherited it yet, and no M6 write occurred. SeriesBibleVersion,
+CharacterContinuityVersion, M6 baseline, M6AuthorityDecision and IdentityLock all
+remain `NOT_CREATED`; the run remains `ROOTS_READY`; G2 and P1 remain `NOT_PASSED`;
+`publicationAllowed=false`. The next host transition is limited to deploying this
+exact digest-pinned scope bundle and authoring M6 drafts for human review. Confirmation
+and baseline activation remain prohibited until their three exact human approvals
+exist.
