@@ -4,13 +4,13 @@
 >
 > Execution Mode: `AUTO-SEQUENTIAL / CONTRACT-FIRST / FAIL-CLOSED`
 >
-> Project Lead Authorization: `K2 PUBLISHABLE PRODUCTION P0 → P10 AUTO-SEQUENTIAL WAVE AUTHORIZED ON 2026-08-17`
+> Project Lead Authorization: `K2 INTERNAL CONTENT LAB P1 SELF-HOSTED EXECUTION REBASELINED ON 2026-08-22 / COMMERCIAL PUBLICATION REMAINS CLOSED`
 >
-> Authorized Wave: `ACS-K2-P0 → P1 → P2 → P3 → P4 → P5 → P6 → P7 → P8 → P9 → GATE A/B/C → P10`
+> Authorized Wave: `CURRENT G2→G6 LINEAGE → P1 INTERNAL VIDEO SMOKE → STOP FOR P2 CONTRACT`
 >
-> Current Task: `ACS-K2-G2 → M6 AUTHORITY + V5 IDENTITY LOCK PREPARATION`
+> Current Task: `ACS-K2-INTERNAL-SELF-HOSTED-P1-SAME-LINEAGE-VIDEO`
 >
-> Current Work Package: `CANONICAL ROOT G1 HOST-VERIFIED / M6 SCOPE AUTHORITY READY / M6 DRAFT + IDENTITY NOT CREATED / P0→P1 HOLD`
+> Current Work Package: `G2/G3/G4/G5/G6 HOST FACTS REPORTED / P1 REPOSITORY REBASELINE IMPLEMENTATION CANDIDATE / NO INTERNAL VIDEO EXPERIMENT YET`
 >
 > M6 Authorization: `ACCEPTED SURFACES + K2 EXTERNAL AUTHORITY CONNECTION / NO M6 SCHEMA EXPANSION`
 >
@@ -22,7 +22,7 @@
 >
 > Integration Baseline: `K2 G0→G7 PRESERVED — CORE 518 / FRONTEND 118 / LOCAL PLAYABLE EVIDENCE`
 >
-> Production Ready: `NO — P1 VIDEO TECHNICAL EVIDENCE VERIFIED; P0→P1 BLOCKED BY EXTERNAL RIGHTS/PROVIDER FACTS`
+> Production Ready: `NO — G6 PREVIEW QC PASSED; P1 INTERNAL VIDEO NOT HOST-VERIFIED; MASTER/EXPORT/PUBLICATION ABSENT`
 
 ---
 
@@ -1208,3 +1208,52 @@ a newly digest-pinned approval bundle are mandatory before the Character stage.
 
 Focused operator verification passes `6 / 6`. The complete repository regression
 passes `605 / 605` — Unit `374 / 374`, Contract `91 / 91`, Integration `140 / 140`.
+
+### K2 G2–G6 host advancement and Internal P1 rebaseline — 2026-08-22
+
+Subsequent host execution advanced the new canonical K2 lineage beyond the older
+offline checkpoint recorded above. The operator-reported current facts are:
+
+- G2 Authority/Identity completed on the canonical run;
+- G3 compiled the four-shot graph;
+- G4 resolved 18 AssetRequirements and emitted eight GenerationRequests — four video
+  and four audio — with provider selection still unselected;
+- G5 used CPU FFmpeg to create/register four MP4 and four WAV immutable
+  `LOCAL_EVIDENCE` AssetVersions; receipt
+  `k2-g5-local-media-20260822T121920Z.json`;
+- G6 composed one preview, machine QC passed six checks, and the preview remains a
+  human-unapproved candidate; receipt
+  `k2-g6-local-preview-qc-20260822T123403Z.json`;
+- the copied preview SHA-256 is
+  `0a49b44121a02aec43836f3a3222a675c4d8b1d88e2fd4a2f1c88fafd0d33516`;
+- Episode Master and export artifact remain absent;
+- Provider Authority remains inactive, the legacy P1 gate remains not passed and
+  publication remains disabled.
+
+A read-only repository audit at Core head
+`abbe6fdb8590274cf556488dbb1f16221928bc4f` selected 76 governing/implementation
+files. All inner file digests and the outer archive digest
+`97fa3fe2bae56cbf6465b3e093cd694503015f381b9695c4c3fc5ad92b3b80fb`
+verified. The audit made zero canonical, runtime or repository mutations.
+
+The Project Lead then rebaselined P1 for the Internal Content Lab:
+
+- Rights Manifest, external Provider Policy/Authority and Budget Authority are not
+  required for the exact K2 internal self-hosted P1 run;
+- the legacy commercial/publication mode is preserved and remains fail-closed;
+- the accepted path is the existing authenticated Public API → V5 current G4 lineage
+  → V4 MediaJob/Attempt → self-hosted ComfyUI/Wan2.2 adapter;
+- the internal grant is server-held and exact-scoped to one workspace/run; a browser
+  cannot supply a provider capability or authority claim;
+- runtime attestation, model digests, GPU facts, bounded execution, artifact digest,
+  independent probe and current lineage remain mandatory;
+- one verified same-lineage 49-frame video smoke passes the bounded internal P1;
+- the candidate remains unselected/not admitted and publication remains false.
+
+ADR-0011 and `K2_INTERNAL_SELF_HOSTED_P1_CONTRACT.md` govern the rebaseline. The
+current repository package is an implementation candidate only: it has not yet been
+applied to or tested on the canonical host, and no internal P1 dispatch has occurred.
+The next valid action is repository patch validation and full Core regression. Only
+after those pass may the exact host run execute one internal video smoke. Frontend/G7,
+full four-shot P2 production, Master/export and publication are not part of this P1
+checkpoint.

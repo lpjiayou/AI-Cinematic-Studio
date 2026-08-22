@@ -48,6 +48,13 @@ from .external_authority import (
     external_authorities_from_environment,
     identity_reference_authority_from_environment,
 )
+from .internal_execution import (
+    INTERNAL_EXECUTION_GRANT_VALUE,
+    INTERNAL_EXECUTION_MODE,
+    InternalExecutionConfigurationError,
+    K2InternalExecutionGrant,
+    internal_execution_grant_from_environment,
+)
 
 __all__ = [
     "EpisodeProductionPublicBoundary",
@@ -79,6 +86,11 @@ __all__ = [
     "ExternalAuthorityConfigurationError",
     "external_authorities_from_environment",
     "identity_reference_authority_from_environment",
+    "INTERNAL_EXECUTION_GRANT_VALUE",
+    "INTERNAL_EXECUTION_MODE",
+    "InternalExecutionConfigurationError",
+    "K2InternalExecutionGrant",
+    "internal_execution_grant_from_environment",
     "create_in_memory_boundary",
     "create_local_development_boundary",
     "create_local_development_boundary_from_environment",

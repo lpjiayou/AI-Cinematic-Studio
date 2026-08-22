@@ -11,6 +11,10 @@
 > missing instance. All downstream rights/provider/selection/publication gates remain
 > unchanged.
 
+> `2026-08-22` scope rebaseline: ADR-0011 supersedes the external Rights/Provider/
+> Budget P1 prerequisites only for the exact K2 `INTERNAL_SELF_HOSTED` Content Lab
+> run. This ADR remains normative for commercial/publication execution.
+
 ## Context
 
 ADR-0008 proved one real, playable, deterministic audiovisual chain through the

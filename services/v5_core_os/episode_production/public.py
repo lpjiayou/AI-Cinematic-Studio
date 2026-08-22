@@ -68,6 +68,10 @@ from .provider_experiments import (
     ProviderExperimentUnavailableError,
     SqliteProviderExperimentAdapter,
 )
+from .internal_execution import (
+    K2InternalExecutionGrant,
+    internal_execution_grant_from_environment,
+)
 from .external_authority import (
     external_authorities_from_environment,
     identity_reference_authority_from_environment,
@@ -258,6 +262,7 @@ def _services(
     rights_evidence_authority=None,
     provider_policy_authority=None,
     provider_experiment_execution=None,
+    internal_execution_grant: K2InternalExecutionGrant | None = None,
     media_execution=None,
     composition_execution=None,
     approval_authority=None,
@@ -302,6 +307,7 @@ def _services(
         production_policy_repository,
         rights_evidence_authority or RejectingRightsEvidenceAuthority(),
         provider_policy_authority or RejectingProviderPolicyAuthority(),
+        internal_execution_grant=internal_execution_grant,
         ref_factory=selected_ref_factory,
         clock=selected_clock,
     )
@@ -324,6 +330,7 @@ def _services(
         production_policy,
         provider_experiment_repository,
         provider_experiment_execution,
+        internal_execution_grant=internal_execution_grant,
         ref_factory=selected_ref_factory,
         clock=selected_clock,
     )
@@ -364,6 +371,7 @@ def create_in_memory_boundary(
     rights_evidence_authority=None,
     provider_policy_authority=None,
     provider_experiment_execution=None,
+    internal_execution_grant: K2InternalExecutionGrant | None = None,
     media_execution=None,
     composition_execution=None,
     approval_authority=None,
@@ -392,6 +400,7 @@ def create_in_memory_boundary(
         rights_evidence_authority=rights_evidence_authority,
         provider_policy_authority=provider_policy_authority,
         provider_experiment_execution=provider_experiment_execution,
+        internal_execution_grant=internal_execution_grant,
         media_execution=media_execution,
         composition_execution=composition_execution,
         approval_authority=approval_authority,
@@ -424,6 +433,7 @@ def create_local_development_boundary(
     rights_evidence_authority=None,
     provider_policy_authority=None,
     provider_experiment_execution=None,
+    internal_execution_grant: K2InternalExecutionGrant | None = None,
     media_execution=None,
     composition_execution=None,
     approval_authority=None,
@@ -477,6 +487,7 @@ def create_local_development_boundary(
         rights_evidence_authority=rights_evidence_authority,
         provider_policy_authority=provider_policy_authority,
         provider_experiment_execution=provider_experiment_execution,
+        internal_execution_grant=internal_execution_grant,
         media_execution=media_execution,
         composition_execution=composition_execution,
         approval_authority=approval_authority,
@@ -532,23 +543,41 @@ def create_local_development_boundary_from_environment(
         or f"{path}.production-policy.sqlite3"
     )
     provider_experiment_execution = None
+    internal_provider_profile = None
     comfyui_configured = any(
         key.startswith("COMFYUI_") and str(value).strip()
         for key, value in values.items()
     )
     if comfyui_configured:
         provider_adapter = create_comfyui_wan22_adapter_from_environment(values)
+        internal_provider_profile = {
+            "providerId": provider_adapter.config.provider_id,
+            "modelId": provider_adapter.config.model_id,
+            "region": provider_adapter.config.region,
+            "endpointClass": provider_adapter.config.endpoint_class,
+            "runtimeAttestationRef": (
+                provider_adapter.config.runtime_attestation_ref
+            ),
+            "runtimeAttestationDigest": (
+                provider_adapter.config.runtime_attestation_digest
+            ),
+            "costCurrency": provider_adapter.config.cost_currency,
+            "maxCostMinor": provider_adapter.config.cost_minor_per_attempt,
+            "timeoutSeconds": int(
+                provider_adapter.config.execution_timeout_seconds
+            ),
+        }
         provider_job_path = Path(
             str(
                 values.get("CREATOR_PROVIDER_EXPERIMENT_JOB_DATA_PATH", "")
             ).strip()
-            or f"{path}.provider-media-jobs.sqlite3"
+            or f"{job_path}.provider-experiments.sqlite3"
         )
         provider_artifact_root = Path(
             str(
                 values.get("CREATOR_PROVIDER_EXPERIMENT_ARTIFACT_ROOT", "")
             ).strip()
-            or f"{path}.provider-artifacts"
+            or artifact_root / "provider-experiments"
         )
         provider_experiment_execution = MediaJobCoordinator(
             SqliteMediaJobAdapter(provider_job_path),
@@ -558,6 +587,10 @@ def create_local_development_boundary_from_environment(
             clock=_utc_now,
             max_attempts=1,
         )
+    internal_execution_grant = internal_execution_grant_from_environment(
+        values,
+        provider_profile=internal_provider_profile,
+    )
     execution = MediaJobCoordinator(
         SqliteMediaJobAdapter(job_path),
         DeterministicLocalFfmpegAdapter(),
@@ -576,6 +609,7 @@ def create_local_development_boundary_from_environment(
         rights_evidence_authority=rights_authority,
         provider_policy_authority=provider_authority,
         provider_experiment_execution=provider_experiment_execution,
+        internal_execution_grant=internal_execution_grant,
         media_execution=execution,
         composition_execution=V4CompositionExecutor.from_artifact_root(artifact_root),
         initialize_if_missing=True,

@@ -5,6 +5,10 @@
 - Scope: existing K2 `EpisodeProductionRun`; no parallel project or media chain
 - Governing ADR: `ADR-0009-k2-publishable-media-production.md`
 
+> Historical/commercial scope notice (`2026-08-22`): this hold no longer blocks the
+> exact K2 Internal Content Lab P1 run governed by ADR-0011. It remains active for
+> commercial/publication execution.
+
 ## Implemented evidence
 
 The P0 change adds one immutable policy bundle on the existing K2 run:

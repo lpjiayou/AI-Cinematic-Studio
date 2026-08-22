@@ -98,6 +98,32 @@ def live_request():
     return value
 
 
+def internal_request():
+    value = live_request()
+    value["schemaVersion"] = (
+        "v5.k2-internal-self-hosted-experiment-request.v1"
+    )
+    value["providerSelection"] = {
+        "executionMode": "INTERNAL_SELF_HOSTED",
+        "executionGrantRef": "k2-internal-execution-grant-test",
+        "executionGrantDigest": "6" * 64,
+        "providerId": "self-hosted-comfyui",
+        "modelId": "wan2.2-ti2v-5b-fp16",
+        "region": "test-a100-region",
+        "endpointClass": "ssh-loopback-tunnel",
+        "runtimeAttestationRef": "runtime-attestation-test-a100-v1",
+        "runtimeAttestationDigest": "4" * 64,
+        "costCurrency": "CNY",
+        "maxCostMinor": 100,
+        "timeoutSeconds": 1800,
+    }
+    unsigned = {
+        key: item for key, item in value.items() if key != "payloadDigest"
+    }
+    value["payloadDigest"] = digest(unsigned)
+    return value
+
+
 class FakeComfyUIHandler(BaseHTTPRequestHandler):
     def log_message(self, *args):
         del args
@@ -306,6 +332,37 @@ class V4ComfyUIWan22AdapterTests(unittest.TestCase):
         self.assertEqual(workflow["1"]["inputs"]["unet_name"], UNET)
         self.assertEqual(workflow["7"]["inputs"]["length"], 5)
         self.assertEqual(workflow["8"]["inputs"]["seed"], 20260818)
+
+    def test_internal_self_hosted_request_uses_same_v4_job_without_external_authorities(self):
+        request = internal_request()
+        queue = MediaJobCoordinator(
+            InMemoryMediaJobAdapter(),
+            ComfyUIWan22VideoAdapter(self.config()),
+            Path(self.directory.name) / "internal-artifacts",
+            ref_factory=lambda prefix: f"{prefix}-internal-test",
+            clock=lambda: "2026-08-18T00:00:00Z",
+            max_attempts=1,
+        )
+
+        jobs = queue.execute_batch(
+            request["workspaceRef"],
+            request["productionRunRef"],
+            [request],
+            batch_idempotency_key="internal-wan22-one",
+        )
+
+        self.assertEqual(jobs[0]["state"], "SUCCEEDED")
+        self.assertTrue(jobs[0]["artifact"]["gpuUsed"])
+        serialized = json.dumps(jobs[0], ensure_ascii=False)
+        for forbidden in (
+            "rightsManifestRef",
+            "providerExecutionPolicyRef",
+            "providerCapabilityRef",
+            "credentialSourceRef",
+            "usageTermsRef",
+            "budgetAuthorityRef",
+        ):
+            self.assertNotIn(forbidden, serialized)
 
     def test_capability_probe_fails_closed_when_model_is_not_recognized(self):
         self.server.omit_unet = True
