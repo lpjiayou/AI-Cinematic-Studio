@@ -114,12 +114,13 @@ closed-world；一个 approval 只能绑定一个精确 scope 和一个精确 ac
 `mediaType` 只能是 `image / video / identity-direction`。bundle 不保存 token、Cookie、
 Provider 凭据或图像二进制，只保存不可变引用和内容摘要。
 
-## 4. 两阶段只验证并生成摘要绑定环境
+## 4. 分阶段只验证并生成摘要绑定环境
 
-### 4.1 Scope-only 草案阶段
+### 4.1 Scope-only Bible 候选阶段
 
 先使用只含 trusted scope、`approvals: []` 的 M6 bundle。此阶段脚本输出两项 M6 环境
-绑定，Creator 只能通过现有命令创建 M6 草案，不能确认版本或激活 baseline：
+绑定，Creator 只能创建 Series Bible 候选，不能确认版本、创建 Character Continuity
+候选或激活 baseline：
 
 ```bash
 cd /data/coding/AI-Cinematic-Studio
@@ -134,14 +135,65 @@ chmod 600 "$M6_ENV_FILE"
 . "$M6_ENV_FILE"
 ```
 
-在 Creator 中创建并提交具体 Series Bible 与 Character Continuity 候选。实际人类审阅
-这些不可变版本后，外部 authority 才能签发对应 approval refs；不得提前填写占位批准。
+现有 M6 合同要求每个 Character Continuity version 引用一个已经 `CONFIRMED` 的
+SeriesBibleVersion；scope-only bundle 的空 approval 集合不可能满足这个条件。因此本阶段
+只能先创建 Bible candidate，不能把两个候选合并成一次写入。
 
-### 4.2 完整 M6 + Identity 阶段
+K2-001 使用受控 Operator 输入和 authenticated loopback Creator Public API。先执行只读
+预检；它会验证精确 scope bundle 摘要、M5 bootstrap 和空 M6 workspace：
+
+```bash
+export K2_CREATOR_API_BEARER_TOKEN='<CURRENT_CREATOR_BEARER_TOKEN>'
+
+python scripts/k2_m6_draft_operator.py \
+  --phase bible-candidate \
+  --base-url http://127.0.0.1:8765 \
+  --m6-bundle /absolute/path/m6-authority-scope-only.json
+```
+
+预检通过后才显式 `--apply`；receipt 路径必须不存在：
+
+```bash
+NOW_UTC="$(date -u +%Y%m%dT%H%M%SZ)"
+
+python scripts/k2_m6_draft_operator.py \
+  --phase bible-candidate \
+  --base-url http://127.0.0.1:8765 \
+  --m6-bundle /absolute/path/m6-authority-scope-only.json \
+  --output "/data/k2-authority/evidence/k2-m6-bible-candidate-$NOW_UTC.json" \
+  --apply
+```
+
+工具不会调用确认、baseline、Identity 或 Provider 端点；Bearer token 只从环境读取，
+不会写入 receipt。实际人类必须先审阅这个不可变 Bible version，外部 Authority 才能为
+精确 `confirm-series-bible-version` 动作签发 approval ref；不得提前填写占位批准。
+
+### 4.2 Bible 确认后 Character 候选阶段
+
+把真实 Bible approval 写入新的 digest-pinned M6 bundle，重启 Creator，并通过现有
+Bible confirmation 端点确认精确 version。GET-only 复核其状态为 `CONFIRMED` 且
+`approvalRef` 精确命中后，停止该进程并重新部署原始 scope-only bundle。这个回退会移除
+确认 authority，但保留已经持久化的 Bible 事实。此时才允许创建 Character Continuity
+candidate：
+
+```bash
+python scripts/k2_m6_draft_operator.py \
+  --phase character-candidate \
+  --base-url http://127.0.0.1:8765 \
+  --m6-bundle /absolute/path/m6-authority-scope-only.json
+```
+
+当前 K2-001 checked-in Operator 输入固定绑定原始 scope-only bundle 摘要，工具也拒绝
+任何含 approvals 的输入 bundle。它只能在 GET 复核已经确认的 Bible 后创建 Character
+candidate，不能复用之前的批准执行新确认。Character 候选写入后仍然没有 baseline、
+Identity Lock、G2 或 P1。
+
+### 4.3 完整 M6 + Identity 阶段
 
 把三个真实 M6 approvals 写入同一个 M6 bundle，先再次省略 `--identity-bundle` 运行
-4.1 的命令（但改用完整 M6 文件），让重启后的 Creator 只在精确 approval 命中时确认
-两个版本并激活 M6 baseline。随后依据 baseline 的真实 `characterRef` 形成每个角色的
+4.1 的环境绑定命令（但改用完整 M6 文件），让重启后的 Creator 只在精确 approval
+命中时确认 Character version 并激活 M6 baseline。随后依据 baseline 的真实
+`characterRef` 形成每个角色的
 immutable identity reference 决定。将最终两个文件保存在受控主机的绝对路径，限制
 读取权限，然后运行：
 
@@ -173,8 +225,10 @@ CREATOR_IDENTITY_REFERENCE_AUTHORITY_BUNDLE_SHA256
 
 ## 5. 启动与边界
 
-草案阶段的 Creator 进程只继承前两项：Lifecycle composition 解析 M6 scope，空 approval
-集合继续拒绝所有确认。最终 G2 进程必须同时继承上述四项：Lifecycle composition 用前
+scope-only Bible 候选阶段的 Creator 进程只继承前两项：Lifecycle composition 解析
+M6 scope，空 approval 集合继续拒绝所有确认。后续每次批准变更都必须使用新的外部文件
+和独立摘要重启，不能把运行中修改文件视为 authority 更新。最终 G2 进程必须同时继承
+上述四项：Lifecycle composition 用前
 两项解析完整 M6 scope/approval，EpisodeProduction composition 用后两项解析 Identity
 reference。没有配置时两边均 fail-closed；任一 bundle 的 path/digest 配置不完整时进程
 必须拒绝启动。
