@@ -515,6 +515,27 @@ class V4ComfyUIWan22AdapterTests(unittest.TestCase):
         self.assertEqual(execution["latentFrameCount"], 169)
         self.assertEqual(execution["outputFrameCount"], 168)
         workflow = self.server.last_prompt["prompt"]
+        positive_prompt = workflow["5"]["inputs"]["text"]
+        negative_prompt = workflow["6"]["inputs"]["text"]
+        self.assertIn(
+            "Camera: wide, eye level, 35mm lens, slow push in; "
+            "preserve spatial continuity.",
+            positive_prompt,
+        )
+        self.assertIn(
+            "Perform one restrained, continuous story beat only.",
+            positive_prompt,
+        )
+        self.assertIn(
+            "Do not introduce any physical prop that is absent from the first frame",
+            positive_prompt,
+        )
+        self.assertIn("preserve both locked identities", positive_prompt)
+        self.assertNotIn('"shotSize"', positive_prompt)
+        self.assertIn("physical prop appearing from nowhere", negative_prompt)
+        self.assertIn("identity drift", negative_prompt)
+        self.assertIn("deformed hands", negative_prompt)
+        self.assertIn("shot cut", negative_prompt)
         self.assertEqual(workflow["7"]["inputs"]["length"], 169)
         self.assertEqual(workflow["7"]["inputs"]["start_image"], ["12", 0])
         self.assertEqual(

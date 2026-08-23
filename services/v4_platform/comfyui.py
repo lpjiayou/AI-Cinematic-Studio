@@ -486,6 +486,7 @@ class ComfyUIWan22VideoAdapter:
         generation_request: Mapping[str, Any],
         *,
         prompt_text: str | None = None,
+        negative_prompt_text: str | None = None,
         start_image_name: str | None = None,
         latent_frame_count: int | None = None,
     ) -> dict[str, Any]:
@@ -493,6 +494,16 @@ class ComfyUIWan22VideoAdapter:
         selected_prompt = prompt_text or parameters.get("prompt")
         if not isinstance(selected_prompt, str) or not selected_prompt.strip():
             raise ComfyUIConfigurationError("Wan2.2 prompt is unavailable")
+        selected_negative_prompt = (
+            negative_prompt_text or parameters.get("negativePrompt")
+        )
+        if (
+            not isinstance(selected_negative_prompt, str)
+            or not selected_negative_prompt.strip()
+        ):
+            raise ComfyUIConfigurationError(
+                "Wan2.2 negative prompt is unavailable"
+            )
         length = (
             parameters["durationFrames"]
             if latent_frame_count is None
@@ -531,7 +542,7 @@ class ComfyUIWan22VideoAdapter:
             },
             "6": {
                 "class_type": "CLIPTextEncode",
-                "inputs": {"text": parameters["negativePrompt"], "clip": ["2", 0]},
+                "inputs": {"text": selected_negative_prompt, "clip": ["2", 0]},
             },
             "7": {
                 "class_type": "Wan22ImageToVideoLatent",
@@ -736,24 +747,111 @@ def _image_dimensions(path: Path) -> tuple[int, int]:
     return width, height
 
 
+def _m11_camera_prompt(value: Any) -> str:
+    if not isinstance(value, Mapping):
+        raise ComfyUIConfigurationError("M11 camera instruction is unavailable")
+    text_fields: dict[str, str] = {}
+    for field in ("shotSize", "angle", "movement", "intent"):
+        item = value.get(field)
+        if not isinstance(item, str) or not item.strip() or len(item) > 160:
+            raise ComfyUIConfigurationError(
+                f"M11 camera instruction {field} is invalid"
+            )
+        text_fields[field] = item.strip().replace("-", " ")
+    lens = value.get("lensMm")
+    if (
+        isinstance(lens, bool)
+        or not isinstance(lens, (int, float))
+        or lens < 8
+        or lens > 200
+    ):
+        raise ComfyUIConfigurationError("M11 camera lens is invalid")
+    lens_text = f"{lens:g}"
+    return (
+        f"{text_fields['shotSize']}, {text_fields['angle']}, "
+        f"{lens_text}mm lens, {text_fields['movement']}; "
+        f"{text_fields['intent']}"
+    )
+
+
 def _m11_prompt(value: Mapping[str, Any]) -> str:
     prompt_spec = value.get("promptSpec")
     if not isinstance(prompt_spec, Mapping):
         raise ComfyUIConfigurationError("M11 prompt specification is unavailable")
-    camera = json.dumps(
-        prompt_spec.get("cameraInstruction"),
-        ensure_ascii=False,
-        sort_keys=True,
-        separators=(",", ":"),
-    )
-    continuity = "; ".join(prompt_spec.get("continuityConstraints", []))
+    action = prompt_spec.get("action")
+    continuity_items = prompt_spec.get("continuityConstraints")
+    if not isinstance(action, str) or not action.strip() or len(action) > 1000:
+        raise ComfyUIConfigurationError("M11 action prompt is invalid")
+    if (
+        not isinstance(continuity_items, list)
+        or not continuity_items
+        or len(continuity_items) > 24
+        or any(
+            not isinstance(item, str) or not item.strip() or len(item) > 300
+            for item in continuity_items
+        )
+    ):
+        raise ComfyUIConfigurationError("M11 continuity prompt is invalid")
+    camera = _m11_camera_prompt(prompt_spec.get("cameraInstruction"))
+    continuity = "; ".join(item.strip() for item in continuity_items)
     prompt = (
-        f"{prompt_spec.get('action', '')}. Camera instruction: {camera}. "
-        f"Continuity constraints: {continuity}. Preserve the exact identities, "
-        "wardrobe, environment and composition established by the start image."
+        f"{action.strip()} Perform one restrained, continuous story beat only. "
+        f"Camera: {camera}. Begin from the exact supplied first frame. "
+        "Keep both people in their established screen positions and preserve their "
+        "roles. Use natural micro-expressions and small controlled body or hand "
+        "movement only. Preserve exact face identity, age, hairstyle, body "
+        "proportions, wardrobe, lighting, environment, framing and all visible "
+        "physical props. Do not introduce any physical prop that is absent from "
+        "the first frame; only diegetic light or projection changes explicitly "
+        "required by the action may appear. Do not remove, duplicate, exchange or "
+        f"transform a prop. Continuity: {continuity}. No cut, role swap, abrupt "
+        "pose change or unmotivated camera motion."
     )
-    if not prompt.strip() or len(prompt) > 4000:
+    if len(prompt) > 4000:
         raise ComfyUIConfigurationError("M11 prompt is outside the bounded scope")
+    return prompt
+
+
+def _m11_negative_prompt(value: Mapping[str, Any]) -> str:
+    parameters = value.get("parameters")
+    if not isinstance(parameters, Mapping):
+        raise ComfyUIConfigurationError("M11 parameters are unavailable")
+    base = parameters.get("negativePrompt")
+    if not isinstance(base, str) or not base.strip() or len(base) > 2000:
+        raise ComfyUIConfigurationError("M11 negative prompt is invalid")
+    items = [item.strip() for item in base.split(",") if item.strip()]
+    guards = [
+        "physical prop appearing from nowhere",
+        "physical prop disappearing",
+        "prop changing shape",
+        "duplicate memory shard",
+        "identity drift",
+        "face morph",
+        "age change",
+        "hairstyle change",
+        "wardrobe change",
+        "person swap",
+        "role swap",
+        "extra person",
+        "merged person",
+        "deformed hands",
+        "fused fingers",
+        "extra fingers",
+        "limb fusion",
+        "background warping",
+        "shot cut",
+        "unmotivated camera motion",
+    ]
+    seen = {item.casefold() for item in items}
+    for guard in guards:
+        if guard.casefold() not in seen:
+            items.append(guard)
+            seen.add(guard.casefold())
+    prompt = ", ".join(items)
+    if len(prompt) > 4000:
+        raise ComfyUIConfigurationError(
+            "M11 guarded negative prompt is outside the bounded scope"
+        )
     return prompt
 
 
@@ -905,9 +1003,12 @@ class ComfyUIWan22ImageToVideoAdapter(ComfyUIWan22VideoAdapter):
             raise ComfyUIConfigurationError(
                 "M11 latent frame count is incompatible with Wan2.2"
             )
+        positive_prompt = _m11_prompt(generation_request)
+        negative_prompt = _m11_negative_prompt(generation_request)
         workflow = self.build_workflow(
             generation_request,
-            prompt_text=_m11_prompt(generation_request),
+            prompt_text=positive_prompt,
+            negative_prompt_text=negative_prompt,
             start_image_name=start_image_name,
             latent_frame_count=latent_frame_count,
         )
