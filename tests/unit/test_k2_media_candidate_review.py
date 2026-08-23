@@ -7,7 +7,7 @@ from services.v5_core_os.episode_production.evidence import (
     SqliteEpisodeProductionEvidenceAdapter,
 )
 from services.v5_core_os.episode_production.foundation import (
-    IdempotencyConflictError,
+    StaleInputError,
 )
 from services.v5_core_os.episode_production.media_candidate_review import (
     CandidateLifecycleError,
@@ -286,6 +286,46 @@ class CandidateReviewMixin:
             if item["candidateRef"] == candidate["candidateRef"]
         )
         self.assertEqual(old_projection["visualQcState"], "NOT_STARTED")
+
+    def test_visual_qc_cas_rejects_intervening_candidate_append(self):
+        service, evidence = self.service()
+        candidate = self.record_candidate(service)
+        validation = self.record_validation(service, candidate)
+        original_append = evidence.append_records
+        injected = False
+
+        def interleaving_append(
+            records, *, expected_record_journal_head=None
+        ):
+            nonlocal injected
+            if not injected:
+                injected = True
+                intervening = dict(self.candidate_command())
+                intervening.update(
+                    {
+                        "idempotencyKey": "candidate-intervening-v1",
+                        "candidateRef": "candidate-intervening-v1",
+                        "slotRef": "shot-intervening",
+                        "sourceRequestRef": "request-intervening-v1",
+                        "artifactRef": "artifact-intervening-v1",
+                        "artifactDigest": "6" * 64,
+                    }
+                )
+                service.register_candidate(intervening)
+            return original_append(
+                records,
+                expected_record_journal_head=expected_record_journal_head,
+            )
+
+        evidence.append_records = interleaving_append
+        with self.assertRaises(StaleInputError):
+            self.record_qc(service, validation)
+        self.assertEqual(
+            evidence.list_records(
+                WORKSPACE, RUN, record_kind="SemanticVisualQCDecision"
+            ),
+            [],
+        )
 
     def test_default_selection_authority_fails_closed(self):
         evidence = self.evidence()

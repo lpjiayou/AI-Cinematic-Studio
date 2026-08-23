@@ -407,6 +407,70 @@ class K2RealImageSelectionTests(unittest.TestCase):
         )
         self.assertEqual(len(projection["candidates"]), 4)
 
+    def test_intervening_candidate_append_cannot_partially_admit_assets(self):
+        review = self.revision.candidate_review
+        delegate = SelectionAuthority()
+        injected = False
+
+        class InterleavingAuthority:
+            def verify(inner_self, *, subject, approval_ref, decision):
+                nonlocal injected
+                if not injected:
+                    injected = True
+                    review.register_candidate(
+                        {
+                            "workspaceRef": WORKSPACE,
+                            "productionRunRef": self.run[
+                                "productionRunRef"
+                            ],
+                            "idempotencyKey": "m10-intervening-candidate-v1",
+                            "candidateRef": "m10-intervening-candidate-v1",
+                            "candidateVersion": 1,
+                            "revisionRef": "m10-intervening-revision-v1",
+                            "mediaKind": "IMAGE",
+                            "slotRef": "intervening-shot-slot",
+                            "sourceRequestRef": "intervening-request-v1",
+                            "sourceRequestDigest": "a" * 64,
+                            "artifactRef": "intervening-artifact-v1",
+                            "artifactDigest": "b" * 64,
+                            "artifactByteSize": 1234,
+                            "sourceAssetVersions": [],
+                            "provenance": "SELF_HOSTED_AI_GENERATED",
+                        }
+                    )
+                return delegate.verify(
+                    subject=subject,
+                    approval_ref=approval_ref,
+                    decision=decision,
+                )
+
+        review.selection_authority = InterleavingAuthority()
+        with self.assertRaises(EpisodeProductionPublicError) as caught:
+            self.boundary.select_real_images(self.selection_command())
+        self.assertEqual(
+            (caught.exception.status, caught.exception.code),
+            (409, "stale_input"),
+        )
+        for kind in (
+            "HumanSelectionDecision",
+            "AssetAdmission",
+            "AssetVersion",
+        ):
+            self.assertEqual(
+                self.revision.evidence.list_records(
+                    WORKSPACE,
+                    self.run["productionRunRef"],
+                    record_kind=kind,
+                ),
+                [],
+            )
+        self.assertEqual(
+            self.revision.evidence.current_state(
+                WORKSPACE, self.run["productionRunRef"]
+            ),
+            "REAL_IMAGE_PLAN_READY",
+        )
+
 
 if __name__ == "__main__":
     unittest.main()
