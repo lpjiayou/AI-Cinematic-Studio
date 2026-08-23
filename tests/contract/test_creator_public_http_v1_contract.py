@@ -54,6 +54,47 @@ class CreatorPublicHttpV1ContractTests(unittest.TestCase):
         second = public_contract.capability_payload()
         self.assertNotIn("forged", second["capabilities"][0]["publicResources"])
 
+    def test_m10_m11_publish_only_the_typed_media_review_chain(self):
+        capabilities = {
+            item["id"]: item
+            for item in public_contract.capability_payload()["capabilities"]
+        }
+        shared_review_resources = {
+            "episode-production-runs/semantic-visual-qc",
+            "episode-production-runs/media-selection",
+            "episode-production-runs/state-projection",
+        }
+        self.assertTrue(
+            shared_review_resources.issubset(
+                capabilities["M10"]["publicResources"]
+            )
+        )
+        self.assertTrue(
+            shared_review_resources.issubset(
+                capabilities["M11"]["publicResources"]
+            )
+        )
+        self.assertTrue(
+            {
+                "episode-production-runs/real-image-candidates",
+                "episode-production-runs/real-image-admission",
+                "episode-production-runs/real-image-successor-admission",
+            }.issubset(capabilities["M10"]["publicResources"])
+        )
+        self.assertTrue(
+            {
+                "episode-production-runs/real-video-candidates",
+                "episode-production-runs/real-video-admission",
+            }.issubset(capabilities["M11"]["publicResources"])
+        )
+        self.assertFalse(
+            any(
+                resource.endswith("/evidence-records")
+                for capability in capabilities.values()
+                for resource in capability["publicResources"]
+            )
+        )
+
 
 if __name__ == "__main__":
     unittest.main()
