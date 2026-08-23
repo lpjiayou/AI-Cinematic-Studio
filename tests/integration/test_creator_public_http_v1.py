@@ -92,7 +92,7 @@ class CreatorPublicHttpV1IntegrationTests(unittest.TestCase):
             payload["capabilities"][6]["state"], "local_evidence_only"
         )
         self.assertEqual(
-            payload["capabilities"][9]["state"], "production_policy_required"
+            payload["capabilities"][9]["state"], "local_evidence_only"
         )
         self.assertEqual(payload["capabilities"][15]["state"], "not_open")
 

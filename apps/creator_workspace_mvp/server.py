@@ -132,6 +132,7 @@ EPISODE_PRODUCTION_SUBRESOURCES = {
     "preview",
     "finalize",
     "delivery",
+    "real-media-revision",
 }
 
 
@@ -362,6 +363,10 @@ class CreatorRequestHandler(BaseHTTPRequestHandler):
                     result = self.episode_production_boundary.execute_media(command)
                 elif resource == "preview":
                     result = self.episode_production_boundary.compose_and_qc(command)
+                elif resource == "real-media-revision":
+                    result = self.episode_production_boundary.plan_real_images(
+                        command
+                    )
                 elif resource == "finalize":
                     result = self.episode_production_boundary.approve_and_finalize(
                         command
@@ -565,6 +570,10 @@ class CreatorRequestHandler(BaseHTTPRequestHandler):
                         )
                     elif resource == "media":
                         result = self.episode_production_boundary.get_media_bundle(
+                            workspace_ref, run_ref
+                        )
+                    elif resource == "real-media-revision":
+                        result = self.episode_production_boundary.get_real_media_revision(
                             workspace_ref, run_ref
                         )
                     elif resource in {"preview", "finalize", "delivery"}:

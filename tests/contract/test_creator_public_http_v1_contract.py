@@ -32,8 +32,9 @@ class CreatorPublicHttpV1ContractTests(unittest.TestCase):
             {item["state"] for item in capabilities[6:9]},
             {"local_evidence_only"},
         )
+        self.assertEqual(capabilities[9]["state"], "local_evidence_only")
         self.assertEqual(
-            {item["state"] for item in capabilities[9:12]},
+            {item["state"] for item in capabilities[10:12]},
             {"production_policy_required"},
         )
         self.assertEqual(

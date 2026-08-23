@@ -4,13 +4,13 @@
 >
 > Execution Mode: `AUTO-SEQUENTIAL / CONTRACT-FIRST / FAIL-CLOSED`
 >
-> Project Lead Authorization: `K2 INTERNAL CONTENT LAB P1 SELF-HOSTED EXECUTION REBASELINED ON 2026-08-22 / COMMERCIAL PUBLICATION REMAINS CLOSED`
+> Project Lead Authorization: `K2 INTERNAL P1 HOST-PASSED / IMAGE-FIRST M10→M11 REVISION AUTHORIZED FOR SAFE AUTOMATIC IMPLEMENTATION / COMMERCIAL PUBLICATION REMAINS CLOSED`
 >
-> Authorized Wave: `CURRENT G2→G6 LINEAGE → P1 INTERNAL VIDEO SMOKE → STOP FOR P2 CONTRACT`
+> Authorized Wave: `P1 CLOSEOUT → M10 IMAGE PLAN → LIVE MULTI-REFERENCE CAPABILITY GATE → IMAGE CANDIDATES → EXACT SELECTION → M11 VIDEO`
 >
-> Current Task: `ACS-K2-INTERNAL-SELF-HOSTED-P1-SAME-LINEAGE-VIDEO`
+> Current Task: `ACS-K2-INTERNAL-IMAGE-FIRST-REAL-MEDIA-REVISION`
 >
-> Current Work Package: `G2/G3/G4/G5/G6 HOST FACTS REPORTED / P1 REPOSITORY REBASELINE IMPLEMENTATION CANDIDATE / NO INTERNAL VIDEO EXPERIMENT YET`
+> Current Work Package: `G2→G6 COMPLETE / P1 HOST-PASSED / M10 OFFLINE IMPLEMENTATION CANDIDATE / GPU OFF`
 >
 > M6 Authorization: `ACCEPTED SURFACES + K2 EXTERNAL AUTHORITY CONNECTION / NO M6 SCHEMA EXPANSION`
 >
@@ -22,7 +22,7 @@
 >
 > Integration Baseline: `K2 G0→G7 PRESERVED — CORE 518 / FRONTEND 118 / LOCAL PLAYABLE EVIDENCE`
 >
-> Production Ready: `NO — G6 PREVIEW QC PASSED; P1 INTERNAL VIDEO NOT HOST-VERIFIED; MASTER/EXPORT/PUBLICATION ABSENT`
+> Production Ready: `NO — P1 TECHNICAL SMOKE PASSED; REAL SHOT IMAGES/VIDEOS, HUMAN MEDIA SELECTION, MASTER/EXPORT/PUBLICATION ABSENT`
 
 ---
 
@@ -1257,3 +1257,48 @@ The next valid action is repository patch validation and full Core regression. O
 after those pass may the exact host run execute one internal video smoke. Frontend/G7,
 full four-shot P2 production, Master/export and publication are not part of this P1
 checkpoint.
+
+### P1 host closeout and image-first M10 rebaseline — 2026-08-23
+
+Later host evidence supersedes the pre-execution statements in the preceding
+historical subsection:
+
+- Core implementation commit:
+  `9fa17347b48e455db39fcabe6b545829738f0f0d` on
+  `feature/k2-publishable-production`;
+- P1 receipt:
+  `k2-p1-internal-video-smoke-20260822T153945Z/receipt.json`;
+- P1 state: `PASSED_INTERNAL_VIDEO_EXECUTION`;
+- one self-hosted Wan2.2 candidate: 49 frames, 24 fps, 640×352;
+- artifact SHA-256:
+  `e2faf5b50527fd8dfcb3b7b63e00ac4d7b4e147fe3303fabc505d50e9c7dff43`;
+- GPU execution verified; candidate remains `UNSELECTED`, `NOT_ADMITTED` and
+  publication-disabled;
+- Master and Export remain absent.
+
+Repository review also confirmed that every current G3 shot binds both locked
+characters. The earlier candidate proposal to use one character reference directly
+as every Wan start image is therefore rejected. The correct connected flow is:
+
+```text
+G2 selected visual references
+→ M10 four two-identity shot/keyframe image requests
+→ exact image selection and immutable image AssetVersions
+→ M11 four image-to-video requests
+→ exact video selection and immutable video successors
+→ real preview/QC
+→ later explicit final decisions and Master
+```
+
+ADR-0012 and
+`architecture/K2_INTERNAL_IMAGE_FIRST_REAL_MEDIA_REVISION_CONTRACT.md` govern this
+revision. The current automatic CPU wave may implement and test state compatibility,
+M10 request derivation, Public API plumbing, closed-world validation, audit and host
+apply/preflight scripts. It must not start a paid GPU instance, fabricate a live
+multi-reference capability PASS, select unseen media, create Master/Export, publish or
+merge unverified code to `main`.
+
+The next paid-server action is not video generation. It is a fresh read-only ComfyUI
+`/object_info` and model/runtime inventory proving an accepted multi-reference image
+workflow. If that capability is absent, execution stops at
+`REAL_IMAGE_PLAN_READY`; text-only fallback is forbidden.

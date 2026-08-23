@@ -72,6 +72,7 @@ from .internal_execution import (
     K2InternalExecutionGrant,
     internal_execution_grant_from_environment,
 )
+from .real_media_revision import K2RealMediaRevisionService
 from .external_authority import (
     external_authorities_from_environment,
     identity_reference_authority_from_environment,
@@ -96,6 +97,7 @@ class EpisodeProductionPublicBoundary:
         assets: K2AssetPipelineService,
         media: K2MediaExecutionService,
         delivery: K2DeliveryService,
+        real_media_revision: K2RealMediaRevisionService,
     ) -> None:
         self.__service = service
         self.__authority_identity = authority_identity
@@ -105,6 +107,7 @@ class EpisodeProductionPublicBoundary:
         self.__assets = assets
         self.__media = media
         self.__delivery = delivery
+        self.__real_media_revision = real_media_revision
 
     @staticmethod
     def _error(exc: EpisodeProductionError) -> EpisodeProductionPublicError:
@@ -233,6 +236,18 @@ class EpisodeProductionPublicBoundary:
             self.__delivery.get_delivery_bundle, workspace_ref, run_ref
         )
 
+    def plan_real_images(self, command: Mapping[str, Any]) -> dict[str, Any]:
+        return self._invoke(self.__real_media_revision.plan_images, command)
+
+    def get_real_media_revision(
+        self, workspace_ref: str, run_ref: str
+    ) -> dict[str, Any]:
+        return self._invoke(
+            self.__real_media_revision.get_revision_bundle,
+            workspace_ref,
+            run_ref,
+        )
+
     def get_preview_file(
         self, workspace_ref: str, run_ref: str
     ) -> dict[str, Any]:
@@ -277,6 +292,7 @@ def _services(
     K2AssetPipelineService,
     K2MediaExecutionService,
     K2DeliveryService,
+    K2RealMediaRevisionService,
 ]:
     selected_ref_factory = ref_factory or (
         lambda prefix: f"{prefix}-{uuid4().hex}"
@@ -349,6 +365,12 @@ def _services(
         ref_factory=selected_ref_factory,
         clock=selected_clock,
     )
+    real_media_revision = K2RealMediaRevisionService(
+        shot_graph,
+        evidence_repository,
+        ref_factory=selected_ref_factory,
+        clock=selected_clock,
+    )
     return (
         service,
         authority_identity,
@@ -358,6 +380,7 @@ def _services(
         assets,
         media,
         delivery,
+        real_media_revision,
     )
 
 
@@ -387,6 +410,7 @@ def create_in_memory_boundary(
         assets,
         media,
         delivery,
+        real_media_revision,
     ) = _services(
         InMemoryEpisodeProductionAdapter(),
         InMemoryEpisodeProductionEvidenceAdapter(),
@@ -416,6 +440,7 @@ def create_in_memory_boundary(
         assets,
         media,
         delivery,
+        real_media_revision,
     )
 
 
@@ -465,6 +490,7 @@ def create_local_development_boundary(
         assets,
         media,
         delivery,
+        real_media_revision,
     ) = _services(
         SqliteEpisodeProductionAdapter(
             database_path, initialize_if_missing=initialize_if_missing
@@ -503,6 +529,7 @@ def create_local_development_boundary(
         assets,
         media,
         delivery,
+        real_media_revision,
     )
 
 
