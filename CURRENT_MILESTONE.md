@@ -4,13 +4,13 @@
 >
 > Execution Mode: `AUTO-SEQUENTIAL / CONTRACT-FIRST / FAIL-CLOSED`
 >
-> Project Lead Authorization: `K2 INTERNAL P1 HOST-PASSED / IMAGE-FIRST M10→M11 REVISION AUTHORIZED FOR SAFE AUTOMATIC IMPLEMENTATION / COMMERCIAL PUBLICATION REMAINS CLOSED`
+> Project Lead Authorization: `K2 INTERNAL P1 HOST-PASSED / IMAGE-FIRST M10→M11 HISTORY PRESERVED / ADR-0013 CONTROL-PLANE CONVERGENCE AUTHORIZED AS NON-GPU CORRECTION / COMMERCIAL PUBLICATION REMAINS CLOSED`
 >
-> Authorized Wave: `P1 CLOSEOUT → M10 IMAGE PLAN → LIVE MULTI-REFERENCE CAPABILITY GATE → IMAGE CANDIDATES → EXACT SELECTION → M11 VIDEO`
+> Authorized Wave: `ADR-0013 GOVERNANCE + CONTRACT → APPEND-ONLY CONTROL-PLANE IMPLEMENTATION + VERIFICATION / NO GPU EXECUTION IN THIS WAVE`
 >
-> Current Task: `ACS-K2-INTERNAL-IMAGE-FIRST-REAL-MEDIA-REVISION`
+> Current Task: `ACS-K2-CONTROL-PLANE-CONVERGENCE`
 >
-> Current Work Package: `G2→G6 COMPLETE / P1 HOST-PASSED / M10 v1 ADMITTED / M11 v1 TECHNICALLY VERIFIED BUT ASSISTED VISUAL QC FAILED / SHOT 01 R2–R7 CALIBRATION CLOSED WITHOUT ADMISSION`
+> Current Work Package: `ADR-0013 CORE IMPLEMENTATION COMPLETE / CORE 713/713 PASS / FRONTEND AND CROSS-REPO BROWSER GATE PENDING / M10 v1 ADMITTED HISTORY / M11 v1 TECHNICALLY VERIFIED BUT SEMANTIC VISUAL QC FAILED / SHOT 01 R2–R7 CLOSED WITHOUT ADMISSION`
 >
 > M6 Authorization: `ACCEPTED SURFACES + K2 EXTERNAL AUTHORITY CONNECTION / NO M6 SCHEMA EXPANSION`
 >
@@ -98,6 +98,153 @@ Required next production step:
 4. only after Shot 01 visual QC passes, regenerate the remaining three M10 images and M11
    videos, independently verify them, and request human selection;
 5. do not merge to main, create a master/export, or publish before those gates pass.
+
+## 0B. 2026-08-23 K2 control-plane convergence authorization
+
+ADR-0013 is the authorized governance prerequisite for the next K2 work package. It
+is a non-GPU control-plane correction. This document update does not claim that its
+persistence, public projection, API, recovery or test gates have been implemented or
+verified.
+
+> ADR-0013 and the amended K2 image-first contract govern architecture and
+> implementation semantics. This file records current facts, gates and execution
+> authorization only; it does not create a new authoritative owner, state model or
+> persistence contract.
+
+The implementation source base is Core `0a6962be`. This section controls the current
+next step and supersedes older historical checkpoint sentences that describe GPU
+execution or review of the existing four M11 candidates as the next action. Those
+sentences remain historical evidence only.
+
+This control-plane wave must close before any item under section 0A's “Required next
+production step” may execute. Those Shot 01/GPU steps remain future gated work, not
+part of the current authorization.
+
+The required public projection separates four orthogonal axes:
+
+- `rootState`: immutable production-root/readiness fact;
+- `productionState`: latest valid append-only V5 production gate; existing `state`
+  remains its backward-compatible alias;
+- `runtimeState`: V4 queue/lease/attempt/job status only; and
+- `visualQcState`: latest applicable canonical V5 append-only semantic assessment
+  for the exact candidate lineage.
+
+The sole admitted-media authority is V5 Core OS. For this exact run, the existing V5
+Episode Production append-only evidence journal and production-gate projection are
+the durable AssetVersion source of truth. V4 runtime databases and receipts,
+provider experiments, filesystem media and process-local asset registries remain
+verification inputs and cannot become a parallel admission authority.
+
+The only canonical candidate chain is:
+
+```text
+GenerationRequest
+→ V4 runtime candidate + immutable execution receipt
+→ V5 Candidate
+→ V5 TechnicalValidation
+→ append-only SemanticVisualQCDecision
+→ exact human HumanSelectionDecision resolved by digest-pinned ApprovalAuthority
+→ V5 AssetAdmission
+→ immutable V5 AssetVersion
+```
+
+Technical success, assisted QC, authority resolution, human selection and admission
+are distinct facts. Visual QC appends `PASS` and `FAIL`, with exact lineage,
+payload/content/source digests, criteria, assessor provenance, evidence and
+supersession/staleness. Client actor, role, approver or authority claims are not
+authority; missing, stale or digest-mismatched authority fails closed.
+
+The additive Episode Production evidence schema v2 is authorized only as a
+non-transition typed-record ledger. Its v1 closed set is `Candidate`,
+`TechnicalValidation`, `SemanticVisualQCDecision`, `HumanSelectionDecision`,
+`AssetAdmission` and `AssetVersion`; no public caller may choose a generic record
+kind or arbitrary fact payload. Each record is sealed by `payloadDigest`, Candidate
+binds the exact source request back to root lineage, and each downstream record pins
+the prior record. A record append creates no gate/transition, changes no
+`current_state`, and rewrites no accepted row. Exact v1 migration must be
+single-transaction, rollback-safe, restart-idempotent and byte/order preserving for
+all existing gate/fact/transition rows; unknown schemas fail closed. The Application
+executes no SQL.
+
+Visual assessment currentness is explicit. A changed shot, request, source
+AssetVersion, candidate bytes/content digest or assessment profile makes the earlier
+assessment `STALE`; `FAIL`, `STALE`, missing or superseded QC cannot
+authorize selection. Assisted QC remains an assessment, not a human decision.
+`SemanticVisualQCDecision` names the assessor verdict; it is never the distinct
+`HumanSelectionDecision`. The v1 QC result set is exactly `PASS|FAIL`.
+
+M10 v1 and its original exact-four atomic admission remain immutable history. For
+later revisions, ADR-0013 permits one exact shot successor to be QC'd, selected and
+admitted in an atomic append-only batch without rewinding `productionState`. This is
+the bounded path by which a valid Shot 01 image successor may become AssetVersion v2
+and seed a later 49-frame calibration. It does not activate a complete replacement
+set. Complete four-shot image-manifest activation and `REAL_VIDEO_READY` each remain
+atomic across the four exact current shots.
+
+Recovery and replay must reproduce the four projections from immutable roots,
+append-only V5 evidence and V4 runtime facts. Exact idempotent replay returns the same
+result; changed content conflicts; restart cannot infer approval, duplicate an
+AssetVersion or trust unrehashable bytes. The authenticated Creator Public API and
+single existing Creator Frontend remain the only user-facing control plane; no
+parallel review UI or browser access to SQL, V4, providers, paths or authority is
+authorized.
+
+After implementation and verification, the first bounded convergence append is four
+exact M11 v1 `Candidate` records, four matching `TechnicalValidation` records and
+four assisted `SemanticVisualQCDecision(FAIL)` records. It must produce zero
+`HumanSelectionDecision`, zero `AssetAdmission`, zero `AssetVersion` and zero
+production transitions. It may not fabricate a retrospective M10 or M11 QC `PASS`.
+
+Current stop conditions remain unchanged:
+
+- M11 v1 semantic visual QC is `FAIL`;
+- all M11 v1 and Shot 01 R2–R7 candidates are unselected and not admitted;
+- canonical `productionState` remains `REAL_VIDEO_PLAN_READY`;
+- no video AssetVersion, EpisodeMaster, ExportArtifact or publication authorization
+  exists; and
+- this wave authorizes no GPU dispatch, waiver admission, Master/Export,
+  publication, deployment or merge to `main`.
+
+No tests were run or claimed for this documentation-only governance prerequisite.
+
+## 0C. 2026-08-24 K2 control-plane implementation candidate
+
+The non-GPU ADR-0013 Core implementation is complete as a technical candidate on
+`feature/k2-control-plane-convergence`. It does not change the production stop
+conditions in section 0B and has not been merged to `main`.
+
+Implemented boundaries:
+
+- one public four-axis projection keeps root, production, V4 runtime and semantic
+  visual-QC state orthogonal;
+- the retired process-local Asset Registry is a fail-closed compatibility tombstone;
+  Episode Production append-only evidence is the sole AssetVersion authority;
+- image and video candidates use one typed, digest-bound candidate-to-AssetVersion
+  chain;
+- semantic visual QC is an append-only canonical record with explicit currentness,
+  supersession and staleness;
+- delivery approval is server-resolved and binds exact TimelineVersion, preview and
+  QC digests; media selection separately binds exact candidate and visual-QC digests;
+- V4 leases, attempts, durable no-clobber publication, crash recovery, orphan
+  inventory and deterministic quarantine/replay are implemented and fail closed;
+- Creator Public API routes expose sanitized projections only and reject browser
+  actor, authority, subject-digest and storage-path claims.
+
+Verification on the final working-tree snapshot:
+
+- focused ADR-0013 Core tests: `67 / 67 PASS` before final regression expansion;
+- repaired artifact-root failure regression: `PASS`;
+- updated connected M10 HTTP candidate/QC/authority/admission chain: `PASS`;
+- complete Core regression: `713 / 713 PASS` in `721.789s`;
+- `git diff --check`: `PASS`;
+- frontend typecheck, lint, production build and `127 / 127` unit tests: `PASS` on
+  the paired frontend candidate workspace.
+
+Cross-repository real-browser Gate C, final commits, push and remote-SHA equality are
+still required before this wave may be reported as a remote-verified checkpoint.
+No GPU dispatch, canonical production-data convergence append, media admission,
+Master/Export, publication, deployment or `main` merge occurred in this local
+implementation checkpoint.
 
 ## 0. Accepted baselines
 
@@ -1476,6 +1623,10 @@ SQLite integrity/foreign keys, a clean worktree, closed ports 8765/8188 and an i
 A100. The next connected stage is GPU execution of four unselected video
 candidates from these exact requests. It must not select or admit unseen videos.
 
+That was the historical next-stage statement at the plan checkpoint. Sections 0A
+and 0B supersede it for current execution: the candidates now exist, semantic visual
+QC is `FAIL`, and the next authorized wave is non-GPU control-plane convergence.
+
 ### M11 exact start-image execution implementation candidate — 2026-08-23
 
 The connected V4 implementation now extends the existing single-episode
@@ -1525,5 +1676,7 @@ All four candidates are H.264, 640×352, 24 fps, with exact frame counts
 The runtime media-job delta is four and the canonical mutation count is zero.
 Every candidate remains `TECHNICALLY_VERIFIED / UNSELECTED / NOT_ADMITTED`;
 publication remains disabled. ComfyUI was stopped after verification and the A100
-returned to zero allocated MiB. The next gate is human review of all four videos,
-not automatic selection, admission, master creation, publication or `main` merge.
+returned to zero allocated MiB. At that historical execution checkpoint, the next
+gate was human review of all four videos, not automatic selection, admission, master
+creation, publication or `main` merge. Section 0A now records that assisted review as
+`FAIL`; section 0B is the current non-GPU control-plane gate.

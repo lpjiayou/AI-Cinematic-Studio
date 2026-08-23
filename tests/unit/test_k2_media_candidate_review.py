@@ -1,0 +1,342 @@
+import tempfile
+import unittest
+from pathlib import Path
+
+from services.v5_core_os.episode_production.evidence import (
+    InMemoryEpisodeProductionEvidenceAdapter,
+    SqliteEpisodeProductionEvidenceAdapter,
+)
+from services.v5_core_os.episode_production.foundation import (
+    IdempotencyConflictError,
+)
+from services.v5_core_os.episode_production.media_candidate_review import (
+    CandidateLifecycleError,
+    CandidateNotSelectableError,
+    K2MediaCandidateReviewService,
+    MediaSelectionApprovalRequiredError,
+    VerifiedMediaSelection,
+)
+
+
+WORKSPACE = "workspace-candidate-review"
+RUN = "episode-production-run-candidate-review"
+
+
+class RootService:
+    def get_run(self, workspace_ref, production_run_ref):
+        if (workspace_ref, production_run_ref) != (WORKSPACE, RUN):
+            raise AssertionError("unexpected scope")
+        return {
+            "workspaceRef": workspace_ref,
+            "productionRunRef": production_run_ref,
+            "payloadDigest": "a" * 64,
+        }
+
+
+class SelectionAuthority:
+    def verify(self, *, subject, approval_ref, decision):
+        values = {
+            "authority_ref": "approval-authority-candidate-tests",
+            "approval_ref": approval_ref,
+            "actor_ref": "human-candidate-reviewer",
+            "actor_kind": "HUMAN",
+            "decision": decision,
+            "authority_decision_ref": f"authority-decision-{approval_ref}",
+            "decided_at": "2026-08-24T00:00:00Z",
+            "subject_digest": subject.subject_digest,
+        }
+        values["authority_decision_digest"] = (
+            VerifiedMediaSelection.expected_decision_digest(**values)
+        )
+        return VerifiedMediaSelection.create(**values)
+
+
+class CandidateReviewMixin:
+    def evidence(self):
+        raise NotImplementedError
+
+    def service(self):
+        evidence = self.evidence()
+        return (
+            K2MediaCandidateReviewService(
+                RootService(),
+                evidence,
+                clock=lambda: "2026-08-23T13:00:00Z",
+                selection_authority=SelectionAuthority(),
+            ),
+            evidence,
+        )
+
+    @staticmethod
+    def candidate_command():
+        return {
+            "workspaceRef": WORKSPACE,
+            "productionRunRef": RUN,
+            "idempotencyKey": "candidate-shot-0001-v1",
+            "candidateRef": "candidate-shot-0001-v1",
+            "candidateVersion": 1,
+            "revisionRef": "real-video-plan-candidate-review-v1",
+            "mediaKind": "VIDEO",
+            "slotRef": "shot-0001",
+            "sourceRequestRef": "request-shot-0001-v1",
+            "sourceRequestDigest": "1" * 64,
+            "artifactRef": "runtime-artifact-shot-0001-v1",
+            "artifactDigest": "2" * 64,
+            "artifactByteSize": 12345,
+            "sourceAssetVersions": [
+                {
+                    "assetVersionRef": "source-image-version-shot-0001-v1",
+                    "assetVersionDigest": "3" * 64,
+                }
+            ],
+            "provenance": "SELF_HOSTED_AI_GENERATED",
+        }
+
+    def record_candidate(self, service):
+        return service.register_candidate(self.candidate_command())["candidate"]
+
+    def record_validation(self, service, candidate, *, result="PASS"):
+        passed = result == "PASS"
+        return service.record_technical_validation(
+            {
+                "workspaceRef": WORKSPACE,
+                "productionRunRef": RUN,
+                "idempotencyKey": "technical-shot-0001-v1",
+                "candidateRef": candidate["candidateRef"],
+                "candidateVersion": candidate["candidateVersion"],
+                "candidateDigest": candidate["payloadDigest"],
+                "technicalValidationRef": "technical-shot-0001-v1",
+                "technicalValidationVersion": 1,
+                "validatorRef": "v4-media-artifact-verifier-v1",
+                "checks": [
+                    {"check": "sha256", "passed": passed},
+                    {"check": "media-probe", "passed": passed},
+                ],
+                "result": result,
+            }
+        )["technicalValidation"]
+
+    def record_qc(
+        self,
+        service,
+        validation,
+        *,
+        result="PASS",
+        version=1,
+        supersedes=None,
+    ):
+        return service.record_semantic_visual_qc(
+            {
+                "workspaceRef": WORKSPACE,
+                "productionRunRef": RUN,
+                "idempotencyKey": f"visual-qc-shot-0001-v{version}",
+                "technicalValidationRef": validation["technicalValidationRef"],
+                "technicalValidationVersion": validation["technicalValidationVersion"],
+                "technicalValidationDigest": validation["payloadDigest"],
+                "visualQcRef": f"visual-qc-shot-0001-v{version}",
+                "visualQcVersion": version,
+                "reviewerRef": "reviewer-project-lead",
+                "reviewProfile": "k2-semantic-visual-qc-v1",
+                "evidence": [
+                    {
+                        "evidenceRef": f"review-frame-shot-0001-v{version}",
+                        "evidenceDigest": str(version) * 64,
+                    }
+                ],
+                "supersedesVisualQc": supersedes,
+                "checks": {
+                    name: {"result": result, "note": ""}
+                    for name in (
+                        "identity",
+                        "wardrobe",
+                        "location",
+                        "action",
+                        "prop",
+                        "motion",
+                    )
+                },
+                "result": result,
+            }
+        )["semanticVisualQc"]
+
+    @staticmethod
+    def selection_command(qc, *, decision="SELECTED", suffix="v1"):
+        return {
+            "workspaceRef": WORKSPACE,
+            "productionRunRef": RUN,
+            "idempotencyKey": f"selection-shot-0001-{suffix}",
+            "visualQcRef": qc["visualQcRef"],
+            "visualQcVersion": qc["visualQcVersion"],
+            "visualQcDigest": qc["payloadDigest"],
+            "selectionRef": f"selection-shot-0001-{suffix}",
+            "selectionVersion": 1,
+            "approvalRef": f"approval-shot-0001-{suffix}",
+            "decision": decision,
+        }
+
+    def test_selected_decision_is_sealed_but_not_written_outside_admission(self):
+        service, evidence = self.service()
+        candidate = self.record_candidate(service)
+        validation = self.record_validation(service, candidate)
+        qc = self.record_qc(service, validation)
+        prepared = service.prepare_human_selection_record(
+            self.selection_command(qc)
+        )
+        self.assertEqual(prepared.payload["decision"], "SELECTED")
+        self.assertEqual(prepared.payload["actorKind"], "HUMAN")
+        self.assertEqual(prepared.payload["visualQcDigest"], qc["payloadDigest"])
+        with self.assertRaises(CandidateLifecycleError):
+            service.record_human_selection(self.selection_command(qc))
+        projection = service.get_projection(WORKSPACE, RUN)
+        item = projection["candidates"][0]
+        self.assertEqual(item["technicalState"], "TECHNICALLY_VERIFIED")
+        self.assertEqual(item["visualQcState"], "SEMANTIC_QC_PASSED")
+        self.assertEqual(item["selectionState"], "UNSELECTED")
+        self.assertEqual(item["admissionState"], "NOT_ADMITTED")
+        self.assertEqual(
+            evidence.list_records(WORKSPACE, RUN, record_kind="HumanSelectionDecision"),
+            [],
+        )
+        self.assertEqual(evidence.current_state(WORKSPACE, RUN), "ROOTS_READY")
+
+    def test_qc_fail_is_canonical_but_cannot_be_selected(self):
+        service, evidence = self.service()
+        candidate = self.record_candidate(service)
+        validation = self.record_validation(service, candidate)
+        qc = self.record_qc(service, validation, result="FAIL")
+        self.assertEqual(qc["lifecycleState"], "SEMANTIC_QC_FAILED")
+        with self.assertRaises(CandidateNotSelectableError):
+            service.prepare_human_selection_record(self.selection_command(qc))
+        projection = service.get_projection(WORKSPACE, RUN)
+        self.assertEqual(
+            projection["candidates"][0]["visualQcState"], "SEMANTIC_QC_FAILED"
+        )
+        self.assertEqual(
+            evidence.list_records(WORKSPACE, RUN, record_kind="AssetVersion"), []
+        )
+
+    def test_failed_technical_validation_cannot_reach_visual_qc(self):
+        service, _ = self.service()
+        candidate = self.record_candidate(service)
+        validation = self.record_validation(service, candidate, result="FAIL")
+        with self.assertRaises(CandidateNotSelectableError):
+            self.record_qc(service, validation)
+
+    def test_qc_supersession_is_explicit_and_old_pass_becomes_stale(self):
+        service, _ = self.service()
+        candidate = self.record_candidate(service)
+        validation = self.record_validation(service, candidate)
+        first = self.record_qc(service, validation)
+        second = self.record_qc(
+            service,
+            validation,
+            result="PASS",
+            version=2,
+            supersedes={
+                "visualQcRef": first["visualQcRef"],
+                "visualQcVersion": first["visualQcVersion"],
+                "visualQcDigest": first["payloadDigest"],
+                "staleReason": "candidate assessment replayed under current profile",
+            },
+        )
+        with self.assertRaises(CandidateNotSelectableError):
+            service.prepare_human_selection_record(
+                self.selection_command(first, suffix="old")
+            )
+        prepared = service.prepare_human_selection_record(
+            self.selection_command(second, suffix="current")
+        )
+        self.assertEqual(prepared.payload["visualQcDigest"], second["payloadDigest"])
+        projection = service.get_projection(WORKSPACE, RUN)
+        self.assertEqual(
+            projection["candidates"][0]["semanticVisualQc"]["visualQcRef"],
+            second["visualQcRef"],
+        )
+
+    def test_new_candidate_for_same_slot_stales_old_qc_and_projects_media_revision(self):
+        service, _ = self.service()
+        candidate = self.record_candidate(service)
+        validation = self.record_validation(service, candidate)
+        old_qc = self.record_qc(service, validation)
+
+        successor_command = dict(self.candidate_command())
+        successor_command.update(
+            {
+                "idempotencyKey": "candidate-shot-0001-v2",
+                "candidateRef": "candidate-shot-0001-v2",
+                "revisionRef": "real-video-plan-candidate-review-v2",
+                "artifactRef": "runtime-artifact-shot-0001-v2",
+                "artifactDigest": "4" * 64,
+            }
+        )
+        service.register_candidate(successor_command)
+
+        with self.assertRaises(CandidateNotSelectableError):
+            service.prepare_human_selection_record(
+                self.selection_command(old_qc, suffix="stale-candidate")
+            )
+        projection = service.get_projection(WORKSPACE, RUN)
+        self.assertEqual(
+            projection["latestCandidateRevisionRefs"]["VIDEO"],
+            successor_command["revisionRef"],
+        )
+        old_projection = next(
+            item
+            for item in projection["candidates"]
+            if item["candidateRef"] == candidate["candidateRef"]
+        )
+        self.assertEqual(old_projection["visualQcState"], "NOT_STARTED")
+
+    def test_default_selection_authority_fails_closed(self):
+        evidence = self.evidence()
+        service = K2MediaCandidateReviewService(
+            RootService(), evidence, clock=lambda: "2026-08-23T13:00:00Z"
+        )
+        candidate = self.record_candidate(service)
+        validation = self.record_validation(service, candidate)
+        qc = self.record_qc(service, validation)
+        with self.assertRaises(MediaSelectionApprovalRequiredError):
+            service.prepare_human_selection_record(self.selection_command(qc))
+
+    def test_rejected_decision_is_append_only_without_admission(self):
+        service, evidence = self.service()
+        candidate = self.record_candidate(service)
+        validation = self.record_validation(service, candidate)
+        qc = self.record_qc(service, validation)
+        rejected = service.record_human_selection(
+            self.selection_command(qc, decision="REJECTED")
+        )["humanSelection"]
+        self.assertEqual(rejected["decision"], "REJECTED")
+        self.assertEqual(
+            evidence.list_records(WORKSPACE, RUN, record_kind="AssetVersion"), []
+        )
+
+    def test_all_stages_replay_without_duplicate_records(self):
+        service, evidence = self.service()
+        first = service.register_candidate(self.candidate_command())
+        replay = service.register_candidate(self.candidate_command())
+        self.assertFalse(first["idempotentReplay"])
+        self.assertTrue(replay["idempotentReplay"])
+        self.assertEqual(len(evidence.list_records(WORKSPACE, RUN)), 1)
+
+
+class InMemoryCandidateReviewTests(CandidateReviewMixin, unittest.TestCase):
+    def evidence(self):
+        return InMemoryEpisodeProductionEvidenceAdapter()
+
+
+class SqliteCandidateReviewTests(CandidateReviewMixin, unittest.TestCase):
+    def setUp(self):
+        self.temporary_directory = tempfile.TemporaryDirectory()
+
+    def tearDown(self):
+        self.temporary_directory.cleanup()
+
+    def evidence(self):
+        return SqliteEpisodeProductionEvidenceAdapter(
+            Path(self.temporary_directory.name) / "evidence.sqlite3",
+            initialize_if_missing=True,
+        )
+
+if __name__ == "__main__":
+    unittest.main()

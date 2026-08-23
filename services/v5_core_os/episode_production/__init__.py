@@ -61,7 +61,27 @@ from .real_media_revision import (
     REAL_VIDEO_CAPABILITY,
     RealImageCandidateEvidencePort,
     RealImageCandidateRejectedError,
+    RealVideoCandidateEvidencePort,
+    RealVideoCandidateRejectedError,
 )
+from .media_candidate_review import (
+    CandidateLifecycleError,
+    CandidateNotSelectableError,
+    CanonicalAssetVersionAuthority,
+    K2MediaCandidateReviewService,
+    MediaSelectionApprovalAuthorityPort,
+    MediaSelectionApprovalRequiredError,
+    MediaSelectionSubject,
+    RejectingMediaSelectionApprovalAuthority,
+    StaticMediaSelectionApprovalAuthority,
+    VerifiedMediaSelection,
+)
+from .external_media_selection_approval import (
+    MEDIA_SELECTION_APPROVAL_AUTHORITY_BUNDLE_SCHEMA,
+    DigestPinnedMediaSelectionApprovalAuthority,
+    media_selection_approval_authority_from_environment,
+)
+from .state_projection import K2ProductionStateProjectionService
 
 __all__ = [
     "EpisodeProductionPublicBoundary",
@@ -103,6 +123,22 @@ __all__ = [
     "REAL_VIDEO_CAPABILITY",
     "RealImageCandidateEvidencePort",
     "RealImageCandidateRejectedError",
+    "RealVideoCandidateEvidencePort",
+    "RealVideoCandidateRejectedError",
+    "CandidateLifecycleError",
+    "CandidateNotSelectableError",
+    "CanonicalAssetVersionAuthority",
+    "K2MediaCandidateReviewService",
+    "MediaSelectionApprovalAuthorityPort",
+    "MediaSelectionApprovalRequiredError",
+    "MediaSelectionSubject",
+    "RejectingMediaSelectionApprovalAuthority",
+    "StaticMediaSelectionApprovalAuthority",
+    "VerifiedMediaSelection",
+    "MEDIA_SELECTION_APPROVAL_AUTHORITY_BUNDLE_SCHEMA",
+    "DigestPinnedMediaSelectionApprovalAuthority",
+    "media_selection_approval_authority_from_environment",
+    "K2ProductionStateProjectionService",
     "create_in_memory_boundary",
     "create_local_development_boundary",
     "create_local_development_boundary_from_environment",

@@ -15,6 +15,9 @@ from services.v4_platform import (
     create_comfyui_wan22_adapter_from_environment,
     real_image_candidate_evidence_from_environment,
 )
+from services.v4_platform.real_video_candidates import (
+    MediaJobRealVideoCandidateEvidence,
+)
 
 from .authority import (
     AuthorityRequiredError,
@@ -76,11 +79,67 @@ from .internal_execution import (
 from .real_media_revision import (
     K2RealMediaRevisionService,
     RealImageCandidateRejectedError,
+    RealVideoCandidateRejectedError,
 )
+from .media_candidate_review import (
+    CandidateLifecycleError,
+    CandidateNotSelectableError,
+    K2MediaCandidateReviewService,
+    MediaSelectionApprovalRequiredError,
+)
+from .state_projection import K2ProductionStateProjectionService
 from .external_authority import (
     external_authorities_from_environment,
     identity_reference_authority_from_environment,
 )
+from .external_delivery_approval import (
+    delivery_approval_authority_from_environment,
+)
+from .external_media_selection_approval import (
+    media_selection_approval_authority_from_environment,
+)
+
+
+_INTERNAL_MEDIA_LOCATOR_FIELDS = frozenset(
+    {
+        "absolutepath",
+        "artifactpath",
+        "artifactroot",
+        "candidatepath",
+        "filesystempath",
+        "finalpath",
+        "inputpath",
+        "internalpath",
+        "outputpath",
+    }
+)
+
+
+def _is_internal_media_locator(field: Any) -> bool:
+    if not isinstance(field, str):
+        return False
+    normalized = field.replace("_", "").replace("-", "").lower()
+    return (
+        normalized in _INTERNAL_MEDIA_LOCATOR_FIELDS
+        or normalized.endswith("storagekey")
+        or normalized.endswith("storagekeys")
+    )
+
+
+def _strip_internal_media_locators(value: Any) -> Any:
+    """Return a detached public DTO without filesystem/storage locators."""
+
+    if isinstance(value, Mapping):
+        return {
+            key: _strip_internal_media_locators(item)
+            for key, item in value.items()
+            if not _is_internal_media_locator(key)
+        }
+    if isinstance(value, list):
+        return [_strip_internal_media_locators(item) for item in value]
+    if isinstance(value, tuple):
+        return tuple(_strip_internal_media_locators(item) for item in value)
+    return value
 
 
 class EpisodeProductionPublicError(RuntimeError):
@@ -112,6 +171,8 @@ class EpisodeProductionPublicBoundary:
         self.__media = media
         self.__delivery = delivery
         self.__real_media_revision = real_media_revision
+        self.__candidate_review = real_media_revision.candidate_review
+        self.__state_projection = real_media_revision.state_projection
 
     @staticmethod
     def _error(exc: EpisodeProductionError) -> EpisodeProductionPublicError:
@@ -125,6 +186,8 @@ class EpisodeProductionPublicBoundary:
             return EpisodeProductionPublicError(exc.code, 403)
         if isinstance(exc, ApprovalRequiredError):
             return EpisodeProductionPublicError(exc.code, 403)
+        if isinstance(exc, MediaSelectionApprovalRequiredError):
+            return EpisodeProductionPublicError(exc.code, 403)
         if isinstance(exc, ApprovalRejectedError):
             return EpisodeProductionPublicError(exc.code, 409)
         if isinstance(exc, ProductionPolicyRequiredError):
@@ -135,6 +198,12 @@ class EpisodeProductionPublicBoundary:
             return EpisodeProductionPublicError(exc.code, 422)
         if isinstance(exc, RealImageCandidateRejectedError):
             return EpisodeProductionPublicError(exc.code, 422)
+        if isinstance(exc, RealVideoCandidateRejectedError):
+            return EpisodeProductionPublicError(exc.code, 422)
+        if isinstance(exc, CandidateNotSelectableError):
+            return EpisodeProductionPublicError(exc.code, 409)
+        if isinstance(exc, CandidateLifecycleError):
+            return EpisodeProductionPublicError(exc.code, 400)
         if isinstance(exc, WorkerUnavailableError):
             return EpisodeProductionPublicError(exc.code, 503)
         if isinstance(exc, ProviderExperimentUnavailableError):
@@ -158,6 +227,9 @@ class EpisodeProductionPublicBoundary:
             return operation(*args)
         except EpisodeProductionError as exc:
             raise self._error(exc) from None
+
+    def _invoke_public_media(self, operation, *args):
+        return _strip_internal_media_locators(self._invoke(operation, *args))
 
     def create_run(self, command: Mapping[str, Any]) -> dict[str, Any]:
         run = self._invoke(self.__service.create_run, command)
@@ -243,24 +315,103 @@ class EpisodeProductionPublicBoundary:
         )
 
     def plan_real_images(self, command: Mapping[str, Any]) -> dict[str, Any]:
-        return self._invoke(self.__real_media_revision.plan_images, command)
+        return self._invoke_public_media(
+            self.__real_media_revision.plan_images, command
+        )
 
     def select_real_images(self, command: Mapping[str, Any]) -> dict[str, Any]:
-        return self._invoke(
+        return self._invoke_public_media(
             self.__real_media_revision.select_and_admit_images, command
         )
 
+    def record_real_image_candidates(
+        self, command: Mapping[str, Any]
+    ) -> dict[str, Any]:
+        return self._invoke_public_media(
+            self.__real_media_revision.record_real_image_candidates, command
+        )
+
+    def admit_real_images(self, command: Mapping[str, Any]) -> dict[str, Any]:
+        return self._invoke_public_media(
+            self.__real_media_revision.admit_real_images, command
+        )
+
+    def admit_real_image_successor(
+        self, command: Mapping[str, Any]
+    ) -> dict[str, Any]:
+        return self._invoke_public_media(
+            self.__real_media_revision.admit_real_image_successor, command
+        )
+
     def plan_real_videos(self, command: Mapping[str, Any]) -> dict[str, Any]:
-        return self._invoke(self.__real_media_revision.plan_videos, command)
+        return self._invoke_public_media(
+            self.__real_media_revision.plan_videos, command
+        )
+
+    def record_real_video_candidates(
+        self, command: Mapping[str, Any]
+    ) -> dict[str, Any]:
+        return self._invoke_public_media(
+            self.__real_media_revision.record_real_video_candidates, command
+        )
+
+    def record_semantic_visual_qc(
+        self, command: Mapping[str, Any]
+    ) -> dict[str, Any]:
+        return self._invoke_public_media(
+            self.__candidate_review.record_semantic_visual_qc, command
+        )
+
+    def record_human_selection(
+        self, command: Mapping[str, Any]
+    ) -> dict[str, Any]:
+        return self._invoke_public_media(
+            self.__candidate_review.record_human_selection, command
+        )
+
+    def admit_real_videos(self, command: Mapping[str, Any]) -> dict[str, Any]:
+        return self._invoke_public_media(
+            self.__real_media_revision.admit_real_videos, command
+        )
+
+    def get_state_projection(
+        self, workspace_ref: str, run_ref: str
+    ) -> dict[str, Any]:
+        return self._invoke_public_media(
+            self.__state_projection.get_projection, workspace_ref, run_ref
+        )
 
     def get_real_media_revision(
         self, workspace_ref: str, run_ref: str
     ) -> dict[str, Any]:
-        return self._invoke(
+        revision = self._invoke(
             self.__real_media_revision.get_revision_bundle,
             workspace_ref,
             run_ref,
         )
+        axes = self._invoke(
+            self.__state_projection.get_projection, workspace_ref, run_ref
+        )
+        # ADR-0013 extends the existing real-media projection; the dedicated
+        # state query remains a compatibility/convenience view, not a second
+        # source of truth.  Preserve all legacy revision fields and add only the
+        # canonical axes owned by the shared projection service.
+        merged = dict(revision)
+        for field in (
+            "state",
+            "rootState",
+            "productionState",
+            "runtimeState",
+            "visualQcState",
+            "activeRevision",
+            "productionProjection",
+            "candidates",
+            "candidateLifecycle",
+            "invariants",
+        ):
+            if field in axes:
+                merged[field] = axes[field]
+        return _strip_internal_media_locators(merged)
 
     def get_preview_file(
         self, workspace_ref: str, run_ref: str
@@ -293,9 +444,11 @@ def _services(
     provider_experiment_execution=None,
     internal_execution_grant: K2InternalExecutionGrant | None = None,
     real_image_candidate_evidence=None,
+    real_video_candidate_evidence=None,
     media_execution=None,
     composition_execution=None,
     approval_authority=None,
+    media_selection_approval_authority=None,
     ref_factory=None,
     clock=None,
 ) -> tuple[
@@ -384,8 +537,21 @@ def _services(
         shot_graph,
         evidence_repository,
         real_image_candidate_evidence,
+        real_video_candidate_evidence,
+        K2MediaCandidateReviewService(
+            service,
+            evidence_repository,
+            clock=selected_clock,
+            selection_authority=media_selection_approval_authority,
+        ),
         ref_factory=selected_ref_factory,
         clock=selected_clock,
+    )
+    real_media_revision.state_projection = K2ProductionStateProjectionService(
+        service,
+        evidence_repository,
+        real_media_revision.candidate_review,
+        media.execution if hasattr(media.execution, "list_jobs") else None,
     )
     return (
         service,
@@ -412,9 +578,11 @@ def create_in_memory_boundary(
     provider_experiment_execution=None,
     internal_execution_grant: K2InternalExecutionGrant | None = None,
     real_image_candidate_evidence=None,
+    real_video_candidate_evidence=None,
     media_execution=None,
     composition_execution=None,
     approval_authority=None,
+    media_selection_approval_authority=None,
     ref_factory=None,
     clock=None,
 ) -> EpisodeProductionPublicBoundary:
@@ -443,9 +611,11 @@ def create_in_memory_boundary(
         provider_experiment_execution=provider_experiment_execution,
         internal_execution_grant=internal_execution_grant,
         real_image_candidate_evidence=real_image_candidate_evidence,
+        real_video_candidate_evidence=real_video_candidate_evidence,
         media_execution=media_execution,
         composition_execution=composition_execution,
         approval_authority=approval_authority,
+        media_selection_approval_authority=media_selection_approval_authority,
         ref_factory=ref_factory,
         clock=clock,
     )
@@ -478,9 +648,11 @@ def create_local_development_boundary(
     provider_experiment_execution=None,
     internal_execution_grant: K2InternalExecutionGrant | None = None,
     real_image_candidate_evidence=None,
+    real_video_candidate_evidence=None,
     media_execution=None,
     composition_execution=None,
     approval_authority=None,
+    media_selection_approval_authority=None,
     ref_factory=None,
     clock=None,
     initialize_if_missing: bool = True,
@@ -534,9 +706,11 @@ def create_local_development_boundary(
         provider_experiment_execution=provider_experiment_execution,
         internal_execution_grant=internal_execution_grant,
         real_image_candidate_evidence=real_image_candidate_evidence,
+        real_video_candidate_evidence=real_video_candidate_evidence,
         media_execution=media_execution,
         composition_execution=composition_execution,
         approval_authority=approval_authority,
+        media_selection_approval_authority=media_selection_approval_authority,
         ref_factory=ref_factory,
         clock=clock,
     )
@@ -565,6 +739,10 @@ def create_local_development_boundary_from_environment(
     rights_authority, provider_authority = external_authorities_from_environment(values)
     identity_reference_authority = (
         identity_reference_authority_from_environment(values)
+    )
+    approval_authority = delivery_approval_authority_from_environment(values)
+    media_selection_approval_authority = (
+        media_selection_approval_authority_from_environment(values)
     )
     configured = str(values.get("CREATOR_EPISODE_PRODUCTION_DATA_PATH", "")).strip()
     if configured:
@@ -641,12 +819,17 @@ def create_local_development_boundary_from_environment(
     real_image_candidate_evidence = (
         real_image_candidate_evidence_from_environment(values)
     )
+    job_repository = SqliteMediaJobAdapter(job_path)
     execution = MediaJobCoordinator(
-        SqliteMediaJobAdapter(job_path),
+        job_repository,
         DeterministicLocalFfmpegAdapter(),
         artifact_root,
         ref_factory=lambda prefix: f"{prefix}-{uuid4().hex}",
         clock=_utc_now,
+    )
+    real_video_candidate_evidence = MediaJobRealVideoCandidateEvidence(
+        job_repository,
+        artifact_root,
     )
     return create_local_development_boundary(
         path,
@@ -661,7 +844,10 @@ def create_local_development_boundary_from_environment(
         provider_experiment_execution=provider_experiment_execution,
         internal_execution_grant=internal_execution_grant,
         real_image_candidate_evidence=real_image_candidate_evidence,
+        real_video_candidate_evidence=real_video_candidate_evidence,
         media_execution=execution,
         composition_execution=V4CompositionExecutor.from_artifact_root(artifact_root),
+        approval_authority=approval_authority,
+        media_selection_approval_authority=media_selection_approval_authority,
         initialize_if_missing=True,
     )

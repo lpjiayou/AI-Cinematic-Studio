@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 from copy import deepcopy
+from dataclasses import dataclass
+from datetime import datetime
 from hashlib import sha256
 from pathlib import Path
 from typing import Any, Callable, Mapping, Protocol
@@ -32,7 +34,9 @@ MASTER_GATE = "G6_MASTER"
 TIMELINE_SCHEMA_VERSION = "v5.timeline-version.v1"
 PREVIEW_SCHEMA_VERSION = "v5.preview-candidate.v1"
 QC_SCHEMA_VERSION = "v5.qc-report.v1"
-APPROVAL_SCHEMA_VERSION = "v5.approval-decision.v1"
+APPROVAL_SCHEMA_VERSION = "v5.approval-decision.v2"
+APPROVAL_SUBJECT_SCHEMA_VERSION = "v5.delivery-approval-subject.v1"
+VERIFIED_APPROVAL_SCHEMA_VERSION = "v5.verified-delivery-approval.v1"
 MASTER_SCHEMA_VERSION = "v5.episode-master.v1"
 EXPORT_SCHEMA_VERSION = "v5.export-artifact.v1"
 DELIVERY_ID = "v5.k2.delivery.v1"
@@ -59,20 +63,308 @@ class CompositionExecutionPort(Protocol):
     def finalize(self, command: Mapping[str, Any]) -> dict[str, Any]: ...
 
 
-class ApprovalAuthorityPort(Protocol):
-    def verify(
-        self,
+def _is_sha256(value: Any) -> bool:
+    return (
+        isinstance(value, str)
+        and len(value) == 64
+        and all(character in "0123456789abcdef" for character in value)
+    )
+
+
+def _is_timestamp(value: Any) -> bool:
+    if (
+        not isinstance(value, str)
+        or value != value.strip()
+        or not value
+        or len(value) > 64
+    ):
+        return False
+    candidate = f"{value[:-1]}+00:00" if value.endswith("Z") else value
+    try:
+        parsed = datetime.fromisoformat(candidate)
+    except ValueError:
+        return False
+    return parsed.tzinfo is not None
+
+
+def _subject_ref(value: Any, field: str) -> str:
+    try:
+        return _required_ref(value, field)
+    except EpisodeProductionError as exc:
+        raise StaleInputError(f"approval subject {field} is invalid") from exc
+
+
+@dataclass(frozen=True, slots=True)
+class ApprovalSubject:
+    """Closed-world identity of the exact media evidence being approved."""
+
+    workspace_ref: str
+    production_run_ref: str
+    kind: str
+    timeline_version_ref: str
+    timeline_digest: str
+    preview_candidate_version_ref: str
+    preview_candidate_digest: str
+    qc_report_ref: str
+    qc_report_digest: str
+    subject_digest: str
+
+    @classmethod
+    def create(
+        cls,
         *,
         workspace_ref: str,
         production_run_ref: str,
         kind: str,
+        timeline_version_ref: str,
+        timeline_digest: str,
+        preview_candidate_version_ref: str,
+        preview_candidate_digest: str,
+        qc_report_ref: str,
+        qc_report_digest: str,
+    ) -> "ApprovalSubject":
+        if kind not in APPROVAL_KINDS:
+            raise StaleInputError("approval subject kind is invalid")
+        values = {
+            "schemaVersion": APPROVAL_SUBJECT_SCHEMA_VERSION,
+            "workspaceRef": _subject_ref(workspace_ref, "workspaceRef"),
+            "productionRunRef": _subject_ref(
+                production_run_ref, "productionRunRef"
+            ),
+            "kind": kind,
+            "timelineVersionRef": _subject_ref(
+                timeline_version_ref, "timelineVersionRef"
+            ),
+            "timelineDigest": timeline_digest,
+            "previewCandidateVersionRef": _subject_ref(
+                preview_candidate_version_ref,
+                "previewCandidateVersionRef",
+            ),
+            "previewCandidateDigest": preview_candidate_digest,
+            "qcReportRef": _subject_ref(qc_report_ref, "qcReportRef"),
+            "qcReportDigest": qc_report_digest,
+        }
+        for field in (
+            "timelineDigest",
+            "previewCandidateDigest",
+            "qcReportDigest",
+        ):
+            if not _is_sha256(values[field]):
+                raise StaleInputError(f"approval subject {field} is invalid")
+        return cls(
+            values["workspaceRef"],
+            values["productionRunRef"],
+            values["kind"],
+            values["timelineVersionRef"],
+            values["timelineDigest"],
+            values["previewCandidateVersionRef"],
+            values["previewCandidateDigest"],
+            values["qcReportRef"],
+            values["qcReportDigest"],
+            _digest(values),
+        )
+
+    @classmethod
+    def from_mapping(cls, value: Mapping[str, Any]) -> "ApprovalSubject":
+        fields = {
+            "schemaVersion",
+            "workspaceRef",
+            "productionRunRef",
+            "kind",
+            "timelineVersionRef",
+            "timelineDigest",
+            "previewCandidateVersionRef",
+            "previewCandidateDigest",
+            "qcReportRef",
+            "qcReportDigest",
+            "subjectDigest",
+        }
+        if (
+            not isinstance(value, Mapping)
+            or set(value) != fields
+            or value.get("schemaVersion") != APPROVAL_SUBJECT_SCHEMA_VERSION
+        ):
+            raise ApprovalRequiredError("approval subject fields are invalid")
+        try:
+            subject = cls.create(
+                workspace_ref=value["workspaceRef"],
+                production_run_ref=value["productionRunRef"],
+                kind=value["kind"],
+                timeline_version_ref=value["timelineVersionRef"],
+                timeline_digest=value["timelineDigest"],
+                preview_candidate_version_ref=value[
+                    "previewCandidateVersionRef"
+                ],
+                preview_candidate_digest=value["previewCandidateDigest"],
+                qc_report_ref=value["qcReportRef"],
+                qc_report_digest=value["qcReportDigest"],
+            )
+        except StaleInputError as exc:
+            raise ApprovalRequiredError("approval subject is invalid") from exc
+        if value.get("subjectDigest") != subject.subject_digest:
+            raise ApprovalRequiredError("approval subject digest does not match")
+        return subject
+
+    def as_dict(self) -> dict[str, Any]:
+        return {
+            "schemaVersion": APPROVAL_SUBJECT_SCHEMA_VERSION,
+            "workspaceRef": self.workspace_ref,
+            "productionRunRef": self.production_run_ref,
+            "kind": self.kind,
+            "timelineVersionRef": self.timeline_version_ref,
+            "timelineDigest": self.timeline_digest,
+            "previewCandidateVersionRef": self.preview_candidate_version_ref,
+            "previewCandidateDigest": self.preview_candidate_digest,
+            "qcReportRef": self.qc_report_ref,
+            "qcReportDigest": self.qc_report_digest,
+            "subjectDigest": self.subject_digest,
+        }
+
+
+@dataclass(frozen=True, slots=True)
+class VerifiedApproval:
+    """Auditable authority decision bound to one exact ApprovalSubject."""
+
+    authority_ref: str
+    approval_ref: str
+    actor_ref: str
+    kind: str
+    authority_type: str
+    decision: str
+    authority_decision_ref: str
+    authority_decision_digest: str
+    decided_at: str
+    subject_digest: str
+
+    @staticmethod
+    def expected_decision_digest(
+        *,
+        authority_ref: str,
         approval_ref: str,
         actor_ref: str,
-    ) -> Mapping[str, Any]: ...
+        kind: str,
+        authority_type: str,
+        decision: str,
+        authority_decision_ref: str,
+        decided_at: str,
+        subject_digest: str,
+    ) -> str:
+        return _digest(
+            {
+                "schemaVersion": VERIFIED_APPROVAL_SCHEMA_VERSION,
+                "authorityRef": authority_ref,
+                "approvalRef": approval_ref,
+                "actorRef": actor_ref,
+                "kind": kind,
+                "authorityType": authority_type,
+                "decision": decision,
+                "authorityDecisionRef": authority_decision_ref,
+                "decidedAt": decided_at,
+                "subjectDigest": subject_digest,
+            }
+        )
+
+    @classmethod
+    def create(
+        cls,
+        *,
+        authority_ref: str,
+        approval_ref: str,
+        actor_ref: str,
+        kind: str,
+        authority_type: str,
+        decision: str,
+        authority_decision_ref: str,
+        authority_decision_digest: str,
+        decided_at: str,
+        subject_digest: str,
+    ) -> "VerifiedApproval":
+        try:
+            authority = _required_ref(authority_ref, "authorityRef")
+            approval = _required_ref(approval_ref, "approvalRef")
+            actor = _required_ref(actor_ref, "actorRef")
+            authority_decision = _required_ref(
+                authority_decision_ref, "authorityDecisionRef"
+            )
+        except EpisodeProductionError as exc:
+            raise ApprovalRequiredError("approval authority evidence is invalid") from exc
+        if (
+            kind not in APPROVAL_KINDS
+            or authority_type != "HUMAN"
+            or decision not in {"ACCEPT", "REJECT"}
+            or not _is_timestamp(decided_at)
+            or not _is_sha256(subject_digest)
+            or not _is_sha256(authority_decision_digest)
+        ):
+            raise ApprovalRequiredError("approval authority evidence is invalid")
+        expected_digest = cls.expected_decision_digest(
+            authority_ref=authority,
+            approval_ref=approval,
+            actor_ref=actor,
+            kind=kind,
+            authority_type=authority_type,
+            decision=decision,
+            authority_decision_ref=authority_decision,
+            decided_at=decided_at,
+            subject_digest=subject_digest,
+        )
+        if authority_decision_digest != expected_digest:
+            raise ApprovalRequiredError(
+                "approval authority decision digest does not match"
+            )
+        return cls(
+            authority,
+            approval,
+            actor,
+            kind,
+            authority_type,
+            decision,
+            authority_decision,
+            authority_decision_digest,
+            decided_at,
+            subject_digest,
+        )
+
+    def matches(
+        self,
+        *,
+        subject: ApprovalSubject,
+        approval_ref: str,
+        actor_ref: str,
+    ) -> bool:
+        return (
+            self.approval_ref == approval_ref
+            and self.actor_ref == actor_ref
+            and self.kind == subject.kind
+            and self.authority_type == "HUMAN"
+            and self.subject_digest == subject.subject_digest
+            and self.authority_decision_digest
+            == self.expected_decision_digest(
+                authority_ref=self.authority_ref,
+                approval_ref=self.approval_ref,
+                actor_ref=self.actor_ref,
+                kind=self.kind,
+                authority_type=self.authority_type,
+                decision=self.decision,
+                authority_decision_ref=self.authority_decision_ref,
+                decided_at=self.decided_at,
+                subject_digest=self.subject_digest,
+            )
+        )
+
+
+class ApprovalAuthorityPort(Protocol):
+    def verify(
+        self,
+        *,
+        subject: ApprovalSubject,
+        approval_ref: str,
+        actor_ref: str,
+    ) -> VerifiedApproval: ...
 
 
 class RejectingApprovalAuthority:
-    def verify(self, **kwargs: Any) -> Mapping[str, Any]:
+    def verify(self, **kwargs: Any) -> VerifiedApproval:
         del kwargs
         raise ApprovalRequiredError("an external approval authority is required")
 
@@ -86,23 +378,65 @@ class StaticApprovalAuthority:
     def verify(
         self,
         *,
-        workspace_ref: str,
-        production_run_ref: str,
-        kind: str,
+        subject: ApprovalSubject,
         approval_ref: str,
         actor_ref: str,
-    ) -> Mapping[str, Any]:
+    ) -> VerifiedApproval:
         value = self._approvals.get(approval_ref)
         if (
             not isinstance(value, Mapping)
-            or value.get("workspaceRef") != workspace_ref
-            or value.get("productionRunRef") != production_run_ref
-            or value.get("kind") != kind
+            or value.get("workspaceRef") != subject.workspace_ref
+            or value.get("productionRunRef") != subject.production_run_ref
+            or value.get("kind") != subject.kind
             or value.get("actorRef") != actor_ref
-            or value.get("authorityType") not in {"HUMAN", "EXTERNAL_POLICY"}
+            or value.get("authorityType") != "HUMAN"
+            or value.get("subjectDigest")
+            not in (None, subject.subject_digest)
         ):
             raise ApprovalRequiredError("approval authority rejected evidence")
-        return deepcopy(dict(value))
+        if "subject" in value:
+            try:
+                configured_subject = ApprovalSubject.from_mapping(value["subject"])
+            except (ApprovalRequiredError, TypeError) as exc:
+                raise ApprovalRequiredError(
+                    "approval authority rejected evidence"
+                ) from exc
+            if configured_subject != subject:
+                raise ApprovalRequiredError("approval authority rejected evidence")
+        authority_ref = value.get(
+            "authorityRef", "static-delivery-approval-authority"
+        )
+        decision = value.get("decision", "ACCEPT")
+        decided_at = value.get("decidedAt", "1970-01-01T00:00:00Z")
+        authority_decision_ref = value.get(
+            "authorityDecisionRef",
+            f"static-authority-decision-{_digest({'approvalRef': approval_ref})[:24]}",
+        )
+        authority_decision_digest = value.get("authorityDecisionDigest")
+        if authority_decision_digest is None:
+            authority_decision_digest = VerifiedApproval.expected_decision_digest(
+                authority_ref=authority_ref,
+                approval_ref=approval_ref,
+                actor_ref=actor_ref,
+                kind=subject.kind,
+                authority_type="HUMAN",
+                decision=decision,
+                authority_decision_ref=authority_decision_ref,
+                decided_at=decided_at,
+                subject_digest=subject.subject_digest,
+            )
+        return VerifiedApproval.create(
+            authority_ref=authority_ref,
+            approval_ref=approval_ref,
+            actor_ref=actor_ref,
+            kind=subject.kind,
+            authority_type=value["authorityType"],
+            decision=decision,
+            authority_decision_ref=authority_decision_ref,
+            authority_decision_digest=authority_decision_digest,
+            decided_at=decided_at,
+            subject_digest=subject.subject_digest,
+        )
 
 
 def _sealed(payload: Mapping[str, Any]) -> dict[str, Any]:
@@ -543,6 +877,7 @@ class K2DeliveryService:
         if not isinstance(decisions_input, list) or len(decisions_input) != len(APPROVAL_KINDS):
             raise ValidationFailedError("all four approval decisions are required")
         by_kind: dict[str, Mapping[str, Any]] = {}
+        approval_refs: set[str] = set()
         for item in decisions_input:
             if not isinstance(item, Mapping) or set(item) != {
                 "kind", "decision", "approvalRef", "actorRef"
@@ -553,13 +888,39 @@ class K2DeliveryService:
                 raise ValidationFailedError("approval decision kinds are invalid")
             if item.get("decision") != "ACCEPT":
                 raise ApprovalRejectedError("rejected decision cannot finalize a master")
-            by_kind[kind] = item
+            approval_ref = _required_ref(item.get("approvalRef"), "approvalRef")
+            actor_ref = _required_ref(item.get("actorRef"), "actorRef")
+            if approval_ref in approval_refs:
+                raise ValidationFailedError("approvalRef must be unique per decision")
+            approval_refs.add(approval_ref)
+            by_kind[kind] = {
+                "kind": kind,
+                "decision": "ACCEPT",
+                "approvalRef": approval_ref,
+                "actorRef": actor_ref,
+            }
         if set(by_kind) != set(APPROVAL_KINDS):
             raise ValidationFailedError("approval decision coverage is incomplete")
         verified, timeline, preview, qc = self._verified_preview_qc(workspace, run_ref)
         root = verified["root"]
         now = self._clock()
         normalized = [deepcopy(dict(by_kind[kind])) for kind in APPROVAL_KINDS]
+        subjects = {
+            kind: ApprovalSubject.create(
+                workspace_ref=workspace,
+                production_run_ref=run_ref,
+                kind=kind,
+                timeline_version_ref=timeline["timelineVersionRef"],
+                timeline_digest=timeline["payloadDigest"],
+                preview_candidate_version_ref=preview[
+                    "previewCandidateVersionRef"
+                ],
+                preview_candidate_digest=preview["payloadDigest"],
+                qc_report_ref=qc["qcReportRef"],
+                qc_report_digest=qc["payloadDigest"],
+            )
+            for kind in APPROVAL_KINDS
+        }
         approval_key = _digest(
             {"clientIdempotencyKey": client_key, "stage": "approvals"}
         )
@@ -569,6 +930,9 @@ class K2DeliveryService:
                 "previewDigest": preview["payloadDigest"],
                 "qcDigest": qc["payloadDigest"],
                 "decisions": normalized,
+                "approvalSubjects": [
+                    subjects[kind].as_dict() for kind in APPROVAL_KINDS
+                ],
             }
         )
         approval_gate = self._existing(
@@ -579,15 +943,29 @@ class K2DeliveryService:
         if approval_gate is None:
             decisions = []
             for ordinal, item in enumerate(normalized, start=1):
-                approval_ref = _required_ref(item["approvalRef"], "approvalRef")
-                actor_ref = _required_ref(item["actorRef"], "actorRef")
+                approval_ref = item["approvalRef"]
+                actor_ref = item["actorRef"]
+                subject = subjects[item["kind"]]
                 authority = self.approval_authority.verify(
-                    workspace_ref=workspace,
-                    production_run_ref=run_ref,
-                    kind=item["kind"],
+                    subject=subject,
                     approval_ref=approval_ref,
                     actor_ref=actor_ref,
                 )
+                if (
+                    not isinstance(authority, VerifiedApproval)
+                    or not authority.matches(
+                        subject=subject,
+                        approval_ref=approval_ref,
+                        actor_ref=actor_ref,
+                    )
+                ):
+                    raise ApprovalRequiredError(
+                        "approval authority returned mismatched evidence"
+                    )
+                if authority.decision != "ACCEPT":
+                    raise ApprovalRejectedError(
+                        "authority rejected decision cannot finalize a master"
+                    )
                 decisions.append(
                     _sealed(
                         {
@@ -604,7 +982,19 @@ class K2DeliveryService:
                             "decision": "ACCEPT",
                             "approvalRef": approval_ref,
                             "actorRef": actor_ref,
-                            "authorityType": authority["authorityType"],
+                            "subjectSchemaVersion": (
+                                APPROVAL_SUBJECT_SCHEMA_VERSION
+                            ),
+                            "subjectDigest": subject.subject_digest,
+                            "authorityRef": authority.authority_ref,
+                            "authorityType": authority.authority_type,
+                            "authorityDecisionRef": (
+                                authority.authority_decision_ref
+                            ),
+                            "authorityDecisionDigest": (
+                                authority.authority_decision_digest
+                            ),
+                            "authorityDecidedAt": authority.decided_at,
                             "previewCandidateVersionRef": preview[
                                 "previewCandidateVersionRef"
                             ],
@@ -635,11 +1025,61 @@ class K2DeliveryService:
                 )
             )
         decisions = _approval_facts(approval_gate)
+        lineage_is_current = len(decisions) == len(APPROVAL_KINDS)
+        for item in decisions:
+            kind = item.get("kind")
+            if kind not in subjects:
+                lineage_is_current = False
+                continue
+            subject = subjects[kind]
+            expected_input = by_kind[kind]
+            lineage_is_current = lineage_is_current and all(
+                (
+                    item.get("schemaVersion") == APPROVAL_SCHEMA_VERSION,
+                    item.get("decision") == "ACCEPT",
+                    item.get("state") == "ACCEPTED",
+                    item.get("approvalRef") == expected_input["approvalRef"],
+                    item.get("actorRef") == expected_input["actorRef"],
+                    item.get("subjectSchemaVersion")
+                    == APPROVAL_SUBJECT_SCHEMA_VERSION,
+                    item.get("subjectDigest") == subject.subject_digest,
+                    item.get("timelineVersionRef")
+                    == subject.timeline_version_ref,
+                    item.get("timelineDigest") == subject.timeline_digest,
+                    item.get("previewCandidateVersionRef")
+                    == subject.preview_candidate_version_ref,
+                    item.get("previewCandidateDigest")
+                    == subject.preview_candidate_digest,
+                    item.get("qcReportRef") == subject.qc_report_ref,
+                    item.get("qcReportDigest") == subject.qc_report_digest,
+                )
+            )
+            try:
+                persisted_authority = VerifiedApproval.create(
+                    authority_ref=item.get("authorityRef"),
+                    approval_ref=item.get("approvalRef"),
+                    actor_ref=item.get("actorRef"),
+                    kind=kind,
+                    authority_type=item.get("authorityType"),
+                    decision=item.get("decision"),
+                    authority_decision_ref=item.get("authorityDecisionRef"),
+                    authority_decision_digest=item.get(
+                        "authorityDecisionDigest"
+                    ),
+                    decided_at=item.get("authorityDecidedAt"),
+                    subject_digest=item.get("subjectDigest"),
+                )
+            except ApprovalRequiredError:
+                lineage_is_current = False
+            else:
+                lineage_is_current = lineage_is_current and persisted_authority.matches(
+                    subject=subject,
+                    approval_ref=expected_input["approvalRef"],
+                    actor_ref=expected_input["actorRef"],
+                )
         if (
-            [item["kind"] for item in decisions] != list(APPROVAL_KINDS)
-            or any(item["decision"] != "ACCEPT" for item in decisions)
-            or any(item["previewCandidateDigest"] != preview["payloadDigest"] for item in decisions)
-            or any(item["qcReportDigest"] != qc["payloadDigest"] for item in decisions)
+            [item.get("kind") for item in decisions] != list(APPROVAL_KINDS)
+            or not lineage_is_current
         ):
             raise StaleInputError("approval decision lineage is stale")
         master_key = _digest(

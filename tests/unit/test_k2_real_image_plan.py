@@ -140,11 +140,13 @@ class K2RealImagePlanTests(unittest.TestCase):
         )
         self.assertTrue(replay["idempotentReplay"])
         self.assertEqual(replay["realImagePlan"], first["realImagePlan"])
-        self.assertEqual(projected, {
-            "realImagePlan": first["realImagePlan"],
-            "generationRequests": first["generationRequests"],
-            "state": "REAL_IMAGE_PLAN_READY",
-        })
+        self.assertEqual(projected["realImagePlan"], first["realImagePlan"])
+        self.assertEqual(
+            projected["generationRequests"], first["generationRequests"]
+        )
+        self.assertEqual(projected["state"], "REAL_IMAGE_PLAN_READY")
+        self.assertEqual(projected["productionState"], projected["state"])
+        self.assertEqual(projected["visualQcState"]["state"], "NOT_RECORDED")
 
     def test_public_command_is_closed_world_and_cannot_supply_paths(self):
         with self.assertRaises(EpisodeProductionPublicError) as caught:

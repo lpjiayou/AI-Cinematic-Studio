@@ -35,7 +35,7 @@ tests/
 | --- | --- |
 | `test_identity_engine.py` | Identity、Workspace、Ownership Reference 的创建、查询、校验、重复与缺失行为 |
 | `test_project_engine.py` | Project 创建、查询、列表、引用、最小生命周期及异常行为 |
-| `test_asset_registry.py` | Asset 创建、查询、列表、类型、初始版本及异常行为 |
+| `test_asset_registry.py` | 旧进程内 Asset Registry 的 fail-closed 退役行为；唯一 AssetVersion authority 位于 Episode Production evidence journal |
 | `test_project_asset_relationship.py` | Project–Asset 关联、双向查询、重复关系和校验行为 |
 
 Unit Test 验证包内最小行为，不证明网络 API、数据库、跨引擎协作或 Production 行为。
@@ -48,19 +48,18 @@ Unit Test 验证包内最小行为，不证明网络 API、数据库、跨引擎
 | --- | --- |
 | `test_identity_engine_contract.py` | Identity Engine 包的公开导出、创建/查询及错误层级 |
 | `test_project_engine_contract.py` | Project Engine 包的公开导出、引用、生命周期及错误层级 |
-| `test_asset_registry_contract.py` | Asset Registry 包的公开导出、类型、版本及错误层级 |
+| `test_asset_registry_contract.py` | 兼容包仍可导入、但所有 authority 操作均拒绝并指向 canonical authority |
 | `test_project_asset_relationship_contract.py` | Relationship 包的公开导出、关联、查询及重复关系契约 |
 
 这些 Contract Test 验证当前 Python 包边界，不等同于 Application–V5、V5–V4、V4–V3 或 V3–Compute 的跨层接口验收。
 
 ## 4. Integration 与 E2E
 
-`tests/integration/` 与 `tests/e2e/` 当前只有 `.gitkeep`：
-
-- 没有 Integration Test 实现；
-- 没有 E2E Test 实现；
-- 仓库未定义 Integration/E2E 测试环境、外部系统、真实用户流量或 Production Validation；
-- 目录存在不能被解释为对应测试层级已经完成或通过。
+`tests/integration/` 与 `tests/e2e/` 包含跨边界与端到端测试；其中 K2
+Creator HTTP 测试覆盖真实 public contract、BFF 所依赖的资源路径和状态投影。
+真实 Chromium 的 Creator→BFF→Core HTTP gate 位于唯一 Frontend 仓库，Core
+仓库不复制第二套浏览器栈。测试通过也不等同于外部系统、真实用户流量或
+Production Validation。
 
 未来新增这些测试必须具有独立授权、明确候选、受控输入、责任人和符合治理标准的证据。
 
