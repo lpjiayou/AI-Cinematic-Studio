@@ -168,6 +168,14 @@ Canonical execution of that planning command is closed by
 The latest state is `REAL_VIDEO_PLAN_READY`; no GPU job or video candidate exists at
 this checkpoint.
 
+Execution reuses the existing V4 `MediaJobCoordinator`. The M11 adapter accepts no
+client path: it selects a private PNG only by the plan's exact content digest,
+rehashes and probes it, stages a digest-named file under the configured ComfyUI input
+root, and connects `LoadImage` to `Wan22ImageToVideoLatent.start_image`. Wan model
+length is `durationFrames + 1` (169/193); V4 then produces the exact requested
+168/192-frame artifact through a recorded `v4.ffmpeg-exact-frame-trim.v1` step before
+the coordinator's independent ffprobe verification.
+
 ## 7. State graph
 
 Historical G2-G6 facts and the original preview remain immutable. The accepted

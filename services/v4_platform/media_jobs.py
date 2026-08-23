@@ -16,6 +16,9 @@ from typing import Any, Callable, Mapping, Protocol
 
 JOB_SCHEMA_VERSION = "v4.media-job.v1"
 ARTIFACT_SCHEMA_VERSION = "v4.media-artifact-handoff.v1"
+M11_VIDEO_REQUEST_SCHEMA_VERSION = "v5.k2-real-shot-video-request.v1"
+M11_VIDEO_CAPABILITY = "self-hosted-wan22-image-to-video-v1"
+M11_VIDEO_PROVENANCE = "SELF_HOSTED_AI_GENERATED"
 
 
 class MediaJobError(RuntimeError):
@@ -77,6 +80,120 @@ def _digest(value: Mapping[str, Any]) -> str:
     return sha256(_canonical(value)).hexdigest()
 
 
+def _hex_digest(value: Any) -> bool:
+    return (
+        isinstance(value, str)
+        and len(value) == 64
+        and all(character in "0123456789abcdef" for character in value)
+    )
+
+
+def _validate_m11_video_request(request: Mapping[str, Any]) -> None:
+    fields = {
+        "schemaVersion", "workspaceRef", "productionRunRef",
+        "generationRequestRef", "generationRequestVersionRef", "version",
+        "ordinal", "mediaKind", "mediaType", "creativeShotRef",
+        "creativeShotVersionRef", "creativeShotDigest",
+        "executableShotGraphVersionRef", "executableShotGraphDigest",
+        "sourceImageAssetRef", "sourceImageAssetVersionRef",
+        "sourceImageAssetVersionDigest", "sourceImageContentDigest",
+        "sourceImageMediaType", "sourceImageProbe", "startImageBindingState",
+        "promptSpec", "parameters", "adapterCapability", "executionMode",
+        "executionAuthorizationState", "requestedProvenance", "rightsState",
+        "providerPolicyState", "budgetAuthorityState", "selectionRequired",
+        "publicationAllowed", "createdBy", "createdAt", "payloadDigest",
+    }
+    parameters = request.get("parameters")
+    prompt_spec = request.get("promptSpec")
+    source_probe = request.get("sourceImageProbe")
+    if (
+        set(request) != fields
+        or request.get("schemaVersion") != M11_VIDEO_REQUEST_SCHEMA_VERSION
+        or _digest({k: v for k, v in request.items() if k != "payloadDigest"})
+        != request.get("payloadDigest")
+        or request.get("version") != 1
+        or isinstance(request.get("ordinal"), bool)
+        or request.get("ordinal") not in {1, 2, 3, 4}
+        or request.get("mediaKind") != "video"
+        or request.get("mediaType") != "video/mp4"
+        or request.get("sourceImageMediaType") != "image/png"
+        or request.get("startImageBindingState")
+        != "EXACT_ASSET_VERSION_BOUND"
+        or request.get("adapterCapability") != M11_VIDEO_CAPABILITY
+        or request.get("executionMode") != "INTERNAL_SELF_HOSTED"
+        or request.get("executionAuthorizationState")
+        != "NOT_DISPATCHED_BY_PLAN"
+        or request.get("requestedProvenance") != M11_VIDEO_PROVENANCE
+        or request.get("rightsState") != "NOT_REQUIRED_INTERNAL"
+        or request.get("providerPolicyState")
+        != "NOT_REQUIRED_SELF_HOSTED"
+        or request.get("budgetAuthorityState") != "NOT_REQUIRED_INTERNAL"
+        or request.get("selectionRequired") is not True
+        or request.get("publicationAllowed") is not False
+        or not all(
+            isinstance(request.get(field), str) and request[field]
+            for field in (
+                "workspaceRef", "productionRunRef", "generationRequestRef",
+                "generationRequestVersionRef", "creativeShotRef",
+                "creativeShotVersionRef", "executableShotGraphVersionRef",
+                "sourceImageAssetRef", "sourceImageAssetVersionRef",
+                "createdBy", "createdAt",
+            )
+        )
+        or not all(
+            _hex_digest(request.get(field))
+            for field in (
+                "payloadDigest", "creativeShotDigest",
+                "executableShotGraphDigest", "sourceImageAssetVersionDigest",
+                "sourceImageContentDigest",
+            )
+        )
+        or not isinstance(source_probe, Mapping)
+        or isinstance(source_probe.get("width"), bool)
+        or not isinstance(source_probe.get("width"), int)
+        or source_probe["width"] < 32
+        or isinstance(source_probe.get("height"), bool)
+        or not isinstance(source_probe.get("height"), int)
+        or source_probe["height"] < 32
+        or not isinstance(prompt_spec, Mapping)
+        or set(prompt_spec)
+        != {"cameraInstruction", "action", "continuityConstraints"}
+        or not isinstance(prompt_spec.get("cameraInstruction"), Mapping)
+        or not isinstance(prompt_spec.get("action"), str)
+        or not prompt_spec["action"].strip()
+        or len(prompt_spec["action"]) > 2000
+        or not isinstance(prompt_spec.get("continuityConstraints"), list)
+        or not all(
+            isinstance(item, str) and item.strip() and len(item) <= 1000
+            for item in prompt_spec["continuityConstraints"]
+        )
+        or len(_canonical(prompt_spec)) > 8_000
+        or not isinstance(parameters, Mapping)
+        or set(parameters)
+        != {
+            "durationFrames", "frameRate", "width", "height", "steps",
+            "cfg", "samplerName", "scheduler", "modelShift", "seed",
+            "negativePrompt",
+        }
+        or isinstance(parameters.get("durationFrames"), bool)
+        or parameters.get("durationFrames") not in {168, 192}
+        or parameters.get("frameRate") != 24
+        or parameters.get("width") != 640
+        or parameters.get("height") != 352
+        or parameters.get("steps") != 20
+        or parameters.get("cfg") != 5.0
+        or parameters.get("samplerName") != "uni_pc"
+        or parameters.get("scheduler") != "simple"
+        or parameters.get("modelShift") != 8.0
+        or isinstance(parameters.get("seed"), bool)
+        or not isinstance(parameters.get("seed"), int)
+        or parameters["seed"] < 0
+        or not isinstance(parameters.get("negativePrompt"), str)
+        or len(parameters["negativePrompt"]) > 4000
+    ):
+        raise MediaJobError("invalid exact M11 video generation request")
+
+
 def _file_digest_and_size(path: Path) -> tuple[str, int]:
     digest = sha256()
     size = 0
@@ -105,6 +222,12 @@ def _format_time(value: datetime) -> str:
 
 
 def _validate_request(request: Mapping[str, Any]) -> None:
+    if (
+        isinstance(request, Mapping)
+        and request.get("schemaVersion") == M11_VIDEO_REQUEST_SCHEMA_VERSION
+    ):
+        _validate_m11_video_request(request)
+        return
     required = {
         "workspaceRef", "productionRunRef", "generationRequestRef",
         "generationRequestVersionRef", "payloadDigest", "assetRequirementRef",
@@ -275,6 +398,66 @@ def _validate_live_execution(
         or runtime_facts.get("deviceName") != execution.get("executionDevice")
     ):
         raise ArtifactVerificationError("live provider execution evidence is invalid")
+    return deepcopy(dict(execution))
+
+
+def _validate_m11_execution(
+    execution: Mapping[str, Any], request: Mapping[str, Any]
+) -> dict[str, Any]:
+    required = {
+        "providerId", "modelId", "region", "endpointClass",
+        "providerRequestRef", "latencyMs", "costCurrency", "costMinor",
+        "seed", "executionDevice", "gpuUsed", "runtimeFacts",
+        "runtimeFactsDigest", "sourceImageContentDigest", "workflowDigest",
+        "latentFrameCount", "outputFrameCount", "postprocessIdentity",
+    }
+    runtime_facts = execution.get("runtimeFacts") if isinstance(
+        execution, Mapping
+    ) else None
+    if (
+        not isinstance(execution, Mapping)
+        or set(execution) != required
+        or not all(
+            isinstance(execution.get(field), str) and execution[field]
+            for field in (
+                "providerId", "modelId", "region", "endpointClass",
+                "providerRequestRef", "executionDevice", "costCurrency",
+                "postprocessIdentity",
+            )
+        )
+        or len(execution["costCurrency"]) != 3
+        or execution["costCurrency"] != execution["costCurrency"].upper()
+        or isinstance(execution.get("latencyMs"), bool)
+        or not isinstance(execution.get("latencyMs"), int)
+        or execution["latencyMs"] < 0
+        or isinstance(execution.get("costMinor"), bool)
+        or not isinstance(execution.get("costMinor"), int)
+        or execution["costMinor"] < 0
+        or execution.get("seed") != request["parameters"]["seed"]
+        or execution.get("gpuUsed") is not True
+        or execution.get("sourceImageContentDigest")
+        != request.get("sourceImageContentDigest")
+        or not _hex_digest(execution.get("workflowDigest"))
+        or execution.get("latentFrameCount")
+        != request["parameters"]["durationFrames"] + 1
+        or execution.get("outputFrameCount")
+        != request["parameters"]["durationFrames"]
+        or execution.get("postprocessIdentity")
+        != "v4.ffmpeg-exact-frame-trim.v1"
+        or not isinstance(runtime_facts, Mapping)
+        or execution.get("runtimeFactsDigest") != _digest(runtime_facts)
+        or any(
+            runtime_facts.get(field) != execution.get(field)
+            for field in ("providerId", "modelId", "region", "endpointClass")
+        )
+        or runtime_facts.get("deviceType") != "cuda"
+        or runtime_facts.get("deviceName") != execution.get("executionDevice")
+        or runtime_facts.get("startImageCapability")
+        != "LOAD_IMAGE_TO_WAN_START_IMAGE_VERIFIED"
+    ):
+        raise ArtifactVerificationError(
+            "M11 self-hosted execution evidence is invalid"
+        )
     return deepcopy(dict(execution))
 
 
@@ -829,11 +1012,18 @@ class MediaJobCoordinator:
             execution: dict[str, Any] | None = None
             if isinstance(produced, MediaAdapterResult):
                 produced_value = produced.path
-                if request["requestedProvenance"] != "LIVE_PROVIDER":
+                if request["requestedProvenance"] == "LIVE_PROVIDER":
+                    execution = _validate_live_execution(
+                        produced.execution, request
+                    )
+                elif request["requestedProvenance"] == M11_VIDEO_PROVENANCE:
+                    execution = _validate_m11_execution(
+                        produced.execution, request
+                    )
+                else:
                     raise ArtifactVerificationError(
                         "local request returned live provider execution evidence"
                     )
-                execution = _validate_live_execution(produced.execution, request)
             else:
                 produced_value = produced
                 if request["requestedProvenance"] != "LOCAL_EVIDENCE":

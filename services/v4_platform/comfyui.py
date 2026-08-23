@@ -15,7 +15,9 @@ from hashlib import sha256
 import json
 import os
 from pathlib import Path, PurePosixPath
+import shutil
 import socket
+import subprocess
 import time
 from typing import Any, Callable, Mapping
 from urllib import error, parse, request as urllib_request
@@ -29,6 +31,9 @@ from .media_jobs import (
 
 COMFYUI_ADAPTER_ID = "v4.comfyui-wan22-ti2v.v1"
 COMFYUI_CAPABILITY = "comfyui-wan22-ti2v-v1"
+COMFYUI_IMAGE_TO_VIDEO_ADAPTER_ID = "v4.comfyui-wan22-image-to-video.v1"
+COMFYUI_IMAGE_TO_VIDEO_CAPABILITY = "self-hosted-wan22-image-to-video-v1"
+COMFYUI_IMAGE_TO_VIDEO_PROVENANCE = "SELF_HOSTED_AI_GENERATED"
 COMFYUI_RUNTIME_ATTESTATION_SCHEMA = "v4.comfyui-runtime-attestation.v1"
 REQUIRED_NODES = (
     "UNETLoader",
@@ -358,10 +363,13 @@ class ComfyUIWan22VideoAdapter:
         self._monotonic = monotonic
         self._sleep = sleep
 
-    def probe_capability(self) -> dict[str, Any]:
+    def probe_capability(
+        self, *, require_start_image: bool = False
+    ) -> dict[str, Any]:
         stats = self.client.json("GET", "/system_stats")
         object_info = self.client.json("GET", "/object_info")
-        missing_nodes = [node for node in REQUIRED_NODES if node not in object_info]
+        required_nodes = REQUIRED_NODES + (("LoadImage",) if require_start_image else ())
+        missing_nodes = [node for node in required_nodes if node not in object_info]
         if missing_nodes:
             raise ComfyUIConfigurationError("ComfyUI required nodes are unavailable")
         required_fields = {
@@ -381,6 +389,8 @@ class ComfyUIWan22VideoAdapter:
             "CreateVideo": {"images", "fps"},
             "SaveVideo": {"video", "filename_prefix", "format", "codec"},
         }
+        if require_start_image:
+            required_fields["LoadImage"] = {"image"}
         if any(
             not fields.issubset(_node_fields(object_info, node, "required"))
             for node, fields in required_fields.items()
@@ -391,6 +401,13 @@ class ComfyUIWan22VideoAdapter:
         if (
             "device" not in _node_fields(object_info, "CLIPLoader", "optional")
             or "bit_depth" not in _node_fields(object_info, "CreateVideo", "optional")
+            or (
+                require_start_image
+                and "start_image"
+                not in _node_fields(
+                    object_info, "Wan22ImageToVideoLatent", "optional"
+                )
+            )
             or "default" not in _node_options(
                 object_info, "UNETLoader", "weight_dtype"
             )
@@ -446,7 +463,7 @@ class ComfyUIWan22VideoAdapter:
             "deviceName": device["name"],
             "deviceType": "cuda",
             "vramTotalBytes": int(device.get("vram_total", 0)),
-            "requiredNodes": list(REQUIRED_NODES),
+            "requiredNodes": list(required_nodes),
             "modelFiles": [
                 {"role": "UNET", "name": self.config.unet_name, "sha256": self.config.unet_sha256},
                 {"role": "TEXT_ENCODER", "name": self.config.clip_name, "sha256": self.config.clip_sha256},
@@ -456,16 +473,45 @@ class ComfyUIWan22VideoAdapter:
             "runtimeAttestationDigest": self.config.runtime_attestation_digest,
             "objectInfoDigest": _canonical_digest(dict(object_info)),
         }
+        if require_start_image:
+            facts["startImageCapability"] = (
+                "LOAD_IMAGE_TO_WAN_START_IMAGE_VERIFIED"
+            )
         if facts["vramTotalBytes"] <= 0:
             raise ComfyUIConfigurationError("CUDA VRAM facts are invalid")
         return facts
 
-    def build_workflow(self, generation_request: Mapping[str, Any]) -> dict[str, Any]:
+    def build_workflow(
+        self,
+        generation_request: Mapping[str, Any],
+        *,
+        prompt_text: str | None = None,
+        start_image_name: str | None = None,
+        latent_frame_count: int | None = None,
+    ) -> dict[str, Any]:
         parameters = generation_request["parameters"]
+        selected_prompt = prompt_text or parameters.get("prompt")
+        if not isinstance(selected_prompt, str) or not selected_prompt.strip():
+            raise ComfyUIConfigurationError("Wan2.2 prompt is unavailable")
+        length = (
+            parameters["durationFrames"]
+            if latent_frame_count is None
+            else latent_frame_count
+        )
+        if isinstance(length, bool) or not isinstance(length, int) or length < 1:
+            raise ComfyUIConfigurationError("Wan2.2 latent frame count is invalid")
+        if start_image_name is not None:
+            image_name = PurePosixPath(start_image_name)
+            if (
+                image_name.is_absolute()
+                or ".." in image_name.parts
+                or image_name.suffix.lower() != ".png"
+            ):
+                raise ComfyUIConfigurationError("start image name is unsafe")
         prefix_digest = sha256(
             str(generation_request["generationRequestRef"]).encode("utf-8")
         ).hexdigest()[:24]
-        return {
+        workflow = {
             "1": {
                 "class_type": "UNETLoader",
                 "inputs": {"unet_name": self.config.unet_name, "weight_dtype": "default"},
@@ -481,7 +527,7 @@ class ComfyUIWan22VideoAdapter:
             },
             "5": {
                 "class_type": "CLIPTextEncode",
-                "inputs": {"text": parameters["prompt"], "clip": ["2", 0]},
+                "inputs": {"text": selected_prompt, "clip": ["2", 0]},
             },
             "6": {
                 "class_type": "CLIPTextEncode",
@@ -493,7 +539,7 @@ class ComfyUIWan22VideoAdapter:
                     "vae": ["3", 0],
                     "width": parameters["width"],
                     "height": parameters["height"],
-                    "length": parameters["durationFrames"],
+                    "length": length,
                     "batch_size": 1,
                 },
             },
@@ -530,6 +576,13 @@ class ComfyUIWan22VideoAdapter:
                 },
             },
         }
+        if start_image_name is not None:
+            workflow["12"] = {
+                "class_type": "LoadImage",
+                "inputs": {"image": start_image_name},
+            }
+            workflow["7"]["inputs"]["start_image"] = ["12", 0]
+        return workflow
 
     @staticmethod
     def _prompt_ref(payload: Mapping[str, Any]) -> str:
@@ -650,6 +703,302 @@ class ComfyUIWan22VideoAdapter:
         return MediaAdapterResult(candidate_path, execution)
 
 
+def _image_dimensions(path: Path) -> tuple[int, int]:
+    try:
+        result = subprocess.run(
+            [
+                "ffprobe", "-v", "error", "-select_streams", "v:0",
+                "-show_entries", "stream=width,height", "-of", "json",
+                str(path),
+            ],
+            check=True,
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+        payload = json.loads(result.stdout)
+        streams = payload.get("streams")
+        if not isinstance(streams, list) or len(streams) != 1:
+            raise ValueError("image stream count")
+        width = int(streams[0]["width"])
+        height = int(streams[0]["height"])
+    except (
+        FileNotFoundError,
+        KeyError,
+        TypeError,
+        ValueError,
+        json.JSONDecodeError,
+        subprocess.SubprocessError,
+    ) as exc:
+        raise ComfyUIConfigurationError("start image could not be probed") from exc
+    if width < 1 or height < 1:
+        raise ComfyUIConfigurationError("start image dimensions are invalid")
+    return width, height
+
+
+def _m11_prompt(value: Mapping[str, Any]) -> str:
+    prompt_spec = value.get("promptSpec")
+    if not isinstance(prompt_spec, Mapping):
+        raise ComfyUIConfigurationError("M11 prompt specification is unavailable")
+    camera = json.dumps(
+        prompt_spec.get("cameraInstruction"),
+        ensure_ascii=False,
+        sort_keys=True,
+        separators=(",", ":"),
+    )
+    continuity = "; ".join(prompt_spec.get("continuityConstraints", []))
+    prompt = (
+        f"{prompt_spec.get('action', '')}. Camera instruction: {camera}. "
+        f"Continuity constraints: {continuity}. Preserve the exact identities, "
+        "wardrobe, environment and composition established by the start image."
+    )
+    if not prompt.strip() or len(prompt) > 4000:
+        raise ComfyUIConfigurationError("M11 prompt is outside the bounded scope")
+    return prompt
+
+
+class ComfyUIWan22ImageToVideoAdapter(ComfyUIWan22VideoAdapter):
+    """Exact start-image adapter for the internal non-publishing M11 run."""
+
+    adapter_identity = COMFYUI_IMAGE_TO_VIDEO_ADAPTER_ID
+    provenance = COMFYUI_IMAGE_TO_VIDEO_PROVENANCE
+
+    def __init__(
+        self,
+        config: ComfyUIWan22Config,
+        *,
+        source_images: Mapping[str, Path | str],
+        input_root: Path | str,
+        workflow_evidence_root: Path | str | None = None,
+        client: ComfyUIHttpClient | None = None,
+        monotonic: Callable[[], float] = time.monotonic,
+        sleep: Callable[[float], None] = time.sleep,
+    ) -> None:
+        super().__init__(
+            config, client=client, monotonic=monotonic, sleep=sleep
+        )
+        if not isinstance(source_images, Mapping) or not source_images:
+            raise ComfyUIConfigurationError("M11 source image map is unavailable")
+        normalized: dict[str, Path] = {}
+        for content_digest, raw_path in source_images.items():
+            digest = _sha256(content_digest, "source image content digest")
+            path = Path(raw_path).resolve()
+            if (
+                not path.is_file()
+                or path.suffix.lower() != ".png"
+                or _file_sha256(path) != digest
+            ):
+                raise ComfyUIConfigurationError(
+                    "M11 source image does not match its digest"
+                )
+            normalized[digest] = path
+        self.source_images = normalized
+        self.input_root = Path(input_root).resolve()
+        if not self.input_root.is_dir():
+            raise ComfyUIConfigurationError("ComfyUI input root is unavailable")
+        self.workflow_evidence_root = (
+            None
+            if workflow_evidence_root is None
+            else Path(workflow_evidence_root).resolve()
+        )
+        if self.workflow_evidence_root is not None:
+            self.workflow_evidence_root.mkdir(
+                mode=0o700, parents=True, exist_ok=True
+            )
+            if not self.workflow_evidence_root.is_dir():
+                raise ComfyUIConfigurationError(
+                    "M11 workflow evidence root is unavailable"
+                )
+
+    def _stage_start_image(self, generation_request: Mapping[str, Any]) -> str:
+        content_digest = generation_request["sourceImageContentDigest"]
+        source = self.source_images.get(content_digest)
+        if source is None or _file_sha256(source) != content_digest:
+            raise ComfyUIConfigurationError(
+                "M11 source image binding is unavailable"
+            )
+        probe = generation_request["sourceImageProbe"]
+        if _image_dimensions(source) != (probe["width"], probe["height"]):
+            raise ComfyUIConfigurationError("M11 source image probe changed")
+        stage_root = (self.input_root / "acs-k2-m11").resolve()
+        if self.input_root not in stage_root.parents:
+            raise ComfyUIConfigurationError("M11 input staging escaped its root")
+        stage_root.mkdir(mode=0o700, parents=True, exist_ok=True)
+        destination = (stage_root / f"{content_digest}.png").resolve()
+        if stage_root not in destination.parents:
+            raise ComfyUIConfigurationError("M11 staged image path is unsafe")
+        if destination.exists():
+            if not destination.is_file() or _file_sha256(destination) != content_digest:
+                raise ComfyUIConfigurationError(
+                    "M11 staged start image conflicts"
+                )
+        else:
+            temporary = destination.with_name(
+                f".{destination.name}.tmp-{os.getpid()}"
+            )
+            try:
+                with source.open("rb") as read_handle, temporary.open("xb") as write_handle:
+                    shutil.copyfileobj(read_handle, write_handle, 1024 * 1024)
+                    write_handle.flush()
+                    os.fsync(write_handle.fileno())
+                os.chmod(temporary, 0o600)
+                if _file_sha256(temporary) != content_digest:
+                    raise ComfyUIConfigurationError(
+                        "M11 staged image digest changed"
+                    )
+                os.replace(temporary, destination)
+            finally:
+                temporary.unlink(missing_ok=True)
+        return destination.relative_to(self.input_root).as_posix()
+
+    @staticmethod
+    def _postprocess_exact_frames(
+        raw_path: Path,
+        candidate_path: Path,
+        generation_request: Mapping[str, Any],
+    ) -> None:
+        parameters = generation_request["parameters"]
+        command = [
+            "ffmpeg", "-v", "error", "-i", str(raw_path),
+            "-map", "0:v:0", "-an", "-vf", f"fps={parameters['frameRate']}",
+            "-frames:v", str(parameters["durationFrames"]),
+            "-c:v", "libx264", "-preset", "fast", "-crf", "18",
+            "-pix_fmt", "yuv420p", "-movflags", "+faststart", "-y",
+            str(candidate_path),
+        ]
+        try:
+            subprocess.run(
+                command, check=True, capture_output=True, timeout=300
+            )
+        except (FileNotFoundError, subprocess.SubprocessError) as exc:
+            candidate_path.unlink(missing_ok=True)
+            raise ComfyUIProviderExecutionError(
+                "M11 exact-frame postprocess failed"
+            ) from exc
+
+    def generate(
+        self, generation_request: Mapping[str, Any], candidate_path: Path
+    ) -> MediaAdapterResult:
+        if (
+            generation_request.get("requestedProvenance")
+            != COMFYUI_IMAGE_TO_VIDEO_PROVENANCE
+            or generation_request.get("adapterCapability")
+            != COMFYUI_IMAGE_TO_VIDEO_CAPABILITY
+            or generation_request.get("executionMode")
+            != "INTERNAL_SELF_HOSTED"
+            or generation_request.get("rightsState")
+            != "NOT_REQUIRED_INTERNAL"
+            or generation_request.get("providerPolicyState")
+            != "NOT_REQUIRED_SELF_HOSTED"
+            or generation_request.get("budgetAuthorityState")
+            != "NOT_REQUIRED_INTERNAL"
+            or generation_request.get("publicationAllowed") is not False
+        ):
+            raise ComfyUIConfigurationError(
+                "M11 request does not match the self-hosted execution scope"
+            )
+        runtime_facts = self.probe_capability(require_start_image=True)
+        start_image_name = self._stage_start_image(generation_request)
+        parameters = generation_request["parameters"]
+        latent_frame_count = parameters["durationFrames"] + 1
+        if latent_frame_count % 4 != 1:
+            raise ComfyUIConfigurationError(
+                "M11 latent frame count is incompatible with Wan2.2"
+            )
+        workflow = self.build_workflow(
+            generation_request,
+            prompt_text=_m11_prompt(generation_request),
+            start_image_name=start_image_name,
+            latent_frame_count=latent_frame_count,
+        )
+        workflow_digest = _canonical_digest(workflow)
+        if self.workflow_evidence_root is not None:
+            workflow_path = self.workflow_evidence_root / (
+                f"shot-{generation_request['ordinal']:02d}-workflow.json"
+            )
+            serialized = json.dumps(
+                workflow,
+                ensure_ascii=False,
+                sort_keys=True,
+                separators=(",", ":"),
+            ).encode("utf-8")
+            if workflow_path.exists():
+                if (
+                    not workflow_path.is_file()
+                    or _file_sha256(workflow_path) != workflow_digest
+                ):
+                    raise ComfyUIConfigurationError(
+                        "M11 workflow evidence conflicts"
+                    )
+            else:
+                temporary = workflow_path.with_name(
+                    f".{workflow_path.name}.tmp-{os.getpid()}"
+                )
+                try:
+                    with temporary.open("xb") as handle:
+                        handle.write(serialized)
+                        handle.flush()
+                        os.fsync(handle.fileno())
+                    os.chmod(temporary, 0o600)
+                    os.replace(temporary, workflow_path)
+                finally:
+                    temporary.unlink(missing_ok=True)
+        output_prefix = workflow["11"]["inputs"]["filename_prefix"].split("/")[-1]
+        started = self._monotonic()
+        submitted = self.client.json(
+            "POST",
+            "/prompt",
+            payload={
+                "prompt": workflow,
+                "client_id": "acs-v4-m11-"
+                + sha256(
+                    str(generation_request["generationRequestRef"]).encode()
+                ).hexdigest()[:24],
+            },
+        )
+        prompt_ref = self._prompt_ref(submitted)
+        file_info = self._wait_for_output(
+            prompt_ref,
+            started,
+            self.config.execution_timeout_seconds,
+            output_prefix,
+        )
+        raw_path = candidate_path.with_name(
+            f"{candidate_path.name}.provider.mp4"
+        )
+        try:
+            self.client.download(file_info, raw_path)
+            self._postprocess_exact_frames(
+                raw_path, candidate_path, generation_request
+            )
+        finally:
+            raw_path.unlink(missing_ok=True)
+        latency_ms = max(0, round((self._monotonic() - started) * 1000))
+        execution = {
+            "providerId": self.config.provider_id,
+            "modelId": self.config.model_id,
+            "region": self.config.region,
+            "endpointClass": self.config.endpoint_class,
+            "providerRequestRef": prompt_ref,
+            "latencyMs": latency_ms,
+            "costCurrency": self.config.cost_currency,
+            "costMinor": self.config.cost_minor_per_attempt,
+            "seed": parameters["seed"],
+            "executionDevice": runtime_facts["deviceName"],
+            "gpuUsed": True,
+            "runtimeFacts": runtime_facts,
+            "runtimeFactsDigest": _canonical_digest(runtime_facts),
+            "sourceImageContentDigest": generation_request[
+                "sourceImageContentDigest"
+            ],
+            "workflowDigest": workflow_digest,
+            "latentFrameCount": latent_frame_count,
+            "outputFrameCount": parameters["durationFrames"],
+            "postprocessIdentity": "v4.ffmpeg-exact-frame-trim.v1",
+        }
+        return MediaAdapterResult(candidate_path, execution)
+
+
 def _file_sha256(path: Path) -> str:
     digest = sha256()
     with path.open("rb") as source:
@@ -667,6 +1016,7 @@ def build_comfyui_runtime_attestation(
     *,
     observed_at: str,
     client: ComfyUIHttpClient | None = None,
+    require_start_image: bool = False,
 ) -> dict[str, Any]:
     """Create a safe runtime snapshot with locally verified model digests.
 
@@ -712,7 +1062,9 @@ def build_comfyui_runtime_attestation(
             {"role": role, "name": name, "sha256": expected_digest}
         )
 
-    facts = ComfyUIWan22VideoAdapter(config, client=client).probe_capability()
+    facts = ComfyUIWan22VideoAdapter(config, client=client).probe_capability(
+        require_start_image=require_start_image
+    )
     facts.pop("runtimeAttestationRef", None)
     facts.pop("runtimeAttestationDigest", None)
     facts["modelFiles"] = verified_files

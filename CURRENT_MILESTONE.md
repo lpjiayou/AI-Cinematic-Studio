@@ -10,7 +10,7 @@
 >
 > Current Task: `ACS-K2-INTERNAL-IMAGE-FIRST-REAL-MEDIA-REVISION`
 >
-> Current Work Package: `G2→G6 COMPLETE / P1 HOST-PASSED / M10 COMPLETE / M11 VIDEO PLAN COMPLETE / REAL_VIDEO_PLAN_READY / M11 GPU CANDIDATES NEXT`
+> Current Work Package: `G2→G6 COMPLETE / P1 HOST-PASSED / M10 COMPLETE / M11 VIDEO PLAN COMPLETE / REAL_VIDEO_PLAN_READY / START-IMAGE EXECUTION HOST-PASSED / FOUR GPU CANDIDATES NEXT`
 >
 > M6 Authorization: `ACCEPTED SURFACES + K2 EXTERNAL AUTHORITY CONNECTION / NO M6 SCHEMA EXPANSION`
 >
@@ -1402,3 +1402,24 @@ gate, the five expected fact kinds, latest state `REAL_VIDEO_PLAN_READY`, valid
 SQLite integrity/foreign keys, a clean worktree, closed ports 8765/8188 and an idle
 A100. The next connected stage is GPU execution of four unselected video
 candidates from these exact requests. It must not select or admit unseen videos.
+
+### M11 exact start-image execution implementation candidate — 2026-08-23
+
+The connected V4 implementation now extends the existing single-episode
+`MediaJobCoordinator` rather than adding another queue. It:
+
+- accepts only the sealed `v5.k2-real-shot-video-request.v1` shape;
+- resolves a start image only from the server-held digest-to-file map and rehashes it;
+- probes `LoadImage` plus the optional `Wan22ImageToVideoLatent.start_image` input;
+- stages a digest-named PNG under the configured ComfyUI input root;
+- binds that `LoadImage` node to the Wan start-image input;
+- uses 169/193 model frames and trims to the exact 168/192 timeline frames with
+  `v4.ffmpeg-exact-frame-trim.v1`;
+- records the workflow digest, start-image digest, fresh runtime facts and exact
+  ffprobe result while keeping publication disabled.
+
+Local focused and full regressions passed 20/20 and 644/644. The implementation
+was then applied to the canonical host, where focused tests passed 20/20 in
+37.981 seconds and the complete Core regression passed 644/644 in 212.245
+seconds. Fresh start-image runtime attestation and four paid GPU candidate
+executions remain pending; video selection and admission have not started.

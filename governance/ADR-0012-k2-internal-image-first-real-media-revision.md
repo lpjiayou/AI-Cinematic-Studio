@@ -76,3 +76,9 @@ The canonical plan command completed on implementation commit
 `137c24c31cc8ddf7cc79d20b20e3d6f9038911b53bfb19dfc543671796b421fd`.
 Four exact start-image-bound requests exist; no video candidate, selection decision
 or video AssetVersion exists yet.
+
+The M11 execution implementation remains in V4's existing `MediaJobCoordinator`.
+It requires a freshly attested `LoadImage → Wan start_image` capability, resolves
+the selected PNG by exact content digest, and records a 169/193-model-frame to
+168/192-timeline-frame postprocess before independent artifact verification. This
+does not authorize automatic selection or admission of the resulting videos.
