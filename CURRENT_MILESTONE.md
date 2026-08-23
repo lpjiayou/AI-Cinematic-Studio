@@ -10,7 +10,7 @@
 >
 > Current Task: `ACS-K2-INTERNAL-IMAGE-FIRST-REAL-MEDIA-REVISION`
 >
-> Current Work Package: `G2→G6 COMPLETE / P1 HOST-PASSED / M10 COMPLETE / REAL_IMAGE_READY / M11 VIDEO PLAN HOST-PASSED / CANONICAL EXECUTION PENDING`
+> Current Work Package: `G2→G6 COMPLETE / P1 HOST-PASSED / M10 COMPLETE / M11 VIDEO PLAN COMPLETE / REAL_VIDEO_PLAN_READY / M11 GPU CANDIDATES NEXT`
 >
 > M6 Authorization: `ACCEPTED SURFACES + K2 EXTERNAL AUTHORITY CONNECTION / NO M6 SCHEMA EXPANSION`
 >
@@ -1373,5 +1373,32 @@ The current CPU-only work package adds one connected
   decisions, zero video AssetVersions and `publicationAllowed=false`.
 
 The host-focused unit set passed 11/11, the connected Creator Public HTTP test
-passed 1/1, and the full Core regression passed 642/642. Canonical M11 plan
-execution remains pending. ComfyUI remains stopped during this plan-only work.
+passed 1/1, and the full Core regression passed 642/642. Canonical execution and
+its independent verification are recorded below.
+
+### M11 exact video-plan canonical closeout — 2026-08-23
+
+The authenticated Public API command completed on implementation commit
+`c07b2af19a983ef0693502ba088baa08a7553181`:
+
+- state transition: `REAL_IMAGE_READY → REAL_VIDEO_PLAN_READY`;
+- exact start-image-bound video requests: `4`;
+- frame counts: `168 / 168 / 192 / 192` at 24 fps, total `720`;
+- evidence delta: one gate, five facts and one transition;
+- video candidates, video selection decisions and video AssetVersions: `0 / 0 / 0`;
+- protected non-evidence database mutation count: `0`;
+- Rights / Provider Policy / Budget Authority:
+  `NOT_REQUIRED_INTERNAL / NOT_REQUIRED_SELF_HOSTED / NOT_REQUIRED_INTERNAL`;
+- Creator/ComfyUI ports after execution: closed / closed;
+- execution device: `CPU_PLAN_ONLY`, GPU utilization/memory: `0 / 0`;
+- publication: `false`;
+- receipt:
+  `k2-m11-real-video-plan-20260823T091831Z/receipt.json`;
+- receipt SHA-256:
+  `137c24c31cc8ddf7cc79d20b20e3d6f9038911b53bfb19dfc543671796b421fd`.
+
+Independent read-only verification confirmed exactly one `M11_REAL_VIDEO_PLAN`
+gate, the five expected fact kinds, latest state `REAL_VIDEO_PLAN_READY`, valid
+SQLite integrity/foreign keys, a clean worktree, closed ports 8765/8188 and an idle
+A100. The next connected stage is GPU execution of four unselected video
+candidates from these exact requests. It must not select or admit unseen videos.
