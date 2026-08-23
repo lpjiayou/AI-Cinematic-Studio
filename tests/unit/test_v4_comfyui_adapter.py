@@ -10,8 +10,10 @@ import unittest
 
 from services.v4_platform import (
     COMFYUI_ADAPTER_ID,
+    COMFYUI_IMAGE_TO_VIDEO_ADAPTER_ID,
     ComfyUIConfigurationError,
     ComfyUIWan22Config,
+    ComfyUIWan22ImageToVideoAdapter,
     ComfyUIWan22VideoAdapter,
     InMemoryMediaJobAdapter,
     MediaJobCoordinator,
@@ -124,6 +126,72 @@ def internal_request():
     return value
 
 
+def m11_request(source_digest):
+    value = {
+        "schemaVersion": "v5.k2-real-shot-video-request.v1",
+        "workspaceRef": "workspace-k2",
+        "productionRunRef": "production-run-k2",
+        "generationRequestRef": "real-video-generation-request-1",
+        "generationRequestVersionRef": "real-video-generation-request-1-v1",
+        "version": 1,
+        "ordinal": 1,
+        "mediaKind": "video",
+        "mediaType": "video/mp4",
+        "creativeShotRef": "creative-shot-k2-1",
+        "creativeShotVersionRef": "creative-shot-k2-1-v1",
+        "creativeShotDigest": "1" * 64,
+        "executableShotGraphVersionRef": "shot-graph-k2-v1",
+        "executableShotGraphDigest": "2" * 64,
+        "sourceImageAssetRef": "asset-m10-image-1",
+        "sourceImageAssetVersionRef": "asset-m10-image-1-v1",
+        "sourceImageAssetVersionDigest": "3" * 64,
+        "sourceImageContentDigest": source_digest,
+        "sourceImageMediaType": "image/png",
+        "sourceImageProbe": {"width": 1280, "height": 720},
+        "startImageBindingState": "EXACT_ASSET_VERSION_BOUND",
+        "promptSpec": {
+            "cameraInstruction": {
+                "shotSize": "wide",
+                "movement": "slow push-in",
+                "angle": "eye-level",
+                "lensMm": 35,
+                "intent": "preserve spatial continuity",
+            },
+            "action": "Two exact characters cross the established set.",
+            "continuityConstraints": [
+                "preserve both locked identities",
+                "preserve wardrobe and lighting",
+            ],
+        },
+        "parameters": {
+            "durationFrames": 168,
+            "frameRate": 24,
+            "width": 640,
+            "height": 352,
+            "steps": 20,
+            "cfg": 5.0,
+            "samplerName": "uni_pc",
+            "scheduler": "simple",
+            "modelShift": 8.0,
+            "seed": int(source_digest[:16], 16),
+            "negativePrompt": "text, watermark, temporal flicker",
+        },
+        "adapterCapability": "self-hosted-wan22-image-to-video-v1",
+        "executionMode": "INTERNAL_SELF_HOSTED",
+        "executionAuthorizationState": "NOT_DISPATCHED_BY_PLAN",
+        "requestedProvenance": "SELF_HOSTED_AI_GENERATED",
+        "rightsState": "NOT_REQUIRED_INTERNAL",
+        "providerPolicyState": "NOT_REQUIRED_SELF_HOSTED",
+        "budgetAuthorityState": "NOT_REQUIRED_INTERNAL",
+        "selectionRequired": True,
+        "publicationAllowed": False,
+        "createdBy": "v5.k2.real-video-planner.v1",
+        "createdAt": "2026-08-23T00:00:00Z",
+    }
+    value["payloadDigest"] = digest(value)
+    return value
+
+
 class FakeComfyUIHandler(BaseHTTPRequestHandler):
     def log_message(self, *args):
         del args
@@ -179,8 +247,10 @@ class FakeComfyUIHandler(BaseHTTPRequestHandler):
                 "VAELoader": node("vae_name"),
                 "ModelSamplingSD3": node("model", "shift"),
                 "CLIPTextEncode": node("text", "clip"),
+                "LoadImage": node("image"),
                 "Wan22ImageToVideoLatent": node(
-                    "vae", "width", "height", "length", "batch_size"
+                    "vae", "width", "height", "length", "batch_size",
+                    optional=("start_image",),
                 ),
                 "KSampler": node(
                     "model", "seed", "steps", "cfg", "sampler_name",
@@ -207,6 +277,10 @@ class FakeComfyUIHandler(BaseHTTPRequestHandler):
             ]
             if self.server.omit_unet:
                 required("UNETLoader")["unet_name"] = [[]]
+            if self.server.omit_start_image:
+                object_info["Wan22ImageToVideoLatent"]["input"][
+                    "optional"
+                ].pop("start_image", None)
             self._json(200, object_info)
             return
         if self.path == "/history/prompt-live-1":
@@ -257,6 +331,31 @@ def create_video(path):
     )
 
 
+def create_m11_source_image(path):
+    subprocess.run(
+        [
+            "ffmpeg", "-v", "error", "-f", "lavfi", "-i",
+            "color=c=0x405060:s=1280x720", "-frames:v", "1", "-y",
+            str(path),
+        ],
+        check=True,
+        capture_output=True,
+    )
+
+
+def create_m11_provider_video(path):
+    subprocess.run(
+        [
+            "ffmpeg", "-v", "error", "-f", "lavfi", "-i",
+            "color=c=0x102030:s=640x352:r=24:d=7.041666667",
+            "-frames:v", "169", "-an", "-c:v", "libx264", "-preset",
+            "ultrafast", "-pix_fmt", "yuv420p", "-y", str(path),
+        ],
+        check=True,
+        capture_output=True,
+    )
+
+
 class V4ComfyUIWan22AdapterTests(unittest.TestCase):
     def setUp(self):
         self.directory = tempfile.TemporaryDirectory()
@@ -266,6 +365,7 @@ class V4ComfyUIWan22AdapterTests(unittest.TestCase):
         self.server.video_bytes = video.read_bytes()
         self.server.last_prompt = None
         self.server.omit_unet = False
+        self.server.omit_start_image = False
         self.thread = Thread(target=self.server.serve_forever, daemon=True)
         self.thread.start()
 
@@ -363,6 +463,101 @@ class V4ComfyUIWan22AdapterTests(unittest.TestCase):
             "budgetAuthorityRef",
         ):
             self.assertNotIn(forbidden, serialized)
+
+    def test_m11_exact_start_image_executes_and_trims_to_timeline_frames(self):
+        source = Path(self.directory.name) / "selected-m10.png"
+        provider_video = Path(self.directory.name) / "provider-m11.mp4"
+        input_root = Path(self.directory.name) / "input"
+        workflow_root = Path(self.directory.name) / "workflow-evidence"
+        input_root.mkdir()
+        create_m11_source_image(source)
+        create_m11_provider_video(provider_video)
+        self.server.video_bytes = provider_video.read_bytes()
+        source_digest = sha256(source.read_bytes()).hexdigest()
+        request = m11_request(source_digest)
+        queue = MediaJobCoordinator(
+            InMemoryMediaJobAdapter(),
+            ComfyUIWan22ImageToVideoAdapter(
+                self.config(),
+                source_images={source_digest: source},
+                input_root=input_root,
+                workflow_evidence_root=workflow_root,
+            ),
+            Path(self.directory.name) / "m11-artifacts",
+            ref_factory=lambda prefix: f"{prefix}-m11-test",
+            clock=lambda: "2026-08-23T00:00:00Z",
+            max_attempts=1,
+        )
+
+        jobs = queue.execute_batch(
+            request["workspaceRef"],
+            request["productionRunRef"],
+            [request],
+            batch_idempotency_key="m11-exact-start-image-one",
+        )
+
+        job = jobs[0]
+        self.assertEqual(job["state"], "SUCCEEDED")
+        self.assertEqual(
+            job["artifact"]["adapterIdentity"],
+            COMFYUI_IMAGE_TO_VIDEO_ADAPTER_ID,
+        )
+        self.assertEqual(
+            job["artifact"]["provenance"], "SELF_HOSTED_AI_GENERATED"
+        )
+        stream = job["artifact"]["probe"]["streams"][0]
+        self.assertEqual(
+            (stream["width"], stream["height"], stream["nb_read_frames"]),
+            (640, 352, "168"),
+        )
+        execution = job["artifact"]["providerExecution"]
+        self.assertEqual(execution["sourceImageContentDigest"], source_digest)
+        self.assertEqual(execution["latentFrameCount"], 169)
+        self.assertEqual(execution["outputFrameCount"], 168)
+        workflow = self.server.last_prompt["prompt"]
+        self.assertEqual(workflow["7"]["inputs"]["length"], 169)
+        self.assertEqual(workflow["7"]["inputs"]["start_image"], ["12", 0])
+        self.assertEqual(
+            workflow["12"]["inputs"]["image"],
+            f"acs-k2-m11/{source_digest}.png",
+        )
+        staged = input_root / "acs-k2-m11" / f"{source_digest}.png"
+        self.assertEqual(sha256(staged.read_bytes()).hexdigest(), source_digest)
+        workflow_path = workflow_root / "shot-01-workflow.json"
+        self.assertEqual(
+            sha256(workflow_path.read_bytes()).hexdigest(),
+            execution["workflowDigest"],
+        )
+        self.assertNotIn(str(source), json.dumps(workflow, ensure_ascii=False))
+
+    def test_m11_start_image_capability_fails_closed_before_submission(self):
+        source = Path(self.directory.name) / "selected-m10.png"
+        input_root = Path(self.directory.name) / "input"
+        input_root.mkdir()
+        create_m11_source_image(source)
+        source_digest = sha256(source.read_bytes()).hexdigest()
+        self.server.omit_start_image = True
+        queue = MediaJobCoordinator(
+            InMemoryMediaJobAdapter(),
+            ComfyUIWan22ImageToVideoAdapter(
+                self.config(),
+                source_images={source_digest: source},
+                input_root=input_root,
+            ),
+            Path(self.directory.name) / "m11-blocked-artifacts",
+            ref_factory=lambda prefix: f"{prefix}-m11-blocked",
+            clock=lambda: "2026-08-23T00:00:00Z",
+            max_attempts=1,
+        )
+
+        with self.assertRaises(MediaJobError):
+            queue.execute_batch(
+                "workspace-k2",
+                "production-run-k2",
+                [m11_request(source_digest)],
+                batch_idempotency_key="m11-missing-start-image-capability",
+            )
+        self.assertIsNone(self.server.last_prompt)
 
     def test_capability_probe_fails_closed_when_model_is_not_recognized(self):
         self.server.omit_unet = True
@@ -485,11 +680,16 @@ class V4ComfyUIWan22AdapterTests(unittest.TestCase):
             config,
             model_root,
             observed_at="2026-08-18T00:00:00Z",
+            require_start_image=True,
         )
 
         self.assertEqual(
             attestation["facts"]["modelDigestVerification"],
             "LOCAL_FILE_SHA256_VERIFIED",
+        )
+        self.assertEqual(
+            attestation["facts"]["startImageCapability"],
+            "LOAD_IMAGE_TO_WAN_START_IMAGE_VERIFIED",
         )
         self.assertEqual(attestation["facts"]["modelFiles"][0]["sha256"], digests[0])
         self.assertEqual(attestation["authorityState"], "TECHNICAL_EVIDENCE_ONLY")

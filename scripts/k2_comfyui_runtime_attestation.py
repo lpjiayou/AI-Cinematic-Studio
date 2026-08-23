@@ -59,6 +59,11 @@ def _arguments() -> argparse.Namespace:
     parser.add_argument("--attestation-ref")
     parser.add_argument("--model-root", required=True)
     parser.add_argument("--output")
+    parser.add_argument(
+        "--require-start-image",
+        action="store_true",
+        help="require LoadImage → Wan start_image capability for M11",
+    )
     args = parser.parse_args()
     for attribute, option_name, environment_name in (
         ("base_url", "--base-url", "COMFYUI_BASE_URL"),
@@ -116,6 +121,7 @@ def main() -> int:
             config,
             args.model_root,
             observed_at=datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
+            require_start_image=args.require_start_image,
         )
     except MediaJobError as exc:
         print(f"runtime attestation failed: {exc}", file=sys.stderr)

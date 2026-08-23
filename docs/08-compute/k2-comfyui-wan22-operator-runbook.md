@@ -183,3 +183,26 @@ Provider Policy 与 CreativeShotVersion，并由这些事实生成固定 49-fram
 本实现只闭合 P1 的视频候选实验入口。P1 仍不能通过，直到同一 K2 lineage 至少有
 真实 image/video/audio 实验事实，并完成后续候选校验、显式选择和 V5 AssetVersion
 接纳。P2 的生产数据库、对象存储、秘密注入、恢复和故障演练也尚未由本手册建立。
+
+## 8. K2 M11 精确 start-image 内部执行分支
+
+本节只适用于 ADR-0012 已限定的同一 K2 内部、自托管、不可发布分支。它不复用第 2
+节的外部 Rights/Provider/Budget 前置审核，而固定记录
+`NOT_REQUIRED_INTERNAL / NOT_REQUIRED_SELF_HOSTED / NOT_REQUIRED_INTERNAL`；商业与发布
+路径仍按第 2 节 fail closed。
+
+运行证明必须追加 `--require-start-image`：
+
+```bash
+PYTHONPATH=. python scripts/k2_comfyui_runtime_attestation.py \
+  --require-start-image \
+  --model-root /data/coding/apps/ComfyUI/models \
+  --output /secure/evidence/k2-m11-comfyui-runtime-attestation.json
+```
+
+证明必须包含 `LoadImage`、`Wan22ImageToVideoLatent.start_image` 和唯一 CUDA 设备。
+V4 只按 canonical M11 请求中的图片内容摘要解析私有 PNG，不接受浏览器路径。模型使用
+169/193 帧潜空间长度，受控 FFmpeg 后处理输出精确的 168/192 帧，随后仍由
+`MediaJobCoordinator` 独立 ffprobe。自动阶段最多产生四个
+`UNSELECTED / NOT_ADMITTED / publicationAllowed=false` 候选；选择与接纳必须等待逐个
+视频审阅。
