@@ -1,6 +1,6 @@
 # Creator Public HTTP/API v1
 
-Status: `XR1 FROZEN / AUTH-W1 SECURITY AMENDMENT / K2 P0-P1 + M10 IMAGE-PLAN BOUNDED EXTENSION`
+Status: `XR1 FROZEN / AUTH-W1 SECURITY AMENDMENT / K2 P0-P1 + M10 ADMISSION + M11 VIDEO-PLAN BOUNDED EXTENSION`
 
 This contract is the only browser-facing Core HTTP surface for the separate Commercial
 Frontend. Existing `/creator/internal/*` endpoints remain compatibility-only and must
@@ -25,8 +25,8 @@ Commercial Frontend → Frontend Experience Adapter → /creator/api/v1
 | M6 | `/series-intelligence-workspaces`, `/series-intelligence/*` | accepted Series Intelligence public boundary |
 | M7–M8 | `/episode-production-runs/{runRef}/shot-graph` | bounded K2 V5 Shot Graph service |
 | M9 | `/episode-production-runs/{runRef}/assets` | bounded K2 V5 Asset Pipeline service |
-| M10 | `/episode-production-runs/{runRef}/real-media-revision`, `/production-readiness` | bounded K2 V5 image-first revision planner; live execution separately gated |
-| M11 | `/episode-production-runs/{runRef}/provider-experiments`, `/media` | bounded K2 V5 experiment/media services over V4 |
+| M10 | `/episode-production-runs/{runRef}/real-media-revision`, `/real-image-selection`, `/production-readiness` | bounded K2 V5 image-first plan, exact selection and admission; live execution separately gated |
+| M11 | `/episode-production-runs/{runRef}/real-video-revision`, `/provider-experiments`, `/media` | bounded K2 V5 exact start-image video planner and experiment/media services over V4 |
 | M12 | `/episode-production-runs/{runRef}/production-readiness`, `/media` | bounded K2 V5 media service; live audio remains blocked |
 | M13–M14 | `/episode-production-runs/{runRef}/preview`, `/finalize` | bounded K2 V5 delivery service over V4/V3 |
 | M15 | `/episode-production-runs/{runRef}/delivery`, preview/export content | bounded K2 V5 delivery authority |

@@ -58,6 +58,7 @@ from .internal_execution import (
 from .real_media_revision import (
     K2RealMediaRevisionService,
     REAL_IMAGE_CAPABILITY,
+    REAL_VIDEO_CAPABILITY,
     RealImageCandidateEvidencePort,
     RealImageCandidateRejectedError,
 )
@@ -99,6 +100,7 @@ __all__ = [
     "internal_execution_grant_from_environment",
     "K2RealMediaRevisionService",
     "REAL_IMAGE_CAPABILITY",
+    "REAL_VIDEO_CAPABILITY",
     "RealImageCandidateEvidencePort",
     "RealImageCandidateRejectedError",
     "create_in_memory_boundary",

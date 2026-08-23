@@ -134,6 +134,7 @@ EPISODE_PRODUCTION_SUBRESOURCES = {
     "delivery",
     "real-media-revision",
     "real-image-selection",
+    "real-video-revision",
 }
 
 
@@ -373,6 +374,10 @@ class CreatorRequestHandler(BaseHTTPRequestHandler):
                     result = self.episode_production_boundary.select_real_images(
                         command
                     )
+                elif resource == "real-video-revision":
+                    result = self.episode_production_boundary.plan_real_videos(
+                        command
+                    )
                 elif resource == "finalize":
                     result = self.episode_production_boundary.approve_and_finalize(
                         command
@@ -583,6 +588,10 @@ class CreatorRequestHandler(BaseHTTPRequestHandler):
                             workspace_ref, run_ref
                         )
                     elif resource == "real-image-selection":
+                        result = self.episode_production_boundary.get_real_media_revision(
+                            workspace_ref, run_ref
+                        )
+                    elif resource == "real-video-revision":
                         result = self.episode_production_boundary.get_real_media_revision(
                             workspace_ref, run_ref
                         )
