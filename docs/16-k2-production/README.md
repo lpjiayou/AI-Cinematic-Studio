@@ -7,7 +7,7 @@ Creator Public API → Application → V5 → V4 → V3 → Compute 主链。
 
 当前所有文件均为：
 
-`DRAFT / CANDIDATE / NOT DOMAIN FACT / P1 HOST-PASSED / M10 FOUR LIVE IMAGE CANDIDATES COMPLETE / EXACT ADMISSION HOST-IMPLEMENTED AND RUNTIME-PENDING / publicationAllowed=false`
+`DRAFT / CANDIDATE / NOT DOMAIN FACT / P1 HOST-PASSED / M10 EXACT FOUR-IMAGE ADMISSION COMPLETE / REAL_IMAGE_READY / M11 NEXT / publicationAllowed=false`
 
 目录内的镜头号、人物设计键和提示词是便于审阅的候选标识，不是 Core 生成的
 `projectRef`、`characterRef`、`creativeShotRef` 或 `GenerationRequestRef`。开机后必须从
