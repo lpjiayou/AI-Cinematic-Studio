@@ -176,6 +176,12 @@ length is `durationFrames + 1` (169/193); V4 then produces the exact requested
 168/192-frame artifact through a recorded `v4.ffmpeg-exact-frame-trim.v1` step before
 the coordinator's independent ffprobe verification.
 
+The 2026-08-23 M11 execution produced four independently verified H.264 candidates
+at 640×352/24 fps with exact frame counts 168/168/192/192. These are runtime
+candidate facts only: all four remain unselected and not admitted, the canonical
+state remains `REAL_VIDEO_PLAN_READY`, and no video AssetVersion exists. Human
+review is the only permitted next transition.
+
 ## 7. State graph
 
 Historical G2-G6 facts and the original preview remain immutable. The accepted

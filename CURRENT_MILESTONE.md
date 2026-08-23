@@ -10,7 +10,7 @@
 >
 > Current Task: `ACS-K2-INTERNAL-IMAGE-FIRST-REAL-MEDIA-REVISION`
 >
-> Current Work Package: `G2→G6 COMPLETE / P1 HOST-PASSED / M10 COMPLETE / M11 VIDEO PLAN COMPLETE / REAL_VIDEO_PLAN_READY / START-IMAGE EXECUTION HOST-PASSED / FOUR GPU CANDIDATES NEXT`
+> Current Work Package: `G2→G6 COMPLETE / P1 HOST-PASSED / M10 COMPLETE / M11 VIDEO PLAN COMPLETE / FOUR M11 VIDEO CANDIDATES INDEPENDENTLY VERIFIED / AWAITING HUMAN VIDEO REVIEW`
 >
 > M6 Authorization: `ACCEPTED SURFACES + K2 EXTERNAL AUTHORITY CONNECTION / NO M6 SCHEMA EXPANSION`
 >
@@ -1421,5 +1421,36 @@ The connected V4 implementation now extends the existing single-episode
 Local focused and full regressions passed 20/20 and 644/644. The implementation
 was then applied to the canonical host, where focused tests passed 20/20 in
 37.981 seconds and the complete Core regression passed 644/644 in 212.245
-seconds. Fresh start-image runtime attestation and four paid GPU candidate
-executions remain pending; video selection and admission have not started.
+seconds. The fresh start-image runtime attestation and four GPU candidate
+executions completed in the connected checkpoint below; video selection and
+admission have not started.
+
+### M11 four exact unselected video candidates — 2026-08-23
+
+Implementation commit `c2e87b55672f38cdd5e00d904975c1641f39f3ba`
+executed the four canonical start-image requests through the existing V4 media-job
+queue. A fresh technical attestation verified the A100, the three digest-pinned
+Wan2.2 files and `LoadImage → Wan22ImageToVideoLatent.start_image` before dispatch.
+
+The candidate receipt is
+`/data/k2-authority/evidence/k2-m11-four-video-candidates-20260823T095109Z/receipt.json`
+with file SHA-256
+`7af764076243939141b0b1f12ca9539d2ed8ca0d6fea51281ca47e36e36ebddf`.
+Independent re-probe and lineage verification is recorded at
+`/data/k2-authority/evidence/k2-m11-four-video-independent-verification-20260823T095638Z/receipt.json`
+with file SHA-256
+`91bda1c55293030aa0bb7e55bab953ecf4db5900d8e484de0de422e22eb098c6`.
+
+All four candidates are H.264, 640×352, 24 fps, with exact frame counts
+168/168/192/192. Their artifact digests are, by ordinal:
+
+1. `80ea4215fa492e847a638f190fd4061cf0c792d20592c34f4eb5c21c0af85b11`
+2. `d213f1caa2b6abbb77e3c7ddc1075956da8d352ceacaafd59bad22e8a1a7665f`
+3. `daaa0045779ac197384a476d5de043ae7da1a54f7239f6648297f3c33d3f771b`
+4. `1d3125df962cb8f5328ce7eef0c0cfbb8d63d5ec7fd75c91eb8fa08fe4c1efcd`
+
+The runtime media-job delta is four and the canonical mutation count is zero.
+Every candidate remains `TECHNICALLY_VERIFIED / UNSELECTED / NOT_ADMITTED`;
+publication remains disabled. ComfyUI was stopped after verification and the A100
+returned to zero allocated MiB. The next gate is human review of all four videos,
+not automatic selection, admission, master creation, publication or `main` merge.
