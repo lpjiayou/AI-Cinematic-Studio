@@ -2,7 +2,7 @@
 
 ## 1. Status and scope
 
-- Status: `M10 COMPLETE / FOUR EXACT HUMAN SELECTIONS ADMITTED / REAL_IMAGE_READY / CORE 638 PASS / M11 NEXT`
+- Status: `M10 COMPLETE / REAL_IMAGE_READY / M11 VIDEO PLAN HOST-PASSED / CANONICAL EXECUTION PENDING`
 - Date: `2026-08-23`
 - Project: `K2-001`
 - Required Core base: `1650c3462b32899151cdba795ddc10e5171ff1da`
@@ -141,9 +141,26 @@ requests. Each request carries one selected shot-image AssetVersion ref and dige
 V4 privately resolves and verifies the corresponding bytes before connecting them to
 `Wan22ImageToVideoLatent.start_image`.
 
+The authenticated planning surface is:
+
+```text
+POST /creator/api/v1/episode-production-runs/{runRef}/real-video-revision
+```
+
+It accepts only `idempotencyKey`. Before deriving requests, V5 revalidates the M10
+plan, admission manifest, four candidate/decision/AssetVersion lineages and asks the
+digest-pinned V4 evidence adapter to rehash the four selected PNG bytes. Each request
+then binds one exact `sourceImageAssetVersionRef`, AssetVersion digest and content
+digest. It carries no browser path and cannot substitute another image.
+
 Frame counts remain exactly `168 / 168 / 192 / 192` at 24 fps, total 720. M11 may
 reuse the existing four audio v1 AssetVersions for the first real-preview revision;
 live audio remains a later M12 branch.
+
+The first exact A100/5B execution profile is `640×352`, 20 steps, `uni_pc/simple`,
+CFG 5.0 and model shift 8.0. The plan records this bounded profile and advances only
+`REAL_IMAGE_READY → REAL_VIDEO_PLAN_READY`; it does not start ComfyUI, dispatch a
+job, create a video candidate, select media or create a video AssetVersion.
 
 ## 7. State graph
 

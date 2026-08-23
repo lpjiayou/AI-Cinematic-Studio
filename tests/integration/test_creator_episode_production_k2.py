@@ -830,6 +830,41 @@ class CreatorEpisodeProductionK2HttpTests(unittest.TestCase):
         self.assertEqual(status, 200)
         self.assertEqual(restored["state"], "REAL_IMAGE_READY")
 
+        video_endpoint = f"{base}/real-video-revision"
+        status, video_plan = self.post(
+            video_endpoint,
+            {"idempotencyKey": "http-m11-video-plan-v1"},
+        )
+        self.assertEqual(status, 201)
+        self.assertEqual(video_plan["state"], "REAL_VIDEO_PLAN_READY")
+        self.assertEqual(
+            [
+                item["parameters"]["durationFrames"]
+                for item in video_plan["generationRequests"]
+            ],
+            [168, 168, 192, 192],
+        )
+        selected_assets = {
+            item["ordinal"]: item for item in selected["assetVersions"]
+        }
+        self.assertTrue(
+            all(
+                item["sourceImageAssetVersionDigest"]
+                == selected_assets[item["ordinal"]]["payloadDigest"]
+                and item["startImageBindingState"]
+                == "EXACT_ASSET_VERSION_BOUND"
+                and item["publicationAllowed"] is False
+                for item in video_plan["generationRequests"]
+            )
+        )
+        self.assertNotIn(
+            "internalPath", json.dumps(video_plan, ensure_ascii=False)
+        )
+        status, restored = self.get(video_endpoint)
+        self.assertEqual(status, 200)
+        self.assertEqual(restored["state"], "REAL_VIDEO_PLAN_READY")
+        self.assertEqual(len(restored["videoGenerationRequests"]), 4)
+
         with self.assertRaises(error.HTTPError) as forged:
             self.post(
                 selection_endpoint,

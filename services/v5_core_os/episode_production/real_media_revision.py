@@ -30,6 +30,7 @@ from .shot_graph import K2ShotGraphService
 
 REAL_IMAGE_PLAN_GATE = "M10_REAL_IMAGE_PLAN"
 REAL_IMAGE_ADMISSION_GATE = "M10_REAL_IMAGE_ADMISSION"
+REAL_VIDEO_PLAN_GATE = "M11_REAL_VIDEO_PLAN"
 REAL_IMAGE_REQUEST_SCHEMA_VERSION = "v5.k2-real-shot-image-request.v1"
 REAL_IMAGE_PLAN_SCHEMA_VERSION = "v5.k2-real-image-plan.v1"
 REAL_IMAGE_CANDIDATE_SCHEMA_VERSION = "v5.k2-real-image-candidate.v1"
@@ -38,9 +39,13 @@ REAL_IMAGE_ASSET_VERSION_SCHEMA_VERSION = "v5.k2-real-image-asset-version.v1"
 REAL_IMAGE_ADMISSION_MANIFEST_SCHEMA_VERSION = (
     "v5.k2-real-image-admission-manifest.v1"
 )
+REAL_VIDEO_REQUEST_SCHEMA_VERSION = "v5.k2-real-shot-video-request.v1"
+REAL_VIDEO_PLAN_SCHEMA_VERSION = "v5.k2-real-video-plan.v1"
 REAL_IMAGE_PLANNER_ID = "v5.k2.real-image-planner.v1"
 REAL_IMAGE_ADMISSION_ID = "v5.k2.real-image-admission.v1"
+REAL_VIDEO_PLANNER_ID = "v5.k2.real-video-planner.v1"
 REAL_IMAGE_CAPABILITY = "self-hosted-multi-reference-shot-image-v1"
+REAL_VIDEO_CAPABILITY = "self-hosted-wan22-image-to-video-v1"
 
 
 class RealImageCandidateRejectedError(EpisodeProductionError):
@@ -869,6 +874,408 @@ class K2RealMediaRevisionService:
         )
         return {**self._admission_bundle(gate), "idempotentReplay": replay}
 
+    def _verified_image_admission(
+        self, workspace: str, run_ref: str
+    ) -> dict[str, Any]:
+        verified, plan_bundle = self._verified_plan(workspace, run_ref)
+        gate = self.evidence.get_gate(
+            workspace, run_ref, REAL_IMAGE_ADMISSION_GATE
+        )
+        if gate is None:
+            raise UpstreamNotReadyError(
+                "four exact M10 image selections are required before M11"
+            )
+        admission = self._admission_bundle(gate)
+        manifest = admission["realImageAdmissionManifest"]
+        plan = plan_bundle["realImagePlan"]
+        requests = plan_bundle["generationRequests"]
+        candidates = admission["candidates"]
+        decisions = admission["selectionDecisions"]
+        assets = admission["assetVersions"]
+        if (
+            manifest.get("rootPayloadDigest")
+            != verified["root"]["payloadDigest"]
+            or manifest.get("realImagePlanRef") != plan["realImagePlanRef"]
+            or manifest.get("realImagePlanDigest") != plan["payloadDigest"]
+            or manifest.get("candidateRefs")
+            != [item["candidateRef"] for item in candidates]
+            or manifest.get("candidateDigests")
+            != [item["payloadDigest"] for item in candidates]
+            or manifest.get("selectionDecisionRefs")
+            != [item["selectionDecisionRef"] for item in decisions]
+            or manifest.get("selectionDecisionDigests")
+            != [item["payloadDigest"] for item in decisions]
+            or manifest.get("assetVersionRefs")
+            != [item["assetVersionRef"] for item in assets]
+            or manifest.get("assetVersionDigests")
+            != [item["payloadDigest"] for item in assets]
+            or manifest.get("state") != "REAL_IMAGE_READY"
+            or manifest.get("publicationAllowed") is not False
+            or len(candidates) != 4
+            or len(decisions) != 4
+            or len(assets) != 4
+        ):
+            raise StaleInputError("M10 image admission manifest is stale")
+        request_by_ref = {
+            item["generationRequestRef"]: item for item in requests
+        }
+        candidate_by_ref = {item["candidateRef"]: item for item in candidates}
+        decision_by_ref = {
+            item["selectionDecisionRef"]: item for item in decisions
+        }
+        if (
+            len(request_by_ref) != 4
+            or len(candidate_by_ref) != 4
+            or len(decision_by_ref) != 4
+        ):
+            raise StaleInputError("M10 image admission lineage is ambiguous")
+        for asset in assets:
+            request = request_by_ref.get(asset.get("generationRequestRef"))
+            candidate = candidate_by_ref.get(asset.get("candidateRef"))
+            decision = decision_by_ref.get(asset.get("selectionDecisionRef"))
+            if (
+                not isinstance(request, Mapping)
+                or not isinstance(candidate, Mapping)
+                or not isinstance(decision, Mapping)
+                or asset.get("generationRequestDigest")
+                != request.get("payloadDigest")
+                or asset.get("creativeShotVersionRef")
+                != request.get("creativeShotVersionRef")
+                or asset.get("candidateDigest")
+                != candidate.get("payloadDigest")
+                or asset.get("selectionDecisionDigest")
+                != decision.get("payloadDigest")
+                or decision.get("candidateDigest")
+                != candidate.get("payloadDigest")
+                or decision.get("decision") != "SELECT"
+                or candidate.get("selectionState") != "SELECTED_BY_HUMAN"
+                or candidate.get("admissionState") != "ADMITTED"
+                or asset.get("mediaKind") != "image"
+                or asset.get("mediaType") != "image/png"
+                or asset.get("state") != "REGISTERED"
+                or asset.get("immutable") is not True
+                or asset.get("publicationAllowed") is not False
+            ):
+                raise StaleInputError("M10 selected image asset lineage is stale")
+        try:
+            handoff = self.candidate_evidence.resolve_candidates(
+                workspace,
+                run_ref,
+                plan["realImagePlanRef"],
+                requests,
+            )
+        except RealImageCandidateEvidenceError as exc:
+            raise RealImageCandidateRejectedError(
+                "V4 could not reverify the admitted M10 image bytes"
+            ) from exc
+        if not isinstance(handoff, Mapping) or not isinstance(
+            handoff.get("candidates"), list
+        ):
+            raise RealImageCandidateRejectedError(
+                "V4 returned an invalid admitted-image handoff"
+            )
+        live_by_ref = {
+            item.get("candidateRef"): item
+            for item in handoff["candidates"]
+            if isinstance(item, Mapping)
+        }
+        for asset in assets:
+            live = live_by_ref.get(asset["candidateRef"])
+            artifact = live.get("artifact") if isinstance(live, Mapping) else None
+            if (
+                not isinstance(artifact, Mapping)
+                or handoff.get("candidateEvidenceDigest")
+                != manifest.get("candidateEvidenceDigest")
+                or handoff.get("artifactStoreRef")
+                != asset.get("artifactStoreRef")
+                or artifact.get("storageKey") != asset.get("storageKey")
+                or artifact.get("sha256") != asset.get("sha256")
+                or artifact.get("byteSize") != asset.get("byteSize")
+                or artifact.get("width") != asset.get("probe", {}).get("width")
+                or artifact.get("height")
+                != asset.get("probe", {}).get("height")
+            ):
+                raise RealImageCandidateRejectedError(
+                    "an admitted M10 image artifact is no longer current"
+                )
+        return {
+            **verified,
+            **plan_bundle,
+            **admission,
+        }
+
+    @staticmethod
+    def _video_profile(
+        graph: Mapping[str, Any],
+        shot: Mapping[str, Any],
+        asset: Mapping[str, Any],
+    ) -> dict[str, Any]:
+        output = graph.get("output")
+        if not isinstance(output, Mapping):
+            raise StaleInputError("shot graph output profile is unavailable")
+        frame_rate = output.get("frameRate")
+        duration = shot.get("durationFrames")
+        if frame_rate != 24 or duration not in {168, 192}:
+            raise StaleInputError("M11 shot timing is outside the exact K2 scope")
+        width = 640
+        source_width = int(output.get("width", 0))
+        source_height = int(output.get("height", 0))
+        if source_width <= 0 or source_height <= 0:
+            raise StaleInputError("shot graph dimensions are invalid")
+        height = max(
+            32,
+            int(round((width * source_height / source_width) / 32)) * 32,
+        )
+        return {
+            "durationFrames": duration,
+            "frameRate": frame_rate,
+            "width": width,
+            "height": height,
+            "steps": 20,
+            "cfg": 5.0,
+            "samplerName": "uni_pc",
+            "scheduler": "simple",
+            "modelShift": 8.0,
+            "seed": int(str(asset["sha256"])[:16], 16),
+            "negativePrompt": (
+                "text, watermark, logo, subtitles, malformed anatomy, "
+                "duplicate subject, temporal flicker, abrupt camera jump"
+            ),
+        }
+
+    def plan_videos(self, command: Mapping[str, Any]) -> dict[str, Any]:
+        if not isinstance(command, Mapping) or set(command) != {
+            "workspaceRef",
+            "productionRunRef",
+            "idempotencyKey",
+        }:
+            raise EpisodeProductionError(
+                "command fields do not match the M11 video plan contract"
+            )
+        workspace = _required_ref(command.get("workspaceRef"), "workspaceRef")
+        run_ref = _required_ref(
+            command.get("productionRunRef"), "productionRunRef"
+        )
+        client_key = _idempotency_key(command.get("idempotencyKey"))
+        verified = self._verified_image_admission(workspace, run_ref)
+        root = verified["root"]
+        graph = verified["executableShotGraph"]
+        admission_manifest = verified["realImageAdmissionManifest"]
+        assets = verified["assetVersions"]
+        shots = verified["creativeShotVersions"]
+        if (
+            graph.get("output", {}).get("totalFrames") != 720
+            or [item.get("durationFrames") for item in shots]
+            != [168, 168, 192, 192]
+            or [item.get("ordinal") for item in assets] != [1, 2, 3, 4]
+        ):
+            raise StaleInputError("M11 is exact-scoped to the current K2 timeline")
+        gate_key = _digest(
+            {
+                "clientIdempotencyKey": client_key,
+                "stage": "m11-real-video-plan",
+            }
+        )
+        existing = self.evidence.get_gate(
+            workspace, run_ref, REAL_VIDEO_PLAN_GATE
+        )
+        if existing is not None:
+            if existing.get("idempotencyKey") != gate_key:
+                raise IdempotencyConflictError("M11 video plan command conflicts")
+            bundle = self._video_bundle(existing)
+            plan = bundle["realVideoPlan"]
+            if (
+                plan.get("rootPayloadDigest") != root["payloadDigest"]
+                or plan.get("realImageAdmissionManifestDigest")
+                != admission_manifest["payloadDigest"]
+                or plan.get("sourceImageAssetVersionDigests")
+                != [item["payloadDigest"] for item in assets]
+                or plan.get("generationRequestDigests")
+                != [
+                    item["payloadDigest"]
+                    for item in bundle["generationRequests"]
+                ]
+            ):
+                raise StaleInputError("recorded M11 video plan lineage is stale")
+            return {**bundle, "idempotentReplay": True}
+        now = self._clock()
+        assets_by_shot = {
+            item["creativeShotVersionRef"]: item for item in assets
+        }
+        if len(assets_by_shot) != 4:
+            raise StaleInputError("M10 image assets do not cover four unique shots")
+        requests: list[dict[str, Any]] = []
+        for shot in shots:
+            asset = assets_by_shot.get(shot["creativeShotVersionRef"])
+            if not isinstance(asset, Mapping):
+                raise StaleInputError("M11 source image asset is missing")
+            request_item = _sealed(
+                {
+                    "schemaVersion": REAL_VIDEO_REQUEST_SCHEMA_VERSION,
+                    "workspaceRef": workspace,
+                    "productionRunRef": run_ref,
+                    "generationRequestRef": _required_ref(
+                        self._ref_factory("real-video-generation-request"),
+                        "generationRequestRef",
+                    ),
+                    "generationRequestVersionRef": _required_ref(
+                        self._ref_factory(
+                            "real-video-generation-request-version"
+                        ),
+                        "generationRequestVersionRef",
+                    ),
+                    "version": 1,
+                    "ordinal": shot["globalOrder"],
+                    "mediaKind": "video",
+                    "mediaType": "video/mp4",
+                    "creativeShotRef": shot["creativeShotRef"],
+                    "creativeShotVersionRef": shot[
+                        "creativeShotVersionRef"
+                    ],
+                    "creativeShotDigest": shot["payloadDigest"],
+                    "executableShotGraphVersionRef": graph[
+                        "executableShotGraphVersionRef"
+                    ],
+                    "executableShotGraphDigest": graph["payloadDigest"],
+                    "sourceImageAssetRef": asset["assetRef"],
+                    "sourceImageAssetVersionRef": asset["assetVersionRef"],
+                    "sourceImageAssetVersionDigest": asset["payloadDigest"],
+                    "sourceImageContentDigest": asset["sha256"],
+                    "sourceImageMediaType": asset["mediaType"],
+                    "sourceImageProbe": deepcopy(asset["probe"]),
+                    "startImageBindingState": "EXACT_ASSET_VERSION_BOUND",
+                    "promptSpec": {
+                        "cameraInstruction": deepcopy(
+                            shot["cameraInstruction"]
+                        ),
+                        "action": shot["action"],
+                        "continuityConstraints": deepcopy(
+                            shot["continuityConstraints"]
+                        ),
+                    },
+                    "parameters": self._video_profile(graph, shot, asset),
+                    "adapterCapability": REAL_VIDEO_CAPABILITY,
+                    "executionMode": "INTERNAL_SELF_HOSTED",
+                    "executionAuthorizationState": "NOT_DISPATCHED_BY_PLAN",
+                    "requestedProvenance": "SELF_HOSTED_AI_GENERATED",
+                    "rightsState": "NOT_REQUIRED_INTERNAL",
+                    "providerPolicyState": "NOT_REQUIRED_SELF_HOSTED",
+                    "budgetAuthorityState": "NOT_REQUIRED_INTERNAL",
+                    "selectionRequired": True,
+                    "publicationAllowed": False,
+                    "createdBy": REAL_VIDEO_PLANNER_ID,
+                    "createdAt": now,
+                }
+            )
+            requests.append(request_item)
+        if sum(item["parameters"]["durationFrames"] for item in requests) != 720:
+            raise StaleInputError("M11 request frame total is not 720")
+        plan = _sealed(
+            {
+                "schemaVersion": REAL_VIDEO_PLAN_SCHEMA_VERSION,
+                "workspaceRef": workspace,
+                "productionRunRef": run_ref,
+                "realVideoPlanRef": _required_ref(
+                    self._ref_factory("real-video-plan"), "realVideoPlanRef"
+                ),
+                "realVideoPlanVersionRef": _required_ref(
+                    self._ref_factory("real-video-plan-version"),
+                    "realVideoPlanVersionRef",
+                ),
+                "version": 1,
+                "rootPayloadDigest": root["payloadDigest"],
+                "executableShotGraphVersionRef": graph[
+                    "executableShotGraphVersionRef"
+                ],
+                "executableShotGraphDigest": graph["payloadDigest"],
+                "realImageAdmissionManifestRef": admission_manifest[
+                    "realImageAdmissionManifestRef"
+                ],
+                "realImageAdmissionManifestDigest": admission_manifest[
+                    "payloadDigest"
+                ],
+                "sourceImageAssetVersionRefs": [
+                    item["assetVersionRef"] for item in assets
+                ],
+                "sourceImageAssetVersionDigests": [
+                    item["payloadDigest"] for item in assets
+                ],
+                "generationRequestRefs": [
+                    item["generationRequestRef"] for item in requests
+                ],
+                "generationRequestDigests": [
+                    item["payloadDigest"] for item in requests
+                ],
+                "expectedRequestCount": 4,
+                "frameCounts": [168, 168, 192, 192],
+                "totalFrames": 720,
+                "frameRate": 24,
+                "executionProfile": {
+                    "width": 640,
+                    "height": 352,
+                    "steps": 20,
+                    "samplerName": "uni_pc",
+                    "scheduler": "simple",
+                    "modelShift": 8.0,
+                },
+                "candidateSelectionState": "NOT_STARTED",
+                "assetAdmissionState": "NOT_STARTED",
+                "publicationAllowed": False,
+                "createdBy": REAL_VIDEO_PLANNER_ID,
+                "createdAt": now,
+            }
+        )
+        request_digest = _digest(
+            {
+                "clientIdempotencyKey": client_key,
+                "rootPayloadDigest": root["payloadDigest"],
+                "realImageAdmissionManifestDigest": admission_manifest[
+                    "payloadDigest"
+                ],
+                "sourceImageAssetVersionDigests": [
+                    item["payloadDigest"] for item in assets
+                ],
+                "generationRequestDigests": [
+                    item["payloadDigest"] for item in requests
+                ],
+                "plannerId": REAL_VIDEO_PLANNER_ID,
+            }
+        )
+        facts = tuple(
+            EvidenceFact(
+                f"RealVideoGenerationRequest:{item['ordinal']:04d}",
+                item["generationRequestRef"],
+                1,
+                item,
+                item["payloadDigest"],
+            )
+            for item in requests
+        )
+        gate, replay = self.evidence.append_gate(
+            GateAppend(
+                workspace,
+                run_ref,
+                REAL_VIDEO_PLAN_GATE,
+                gate_key,
+                root["payloadDigest"],
+                request_digest,
+                "REAL_IMAGE_READY",
+                "REAL_VIDEO_PLAN_READY",
+                now,
+                (
+                    EvidenceFact(
+                        "RealVideoPlan",
+                        plan["realVideoPlanRef"],
+                        1,
+                        plan,
+                        plan["payloadDigest"],
+                    ),
+                    *facts,
+                ),
+            )
+        )
+        return {**self._video_bundle(gate), "idempotentReplay": replay}
+
     @staticmethod
     def _bundle(gate: Mapping[str, Any]) -> dict[str, Any]:
         return {
@@ -891,6 +1298,16 @@ class K2RealMediaRevisionService:
             "state": gate["toState"],
         }
 
+    @staticmethod
+    def _video_bundle(gate: Mapping[str, Any]) -> dict[str, Any]:
+        return {
+            "realVideoPlan": _fact(gate, "RealVideoPlan"),
+            "generationRequests": _facts(
+                gate, "RealVideoGenerationRequest:"
+            ),
+            "state": gate["toState"],
+        }
+
     def get_revision_bundle(
         self, workspace_ref: str, production_run_ref: str
     ) -> dict[str, Any]:
@@ -908,4 +1325,21 @@ class K2RealMediaRevisionService:
         )
         if admission is None:
             return plan_bundle
-        return {**plan_bundle, **self._admission_bundle(admission)}
+        result = {**plan_bundle, **self._admission_bundle(admission)}
+        video_plan = self.evidence.get_gate(
+            workspace_ref,
+            production_run_ref,
+            REAL_VIDEO_PLAN_GATE,
+        )
+        if video_plan is not None:
+            video_bundle = self._video_bundle(video_plan)
+            result.update(
+                {
+                    "realVideoPlan": video_bundle["realVideoPlan"],
+                    "videoGenerationRequests": video_bundle[
+                        "generationRequests"
+                    ],
+                    "state": video_bundle["state"],
+                }
+            )
+        return result

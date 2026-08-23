@@ -1,6 +1,6 @@
 # ADR-0012 — K2 Internal Image-First Real-Media Revision
 
-- Status: `ACCEPTED / M10 COMPLETE / EXACT FOUR-IMAGE ADMISSION HOST-PASSED / REAL_IMAGE_READY / M11 NEXT`
+- Status: `ACCEPTED / M10 COMPLETE / REAL_IMAGE_READY / M11 VIDEO PLAN HOST-PASSED / CANONICAL EXECUTION PENDING`
 - Date: `2026-08-23`
 - Decision owner: Project Lead / Architecture Owner `蔺鹏`
 - Required base: `1650c3462b32899151cdba795ddc10e5171ff1da`
@@ -64,3 +64,8 @@ M10 live capability and four-candidate execution have passed on the current A100
 host. Exact selection/admission is CPU and persistence work; it does not require
 ComfyUI or a running GPU process. M11 planning may begin only after the four exact
 selections have produced four immutable image AssetVersions.
+
+M11 planning is a separate append-only gate. It revalidates those exact admitted
+bytes, binds one image AssetVersion to each current CreativeShotVersion, fixes the
+four canonical frame counts and bounded A100 profile, and stops before GPU dispatch
+or video selection.

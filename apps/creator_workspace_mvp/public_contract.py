@@ -120,6 +120,7 @@ CAPABILITY_PROJECTION: Final = (
             "episode-production-runs/production-readiness",
             "episode-production-runs/provider-experiments",
             "episode-production-runs/media",
+            "episode-production-runs/real-video-revision",
         ],
         "requirements": ["M10", "rights_manifest", "live_video_provider"],
     },

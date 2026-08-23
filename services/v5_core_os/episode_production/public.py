@@ -250,6 +250,9 @@ class EpisodeProductionPublicBoundary:
             self.__real_media_revision.select_and_admit_images, command
         )
 
+    def plan_real_videos(self, command: Mapping[str, Any]) -> dict[str, Any]:
+        return self._invoke(self.__real_media_revision.plan_videos, command)
+
     def get_real_media_revision(
         self, workspace_ref: str, run_ref: str
     ) -> dict[str, Any]:

@@ -10,7 +10,7 @@
 >
 > Current Task: `ACS-K2-INTERNAL-IMAGE-FIRST-REAL-MEDIA-REVISION`
 >
-> Current Work Package: `G2→G6 COMPLETE / P1 HOST-PASSED / M10 COMPLETE / FOUR EXACT IMAGE SELECTIONS ADMITTED / REAL_IMAGE_READY / M11 PLAN NEXT`
+> Current Work Package: `G2→G6 COMPLETE / P1 HOST-PASSED / M10 COMPLETE / REAL_IMAGE_READY / M11 VIDEO PLAN HOST-PASSED / CANONICAL EXECUTION PENDING`
 >
 > M6 Authorization: `ACCEPTED SURFACES + K2 EXTERNAL AUTHORITY CONNECTION / NO M6 SCHEMA EXPANSION`
 >
@@ -1355,3 +1355,23 @@ latest state `REAL_IMAGE_READY`, a clean Core worktree, closed ports 8765/8188 a
 zero GPU utilization/memory use. The next connected work is M11 request derivation
 from these four exact image AssetVersions; it must not regenerate M10 or create a
 parallel asset stack.
+
+### M11 exact video-plan implementation host-passed — 2026-08-23
+
+The current CPU-only work package adds one connected
+`real-video-revision` Public API command and `M11_REAL_VIDEO_PLAN` gate. It:
+
+- requires the same run to be exactly `REAL_IMAGE_READY`;
+- revalidates all four admitted M10 lineages and selected PNG bytes;
+- binds one exact image AssetVersion ref/digest/content digest to each current shot;
+- derives four video requests with `168 / 168 / 192 / 192` frames at 24 fps;
+- fixes the first bounded A100/5B profile to 640×352, 20 steps,
+  `uni_pc/simple`, CFG 5.0 and model shift 8.0;
+- keeps Rights/Provider/Budget external authorities out of this exact internal
+  self-hosted non-publishing path;
+- stops at `REAL_VIDEO_PLAN_READY` with zero video candidates, zero video selection
+  decisions, zero video AssetVersions and `publicationAllowed=false`.
+
+The host-focused unit set passed 11/11, the connected Creator Public HTTP test
+passed 1/1, and the full Core regression passed 642/642. Canonical M11 plan
+execution remains pending. ComfyUI remains stopped during this plan-only work.
