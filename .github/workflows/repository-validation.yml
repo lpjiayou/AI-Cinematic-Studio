@@ -1,0 +1,316 @@
+name: Repository Validation
+
+on:
+  pull_request:
+    branches:
+      - main
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: repository-validation-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  markdown:
+    name: Markdown
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Validate tracked Markdown files
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import re
+          import subprocess
+
+          files = [
+              Path(path)
+              for path in subprocess.check_output(
+                  ["git", "ls-files", "--", "*.md"],
+                  text=True,
+              ).splitlines()
+          ]
+          errors: list[str] = []
+
+          if not files:
+              errors.append("No tracked Markdown files were found.")
+
+          for path in files:
+              try:
+                  text = path.read_text(encoding="utf-8")
+              except UnicodeDecodeError as error:
+                  errors.append(f"{path}: invalid UTF-8 ({error})")
+                  continue
+
+              if not text.strip():
+                  errors.append(f"{path}: file is empty")
+              if "\ufffd" in text:
+                  errors.append(f"{path}: contains the Unicode replacement character")
+              if not re.search(r"(?m)^#\s+\S", text):
+                  errors.append(f"{path}: missing a level-one heading")
+
+              open_fence: tuple[str, int, int] | None = None
+              for line_number, line in enumerate(text.splitlines(), start=1):
+                  match = re.match(r"^ {0,3}(`{3,}|~{3,})", line)
+                  if not match:
+                      continue
+                  marker = match.group(1)
+                  if open_fence is None:
+                      open_fence = (marker[0], len(marker), line_number)
+                  elif marker[0] == open_fence[0] and len(marker) >= open_fence[1]:
+                      open_fence = None
+
+              if open_fence is not None:
+                  errors.append(
+                      f"{path}:{open_fence[2]}: unclosed {open_fence[0] * open_fence[1]} fence"
+                  )
+
+          if errors:
+              print("Markdown validation failed:")
+              print("\n".join(f"- {error}" for error in errors))
+              raise SystemExit(1)
+
+          print(f"Validated {len(files)} tracked Markdown files.")
+          PY
+
+  documentation-links:
+    name: Documentation Links
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Validate local documentation links
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path, PurePosixPath
+          import posixpath
+          import re
+          import subprocess
+          from urllib.parse import unquote, urlsplit
+
+          tracked_files = set(
+              subprocess.check_output(
+                  ["git", "ls-files"],
+                  text=True,
+              ).splitlines()
+          )
+          tracked_targets = set(tracked_files)
+          for tracked_file in tracked_files:
+              parent = PurePosixPath(tracked_file).parent
+              while parent.as_posix() != ".":
+                  tracked_targets.add(parent.as_posix())
+                  parent = parent.parent
+
+          files = [Path(path) for path in sorted(tracked_files) if path.endswith(".md")]
+          inline_link = re.compile(r"!?\[[^\]]*\]\(([^)]+)\)")
+          reference_link = re.compile(r"^\s*\[[^\]]+\]:\s*(\S+)")
+          fence = re.compile(r"^ {0,3}(`{3,}|~{3,})")
+          errors: list[str] = []
+          checked = 0
+
+          for source in files:
+              in_fence: tuple[str, int] | None = None
+              for line_number, line in enumerate(
+                  source.read_text(encoding="utf-8").splitlines(),
+                  start=1,
+              ):
+                  fence_match = fence.match(line)
+                  if fence_match:
+                      marker = fence_match.group(1)
+                      if in_fence is None:
+                          in_fence = (marker[0], len(marker))
+                      elif marker[0] == in_fence[0] and len(marker) >= in_fence[1]:
+                          in_fence = None
+                      continue
+                  if in_fence is not None:
+                      continue
+
+                  targets = inline_link.findall(line)
+                  reference_match = reference_link.match(line)
+                  if reference_match:
+                      targets.append(reference_match.group(1))
+
+                  for raw_target in targets:
+                      target = raw_target.strip()
+                      if target.startswith("<") and ">" in target:
+                          target = target[1 : target.index(">")]
+                      else:
+                          target = target.split(maxsplit=1)[0]
+
+                      parsed = urlsplit(target)
+                      if not parsed.path or parsed.scheme:
+                          continue
+
+                      decoded_path = unquote(parsed.path).replace("\\", "/")
+                      source_parent = PurePosixPath(source.as_posix()).parent.as_posix()
+                      if decoded_path.startswith("/"):
+                          destination = posixpath.normpath(decoded_path.lstrip("/"))
+                      else:
+                          destination = posixpath.normpath(
+                              posixpath.join(source_parent, decoded_path)
+                          )
+
+                      if destination == ".." or destination.startswith("../"):
+                          errors.append(
+                              f"{source}:{line_number}: local target escapes the repository {target!r}"
+                          )
+                          continue
+
+                      checked += 1
+                      if destination not in tracked_targets:
+                          errors.append(
+                              f"{source}:{line_number}: missing tracked local target {target!r}"
+                          )
+
+          if errors:
+              print("Documentation link validation failed:")
+              print("\n".join(f"- {error}" for error in errors))
+              raise SystemExit(1)
+
+          print(f"Validated {checked} local documentation links across {len(files)} files.")
+          PY
+
+  unit-tests:
+    name: Unit Tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install deterministic media runtime
+        shell: bash
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes ffmpeg
+          ffmpeg -version
+          ffprobe -version
+
+      - name: Run unit tests
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import unittest
+
+          start_directory = Path("tests/unit")
+          if not start_directory.is_dir():
+              raise SystemExit("tests/unit does not exist in the repository checkout.")
+
+          suite = unittest.defaultTestLoader.discover(
+              str(start_directory),
+              pattern="test_*.py",
+          )
+          count = suite.countTestCases()
+          if count == 0:
+              raise SystemExit("No unit tests were discovered; validation cannot pass.")
+
+          print(f"Discovered {count} unit tests.")
+          result = unittest.TextTestRunner(verbosity=2).run(suite)
+          raise SystemExit(0 if result.wasSuccessful() else 1)
+          PY
+
+  contract-tests:
+    name: Contract Tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Run contract tests
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import unittest
+
+          start_directory = Path("tests/contract")
+          if not start_directory.is_dir():
+              raise SystemExit("tests/contract does not exist in the repository checkout.")
+
+          suite = unittest.defaultTestLoader.discover(
+              str(start_directory),
+              pattern="test_*.py",
+          )
+          count = suite.countTestCases()
+          if count == 0:
+              raise SystemExit("No contract tests were discovered; validation cannot pass.")
+
+          print(f"Discovered {count} contract tests.")
+          result = unittest.TextTestRunner(verbosity=2).run(suite)
+          raise SystemExit(0 if result.wasSuccessful() else 1)
+          PY
+
+  integration-tests:
+    name: Integration Tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install deterministic media runtime
+        shell: bash
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes ffmpeg
+          ffmpeg -version
+          ffprobe -version
+
+      - name: Run integration tests
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import unittest
+
+          start_directory = Path("tests/integration")
+          if not start_directory.is_dir():
+              raise SystemExit("tests/integration does not exist in the repository checkout.")
+
+          suite = unittest.defaultTestLoader.discover(
+              str(start_directory),
+              pattern="test_*.py",
+          )
+          count = suite.countTestCases()
+          if count == 0:
+              raise SystemExit("No integration tests were discovered; validation cannot pass.")
+
+          print(f"Discovered {count} integration tests.")
+          result = unittest.TextTestRunner(verbosity=2).run(suite)
+          raise SystemExit(0 if result.wasSuccessful() else 1)
+          PY

@@ -1,0 +1,197 @@
+{
+  "configVersion": "1.0",
+  "experimentId": "acs-ccv-r1",
+  "roundId": "round-3",
+  "evidenceStatus": "PENDING_EXTERNAL_EVIDENCE",
+  "rightsLabels": [
+    "SYNTHETIC_TEST_ONLY",
+    "NOT_FOR_PRODUCTION"
+  ],
+  "globalParameters": {
+    "positivePrompt": "a young woman, 20 years old, long straight black hair, brown eyes, red leather jacket, white t-shirt, blue jeans",
+    "negativePrompt": "lowres, bad anatomy, bad hands, blurry, watermark, text, deformed face",
+    "width": 1024,
+    "height": 1024,
+    "steps": 25,
+    "cfg": 7.0,
+    "sampler": "dpmpp_2m",
+    "scheduler": "karras",
+    "identityMethod": "ipadapter-plus-face",
+    "ipAdapterPreset": "PLUS FACE (portraits)",
+    "ipAdapterWeight": 0.6,
+    "poseControl": "controlnet-openpose-sdxl"
+  },
+  "shots": [
+    {
+      "shotId": "01_medium_front",
+      "description": "medium shot, standing, facing camera, neutral background"
+    },
+    {
+      "shotId": "02_closeup_side",
+      "description": "close-up portrait, side profile view, soft lighting"
+    },
+    {
+      "shotId": "03_full_walking",
+      "description": "full body shot, walking on a street, wide angle"
+    },
+    {
+      "shotId": "04_back_turning",
+      "description": "from behind, turning head back over shoulder"
+    },
+    {
+      "shotId": "05_sitting_high",
+      "description": "sitting on a chair, high angle shot, looking up"
+    }
+  ],
+  "models": [
+    {
+      "role": "base",
+      "logicalName": "sd_xl_base_1.0.safetensors",
+      "filePath": null,
+      "sizeBytes": null,
+      "sha256": null,
+      "modelFamily": "sdxl",
+      "conditioningDimension": 2048,
+      "source": "PENDING_COLLECTION_FROM_EXTERNAL_GPU",
+      "licenseStatus": "PENDING_VERIFICATION"
+    },
+    {
+      "role": "identity_adapter",
+      "logicalName": "ip-adapter-plus-face_sdxl_vit-h.safetensors",
+      "filePath": null,
+      "sizeBytes": null,
+      "sha256": null,
+      "modelFamily": "sdxl",
+      "conditioningDimension": 2048,
+      "source": "PENDING_COLLECTION_FROM_EXTERNAL_GPU",
+      "licenseStatus": "PENDING_VERIFICATION"
+    },
+    {
+      "role": "image_encoder",
+      "logicalName": "CLIP-ViT-H-14-laion2B-s32B-b79K.safetensors",
+      "filePath": null,
+      "sizeBytes": null,
+      "sha256": null,
+      "modelFamily": "clip-vit-h",
+      "conditioningDimension": 1024,
+      "source": "PENDING_COLLECTION_FROM_EXTERNAL_GPU",
+      "licenseStatus": "PENDING_VERIFICATION"
+    },
+    {
+      "role": "pose_control",
+      "logicalName": "controlnet-openpose-sdxl.safetensors",
+      "filePath": null,
+      "sizeBytes": null,
+      "sha256": null,
+      "modelFamily": "sdxl",
+      "conditioningDimension": 2048,
+      "source": "PENDING_COLLECTION_FROM_EXTERNAL_GPU",
+      "licenseStatus": "PENDING_VERIFICATION"
+    }
+  ],
+  "artifacts": [
+    {
+      "role": "comfyui_workflow",
+      "logicalName": "round-3.api.json",
+      "filePath": null,
+      "sizeBytes": null,
+      "sha256": null
+    },
+    {
+      "role": "face_crop_reference",
+      "logicalName": "consistency_fixed_01_medium_front_face_crop.png",
+      "filePath": null,
+      "sizeBytes": null,
+      "sha256": null
+    },
+    {
+      "role": "pose_skeleton",
+      "logicalName": "01_medium_front_coco18.png",
+      "filePath": null,
+      "sizeBytes": null,
+      "sha256": null
+    },
+    {
+      "role": "pose_skeleton",
+      "logicalName": "02_closeup_side_coco18.png",
+      "filePath": null,
+      "sizeBytes": null,
+      "sha256": null
+    },
+    {
+      "role": "pose_skeleton",
+      "logicalName": "03_full_walking_coco18.png",
+      "filePath": null,
+      "sizeBytes": null,
+      "sha256": null
+    },
+    {
+      "role": "pose_skeleton",
+      "logicalName": "04_back_turning_coco18.png",
+      "filePath": null,
+      "sizeBytes": null,
+      "sha256": null
+    },
+    {
+      "role": "pose_skeleton",
+      "logicalName": "05_sitting_high_coco18.png",
+      "filePath": null,
+      "sizeBytes": null,
+      "sha256": null
+    },
+    {
+      "role": "historical_run_log",
+      "logicalName": "round-3.log",
+      "filePath": null,
+      "sizeBytes": null,
+      "sha256": null
+    }
+  ],
+  "environment": {
+    "hardware": "NVIDIA A100-PCIE-40GB",
+    "cuda": "12.6",
+    "python": "3.12.7",
+    "pytorch": "2.13.0+cu126",
+    "comfyuiVersionReported": "0.28.0",
+    "comfyuiCommit": null,
+    "customNodes": [
+      {
+        "name": "ComfyUI_IPAdapter_plus",
+        "commit": null
+      }
+    ],
+    "driver": "560.35.03",
+    "collectionState": "PENDING_EXACT_EXTERNAL_EVIDENCE"
+  },
+  "matrices": [
+    {
+      "batchId": "r3-face-pose",
+      "axes": {
+        "controlNetStrength": [0.6, 0.8, 1.0],
+        "shotId": [
+          "01_medium_front",
+          "02_closeup_side",
+          "03_full_walking",
+          "04_back_turning",
+          "05_sitting_high"
+        ]
+      },
+      "fixedParameters": {
+        "seed": null,
+        "seedMode": "fixed-pending-collection",
+        "referenceRole": "face_crop_reference",
+        "poseSkeletonFormat": "COCO-18"
+      },
+      "perShotParameters": {
+        "poseSkeletonLogicalName": {
+          "01_medium_front": "01_medium_front_coco18.png",
+          "02_closeup_side": "02_closeup_side_coco18.png",
+          "03_full_walking": "03_full_walking_coco18.png",
+          "04_back_turning": "04_back_turning_coco18.png",
+          "05_sitting_high": "05_sitting_high_coco18.png"
+        }
+      },
+      "outputPattern": "outputs/r3-face-pose/cn{controlNetStrength}/{shotId}.png"
+    }
+  ]
+}

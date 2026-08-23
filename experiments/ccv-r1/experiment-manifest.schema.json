@@ -1,0 +1,423 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ai-cinematic-studio.local/schemas/ccv-r1-experiment-manifest.schema.json",
+  "title": "ACS CCV-R1 Experiment Evidence Manifest",
+  "description": "EXPERIMENT EVIDENCE / NOT PRODUCTION CODE / NOT A MILESTONE DELIVERABLE / SYNTHETIC_TEST_ONLY / NOT FOR PRODUCTION",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "manifestVersion",
+    "experimentId",
+    "roundId",
+    "status",
+    "rightsLabels",
+    "historicalExecutionDate",
+    "manifestCreatedAt",
+    "historicalScriptBytesRecovered",
+    "hardenedSuccessorScripts",
+    "environment",
+    "models",
+    "artifacts",
+    "expectedRunCount",
+    "runs",
+    "claims"
+  ],
+  "properties": {
+    "$schema": {
+      "type": "string"
+    },
+    "manifestVersion": {
+      "const": "1.0"
+    },
+    "experimentId": {
+      "const": "acs-ccv-r1"
+    },
+    "roundId": {
+      "enum": ["round-1", "round-2", "round-3", "all-rounds"]
+    },
+    "status": {
+      "enum": [
+        "EXPERIMENT_REPORTED_INDEPENDENT_REPRODUCTION_NOT_POSSIBLE",
+        "EVIDENCE_CAPTURED_NOT_VALIDATION_ACCEPTED"
+      ]
+    },
+    "rightsLabels": {
+      "const": ["SYNTHETIC_TEST_ONLY", "NOT_FOR_PRODUCTION"]
+    },
+    "historicalExecutionDate": {
+      "const": "2026-08-14"
+    },
+    "manifestCreatedAt": {
+      "type": ["string", "null"],
+      "format": "date-time"
+    },
+    "historicalScriptBytesRecovered": {
+      "type": "boolean"
+    },
+    "hardenedSuccessorScripts": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/fileEvidence"
+      }
+    },
+    "environment": {
+      "type": "object"
+    },
+    "models": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/fileEvidence"
+      }
+    },
+    "artifacts": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/fileEvidence"
+      }
+    },
+    "expectedRunCount": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "runs": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/runEvidence"
+      }
+    },
+    "claims": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["validationAccepted", "independentReproductionPossible", "schemaChangeAuthorized"],
+      "properties": {
+        "validationAccepted": {
+          "const": false
+        },
+        "independentReproductionPossible": {
+          "const": false
+        },
+        "schemaChangeAuthorized": {
+          "const": false
+        }
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "status": {
+            "const": "EVIDENCE_CAPTURED_NOT_VALIDATION_ACCEPTED"
+          }
+        },
+        "required": ["status"]
+      },
+      "then": {
+        "properties": {
+          "manifestCreatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "hardenedSuccessorScripts": {
+            "items": {
+              "$ref": "#/$defs/finalizedDigestEvidence"
+            }
+          },
+          "models": {
+            "items": {
+              "$ref": "#/$defs/finalizedModelEvidence"
+            }
+          },
+          "artifacts": {
+            "items": {
+              "$ref": "#/$defs/finalizedFileEvidence"
+            }
+          },
+          "runs": {
+            "items": {
+              "$ref": "#/$defs/finalizedRunEvidence"
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {"roundId": {"const": "round-1"}},
+        "required": ["roundId"]
+      },
+      "then": {
+        "properties": {
+          "expectedRunCount": {"const": 10},
+          "runs": {"minItems": 10, "maxItems": 10}
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {"roundId": {"const": "round-2"}},
+        "required": ["roundId"]
+      },
+      "then": {
+        "properties": {
+          "expectedRunCount": {"const": 25},
+          "runs": {"minItems": 25, "maxItems": 25}
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {"roundId": {"const": "round-3"}},
+        "required": ["roundId"]
+      },
+      "then": {
+        "properties": {
+          "expectedRunCount": {"const": 15},
+          "runs": {"minItems": 15, "maxItems": 15}
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {"roundId": {"const": "all-rounds"}},
+        "required": ["roundId"]
+      },
+      "then": {
+        "properties": {
+          "expectedRunCount": {"const": 50},
+          "runs": {"minItems": 50, "maxItems": 50}
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "sha256": {
+      "type": ["string", "null"],
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "finalSha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "architectureEvidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "format",
+        "modelSha256",
+        "headerSha256",
+        "conditioningDimension",
+        "evidenceTensorKeys"
+      ],
+      "properties": {
+        "format": {"const": "safetensors"},
+        "modelSha256": {"$ref": "#/$defs/finalSha256"},
+        "headerSha256": {"$ref": "#/$defs/finalSha256"},
+        "conditioningDimension": {"enum": [768, 2048]},
+        "evidenceTensorKeys": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {"type": "string", "minLength": 1}
+        }
+      }
+    },
+    "fileEvidence": {
+      "type": "object",
+      "required": ["role", "logicalName", "sizeBytes", "sha256"],
+      "properties": {
+        "role": {
+          "type": "string",
+          "minLength": 1
+        },
+        "logicalName": {
+          "type": "string",
+          "minLength": 1
+        },
+        "filePath": {
+          "type": ["string", "null"]
+        },
+        "sizeBytes": {
+          "type": ["integer", "null"],
+          "minimum": 1
+        },
+        "sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "modelFamily": {
+          "type": "string"
+        },
+        "conditioningDimension": {
+          "type": "integer"
+        },
+        "source": {
+          "type": "string"
+        },
+        "licenseStatus": {
+          "type": "string"
+        },
+        "architectureEvidence": {
+          "$ref": "#/$defs/architectureEvidence"
+        }
+      },
+      "additionalProperties": true
+    },
+    "finalizedDigestEvidence": {
+      "allOf": [
+        {"$ref": "#/$defs/fileEvidence"},
+        {
+          "properties": {
+            "sizeBytes": {"type": "integer", "minimum": 1},
+            "sha256": {"$ref": "#/$defs/finalSha256"}
+          }
+        }
+      ]
+    },
+    "finalizedFileEvidence": {
+      "allOf": [
+        {"$ref": "#/$defs/finalizedDigestEvidence"},
+        {
+          "required": ["filePath"],
+          "properties": {
+            "filePath": {"type": "string", "minLength": 1}
+          }
+        }
+      ]
+    },
+    "finalizedModelEvidence": {
+      "allOf": [
+        {"$ref": "#/$defs/finalizedFileEvidence"},
+        {
+          "if": {
+            "properties": {
+              "role": {"enum": ["base", "identity_adapter", "pose_control"]}
+            },
+            "required": ["role"]
+          },
+          "then": {
+            "required": ["architectureEvidence"]
+          }
+        }
+      ]
+    },
+    "runEvidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "runId",
+        "roundId",
+        "batchId",
+        "shotId",
+        "parameters",
+        "output",
+        "runState",
+        "failure",
+        "retryOfRunId",
+        "excluded",
+        "exclusionReason"
+      ],
+      "properties": {
+        "runId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "roundId": {
+          "enum": ["round-1", "round-2", "round-3"]
+        },
+        "batchId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "shotId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "parameters": {
+          "type": "object",
+          "required": [
+            "positivePrompt",
+            "negativePrompt",
+            "width",
+            "height",
+            "steps",
+            "cfg",
+            "sampler",
+            "scheduler",
+            "seed"
+          ],
+          "properties": {
+            "positivePrompt": {"type": "string"},
+            "negativePrompt": {"type": "string"},
+            "width": {"type": "integer", "minimum": 1},
+            "height": {"type": "integer", "minimum": 1},
+            "steps": {"type": "integer", "minimum": 1},
+            "cfg": {"type": "number", "exclusiveMinimum": 0},
+            "sampler": {"type": "string", "minLength": 1},
+            "scheduler": {"type": "string", "minLength": 1},
+            "seed": {"type": ["integer", "null"], "minimum": 0}
+          }
+        },
+        "output": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["logicalPath", "sizeBytes", "sha256"],
+          "properties": {
+            "logicalPath": {
+              "type": "string",
+              "pattern": "^[^/].*\\.png$"
+            },
+            "sizeBytes": {
+              "type": ["integer", "null"],
+              "minimum": 1
+            },
+            "sha256": {
+              "$ref": "#/$defs/sha256"
+            }
+          }
+        },
+        "runState": {
+          "enum": ["PENDING_EXTERNAL_EVIDENCE", "CAPTURED", "FAILED", "EXCLUDED"]
+        },
+        "failure": {
+          "type": ["object", "null"]
+        },
+        "retryOfRunId": {
+          "type": ["string", "null"]
+        },
+        "excluded": {
+          "type": "boolean"
+        },
+        "exclusionReason": {
+          "type": ["string", "null"]
+        }
+      }
+    },
+    "finalizedRunEvidence": {
+      "allOf": [
+        {"$ref": "#/$defs/runEvidence"},
+        {
+          "properties": {
+            "parameters": {
+              "properties": {
+                "seed": {"type": "integer", "minimum": 0}
+              }
+            },
+            "output": {
+              "properties": {
+                "sizeBytes": {"type": "integer", "minimum": 1},
+                "sha256": {"$ref": "#/$defs/finalSha256"}
+              }
+            },
+            "runState": {"const": "CAPTURED"},
+            "failure": {"type": "null"},
+            "excluded": {"const": false},
+            "exclusionReason": {"type": "null"}
+          }
+        }
+      ]
+    }
+  }
+}

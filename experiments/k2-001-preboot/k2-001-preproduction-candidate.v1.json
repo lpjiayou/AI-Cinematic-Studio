@@ -1,0 +1,446 @@
+{
+  "schemaVersion": "k2.preboot-candidate.v1",
+  "packageId": "k2-001-preboot-v1",
+  "truthBoundary": {
+    "classification": "DRAFT_CANDIDATE_NOT_DOMAIN_FACT",
+    "domainFact": false,
+    "publicationAllowed": false,
+    "spendingAuthorized": false,
+    "currentGate": "P1_NOT_PASSED",
+    "nextGateAllowed": false
+  },
+  "budget": {
+    "currency": "CNY",
+    "hardCapMinor": 100000,
+    "committedSpendMinor": 0,
+    "allocationState": "UNALLOCATED_PENDING_PROVIDER_QUOTES",
+    "paidCallsAllowedNow": false
+  },
+  "episodeDesign": {
+    "designKey": "K2-001",
+    "title": "记忆回声",
+    "sourceClassification": "CURRENT_K2_LOCAL_EVIDENCE_BASELINE",
+    "targetDurationSec": 30,
+    "frameRate": 24,
+    "totalFrames": 720,
+    "aspectRatio": "16:9",
+    "sceneCount": 2,
+    "shotCount": 4
+  },
+  "technicalEvidence": {
+    "attestationRef": "technical-k2-funhpc-a100-20260821T130634Z",
+    "attestationPayloadDigest": "be03a079d17cad524b5e2e061e0c651a8f41f6f5221dfe80a8244398817ded53",
+    "authorityState": "TECHNICAL_EVIDENCE_ONLY",
+    "providerAuthorityAccepted": false,
+    "publicationAllowed": false
+  },
+  "models": [
+    {
+      "role": "UNET",
+      "name": "wan2.2_ti2v_5B_fp16.safetensors",
+      "sha256": "456f901338bd9eadbded3828b819109a9b68e8a525ca5cf8d0049a69fcfeca1e"
+    },
+    {
+      "role": "TEXT_ENCODER",
+      "name": "umt5_xxl_fp8_e4m3fn_scaled.safetensors",
+      "sha256": "c3355d30191f1f066b26d93fba017ae9809dce6c627dda5f6a66eaa651204f68"
+    },
+    {
+      "role": "VAE",
+      "name": "wan2.2_vae.safetensors",
+      "sha256": "e40321bd36b9709991dae2530eb4ac303dd168276980d3e9bc4b6e2b75fed156"
+    }
+  ],
+  "authorityInputs": {
+    "rightsBundle": "MISSING_EXTERNAL_FACT",
+    "providerBundle": "MISSING_EXTERNAL_FACT",
+    "budgetAuthorityRef": "MISSING_EXTERNAL_FACT",
+    "runtimeCredential": "NOT_STORED_IN_PACKAGE"
+  },
+  "characters": [
+    {
+      "characterKey": "character-lin",
+      "name": "林澈",
+      "designStatus": "DRAFT_CANDIDATE_NOT_IDENTITY_AUTHORITY",
+      "visualAnchors": [
+        "黑色短发，轮廓利落",
+        "深炭色功能风衣，低反光面料",
+        "右袖银灰粉尘为跨镜固定识别点",
+        "克制而敏锐的观察姿态",
+        "冷蓝环境光下保留自然肤色"
+      ],
+      "forbiddenDrift": [
+        "不得改变发色与短发长度",
+        "不得把右袖粉尘移动到左袖",
+        "不得添加高饱和装饰或品牌标志",
+        "不得在同一场景改变风衣版型"
+      ],
+      "requiredViews": [
+        "front-full",
+        "front-close",
+        "three-quarter-left",
+        "profile-left",
+        "profile-right",
+        "rear-three-quarter",
+        "rear-full",
+        "expression-sheet"
+      ]
+    },
+    {
+      "characterKey": "character-gu",
+      "name": "顾言",
+      "designStatus": "DRAFT_CANDIDATE_NOT_IDENTITY_AUTHORITY",
+      "visualAnchors": [
+        "灰白短发，发际与轮廓固定",
+        "深灰监察制服，结构简洁",
+        "胸前琥珀色身份灯为跨镜固定识别点",
+        "审慎内敛、动作果断",
+        "冷蓝环境光与琥珀身份灯形成双色关系"
+      ],
+      "forbiddenDrift": [
+        "不得改变灰白发色",
+        "不得移动或删除胸前身份灯",
+        "不得把监察制服改成军装或礼服",
+        "不得在同一场景改变制服灰阶"
+      ],
+      "requiredViews": [
+        "front-full",
+        "front-close",
+        "three-quarter-left",
+        "profile-left",
+        "profile-right",
+        "rear-three-quarter",
+        "rear-full",
+        "expression-sheet"
+      ]
+    }
+  ],
+  "shots": [
+    {
+      "shotKey": "K2-001-SH-010",
+      "sceneNumber": 1,
+      "globalOrder": 1,
+      "startFrame": 0,
+      "durationFrames": 168,
+      "frameRate": 24,
+      "cameraBaseline": {
+        "shotSize": "wide",
+        "movement": "slow-dolly-in",
+        "angle": "eye-level",
+        "lensMm": 28,
+        "intent": "establish-space-and-character-blocking"
+      },
+      "storyBeatCandidate": "雨夜的中央记忆档案城校验台被冷蓝光切开；林澈把异常记忆片放入读槽，顾言封锁外部检索并说出共同规则。",
+      "dialoguePlan": {
+        "speaker": "顾言",
+        "transcript": "从现在起，只相信我们亲眼看到的。",
+        "emotion": "克制",
+        "sourceStatus": "CURRENT_SCRIPT_CANDIDATE",
+        "estimatedStartSec": 2.2
+      },
+      "imagePreflight": {
+        "purpose": "校验台双人站位、服装与光色参考",
+        "requiredCharacterViews": [
+          "front-full",
+          "three-quarter-left"
+        ],
+        "targetWidth": 1024,
+        "targetHeight": 1024,
+        "adapterState": "DESIGN_ONLY_ADAPTER_NOT_SELECTED",
+        "outputAdmitted": false
+      },
+      "videoExperimentDraft": {
+        "modelId": "wan2.2-ti2v-5b-fp16",
+        "profileId": "k2.wan22-ti2v.p1-smoke.v1",
+        "smokeFrames": 49,
+        "width": 640,
+        "height": 352,
+        "frameRate": 24,
+        "promptDraft": "cinematic science-fiction archive interior at rainy night, wide eye-level 28mm slow dolly in, Lin Che in a dark charcoal functional coat inserts a translucent memory chip into an amber validation console, silver-gray dust fixed on the right sleeve, Gu Yan in a dark gray inspector uniform locks the retrieval channel, gray-white short hair and a small amber identity light, cold blue environment with restrained amber practical light, realistic material response, consistent faces and wardrobe",
+        "negativePromptDraft": "identity drift, face swap, hair color change, missing right-sleeve dust, missing amber identity light, extra fingers, duplicate person, wardrobe change, logo, text, watermark, oversaturated neon, unstable geometry, abrupt camera motion",
+        "seedResolution": "DERIVE_FROM_CURRENT_GENERATION_REQUEST_DIGEST_AT_RUNTIME",
+        "dispatchState": "DESIGN_ONLY_NO_DISPATCH",
+        "outputAdmitted": false
+      },
+      "audioExperimentDraft": {
+        "mode": "TEXT_ONLY_NEUTRAL_TTS_PLAN",
+        "dialogueTranscript": "从现在起，只相信我们亲眼看到的。",
+        "voiceProfile": "顾言候选：低声、清晰、克制的中性合成声，不模仿任何真人",
+        "voiceCloning": false,
+        "externalAudioRef": null,
+        "musicMode": "NONE_FOR_P1",
+        "ambienceCandidate": "内部低频设备底噪、远处雨声与一次检索锁定提示音；全部待内部合成或权利核验",
+        "sampleRate": 48000,
+        "channels": 2,
+        "adapterState": "DESIGN_ONLY_ADAPTER_NOT_SELECTED",
+        "outputAdmitted": false
+      },
+      "continuityCandidate": [
+        "林澈右袖银灰粉尘位置固定",
+        "顾言胸前琥珀身份灯常亮",
+        "记忆片编号与插入方向跨镜一致",
+        "冷蓝主光与琥珀实景光比例保持稳定"
+      ],
+      "candidateStatus": "DRAFT_NOT_CONFIRMED"
+    },
+    {
+      "shotKey": "K2-001-SH-020",
+      "sceneNumber": 1,
+      "globalOrder": 2,
+      "startFrame": 168,
+      "durationFrames": 168,
+      "frameRate": 24,
+      "cameraBaseline": {
+        "shotSize": "medium-close-up",
+        "movement": "locked-off",
+        "angle": "eye-level",
+        "lensMm": 50,
+        "intent": "hold-performance-and-story-turn"
+      },
+      "storyBeatCandidate": "校验台投出一帧被抹除的童年影像；两人的目光从屏幕交汇到记忆片，系统警示在背景熄灭。",
+      "dialoguePlan": {
+        "speaker": null,
+        "transcript": "",
+        "emotion": "NONE",
+        "sourceStatus": "CURRENT_SCRIPT_CANDIDATE",
+        "estimatedStartSec": 0
+      },
+      "imagePreflight": {
+        "purpose": "双人反应、面部比例与眼线连续参考",
+        "requiredCharacterViews": [
+          "front-close",
+          "profile-left"
+        ],
+        "targetWidth": 1024,
+        "targetHeight": 1024,
+        "adapterState": "DESIGN_ONLY_ADAPTER_NOT_SELECTED",
+        "outputAdmitted": false
+      },
+      "videoExperimentDraft": {
+        "modelId": "wan2.2-ti2v-5b-fp16",
+        "profileId": "k2.wan22-ti2v.p1-smoke.v1",
+        "smokeFrames": 49,
+        "width": 640,
+        "height": 352,
+        "frameRate": 24,
+        "promptDraft": "cinematic medium close-up at eye level, locked 50mm camera, Lin Che and Gu Yan react to a fragmented childhood image projected by an amber validation console, restrained micro-expressions and precise eyelines, Lin Che black short hair and right-sleeve silver dust, Gu Yan gray-white short hair and chest amber identity light, cold blue archive atmosphere, realistic skin and fabric, stable two-character identity",
+        "negativePromptDraft": "identity drift, face swap, changed hairstyle, missing sleeve dust, missing identity light, exaggerated emotion, extra limbs, merged faces, floating objects, camera shake, logo, text, watermark, oversaturated colors",
+        "seedResolution": "DERIVE_FROM_CURRENT_GENERATION_REQUEST_DIGEST_AT_RUNTIME",
+        "dispatchState": "DESIGN_ONLY_NO_DISPATCH",
+        "outputAdmitted": false
+      },
+      "audioExperimentDraft": {
+        "mode": "TEXT_ONLY_NEUTRAL_TTS_PLAN",
+        "dialogueTranscript": "",
+        "voiceProfile": "无对白；保留可验证静音区，不使用任何真人声纹",
+        "voiceCloning": false,
+        "externalAudioRef": null,
+        "musicMode": "NONE_FOR_P1",
+        "ambienceCandidate": "校验台脉冲、短促系统警示后落入近静音；全部待内部合成或权利核验",
+        "sampleRate": 48000,
+        "channels": 2,
+        "adapterState": "DESIGN_ONLY_ADAPTER_NOT_SELECTED",
+        "outputAdmitted": false
+      },
+      "continuityCandidate": [
+        "承接上一镜相同站位轴线",
+        "童年影像只作为抽象光影候选，不补造人物身份事实",
+        "记忆片保持在校验台读槽内",
+        "系统警示由亮至灭，不反向跳变"
+      ],
+      "candidateStatus": "DRAFT_NOT_CONFIRMED"
+    },
+    {
+      "shotKey": "K2-001-SH-030",
+      "sceneNumber": 2,
+      "globalOrder": 3,
+      "startFrame": 336,
+      "durationFrames": 192,
+      "frameRate": 24,
+      "cameraBaseline": {
+        "shotSize": "wide",
+        "movement": "slow-dolly-in",
+        "angle": "eye-level",
+        "lensMm": 28,
+        "intent": "establish-space-and-character-blocking"
+      },
+      "storyBeatCandidate": "外环廊桥暴露在斜向雨幕中，城市档案塔在远处退入雾层；两人并肩查看被判定为不存在的影像，林澈确认删除并未消除痕迹。",
+      "dialoguePlan": {
+        "speaker": "林澈",
+        "transcript": "它被删掉了，但没有消失。",
+        "emotion": "坚定",
+        "sourceStatus": "CURRENT_SCRIPT_CANDIDATE",
+        "estimatedStartSec": 16.8
+      },
+      "imagePreflight": {
+        "purpose": "廊桥背侧轮廓、雨向与城市尺度参考",
+        "requiredCharacterViews": [
+          "rear-three-quarter",
+          "profile-right"
+        ],
+        "targetWidth": 1024,
+        "targetHeight": 1024,
+        "adapterState": "DESIGN_ONLY_ADAPTER_NOT_SELECTED",
+        "outputAdmitted": false
+      },
+      "videoExperimentDraft": {
+        "modelId": "wan2.2-ti2v-5b-fp16",
+        "profileId": "k2.wan22-ti2v.p1-smoke.v1",
+        "smokeFrames": 49,
+        "width": 640,
+        "height": 352,
+        "frameRate": 24,
+        "promptDraft": "cinematic rainy-night outer skybridge above a monumental memory archive city, wide eye-level 28mm slow dolly in, Lin Che and Gu Yan stand side by side viewing a translucent erased childhood image, consistent dark functional coat with silver-gray dust on Lin Che right sleeve, consistent dark gray inspector uniform and amber identity light on Gu Yan, rain travels steadily from upper left to lower right, cold blue city fog, sparse amber reflections, restrained science fiction realism",
+        "negativePromptDraft": "identity drift, changed coat, missing sleeve dust, missing amber identity light, reversed rain direction, duplicate character, extra limbs, warped bridge, unstable skyline, fast camera, logo, text, watermark, oversaturated neon",
+        "seedResolution": "DERIVE_FROM_CURRENT_GENERATION_REQUEST_DIGEST_AT_RUNTIME",
+        "dispatchState": "DESIGN_ONLY_NO_DISPATCH",
+        "outputAdmitted": false
+      },
+      "audioExperimentDraft": {
+        "mode": "TEXT_ONLY_NEUTRAL_TTS_PLAN",
+        "dialogueTranscript": "它被删掉了，但没有消失。",
+        "voiceProfile": "林澈候选：低声、清晰、坚定的中性合成声，不模仿任何真人",
+        "voiceCloning": false,
+        "externalAudioRef": null,
+        "musicMode": "NONE_FOR_P1",
+        "ambienceCandidate": "持续斜向雨声、廊桥低频共振与远处城市通风声；全部待内部合成或权利核验",
+        "sampleRate": 48000,
+        "channels": 2,
+        "adapterState": "DESIGN_ONLY_ADAPTER_NOT_SELECTED",
+        "outputAdmitted": false
+      },
+      "continuityCandidate": [
+        "雨向固定为画面左上至右下",
+        "两人衣着与上一场无跳变",
+        "记忆片编号保持一致",
+        "廊桥边缘琥珀反光不替代顾言身份灯"
+      ],
+      "candidateStatus": "DRAFT_NOT_CONFIRMED"
+    },
+    {
+      "shotKey": "K2-001-SH-040",
+      "sceneNumber": 2,
+      "globalOrder": 4,
+      "startFrame": 528,
+      "durationFrames": 192,
+      "frameRate": 24,
+      "cameraBaseline": {
+        "shotSize": "medium-close-up",
+        "movement": "locked-off",
+        "angle": "eye-level",
+        "lensMm": 50,
+        "intent": "hold-performance-and-story-turn"
+      },
+      "storyBeatCandidate": "两台终端分别写入同一校验摘要；顾言先收回视线，林澈把记忆片握在掌心，最后两秒停留在琥珀摘要光与冷蓝雨幕之间。",
+      "dialoguePlan": {
+        "speaker": null,
+        "transcript": "",
+        "emotion": "NONE",
+        "sourceStatus": "CURRENT_SCRIPT_CANDIDATE",
+        "estimatedStartSec": 0
+      },
+      "imagePreflight": {
+        "purpose": "终局表演、手部道具与两秒停留构图参考",
+        "requiredCharacterViews": [
+          "front-close",
+          "expression-sheet"
+        ],
+        "targetWidth": 1024,
+        "targetHeight": 1024,
+        "adapterState": "DESIGN_ONLY_ADAPTER_NOT_SELECTED",
+        "outputAdmitted": false
+      },
+      "videoExperimentDraft": {
+        "modelId": "wan2.2-ti2v-5b-fp16",
+        "profileId": "k2.wan22-ti2v.p1-smoke.v1",
+        "smokeFrames": 49,
+        "width": 640,
+        "height": 352,
+        "frameRate": 24,
+        "promptDraft": "cinematic medium close-up on a rainy archive skybridge, locked eye-level 50mm camera, two terminals save the same amber verification digest, Gu Yan lowers his gaze while Lin Che closes one hand around the translucent memory chip, consistent faces, black short hair and right-sleeve silver dust for Lin Che, gray-white short hair and amber chest identity light for Gu Yan, cold blue rain background, controlled amber highlights, final two-second visual hold, restrained performance",
+        "negativePromptDraft": "identity drift, face swap, wrong hand count, duplicate memory chip, changed hairstyle, missing sleeve dust, missing identity light, wardrobe change, reversed rain, camera shake, logo, readable interface text, watermark, oversaturated neon",
+        "seedResolution": "DERIVE_FROM_CURRENT_GENERATION_REQUEST_DIGEST_AT_RUNTIME",
+        "dispatchState": "DESIGN_ONLY_NO_DISPATCH",
+        "outputAdmitted": false
+      },
+      "audioExperimentDraft": {
+        "mode": "TEXT_ONLY_NEUTRAL_TTS_PLAN",
+        "dialogueTranscript": "",
+        "voiceProfile": "无对白；结尾保留两秒可验证环境声，不使用任何真人声纹",
+        "voiceCloning": false,
+        "externalAudioRef": null,
+        "musicMode": "NONE_FOR_P1",
+        "ambienceCandidate": "两次摘要写入提示音、持续雨声与结尾两秒低动态环境尾音；全部待内部合成或权利核验",
+        "sampleRate": 48000,
+        "channels": 2,
+        "adapterState": "DESIGN_ONLY_ADAPTER_NOT_SELECTED",
+        "outputAdmitted": false
+      },
+      "continuityCandidate": [
+        "两个终端显示同一摘要光型但不生成可读假数据",
+        "记忆片从终端转入林澈掌心的方向连续",
+        "顾言身份灯与终端琥珀光亮度可区分",
+        "最后 48 帧保持构图稳定"
+      ],
+      "candidateStatus": "DRAFT_NOT_CONFIRMED"
+    }
+  ],
+  "experiments": [
+    {
+      "mediaKind": "image",
+      "lineageRule": "SAME_CURRENT_K2_GENERATION_REQUEST_REQUIRED",
+      "generationRequestResolution": "BLOCKED_CURRENT_G4_IMAGE_REQUEST_ABSENT",
+      "adapterState": "NOT_SELECTED",
+      "authorityRequired": true,
+      "realAttemptRecorded": false,
+      "candidateSelected": false,
+      "assetAdmitted": false,
+      "publicationAllowed": false
+    },
+    {
+      "mediaKind": "video",
+      "lineageRule": "SAME_CURRENT_K2_GENERATION_REQUEST_REQUIRED",
+      "generationRequestResolution": "AT_RUNTIME_FROM_CURRENT_G4",
+      "adapterState": "TECHNICAL_PREREQUISITE_ONLY",
+      "authorityRequired": true,
+      "realAttemptRecorded": false,
+      "candidateSelected": false,
+      "assetAdmitted": false,
+      "publicationAllowed": false
+    },
+    {
+      "mediaKind": "audio",
+      "lineageRule": "SAME_CURRENT_K2_GENERATION_REQUEST_REQUIRED",
+      "generationRequestResolution": "AT_RUNTIME_FROM_CURRENT_G4",
+      "adapterState": "NOT_SELECTED",
+      "authorityRequired": true,
+      "realAttemptRecorded": false,
+      "candidateSelected": false,
+      "assetAdmitted": false,
+      "publicationAllowed": false
+    }
+  ],
+  "runtimeChecklist": [
+    "re-resolve exact current K2 Project, EpisodeProductionRun, CreativeShotVersion and GenerationRequest refs",
+    "validate digest-pinned Rights and Provider authority bundles before any dispatch",
+    "obtain an external budgetAuthorityRef and provider sub-caps whose sum does not exceed CNY 1000",
+    "verify the exact runtime attestation ref and payload digest is accepted by Provider Authority",
+    "preserve the missing current G4 image GenerationRequest as a blocker until an authorized same-lineage contract extension exists",
+    "inject worker credentials outside Git and browser state",
+    "run one bounded same-lineage image, video and audio attempt through V4 adapters",
+    "record attempt cost, latency, probe, digest, runtime facts and complete lineage",
+    "keep every result unselected, not admitted and non-publishable until explicit decisions"
+  ],
+  "blockers": [
+    "RIGHTS_AUTHORITY_BUNDLE_MISSING",
+    "PROVIDER_AUTHORITY_BUNDLE_MISSING",
+    "BUDGET_AUTHORITY_REF_MISSING",
+    "IMAGE_CURRENT_G4_GENERATION_REQUEST_MISSING",
+    "IMAGE_LIVE_ADAPTER_MISSING",
+    "AUDIO_LIVE_ADAPTER_MISSING",
+    "IMAGE_PROVIDER_EXPERIMENT_MISSING",
+    "VIDEO_SAME_LINEAGE_PROVIDER_EXPERIMENT_MISSING",
+    "AUDIO_PROVIDER_EXPERIMENT_MISSING",
+    "CANDIDATE_SELECTION_MISSING"
+  ]
+}
