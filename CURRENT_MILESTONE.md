@@ -10,7 +10,7 @@
 >
 > Current Task: `ACS-K2-INTERNAL-IMAGE-FIRST-REAL-MEDIA-REVISION`
 >
-> Current Work Package: `G2→G6 COMPLETE / P1 HOST-PASSED / M10 COMPLETE / M11 VIDEO PLAN COMPLETE / FOUR M11 VIDEO CANDIDATES INDEPENDENTLY VERIFIED / AWAITING HUMAN VIDEO REVIEW`
+> Current Work Package: `G2→G6 COMPLETE / P1 HOST-PASSED / M10 v1 ADMITTED / M11 v1 TECHNICALLY VERIFIED BUT ASSISTED VISUAL QC FAILED / SHOT 01 R2–R7 CALIBRATION CLOSED WITHOUT ADMISSION`
 >
 > M6 Authorization: `ACCEPTED SURFACES + K2 EXTERNAL AUTHORITY CONNECTION / NO M6 SCHEMA EXPANSION`
 >
@@ -22,9 +22,82 @@
 >
 > Integration Baseline: `K2 G0→G7 PRESERVED — CORE 518 / FRONTEND 118 / LOCAL PLAYABLE EVIDENCE`
 >
-> Production Ready: `NO — FOUR REAL SHOT-IMAGE ASSETVERSIONS ARE ADMITTED; REAL SHOT VIDEOS, MASTER/EXPORT/PUBLICATION ABSENT`
+> Production Ready: `NO — M11 v1 SEMANTIC VISUAL QC FAILED; ACTION-READY M10 REPLACEMENTS, SELECTED REAL VIDEOS, MASTER/EXPORT/PUBLICATION ABSENT`
 
 ---
+
+## 0A. 2026-08-23 assisted visual-quality audit
+
+This section records an assisted visual review requested by the project lead. It does not
+rewrite the append-only M10 selections, make a human approval decision, admit a replacement
+asset, or authorize publication.
+
+Current factual verdict:
+
+- the four M11 videos remain technically verified evidence only;
+- assisted semantic visual QC is **FAIL** for the current four-video set;
+- no M11 video candidate is selected or admitted;
+- no EpisodeMaster or ExportArtifact exists;
+- the admitted M10 v1 image AssetVersions remain canonical history, but they are not
+  action-ready source frames for formal M11 production;
+- all R2–R7 Shot 01 calibration outputs are unselected, not admitted and non-publishing.
+
+Observed root causes, in descending order of impact:
+
+1. the four G3 CreativeShotVersions contain only two unique scene-level action strings, so
+   the four per-shot requests do not encode four distinct physical beats;
+2. the original M10 operator prompts drift from preproduction: SH030 and SH040 were kept in
+   the verification room even though the accepted preproduction candidate places them on
+   the exterior bridge in rain;
+3. the M10 dual-reference workflow feeds 1024×1024 nine-view identity boards into
+   ip-adapter-plus-face; a face-only adapter therefore receives multiple faces, body
+   views and background cells per character;
+4. the admitted M10 v1 frames omit the action-critical shard/read-slot/lock-control state
+   and show material identity, wardrobe, geography and age drift;
+5. M11 v1 receives only one start image and a Wan 2.2 TI2V 5B model; it has no independent
+   identity or prop-control conditioning during motion;
+6. the 5B video model is a contributing limit, but it is not the first failure source.
+
+Completed safe implementation:
+
+- Core commit f4cdf93a5e17a349147f25db96b6e6f074cbe1a8 normalizes M11 camera
+  prompts and adds explicit identity, role, prop, cut and deformation guards;
+- focused ComfyUI adapter regression: 12 / 12 PASS;
+- full Core regression: 644 / 644 PASS;
+- repository worktree was clean after the commit; no push or main merge was performed.
+
+Bounded Shot 01 calibration evidence:
+
+| Revision | Method | Assisted visual-QC result |
+|---|---|---|
+| R2 | stronger prompt + adjusted dual IPAdapter weights | FAIL — identity/wardrobe/geography drift; shard and slot absent |
+| R3 | single-face crops from the exact authority identity boards | FAIL — third person introduced; action props absent |
+| R4 | localized generic-checkpoint inpaint over the stable v1 composition | FAIL — two people preserved, but shard/slot/control are not visually explicit |
+| R5 | higher-denoise localized inpaint | FAIL — giant malformed foreground hand and meaningless prop |
+| R6 | deterministic local VFX prop composite | FAIL for formal production — semantics explicit, but overlay is visibly synthetic |
+| R7 | low-denoise material integration over R6 | FAIL for formal production — geometry preserved, but hand contact and photorealism remain insufficient |
+
+R2–R7 evidence is under /data/k2-authority/evidence/k2-m10-r*-shot01-*.
+Every receipt records selectionState=UNSELECTED, admissionState=NOT_ADMITTED,
+canonicalMutationCount=0 and publicationAllowed=false.
+
+Local capability boundary confirmed after the audit:
+
+- available: RealVisXL v4, IPAdapter Plus Face SDXL, OpenPose SDXL ControlNet,
+  Wan 2.2 TI2V 5B, standard latent inpaint nodes;
+- absent: a dedicated local SDXL inpaint checkpoint and local canny/depth control models;
+- increasing steps, reference weight or denoise is not an accepted next action.
+
+Required next production step:
+
+1. add and digest-pin a dedicated local inpaint/control capability, or implement a
+   single-character action-plate plus deterministic compositor path;
+2. regenerate only Shot 01 as an action-ready image and obtain explicit human image
+   selection;
+3. generate one bounded 49-frame M11 calibration from that selected image;
+4. only after Shot 01 visual QC passes, regenerate the remaining three M10 images and M11
+   videos, independently verify them, and request human selection;
+5. do not merge to main, create a master/export, or publish before those gates pass.
 
 ## 0. Accepted baselines
 
