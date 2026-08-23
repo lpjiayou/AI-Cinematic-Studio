@@ -10,7 +10,7 @@
 >
 > Current Task: `ACS-K2-INTERNAL-IMAGE-FIRST-REAL-MEDIA-REVISION`
 >
-> Current Work Package: `G2→G6 COMPLETE / P1 HOST-PASSED / M10 OFFLINE IMPLEMENTATION CANDIDATE / GPU OFF`
+> Current Work Package: `G2→G6 COMPLETE / P1 HOST-PASSED / M10 PLAN + FOUR LIVE CANDIDATES COMPLETE / EXACT SELECTION + ADMISSION HOST-IMPLEMENTED AND 638-PASS / RUNTIME ADMISSION NEXT`
 >
 > M6 Authorization: `ACCEPTED SURFACES + K2 EXTERNAL AUTHORITY CONNECTION / NO M6 SCHEMA EXPANSION`
 >
@@ -22,7 +22,7 @@
 >
 > Integration Baseline: `K2 G0→G7 PRESERVED — CORE 518 / FRONTEND 118 / LOCAL PLAYABLE EVIDENCE`
 >
-> Production Ready: `NO — P1 TECHNICAL SMOKE PASSED; REAL SHOT IMAGES/VIDEOS, HUMAN MEDIA SELECTION, MASTER/EXPORT/PUBLICATION ABSENT`
+> Production Ready: `NO — FOUR REAL SHOT-IMAGE CANDIDATES EXIST; EXACT IMAGE ADMISSION, REAL SHOT VIDEOS, MASTER/EXPORT/PUBLICATION ABSENT`
 
 ---
 
@@ -1302,3 +1302,29 @@ The next paid-server action is not video generation. It is a fresh read-only Com
 `/object_info` and model/runtime inventory proving an accepted multi-reference image
 workflow. If that capability is absent, execution stops at
 `REAL_IMAGE_PLAN_READY`; text-only fallback is forbidden.
+
+### M10 host candidate execution and exact-selection work package — 2026-08-23
+
+Later host evidence supersedes the final pre-execution paragraph above:
+
+- current Core base: `1650c3462b32899151cdba795ddc10e5171ff1da`;
+- real-image plan ref:
+  `real-image-plan-8d1405aa194747e0b40fc4892f81f382`;
+- plan state: `REAL_IMAGE_PLAN_READY` with four 1280×720 requests, each bound to
+  both exact G2 reference digests;
+- multi-reference technical-smoke receipt:
+  `k2-m10-dual-reference-technical-smoke-20260823T080545Z/receipt.json`;
+- four-candidate receipt:
+  `k2-m10-four-image-candidates-20260823T081016Z/receipt.json`;
+- candidate receipt SHA-256:
+  `2b4d0ad87e10542ec6bd7c74db0a0c2e84d4db0c6b5411de5122c240e8d1c192`;
+- all four candidates remain publication-disabled until the exact selection gate is
+  applied.
+
+The Project Lead has now reviewed those four exact receipt-bound candidates and
+explicitly chosen all four. The missing canonical `real-image-selection` Public API,
+digest-pinned V4 evidence adapter and atomic V5 admission gate have passed 29 focused
+tests and the complete 638-test Core suite on the canonical host. The next authorized
+mutation is the one exact authenticated selection/admission command; M11 remains
+blocked until that command independently verifies the pinned evidence and advances
+the same run to `REAL_IMAGE_READY`.

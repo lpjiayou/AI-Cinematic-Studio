@@ -1,9 +1,9 @@
 # ADR-0012 — K2 Internal Image-First Real-Media Revision
 
-- Status: `CANDIDATE / OFFLINE IMPLEMENTED AND TESTED / HOST APPLY PENDING`
+- Status: `ACCEPTED / M10 LIVE CANDIDATES COMPLETE / EXACT SELECTION + ADMISSION HOST-IMPLEMENTED / CORE 638 PASS / RUNTIME ADMISSION PENDING`
 - Date: `2026-08-23`
 - Decision owner: Project Lead / Architecture Owner `蔺鹏`
-- Required base: `9fa17347b48e455db39fcabe6b545829738f0f0d`
+- Required base: `1650c3462b32899151cdba795ddc10e5171ff1da`
 - Parent: ADR-0011
 - Contract: `architecture/K2_INTERNAL_IMAGE_FIRST_REAL_MEDIA_REVISION_CONTRACT.md`
 
@@ -40,6 +40,10 @@ would discard required identity lineage and does not implement M10.
    unchanged and fail-closed.
 9. Frontend/G7 work is not a prerequisite for M10/M11 execution; the accepted
    authenticated Creator Public API is the application boundary.
+10. One exact four-item selection command is atomic. The authenticated credential is
+    the decision actor, V4 owns private paths and re-verification, and V5 alone records
+    candidates, decisions, immutable image AssetVersions and the
+    `REAL_IMAGE_PLAN_READY → REAL_IMAGE_READY` gate.
 
 ## Rejected alternatives
 
@@ -56,8 +60,7 @@ would discard required identity lineage and does not implement M10.
 
 ## Consequences
 
-The repository can complete M10 planning and all CPU verification while the A100 is
-off. The next paid-server action is a read-only live capability inventory and fresh
-runtime attestation. GPU generation begins only if that preflight proves the required
-workflow.
-
+M10 live capability and four-candidate execution have passed on the current A100
+host. Exact selection/admission is CPU and persistence work; it does not require
+ComfyUI or a running GPU process. M11 planning may begin only after the four exact
+selections have produced four immutable image AssetVersions.

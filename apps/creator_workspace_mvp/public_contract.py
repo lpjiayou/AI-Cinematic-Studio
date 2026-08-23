@@ -106,6 +106,7 @@ CAPABILITY_PROJECTION: Final = (
         "publicResources": [
             "episode-production-runs/production-readiness",
             "episode-production-runs/real-media-revision",
+            "episode-production-runs/real-image-selection",
         ],
         "requirements": [
             "M9",

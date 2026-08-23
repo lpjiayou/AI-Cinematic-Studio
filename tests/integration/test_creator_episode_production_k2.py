@@ -40,6 +40,9 @@ from tests.unit.test_episode_production_k2 import (
     seed_k2_roots,
 )
 from tests.unit.test_k2_provider_experiments import StubLiveVideoAdapter
+from tests.unit.test_k2_real_image_selection import (
+    StubRealImageCandidateEvidence,
+)
 
 
 DEFAULT_HTTP_TIMEOUT_SECONDS = 5
@@ -67,12 +70,14 @@ class CreatorEpisodeProductionK2HttpTests(unittest.TestCase):
             ref_factory=self.refs,
             clock=lambda: "2026-08-17T01:00:00Z",
         )
+        self.real_image_candidate_evidence = StubRealImageCandidateEvidence()
         self.production = create_in_memory_boundary(
             project_boundary=self.assembly.project_context,
             series_episode_boundary=self.assembly.series_episode,
             series_planning_boundary=self.assembly.series_planning,
             script_studio_boundary=self.assembly.script_studio,
             identity_reference_authority=k2_identity_authority(),
+            real_image_candidate_evidence=self.real_image_candidate_evidence,
             media_execution=self.media_execution,
             composition_execution=V4CompositionExecutor.from_artifact_root(
                 Path(self.artifacts.name)
@@ -780,6 +785,58 @@ class CreatorEpisodeProductionK2HttpTests(unittest.TestCase):
             )
         self.assertEqual(injected.exception.code, 400)
         payload = json.loads(injected.exception.read().decode("utf-8"))
+        self.assertEqual(payload["error"]["code"], "invalid_request")
+
+        selection_endpoint = f"{base}/real-image-selection"
+        selection_payload = {
+            "idempotencyKey": "http-m10-image-selection-v1",
+            "selections": [
+                {
+                    "generationRequestRef": item["generationRequestRef"],
+                    "candidateRef": (
+                        self.real_image_candidate_evidence.candidate_ref(
+                            item["ordinal"]
+                        )
+                    ),
+                    "candidateContentDigest": (
+                        self.real_image_candidate_evidence.content_digest(
+                            item["ordinal"]
+                        )
+                    ),
+                }
+                for item in planned["generationRequests"]
+            ],
+        }
+        status, selected = self.post(selection_endpoint, selection_payload)
+        self.assertEqual(status, 201)
+        self.assertEqual(selected["state"], "REAL_IMAGE_READY")
+        self.assertEqual(len(selected["selectionDecisions"]), 4)
+        self.assertEqual(len(selected["assetVersions"]), 4)
+        self.assertEqual(
+            {item["actorRef"] for item in selected["selectionDecisions"]},
+            {"runtime-test-credential"},
+        )
+        self.assertTrue(
+            all(
+                item["immutable"] is True
+                and item["publicationAllowed"] is False
+                for item in selected["assetVersions"]
+            )
+        )
+        self.assertNotIn(
+            "internalPath", json.dumps(selected, ensure_ascii=False)
+        )
+        status, restored = self.get(selection_endpoint)
+        self.assertEqual(status, 200)
+        self.assertEqual(restored["state"], "REAL_IMAGE_READY")
+
+        with self.assertRaises(error.HTTPError) as forged:
+            self.post(
+                selection_endpoint,
+                {**selection_payload, "actorRef": "browser-forged-actor"},
+            )
+        self.assertEqual(forged.exception.code, 400)
+        payload = json.loads(forged.exception.read().decode("utf-8"))
         self.assertEqual(payload["error"]["code"], "invalid_request")
 
 

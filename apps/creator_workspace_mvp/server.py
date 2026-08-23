@@ -133,6 +133,7 @@ EPISODE_PRODUCTION_SUBRESOURCES = {
     "finalize",
     "delivery",
     "real-media-revision",
+    "real-image-selection",
 }
 
 
@@ -310,7 +311,8 @@ class CreatorRequestHandler(BaseHTTPRequestHandler):
                 return
             if (
                 production_subresource is not None
-                and production_subresource[1] == "production-readiness"
+                and production_subresource[1]
+                in {"production-readiness", "real-image-selection"}
             ):
                 if "actorRef" in payload:
                     self._send_application_error(400, "invalid_request")
@@ -365,6 +367,10 @@ class CreatorRequestHandler(BaseHTTPRequestHandler):
                     result = self.episode_production_boundary.compose_and_qc(command)
                 elif resource == "real-media-revision":
                     result = self.episode_production_boundary.plan_real_images(
+                        command
+                    )
+                elif resource == "real-image-selection":
+                    result = self.episode_production_boundary.select_real_images(
                         command
                     )
                 elif resource == "finalize":
@@ -573,6 +579,10 @@ class CreatorRequestHandler(BaseHTTPRequestHandler):
                             workspace_ref, run_ref
                         )
                     elif resource == "real-media-revision":
+                        result = self.episode_production_boundary.get_real_media_revision(
+                            workspace_ref, run_ref
+                        )
+                    elif resource == "real-image-selection":
                         result = self.episode_production_boundary.get_real_media_revision(
                             workspace_ref, run_ref
                         )
