@@ -102,9 +102,16 @@ CAPABILITY_PROJECTION: Final = (
         "publicResources": ["episode-production-runs/assets"], "requirements": ["M8"],
     },
     {
-        "id": "M10", "name": "Image Generation", "state": "production_policy_required",
-        "publicResources": ["episode-production-runs/production-readiness"],
-        "requirements": ["M9", "rights_manifest", "live_image_provider"],
+        "id": "M10", "name": "Image Generation", "state": "local_evidence_only",
+        "publicResources": [
+            "episode-production-runs/production-readiness",
+            "episode-production-runs/real-media-revision",
+        ],
+        "requirements": [
+            "M9",
+            "G6_local_qc_parent_for_same_run_revision",
+            "live_multi_reference_image_capability_before_execution",
+        ],
     },
     {
         "id": "M11", "name": "Video Production", "state": "production_policy_required",

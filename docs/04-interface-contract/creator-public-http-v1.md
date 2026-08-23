@@ -1,6 +1,6 @@
 # Creator Public HTTP/API v1
 
-Status: `XR1 FROZEN / AUTH-W1 SECURITY AMENDMENT / K2 P0-P1 BOUNDED EXTENSION`
+Status: `XR1 FROZEN / AUTH-W1 SECURITY AMENDMENT / K2 P0-P1 + M10 IMAGE-PLAN BOUNDED EXTENSION`
 
 This contract is the only browser-facing Core HTTP surface for the separate Commercial
 Frontend. Existing `/creator/internal/*` endpoints remain compatibility-only and must
@@ -25,7 +25,7 @@ Commercial Frontend → Frontend Experience Adapter → /creator/api/v1
 | M6 | `/series-intelligence-workspaces`, `/series-intelligence/*` | accepted Series Intelligence public boundary |
 | M7–M8 | `/episode-production-runs/{runRef}/shot-graph` | bounded K2 V5 Shot Graph service |
 | M9 | `/episode-production-runs/{runRef}/assets` | bounded K2 V5 Asset Pipeline service |
-| M10 | `/episode-production-runs/{runRef}/production-readiness` | bounded K2 V5 policy/rights authority |
+| M10 | `/episode-production-runs/{runRef}/real-media-revision`, `/production-readiness` | bounded K2 V5 image-first revision planner; live execution separately gated |
 | M11 | `/episode-production-runs/{runRef}/provider-experiments`, `/media` | bounded K2 V5 experiment/media services over V4 |
 | M12 | `/episode-production-runs/{runRef}/production-readiness`, `/media` | bounded K2 V5 media service; live audio remains blocked |
 | M13–M14 | `/episode-production-runs/{runRef}/preview`, `/finalize` | bounded K2 V5 delivery service over V4/V3 |
@@ -87,9 +87,34 @@ video candidate satisfies the bounded P1 state
 Rights/Provider/Budget authorities are not blockers for that internal P1 checkpoint.
 This does not create an AssetVersion, Master, export, approval or publication fact.
 
+## K2 M10 image-plan semantics
+
+`POST /episode-production-runs/{runRef}/real-media-revision` accepts exactly
+`idempotencyKey`. Workspace and run scope are injected from authentication and the
+path. Provider/model/runtime, identity, prompt, file path, approval and publication
+fields are rejected.
+
+The operation is available only after the same run has a current passed G6 machine-QC
+fact. It creates exactly four provider-neutral shot-image GenerationRequests from the
+current four CreativeShotVersions. Every request binds both current K2 identity visual
+references by ref, version ref and content digest and contains no internal path.
+
+A successful response advances only to `REAL_IMAGE_PLAN_READY`. It explicitly reports
+live capability verification pending, execution authorization not granted by the
+plan, candidate selection not started, AssetVersion admission not started and
+`publicationAllowed=false`. It does not invoke ComfyUI. `GET` returns the immutable
+plan projection.
+
+Live M10 execution requires a separate server-derived multi-reference image adapter
+and fresh runtime capability evidence. The service must fail closed rather than use a
+text-only fallback. Candidate execution, exact human selection and immutable image
+admission are later bounded operations.
+
 ## Capability states
 
 - `available`: accepted and exposed through public v1.
+- `local_evidence_only`: the bounded Core surface exists but cannot make a
+  publishable or external-provider claim.
 - `authority_required`: accepted Core surface exists but the configured external
   authority is unavailable.
 - `not_open`: implementation is not authorized or not present.

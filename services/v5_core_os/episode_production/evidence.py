@@ -31,8 +31,37 @@ K2_STATES = (
     "MEDIA_READY",
     "PREVIEW_READY",
     "QC_READY",
+    "REAL_IMAGE_PLAN_READY",
+    "REAL_IMAGE_READY",
+    "REAL_VIDEO_PLAN_READY",
+    "REAL_VIDEO_READY",
+    "REAL_PREVIEW_READY",
+    "REAL_QC_READY",
     "APPROVAL_READY",
     "MASTER_READY",
+)
+
+ALLOWED_K2_STATE_TRANSITIONS = frozenset(
+    {
+        (K2_STATES[index], K2_STATES[index + 1])
+        for index in range(K2_STATES.index("QC_READY"))
+    }
+    | {
+        # The accepted deterministic G2-G6 path remains valid for runs that do
+        # not enter a real-media revision.
+        ("QC_READY", "APPROVAL_READY"),
+        # A same-run, append-only image-first revision.  Candidate execution
+        # and technical verification do not advance these states; only the
+        # corresponding plan/admission evidence gates do.
+        ("QC_READY", "REAL_IMAGE_PLAN_READY"),
+        ("REAL_IMAGE_PLAN_READY", "REAL_IMAGE_READY"),
+        ("REAL_IMAGE_READY", "REAL_VIDEO_PLAN_READY"),
+        ("REAL_VIDEO_PLAN_READY", "REAL_VIDEO_READY"),
+        ("REAL_VIDEO_READY", "REAL_PREVIEW_READY"),
+        ("REAL_PREVIEW_READY", "REAL_QC_READY"),
+        ("REAL_QC_READY", "APPROVAL_READY"),
+        ("APPROVAL_READY", "MASTER_READY"),
+    }
 )
 
 
@@ -111,8 +140,8 @@ def _validate_gate(gate: GateAppend) -> None:
             raise EpisodeProductionError(f"{field} is invalid")
     if gate.fromState not in K2_STATES or gate.toState not in K2_STATES:
         raise InvalidStateTransitionError("unknown K2 state")
-    if K2_STATES.index(gate.toState) != K2_STATES.index(gate.fromState) + 1:
-        raise InvalidStateTransitionError("K2 states must advance exactly once")
+    if (gate.fromState, gate.toState) not in ALLOWED_K2_STATE_TRANSITIONS:
+        raise InvalidStateTransitionError("K2 state transition is not allowed")
     kinds = [fact.factKind for fact in gate.facts]
     if not kinds or len(kinds) != len(set(kinds)):
         raise EpisodeProductionError("gate facts must have unique kinds")

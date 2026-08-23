@@ -55,6 +55,10 @@ from .internal_execution import (
     K2InternalExecutionGrant,
     internal_execution_grant_from_environment,
 )
+from .real_media_revision import (
+    K2RealMediaRevisionService,
+    REAL_IMAGE_CAPABILITY,
+)
 
 __all__ = [
     "EpisodeProductionPublicBoundary",
@@ -91,6 +95,8 @@ __all__ = [
     "InternalExecutionConfigurationError",
     "K2InternalExecutionGrant",
     "internal_execution_grant_from_environment",
+    "K2RealMediaRevisionService",
+    "REAL_IMAGE_CAPABILITY",
     "create_in_memory_boundary",
     "create_local_development_boundary",
     "create_local_development_boundary_from_environment",

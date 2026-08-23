@@ -712,6 +712,76 @@ class CreatorEpisodeProductionK2HttpTests(unittest.TestCase):
             payload["error"]["code"], "client_workspace_scope_forbidden"
         )
 
+    def test_public_m10_image_plan_is_scoped_and_never_accepts_paths(self):
+        public_run = {
+            key: value
+            for key, value in run_command(
+                self.project, self.series, self.episode
+            ).items()
+            if key != "workspaceRef"
+        }
+        _, created = self.post(
+            PUBLIC_EPISODE_PRODUCTION_RUNS_ENDPOINT, public_run
+        )
+        run = created["run"]
+        base = (
+            f"{PUBLIC_EPISODE_PRODUCTION_RUNS_ENDPOINT}/"
+            f"{parse.quote(run['productionRunRef'])}"
+        )
+        for resource, command in (
+            ("authority-identity", g2_command(run)),
+            ("shot-graph", g3_command(run)),
+            ("assets", g4_command(run)),
+            ("media", g5_command(run)),
+            ("preview", g6_preview_command(run)),
+        ):
+            self.post(
+                f"{base}/{resource}",
+                {
+                    key: value
+                    for key, value in command.items()
+                    if key not in {"workspaceRef", "productionRunRef"}
+                },
+                timeout=(
+                    MEDIA_HTTP_TIMEOUT_SECONDS
+                    if resource in {"media", "preview"}
+                    else DEFAULT_HTTP_TIMEOUT_SECONDS
+                ),
+            )
+        endpoint = f"{base}/real-media-revision"
+        status, planned = self.post(
+            endpoint, {"idempotencyKey": "http-m10-image-plan-v1"}
+        )
+        self.assertEqual(status, 201)
+        self.assertEqual(planned["state"], "REAL_IMAGE_PLAN_READY")
+        self.assertEqual(len(planned["generationRequests"]), 4)
+        self.assertTrue(
+            all(
+                len(item["identityInputs"]) == 2
+                and item["publicationAllowed"] is False
+                for item in planned["generationRequests"]
+            )
+        )
+        self.assertNotIn("path", json.dumps(planned, ensure_ascii=False).lower())
+
+        status, restored = self.get(endpoint)
+        self.assertEqual(status, 200)
+        self.assertEqual(
+            restored["realImagePlan"]["payloadDigest"],
+            planned["realImagePlan"]["payloadDigest"],
+        )
+        with self.assertRaises(error.HTTPError) as injected:
+            self.post(
+                endpoint,
+                {
+                    "idempotencyKey": "http-m10-image-plan-injected",
+                    "identityImagePath": "/tmp/injected.png",
+                },
+            )
+        self.assertEqual(injected.exception.code, 400)
+        payload = json.loads(injected.exception.read().decode("utf-8"))
+        self.assertEqual(payload["error"]["code"], "invalid_request")
+
 
 if __name__ == "__main__":
     unittest.main()
