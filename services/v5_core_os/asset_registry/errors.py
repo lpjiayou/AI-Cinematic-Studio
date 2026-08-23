@@ -5,6 +5,10 @@ class AssetRegistryError(Exception):
     """Base error for all Asset Registry failures."""
 
 
+class AssetRegistryDeprecatedError(AssetRegistryError):
+    """Raised because the process-local AssetVersion authority was retired."""
+
+
 class ValidationError(AssetRegistryError, ValueError):
     """Raised when a caller supplies invalid input."""
 

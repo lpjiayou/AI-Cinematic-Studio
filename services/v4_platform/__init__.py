@@ -14,6 +14,7 @@ from .text_generation import (
     create_text_provider_from_environment,
 )
 from .media_jobs import (
+    ARTIFACT_COMMIT_INTENT_SCHEMA_VERSION,
     ArtifactVerificationError,
     DeterministicLocalFfmpegAdapter,
     InMemoryMediaJobAdapter,
@@ -67,6 +68,7 @@ __all__ = [
     "TextProviderError",
     "create_text_provider_from_environment",
     "ArtifactVerificationError",
+    "ARTIFACT_COMMIT_INTENT_SCHEMA_VERSION",
     "DeterministicLocalFfmpegAdapter",
     "InMemoryMediaJobAdapter",
     "MediaAdapterResult",

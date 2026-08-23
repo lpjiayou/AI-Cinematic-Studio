@@ -14,6 +14,9 @@ from services.v5_core_os.episode_production import (
     EpisodeProductionPublicError,
     create_in_memory_boundary,
 )
+from services.v5_core_os.episode_production.media_candidate_review import (
+    VerifiedMediaSelection,
+)
 from tests.unit.test_episode_production_k2 import (
     WORKSPACE,
     activate_k2_m6_baseline,
@@ -35,14 +38,16 @@ def _digest(label: str) -> str:
 class StubRealImageCandidateEvidence:
     def __init__(self) -> None:
         self.calls = 0
+        self.generation = 1
 
     @staticmethod
     def candidate_ref(ordinal: int) -> str:
         return f"m10-reviewed-candidate-{ordinal}"
 
-    @staticmethod
-    def content_digest(ordinal: int) -> str:
-        return _digest(f"m10-candidate-content-{ordinal}")
+    def content_digest(self, ordinal: int) -> str:
+        return _digest(
+            f"m10-candidate-content-{ordinal}-generation-{self.generation}"
+        )
 
     def resolve_candidates(
         self,
@@ -53,8 +58,12 @@ class StubRealImageCandidateEvidence:
     ):
         self.calls += 1
         return {
-            "candidateEvidenceRef": "candidate-evidence-test-v1",
-            "candidateEvidenceDigest": _digest("candidate-evidence"),
+            "candidateEvidenceRef": (
+                f"candidate-evidence-test-v{self.generation}"
+            ),
+            "candidateEvidenceDigest": _digest(
+                f"candidate-evidence-{self.generation}"
+            ),
             "artifactStoreRef": "artifact-store-test-v1",
             "modelSetDigest": _digest("model-set"),
             "adapterIdentity": "v4.comfyui.pinned-image-evidence.v1",
@@ -89,6 +98,24 @@ class StubRealImageCandidateEvidence:
             ],
             "publicationAllowed": False,
         }
+
+
+class SelectionAuthority:
+    def verify(self, *, subject, approval_ref, decision):
+        values = {
+            "authority_ref": "approval-authority-k2-image-test",
+            "approval_ref": approval_ref,
+            "actor_ref": "human-reviewer-k2-image-test",
+            "actor_kind": "HUMAN",
+            "decision": decision,
+            "authority_decision_ref": f"authority-{approval_ref}",
+            "decided_at": "2026-08-24T00:00:00Z",
+            "subject_digest": subject.subject_digest,
+        }
+        values["authority_decision_digest"] = (
+            VerifiedMediaSelection.expected_decision_digest(**values)
+        )
+        return VerifiedMediaSelection.create(**values)
 
 
 class K2RealImageSelectionTests(unittest.TestCase):
@@ -141,31 +168,79 @@ class K2RealImageSelectionTests(unittest.TestCase):
                 "idempotencyKey": "m10-image-plan-selection-tests",
             }
         )
+        self.revision = (
+            self.boundary._EpisodeProductionPublicBoundary__real_media_revision
+        )
+        self.revision.candidate_review.selection_authority = SelectionAuthority()
+        self.recorded = self.boundary.record_real_image_candidates(
+            {
+                "workspaceRef": WORKSPACE,
+                "productionRunRef": self.run["productionRunRef"],
+                "idempotencyKey": "m10-image-candidate-handoff-tests",
+            }
+        )
+        self.qcs = [
+            K2RealImageSelectionTests.visual_qc(self, validation, ordinal)
+            for ordinal, validation in enumerate(
+                self.recorded["technicalValidations"], start=1
+            )
+        ]
 
     def tearDown(self):
         self.directory.cleanup()
+
+    def visual_qc(self, validation, ordinal):
+        return self.revision.candidate_review.record_semantic_visual_qc(
+            {
+                "workspaceRef": WORKSPACE,
+                "productionRunRef": self.run["productionRunRef"],
+                "idempotencyKey": f"m10-visual-qc-{ordinal}-v1",
+                "technicalValidationRef": validation[
+                    "technicalValidationRef"
+                ],
+                "technicalValidationVersion": 1,
+                "technicalValidationDigest": validation["payloadDigest"],
+                "visualQcRef": f"m10-visual-qc-{ordinal}-v1",
+                "visualQcVersion": 1,
+                "reviewerRef": "reviewer-project-lead",
+                "reviewProfile": "k2-semantic-visual-qc-v1",
+                "evidence": [
+                    {
+                        "evidenceRef": f"m10-review-frame-{ordinal}",
+                        "evidenceDigest": str(ordinal) * 64,
+                    }
+                ],
+                "supersedesVisualQc": None,
+                "checks": {
+                    name: {"result": "PASS", "note": ""}
+                    for name in (
+                        "identity",
+                        "wardrobe",
+                        "location",
+                        "action",
+                        "prop",
+                        "motion",
+                    )
+                },
+                "result": "PASS",
+            }
+        )["semanticVisualQc"]
 
     def selection_command(self):
         return {
             "workspaceRef": WORKSPACE,
             "productionRunRef": self.run["productionRunRef"],
             "idempotencyKey": "m10-four-image-selection-v1",
-            "actorRef": "authenticated-creator-credential",
             "selections": [
                 {
-                    "generationRequestRef": request[
-                        "generationRequestRef"
-                    ],
-                    "candidateRef": self.candidate_evidence.candidate_ref(
-                        request["ordinal"]
-                    ),
-                    "candidateContentDigest": (
-                        self.candidate_evidence.content_digest(
-                            request["ordinal"]
-                        )
-                    ),
+                    "visualQcRef": qc["visualQcRef"],
+                    "visualQcVersion": qc["visualQcVersion"],
+                    "visualQcDigest": qc["payloadDigest"],
+                    "selectionRef": f"m10-selection-{ordinal}-v1",
+                    "selectionVersion": 1,
+                    "approvalRef": f"m10-approval-{ordinal}-v1",
                 }
-                for request in reversed(self.plan["generationRequests"])
+                for ordinal, qc in enumerate(self.qcs, start=1)
             ],
         }
 
@@ -183,33 +258,17 @@ class K2RealImageSelectionTests(unittest.TestCase):
         for decision, asset in zip(
             result["selectionDecisions"], result["assetVersions"]
         ):
+            self.assertEqual(decision["actorKind"], "HUMAN")
+            self.assertEqual(decision["decision"], "SELECTED")
             self.assertEqual(
-                decision["actorRef"], "authenticated-creator-credential"
-            )
-            self.assertEqual(decision["decision"], "SELECT")
-            self.assertEqual(
-                asset["selectionDecisionDigest"],
+                asset["humanSelectionDigest"],
                 decision["payloadDigest"],
             )
             self.assertTrue(asset["immutable"])
             self.assertEqual(asset["state"], "REGISTERED")
-            self.assertEqual(asset["rightsState"], "NOT_REQUIRED_INTERNAL")
-            self.assertEqual(
-                asset["providerPolicyState"],
-                "NOT_REQUIRED_SELF_HOSTED",
-            )
-            self.assertEqual(
-                asset["budgetAuthorityState"], "NOT_REQUIRED_INTERNAL"
-            )
             self.assertFalse(asset["publicationAllowed"])
         self.assertEqual(
-            result["realImageAdmissionManifest"]["summary"],
-            {
-                "technicallyVerifiedCandidates": 4,
-                "humanSelections": 4,
-                "registeredImageAssets": 4,
-                "failed": 0,
-            },
+            result["realImageAdmissionManifest"]["admittedCount"], 4
         )
         self.assertNotIn(
             "internalPath", json.dumps(result, ensure_ascii=False)
@@ -235,18 +294,18 @@ class K2RealImageSelectionTests(unittest.TestCase):
         replay = self.boundary.select_real_images(self.selection_command())
         self.assertTrue(replay["idempotentReplay"])
         self.assertEqual(replay["assetVersions"], first["assetVersions"])
-        self.assertEqual(self.candidate_evidence.calls, 1)
+        self.assertEqual(self.candidate_evidence.calls, 2)
 
     def test_rejects_one_changed_candidate_digest_atomically(self):
         command = self.selection_command()
-        command["selections"][2]["candidateContentDigest"] = _digest(
+        command["selections"][2]["visualQcDigest"] = _digest(
             "not-the-reviewed-candidate"
         )
         with self.assertRaises(EpisodeProductionPublicError) as caught:
             self.boundary.select_real_images(command)
         self.assertEqual(
             (caught.exception.status, caught.exception.code),
-            (422, "real_image_candidate_evidence_rejected"),
+            (409, "stale_input"),
         )
         self.assertEqual(
             self.boundary.get_run(
@@ -264,7 +323,89 @@ class K2RealImageSelectionTests(unittest.TestCase):
             (caught.exception.status, caught.exception.code),
             (400, "invalid_request"),
         )
-        self.assertEqual(self.candidate_evidence.calls, 0)
+        self.assertEqual(self.candidate_evidence.calls, 1)
+
+    def test_post_baseline_candidate_revision_admits_one_successor_without_state_rewind(self):
+        baseline = self.boundary.select_real_images(self.selection_command())
+        predecessor = baseline["assetVersions"][0]
+        self.candidate_evidence.generation = 2
+        successor_candidates = self.boundary.record_real_image_candidates(
+            {
+                "workspaceRef": WORKSPACE,
+                "productionRunRef": self.run["productionRunRef"],
+                "idempotencyKey": "m10-image-candidate-handoff-successor-v2",
+            }
+        )
+        validation = successor_candidates["technicalValidations"][0]
+        qc = self.revision.candidate_review.record_semantic_visual_qc(
+            {
+                "workspaceRef": WORKSPACE,
+                "productionRunRef": self.run["productionRunRef"],
+                "idempotencyKey": "m10-successor-visual-qc-1-v1",
+                "technicalValidationRef": validation[
+                    "technicalValidationRef"
+                ],
+                "technicalValidationVersion": validation[
+                    "technicalValidationVersion"
+                ],
+                "technicalValidationDigest": validation["payloadDigest"],
+                "visualQcRef": "m10-successor-visual-qc-1-v1",
+                "visualQcVersion": 1,
+                "reviewerRef": "reviewer-project-lead",
+                "reviewProfile": "k2-semantic-visual-qc-v1",
+                "evidence": [
+                    {
+                        "evidenceRef": "m10-successor-review-frame-1",
+                        "evidenceDigest": "8" * 64,
+                    }
+                ],
+                "supersedesVisualQc": None,
+                "checks": {
+                    name: {"result": "PASS", "note": ""}
+                    for name in (
+                        "identity",
+                        "wardrobe",
+                        "location",
+                        "action",
+                        "prop",
+                        "motion",
+                    )
+                },
+                "result": "PASS",
+            }
+        )["semanticVisualQc"]
+        admitted = self.boundary.admit_real_image_successor(
+            {
+                "workspaceRef": WORKSPACE,
+                "productionRunRef": self.run["productionRunRef"],
+                "idempotencyKey": "m10-image-successor-admission-v2",
+                "selection": {
+                    "visualQcRef": qc["visualQcRef"],
+                    "visualQcVersion": qc["visualQcVersion"],
+                    "visualQcDigest": qc["payloadDigest"],
+                    "selectionRef": "m10-successor-selection-1-v1",
+                    "selectionVersion": 1,
+                    "approvalRef": "m10-successor-approval-1-v1",
+                },
+            }
+        )
+        self.assertEqual(admitted["state"], "REAL_IMAGE_READY")
+        self.assertEqual(admitted["assetVersion"]["version"], 2)
+        self.assertEqual(
+            admitted["assetVersion"]["supersedesAssetVersionRef"],
+            predecessor["assetVersionRef"],
+        )
+        self.assertNotEqual(
+            admitted["assetVersion"]["revisionRef"],
+            self.plan["realImagePlan"]["realImagePlanRef"],
+        )
+        projection = self.revision.state_projection.get_projection(
+            WORKSPACE, self.run["productionRunRef"]
+        )
+        self.assertEqual(
+            projection["productionState"], "REAL_IMAGE_READY"
+        )
+        self.assertEqual(len(projection["candidates"]), 4)
 
 
 if __name__ == "__main__":

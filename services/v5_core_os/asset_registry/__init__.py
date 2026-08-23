@@ -1,8 +1,9 @@
-"""V5-internal package surface for the Asset Registry MVP."""
+"""Deprecated package surface retained only for fail-closed compatibility."""
 
 from .engine import AssetRegistry
 from .errors import (
     AssetNotFoundError,
+    AssetRegistryDeprecatedError,
     AssetRegistryError,
     DuplicateAssetError,
     ValidationError,
@@ -13,6 +14,7 @@ __all__ = [
     "Asset",
     "AssetNotFoundError",
     "AssetRegistry",
+    "AssetRegistryDeprecatedError",
     "AssetRegistryError",
     "AssetType",
     "AssetVersion",

@@ -1,5 +1,12 @@
 # M003 — V5 Asset Registry Foundation
 
+> **Retired by ADR-0013 (2026-08-24).** The process-local `AssetRegistry`
+> described by this historical milestone is no longer an AssetVersion
+> authority. Its package remains importable only as a fail-closed tombstone.
+> The sole current authority is the append-only Episode Production evidence
+> journal, projected through `CanonicalAssetVersionAuthority`; no new writes
+> may be made through this M003 model.
+
 ## 1. Milestone Overview
 
 | 字段 | 已核对事实 |

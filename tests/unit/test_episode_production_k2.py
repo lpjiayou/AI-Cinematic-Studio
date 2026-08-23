@@ -855,6 +855,7 @@ class EpisodeProductionG2AuthorityIdentityTests(unittest.TestCase):
                     "v5_episode_production_gates",
                     "v5_episode_production_facts",
                     "v5_episode_production_transitions",
+                    "v5_episode_production_records",
                 },
             )
             self.assertEqual(

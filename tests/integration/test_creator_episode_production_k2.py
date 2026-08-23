@@ -41,8 +41,10 @@ from tests.unit.test_episode_production_k2 import (
 )
 from tests.unit.test_k2_provider_experiments import StubLiveVideoAdapter
 from tests.unit.test_k2_real_image_selection import (
+    SelectionAuthority,
     StubRealImageCandidateEvidence,
 )
+from tests.unit.test_k2_real_video_selection import VideoCandidateEvidence
 
 
 DEFAULT_HTTP_TIMEOUT_SECONDS = 5
@@ -71,6 +73,7 @@ class CreatorEpisodeProductionK2HttpTests(unittest.TestCase):
             clock=lambda: "2026-08-17T01:00:00Z",
         )
         self.real_image_candidate_evidence = StubRealImageCandidateEvidence()
+        self.real_video_candidate_evidence = VideoCandidateEvidence()
         self.production = create_in_memory_boundary(
             project_boundary=self.assembly.project_context,
             series_episode_boundary=self.assembly.series_episode,
@@ -78,6 +81,8 @@ class CreatorEpisodeProductionK2HttpTests(unittest.TestCase):
             script_studio_boundary=self.assembly.script_studio,
             identity_reference_authority=k2_identity_authority(),
             real_image_candidate_evidence=self.real_image_candidate_evidence,
+            real_video_candidate_evidence=self.real_video_candidate_evidence,
+            media_selection_approval_authority=SelectionAuthority(),
             media_execution=self.media_execution,
             composition_execution=V4CompositionExecutor.from_artifact_root(
                 Path(self.artifacts.name)
@@ -787,24 +792,66 @@ class CreatorEpisodeProductionK2HttpTests(unittest.TestCase):
         payload = json.loads(injected.exception.read().decode("utf-8"))
         self.assertEqual(payload["error"]["code"], "invalid_request")
 
-        selection_endpoint = f"{base}/real-image-selection"
+        legacy_selection_endpoint = f"{base}/real-image-selection"
+        selection_endpoint = f"{base}/real-image-admission"
+        status, recorded = self.post(
+            f"{base}/real-image-candidates",
+            {"idempotencyKey": "http-m10-image-candidates-v1"},
+        )
+        self.assertEqual(status, 201)
+        self.assertEqual(len(recorded["candidates"]), 4)
+        self.assertEqual(len(recorded["technicalValidations"]), 4)
+        visual_qcs = []
+        for ordinal, validation in enumerate(
+            recorded["technicalValidations"], start=1
+        ):
+            status, assessed = self.post(
+                f"{base}/semantic-visual-qc",
+                {
+                    "idempotencyKey": f"http-m10-visual-qc-{ordinal}-v1",
+                    "technicalValidationRef": validation[
+                        "technicalValidationRef"
+                    ],
+                    "technicalValidationVersion": 1,
+                    "technicalValidationDigest": validation["payloadDigest"],
+                    "visualQcRef": f"http-m10-visual-qc-{ordinal}-v1",
+                    "visualQcVersion": 1,
+                    "reviewProfile": "k2-semantic-visual-qc-v1",
+                    "evidence": [
+                        {
+                            "evidenceRef": f"http-m10-review-frame-{ordinal}",
+                            "evidenceDigest": str(ordinal) * 64,
+                        }
+                    ],
+                    "supersedesVisualQc": None,
+                    "checks": {
+                        name: {"result": "PASS", "note": ""}
+                        for name in (
+                            "identity",
+                            "wardrobe",
+                            "location",
+                            "action",
+                            "prop",
+                            "motion",
+                        )
+                    },
+                    "result": "PASS",
+                },
+            )
+            self.assertEqual(status, 201)
+            visual_qcs.append(assessed["semanticVisualQc"])
         selection_payload = {
             "idempotencyKey": "http-m10-image-selection-v1",
             "selections": [
                 {
-                    "generationRequestRef": item["generationRequestRef"],
-                    "candidateRef": (
-                        self.real_image_candidate_evidence.candidate_ref(
-                            item["ordinal"]
-                        )
-                    ),
-                    "candidateContentDigest": (
-                        self.real_image_candidate_evidence.content_digest(
-                            item["ordinal"]
-                        )
-                    ),
+                    "visualQcRef": qc["visualQcRef"],
+                    "visualQcVersion": qc["visualQcVersion"],
+                    "visualQcDigest": qc["payloadDigest"],
+                    "selectionRef": f"http-m10-selection-{ordinal}-v1",
+                    "selectionVersion": 1,
+                    "approvalRef": f"http-m10-approval-{ordinal}-v1",
                 }
-                for item in planned["generationRequests"]
+                for ordinal, qc in enumerate(visual_qcs, start=1)
             ],
         }
         status, selected = self.post(selection_endpoint, selection_payload)
@@ -814,7 +861,7 @@ class CreatorEpisodeProductionK2HttpTests(unittest.TestCase):
         self.assertEqual(len(selected["assetVersions"]), 4)
         self.assertEqual(
             {item["actorRef"] for item in selected["selectionDecisions"]},
-            {"runtime-test-credential"},
+            {"human-reviewer-k2-image-test"},
         )
         self.assertTrue(
             all(
@@ -829,6 +876,12 @@ class CreatorEpisodeProductionK2HttpTests(unittest.TestCase):
         status, restored = self.get(selection_endpoint)
         self.assertEqual(status, 200)
         self.assertEqual(restored["state"], "REAL_IMAGE_READY")
+        status, legacy_restored = self.get(legacy_selection_endpoint)
+        self.assertEqual(status, 200)
+        self.assertEqual(
+            legacy_restored["realImageAdmissionManifest"]["payloadDigest"],
+            restored["realImageAdmissionManifest"]["payloadDigest"],
+        )
 
         video_endpoint = f"{base}/real-video-revision"
         status, video_plan = self.post(
@@ -865,6 +918,35 @@ class CreatorEpisodeProductionK2HttpTests(unittest.TestCase):
         self.assertEqual(restored["state"], "REAL_VIDEO_PLAN_READY")
         self.assertEqual(len(restored["videoGenerationRequests"]), 4)
 
+        status, projected = self.get(f"{base}/state-projection")
+        self.assertEqual(status, 200)
+        self.assertEqual(projected["rootState"]["state"], "ROOTS_READY")
+        self.assertEqual(
+            projected["productionProjection"]["state"],
+            "REAL_VIDEO_PLAN_READY",
+        )
+        self.assertEqual(projected["state"], "REAL_VIDEO_PLAN_READY")
+        self.assertEqual(projected["productionState"], projected["state"])
+        self.assertEqual(projected["visualQcState"]["state"], "NOT_RECORDED")
+        self.assertEqual(
+            projected["activeRevision"]["revisionRef"],
+            video_plan["realVideoPlan"]["realVideoPlanRef"],
+        )
+        self.assertEqual(
+            projected["invariants"]["assetVersionAuthority"],
+            "V5_CANONICAL_EVIDENCE_ONLY",
+        )
+
+        with self.assertRaises(error.HTTPError) as forged_reviewer:
+            self.post(
+                f"{base}/semantic-visual-qc",
+                {
+                    "idempotencyKey": "forged-reviewer",
+                    "reviewerRef": "browser-forged-reviewer",
+                },
+            )
+        self.assertEqual(forged_reviewer.exception.code, 400)
+
         with self.assertRaises(error.HTTPError) as forged:
             self.post(
                 selection_endpoint,
@@ -873,6 +955,155 @@ class CreatorEpisodeProductionK2HttpTests(unittest.TestCase):
         self.assertEqual(forged.exception.code, 400)
         payload = json.loads(forged.exception.read().decode("utf-8"))
         self.assertEqual(payload["error"]["code"], "invalid_request")
+
+        for forged_field in (
+            "actorRef",
+            "actorKind",
+            "authorityRef",
+            "authorityDecisionDigest",
+            "subjectDigest",
+        ):
+            with self.subTest(forged_field=forged_field):
+                with self.assertRaises(error.HTTPError) as forged_authority:
+                    self.post(
+                        f"{base}/media-selection",
+                        {
+                            "idempotencyKey": f"forged-{forged_field}",
+                            "approvalRef": "opaque-human-approval-ref",
+                            forged_field: "browser-forged-authority",
+                        },
+                    )
+                self.assertEqual(forged_authority.exception.code, 400)
+                rejected = json.loads(
+                    forged_authority.exception.read().decode("utf-8")
+                )
+                self.assertEqual(rejected["error"]["code"], "invalid_request")
+
+        # A closed-world request containing only approvalRef reaches Core
+        # unchanged.  This scope has no matching QC, so the expected result is
+        # an upstream conflict rather than a command-shape failure caused by a
+        # server-injected actor/authority field.
+        with self.assertRaises(error.HTTPError) as missing_qc:
+            self.post(
+                f"{base}/media-selection",
+                {
+                    "idempotencyKey": "media-selection-approval-ref-only",
+                    "visualQcRef": "missing-visual-qc",
+                    "visualQcVersion": 1,
+                    "visualQcDigest": "7" * 64,
+                    "selectionRef": "missing-qc-rejection",
+                    "selectionVersion": 1,
+                    "approvalRef": "opaque-human-approval-ref",
+                    "decision": "REJECTED",
+                },
+            )
+        self.assertEqual(missing_qc.exception.code, 409)
+        missing_qc_payload = json.loads(
+            missing_qc.exception.read().decode("utf-8")
+        )
+        self.assertEqual(
+            missing_qc_payload["error"]["code"], "upstream_not_confirmed"
+        )
+
+        status, video_candidates = self.post(
+            f"{base}/real-video-candidates",
+            {"idempotencyKey": "http-m11-video-candidates-v1"},
+        )
+        self.assertEqual(status, 201)
+        self.assertEqual(len(video_candidates["candidates"]), 4)
+        self.assertEqual(len(video_candidates["technicalValidations"]), 4)
+        video_selections = []
+        for ordinal, validation in enumerate(
+            video_candidates["technicalValidations"], start=1
+        ):
+            status, assessed = self.post(
+                f"{base}/semantic-visual-qc",
+                {
+                    "idempotencyKey": f"http-m11-visual-qc-{ordinal}-v1",
+                    "technicalValidationRef": validation[
+                        "technicalValidationRef"
+                    ],
+                    "technicalValidationVersion": 1,
+                    "technicalValidationDigest": validation["payloadDigest"],
+                    "visualQcRef": f"http-m11-visual-qc-{ordinal}-v1",
+                    "visualQcVersion": 1,
+                    "reviewProfile": "k2-semantic-visual-qc-v1",
+                    "evidence": [
+                        {
+                            "evidenceRef": f"http-m11-review-frame-{ordinal}",
+                            "evidenceDigest": format(ordinal + 4, "x") * 64,
+                        }
+                    ],
+                    "supersedesVisualQc": None,
+                    "checks": {
+                        name: {"result": "PASS", "note": ""}
+                        for name in (
+                            "identity",
+                            "wardrobe",
+                            "location",
+                            "action",
+                            "prop",
+                            "motion",
+                        )
+                    },
+                    "result": "PASS",
+                },
+            )
+            self.assertEqual(status, 201)
+            qc = assessed["semanticVisualQc"]
+            self.assertEqual(qc["reviewerRef"], "runtime-test-credential")
+            video_selections.append(
+                {
+                    "visualQcRef": qc["visualQcRef"],
+                    "visualQcVersion": qc["visualQcVersion"],
+                    "visualQcDigest": qc["payloadDigest"],
+                    "selectionRef": f"http-m11-selection-{ordinal}-v1",
+                    "selectionVersion": 1,
+                    "approvalRef": f"http-m11-approval-{ordinal}-v1",
+                }
+            )
+
+        status, video_admitted = self.post(
+            f"{base}/real-video-admission",
+            {
+                "idempotencyKey": "http-m11-video-admission-v1",
+                "selections": video_selections,
+            },
+        )
+        self.assertEqual(status, 201)
+        self.assertEqual(video_admitted["state"], "REAL_VIDEO_READY")
+        self.assertEqual(len(video_admitted["assetVersions"]), 4)
+        self.assertTrue(
+            all(
+                item["publicationAllowed"] is False
+                and item["immutable"] is True
+                for item in video_admitted["assetVersions"]
+            )
+        )
+        self.assertNotIn(
+            "storageKey", json.dumps(video_admitted, ensure_ascii=False)
+        )
+
+        status, final_projection = self.get(f"{base}/state-projection")
+        self.assertEqual(status, 200)
+        self.assertEqual(final_projection["state"], "REAL_VIDEO_READY")
+        self.assertEqual(
+            final_projection["productionProjection"]["state"],
+            "REAL_VIDEO_READY",
+        )
+        self.assertEqual(final_projection["visualQcState"]["state"], "PASS")
+        active_candidates = final_projection["candidateLifecycle"]["candidates"]
+        self.assertEqual(len(active_candidates), 4)
+        self.assertTrue(
+            all(
+                item["technicalState"] == "TECHNICALLY_VERIFIED"
+                and item["visualQcState"] == "VISUAL_QC_PASSED"
+                and item["selectionState"] == "SELECTED_BY_HUMAN"
+                and item["admissionState"] == "ADMITTED"
+                for item in active_candidates
+            ),
+            active_candidates,
+        )
 
 
 if __name__ == "__main__":

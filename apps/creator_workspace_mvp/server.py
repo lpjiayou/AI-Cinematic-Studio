@@ -133,8 +133,16 @@ EPISODE_PRODUCTION_SUBRESOURCES = {
     "finalize",
     "delivery",
     "real-media-revision",
+    "real-image-candidates",
     "real-image-selection",
+    "real-image-admission",
+    "real-image-successor-admission",
     "real-video-revision",
+    "real-video-candidates",
+    "semantic-visual-qc",
+    "media-selection",
+    "real-video-admission",
+    "state-projection",
 }
 
 
@@ -313,15 +321,35 @@ class CreatorRequestHandler(BaseHTTPRequestHandler):
             if (
                 production_subresource is not None
                 and production_subresource[1]
-                in {"production-readiness", "real-image-selection"}
+                in {
+                    "production-readiness",
+                    "semantic-visual-qc",
+                }
             ):
-                if "actorRef" in payload:
+                actor_field = (
+                    "reviewerRef"
+                    if production_subresource[1] == "semantic-visual-qc"
+                    else "actorRef"
+                )
+                if actor_field in payload:
                     self._send_application_error(400, "invalid_request")
                     return
                 payload = {
                     **payload,
-                    "actorRef": self._authenticated_credential_ref(),
+                    actor_field: self._authenticated_credential_ref(),
                 }
+            if (
+                production_subresource is not None
+                and production_subresource[1] == "media-selection"
+                and any(
+                    field == "subjectDigest"
+                    or field.startswith("actor")
+                    or field.startswith("authority")
+                    for field in payload
+                )
+            ):
+                self._send_application_error(400, "invalid_request")
+                return
             payload = {
                 **payload,
                 "workspaceRef": self._authenticated_workspace_ref(),
@@ -374,8 +402,36 @@ class CreatorRequestHandler(BaseHTTPRequestHandler):
                     result = self.episode_production_boundary.select_real_images(
                         command
                     )
+                elif resource == "real-image-candidates":
+                    result = self.episode_production_boundary.record_real_image_candidates(
+                        command
+                    )
+                elif resource == "real-image-admission":
+                    result = self.episode_production_boundary.admit_real_images(
+                        command
+                    )
+                elif resource == "real-image-successor-admission":
+                    result = self.episode_production_boundary.admit_real_image_successor(
+                        command
+                    )
                 elif resource == "real-video-revision":
                     result = self.episode_production_boundary.plan_real_videos(
+                        command
+                    )
+                elif resource == "real-video-candidates":
+                    result = self.episode_production_boundary.record_real_video_candidates(
+                        command
+                    )
+                elif resource == "semantic-visual-qc":
+                    result = self.episode_production_boundary.record_semantic_visual_qc(
+                        command
+                    )
+                elif resource == "media-selection":
+                    result = self.episode_production_boundary.record_human_selection(
+                        command
+                    )
+                elif resource == "real-video-admission":
+                    result = self.episode_production_boundary.admit_real_videos(
                         command
                     )
                 elif resource == "finalize":
@@ -587,12 +643,30 @@ class CreatorRequestHandler(BaseHTTPRequestHandler):
                         result = self.episode_production_boundary.get_real_media_revision(
                             workspace_ref, run_ref
                         )
-                    elif resource == "real-image-selection":
+                    elif resource in {
+                        "real-image-candidates",
+                        "real-image-selection",
+                        "real-image-admission",
+                        "real-image-successor-admission",
+                    }:
                         result = self.episode_production_boundary.get_real_media_revision(
                             workspace_ref, run_ref
                         )
                     elif resource == "real-video-revision":
                         result = self.episode_production_boundary.get_real_media_revision(
+                            workspace_ref, run_ref
+                        )
+                    elif resource in {
+                        "real-video-candidates",
+                        "semantic-visual-qc",
+                        "media-selection",
+                        "real-video-admission",
+                    }:
+                        result = self.episode_production_boundary.get_real_media_revision(
+                            workspace_ref, run_ref
+                        )
+                    elif resource == "state-projection":
+                        result = self.episode_production_boundary.get_state_projection(
                             workspace_ref, run_ref
                         )
                     elif resource in {"preview", "finalize", "delivery"}:
