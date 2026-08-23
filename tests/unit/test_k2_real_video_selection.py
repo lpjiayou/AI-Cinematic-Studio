@@ -277,6 +277,48 @@ class K2RealVideoSelectionTests(unittest.TestCase):
             "REAL_VIDEO_PLAN_READY",
         )
 
+    def test_changed_handoff_creates_complete_successor_revision_and_stales_old_qc(self):
+        first = self.record_candidates()
+        old_qc = self.visual_qc(first["technicalValidations"][0], 1)
+        self.video_candidate_evidence.tamper_after_recording = True
+        successor = self.revision.record_real_video_candidates(
+            {
+                "workspaceRef": WORKSPACE,
+                "productionRunRef": self.run["productionRunRef"],
+                "idempotencyKey": "m11-candidate-handoff-successor-v2",
+            }
+        )
+
+        successor_revisions = {
+            item["revisionRef"] for item in successor["candidates"]
+        }
+        self.assertEqual(len(successor_revisions), 1)
+        successor_revision = next(iter(successor_revisions))
+        self.assertNotEqual(
+            successor_revision, self.plan["realVideoPlan"]["realVideoPlanRef"]
+        )
+        self.assertTrue(
+            all(item.get("sourceCandidateRef") for item in successor["candidates"])
+        )
+        with self.assertRaises(CandidateNotSelectableError):
+            self.revision.candidate_review.prepare_human_selection_record(
+                {
+                    "workspaceRef": WORKSPACE,
+                    "productionRunRef": self.run["productionRunRef"],
+                    "idempotencyKey": "m11-stale-old-qc-selection-v1",
+                    **self.selection_request(old_qc, 1),
+                    "decision": "SELECTED",
+                }
+            )
+        projection = self.revision.state_projection.get_projection(
+            WORKSPACE, self.run["productionRunRef"]
+        )
+        self.assertEqual(
+            projection["activeRevision"]["revisionRef"], successor_revision
+        )
+        self.assertEqual(len(projection["candidates"]), 4)
+        self.assertEqual(projection["visualQcState"]["state"], "NOT_RECORDED")
+
 
 if __name__ == "__main__":
     unittest.main()

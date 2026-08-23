@@ -1097,7 +1097,7 @@ class CreatorEpisodeProductionK2HttpTests(unittest.TestCase):
         self.assertTrue(
             all(
                 item["technicalState"] == "TECHNICALLY_VERIFIED"
-                and item["visualQcState"] == "VISUAL_QC_PASSED"
+                and item["visualQcState"] == "SEMANTIC_QC_PASSED"
                 and item["selectionState"] == "SELECTED_BY_HUMAN"
                 and item["admissionState"] == "ADMITTED"
                 for item in active_candidates
