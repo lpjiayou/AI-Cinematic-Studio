@@ -1,6 +1,6 @@
 # ADR-0012 — K2 Internal Image-First Real-Media Revision
 
-- Status: `ACCEPTED / M10 COMPLETE / REAL_IMAGE_READY / M11 VIDEO PLAN HOST-PASSED / CANONICAL EXECUTION PENDING`
+- Status: `ACCEPTED / M10 COMPLETE / M11 VIDEO PLAN COMPLETE / REAL_VIDEO_PLAN_READY / GPU CANDIDATES NEXT`
 - Date: `2026-08-23`
 - Decision owner: Project Lead / Architecture Owner `蔺鹏`
 - Required base: `1650c3462b32899151cdba795ddc10e5171ff1da`
@@ -69,3 +69,10 @@ M11 planning is a separate append-only gate. It revalidates those exact admitted
 bytes, binds one image AssetVersion to each current CreativeShotVersion, fixes the
 four canonical frame counts and bounded A100 profile, and stops before GPU dispatch
 or video selection.
+
+The canonical plan command completed on implementation commit
+`c07b2af19a983ef0693502ba088baa08a7553181`. Its receipt is
+`k2-m11-real-video-plan-20260823T091831Z/receipt.json` with SHA-256
+`137c24c31cc8ddf7cc79d20b20e3d6f9038911b53bfb19dfc543671796b421fd`.
+Four exact start-image-bound requests exist; no video candidate, selection decision
+or video AssetVersion exists yet.

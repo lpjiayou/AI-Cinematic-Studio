@@ -2,7 +2,7 @@
 
 ## 1. Status and scope
 
-- Status: `M10 COMPLETE / REAL_IMAGE_READY / M11 VIDEO PLAN HOST-PASSED / CANONICAL EXECUTION PENDING`
+- Status: `M10 COMPLETE / M11 VIDEO PLAN COMPLETE / REAL_VIDEO_PLAN_READY / GPU CANDIDATE EXECUTION NEXT`
 - Date: `2026-08-23`
 - Project: `K2-001`
 - Required Core base: `1650c3462b32899151cdba795ddc10e5171ff1da`
@@ -161,6 +161,12 @@ The first exact A100/5B execution profile is `640×352`, 20 steps, `uni_pc/simpl
 CFG 5.0 and model shift 8.0. The plan records this bounded profile and advances only
 `REAL_IMAGE_READY → REAL_VIDEO_PLAN_READY`; it does not start ComfyUI, dispatch a
 job, create a video candidate, select media or create a video AssetVersion.
+
+Canonical execution of that planning command is closed by
+`k2-m11-real-video-plan-20260823T091831Z/receipt.json` with SHA-256
+`137c24c31cc8ddf7cc79d20b20e3d6f9038911b53bfb19dfc543671796b421fd`.
+The latest state is `REAL_VIDEO_PLAN_READY`; no GPU job or video candidate exists at
+this checkpoint.
 
 ## 7. State graph
 
