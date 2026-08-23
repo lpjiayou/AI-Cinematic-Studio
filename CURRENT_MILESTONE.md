@@ -10,7 +10,7 @@
 >
 > Current Task: `ACS-K2-CONTROL-PLANE-CONVERGENCE`
 >
-> Current Work Package: `ADR-0013 CORE IMPLEMENTATION COMPLETE / CORE 713/713 PASS / FRONTEND AND CROSS-REPO BROWSER GATE PENDING / M10 v1 ADMITTED HISTORY / M11 v1 TECHNICALLY VERIFIED BUT SEMANTIC VISUAL QC FAILED / SHOT 01 R2–R7 CLOSED WITHOUT ADMISSION`
+> Current Work Package: `ADR-0013 IMPLEMENTED + LOCALLY VERIFIED AS A TECHNICAL CANDIDATE / PROJECT LEAD ACCEPTANCE PENDING / M10 v1 ADMITTED HISTORY / M11 v1 TECHNICALLY VERIFIED BUT SEMANTIC VISUAL QC FAILED / SHOT 01 R2–R7 CLOSED WITHOUT ADMISSION`
 >
 > M6 Authorization: `ACCEPTED SURFACES + K2 EXTERNAL AUTHORITY CONNECTION / NO M6 SCHEMA EXPANSION`
 >
@@ -232,16 +232,23 @@ Implemented boundaries:
 
 Verification on the final working-tree snapshot:
 
-- focused ADR-0013 Core tests: `67 / 67 PASS` before final regression expansion;
-- repaired artifact-root failure regression: `PASS`;
-- updated connected M10 HTTP candidate/QC/authority/admission chain: `PASS`;
-- complete Core regression: `713 / 713 PASS` in `721.789s`;
+- append-only evidence, migration, CAS, V4 recovery/orphan handling and retired
+  Asset Registry focused regression: `53 / 53 PASS`;
+- digest-pinned delivery/media ApprovalAuthority focused regression: `11 / 11 PASS`;
+- Creator HTTP/contract regression: `14 / 14 PASS` plus public/canonical HTTP
+  regression `18 / 18 PASS`;
+- successor-revision, artifact revalidation and admission atomicity regression:
+  `PASS` for both image and video paths;
+- complete Core regression: `721 / 721 PASS` in `657.652s`;
 - `git diff --check`: `PASS`;
-- frontend typecheck, lint, production build and `127 / 127` unit tests: `PASS` on
+- frontend typecheck, lint, production build and `130 / 130` unit tests: `PASS` on
   the paired frontend candidate workspace.
 
-Cross-repository real-browser Gate C, final commits, push and remote-SHA equality are
-still required before this wave may be reported as a remote-verified checkpoint.
+The real Chromium Creator→BFF→Core HTTP gate passed on the candidate worktree with
+four active M11 candidates, canonical visual QC `FAIL`, zero selection/admission and
+zero browser/HTTP/mutation errors. Final handoff additionally requires rerunning that
+gate against the local feature-branch commit pair. Push, remote-SHA equality and
+Project Lead acceptance remain separate future gates.
 No GPU dispatch, canonical production-data convergence append, media admission,
 Master/Export, publication, deployment or `main` merge occurred in this local
 implementation checkpoint.
