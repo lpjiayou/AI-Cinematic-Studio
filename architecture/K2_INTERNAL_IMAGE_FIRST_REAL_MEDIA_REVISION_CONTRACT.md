@@ -2,10 +2,10 @@
 
 ## 1. Status and scope
 
-- Status: `IMPLEMENTATION CANDIDATE / OFFLINE VERIFIED / HOST APPLY PENDING`
+- Status: `M10 PLAN + FOUR LIVE CANDIDATES HOST-PASSED / EXACT SELECTION + ADMISSION HOST-IMPLEMENTED / CORE 638 PASS / RUNTIME ADMISSION PENDING`
 - Date: `2026-08-23`
 - Project: `K2-001`
-- Required Core base: `9fa17347b48e455db39fcabe6b545829738f0f0d`
+- Required Core base: `1650c3462b32899151cdba795ddc10e5171ff1da`
 - Parent run: `episode-production-run-f918dc281320440b9848bcb476f5605a`
 - Publication invariant: `publicationAllowed=false`
 
@@ -106,6 +106,23 @@ shot-image requests. It then creates immutable image AssetVersions and advances:
 REAL_IMAGE_PLAN_READY → REAL_IMAGE_READY
 ```
 
+The authenticated command surface is:
+
+```text
+POST /creator/api/v1/episode-production-runs/{runRef}/real-image-selection
+```
+
+It accepts only `idempotencyKey` plus exactly four closed-world selection items
+(`generationRequestRef`, `candidateRef`, `candidateContentDigest`). Workspace,
+production-run scope and `actorRef` are server-injected from the authenticated
+principal; a client-supplied actor or private path is rejected. Before the single
+append-only admission gate, V4 revalidates the digest-pinned execution receipt,
+technical-smoke receipt, four workflow graphs, both G2 reference bytes and all four
+PNG artifacts. V5 then records four `RealImageCandidate` facts, four
+`MediaSelectionDecision` facts, four immutable image `AssetVersion` facts and one
+admission manifest. The batch is atomic: no partial selection or partial asset
+admission is allowed.
+
 The same rule applies to the four M11 video candidates. A valid exact selection
 creates video successor AssetVersions and advances:
 
@@ -175,4 +192,3 @@ scripts. GPU execution starts only when the live capability gate can be evaluate
 The maximum automatic result before unseen-media review is technically verified
 candidates with zero selection decisions and zero admitted AssetVersions. Master,
 Export and publication remain prohibited.
-

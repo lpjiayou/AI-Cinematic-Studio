@@ -13,6 +13,7 @@ from services.v4_platform import (
     SqliteMediaJobAdapter,
     V4CompositionExecutor,
     create_comfyui_wan22_adapter_from_environment,
+    real_image_candidate_evidence_from_environment,
 )
 
 from .authority import (
@@ -72,7 +73,10 @@ from .internal_execution import (
     K2InternalExecutionGrant,
     internal_execution_grant_from_environment,
 )
-from .real_media_revision import K2RealMediaRevisionService
+from .real_media_revision import (
+    K2RealMediaRevisionService,
+    RealImageCandidateRejectedError,
+)
 from .external_authority import (
     external_authorities_from_environment,
     identity_reference_authority_from_environment,
@@ -128,6 +132,8 @@ class EpisodeProductionPublicBoundary:
         if isinstance(exc, ArtifactRejectedError):
             return EpisodeProductionPublicError(exc.code, 422)
         if isinstance(exc, ProviderCandidateRejectedError):
+            return EpisodeProductionPublicError(exc.code, 422)
+        if isinstance(exc, RealImageCandidateRejectedError):
             return EpisodeProductionPublicError(exc.code, 422)
         if isinstance(exc, WorkerUnavailableError):
             return EpisodeProductionPublicError(exc.code, 503)
@@ -239,6 +245,11 @@ class EpisodeProductionPublicBoundary:
     def plan_real_images(self, command: Mapping[str, Any]) -> dict[str, Any]:
         return self._invoke(self.__real_media_revision.plan_images, command)
 
+    def select_real_images(self, command: Mapping[str, Any]) -> dict[str, Any]:
+        return self._invoke(
+            self.__real_media_revision.select_and_admit_images, command
+        )
+
     def get_real_media_revision(
         self, workspace_ref: str, run_ref: str
     ) -> dict[str, Any]:
@@ -278,6 +289,7 @@ def _services(
     provider_policy_authority=None,
     provider_experiment_execution=None,
     internal_execution_grant: K2InternalExecutionGrant | None = None,
+    real_image_candidate_evidence=None,
     media_execution=None,
     composition_execution=None,
     approval_authority=None,
@@ -368,6 +380,7 @@ def _services(
     real_media_revision = K2RealMediaRevisionService(
         shot_graph,
         evidence_repository,
+        real_image_candidate_evidence,
         ref_factory=selected_ref_factory,
         clock=selected_clock,
     )
@@ -395,6 +408,7 @@ def create_in_memory_boundary(
     provider_policy_authority=None,
     provider_experiment_execution=None,
     internal_execution_grant: K2InternalExecutionGrant | None = None,
+    real_image_candidate_evidence=None,
     media_execution=None,
     composition_execution=None,
     approval_authority=None,
@@ -425,6 +439,7 @@ def create_in_memory_boundary(
         provider_policy_authority=provider_policy_authority,
         provider_experiment_execution=provider_experiment_execution,
         internal_execution_grant=internal_execution_grant,
+        real_image_candidate_evidence=real_image_candidate_evidence,
         media_execution=media_execution,
         composition_execution=composition_execution,
         approval_authority=approval_authority,
@@ -459,6 +474,7 @@ def create_local_development_boundary(
     provider_policy_authority=None,
     provider_experiment_execution=None,
     internal_execution_grant: K2InternalExecutionGrant | None = None,
+    real_image_candidate_evidence=None,
     media_execution=None,
     composition_execution=None,
     approval_authority=None,
@@ -514,6 +530,7 @@ def create_local_development_boundary(
         provider_policy_authority=provider_policy_authority,
         provider_experiment_execution=provider_experiment_execution,
         internal_execution_grant=internal_execution_grant,
+        real_image_candidate_evidence=real_image_candidate_evidence,
         media_execution=media_execution,
         composition_execution=composition_execution,
         approval_authority=approval_authority,
@@ -618,6 +635,9 @@ def create_local_development_boundary_from_environment(
         values,
         provider_profile=internal_provider_profile,
     )
+    real_image_candidate_evidence = (
+        real_image_candidate_evidence_from_environment(values)
+    )
     execution = MediaJobCoordinator(
         SqliteMediaJobAdapter(job_path),
         DeterministicLocalFfmpegAdapter(),
@@ -637,6 +657,7 @@ def create_local_development_boundary_from_environment(
         provider_policy_authority=provider_authority,
         provider_experiment_execution=provider_experiment_execution,
         internal_execution_grant=internal_execution_grant,
+        real_image_candidate_evidence=real_image_candidate_evidence,
         media_execution=execution,
         composition_execution=V4CompositionExecutor.from_artifact_root(artifact_root),
         initialize_if_missing=True,

@@ -41,6 +41,14 @@ from .comfyui import (
     create_comfyui_wan22_adapter_from_environment,
 )
 from .composition import CompositionExecutionError, V4CompositionExecutor
+from .real_image_candidates import (
+    PinnedRealImageCandidateEvidence,
+    REAL_IMAGE_EVIDENCE_ADAPTER_ID,
+    REAL_IMAGE_EVIDENCE_SCHEMA,
+    RealImageCandidateEvidenceConfigurationError,
+    RealImageCandidateEvidenceError,
+    real_image_candidate_evidence_from_environment,
+)
 
 __all__ = [
     "DeepSeekTextProvider",
@@ -79,4 +87,10 @@ __all__ = [
     "create_comfyui_wan22_adapter_from_environment",
     "CompositionExecutionError",
     "V4CompositionExecutor",
+    "PinnedRealImageCandidateEvidence",
+    "REAL_IMAGE_EVIDENCE_ADAPTER_ID",
+    "REAL_IMAGE_EVIDENCE_SCHEMA",
+    "RealImageCandidateEvidenceConfigurationError",
+    "RealImageCandidateEvidenceError",
+    "real_image_candidate_evidence_from_environment",
 ]

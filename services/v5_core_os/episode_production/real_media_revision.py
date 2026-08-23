@@ -9,7 +9,9 @@ are separate V4 execution and V5 admission operations.
 from __future__ import annotations
 
 from copy import deepcopy
-from typing import Any, Callable, Mapping
+from typing import Any, Callable, Mapping, Protocol, Sequence
+
+from services.v4_platform import RealImageCandidateEvidenceError
 
 from .delivery import QC_GATE
 from .evidence import EpisodeProductionEvidenceRepository, EvidenceFact, GateAppend
@@ -27,10 +29,40 @@ from .shot_graph import K2ShotGraphService
 
 
 REAL_IMAGE_PLAN_GATE = "M10_REAL_IMAGE_PLAN"
+REAL_IMAGE_ADMISSION_GATE = "M10_REAL_IMAGE_ADMISSION"
 REAL_IMAGE_REQUEST_SCHEMA_VERSION = "v5.k2-real-shot-image-request.v1"
 REAL_IMAGE_PLAN_SCHEMA_VERSION = "v5.k2-real-image-plan.v1"
+REAL_IMAGE_CANDIDATE_SCHEMA_VERSION = "v5.k2-real-image-candidate.v1"
+REAL_IMAGE_SELECTION_SCHEMA_VERSION = "v5.k2-media-selection-decision.v1"
+REAL_IMAGE_ASSET_VERSION_SCHEMA_VERSION = "v5.k2-real-image-asset-version.v1"
+REAL_IMAGE_ADMISSION_MANIFEST_SCHEMA_VERSION = (
+    "v5.k2-real-image-admission-manifest.v1"
+)
 REAL_IMAGE_PLANNER_ID = "v5.k2.real-image-planner.v1"
+REAL_IMAGE_ADMISSION_ID = "v5.k2.real-image-admission.v1"
 REAL_IMAGE_CAPABILITY = "self-hosted-multi-reference-shot-image-v1"
+
+
+class RealImageCandidateRejectedError(EpisodeProductionError):
+    code = "real_image_candidate_evidence_rejected"
+
+
+class RealImageCandidateEvidencePort(Protocol):
+    def resolve_candidates(
+        self,
+        workspace_ref: str,
+        production_run_ref: str,
+        real_image_plan_ref: str,
+        expected_requests: Sequence[Mapping[str, Any]],
+    ) -> dict[str, Any]: ...
+
+
+class RejectingRealImageCandidateEvidence:
+    def resolve_candidates(self, *args: Any, **kwargs: Any) -> dict[str, Any]:
+        del args, kwargs
+        raise RealImageCandidateEvidenceError(
+            "M10 candidate evidence is not configured"
+        )
 
 
 def _sealed(payload: Mapping[str, Any]) -> dict[str, Any]:
@@ -63,6 +95,27 @@ def _request_facts(gate: Mapping[str, Any]) -> list[dict[str, Any]]:
     return sorted(values, key=lambda item: item["ordinal"])
 
 
+def _facts(gate: Mapping[str, Any], prefix: str) -> list[dict[str, Any]]:
+    values = [
+        deepcopy(dict(item["payload"]))
+        for item in gate.get("facts", [])
+        if isinstance(item, Mapping)
+        and str(item.get("factKind", "")).startswith(prefix)
+        and isinstance(item.get("payload"), Mapping)
+    ]
+    return sorted(values, key=lambda item: item["ordinal"])
+
+
+def _content_digest(value: object, field: str) -> str:
+    if (
+        not isinstance(value, str)
+        or len(value) != 64
+        or any(character not in "0123456789abcdef" for character in value)
+    ):
+        raise EpisodeProductionError(f"{field} is invalid")
+    return value
+
+
 class K2RealMediaRevisionService:
     """Owns M10/M11 domain planning without owning provider execution."""
 
@@ -70,12 +123,16 @@ class K2RealMediaRevisionService:
         self,
         shot_graph: K2ShotGraphService,
         evidence: EpisodeProductionEvidenceRepository,
+        candidate_evidence: RealImageCandidateEvidencePort | None = None,
         *,
         ref_factory: Callable[[str], str],
         clock: Callable[[], str],
     ) -> None:
         self.shot_graph = shot_graph
         self.evidence = evidence
+        self.candidate_evidence = (
+            candidate_evidence or RejectingRealImageCandidateEvidence()
+        )
         self._ref_factory = ref_factory
         self._clock = clock
 
@@ -364,11 +421,473 @@ class K2RealMediaRevisionService:
         )
         return {**self._bundle(gate), "idempotentReplay": replay}
 
+    def _verified_plan(
+        self, workspace: str, run_ref: str
+    ) -> tuple[dict[str, Any], dict[str, Any]]:
+        verified = self.shot_graph.verify_shot_graph_current(workspace, run_ref)
+        qc = self._verified_qc(self.evidence, workspace, run_ref)
+        gate = self.evidence.get_gate(
+            workspace, run_ref, REAL_IMAGE_PLAN_GATE
+        )
+        if gate is None:
+            raise UpstreamNotReadyError("M10 real image plan is not ready")
+        bundle = self._bundle(gate)
+        plan = bundle["realImagePlan"]
+        requests = bundle["generationRequests"]
+        if (
+            plan.get("rootPayloadDigest") != verified["root"]["payloadDigest"]
+            or plan.get("identityLockDigest")
+            != verified["identityLock"]["payloadDigest"]
+            or plan.get("executableShotGraphDigest")
+            != verified["executableShotGraph"]["payloadDigest"]
+            or plan.get("sourceQcReportDigest") != qc["payloadDigest"]
+            or plan.get("generationRequestDigests")
+            != [item["payloadDigest"] for item in requests]
+            or plan.get("expectedRequestCount") != 4
+            or len(requests) != 4
+            or plan.get("publicationAllowed") is not False
+        ):
+            raise StaleInputError("recorded M10 image plan lineage is stale")
+        return verified, bundle
+
+    @staticmethod
+    def _selection_items(value: object) -> list[dict[str, str]]:
+        if not isinstance(value, list) or len(value) != 4:
+            raise EpisodeProductionError(
+                "exactly four M10 image selections are required"
+            )
+        result: list[dict[str, str]] = []
+        for item in value:
+            if not isinstance(item, Mapping) or set(item) != {
+                "generationRequestRef",
+                "candidateRef",
+                "candidateContentDigest",
+            }:
+                raise EpisodeProductionError(
+                    "selection fields do not match the M10 contract"
+                )
+            result.append(
+                {
+                    "generationRequestRef": _required_ref(
+                        item.get("generationRequestRef"),
+                        "generationRequestRef",
+                    ),
+                    "candidateRef": _required_ref(
+                        item.get("candidateRef"), "candidateRef"
+                    ),
+                    "candidateContentDigest": _content_digest(
+                        item.get("candidateContentDigest"),
+                        "candidateContentDigest",
+                    ),
+                }
+            )
+        request_refs = [item["generationRequestRef"] for item in result]
+        candidate_refs = [item["candidateRef"] for item in result]
+        if (
+            len(set(request_refs)) != 4
+            or len(set(candidate_refs)) != 4
+        ):
+            raise EpisodeProductionError("M10 image selections are ambiguous")
+        return sorted(result, key=lambda item: item["generationRequestRef"])
+
+    def select_and_admit_images(
+        self, command: Mapping[str, Any]
+    ) -> dict[str, Any]:
+        if not isinstance(command, Mapping) or set(command) != {
+            "workspaceRef",
+            "productionRunRef",
+            "idempotencyKey",
+            "actorRef",
+            "selections",
+        }:
+            raise EpisodeProductionError(
+                "command fields do not match the M10 selection contract"
+            )
+        workspace = _required_ref(command.get("workspaceRef"), "workspaceRef")
+        run_ref = _required_ref(
+            command.get("productionRunRef"), "productionRunRef"
+        )
+        client_key = _idempotency_key(command.get("idempotencyKey"))
+        actor_ref = _required_ref(command.get("actorRef"), "actorRef")
+        selections = self._selection_items(command.get("selections"))
+        verified, plan_bundle = self._verified_plan(workspace, run_ref)
+        root = verified["root"]
+        plan = plan_bundle["realImagePlan"]
+        requests = plan_bundle["generationRequests"]
+        request_by_ref = {
+            item["generationRequestRef"]: item for item in requests
+        }
+        if {item["generationRequestRef"] for item in selections} != set(
+            request_by_ref
+        ):
+            raise StaleInputError(
+                "M10 image selections do not cover the current plan"
+            )
+        gate_key = _digest(
+            {
+                "clientIdempotencyKey": client_key,
+                "stage": "m10-real-image-admission",
+            }
+        )
+        request_digest = _digest(
+            {
+                "clientIdempotencyKey": client_key,
+                "actorRef": actor_ref,
+                "rootPayloadDigest": root["payloadDigest"],
+                "realImagePlanDigest": plan["payloadDigest"],
+                "selections": selections,
+                "admissionId": REAL_IMAGE_ADMISSION_ID,
+            }
+        )
+        existing = self.evidence.get_gate(
+            workspace, run_ref, REAL_IMAGE_ADMISSION_GATE
+        )
+        if existing is not None:
+            if (
+                existing.get("idempotencyKey") != gate_key
+                or existing.get("requestDigest") != request_digest
+            ):
+                raise IdempotencyConflictError(
+                    "M10 image selection command conflicts"
+                )
+            return {**self._admission_bundle(existing), "idempotentReplay": True}
+        try:
+            handoff = self.candidate_evidence.resolve_candidates(
+                workspace,
+                run_ref,
+                plan["realImagePlanRef"],
+                requests,
+            )
+        except RealImageCandidateEvidenceError as exc:
+            raise RealImageCandidateRejectedError(
+                "V4 rejected the M10 image candidate evidence"
+            ) from exc
+        if (
+            not isinstance(handoff, Mapping)
+            or handoff.get("publicationAllowed") is not False
+            or not isinstance(handoff.get("candidates"), list)
+            or len(handoff["candidates"]) != 4
+        ):
+            raise RealImageCandidateRejectedError(
+                "V4 returned an incomplete M10 candidate handoff"
+            )
+        candidate_by_request = {
+            item.get("generationRequestRef"): item
+            for item in handoff["candidates"]
+            if isinstance(item, Mapping)
+        }
+        if len(candidate_by_request) != 4 or set(candidate_by_request) != set(
+            request_by_ref
+        ):
+            raise RealImageCandidateRejectedError(
+                "M10 candidate handoff does not match the current requests"
+            )
+        selection_by_request = {
+            item["generationRequestRef"]: item for item in selections
+        }
+        now = self._clock()
+        candidates: list[dict[str, Any]] = []
+        decisions: list[dict[str, Any]] = []
+        asset_versions: list[dict[str, Any]] = []
+        artifact_store_ref = _required_ref(
+            handoff.get("artifactStoreRef"), "artifactStoreRef"
+        )
+        evidence_ref = _required_ref(
+            handoff.get("candidateEvidenceRef"), "candidateEvidenceRef"
+        )
+        evidence_digest = _content_digest(
+            handoff.get("candidateEvidenceDigest"),
+            "candidateEvidenceDigest",
+        )
+        model_set_digest = _content_digest(
+            handoff.get("modelSetDigest"), "modelSetDigest"
+        )
+        adapter_identity = _required_ref(
+            handoff.get("adapterIdentity"), "adapterIdentity"
+        )
+        for request in requests:
+            raw = candidate_by_request[request["generationRequestRef"]]
+            selected = selection_by_request[request["generationRequestRef"]]
+            artifact = raw.get("artifact")
+            if not isinstance(artifact, Mapping):
+                raise RealImageCandidateRejectedError(
+                    "M10 candidate artifact metadata is missing"
+                )
+            candidate_ref = _required_ref(
+                raw.get("candidateRef"), "candidateRef"
+            )
+            artifact_digest = _content_digest(
+                artifact.get("sha256"), "candidate artifact digest"
+            )
+            if (
+                candidate_ref != selected["candidateRef"]
+                or artifact_digest != selected["candidateContentDigest"]
+                or raw.get("ordinal") != request["ordinal"]
+                or raw.get("generationRequestDigest")
+                != request["payloadDigest"]
+                or raw.get("creativeShotVersionRef")
+                != request["creativeShotVersionRef"]
+                or raw.get("state") != "TECHNICALLY_VERIFIED"
+                or raw.get("provenance") != "SELF_HOSTED_AI_GENERATED"
+                or raw.get("gpuUsed") is not True
+                or raw.get("publicationAllowed") is not False
+                or artifact.get("mediaType") != "image/png"
+                or artifact.get("width") != request["parameters"]["width"]
+                or artifact.get("height") != request["parameters"]["height"]
+                or not isinstance(artifact.get("byteSize"), int)
+                or artifact["byteSize"] <= 0
+                or not isinstance(artifact.get("storageKey"), str)
+                or not artifact["storageKey"]
+            ):
+                raise RealImageCandidateRejectedError(
+                    "selected M10 candidate failed lineage verification"
+                )
+            candidate = _sealed(
+                {
+                    "schemaVersion": REAL_IMAGE_CANDIDATE_SCHEMA_VERSION,
+                    "workspaceRef": workspace,
+                    "productionRunRef": run_ref,
+                    "candidateRef": candidate_ref,
+                    "candidateVersionRef": f"{candidate_ref}-v1",
+                    "version": 1,
+                    "ordinal": request["ordinal"],
+                    "generationRequestRef": request["generationRequestRef"],
+                    "generationRequestVersionRef": request[
+                        "generationRequestVersionRef"
+                    ],
+                    "generationRequestDigest": request["payloadDigest"],
+                    "creativeShotRef": request["creativeShotRef"],
+                    "creativeShotVersionRef": request[
+                        "creativeShotVersionRef"
+                    ],
+                    "creativeShotDigest": request["creativeShotDigest"],
+                    "candidateEvidenceRef": evidence_ref,
+                    "candidateEvidenceDigest": evidence_digest,
+                    "adapterIdentity": adapter_identity,
+                    "modelSetDigest": model_set_digest,
+                    "workflowDigest": _content_digest(
+                        raw.get("workflowDigest"), "workflowDigest"
+                    ),
+                    "artifactStoreRef": artifact_store_ref,
+                    "artifactStorageKey": artifact["storageKey"],
+                    "artifactSha256": artifact_digest,
+                    "artifactByteSize": artifact["byteSize"],
+                    "dimensions": {
+                        "width": artifact["width"],
+                        "height": artifact["height"],
+                    },
+                    "mediaKind": "image",
+                    "mediaType": "image/png",
+                    "validationState": "TECHNICALLY_VERIFIED",
+                    "selectionState": "SELECTED_BY_HUMAN",
+                    "admissionState": "ADMITTED",
+                    "provenance": "SELF_HOSTED_AI_GENERATED",
+                    "gpuUsed": True,
+                    "publicationAllowed": False,
+                    "recordedBy": REAL_IMAGE_ADMISSION_ID,
+                    "recordedAt": now,
+                }
+            )
+            decision = _sealed(
+                {
+                    "schemaVersion": REAL_IMAGE_SELECTION_SCHEMA_VERSION,
+                    "workspaceRef": workspace,
+                    "productionRunRef": run_ref,
+                    "selectionDecisionRef": _required_ref(
+                        self._ref_factory("media-selection-decision"),
+                        "selectionDecisionRef",
+                    ),
+                    "version": 1,
+                    "ordinal": request["ordinal"],
+                    "decision": "SELECT",
+                    "actorRef": actor_ref,
+                    "generationRequestRef": request[
+                        "generationRequestRef"
+                    ],
+                    "generationRequestDigest": request["payloadDigest"],
+                    "candidateRef": candidate["candidateRef"],
+                    "candidateDigest": candidate["payloadDigest"],
+                    "candidateContentDigest": artifact_digest,
+                    "decisionScope": "EXACT_FOUR_M10_IMAGE_CANDIDATES",
+                    "publicationAllowed": False,
+                    "decidedAt": now,
+                }
+            )
+            asset = _sealed(
+                {
+                    "schemaVersion": REAL_IMAGE_ASSET_VERSION_SCHEMA_VERSION,
+                    "workspaceRef": workspace,
+                    "productionRunRef": run_ref,
+                    "assetRef": _required_ref(
+                        self._ref_factory("real-image-asset"), "assetRef"
+                    ),
+                    "assetVersionRef": _required_ref(
+                        self._ref_factory("real-image-asset-version"),
+                        "assetVersionRef",
+                    ),
+                    "version": 1,
+                    "ordinal": request["ordinal"],
+                    "generationRequestRef": request[
+                        "generationRequestRef"
+                    ],
+                    "generationRequestVersionRef": request[
+                        "generationRequestVersionRef"
+                    ],
+                    "generationRequestDigest": request["payloadDigest"],
+                    "candidateRef": candidate["candidateRef"],
+                    "candidateDigest": candidate["payloadDigest"],
+                    "selectionDecisionRef": decision[
+                        "selectionDecisionRef"
+                    ],
+                    "selectionDecisionDigest": decision["payloadDigest"],
+                    "creativeShotRef": request["creativeShotRef"],
+                    "creativeShotVersionRef": request[
+                        "creativeShotVersionRef"
+                    ],
+                    "creativeShotDigest": request["creativeShotDigest"],
+                    "mediaKind": "image",
+                    "mediaType": "image/png",
+                    "artifactStoreRef": artifact_store_ref,
+                    "storageKey": artifact["storageKey"],
+                    "byteSize": artifact["byteSize"],
+                    "sha256": artifact_digest,
+                    "probe": {
+                        "width": artifact["width"],
+                        "height": artifact["height"],
+                        "format": "png",
+                    },
+                    "adapterIdentity": adapter_identity,
+                    "provenance": "SELF_HOSTED_AI_GENERATED",
+                    "rightsState": "NOT_REQUIRED_INTERNAL",
+                    "providerPolicyState": "NOT_REQUIRED_SELF_HOSTED",
+                    "budgetAuthorityState": "NOT_REQUIRED_INTERNAL",
+                    "state": "REGISTERED",
+                    "immutable": True,
+                    "publicationAllowed": False,
+                    "createdBy": REAL_IMAGE_ADMISSION_ID,
+                    "createdAt": now,
+                }
+            )
+            candidates.append(candidate)
+            decisions.append(decision)
+            asset_versions.append(asset)
+        manifest = _sealed(
+            {
+                "schemaVersion": REAL_IMAGE_ADMISSION_MANIFEST_SCHEMA_VERSION,
+                "workspaceRef": workspace,
+                "productionRunRef": run_ref,
+                "realImageAdmissionManifestRef": _required_ref(
+                    self._ref_factory("real-image-admission-manifest"),
+                    "realImageAdmissionManifestRef",
+                ),
+                "version": 1,
+                "rootPayloadDigest": root["payloadDigest"],
+                "realImagePlanRef": plan["realImagePlanRef"],
+                "realImagePlanDigest": plan["payloadDigest"],
+                "candidateEvidenceRef": evidence_ref,
+                "candidateEvidenceDigest": evidence_digest,
+                "candidateRefs": [item["candidateRef"] for item in candidates],
+                "candidateDigests": [
+                    item["payloadDigest"] for item in candidates
+                ],
+                "selectionDecisionRefs": [
+                    item["selectionDecisionRef"] for item in decisions
+                ],
+                "selectionDecisionDigests": [
+                    item["payloadDigest"] for item in decisions
+                ],
+                "assetVersionRefs": [
+                    item["assetVersionRef"] for item in asset_versions
+                ],
+                "assetVersionDigests": [
+                    item["payloadDigest"] for item in asset_versions
+                ],
+                "summary": {
+                    "technicallyVerifiedCandidates": 4,
+                    "humanSelections": 4,
+                    "registeredImageAssets": 4,
+                    "failed": 0,
+                },
+                "state": "REAL_IMAGE_READY",
+                "rightsState": "NOT_REQUIRED_INTERNAL",
+                "providerPolicyState": "NOT_REQUIRED_SELF_HOSTED",
+                "budgetAuthorityState": "NOT_REQUIRED_INTERNAL",
+                "publicationAllowed": False,
+                "createdBy": REAL_IMAGE_ADMISSION_ID,
+                "createdAt": now,
+            }
+        )
+        facts = tuple(
+            EvidenceFact(
+                f"RealImageCandidate:{item['ordinal']:04d}",
+                item["candidateRef"],
+                1,
+                item,
+                item["payloadDigest"],
+            )
+            for item in candidates
+        ) + tuple(
+            EvidenceFact(
+                f"MediaSelectionDecision:{item['ordinal']:04d}",
+                item["selectionDecisionRef"],
+                1,
+                item,
+                item["payloadDigest"],
+            )
+            for item in decisions
+        ) + tuple(
+            EvidenceFact(
+                f"AssetVersion:M10:{item['ordinal']:04d}",
+                item["assetVersionRef"],
+                1,
+                item,
+                item["payloadDigest"],
+            )
+            for item in asset_versions
+        ) + (
+            EvidenceFact(
+                "RealImageAdmissionManifest",
+                manifest["realImageAdmissionManifestRef"],
+                1,
+                manifest,
+                manifest["payloadDigest"],
+            ),
+        )
+        gate, replay = self.evidence.append_gate(
+            GateAppend(
+                workspace,
+                run_ref,
+                REAL_IMAGE_ADMISSION_GATE,
+                gate_key,
+                root["payloadDigest"],
+                request_digest,
+                "REAL_IMAGE_PLAN_READY",
+                "REAL_IMAGE_READY",
+                now,
+                facts,
+            )
+        )
+        return {**self._admission_bundle(gate), "idempotentReplay": replay}
+
     @staticmethod
     def _bundle(gate: Mapping[str, Any]) -> dict[str, Any]:
         return {
             "realImagePlan": _fact(gate, "RealImagePlan"),
             "generationRequests": _request_facts(gate),
+            "state": gate["toState"],
+        }
+
+    @staticmethod
+    def _admission_bundle(gate: Mapping[str, Any]) -> dict[str, Any]:
+        return {
+            "realImageAdmissionManifest": _fact(
+                gate, "RealImageAdmissionManifest"
+            ),
+            "candidates": _facts(gate, "RealImageCandidate:"),
+            "selectionDecisions": _facts(
+                gate, "MediaSelectionDecision:"
+            ),
+            "assetVersions": _facts(gate, "AssetVersion:M10:"),
             "state": gate["toState"],
         }
 
@@ -381,4 +900,12 @@ class K2RealMediaRevisionService:
         )
         if gate is None:
             raise UpstreamNotReadyError("M10 real image plan is not ready")
-        return self._bundle(gate)
+        plan_bundle = self._bundle(gate)
+        admission = self.evidence.get_gate(
+            workspace_ref,
+            production_run_ref,
+            REAL_IMAGE_ADMISSION_GATE,
+        )
+        if admission is None:
+            return plan_bundle
+        return {**plan_bundle, **self._admission_bundle(admission)}
