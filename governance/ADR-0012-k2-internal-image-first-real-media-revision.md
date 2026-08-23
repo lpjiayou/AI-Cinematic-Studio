@@ -82,3 +82,9 @@ It requires a freshly attested `LoadImage → Wan start_image` capability, resol
 the selected PNG by exact content digest, and records a 169/193-model-frame to
 168/192-timeline-frame postprocess before independent artifact verification. This
 does not authorize automatic selection or admission of the resulting videos.
+
+On 2026-08-23 that path produced four exact-frame, independently verified M11
+video candidates. The execution added four records only to the existing runtime
+media-job database and changed no canonical database. The candidates remain
+`UNSELECTED / NOT_ADMITTED / publicationAllowed=false`; this ADR does not permit
+the implementation or an operator wrapper to infer approval from technical pass.
