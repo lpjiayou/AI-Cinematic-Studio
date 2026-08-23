@@ -10,7 +10,7 @@
 >
 > Current Task: `ACS-K2-INTERNAL-IMAGE-FIRST-REAL-MEDIA-REVISION`
 >
-> Current Work Package: `G2→G6 COMPLETE / P1 HOST-PASSED / M10 PLAN + FOUR LIVE CANDIDATES COMPLETE / EXACT SELECTION + ADMISSION HOST-IMPLEMENTED AND 638-PASS / RUNTIME ADMISSION NEXT`
+> Current Work Package: `G2→G6 COMPLETE / P1 HOST-PASSED / M10 COMPLETE / FOUR EXACT IMAGE SELECTIONS ADMITTED / REAL_IMAGE_READY / M11 PLAN NEXT`
 >
 > M6 Authorization: `ACCEPTED SURFACES + K2 EXTERNAL AUTHORITY CONNECTION / NO M6 SCHEMA EXPANSION`
 >
@@ -22,7 +22,7 @@
 >
 > Integration Baseline: `K2 G0→G7 PRESERVED — CORE 518 / FRONTEND 118 / LOCAL PLAYABLE EVIDENCE`
 >
-> Production Ready: `NO — FOUR REAL SHOT-IMAGE CANDIDATES EXIST; EXACT IMAGE ADMISSION, REAL SHOT VIDEOS, MASTER/EXPORT/PUBLICATION ABSENT`
+> Production Ready: `NO — FOUR REAL SHOT-IMAGE ASSETVERSIONS ARE ADMITTED; REAL SHOT VIDEOS, MASTER/EXPORT/PUBLICATION ABSENT`
 
 ---
 
@@ -1321,10 +1321,37 @@ Later host evidence supersedes the final pre-execution paragraph above:
 - all four candidates remain publication-disabled until the exact selection gate is
   applied.
 
-The Project Lead has now reviewed those four exact receipt-bound candidates and
-explicitly chosen all four. The missing canonical `real-image-selection` Public API,
-digest-pinned V4 evidence adapter and atomic V5 admission gate have passed 29 focused
-tests and the complete 638-test Core suite on the canonical host. The next authorized
-mutation is the one exact authenticated selection/admission command; M11 remains
-blocked until that command independently verifies the pinned evidence and advances
-the same run to `REAL_IMAGE_READY`.
+The Project Lead reviewed those four exact receipt-bound candidates and explicitly
+chose all four. The missing canonical `real-image-selection` Public API,
+digest-pinned V4 evidence adapter and atomic V5 admission gate passed 29 focused
+tests and the complete 638-test Core suite on the canonical host. At that
+implementation checkpoint the only authorized mutation was the exact authenticated
+selection/admission command; the closeout below supersedes that pending state.
+
+### M10 exact image admission closeout — 2026-08-23
+
+The authenticated selection command has now completed on implementation commit
+`50415603f0d5d52fd43484d5a69d52bce71e5274`:
+
+- state transition: `REAL_IMAGE_PLAN_READY → REAL_IMAGE_READY`;
+- exact reviewed candidates: `4`;
+- authenticated `MediaSelectionDecision` facts: `4`;
+- immutable registered image `AssetVersion` facts: `4`;
+- admission facts: `13` in one atomic `M10_REAL_IMAGE_ADMISSION` gate;
+- non-evidence canonical/runtime database mutation count: `0`;
+- Rights: `NOT_REQUIRED_INTERNAL`;
+- Provider Policy: `NOT_REQUIRED_SELF_HOSTED`;
+- Budget Authority: `NOT_REQUIRED_INTERNAL`;
+- ComfyUI/GPU required for admission: `false`;
+- publication: `false`;
+- receipt:
+  `k2-m10-exact-image-selection-20260823T085155Z/receipt.json`;
+- receipt SHA-256:
+  `ed699ed23e6440cc5d2232f73d26d590d1c5805cc4536b5ecce4d496ee2fea24`.
+
+Independent read-only verification confirmed one admission gate, thirteen facts,
+four decisions bound to `k2-m10-four-image-review-20260823`, four immutable assets,
+latest state `REAL_IMAGE_READY`, a clean Core worktree, closed ports 8765/8188 and
+zero GPU utilization/memory use. The next connected work is M11 request derivation
+from these four exact image AssetVersions; it must not regenerate M10 or create a
+parallel asset stack.
