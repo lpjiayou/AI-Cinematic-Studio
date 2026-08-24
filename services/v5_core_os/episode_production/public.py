@@ -29,6 +29,7 @@ from .evidence import (
     InMemoryEpisodeProductionEvidenceAdapter,
     InvalidStateTransitionError,
     SqliteEpisodeProductionEvidenceAdapter,
+    validated_evidence_snapshot,
 )
 
 from .foundation import (
@@ -390,6 +391,12 @@ class EpisodeProductionPublicBoundary:
             self.__real_media_revision.evidence.read_snapshot,
             workspace_ref,
             run_ref,
+        )
+        snapshot = self._invoke(
+            validated_evidence_snapshot,
+            snapshot,
+            workspace_ref=workspace_ref,
+            run_ref=run_ref,
         )
         revision = self._invoke(
             self.__real_media_revision.get_revision_bundle,
