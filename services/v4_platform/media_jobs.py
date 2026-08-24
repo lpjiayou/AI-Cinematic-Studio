@@ -156,6 +156,34 @@ def _hex_digest(value: Any) -> bool:
     )
 
 
+def _m11_rendered_prompt_size(prompt_spec: Mapping[str, Any]) -> int:
+    camera = prompt_spec["cameraInstruction"]
+    camera_text = (
+        f"{camera['shotSize'].strip().replace('-', ' ')}, "
+        f"{camera['angle'].strip().replace('-', ' ')}, "
+        f"{camera['lensMm']:g}mm lens, "
+        f"{camera['movement'].strip().replace('-', ' ')}; "
+        f"{camera['intent'].strip().replace('-', ' ')}"
+    )
+    continuity = "; ".join(
+        item.strip() for item in prompt_spec["continuityConstraints"]
+    )
+    prompt = (
+        f"{prompt_spec['action'].strip()} Perform one restrained, continuous "
+        f"story beat only. Camera: {camera_text}. Begin from the exact supplied "
+        "first frame. Keep both people in their established screen positions and "
+        "preserve their roles. Use natural micro-expressions and small controlled "
+        "body or hand movement only. Preserve exact face identity, age, hairstyle, "
+        "body proportions, wardrobe, lighting, environment, framing and all visible "
+        "physical props. Do not introduce any physical prop that is absent from the "
+        "first frame; only diegetic light or projection changes explicitly required "
+        "by the action may appear. Do not remove, duplicate, exchange or transform a "
+        f"prop. Continuity: {continuity}. No cut, role swap, abrupt pose change or "
+        "unmotivated camera motion."
+    )
+    return len(prompt)
+
+
 def _validate_m11_video_request(request: Mapping[str, Any]) -> None:
     base_fields = {
         "schemaVersion", "workspaceRef", "productionRunRef",
@@ -184,6 +212,11 @@ def _validate_m11_video_request(request: Mapping[str, Any]) -> None:
     parameters = request.get("parameters")
     prompt_spec = request.get("promptSpec")
     source_probe = request.get("sourceImageProbe")
+    camera_instruction = (
+        prompt_spec.get("cameraInstruction")
+        if isinstance(prompt_spec, Mapping)
+        else None
+    )
     if (
         set(request) != fields
         or schema_version
@@ -262,25 +295,41 @@ def _validate_m11_video_request(request: Mapping[str, Any]) -> None:
             )
         )
         or not isinstance(source_probe, Mapping)
+        or set(source_probe) != {"width", "height", "format"}
         or isinstance(source_probe.get("width"), bool)
         or not isinstance(source_probe.get("width"), int)
         or source_probe["width"] < 32
         or isinstance(source_probe.get("height"), bool)
         or not isinstance(source_probe.get("height"), int)
         or source_probe["height"] < 32
+        or source_probe.get("format") != "png"
         or not isinstance(prompt_spec, Mapping)
         or set(prompt_spec)
         != {"cameraInstruction", "action", "continuityConstraints"}
-        or not isinstance(prompt_spec.get("cameraInstruction"), Mapping)
+        or not isinstance(camera_instruction, Mapping)
+        or set(camera_instruction)
+        != {"shotSize", "movement", "angle", "lensMm", "intent"}
+        or any(
+            not isinstance(camera_instruction.get(field), str)
+            or not camera_instruction[field].strip()
+            or len(camera_instruction[field]) > 160
+            for field in ("shotSize", "movement", "angle", "intent")
+        )
+        or isinstance(camera_instruction.get("lensMm"), bool)
+        or not isinstance(camera_instruction.get("lensMm"), (int, float))
+        or camera_instruction["lensMm"] < 8
+        or camera_instruction["lensMm"] > 200
         or not isinstance(prompt_spec.get("action"), str)
         or not prompt_spec["action"].strip()
-        or len(prompt_spec["action"]) > 2000
+        or len(prompt_spec["action"]) > 1000
         or not isinstance(prompt_spec.get("continuityConstraints"), list)
+        or not prompt_spec["continuityConstraints"]
+        or len(prompt_spec["continuityConstraints"]) > 24
         or not all(
-            isinstance(item, str) and item.strip() and len(item) <= 1000
+            isinstance(item, str) and item.strip() and len(item) <= 300
             for item in prompt_spec["continuityConstraints"]
         )
-        or len(_canonical(prompt_spec)) > 8_000
+        or _m11_rendered_prompt_size(prompt_spec) > 4_000
         or not isinstance(parameters, Mapping)
         or set(parameters)
         != {
@@ -302,7 +351,8 @@ def _validate_m11_video_request(request: Mapping[str, Any]) -> None:
         or not isinstance(parameters.get("seed"), int)
         or parameters["seed"] < 0
         or not isinstance(parameters.get("negativePrompt"), str)
-        or len(parameters["negativePrompt"]) > 4000
+        or not parameters["negativePrompt"].strip()
+        or len(parameters["negativePrompt"]) > 2000
     ):
         raise MediaJobError("invalid exact M11 video generation request")
 
@@ -1968,6 +2018,30 @@ class MediaJobCoordinator:
     ) -> tuple[list[str], bool]:
         quarantined: list[str] = []
         unsafe = False
+        candidate_key = intent.get("candidateStorageKey")
+        final_key = intent.get("finalStorageKey")
+        if isinstance(candidate_key, str) and isinstance(final_key, str):
+            try:
+                candidate_path = self._artifact_recovery.path_from_storage_key(
+                    candidate_key
+                )
+                final_path = self._artifact_recovery.path_from_storage_key(final_key)
+                if os.path.lexists(candidate_path) and os.path.lexists(final_path):
+                    candidate_stat = os.lstat(candidate_path)
+                    final_stat = os.lstat(final_path)
+                    if (
+                        stat.S_ISREG(candidate_stat.st_mode)
+                        and stat.S_ISREG(final_stat.st_mode)
+                        and candidate_stat.st_dev == final_stat.st_dev
+                        and candidate_stat.st_ino == final_stat.st_ino
+                        and candidate_stat.st_nlink == 2
+                        and final_stat.st_nlink == 2
+                    ):
+                        self._artifact_recovery.complete_linked_publication(
+                            candidate_path, final_path
+                        )
+            except (OSError, ArtifactRecoveryStoreError):
+                unsafe = True
         for field in ("finalStorageKey", "candidateStorageKey"):
             storage_key = intent.get(field)
             if not isinstance(storage_key, str):
@@ -2413,6 +2487,12 @@ class MediaJobCoordinator:
             }
         )
         current = self.repository.save(current, expected)
+        lease = current.get("lease")
+        if not isinstance(lease, Mapping) or not isinstance(
+            lease.get("leaseToken"), str
+        ):
+            raise MediaJobStateError("worker lease token is missing")
+        attempt_lease_token = lease["leaseToken"]
         candidate_path, final_path = self._attempt_paths(current, attempt_number)
         intent_persisted = False
         heartbeat: tuple[Event, Thread, list[BaseException]] | None = None
@@ -2518,9 +2598,22 @@ class MediaJobCoordinator:
             heartbeat = self._start_lease_heartbeat(
                 heartbeat_job, worker_ref, attempt["attemptRef"]
             )
+
+            def assert_publication_fence() -> None:
+                self._active_worker_job(
+                    current["workspaceRef"],
+                    current["productionRunRef"],
+                    current["jobRef"],
+                    worker_ref,
+                    attempt_lease_token,
+                    attempt["attemptRef"],
+                )
+
             try:
                 self._artifact_recovery.durable_replace(
-                    produced_path, final_path
+                    produced_path,
+                    final_path,
+                    assert_fence=assert_publication_fence,
                 )
             except ArtifactRecoveryStoreError as exc:
                 raise ArtifactVerificationError(str(exc)) from exc
@@ -2569,20 +2662,21 @@ class MediaJobCoordinator:
                 raise
             if intent_persisted:
                 raise
-            refreshed = self.repository.get(
-                current["workspaceRef"],
-                current["productionRunRef"],
-                current["jobRef"],
-            )
-            if (
-                refreshed is None
-                or refreshed.get("state") != "RUNNING"
-                or not refreshed.get("attempts")
-                or refreshed["attempts"][-1].get("attemptRef")
-                != attempt["attemptRef"]
-                or refreshed["attempts"][-1].get("state") != "RUNNING"
-            ):
+            try:
+                refreshed = self._active_worker_job(
+                    current["workspaceRef"],
+                    current["productionRunRef"],
+                    current["jobRef"],
+                    worker_ref,
+                    attempt_lease_token,
+                    attempt["attemptRef"],
+                )
+            except MediaJobStateError:
                 raise MediaJobStateError("worker lease was fenced") from exc
+            if isinstance(refreshed.get("artifactCommitIntent"), Mapping):
+                raise MediaJobStateError(
+                    "worker artifact commit state changed"
+                ) from exc
             current = refreshed
             current["artifactCommitIntent"] = None
             synthetic_intent: dict[str, str] | None = None
