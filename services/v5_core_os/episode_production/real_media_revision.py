@@ -3785,7 +3785,10 @@ class K2RealMediaRevisionService:
         ):
             return False
         current_candidates = self._current_video_candidates_by_slot(
-            workspace, run_ref, records=records
+            workspace,
+            run_ref,
+            records=records,
+            gates=gates,
         )
         if len(current_candidates) != 4:
             return False
@@ -3850,6 +3853,7 @@ class K2RealMediaRevisionService:
                     run_ref,
                     str(slot.get("candidateRef")),
                     records=records,
+                    gates=gates,
                 )
             except EpisodeProductionError:
                 return False
@@ -3930,6 +3934,7 @@ class K2RealMediaRevisionService:
         run_ref: str,
         *,
         records: Sequence[Mapping[str, Any]] | None = None,
+        gates: Sequence[Mapping[str, Any]] | None = None,
     ) -> dict[str, dict[str, Any]]:
         current: dict[str, dict[str, Any]] = {}
         candidate_records = (
@@ -3951,6 +3956,7 @@ class K2RealMediaRevisionService:
                     run_ref,
                     str(payload.get("candidateRef", "")),
                     records=records,
+                    gates=gates,
                 )
                 is None
             ):
@@ -6229,6 +6235,7 @@ class K2RealMediaRevisionService:
                 workspace_ref,
                 production_run_ref,
                 records=snapshot.records,
+                gates=snapshot.gates,
             )
             activation_is_current = (
                 active_video_admission.get("lineageCurrent") is True
