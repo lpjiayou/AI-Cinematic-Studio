@@ -919,6 +919,36 @@ class K2RealImageSelectionTests(unittest.TestCase):
             "SemanticVisualQCDecision"
         )
 
+    def test_public_image_successor_replay_rejects_invalid_snapshot_token(self):
+        _, command = self._prepare_successor_command(
+            "invalid-snapshot-token-replay"
+        )
+        self.boundary.admit_real_image_successor(command)
+        evidence = self.revision.evidence
+        original_read_snapshot = evidence.read_snapshot
+
+        def invalid_snapshot(workspace_ref, production_run_ref):
+            snapshot = original_read_snapshot(
+                workspace_ref, production_run_ref
+            )
+            invalid_token = (
+                "f" * 64
+                if snapshot.revisionToken != "f" * 64
+                else "e" * 64
+            )
+            return replace(snapshot, revisionToken=invalid_token)
+
+        evidence.read_snapshot = invalid_snapshot
+        try:
+            with self.assertRaises(EpisodeProductionPublicError) as caught:
+                self.boundary.admit_real_image_successor(command)
+        finally:
+            evidence.read_snapshot = original_read_snapshot
+        self.assertEqual(
+            (caught.exception.status, caught.exception.code),
+            (503, "episode_production_unavailable"),
+        )
+
     def test_intervening_candidate_append_cannot_partially_admit_assets(self):
         review = self.revision.candidate_review
         delegate = SelectionAuthority()
