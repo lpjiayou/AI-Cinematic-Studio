@@ -7,12 +7,14 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from hashlib import sha256
 import json
+from math import isfinite
 import os
 from pathlib import Path
+import re
 import sqlite3
 import stat
 import subprocess
-from threading import RLock
+from threading import Event, RLock, Thread
 from typing import Any, Callable, Mapping, Protocol
 
 from .artifact_recovery import ArtifactRecoveryStore, ArtifactRecoveryStoreError
@@ -22,8 +24,12 @@ LEGACY_JOB_SCHEMA_VERSION = "v4.media-job.v1"
 JOB_SCHEMA_VERSION = "v4.media-job.v2"
 ARTIFACT_SCHEMA_VERSION = "v4.media-artifact-handoff.v1"
 ARTIFACT_COMMIT_INTENT_SCHEMA_VERSION = "v4.media-artifact-commit-intent.v1"
+MEDIA_BATCH_SCHEMA_VERSION = "v4.media-batch.v1"
 _RECOVERY_WORKER_REF = "v4-media-artifact-recovery"
 M11_VIDEO_REQUEST_SCHEMA_VERSION = "v5.k2-real-shot-video-request.v1"
+M11_VIDEO_SUCCESSOR_REQUEST_SCHEMA_VERSION = (
+    "v5.k2-real-shot-video-request.v2"
+)
 M11_VIDEO_CAPABILITY = "self-hosted-wan22-image-to-video-v1"
 M11_VIDEO_PROVENANCE = "SELF_HOSTED_AI_GENERATED"
 
@@ -50,6 +56,9 @@ class ArtifactVerificationError(MediaJobError):
 
 class MediaJobRepository(Protocol):
     def create(self, job: Mapping[str, Any]) -> tuple[dict[str, Any], bool]: ...
+    def reserve_batch(
+        self, batch: Mapping[str, Any]
+    ) -> tuple[dict[str, Any], bool]: ...
     def get(self, workspace_ref: str, run_ref: str, job_ref: str) -> dict[str, Any] | None: ...
     def list(self, workspace_ref: str, run_ref: str) -> list[dict[str, Any]]: ...
     def save(self, job: Mapping[str, Any], expected_revision: int) -> dict[str, Any]: ...
@@ -87,6 +96,58 @@ def _digest(value: Mapping[str, Any]) -> str:
     return sha256(_canonical(value)).hexdigest()
 
 
+def _validate_batch(batch: Mapping[str, Any]) -> None:
+    members = batch.get("members")
+    if (
+        set(batch)
+        != {
+            "schemaVersion",
+            "workspaceRef",
+            "productionRunRef",
+            "batchIdempotencyKey",
+            "members",
+            "payloadDigest",
+        }
+        or batch.get("schemaVersion") != MEDIA_BATCH_SCHEMA_VERSION
+        or not isinstance(batch.get("workspaceRef"), str)
+        or not batch["workspaceRef"]
+        or not isinstance(batch.get("productionRunRef"), str)
+        or not batch["productionRunRef"]
+        or not isinstance(batch.get("batchIdempotencyKey"), str)
+        or not batch["batchIdempotencyKey"]
+        or not isinstance(members, list)
+        or not members
+        or _digest(
+            {key: value for key, value in batch.items() if key != "payloadDigest"}
+        )
+        != batch.get("payloadDigest")
+    ):
+        raise MediaJobError("media batch reservation is invalid")
+    expected_positions = list(range(1, len(members) + 1))
+    positions: list[int] = []
+    refs: list[str] = []
+    for member in members:
+        if (
+            not isinstance(member, Mapping)
+            or set(member)
+            != {
+                "position",
+                "generationRequestRef",
+                "generationRequestDigest",
+            }
+            or isinstance(member.get("position"), bool)
+            or not isinstance(member.get("position"), int)
+            or not isinstance(member.get("generationRequestRef"), str)
+            or not member["generationRequestRef"]
+            or not _hex_digest(member.get("generationRequestDigest"))
+        ):
+            raise MediaJobError("media batch member is invalid")
+        positions.append(member["position"])
+        refs.append(member["generationRequestRef"])
+    if positions != expected_positions or len(set(refs)) != len(refs):
+        raise MediaJobError("media batch members are not one ordered unique set")
+
+
 def _hex_digest(value: Any) -> bool:
     return (
         isinstance(value, str)
@@ -96,7 +157,7 @@ def _hex_digest(value: Any) -> bool:
 
 
 def _validate_m11_video_request(request: Mapping[str, Any]) -> None:
-    fields = {
+    base_fields = {
         "schemaVersion", "workspaceRef", "productionRunRef",
         "generationRequestRef", "generationRequestVersionRef", "version",
         "ordinal", "mediaKind", "mediaType", "creativeShotRef",
@@ -110,15 +171,60 @@ def _validate_m11_video_request(request: Mapping[str, Any]) -> None:
         "providerPolicyState", "budgetAuthorityState", "selectionRequired",
         "publicationAllowed", "createdBy", "createdAt", "payloadDigest",
     }
+    successor_fields = {
+        "realVideoRevisionRef",
+        "sourceRealVideoPlanRef",
+        "sourceRealVideoPlanDigest",
+        "supersedesGenerationRequestVersionRef",
+        "supersedesGenerationRequestDigest",
+    }
+    schema_version = request.get("schemaVersion")
+    is_successor = schema_version == M11_VIDEO_SUCCESSOR_REQUEST_SCHEMA_VERSION
+    fields = base_fields | (successor_fields if is_successor else set())
     parameters = request.get("parameters")
     prompt_spec = request.get("promptSpec")
     source_probe = request.get("sourceImageProbe")
     if (
         set(request) != fields
-        or request.get("schemaVersion") != M11_VIDEO_REQUEST_SCHEMA_VERSION
+        or schema_version
+        not in {
+            M11_VIDEO_REQUEST_SCHEMA_VERSION,
+            M11_VIDEO_SUCCESSOR_REQUEST_SCHEMA_VERSION,
+        }
         or _digest({k: v for k, v in request.items() if k != "payloadDigest"})
         != request.get("payloadDigest")
-        or request.get("version") != 1
+        or (
+            schema_version == M11_VIDEO_REQUEST_SCHEMA_VERSION
+            and (
+                isinstance(request.get("version"), bool)
+                or request.get("version") != 1
+            )
+        )
+        or (
+            is_successor
+            and (
+                isinstance(request.get("version"), bool)
+                or not isinstance(request.get("version"), int)
+                or request["version"] < 2
+                or not all(
+                    isinstance(request.get(field), str) and request[field]
+                    for field in (
+                        "realVideoRevisionRef",
+                        "sourceRealVideoPlanRef",
+                        "supersedesGenerationRequestVersionRef",
+                    )
+                )
+                or request.get("generationRequestVersionRef")
+                == request.get("supersedesGenerationRequestVersionRef")
+                or not all(
+                    _hex_digest(request.get(field))
+                    for field in (
+                        "sourceRealVideoPlanDigest",
+                        "supersedesGenerationRequestDigest",
+                    )
+                )
+            )
+        )
         or isinstance(request.get("ordinal"), bool)
         or request.get("ordinal") not in {1, 2, 3, 4}
         or request.get("mediaKind") != "video"
@@ -252,7 +358,11 @@ def _format_time(value: datetime) -> str:
 def _validate_request(request: Mapping[str, Any]) -> None:
     if (
         isinstance(request, Mapping)
-        and request.get("schemaVersion") == M11_VIDEO_REQUEST_SCHEMA_VERSION
+        and request.get("schemaVersion")
+        in {
+            M11_VIDEO_REQUEST_SCHEMA_VERSION,
+            M11_VIDEO_SUCCESSOR_REQUEST_SCHEMA_VERSION,
+        }
     ):
         _validate_m11_video_request(request)
         return
@@ -852,10 +962,24 @@ def _validate_job_update(
             and _parse_time(next_lease["leasedAt"])
             >= _parse_time(current_lease["expiresAt"])
         )
+        heartbeat_renewal = (
+            current["schemaVersion"] == JOB_SCHEMA_VERSION
+            and value["schemaVersion"] == JOB_SCHEMA_VERSION
+            and current["state"] == "RUNNING"
+            and value["state"] == "RUNNING"
+            and isinstance(current_lease, Mapping)
+            and isinstance(next_lease, Mapping)
+            and next_lease.get("workerRef") == current_lease.get("workerRef")
+            and next_lease.get("leaseToken") == current_lease.get("leaseToken")
+            and next_lease.get("leasedAt") == current_lease.get("leasedAt")
+            and _parse_time(next_lease["expiresAt"])
+            > _parse_time(current_lease["expiresAt"])
+        )
         if (
             next_lease != current_lease
             and not legacy_upgrade
             and not recovery_rotation
+            and not heartbeat_renewal
         ):
             raise MediaJobStateError("media job lease identity changed")
 
@@ -872,6 +996,7 @@ class InMemoryMediaJobAdapter:
     def __init__(self) -> None:
         self._jobs: dict[tuple[str, str, str], dict[str, Any]] = {}
         self._idem: dict[tuple[str, str, str], str] = {}
+        self._batches: dict[tuple[str, str, str], dict[str, Any]] = {}
         self._lock = RLock()
 
     def create(self, job: Mapping[str, Any]) -> tuple[dict[str, Any], bool]:
@@ -890,6 +1015,27 @@ class InMemoryMediaJobAdapter:
                 raise MediaJobConflictError("duplicate media job ref")
             self._jobs[key] = value
             self._idem[idem] = value["jobRef"]
+            return deepcopy(value), False
+
+    def reserve_batch(
+        self, batch: Mapping[str, Any]
+    ) -> tuple[dict[str, Any], bool]:
+        value = deepcopy(dict(batch))
+        _validate_batch(value)
+        key = (
+            value["workspaceRef"],
+            value["productionRunRef"],
+            value["batchIdempotencyKey"],
+        )
+        with self._lock:
+            existing = self._batches.get(key)
+            if existing is not None:
+                if existing["payloadDigest"] != value["payloadDigest"]:
+                    raise MediaJobConflictError(
+                        "media batch idempotency conflict"
+                    )
+                return deepcopy(existing), True
+            self._batches[key] = value
             return deepcopy(value), False
 
     def get(self, workspace_ref: str, run_ref: str, job_ref: str) -> dict[str, Any] | None:
@@ -920,78 +1066,222 @@ class InMemoryMediaJobAdapter:
 
 
 class SqliteMediaJobAdapter:
-    _TABLES = {"v4_media_job_schema", "v4_media_jobs"}
-    _COLUMNS = {
-        "v4_media_job_schema": ("component", "schema_version"),
-        "v4_media_jobs": (
-            "workspace_ref", "production_run_ref", "job_ref", "idempotency_key",
-            "request_digest", "state", "revision", "payload_json",
+    _SCHEMA_VERSION = 2
+    _LEGACY_TABLES = {"v4_media_job_schema", "v4_media_jobs"}
+    _TABLES = {
+        "v4_media_job_schema",
+        "v4_media_jobs",
+        "v4_media_job_batches",
+    }
+    _DDL = {
+        "v4_media_job_schema": (
+            "CREATE TABLE v4_media_job_schema ("
+            "component TEXT PRIMARY KEY, schema_version INTEGER NOT NULL)"
         ),
+        "v4_media_jobs": (
+            "CREATE TABLE v4_media_jobs ("
+            "workspace_ref TEXT NOT NULL,"
+            "production_run_ref TEXT NOT NULL,"
+            "job_ref TEXT NOT NULL,"
+            "idempotency_key TEXT NOT NULL,"
+            "request_digest TEXT NOT NULL,"
+            "state TEXT NOT NULL,"
+            "revision INTEGER NOT NULL,"
+            "payload_json TEXT NOT NULL,"
+            "PRIMARY KEY(workspace_ref,production_run_ref,job_ref),"
+            "UNIQUE(workspace_ref,production_run_ref,idempotency_key))"
+        ),
+        "v4_media_job_batches": (
+            "CREATE TABLE v4_media_job_batches ("
+            "workspace_ref TEXT NOT NULL,"
+            "production_run_ref TEXT NOT NULL,"
+            "batch_idempotency_key TEXT NOT NULL,"
+            "payload_digest TEXT NOT NULL,"
+            "payload_json TEXT NOT NULL,"
+            "PRIMARY KEY(workspace_ref,production_run_ref,batch_idempotency_key))"
+        ),
+    }
+    _TABLE_INFO = {
+        "v4_media_job_schema": (
+            ("component", "TEXT", 0, None, 1),
+            ("schema_version", "INTEGER", 1, None, 0),
+        ),
+        "v4_media_jobs": (
+            ("workspace_ref", "TEXT", 1, None, 1),
+            ("production_run_ref", "TEXT", 1, None, 2),
+            ("job_ref", "TEXT", 1, None, 3),
+            ("idempotency_key", "TEXT", 1, None, 0),
+            ("request_digest", "TEXT", 1, None, 0),
+            ("state", "TEXT", 1, None, 0),
+            ("revision", "INTEGER", 1, None, 0),
+            ("payload_json", "TEXT", 1, None, 0),
+        ),
+        "v4_media_job_batches": (
+            ("workspace_ref", "TEXT", 1, None, 1),
+            ("production_run_ref", "TEXT", 1, None, 2),
+            ("batch_idempotency_key", "TEXT", 1, None, 3),
+            ("payload_digest", "TEXT", 1, None, 0),
+            ("payload_json", "TEXT", 1, None, 0),
+        ),
+    }
+    _INDEXES = {
+        "v4_media_job_schema": {
+            ("pk", ("component",)),
+        },
+        "v4_media_jobs": {
+            ("pk", ("workspace_ref", "production_run_ref", "job_ref")),
+            (
+                "u",
+                ("workspace_ref", "production_run_ref", "idempotency_key"),
+            ),
+        },
+        "v4_media_job_batches": {
+            (
+                "pk",
+                (
+                    "workspace_ref",
+                    "production_run_ref",
+                    "batch_idempotency_key",
+                ),
+            ),
+        },
     }
 
     def __init__(self, database_path: Path | str, *, initialize_if_missing: bool = True) -> None:
         self.path = Path(database_path)
-        if initialize_if_missing:
-            self.path.parent.mkdir(parents=True, exist_ok=True)
-            self._initialize()
-        self._verify_schema()
+        try:
+            if initialize_if_missing:
+                self.path.parent.mkdir(parents=True, exist_ok=True)
+                self._initialize_or_migrate()
+            elif not self.path.is_file():
+                raise MediaJobError("media job database is unavailable")
+            self._verify_schema()
+        except MediaJobError:
+            raise
+        except (OSError, sqlite3.Error) as exc:
+            raise MediaJobError("media job database is unavailable") from exc
 
     def _connect(self) -> sqlite3.Connection:
         connection = sqlite3.connect(self.path, timeout=10)
         connection.row_factory = sqlite3.Row
         return connection
 
-    def _initialize(self) -> None:
+    @staticmethod
+    def _normalized_ddl(value: str | None) -> str:
+        if not isinstance(value, str):
+            return ""
+        normalized = re.sub(r"\s+", "", value).lower()
+        return normalized.replace("ifnotexists", "")
+
+    @staticmethod
+    def _user_objects(connection: sqlite3.Connection) -> set[tuple[str, str]]:
+        return {
+            (str(row[0]), str(row[1]))
+            for row in connection.execute(
+                "SELECT type,name FROM sqlite_master "
+                "WHERE name NOT LIKE 'sqlite_%'"
+            )
+        }
+
+    @classmethod
+    def _verify_table(
+        cls, connection: sqlite3.Connection, table: str
+    ) -> None:
+        row = connection.execute(
+            "SELECT sql FROM sqlite_master WHERE type='table' AND name=?",
+            (table,),
+        ).fetchone()
+        if (
+            row is None
+            or cls._normalized_ddl(row[0])
+            != cls._normalized_ddl(cls._DDL[table])
+        ):
+            raise MediaJobError("media job schema DDL mismatch")
+        table_info = tuple(
+            (str(row[1]), str(row[2]).upper(), int(row[3]), row[4], int(row[5]))
+            for row in connection.execute(f"PRAGMA table_info({table})")
+        )
+        if table_info != cls._TABLE_INFO[table]:
+            raise MediaJobError("media job schema columns mismatch")
+        indexes: set[tuple[str, tuple[str, ...]]] = set()
+        for row in connection.execute(f"PRAGMA index_list({table})"):
+            if int(row[2]) != 1 or int(row[4]) != 0:
+                raise MediaJobError("media job schema index mismatch")
+            name = str(row[1])
+            columns = tuple(
+                str(index_row[2])
+                for index_row in connection.execute(
+                    f"PRAGMA index_info({name})"
+                )
+            )
+            indexes.add((str(row[3]), columns))
+        if indexes != cls._INDEXES[table]:
+            raise MediaJobError("media job schema index mismatch")
+        if connection.execute(f"PRAGMA foreign_key_list({table})").fetchall():
+            raise MediaJobError("media job schema foreign keys mismatch")
+
+    @classmethod
+    def _verify_schema_connection(
+        cls, connection: sqlite3.Connection, *, version: int
+    ) -> None:
+        expected_tables = cls._LEGACY_TABLES if version == 1 else cls._TABLES
+        objects = cls._user_objects(connection)
+        if objects != {("table", table) for table in expected_tables}:
+            raise MediaJobError("media job schema mismatch")
+        for table in expected_tables:
+            cls._verify_table(connection, table)
+        marker = connection.execute(
+            "SELECT component,schema_version FROM v4_media_job_schema"
+        ).fetchall()
+        if [tuple(row) for row in marker] != [("media_jobs", version)]:
+            raise MediaJobError("media job schema marker mismatch")
+        integrity = connection.execute("PRAGMA quick_check").fetchall()
+        if [tuple(row) for row in integrity] != [("ok",)]:
+            raise MediaJobError("media job database integrity check failed")
+
+    def _initialize_or_migrate(self) -> None:
         connection = self._connect()
         try:
             connection.execute("PRAGMA foreign_keys=ON")
-            connection.execute(
-                "CREATE TABLE IF NOT EXISTS v4_media_job_schema ("
-                "component TEXT PRIMARY KEY, schema_version INTEGER NOT NULL)"
-            )
-            connection.execute(
-                "INSERT OR IGNORE INTO v4_media_job_schema VALUES ('media_jobs',1)"
-            )
-            connection.execute(
-                """CREATE TABLE IF NOT EXISTS v4_media_jobs (
-                workspace_ref TEXT NOT NULL,
-                production_run_ref TEXT NOT NULL,
-                job_ref TEXT NOT NULL,
-                idempotency_key TEXT NOT NULL,
-                request_digest TEXT NOT NULL,
-                state TEXT NOT NULL,
-                revision INTEGER NOT NULL,
-                payload_json TEXT NOT NULL,
-                PRIMARY KEY(workspace_ref,production_run_ref,job_ref),
-                UNIQUE(workspace_ref,production_run_ref,idempotency_key)
-                )"""
-            )
+            connection.execute("BEGIN IMMEDIATE")
+            objects = self._user_objects(connection)
+            if not objects:
+                connection.execute(self._DDL["v4_media_job_schema"])
+                connection.execute(
+                    "INSERT INTO v4_media_job_schema VALUES ('media_jobs',?)",
+                    (self._SCHEMA_VERSION,),
+                )
+                connection.execute(self._DDL["v4_media_jobs"])
+                connection.execute(self._DDL["v4_media_job_batches"])
+            elif objects == {
+                ("table", table) for table in self._LEGACY_TABLES
+            }:
+                self._verify_schema_connection(connection, version=1)
+                connection.execute(self._DDL["v4_media_job_batches"])
+                connection.execute(
+                    "UPDATE v4_media_job_schema SET schema_version=? "
+                    "WHERE component='media_jobs' AND schema_version=1",
+                    (self._SCHEMA_VERSION,),
+                )
+                if connection.total_changes != 1:
+                    raise MediaJobError("media job schema migration failed")
+            else:
+                self._verify_schema_connection(
+                    connection, version=self._SCHEMA_VERSION
+                )
             connection.commit()
+        except Exception:
+            connection.rollback()
+            raise
         finally:
             connection.close()
 
     def _verify_schema(self) -> None:
         connection = self._connect()
         try:
-            tables = {
-                row[0] for row in connection.execute(
-                    "SELECT name FROM sqlite_master WHERE type='table' "
-                    "AND name NOT LIKE 'sqlite_%'"
-                )
-            }
-            if tables != self._TABLES:
-                raise MediaJobError("media job schema mismatch")
-            for table, expected in self._COLUMNS.items():
-                actual = tuple(
-                    row[1] for row in connection.execute(f"PRAGMA table_info({table})")
-                )
-                if actual != expected:
-                    raise MediaJobError("media job schema columns mismatch")
-            marker = connection.execute(
-                "SELECT component,schema_version FROM v4_media_job_schema"
-            ).fetchall()
-            if [tuple(row) for row in marker] != [("media_jobs", 1)]:
-                raise MediaJobError("media job schema marker mismatch")
+            self._verify_schema_connection(
+                connection, version=self._SCHEMA_VERSION
+            )
         finally:
             connection.close()
 
@@ -1014,6 +1304,25 @@ class SqliteMediaJobAdapter:
             or value.get("revision") != row["revision"]
         ):
             raise MediaJobError("media job indexed fields are corrupt")
+        return value
+
+    @staticmethod
+    def _decode_batch(row: sqlite3.Row) -> dict[str, Any]:
+        try:
+            value = json.loads(row["payload_json"])
+        except (json.JSONDecodeError, TypeError):
+            raise MediaJobError("media batch payload is corrupt") from None
+        if not isinstance(value, dict):
+            raise MediaJobError("media batch payload is corrupt")
+        _validate_batch(value)
+        if (
+            value.get("workspaceRef") != row["workspace_ref"]
+            or value.get("productionRunRef") != row["production_run_ref"]
+            or value.get("batchIdempotencyKey")
+            != row["batch_idempotency_key"]
+            or value.get("payloadDigest") != row["payload_digest"]
+        ):
+            raise MediaJobError("media batch indexed fields are corrupt")
         return value
 
     def create(self, job: Mapping[str, Any]) -> tuple[dict[str, Any], bool]:
@@ -1046,6 +1355,51 @@ class SqliteMediaJobAdapter:
         except sqlite3.IntegrityError as exc:
             connection.rollback()
             raise MediaJobConflictError("duplicate media job") from exc
+        finally:
+            connection.close()
+
+    def reserve_batch(
+        self, batch: Mapping[str, Any]
+    ) -> tuple[dict[str, Any], bool]:
+        value = deepcopy(dict(batch))
+        _validate_batch(value)
+        connection = self._connect()
+        try:
+            connection.execute("BEGIN IMMEDIATE")
+            existing = connection.execute(
+                "SELECT * FROM v4_media_job_batches WHERE workspace_ref=? "
+                "AND production_run_ref=? AND batch_idempotency_key=?",
+                (
+                    value["workspaceRef"],
+                    value["productionRunRef"],
+                    value["batchIdempotencyKey"],
+                ),
+            ).fetchone()
+            if existing is not None:
+                restored = self._decode_batch(existing)
+                if restored["payloadDigest"] != value["payloadDigest"]:
+                    raise MediaJobConflictError(
+                        "media batch idempotency conflict"
+                    )
+                connection.rollback()
+                return deepcopy(restored), True
+            connection.execute(
+                "INSERT INTO v4_media_job_batches "
+                "(workspace_ref,production_run_ref,batch_idempotency_key,"
+                "payload_digest,payload_json) VALUES (?,?,?,?,?)",
+                (
+                    value["workspaceRef"],
+                    value["productionRunRef"],
+                    value["batchIdempotencyKey"],
+                    value["payloadDigest"],
+                    _canonical(value).decode("utf-8"),
+                ),
+            )
+            connection.commit()
+            return deepcopy(value), False
+        except sqlite3.IntegrityError as exc:
+            connection.rollback()
+            raise MediaJobConflictError("duplicate media batch") from exc
         finally:
             connection.close()
 
@@ -1234,12 +1588,23 @@ class MediaJobCoordinator:
         ref_factory: Callable[[str], str],
         clock: Callable[[], str],
         lease_seconds: int = 30,
+        heartbeat_interval_seconds: float | None = None,
         max_attempts: int = 3,
     ) -> None:
         if (
             isinstance(lease_seconds, bool)
             or not isinstance(lease_seconds, int)
             or lease_seconds < 1
+            or (
+                heartbeat_interval_seconds is not None
+                and (
+                    isinstance(heartbeat_interval_seconds, bool)
+                    or not isinstance(heartbeat_interval_seconds, (int, float))
+                    or not isfinite(float(heartbeat_interval_seconds))
+                    or heartbeat_interval_seconds <= 0
+                    or heartbeat_interval_seconds >= lease_seconds
+                )
+            )
             or isinstance(max_attempts, bool)
             or not isinstance(max_attempts, int)
             or max_attempts < 1
@@ -1255,7 +1620,150 @@ class MediaJobCoordinator:
         self._ref_factory = ref_factory
         self._clock = clock
         self.lease_seconds = lease_seconds
+        self.heartbeat_interval_seconds = (
+            float(heartbeat_interval_seconds)
+            if heartbeat_interval_seconds is not None
+            else min(max(lease_seconds / 3.0, 0.05), 5.0)
+        )
         self.max_attempts = max_attempts
+
+    def _active_worker_job(
+        self,
+        workspace_ref: str,
+        run_ref: str,
+        job_ref: str,
+        worker_ref: str,
+        lease_token: str,
+        attempt_ref: str,
+    ) -> dict[str, Any]:
+        current = self.repository.get(workspace_ref, run_ref, job_ref)
+        lease = current.get("lease") if current is not None else None
+        attempts = current.get("attempts") if current is not None else None
+        latest = attempts[-1] if isinstance(attempts, list) and attempts else None
+        if (
+            current is None
+            or current.get("state") != "RUNNING"
+            or not isinstance(lease, Mapping)
+            or lease.get("workerRef") != worker_ref
+            or lease.get("leaseToken") != lease_token
+            or _parse_time(lease["expiresAt"]) <= _parse_time(self._clock())
+            or not isinstance(latest, Mapping)
+            or latest.get("attemptRef") != attempt_ref
+            or latest.get("state") != "RUNNING"
+        ):
+            raise MediaJobStateError("worker lease was fenced")
+        return current
+
+    def _renew_running_lease(
+        self,
+        workspace_ref: str,
+        run_ref: str,
+        job_ref: str,
+        worker_ref: str,
+        lease_token: str,
+        attempt_ref: str,
+    ) -> dict[str, Any]:
+        for _ in range(4):
+            current = self._active_worker_job(
+                workspace_ref,
+                run_ref,
+                job_ref,
+                worker_ref,
+                lease_token,
+                attempt_ref,
+            )
+            lease = current["lease"]
+            now = _parse_time(self._clock())
+            proposed_expiry = now + timedelta(seconds=self.lease_seconds)
+            if proposed_expiry <= _parse_time(lease["expiresAt"]):
+                return current
+            expected = current["revision"]
+            current["lease"] = {
+                **dict(lease),
+                "expiresAt": _format_time(proposed_expiry),
+            }
+            current["updatedAt"] = _format_time(now)
+            try:
+                return self.repository.save(current, expected)
+            except MediaJobStateError:
+                continue
+        raise MediaJobStateError("worker lease heartbeat lost its CAS fence")
+
+    def _start_lease_heartbeat(
+        self,
+        job: Mapping[str, Any],
+        worker_ref: str,
+        attempt_ref: str,
+    ) -> tuple[Event, Thread, list[BaseException]]:
+        lease = job.get("lease")
+        if not isinstance(lease, Mapping) or not isinstance(
+            lease.get("leaseToken"), str
+        ):
+            raise MediaJobStateError("worker lease token is missing")
+        lease_token = lease["leaseToken"]
+        self._renew_running_lease(
+            job["workspaceRef"],
+            job["productionRunRef"],
+            job["jobRef"],
+            worker_ref,
+            lease_token,
+            attempt_ref,
+        )
+        stopped = Event()
+        failures: list[BaseException] = []
+
+        def heartbeat() -> None:
+            while not stopped.wait(self.heartbeat_interval_seconds):
+                try:
+                    self._renew_running_lease(
+                        job["workspaceRef"],
+                        job["productionRunRef"],
+                        job["jobRef"],
+                        worker_ref,
+                        lease_token,
+                        attempt_ref,
+                    )
+                except BaseException as exc:
+                    failures.append(exc)
+                    stopped.set()
+                    return
+
+        thread = Thread(
+            target=heartbeat,
+            name=f"media-job-heartbeat-{sha256(job['jobRef'].encode()).hexdigest()[:8]}",
+            daemon=True,
+        )
+        thread.start()
+        return stopped, thread, failures
+
+    def _stop_lease_heartbeat(
+        self,
+        heartbeat: tuple[Event, Thread, list[BaseException]],
+        job: Mapping[str, Any],
+        worker_ref: str,
+        attempt_ref: str,
+    ) -> dict[str, Any]:
+        stopped, thread, failures = heartbeat
+        stopped.set()
+        thread.join(timeout=max(1.0, min(self.heartbeat_interval_seconds * 2, 15.0)))
+        if thread.is_alive():
+            raise MediaJobStateError("worker lease heartbeat did not stop")
+        if failures:
+            failure = failures[0]
+            if isinstance(failure, MediaJobStateError):
+                raise failure
+            raise MediaJobStateError("worker lease heartbeat failed") from failure
+        lease = job.get("lease")
+        if not isinstance(lease, Mapping):
+            raise MediaJobStateError("worker lease token is missing")
+        return self._active_worker_job(
+            job["workspaceRef"],
+            job["productionRunRef"],
+            job["jobRef"],
+            worker_ref,
+            str(lease.get("leaseToken", "")),
+            attempt_ref,
+        )
 
     def _run_root(self, workspace_ref: str, run_ref: str) -> Path:
         try:
@@ -1907,7 +2415,13 @@ class MediaJobCoordinator:
         current = self.repository.save(current, expected)
         candidate_path, final_path = self._attempt_paths(current, attempt_number)
         intent_persisted = False
+        heartbeat: tuple[Event, Thread, list[BaseException]] | None = None
+        heartbeat_job: dict[str, Any] | None = None
         try:
+            heartbeat_job = deepcopy(current)
+            heartbeat = self._start_lease_heartbeat(
+                heartbeat_job, worker_ref, attempt["attemptRef"]
+            )
             try:
                 self._artifact_recovery.require_absent(candidate_path)
                 self._artifact_recovery.require_absent(final_path)
@@ -1985,15 +2499,13 @@ class MediaJobCoordinator:
             }
             if execution is not None:
                 artifact["providerExecution"] = deepcopy(execution)
-            current_lease = current.get("lease")
-            if (
-                not isinstance(current_lease, Mapping)
-                or _parse_time(current_lease["expiresAt"])
-                <= _parse_time(self._clock())
-            ):
-                raise MediaJobStateError(
-                    "worker lease expired before artifact commit"
-                )
+            current = self._stop_lease_heartbeat(
+                heartbeat,
+                heartbeat_job,
+                worker_ref,
+                attempt["attemptRef"],
+            )
+            heartbeat = None
             expected = current["revision"]
             commit_intent = self._build_commit_intent(
                 current, attempt, candidate_path, final_path, artifact
@@ -2002,6 +2514,10 @@ class MediaJobCoordinator:
             current["updatedAt"] = self._clock()
             current = self.repository.save(current, expected)
             intent_persisted = True
+            heartbeat_job = deepcopy(current)
+            heartbeat = self._start_lease_heartbeat(
+                heartbeat_job, worker_ref, attempt["attemptRef"]
+            )
             try:
                 self._artifact_recovery.durable_replace(
                     produced_path, final_path
@@ -2009,6 +2525,13 @@ class MediaJobCoordinator:
             except ArtifactRecoveryStoreError as exc:
                 raise ArtifactVerificationError(str(exc)) from exc
             artifact = self._verify_final_from_intent(current, commit_intent)
+            current = self._stop_lease_heartbeat(
+                heartbeat,
+                heartbeat_job,
+                worker_ref,
+                attempt["attemptRef"],
+            )
+            heartbeat = None
             expected = current["revision"]
             attempt_result = {
                 "state": "SUCCEEDED",
@@ -2029,9 +2552,38 @@ class MediaJobCoordinator:
                 }
             )
             return self.repository.save(current, expected)
-        except Exception as exc:
+        except BaseException as exc:
+            if heartbeat is not None:
+                heartbeat[0].set()
+                heartbeat[1].join(
+                    timeout=max(
+                        1.0,
+                        min(self.heartbeat_interval_seconds * 2, 15.0),
+                    )
+                )
+                if heartbeat[1].is_alive():
+                    raise MediaJobStateError(
+                        "worker lease heartbeat did not stop"
+                    ) from exc
+            if not isinstance(exc, Exception):
+                raise
             if intent_persisted:
                 raise
+            refreshed = self.repository.get(
+                current["workspaceRef"],
+                current["productionRunRef"],
+                current["jobRef"],
+            )
+            if (
+                refreshed is None
+                or refreshed.get("state") != "RUNNING"
+                or not refreshed.get("attempts")
+                or refreshed["attempts"][-1].get("attemptRef")
+                != attempt["attemptRef"]
+                or refreshed["attempts"][-1].get("state") != "RUNNING"
+            ):
+                raise MediaJobStateError("worker lease was fenced") from exc
+            current = refreshed
             current["artifactCommitIntent"] = None
             synthetic_intent: dict[str, str] | None = None
             error_code = getattr(exc, "code", "adapter_failed")
@@ -2072,17 +2624,46 @@ class MediaJobCoordinator:
         *,
         batch_idempotency_key: str,
     ) -> list[dict[str, Any]]:
-        for request in requests:
+        if (
+            not isinstance(batch_idempotency_key, str)
+            or not batch_idempotency_key
+            or not isinstance(requests, list)
+            or not requests
+        ):
+            raise MediaJobError("media batch identity is invalid")
+        members: list[dict[str, Any]] = []
+        for position, request in enumerate(requests, start=1):
+            _validate_request(request)
             if request.get("workspaceRef") != workspace_ref or request.get("productionRunRef") != run_ref:
                 raise MediaJobError("generation request scope mismatch")
+            members.append(
+                {
+                    "position": position,
+                    "generationRequestRef": request["generationRequestRef"],
+                    "generationRequestDigest": request["payloadDigest"],
+                }
+            )
+        batch = {
+            "schemaVersion": MEDIA_BATCH_SCHEMA_VERSION,
+            "workspaceRef": workspace_ref,
+            "productionRunRef": run_ref,
+            "batchIdempotencyKey": batch_idempotency_key,
+            "members": members,
+        }
+        batch["payloadDigest"] = _digest(batch)
+        self.repository.reserve_batch(batch)
+        expected_job_keys: set[str] = set()
+        for request in requests:
+            child_key = _digest(
+                {
+                    "batchIdempotencyKey": batch_idempotency_key,
+                    "generationRequestRef": request["generationRequestRef"],
+                }
+            )
+            expected_job_keys.add(child_key)
             self.dispatch(
                 request,
-                idempotency_key=_digest(
-                    {
-                        "batchIdempotencyKey": batch_idempotency_key,
-                        "generationRequestRef": request["generationRequestRef"],
-                    }
-                ),
+                idempotency_key=child_key,
             )
         worker_ref = (
             "v4-media-worker-"
@@ -2096,12 +2677,9 @@ class MediaJobCoordinator:
             if result["state"] == "FAILED" and len(result["attempts"]) < result["maxAttempts"]:
                 self.retry(workspace_ref, run_ref, result["jobRef"])
         jobs = self.repository.list(workspace_ref, run_ref)
-        relevant = {
-            request["generationRequestRef"] for request in requests
-        }
         selected = [
             job for job in jobs
-            if job["request"]["generationRequestRef"] in relevant
+            if job["idempotencyKey"] in expected_job_keys
         ]
         if len(selected) != len(requests):
             raise MediaAdapterUnavailableError("media batch did not complete")

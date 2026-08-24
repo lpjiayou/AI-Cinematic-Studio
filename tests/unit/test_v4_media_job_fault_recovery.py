@@ -314,6 +314,41 @@ class V4MediaJobFaultRecoveryTests(unittest.TestCase):
                 resumed.list_jobs(WORKSPACE, RUN)[0]["revision"], revision
             )
 
+    def test_unsafe_cleanup_target_never_clears_the_durable_intent(self):
+        with tempfile.TemporaryDirectory() as directory:
+            database, artifacts, clock, refs, adapter, stored, final_path = (
+                self._crash_after_publish(directory)
+            )
+            outside = Path(directory) / "outside-unsafe.mp4"
+            outside.write_bytes(b"must not be quarantined")
+            final_path.unlink()
+            final_path.symlink_to(outside)
+            clock.value = "2026-08-24T00:00:11Z"
+            restored = MediaJobCoordinator(
+                SqliteMediaJobAdapter(database),
+                adapter,
+                artifacts,
+                ref_factory=refs,
+                clock=clock,
+                lease_seconds=10,
+                max_attempts=1,
+            )
+
+            blocked = restored.recover_expired(WORKSPACE, RUN)[0]
+            self.assertEqual(blocked["state"], "FAILED")
+            self.assertEqual(
+                blocked["artifactCommitIntent"],
+                stored["artifactCommitIntent"],
+            )
+            self.assertTrue(final_path.is_symlink())
+            self.assertEqual(outside.read_bytes(), b"must not be quarantined")
+            revision = blocked["revision"]
+
+            replay = restored.recover_expired(WORKSPACE, RUN)[0]
+            self.assertEqual(replay["revision"], revision)
+            self.assertIsNotNone(replay["artifactCommitIntent"])
+            self.assertTrue(final_path.is_symlink())
+
     def test_expired_running_attempt_never_exceeds_max_attempts(self):
         class CrashBeforeArtifact:
             adapter_identity = "test.crash-before-artifact"

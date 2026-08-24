@@ -7,6 +7,7 @@ can be replayed safely after a process restart.
 
 from __future__ import annotations
 
+import errno
 from hashlib import sha256
 import os
 from pathlib import Path, PurePosixPath
@@ -487,7 +488,11 @@ class ArtifactRecoveryStore:
         if not os.path.lexists(source):
             if os.path.lexists(destination):
                 self._assert_no_symlinks(destination)
-                if not stat.S_ISREG(os.lstat(destination).st_mode):
+                destination_stat = os.lstat(destination)
+                if (
+                    not stat.S_ISREG(destination_stat.st_mode)
+                    or destination_stat.st_nlink != 1
+                ):
                     raise ArtifactRecoveryStoreError(
                         "quarantine replay target is unsafe"
                     )
@@ -508,81 +513,185 @@ class ArtifactRecoveryStore:
             raise ArtifactRecoveryStoreError(
                 "only one exact regular artifact may be quarantined"
             )
-        if os.path.lexists(destination):
-            try:
-                source_stat = os.lstat(source)
+        interrupted_link = False
+        if source_stat.st_nlink != 1:
+            if source_stat.st_nlink == 2 and os.path.lexists(destination):
                 destination_stat = os.lstat(destination)
-            except OSError as exc:
-                raise ArtifactRecoveryStoreError(
-                    "quarantine replay identity is unavailable"
-                ) from exc
-            if (
-                not stat.S_ISREG(source_stat.st_mode)
-                or not stat.S_ISREG(destination_stat.st_mode)
-                or source_stat.st_dev != destination_stat.st_dev
-                or source_stat.st_ino != destination_stat.st_ino
-            ):
-                raise ArtifactRecoveryStoreError(
-                    "quarantine target already exists"
+                interrupted_link = (
+                    stat.S_ISREG(destination_stat.st_mode)
+                    and destination_stat.st_dev == source_stat.st_dev
+                    and destination_stat.st_ino == source_stat.st_ino
+                    and destination_stat.st_nlink == 2
                 )
+            if not interrupted_link:
+                raise ArtifactRecoveryStoreError(
+                    "only one exact regular artifact may be quarantined"
+                )
+        created_link = False
+        replay = interrupted_link or os.path.lexists(destination)
+        completed_elsewhere = False
+        try:
             try:
-                synced_destination = self._fsync_file(destination)
+                synced_source = self._fsync_file(source)
+            except FileNotFoundError:
+                if not os.path.lexists(destination):
+                    raise
+                completed_destination = os.lstat(destination)
                 if (
-                    synced_destination.st_dev != destination_stat.st_dev
-                    or synced_destination.st_ino != destination_stat.st_ino
+                    not stat.S_ISREG(completed_destination.st_mode)
+                    or completed_destination.st_dev != source_stat.st_dev
+                    or completed_destination.st_ino != source_stat.st_ino
+                    or completed_destination.st_nlink != 1
                 ):
                     raise ArtifactRecoveryStoreError(
-                        "quarantine replay target changed"
+                        "quarantine target already exists"
                     )
-                self._fsync_directory(destination.parent)
-                os.unlink(source)
-                self._fsync_directory(source.parent)
-            except ArtifactRecoveryStoreError:
-                raise
-            except OSError as exc:
-                raise ArtifactRecoveryStoreError(
-                    "quarantine replay could not finish its move"
-                ) from exc
-            entry = self._entry(run_root, destination, set())
-            entry.update(
-                {
-                    "originalStorageKey": normalized_key,
-                    "quarantineReason": reason,
-                    "idempotentReplay": True,
-                }
-            )
-            return entry
-        if source_stat.st_nlink != 1:
-            raise ArtifactRecoveryStoreError(
-                "only one exact regular artifact may be quarantined"
-            )
-        try:
-            synced_source = self._fsync_file(source)
-            os.link(source, destination, follow_symlinks=False)
-            synced_destination = self._fsync_file(destination)
-            current_source = os.lstat(source)
+                synced_source = source_stat
+                interrupted_link = True
+                replay = True
+                completed_elsewhere = True
             if (
-                synced_destination.st_dev != synced_source.st_dev
-                or synced_destination.st_ino != synced_source.st_ino
-                or current_source.st_dev != synced_source.st_dev
-                or current_source.st_ino != synced_source.st_ino
+                synced_source.st_dev != source_stat.st_dev
+                or synced_source.st_ino != source_stat.st_ino
+                or not stat.S_ISREG(synced_source.st_mode)
+                or synced_source.st_nlink not in {1, 2}
             ):
                 raise ArtifactRecoveryStoreError(
-                    "artifact changed during quarantine"
+                    "artifact changed before quarantine claim"
                 )
-            self._fsync_directory(destination.parent)
-            os.unlink(source)
-            self._fsync_directory(source.parent)
+            if not completed_elsewhere and synced_source.st_nlink == 2:
+                if not os.path.lexists(destination):
+                    raise ArtifactRecoveryStoreError(
+                        "artifact has an unclaimed hard link"
+                    )
+                linked_destination = os.lstat(destination)
+                if (
+                    not stat.S_ISREG(linked_destination.st_mode)
+                    or linked_destination.st_dev != synced_source.st_dev
+                    or linked_destination.st_ino != synced_source.st_ino
+                    or linked_destination.st_nlink != 2
+                ):
+                    raise ArtifactRecoveryStoreError(
+                        "artifact has an unsafe hard link"
+                    )
+                interrupted_link = True
+                replay = True
+            if not interrupted_link:
+                try:
+                    os.link(source, destination, follow_symlinks=False)
+                    created_link = True
+                except OSError as exc:
+                    if exc.errno == errno.EEXIST:
+                        replay = True
+                    elif exc.errno == errno.ENOENT and os.path.lexists(
+                        destination
+                    ):
+                        replay = True
+                    else:
+                        raise
+
+            for _ in range(4):
+                source_exists = os.path.lexists(source)
+                destination_exists = os.path.lexists(destination)
+                if not destination_exists:
+                    raise ArtifactRecoveryStoreError(
+                        "quarantine claim disappeared"
+                    )
+                destination_stat = os.lstat(destination)
+                if (
+                    not stat.S_ISREG(destination_stat.st_mode)
+                    or destination_stat.st_dev != synced_source.st_dev
+                    or destination_stat.st_ino != synced_source.st_ino
+                ):
+                    raise ArtifactRecoveryStoreError(
+                        "quarantine target already exists"
+                    )
+                if not source_exists:
+                    if destination_stat.st_nlink != 1:
+                        raise ArtifactRecoveryStoreError(
+                            "quarantine move did not converge"
+                        )
+                    self._fsync_file(destination)
+                    self._fsync_directory(destination.parent)
+                    break
+                current_source = os.lstat(source)
+                if (
+                    not stat.S_ISREG(current_source.st_mode)
+                    or current_source.st_dev != synced_source.st_dev
+                    or current_source.st_ino != synced_source.st_ino
+                    or current_source.st_nlink != 2
+                    or destination_stat.st_nlink != 2
+                ):
+                    raise ArtifactRecoveryStoreError(
+                        "artifact changed during quarantine"
+                    )
+                synced_destination = self._fsync_file(destination)
+                if (
+                    synced_destination.st_dev != synced_source.st_dev
+                    or synced_destination.st_ino != synced_source.st_ino
+                    or synced_destination.st_nlink != 2
+                ):
+                    raise ArtifactRecoveryStoreError(
+                        "quarantine target changed"
+                    )
+                self._fsync_directory(destination.parent)
+                try:
+                    os.unlink(source)
+                except FileNotFoundError:
+                    continue
+                self._fsync_directory(source.parent)
+            else:
+                raise ArtifactRecoveryStoreError(
+                    "quarantine move did not converge"
+                )
         except ArtifactRecoveryStoreError:
+            if created_link:
+                try:
+                    if os.path.lexists(source) and os.path.lexists(destination):
+                        current_source = os.lstat(source)
+                        current_destination = os.lstat(destination)
+                        if (
+                            current_source.st_dev == synced_source.st_dev
+                            and current_source.st_ino == synced_source.st_ino
+                            and current_destination.st_dev == synced_source.st_dev
+                            and current_destination.st_ino == synced_source.st_ino
+                            and current_source.st_nlink == 2
+                            and current_destination.st_nlink == 2
+                        ):
+                            os.unlink(destination)
+                            self._fsync_directory(destination.parent)
+                except OSError as rollback_exc:
+                    raise ArtifactRecoveryStoreError(
+                        "artifact quarantine rollback failed"
+                    ) from rollback_exc
             raise
         except OSError as exc:
+            if created_link:
+                try:
+                    if os.path.lexists(source) and os.path.lexists(destination):
+                        current_source = os.lstat(source)
+                        current_destination = os.lstat(destination)
+                        if (
+                            current_source.st_dev == synced_source.st_dev
+                            and current_source.st_ino == synced_source.st_ino
+                            and current_destination.st_dev == synced_source.st_dev
+                            and current_destination.st_ino == synced_source.st_ino
+                            and current_source.st_nlink == 2
+                            and current_destination.st_nlink == 2
+                        ):
+                            os.unlink(destination)
+                            self._fsync_directory(destination.parent)
+                except OSError as rollback_exc:
+                    raise ArtifactRecoveryStoreError(
+                        "artifact quarantine rollback failed"
+                    ) from rollback_exc
             raise ArtifactRecoveryStoreError("artifact quarantine failed") from exc
         entry = self._entry(run_root, destination, set())
         entry.update(
             {
                 "originalStorageKey": normalized_key,
                 "quarantineReason": reason,
-                "idempotentReplay": False,
+                "idempotentReplay": replay,
             }
         )
         return entry

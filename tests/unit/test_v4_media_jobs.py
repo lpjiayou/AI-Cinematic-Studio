@@ -115,7 +115,14 @@ class V4SingleEpisodeMediaJobTests(unittest.TestCase):
                 }
             finally:
                 connection.close()
-            self.assertEqual(tables, {"v4_media_job_schema", "v4_media_jobs"})
+            self.assertEqual(
+                tables,
+                {
+                    "v4_media_job_schema",
+                    "v4_media_jobs",
+                    "v4_media_job_batches",
+                },
+            )
 
     def test_adapter_escape_is_failed_not_accepted(self):
         refs, run, generation_request = one_request()

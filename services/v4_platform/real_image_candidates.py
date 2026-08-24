@@ -12,6 +12,7 @@ from hashlib import sha256
 import json
 import os
 from pathlib import Path
+import stat
 import struct
 from typing import Any, Mapping, Sequence
 import zlib
@@ -39,6 +40,54 @@ def _sha256_file(path: Path) -> str:
         while chunk := handle.read(8 * 1024 * 1024):
             digest.update(chunk)
     return digest.hexdigest()
+
+
+def _read_exact_bytes(
+    path: Path, *, label: str, maximum_bytes: int = 8 * 1024 * 1024
+) -> bytes:
+    descriptor: int | None = None
+    try:
+        descriptor = os.open(
+            path,
+            os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0),
+        )
+        opened = os.fstat(descriptor)
+        if (
+            not os.path.samestat(opened, os.lstat(path))
+            or not stat.S_ISREG(opened.st_mode)
+            or opened.st_nlink != 1
+            or opened.st_size < 1
+            or opened.st_size > maximum_bytes
+        ):
+            raise RealImageCandidateEvidenceError(f"{label} is not one exact file")
+        chunks: list[bytes] = []
+        remaining = opened.st_size
+        while remaining:
+            chunk = os.read(descriptor, min(remaining, 1024 * 1024))
+            if not chunk:
+                break
+            chunks.append(chunk)
+            remaining -= len(chunk)
+        closed_over = os.fstat(descriptor)
+        current = os.lstat(path)
+    except RealImageCandidateEvidenceError:
+        raise
+    except OSError as exc:
+        raise RealImageCandidateEvidenceError(f"{label} is unreadable") from exc
+    finally:
+        if descriptor is not None:
+            os.close(descriptor)
+    content = b"".join(chunks)
+    if (
+        remaining != 0
+        or len(content) != opened.st_size
+        or not os.path.samestat(opened, closed_over)
+        or not os.path.samestat(opened, current)
+        or current.st_nlink != 1
+        or current.st_size != len(content)
+    ):
+        raise RealImageCandidateEvidenceError(f"{label} changed while being read")
+    return content
 
 
 def _exact(value: object, allowed: set[str], label: str) -> Mapping[str, Any]:
@@ -132,7 +181,7 @@ class PinnedRealImageCandidateEvidence:
         artifact_root: Path | str,
         input_root: Path | str,
     ) -> None:
-        self.evidence_path = Path(evidence_path).resolve()
+        self.evidence_path = Path(os.path.abspath(os.fspath(evidence_path)))
         self.evidence_sha256 = _hex_digest(
             evidence_sha256, "candidate evidence digest"
         )
@@ -140,25 +189,41 @@ class PinnedRealImageCandidateEvidence:
         self.input_root = Path(input_root).resolve()
         if (
             not self.evidence_path.is_absolute()
-            or not self.evidence_path.is_file()
             or not self.artifact_root.is_dir()
             or not self.input_root.is_dir()
         ):
             raise RealImageCandidateEvidenceConfigurationError(
                 "candidate evidence paths are unavailable"
             )
-        if _sha256_file(self.evidence_path) != self.evidence_sha256:
+        try:
+            evidence_bytes = _read_exact_bytes(
+                self.evidence_path, label="candidate evidence"
+            )
+        except RealImageCandidateEvidenceError as exc:
+            raise RealImageCandidateEvidenceConfigurationError(
+                "candidate evidence path is unavailable"
+            ) from exc
+        if sha256(evidence_bytes).hexdigest() != self.evidence_sha256:
             raise RealImageCandidateEvidenceConfigurationError(
                 "candidate evidence digest mismatch"
             )
 
     def _load(self) -> Mapping[str, Any]:
         try:
+            content = _read_exact_bytes(
+                self.evidence_path, label="candidate evidence"
+            )
+            if sha256(content).hexdigest() != self.evidence_sha256:
+                raise RealImageCandidateEvidenceError(
+                    "candidate evidence digest mismatch"
+                )
             value = json.loads(
-                self.evidence_path.read_text(encoding="utf-8"),
+                content.decode("utf-8"),
                 object_pairs_hook=self._reject_duplicate_keys,
             )
-        except (OSError, UnicodeError, json.JSONDecodeError) as exc:
+        except RealImageCandidateEvidenceError:
+            raise
+        except (UnicodeError, json.JSONDecodeError) as exc:
             raise RealImageCandidateEvidenceError(
                 "candidate evidence is unreadable"
             ) from exc
@@ -233,14 +298,19 @@ class PinnedRealImageCandidateEvidence:
         workflow_path = self.evidence_path.parent / (
             f"shot-{ordinal:02d}-workflow.json"
         )
-        if (
-            not workflow_path.is_file()
-            or _sha256_file(workflow_path) != candidate["workflowDigest"]
-        ):
+        try:
+            workflow_bytes = _read_exact_bytes(
+                workflow_path, label="workflow"
+            )
+        except RealImageCandidateEvidenceError:
+            raise RealImageCandidateEvidenceError(
+                "workflow digest mismatch"
+            ) from None
+        if sha256(workflow_bytes).hexdigest() != candidate["workflowDigest"]:
             raise RealImageCandidateEvidenceError("workflow digest mismatch")
         try:
-            workflow = json.loads(workflow_path.read_text(encoding="utf-8"))
-        except (OSError, UnicodeError, json.JSONDecodeError) as exc:
+            workflow = json.loads(workflow_bytes.decode("utf-8"))
+        except (UnicodeError, json.JSONDecodeError) as exc:
             raise RealImageCandidateEvidenceError("workflow is unreadable") from exc
         if not isinstance(workflow, Mapping):
             raise RealImageCandidateEvidenceError("workflow is invalid")
