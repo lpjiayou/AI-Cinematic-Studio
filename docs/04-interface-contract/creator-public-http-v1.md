@@ -174,6 +174,13 @@ current. `activeVideoAdmission` preserves the immutable historical activation fo
 audit. V4 `runtimeState` is observed separately and is not covered by
 `evidenceRevisionToken`.
 
+Canonical HumanSelection responses retain opaque `approvalRef`, actor/authority
+refs, the authority-decision ref/digest/time and `subjectDigest` as sealed lineage
+pins required for fail-closed client validation. These scalars are not the raw
+authority evidence body. The external bundle, its `approvals` array and nested
+subject object, raw bytes, credentials and operator configuration location are never
+public DTO fields.
+
 ### BREAKING migration: `real-image-selection`
 
 `POST /episode-production-runs/{runRef}/real-image-selection` is retained only as a
