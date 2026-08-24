@@ -20,11 +20,13 @@ class K2ProductionStateProjectionService:
         evidence: EpisodeProductionEvidenceRepository,
         candidate_review: K2MediaCandidateReviewService,
         runtime_reader: Any | None = None,
+        activation_reader: Any | None = None,
     ) -> None:
         self.root_service = root_service
         self.evidence = evidence
         self.candidate_review = candidate_review
         self.runtime_reader = runtime_reader
+        self.activation_reader = activation_reader
 
     def _runtime(self, workspace_ref: str, run_ref: str) -> dict[str, Any]:
         if self.runtime_reader is None or not hasattr(self.runtime_reader, "list_jobs"):
@@ -58,32 +60,78 @@ class K2ProductionStateProjectionService:
             "jobCount": len(jobs),
         }
 
+    @classmethod
+    def _active_candidates(
+        cls,
+        candidate_projection: Mapping[str, Any],
+        active_revision: Mapping[str, Any],
+    ) -> list[dict[str, Any]]:
+        all_candidates = candidate_projection.get("candidates", [])
+        candidate_refs = active_revision.get("candidateRefs")
+        if isinstance(candidate_refs, list):
+            expected = set(candidate_refs)
+            return [
+                deepcopy(dict(item))
+                for item in all_candidates
+                if isinstance(item, Mapping)
+                and item.get("candidateRef") in expected
+            ]
+        revision_ref = active_revision.get("revisionRef")
+        return [
+            deepcopy(dict(item))
+            for item in all_candidates
+            if isinstance(item, Mapping)
+            and (
+                item.get("revisionRef")
+                or (
+                    item.get("candidate", {}).get("revisionRef")
+                    if isinstance(item.get("candidate"), Mapping)
+                    else None
+                )
+            )
+            == revision_ref
+        ]
+
     def _active_revision(
         self,
         candidate_projection: Mapping[str, Any],
         gates: list[dict[str, Any]],
+        production_state: str,
+        video_activation: Mapping[str, Any] | None = None,
     ) -> dict[str, Any]:
+        if production_state in {
+                "REAL_VIDEO_PLAN_READY",
+                "REAL_VIDEO_READY",
+                "REAL_PREVIEW_READY",
+                "REAL_QC_READY",
+                "APPROVAL_READY",
+                "MASTER_READY",
+        }:
+            media_kind = "VIDEO"
+        elif production_state in {"REAL_IMAGE_PLAN_READY", "REAL_IMAGE_READY"}:
+            media_kind = "IMAGE"
+        else:
+            latest_by_kind = candidate_projection.get(
+                "latestCandidateRevisionRefs", {}
+            )
+            media_kind = (
+                "VIDEO"
+                if isinstance(latest_by_kind, Mapping)
+                and isinstance(latest_by_kind.get("VIDEO"), str)
+                else "IMAGE"
+            )
         latest_plan_revision: str | None = None
-        latest_admitted_revision: str | None = None
+        latest_plan_kind: str | None = None
+        latest_plan_expected_count: int | None = None
+        activation_manifest_ref: str | None = None
+        activation_manifest_digest: str | None = None
+        activation_revision_ref: str | None = None
+        activation_lineage_current = False
+        activation_candidate_identities: set[tuple[Any, Any]] = set()
         for gate in reversed(gates):
             facts = gate.get("facts", [])
             if not isinstance(facts, list):
                 continue
-            if latest_admitted_revision is None:
-                for fact in facts:
-                    if (
-                        isinstance(fact, Mapping)
-                        and fact.get("factKind")
-                        in {
-                            "RealImageAdmissionManifest",
-                            "RealVideoAdmissionManifest",
-                        }
-                        and isinstance(fact.get("payload"), Mapping)
-                    ):
-                        value = fact["payload"].get("revisionRef")
-                        if isinstance(value, str) and value:
-                            latest_admitted_revision = value
-                            break
             for expected_kind, field in (
                 ("RealVideoPlan", "realVideoPlanRef"),
                 ("RealImagePlan", "realImagePlanRef"),
@@ -97,107 +145,182 @@ class K2ProductionStateProjectionService:
                         value = fact["payload"].get(field)
                         if isinstance(value, str) and value:
                             latest_plan_revision = value
+                            latest_plan_kind = (
+                                "VIDEO" if expected_kind == "RealVideoPlan" else "IMAGE"
+                            )
+                            expected = fact["payload"].get("expectedRequestCount")
+                            if (
+                                isinstance(expected, int)
+                                and not isinstance(expected, bool)
+                                and expected > 0
+                            ):
+                                latest_plan_expected_count = expected
                             break
                 if latest_plan_revision is not None:
                     break
             if latest_plan_revision is not None:
                 break
-
-        # A Candidate append is the canonical declaration that a planned or
-        # successor revision has entered review.  Prefer the journal's explicit
-        # latest lineage over a plan: successor revisions intentionally need not
-        # manufacture another one-time production gate.  Older projections do not
-        # expose this field, so their existing plan fact remains the compatibility
-        # fallback.
-        latest_candidate_revision = candidate_projection.get(
-            "latestCandidateRevisionRef"
-        )
-        if latest_candidate_revision is not None:
-            if (
-                not isinstance(latest_candidate_revision, str)
-                or not latest_candidate_revision
-                or latest_candidate_revision != latest_candidate_revision.strip()
-            ):
-                raise RepositoryUnavailableError(
-                    "candidate revision projection is invalid"
-                )
-            latest_candidates = [
-                item
-                for item in candidate_projection.get("candidates", [])
-                if isinstance(item, Mapping)
-                and item.get("revisionRef") == latest_candidate_revision
-            ]
-            # A later production plan supersedes the review focus of a fully
-            # admitted predecessor revision.  An unadmitted successor Candidate
-            # still becomes active without manufacturing another one-time gate.
-            if (
-                latest_plan_revision is not None
-                and latest_plan_revision != latest_candidate_revision
-                and latest_candidates
-                and all(
-                    item.get("admissionState") == "ADMITTED"
-                    for item in latest_candidates
-                )
-            ):
-                if latest_admitted_revision == latest_candidate_revision:
-                    return {
-                        "state": "ACTIVE",
-                        "revisionRef": latest_candidate_revision,
-                        "authority": "V5_CANONICAL_APPEND_ONLY",
-                        "lineageSource": "ADMISSION_MANIFEST",
-                    }
-                return {
-                    "state": "ACTIVE",
-                    "revisionRef": latest_plan_revision,
-                    "authority": "V5_CANONICAL_APPEND_ONLY",
-                    "lineageSource": "PRODUCTION_PLAN_AFTER_ADMISSION",
+        if media_kind == "VIDEO" and isinstance(video_activation, Mapping):
+            activation_manifest_ref = video_activation.get("manifestRef")
+            activation_manifest_digest = video_activation.get("manifestDigest")
+            activation_revision_ref = video_activation.get("revisionRef")
+            activation_lineage_current = (
+                video_activation.get("lineageCurrent") is True
+            )
+            identities = video_activation.get("candidateIdentities")
+            if isinstance(identities, list):
+                activation_candidate_identities = {
+                    (item.get("candidateRef"), item.get("candidateDigest"))
+                    for item in identities
+                    if isinstance(item, Mapping)
                 }
-            return {
-                "state": "ACTIVE",
-                "revisionRef": latest_candidate_revision,
-                "authority": "V5_CANONICAL_APPEND_ONLY",
-                "lineageSource": "CANDIDATE_JOURNAL",
-            }
 
-        # There is deliberately no ActiveRevision fact lookup here: no accepted
-        # writer owns such a fact.  A current canonical plan is the safe fallback
-        # until the first Candidate for a successor lineage is appended.
-        if latest_plan_revision is not None:
-            return {
-                "state": "ACTIVE",
-                "revisionRef": latest_plan_revision,
-                "authority": "V5_CANONICAL_APPEND_ONLY",
-                "lineageSource": "PRODUCTION_PLAN",
-            }
-        candidates = candidate_projection.get("candidates", [])
-        revision_refs = {
-            candidate.get("revisionRef")
-            or (
-                candidate.get("candidate", {}).get("revisionRef")
-                if isinstance(candidate.get("candidate"), Mapping)
+        current_candidates = []
+        for item in candidate_projection.get("candidates", []):
+            payload = item.get("candidate") if isinstance(item, Mapping) else None
+            if (
+                isinstance(item, Mapping)
+                and (
+                    not isinstance(payload, Mapping)
+                    or payload.get("mediaKind") == media_kind
+                )
+                and item.get("applicabilityState", "CURRENT") == "CURRENT"
+            ):
+                current_candidates.append(item)
+        latest_refs = candidate_projection.get("latestCandidateRevisionRefs", {})
+        candidate_revision = (
+            latest_refs.get(media_kind) if isinstance(latest_refs, Mapping) else None
+        )
+        if candidate_revision is None:
+            candidate_revision = candidate_projection.get(
+                "latestCandidateRevisionRef"
+            )
+        if isinstance(candidate_revision, str) and candidate_revision:
+            revision_carriers = [
+                item.get("candidate")
+                for item in current_candidates
+                if isinstance(item.get("candidate"), Mapping)
+                and item.get("revisionRef") == candidate_revision
+                and isinstance(
+                    item["candidate"].get("consumedRealVideoRevision"), Mapping
+                )
+            ]
+            if revision_carriers:
+                revision_payload = revision_carriers[-1][
+                    "consumedRealVideoRevision"
+                ]
+                allowed_digests = set(
+                    revision_payload.get("generationRequestDigests", [])
+                )
+                current_candidates = [
+                    item
+                    for item in current_candidates
+                    if isinstance(item.get("candidate"), Mapping)
+                    and item["candidate"].get("sourceRequestDigest")
+                    in allowed_digests
+                ]
+            else:
+                current_candidates = [
+                    item
+                    for item in current_candidates
+                    if (
+                        item.get("revisionRef")
+                        or (
+                            item.get("candidate", {}).get("revisionRef")
+                            if isinstance(item.get("candidate"), Mapping)
+                            else None
+                        )
+                    )
+                    == candidate_revision
+                ]
+        by_slot: dict[str, Mapping[str, Any]] = {}
+        for item in current_candidates:
+            payload = item.get("candidate")
+            slot_ref = (
+                payload.get("slotRef")
+                if isinstance(payload, Mapping)
+                else item.get("candidateRef")
+            )
+            if not isinstance(slot_ref, str) or slot_ref in by_slot:
+                return {
+                    "state": "BLOCKED_AMBIGUOUS",
+                    "revisionRef": None,
+                    "mediaKind": media_kind,
+                    "candidateRefs": [],
+                    "activationManifestRef": activation_manifest_ref,
+                    "activationManifestDigest": activation_manifest_digest,
+                    "authority": "V5_CANONICAL_APPEND_ONLY",
+                }
+            by_slot[slot_ref] = item
+        revision_ref = (
+            candidate_revision
+            if isinstance(candidate_revision, str) and candidate_revision
+            else (
+                latest_plan_revision
+                if latest_plan_kind == media_kind
                 else None
             )
-            for candidate in candidates
-            if isinstance(candidate, Mapping)
-        }
-        revision_refs.discard(None)
-        if len(revision_refs) > 1:
+        )
+        if revision_ref is not None:
+            activation_state = (
+                "CURRENT"
+                if activation_lineage_current
+                and activation_revision_ref == revision_ref
+                and (
+                    len(by_slot) == latest_plan_expected_count
+                    if latest_plan_expected_count is not None
+                    else bool(by_slot)
+                )
+                and (
+                    not activation_candidate_identities
+                    or activation_candidate_identities
+                    == {
+                        (
+                            item.get("candidateRef"),
+                            item.get("candidate", {}).get("payloadDigest")
+                            if isinstance(item.get("candidate"), Mapping)
+                            else None,
+                        )
+                        for item in by_slot.values()
+                    }
+                )
+                else "STALE"
+            )
             return {
-                "state": "BLOCKED_AMBIGUOUS",
-                "revisionRef": None,
-                "candidateRevisionRefs": sorted(revision_refs),
+                "state": (
+                    "STALE_BLOCKED"
+                    if activation_manifest_ref is not None
+                    and activation_state != "CURRENT"
+                    else "ACTIVE"
+                ),
+                "revisionRef": revision_ref,
+                "mediaKind": media_kind,
+                "candidateRefs": [
+                    item["candidateRef"]
+                    for _, item in sorted(by_slot.items())
+                ],
+                "activationState": activation_state,
+                "activationManifestRef": activation_manifest_ref,
+                "activationManifestDigest": activation_manifest_digest,
+                "activationRevisionRef": activation_revision_ref,
                 "authority": "V5_CANONICAL_APPEND_ONLY",
-            }
-        if len(revision_refs) == 1:
-            return {
-                "state": "ACTIVE",
-                "revisionRef": next(iter(revision_refs)),
-                "authority": "V5_CANONICAL_APPEND_ONLY",
-                "lineageSource": "CANDIDATE_JOURNAL_COMPATIBILITY",
+                "lineageSource": (
+                    "ADMISSION_MANIFEST"
+                    if activation_state == "CURRENT"
+                    else (
+                        "CANDIDATE_JOURNAL"
+                        if candidate_revision is not None
+                        else "PRODUCTION_PLAN"
+                    )
+                ),
             }
         return {
             "state": "NOT_RECORDED",
             "revisionRef": None,
+            "mediaKind": media_kind,
+            "candidateRefs": [],
+            "activationManifestRef": activation_manifest_ref,
+            "activationManifestDigest": activation_manifest_digest,
             "authority": "V5_CANONICAL_APPEND_ONLY",
         }
 
@@ -225,7 +348,17 @@ class K2ProductionStateProjectionService:
                 else:
                     continue
                 expected = payload.get("expectedRequestCount")
-                if fact_revision_ref == revision_ref and (
+                if (
+                    fact_revision_ref == revision_ref
+                    or (
+                        active_revision.get("mediaKind") == "VIDEO"
+                        and fact.get("factKind") == "RealVideoPlan"
+                    )
+                    or (
+                        active_revision.get("mediaKind") == "IMAGE"
+                        and fact.get("factKind") == "RealImagePlan"
+                    )
+                ) and (
                     isinstance(expected, int)
                     and not isinstance(expected, bool)
                     and expected > 0
@@ -249,21 +382,9 @@ class K2ProductionStateProjectionService:
                 "decisions": [],
             }
         revision_ref = active_revision.get("revisionRef")
-        all_candidates = candidate_projection.get("candidates", [])
-        candidates = [
-            item
-            for item in all_candidates
-            if isinstance(item, Mapping)
-            and (
-                item.get("revisionRef")
-                or (
-                    item.get("candidate", {}).get("revisionRef")
-                    if isinstance(item.get("candidate"), Mapping)
-                    else None
-                )
-            )
-            == revision_ref
-        ]
+        candidates = K2ProductionStateProjectionService._active_candidates(
+            candidate_projection, active_revision
+        )
         decisions = [
             item["semanticVisualQc"]
             for item in candidates
@@ -275,7 +396,15 @@ class K2ProductionStateProjectionService:
                 gates, active_revision
             )
         )
-        if (
+        if active_revision.get("state") == "STALE_BLOCKED":
+            state = "STALE_BLOCKED"
+        elif any(
+            item.get("visualQcState") == "STALE"
+            for item in candidates
+            if isinstance(item, Mapping)
+        ):
+            state = "STALE"
+        elif (
             expected_candidate_count is not None
             and len(candidates) > expected_candidate_count
         ):
@@ -327,23 +456,19 @@ class K2ProductionStateProjectionService:
         candidates = self.candidate_review.get_projection(
             workspace_ref, production_run_ref
         )
-        active_revision = self._active_revision(candidates, gates)
-        active_revision_ref = active_revision.get("revisionRef")
-        all_candidates = candidates.get("candidates", [])
-        active_candidates = [
-            deepcopy(item)
-            for item in all_candidates
-            if isinstance(item, Mapping)
-            and (
-                item.get("revisionRef")
-                or (
-                    item.get("candidate", {}).get("revisionRef")
-                    if isinstance(item.get("candidate"), Mapping)
-                    else None
-                )
+        video_activation = None
+        if self.activation_reader is not None and hasattr(
+            self.activation_reader, "get_video_activation_projection"
+        ):
+            video_activation = self.activation_reader.get_video_activation_projection(
+                workspace_ref, production_run_ref
             )
-            == active_revision_ref
-        ]
+        active_revision = self._active_revision(
+            candidates, gates, production_state, video_activation
+        )
+        all_candidates = candidates.get("candidates", [])
+        active_revision_ref = active_revision.get("revisionRef")
+        active_candidates = self._active_candidates(candidates, active_revision)
         active_lifecycle = deepcopy(dict(candidates))
         active_lifecycle["candidates"] = active_candidates
         active_lifecycle["activeRevisionRef"] = active_revision_ref

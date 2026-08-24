@@ -4,7 +4,9 @@ from services.v5_core_os.episode_production.evidence import (
     InMemoryEpisodeProductionEvidenceAdapter,
 )
 from services.v5_core_os.episode_production.media_candidate_review import (
+    ASSET_VERSION,
     K2MediaCandidateReviewService,
+    _record,
 )
 from services.v5_core_os.episode_production.state_projection import (
     K2ProductionStateProjectionService,
@@ -146,6 +148,28 @@ class CandidateProjectionWithLatestRevision:
         }
 
 
+class ValidatedActivationReader:
+    def __init__(self, revision_ref):
+        self.revision_ref = revision_ref
+
+    def get_video_activation_projection(self, workspace_ref, production_run_ref):
+        return {
+            "manifestRef": "manifest-successor",
+            "manifestDigest": "5" * 64,
+            "revisionRef": self.revision_ref,
+            "revisionDigest": "4" * 64,
+            "candidateIdentities": [
+                {
+                    "slotRef": "slot-successor",
+                    "candidateRef": "candidate-successor",
+                    "candidateDigest": None,
+                }
+            ],
+            "lineageCurrent": True,
+            "mediaKind": "VIDEO",
+        }
+
+
 class K2StateProjectionTests(unittest.TestCase):
     def setUp(self):
         self.evidence = InMemoryEpisodeProductionEvidenceAdapter()
@@ -206,6 +230,32 @@ class K2StateProjectionTests(unittest.TestCase):
             "artifactByteSize": 1000,
             "provenance": "SELF_HOSTED_AI_GENERATED",
         }
+
+    def _register_candidate(self, service, evidence, revision_ref, suffix):
+        asset = _record(
+            workspace_ref=WORKSPACE,
+            run_ref=RUN,
+            kind=ASSET_VERSION,
+            ref=f"source-asset-{suffix}",
+            version=1,
+            idempotency_key=f"source-asset-{suffix}",
+            created_at="2026-08-24T00:59:00Z",
+            payload={
+                "schemaVersion": "v5.k2-real-image-asset-version.v1",
+                "assetRef": f"source-image-{suffix}",
+                "assetVersionRef": f"source-asset-{suffix}",
+                "version": 1,
+                "mediaKind": "image",
+                "creativeShotVersionRef": f"shot-{suffix}",
+                "state": "REGISTERED",
+                "immutable": True,
+                "publicationAllowed": False,
+            },
+        )
+        evidence.append_record(asset)
+        command = self._candidate_command(revision_ref, suffix)
+        command["sourceAssetVersions"][0]["assetVersionDigest"] = asset.payloadDigest
+        return service.register_candidate(command)["candidate"]
 
     @staticmethod
     def _record_qc(service, candidate, suffix, result):
@@ -268,12 +318,12 @@ class K2StateProjectionTests(unittest.TestCase):
             evidence,
             clock=lambda: "2026-08-24T01:00:00Z",
         )
-        old = candidates.register_candidate(
-            self._candidate_command("real-video-plan-history-v1", "old")
-        )["candidate"]
-        current = candidates.register_candidate(
-            self._candidate_command(current_revision, "current")
-        )["candidate"]
+        old = self._register_candidate(
+            candidates, evidence, "real-video-plan-history-v1", "old"
+        )
+        current = self._register_candidate(
+            candidates, evidence, current_revision, "current"
+        )
         self._record_qc(candidates, old, "old", "FAIL")
         self._record_qc(candidates, current, "current", "PASS")
 
@@ -330,6 +380,8 @@ class K2StateProjectionTests(unittest.TestCase):
                 visual_result="PASS",
                 admission_state="ADMITTED",
             ),
+            None,
+            ValidatedActivationReader(successor_revision),
         ).get_projection(WORKSPACE, RUN)
 
         self.assertEqual(
@@ -360,12 +412,12 @@ class K2StateProjectionTests(unittest.TestCase):
         self.assertEqual(projection["visualQcState"]["decisionCount"], 1)
 
     def test_multiple_candidate_revisions_use_latest_candidate_journal_lineage(self):
-        first = self.candidates.register_candidate(
-            self._candidate_command("revision-one", "one")
-        )["candidate"]
-        second = self.candidates.register_candidate(
-            self._candidate_command("revision-two", "two")
-        )["candidate"]
+        first = self._register_candidate(
+            self.candidates, self.evidence, "revision-one", "one"
+        )
+        second = self._register_candidate(
+            self.candidates, self.evidence, "revision-two", "two"
+        )
         self._record_qc(self.candidates, first, "one", "PASS")
         self._record_qc(self.candidates, second, "two", "PASS")
 
@@ -383,9 +435,12 @@ class K2StateProjectionTests(unittest.TestCase):
         self.assertEqual(projection["visualQcState"]["state"], "PASS")
 
     def test_explicit_qc_supersession_projects_only_the_applicable_decision(self):
-        candidate = self.candidates.register_candidate(
-            self._candidate_command("revision-supersession", "superseded")
-        )["candidate"]
+        candidate = self._register_candidate(
+            self.candidates,
+            self.evidence,
+            "revision-supersession",
+            "superseded",
+        )
         old_qc = self._record_qc(
             self.candidates, candidate, "superseded", "FAIL"
         )

@@ -139,7 +139,10 @@ class K2RealImageSelectionTests(unittest.TestCase):
             clock=lambda: "2026-08-23T08:00:00Z",
         )
         self.candidate_evidence = StubRealImageCandidateEvidence()
-        self.boundary = create_in_memory_boundary(
+        boundary_factory = getattr(
+            self, "_episode_production_boundary_factory", create_in_memory_boundary
+        )
+        self.boundary = boundary_factory(
             project_boundary=self.assembly.project_context,
             series_episode_boundary=self.assembly.series_episode,
             series_planning_boundary=self.assembly.series_planning,

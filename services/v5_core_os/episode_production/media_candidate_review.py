@@ -50,6 +50,7 @@ VISUAL_QC_PROFILE = {
 VISUAL_QC_PROFILE_DIGEST = _digest(VISUAL_QC_PROFILE)
 MEDIA_SELECTION_SUBJECT_SCHEMA_VERSION = "v5.k2-media-selection-subject.v1"
 VERIFIED_MEDIA_SELECTION_SCHEMA_VERSION = "v5.k2-verified-media-selection.v1"
+SUCCESSOR_VIDEO_CANDIDATE_SCHEMA_VERSION = "v5.k2-media-candidate.v2"
 
 
 class CandidateLifecycleError(EpisodeProductionError):
@@ -604,8 +605,33 @@ class K2MediaCandidateReviewService:
             raise CandidateLifecycleError(
                 "video candidate requires one exact source AssetVersion"
             )
+        consumed_request = command.get("consumedGenerationRequest")
+        consumed_revision = command.get("consumedRealVideoRevision")
+        if (consumed_request is None) != (consumed_revision is None):
+            raise CandidateLifecycleError(
+                "successor video candidate consumption evidence is incomplete"
+            )
+        if consumed_request is not None:
+            if media_kind != "VIDEO":
+                raise CandidateLifecycleError(
+                    "only video candidates may bind consumed video requests"
+                )
+            for value, field in (
+                (consumed_request, "consumedGenerationRequest"),
+                (consumed_revision, "consumedRealVideoRevision"),
+            ):
+                if not isinstance(value, Mapping):
+                    raise CandidateLifecycleError(f"{field} is invalid")
+                sealed = deepcopy(dict(value))
+                digest = sealed.pop("payloadDigest", None)
+                if digest is None or digest != _digest(sealed):
+                    raise CandidateLifecycleError(f"{field} digest is invalid")
         payload = {
-            "schemaVersion": "v5.k2-media-candidate.v1",
+            "schemaVersion": (
+                SUCCESSOR_VIDEO_CANDIDATE_SCHEMA_VERSION
+                if consumed_request is not None
+                else "v5.k2-media-candidate.v1"
+            ),
             "candidateRef": candidate_ref,
             "candidateVersion": candidate_version,
             "rootPayloadDigest": root_digest,
@@ -634,6 +660,25 @@ class K2MediaCandidateReviewService:
             "lifecycleState": "CANDIDATE_RECORDED",
             "publicationAllowed": False,
         }
+        if consumed_request is not None:
+            request = deepcopy(dict(consumed_request))
+            revision = deepcopy(dict(consumed_revision))
+            if (
+                request.get("generationRequestRef")
+                != payload["sourceRequestRef"]
+                or request.get("payloadDigest")
+                != payload["sourceRequestDigest"]
+                or request.get("creativeShotVersionRef") != payload["slotRef"]
+                or revision.get("realVideoRevisionRef")
+                != payload["revisionRef"]
+                or request.get("payloadDigest")
+                not in revision.get("generationRequestDigests", [])
+            ):
+                raise CandidateLifecycleError(
+                    "successor video candidate consumption lineage is invalid"
+                )
+            payload["consumedGenerationRequest"] = request
+            payload["consumedRealVideoRevision"] = revision
         if "storageKey" in command:
             payload["storageKey"] = _storage_key(command.get("storageKey"))
         if "sourceCandidateRef" in command:
@@ -700,7 +745,72 @@ class K2MediaCandidateReviewService:
             != selected_record.get("payloadDigest")
         ):
             return None
+        if not self._source_asset_versions_are_current(
+            workspace, run_ref, selected_payload
+        ):
+            return None
         return selected_record
+
+    def _source_asset_versions_are_current(
+        self,
+        workspace: str,
+        run_ref: str,
+        candidate: Mapping[str, Any],
+    ) -> bool:
+        """Verify that a VIDEO candidate still uses the canonical image version.
+
+        Historical compatibility records created before ADR-0013 can exist in a
+        journal that has no AssetVersion authority facts at all.  Once an
+        authoritative AssetVersion stream exists, however, every VIDEO source
+        binding must resolve to the latest immutable version of the same logical
+        image asset and the same shot slot.  This makes an admitted image
+        successor stale the old video candidate/QC without rewriting either.
+        """
+
+        if candidate.get("mediaKind") != "VIDEO":
+            return True
+        source_versions = candidate.get("sourceAssetVersions")
+        if not isinstance(source_versions, list) or len(source_versions) != 1:
+            return False
+        canonical = self.asset_versions.list_asset_versions(workspace, run_ref)
+        if not canonical:
+            return False
+        source = source_versions[0]
+        if not isinstance(source, Mapping):
+            return False
+        matching = [
+            item
+            for item in canonical
+            if item.get("assetVersionRef") == source.get("assetVersionRef")
+            and item.get("payloadDigest") == source.get("assetVersionDigest")
+        ]
+        if len(matching) != 1:
+            return False
+        selected = matching[0]
+        if (
+            str(selected.get("mediaKind", "")).lower() != "image"
+            or selected.get("creativeShotVersionRef") != candidate.get("slotRef")
+        ):
+            return False
+        logical_versions = [
+            item
+            for item in canonical
+            if item.get("assetRef") == selected.get("assetRef")
+            and str(item.get("mediaKind", "")).lower() == "image"
+        ]
+        if not logical_versions:
+            return False
+        latest = max(
+            logical_versions,
+            key=lambda item: (
+                int(item.get("version", 0)),
+                str(item.get("assetVersionRef", "")),
+            ),
+        )
+        return (
+            latest.get("assetVersionRef") == selected.get("assetVersionRef")
+            and latest.get("payloadDigest") == selected.get("payloadDigest")
+        )
 
     def _applicable_visual_qc(
         self, workspace: str, run_ref: str, candidate_ref: str
@@ -1274,10 +1384,30 @@ class K2MediaCandidateReviewService:
                 )
                 item["assetVersionRef"] = admission.get("assetVersionRef")
         for candidate_ref, item in candidates.items():
+            item["applicabilityState"] = (
+                "CURRENT"
+                if self._current_candidate_record(
+                    workspace_ref, production_run_ref, candidate_ref
+                )
+                is not None
+                else "STALE"
+            )
             current_qc = self._applicable_visual_qc(
                 workspace_ref, production_run_ref, candidate_ref
             )
             if current_qc is None:
+                historical_qc = [
+                    _payload(record)
+                    for record in records
+                    if record.get("recordKind") == SEMANTIC_VISUAL_QC
+                    and isinstance(record.get("payload"), Mapping)
+                    and record["payload"].get("candidateRef") == candidate_ref
+                ]
+                if historical_qc and self._current_candidate_record(
+                    workspace_ref, production_run_ref, candidate_ref
+                ) is None:
+                    item["visualQcState"] = "STALE"
+                    item["latestHistoricalSemanticVisualQc"] = historical_qc[-1]
                 continue
             _, qc_payload = current_qc
             item["visualQcState"] = qc_payload["lifecycleState"]
