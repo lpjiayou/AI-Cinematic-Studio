@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from concurrent.futures import ThreadPoolExecutor
 from copy import deepcopy
+import errno
 import fcntl
 from hashlib import sha256
 import json
@@ -792,8 +793,259 @@ class V4DurablePublicationR1Tests(unittest.TestCase):
                 [],
             )
 
+    def test_final_destination_binding_rename_restores_durable_source(self):
+        with tempfile.TemporaryDirectory() as directory:
+            store = ArtifactRecoveryStore(Path(directory) / "artifacts")
+            run_root = store.run_root(RECOVERY_WORKSPACE, RUN)
+            source_parent = run_root / "jobs" / "source"
+            destination_parent = run_root / "published"
+            source_parent.mkdir(parents=True)
+            destination_parent.mkdir()
+            source = source_parent / "candidate.part.mp4"
+            destination = destination_parent / "final.mp4"
+            payload = b"restore source after final destination binding rename"
+            source.write_bytes(payload)
+
+            detached_parent = Path(directory) / "detached-published"
+            destination_parts = destination_parent.relative_to(store.root).parts
+            original_binding_check = store._assert_directory_binding
+            destination_binding_checks = 0
+
+            def rename_after_final_destination_check(root_fd, parts, expected_fd):
+                nonlocal destination_binding_checks
+                result = original_binding_check(root_fd, parts, expected_fd)
+                if tuple(parts) == destination_parts:
+                    destination_binding_checks += 1
+                    if destination_binding_checks == 5:
+                        os.rename(destination_parent, detached_parent)
+                        destination_parent.mkdir()
+                return result
+
+            with mock.patch.object(
+                store,
+                "_assert_directory_binding",
+                side_effect=rename_after_final_destination_check,
+            ):
+                with self.assertRaises(ArtifactRecoveryStoreError):
+                    store.durable_replace(source, destination)
+
+            self.assertEqual(source.read_bytes(), payload)
+            self.assertEqual(source.stat().st_nlink, 1)
+            self.assertEqual(list(destination_parent.iterdir()), [])
+            self.assertEqual(list(detached_parent.iterdir()), [])
+
+    def test_final_absolute_file_binding_rejects_same_parent_replacement(self):
+        with tempfile.TemporaryDirectory() as directory:
+            store = ArtifactRecoveryStore(Path(directory) / "artifacts")
+            run_root = store.run_root(RECOVERY_WORKSPACE, RUN)
+            publication_parent = run_root / "jobs" / "request" / "job"
+            publication_parent.mkdir(parents=True)
+            source = publication_parent / "candidate.part.mp4"
+            destination = publication_parent / "final.mp4"
+            detached_destination = publication_parent / "detached-final.mp4"
+            payload = b"original final publication bytes"
+            replacement = b"concurrent replacement bytes"
+            source.write_bytes(payload)
+            original_binding_check = store._assert_absolute_regular_file_binding
+            replaced = False
+
+            def replace_before_final_absolute_open(path, **kwargs):
+                nonlocal replaced
+                if not replaced:
+                    replaced = True
+                    os.rename(destination, detached_destination)
+                    destination.write_bytes(replacement)
+                return original_binding_check(path, **kwargs)
+
+            with mock.patch.object(
+                store,
+                "_assert_absolute_regular_file_binding",
+                side_effect=replace_before_final_absolute_open,
+            ):
+                with self.assertRaisesRegex(
+                    ArtifactRecoveryStoreError,
+                    "absolute namespace binding",
+                ):
+                    store.durable_replace(source, destination)
+
+            self.assertEqual(detached_destination.read_bytes(), payload)
+            self.assertEqual(detached_destination.stat().st_nlink, 1)
+            self.assertEqual(destination.read_bytes(), replacement)
+            self.assertEqual(destination.stat().st_nlink, 1)
+
+    def test_full_path_linearization_catches_parent_rename_before_openat2(self):
+        with tempfile.TemporaryDirectory() as directory:
+            store = ArtifactRecoveryStore(Path(directory) / "artifacts")
+            run_root = store.run_root(RECOVERY_WORKSPACE, RUN)
+            source_parent = run_root / "jobs" / "source"
+            destination_parent = run_root / "published"
+            source_parent.mkdir(parents=True)
+            destination_parent.mkdir()
+            source = source_parent / "candidate.part.mp4"
+            destination = destination_parent / "final.mp4"
+            payload = b"full path final binding payload"
+            source.write_bytes(payload)
+
+            detached_parent = Path(directory) / "detached-published"
+            original_openat2 = store._openat2_no_symlinks
+            observed_paths = []
+
+            def rename_before_full_path_open(base_fd, relative_path, flags):
+                observed_paths.append(relative_path)
+                os.rename(destination_parent, detached_parent)
+                destination_parent.mkdir()
+                return original_openat2(base_fd, relative_path, flags)
+
+            with mock.patch.object(
+                store,
+                "_openat2_no_symlinks",
+                side_effect=rename_before_full_path_open,
+            ):
+                with self.assertRaises(ArtifactRecoveryStoreError):
+                    store.durable_replace(source, destination)
+
+            self.assertEqual(
+                observed_paths,
+                [destination.relative_to(Path(os.sep)).as_posix()],
+            )
+            self.assertEqual(source.read_bytes(), payload)
+            self.assertEqual(source.stat().st_nlink, 1)
+            self.assertEqual(list(destination_parent.iterdir()), [])
+            self.assertEqual(list(detached_parent.iterdir()), [])
+
+    def test_openat2_unavailable_fails_closed_and_restores_source(self):
+        with tempfile.TemporaryDirectory() as directory:
+            store = ArtifactRecoveryStore(Path(directory) / "artifacts")
+            run_root = store.run_root(RECOVERY_WORKSPACE, RUN)
+            publication_parent = run_root / "jobs" / "request" / "job"
+            publication_parent.mkdir(parents=True)
+            source = publication_parent / "candidate.part.mp4"
+            destination = publication_parent / "final.mp4"
+            payload = b"restore source when openat2 is unavailable"
+            source.write_bytes(payload)
+
+            with mock.patch.object(
+                store,
+                "_openat2_no_symlinks",
+                side_effect=OSError(errno.ENOSYS, "openat2 unavailable"),
+            ):
+                with self.assertRaisesRegex(
+                    ArtifactRecoveryStoreError,
+                    "required openat2 artifact binding is unavailable",
+                ):
+                    store.durable_replace(source, destination)
+
+            self.assertEqual(source.read_bytes(), payload)
+            self.assertEqual(source.stat().st_nlink, 1)
+            self.assertFalse(destination.exists())
+
+    def test_openat2_rejects_nul_in_relative_path_before_syscall(self):
+        slash_fd = os.open(os.sep, ArtifactRecoveryStore._directory_open_flags())
+        try:
+            with self.assertRaises(OSError) as raised:
+                ArtifactRecoveryStore._openat2_no_symlinks(
+                    slash_fd,
+                    "tmp/final.mp4\0ignored",
+                    os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0),
+                )
+            self.assertEqual(raised.exception.errno, errno.EINVAL)
+        finally:
+            os.close(slash_fd)
+
+    def test_final_destination_binding_rename_restores_interrupted_links(self):
+        with tempfile.TemporaryDirectory() as directory:
+            store = ArtifactRecoveryStore(Path(directory) / "artifacts")
+            run_root = store.run_root(RECOVERY_WORKSPACE, RUN)
+            candidate_parent = run_root / "jobs" / "source"
+            final_parent = run_root / "published"
+            candidate_parent.mkdir(parents=True)
+            final_parent.mkdir()
+            candidate = candidate_parent / "candidate.part.mp4"
+            final = final_parent / "final.mp4"
+            payload = b"restore linked publication after final binding rename"
+            candidate.write_bytes(payload)
+            os.link(candidate, final)
+
+            detached_parent = Path(directory) / "detached-published"
+            final_parts = final_parent.relative_to(store.root).parts
+            original_binding_check = store._assert_directory_binding
+            destination_binding_checks = 0
+
+            def rename_after_final_destination_check(root_fd, parts, expected_fd):
+                nonlocal destination_binding_checks
+                result = original_binding_check(root_fd, parts, expected_fd)
+                if tuple(parts) == final_parts:
+                    destination_binding_checks += 1
+                    if destination_binding_checks == 4:
+                        os.rename(final_parent, detached_parent)
+                        final_parent.mkdir()
+                return result
+
+            with mock.patch.object(
+                store,
+                "_assert_directory_binding",
+                side_effect=rename_after_final_destination_check,
+            ):
+                with self.assertRaises(ArtifactRecoveryStoreError):
+                    store.complete_linked_publication(candidate, final)
+
+            detached_final = detached_parent / final.name
+            self.assertEqual(candidate.read_bytes(), payload)
+            self.assertEqual(detached_final.read_bytes(), payload)
+            self.assertEqual(
+                candidate.stat().st_ino,
+                detached_final.stat().st_ino,
+            )
+            self.assertEqual(candidate.stat().st_nlink, 2)
+            self.assertEqual(detached_final.stat().st_nlink, 2)
+            self.assertEqual(list(final_parent.iterdir()), [])
+
 
 class V4QuarantineR1Tests(unittest.TestCase):
+    def test_final_destination_binding_rename_restores_quarantine_source(self):
+        with tempfile.TemporaryDirectory() as directory:
+            store = ArtifactRecoveryStore(Path(directory) / "artifacts")
+            run_root = store.run_root(RECOVERY_WORKSPACE, RUN)
+            source = run_root / "jobs" / "final-binding.part.mp4"
+            source.parent.mkdir(parents=True)
+            payload = b"restore quarantine source after final binding rename"
+            source.write_bytes(payload)
+            storage_key = store.storage_key(source)
+            destination_parent = run_root / "quarantine" / "recovery"
+            detached_parent = Path(directory) / "detached-quarantine"
+            destination_parts = destination_parent.relative_to(store.root).parts
+            original_binding_check = store._assert_directory_binding
+            destination_binding_checks = 0
+
+            def rename_after_final_destination_check(root_fd, parts, expected_fd):
+                nonlocal destination_binding_checks
+                result = original_binding_check(root_fd, parts, expected_fd)
+                if tuple(parts) == destination_parts:
+                    destination_binding_checks += 1
+                    if destination_binding_checks == 4:
+                        os.rename(destination_parent, detached_parent)
+                        destination_parent.mkdir()
+                return result
+
+            with mock.patch.object(
+                store,
+                "_assert_directory_binding",
+                side_effect=rename_after_final_destination_check,
+            ):
+                with self.assertRaises(ArtifactRecoveryStoreError):
+                    store.quarantine(
+                        RECOVERY_WORKSPACE,
+                        RUN,
+                        storage_key,
+                        category="recovery",
+                        reason="final-destination-binding-rename",
+                    )
+
+            self.assertEqual(source.read_bytes(), payload)
+            self.assertEqual(source.stat().st_nlink, 1)
+            self.assertEqual(list(destination_parent.iterdir()), [])
+            self.assertEqual(list(detached_parent.iterdir()), [])
+
     def test_directory_binding_cleanup_preserves_primary_mismatch(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
