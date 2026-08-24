@@ -1940,6 +1940,11 @@ class K2RealMediaRevisionService:
             )
         if records is None and gates is None and current_state is None:
             snapshot = self.evidence.read_snapshot(workspace, run_ref)
+            snapshot = validated_evidence_snapshot(
+                snapshot,
+                workspace_ref=workspace,
+                run_ref=run_ref,
+            )
             records = snapshot.records
             gates = snapshot.gates
             current_state = snapshot.currentState
@@ -5570,13 +5575,11 @@ class K2RealMediaRevisionService:
         selection_request_digest: str,
     ) -> dict[str, Any] | None:
         snapshot = self.evidence.read_snapshot(workspace, run_ref)
-        if (
-            snapshot.workspaceRef != workspace
-            or snapshot.productionRunRef != run_ref
-        ):
-            raise RepositoryUnavailableError(
-                "M11 successor replay snapshot scope is invalid"
-            )
+        snapshot = validated_evidence_snapshot(
+            snapshot,
+            workspace_ref=workspace,
+            run_ref=run_ref,
+        )
         records = snapshot.records
         gates = snapshot.gates
         matches = [

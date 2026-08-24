@@ -22,6 +22,9 @@ from services.v5_core_os.episode_production.foundation import (
     StaleInputError,
     _digest,
 )
+from services.v5_core_os.episode_production.evidence import (
+    _snapshot_revision_token,
+)
 from services.v5_core_os.episode_production.real_media_revision import (
     REAL_VIDEO_ADMISSION_GATE,
     RealVideoCandidateRejectedError,
@@ -1476,7 +1479,17 @@ class K2RealVideoSelectionTests(unittest.TestCase):
 
         def incomplete_snapshot(workspace_ref, production_run_ref):
             current = original_read_snapshot(workspace_ref, production_run_ref)
-            return replace(current, records=incomplete_records)
+            return replace(
+                current,
+                records=incomplete_records,
+                revisionToken=_snapshot_revision_token(
+                    current.workspaceRef,
+                    current.productionRunRef,
+                    current.currentState,
+                    current.gates,
+                    incomplete_records,
+                ),
+            )
 
         evidence.read_snapshot = incomplete_snapshot
         try:
@@ -1497,6 +1510,79 @@ class K2RealVideoSelectionTests(unittest.TestCase):
     def test_public_video_successor_replay_requires_exact_semantic_visual_qc(self):
         self._assert_public_video_successor_replay_rejects_missing_typed_record(
             "SemanticVisualQCDecision"
+        )
+
+    def test_public_video_successor_replay_rejects_invalid_snapshot_token(self):
+        baseline_handoff = self.record_candidates()
+        self.admit_video_handoff(
+            baseline_handoff, prefix="m11-invalid-token-successor-baseline"
+        )
+        self.admit_shot_one_image_successor(
+            prefix="m11-invalid-token-successor-image"
+        )
+        successor_handoff = self.revision.record_real_video_candidates(
+            {
+                "workspaceRef": WORKSPACE,
+                "productionRunRef": self.run["productionRunRef"],
+                "idempotencyKey": "m11-invalid-token-successor-handoff",
+            }
+        )
+        prefix = "m11-invalid-token-successor"
+        successor = self.admit_video_handoff(
+            successor_handoff, prefix=prefix
+        )
+        changed_admission = next(
+            item
+            for item in successor["assetAdmissions"]
+            if item.get("selectionRef", "").startswith(
+                f"{prefix}-selection-"
+            )
+        )
+        selection_record = self.revision.evidence.get_record(
+            WORKSPACE,
+            self.run["productionRunRef"],
+            changed_admission["selectionRef"],
+            changed_admission["selectionVersion"],
+        )
+        selection = selection_record["payload"]
+        command = {
+            "workspaceRef": WORKSPACE,
+            "productionRunRef": self.run["productionRunRef"],
+            "idempotencyKey": f"{prefix}-admit",
+            "selections": [
+                {
+                    "visualQcRef": selection["visualQcRef"],
+                    "visualQcVersion": selection["visualQcVersion"],
+                    "visualQcDigest": selection["visualQcDigest"],
+                    "selectionRef": selection["selectionRef"],
+                    "selectionVersion": selection["selectionVersion"],
+                    "approvalRef": selection["approvalRef"],
+                }
+            ],
+        }
+        evidence = self.revision.evidence
+        original_read_snapshot = evidence.read_snapshot
+
+        def invalid_snapshot(workspace_ref, production_run_ref):
+            snapshot = original_read_snapshot(
+                workspace_ref, production_run_ref
+            )
+            invalid_token = (
+                "f" * 64
+                if snapshot.revisionToken != "f" * 64
+                else "e" * 64
+            )
+            return replace(snapshot, revisionToken=invalid_token)
+
+        evidence.read_snapshot = invalid_snapshot
+        try:
+            with self.assertRaises(EpisodeProductionPublicError) as caught:
+                self.boundary.admit_real_videos(command)
+        finally:
+            evidence.read_snapshot = original_read_snapshot
+        self.assertEqual(
+            (caught.exception.status, caught.exception.code),
+            (503, "episode_production_unavailable"),
         )
 
     def test_semantic_qc_fail_cannot_select_or_advance_production(self):
