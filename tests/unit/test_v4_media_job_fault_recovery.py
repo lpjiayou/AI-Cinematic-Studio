@@ -603,7 +603,14 @@ class V4MediaJobFaultRecoveryTests(unittest.TestCase):
             )
             coordinator.dispatch(request(), idempotency_key="lease-expired-mid-run")
             leased = coordinator.lease_next(WORKSPACE, RUN, "slow-worker")
-            result = coordinator.run_leased(leased, "slow-worker")
+            with self.assertRaisesRegex(
+                MediaJobStateError, "worker lease was fenced"
+            ):
+                coordinator.run_leased(leased, "slow-worker")
+            running = coordinator.list_jobs(WORKSPACE, RUN)[0]
+            self.assertEqual(running["state"], "RUNNING")
+            self.assertEqual(running["attempts"][-1]["state"], "RUNNING")
+            result = coordinator.recover_expired(WORKSPACE, RUN)[0]
             self.assertEqual(result["state"], "FAILED")
             self.assertEqual(result["attempts"][-1]["state"], "FAILED")
             self.assertIsNone(result["artifact"])
@@ -690,6 +697,47 @@ class V4MediaJobFaultRecoveryTests(unittest.TestCase):
             self.assertTrue(final.is_file())
             self.assertEqual(final.stat().st_nlink, 1)
             self.assertEqual(adapter.calls, 1)
+
+    def test_cancel_cleans_interrupted_linked_publication_and_consumes_intent(self):
+        with tempfile.TemporaryDirectory() as directory:
+            artifacts = Path(directory) / "artifacts"
+            repository = InMemoryMediaJobAdapter()
+            coordinator = MediaJobCoordinator(
+                repository,
+                DeterministicLocalFfmpegAdapter(),
+                artifacts,
+                ref_factory=Refs(),
+                clock=MutableClock(),
+                lease_seconds=10,
+                max_attempts=1,
+            )
+            created, _ = coordinator.dispatch(
+                request(), idempotency_key="cancel-linked-publication"
+            )
+            leased = coordinator.lease_next(WORKSPACE, RUN, "worker")
+            with mock.patch(
+                "services.v4_platform.artifact_recovery.os.unlink",
+                side_effect=OSError("interrupt after final link"),
+            ):
+                with self.assertRaises(ArtifactVerificationError):
+                    coordinator.run_leased(leased, "worker")
+
+            prepared = repository.get(WORKSPACE, RUN, created["jobRef"])
+            intent = prepared["artifactCommitIntent"]
+            candidate = artifacts / intent["candidateStorageKey"]
+            final = artifacts / intent["finalStorageKey"]
+            self.assertEqual(candidate.stat().st_ino, final.stat().st_ino)
+            self.assertEqual(candidate.stat().st_nlink, 2)
+
+            cancelled = coordinator.cancel(WORKSPACE, RUN, created["jobRef"])
+            self.assertEqual(cancelled["state"], "CANCELLED")
+            self.assertIsNone(cancelled["artifactCommitIntent"])
+            self.assertFalse(candidate.exists())
+            self.assertFalse(final.exists())
+            self.assertEqual(
+                len(cancelled["attempts"][-1]["quarantineStorageKeys"]), 1
+            )
+            self.assertEqual(coordinator.recover_expired(WORKSPACE, RUN), [])
 
     def test_recovery_loser_never_quarantines_winner_final(self):
         class ConcurrentSuccess:

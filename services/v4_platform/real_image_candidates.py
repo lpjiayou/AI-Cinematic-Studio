@@ -117,17 +117,7 @@ def _safe_ref(value: object, label: str) -> str:
     return value
 
 
-def _contained(root: Path, candidate: object, label: str) -> Path:
-    if not isinstance(candidate, str) or not candidate:
-        raise RealImageCandidateEvidenceError(f"{label} is missing")
-    path = Path(candidate).resolve()
-    if root not in path.parents or not path.is_file():
-        raise RealImageCandidateEvidenceError(f"{label} escaped its root")
-    return path
-
-
-def _png_dimensions(path: Path) -> tuple[int, int]:
-    content = path.read_bytes()
+def _png_dimensions(content: bytes) -> tuple[int, int]:
     if content[:8] != b"\x89PNG\r\n\x1a\n":
         raise RealImageCandidateEvidenceError("candidate is not a PNG")
     offset = 8
@@ -169,6 +159,77 @@ def _png_dimensions(path: Path) -> tuple[int, int]:
     if dimensions is None or not saw_idat or not saw_iend:
         raise RealImageCandidateEvidenceError("candidate PNG is incomplete")
     return dimensions
+
+
+def _read_verified_png(
+    root: Path,
+    candidate: object,
+    *,
+    label: str,
+) -> tuple[Path, str, int, int, int]:
+    if not isinstance(candidate, str) or not candidate:
+        raise RealImageCandidateEvidenceError(f"{label} is missing")
+    raw = Path(os.path.abspath(candidate))
+    try:
+        path = raw.resolve(strict=True)
+    except OSError as exc:
+        raise RealImageCandidateEvidenceError(f"{label} is unreadable") from exc
+    if root not in path.parents:
+        raise RealImageCandidateEvidenceError(f"{label} escaped its root")
+
+    descriptor: int | None = None
+    try:
+        descriptor = os.open(
+            path,
+            os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0),
+        )
+        opened = os.fstat(descriptor)
+        initial = os.lstat(path)
+        if (
+            not os.path.samestat(opened, initial)
+            or not stat.S_ISREG(opened.st_mode)
+            or opened.st_nlink != 1
+            or opened.st_size < 1
+        ):
+            raise RealImageCandidateEvidenceError(
+                f"{label} is not one exact file"
+            )
+        chunks: list[bytes] = []
+        remaining = opened.st_size
+        while remaining:
+            chunk = os.read(descriptor, min(remaining, 1024 * 1024))
+            if not chunk:
+                break
+            chunks.append(chunk)
+            remaining -= len(chunk)
+        content = b"".join(chunks)
+        width, height = _png_dimensions(content)
+        content_digest = sha256(content).hexdigest()
+        closed_over = os.fstat(descriptor)
+        current = os.lstat(path)
+        current_path = path.resolve(strict=True)
+    except RealImageCandidateEvidenceError:
+        raise
+    except OSError as exc:
+        raise RealImageCandidateEvidenceError(f"{label} is unreadable") from exc
+    finally:
+        if descriptor is not None:
+            os.close(descriptor)
+    if (
+        remaining != 0
+        or len(content) != opened.st_size
+        or not os.path.samestat(opened, closed_over)
+        or not os.path.samestat(opened, current)
+        or opened.st_size != closed_over.st_size
+        or opened.st_mtime_ns != closed_over.st_mtime_ns
+        or opened.st_ctime_ns != closed_over.st_ctime_ns
+        or current.st_nlink != 1
+        or current.st_size != len(content)
+        or current_path != path
+        or root not in current_path.parents
+    ):
+        raise RealImageCandidateEvidenceError(f"{label} changed while being read")
+    return path, content_digest, len(content), width, height
 
 
 class PinnedRealImageCandidateEvidence:
@@ -506,19 +567,24 @@ class PinnedRealImageCandidateEvidence:
                 },
                 "candidate output",
             )
-            path = _contained(
+            (
+                path,
+                verified_content_digest,
+                verified_byte_size,
+                width,
+                height,
+            ) = _read_verified_png(
                 self.artifact_root,
                 output.get("artifactFile"),
-                "candidate artifact",
+                label="candidate artifact",
             )
             content_digest = _hex_digest(
                 output.get("contentDigest"), "candidate content digest"
             )
-            width, height = _png_dimensions(path)
             if (
                 output.get("mediaType") != "image/png"
-                or output.get("byteSize") != path.stat().st_size
-                or content_digest != _sha256_file(path)
+                or output.get("byteSize") != verified_byte_size
+                or content_digest != verified_content_digest
                 or (output.get("width"), output.get("height"))
                 != (width, height)
                 or (width, height)
@@ -552,7 +618,7 @@ class PinnedRealImageCandidateEvidence:
                         "internalPath": str(path),
                         "storageKey": str(path.relative_to(self.artifact_root)),
                         "sha256": content_digest,
-                        "byteSize": path.stat().st_size,
+                        "byteSize": verified_byte_size,
                         "width": width,
                         "height": height,
                         "mediaType": "image/png",

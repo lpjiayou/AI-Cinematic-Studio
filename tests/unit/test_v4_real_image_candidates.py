@@ -1,10 +1,14 @@
 from hashlib import sha256
 import json
+import os
 from pathlib import Path
 import struct
 import tempfile
 import unittest
+from unittest import mock
 import zlib
+
+import services.v4_platform.real_image_candidates as real_image_candidates
 
 from services.v4_platform import (
     PinnedRealImageCandidateEvidence,
@@ -222,6 +226,37 @@ class PinnedRealImageCandidateEvidenceTests(unittest.TestCase):
                 "real-image-plan-test",
                 self.requests,
             )
+
+    def test_rejects_candidate_path_replaced_during_same_fd_png_validation(self):
+        artifact_path = self.artifact_root / "shot-01.png"
+        replacement_path = self.artifact_root / "shot-01-replacement.png"
+        replacement_path.write_bytes(b"X" * artifact_path.stat().st_size)
+        original_parser = real_image_candidates._png_dimensions
+        replaced = False
+
+        def parse_then_replace(content):
+            nonlocal replaced
+            dimensions = original_parser(content)
+            if not replaced:
+                replaced = True
+                os.replace(replacement_path, artifact_path)
+            return dimensions
+
+        with mock.patch.object(
+            real_image_candidates,
+            "_png_dimensions",
+            side_effect=parse_then_replace,
+        ):
+            with self.assertRaisesRegex(
+                RealImageCandidateEvidenceError,
+                "candidate artifact changed while being read",
+            ):
+                self.adapter.resolve_candidates(
+                    "workspace-test",
+                    "production-run-test",
+                    "real-image-plan-test",
+                    self.requests,
+                )
 
     def test_rejects_changed_locked_identity_input(self):
         self.input_files[0].write_bytes(b"changed-reference")

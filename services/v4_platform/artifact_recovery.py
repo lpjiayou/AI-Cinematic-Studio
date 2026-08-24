@@ -13,7 +13,7 @@ import os
 from pathlib import Path, PurePosixPath
 import re
 import stat
-from typing import Any, Iterable
+from typing import Any, Callable, Iterable
 
 
 class ArtifactRecoveryStoreError(RuntimeError):
@@ -235,7 +235,13 @@ class ArtifactRecoveryStore:
         finally:
             os.close(descriptor)
 
-    def durable_replace(self, source: Path | str, destination: Path | str) -> Path:
+    def durable_replace(
+        self,
+        source: Path | str,
+        destination: Path | str,
+        *,
+        assert_fence: Callable[[], None] | None = None,
+    ) -> Path:
         source_path = self._assert_under_root(Path(source))
         destination_path = self._assert_under_root(Path(destination))
         self._assert_no_symlinks(source_path)
@@ -252,6 +258,8 @@ class ArtifactRecoveryStore:
         destination_path.parent.mkdir(parents=True, exist_ok=True)
         self._assert_no_symlinks(destination_path.parent)
         try:
+            if assert_fence is not None:
+                assert_fence()
             os.link(source_path, destination_path, follow_symlinks=False)
             destination_stat = self._fsync_file(destination_path)
             current_source_stat = os.lstat(source_path)
@@ -651,12 +659,12 @@ class ArtifactRecoveryStore:
                         current_source = os.lstat(source)
                         current_destination = os.lstat(destination)
                         if (
-                            current_source.st_dev == synced_source.st_dev
+                            stat.S_ISREG(current_source.st_mode)
+                            and stat.S_ISREG(current_destination.st_mode)
+                            and current_source.st_dev == synced_source.st_dev
                             and current_source.st_ino == synced_source.st_ino
                             and current_destination.st_dev == synced_source.st_dev
                             and current_destination.st_ino == synced_source.st_ino
-                            and current_source.st_nlink == 2
-                            and current_destination.st_nlink == 2
                         ):
                             os.unlink(destination)
                             self._fsync_directory(destination.parent)
@@ -672,12 +680,12 @@ class ArtifactRecoveryStore:
                         current_source = os.lstat(source)
                         current_destination = os.lstat(destination)
                         if (
-                            current_source.st_dev == synced_source.st_dev
+                            stat.S_ISREG(current_source.st_mode)
+                            and stat.S_ISREG(current_destination.st_mode)
+                            and current_source.st_dev == synced_source.st_dev
                             and current_source.st_ino == synced_source.st_ino
                             and current_destination.st_dev == synced_source.st_dev
                             and current_destination.st_ino == synced_source.st_ino
-                            and current_source.st_nlink == 2
-                            and current_destination.st_nlink == 2
                         ):
                             os.unlink(destination)
                             self._fsync_directory(destination.parent)

@@ -147,7 +147,7 @@ def m11_request(source_digest):
         "sourceImageAssetVersionDigest": "3" * 64,
         "sourceImageContentDigest": source_digest,
         "sourceImageMediaType": "image/png",
-        "sourceImageProbe": {"width": 1280, "height": 720},
+        "sourceImageProbe": {"width": 1280, "height": 720, "format": "png"},
         "startImageBindingState": "EXACT_ASSET_VERSION_BOUND",
         "promptSpec": {
             "cameraInstruction": {

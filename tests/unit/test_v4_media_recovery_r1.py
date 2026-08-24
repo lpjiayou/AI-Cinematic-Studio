@@ -18,6 +18,7 @@ from services.v4_platform import (
     InMemoryMediaJobAdapter,
     MediaJobCoordinator,
     MediaJobError,
+    MediaJobStateError,
     SqliteMediaJobAdapter,
 )
 from services.v4_platform.artifact_recovery import (
@@ -257,6 +258,46 @@ class V4M11SuccessorRequestR1Tests(unittest.TestCase):
         with self.assertRaises(MediaJobError):
             _validate_request(bad_predecessor)
 
+    def test_v1_and_v2_reject_broadened_or_runtime_invalid_nested_shapes(self):
+        for schema in ("v1", "v2"):
+            with self.subTest(schema=schema):
+                source = (
+                    m11_request("a" * 64)
+                    if schema == "v1"
+                    else self._successor_request()
+                )
+                cases = []
+
+                broadened_probe = deepcopy(source)
+                broadened_probe["sourceImageProbe"]["internalPath"] = (
+                    "/private/start.png"
+                )
+                cases.append(broadened_probe)
+
+                broadened_camera = deepcopy(source)
+                broadened_camera["promptSpec"]["cameraInstruction"][
+                    "providerSecret"
+                ] = "forbidden"
+                cases.append(broadened_camera)
+
+                empty_continuity = deepcopy(source)
+                empty_continuity["promptSpec"]["continuityConstraints"] = []
+                cases.append(empty_continuity)
+
+                oversized_action = deepcopy(source)
+                oversized_action["promptSpec"]["action"] = "x" * 1001
+                cases.append(oversized_action)
+
+                empty_negative = deepcopy(source)
+                empty_negative["parameters"]["negativePrompt"] = ""
+                cases.append(empty_negative)
+
+                for value in cases:
+                    value.pop("payloadDigest")
+                    value["payloadDigest"] = sha256(_canonical(value)).hexdigest()
+                    with self.assertRaises(MediaJobError):
+                        _validate_request(value)
+
 
 class V4LeaseHeartbeatR1Tests(unittest.TestCase):
     def test_running_attempt_renews_lease_and_recovery_cannot_duplicate_it(self):
@@ -325,6 +366,62 @@ class V4LeaseHeartbeatR1Tests(unittest.TestCase):
                 self.assertEqual(observed_recovery, [])
                 self.assertEqual(adapter.calls, 1)
                 self.assertEqual(len(result["attempts"]), 1)
+
+    def test_expired_worker_cannot_create_final_artifact_after_commit_intent(self):
+        with tempfile.TemporaryDirectory() as directory:
+            repository = InMemoryMediaJobAdapter()
+            clock = MutableClock()
+            artifacts = Path(directory) / "artifacts"
+            coordinator = MediaJobCoordinator(
+                repository,
+                DeterministicLocalFfmpegAdapter(),
+                artifacts,
+                ref_factory=Refs(),
+                clock=clock,
+                lease_seconds=10,
+                heartbeat_interval_seconds=9.9,
+                max_attempts=1,
+            )
+            created, _ = coordinator.dispatch(
+                recovery_request(), idempotency_key="fenced-publication"
+            )
+            leased = coordinator.lease_next(
+                RECOVERY_WORKSPACE, RUN, "fenced-worker"
+            )
+            original_replace = coordinator._artifact_recovery.durable_replace
+
+            def expire_before_publish(source, destination, **kwargs):
+                clock.value = "2026-08-24T00:00:11Z"
+                return original_replace(source, destination, **kwargs)
+
+            with mock.patch.object(
+                coordinator._artifact_recovery,
+                "durable_replace",
+                side_effect=expire_before_publish,
+            ):
+                with self.assertRaisesRegex(
+                    MediaJobStateError, "worker lease was fenced"
+                ):
+                    coordinator.run_leased(leased, "fenced-worker")
+
+            pending = repository.get(
+                RECOVERY_WORKSPACE, RUN, created["jobRef"]
+            )
+            intent = pending["artifactCommitIntent"]
+            self.assertEqual(pending["state"], "RUNNING")
+            self.assertIsNotNone(intent)
+            candidate = artifacts / intent["candidateStorageKey"]
+            final = artifacts / intent["finalStorageKey"]
+            self.assertTrue(candidate.is_file())
+            self.assertFalse(final.exists())
+
+            recovered = coordinator.recover_expired(
+                RECOVERY_WORKSPACE, RUN
+            )[0]
+            self.assertEqual(recovered["state"], "FAILED")
+            self.assertIsNone(recovered["artifactCommitIntent"])
+            self.assertFalse(candidate.exists())
+            self.assertFalse(final.exists())
 
 
 class V4SqliteSchemaR1Tests(unittest.TestCase):
@@ -486,6 +583,47 @@ class V4QuarantineR1Tests(unittest.TestCase):
             self.assertTrue(
                 any(result["idempotentReplay"] for result in results)
             )
+
+    def test_two_distinct_concurrent_claims_roll_back_only_their_own_links(self):
+        with tempfile.TemporaryDirectory() as directory:
+            store = ArtifactRecoveryStore(Path(directory) / "artifacts")
+            run_root = store.run_root(RECOVERY_WORKSPACE, RUN)
+            source = run_root / "jobs" / "two-claims.part.mp4"
+            source.parent.mkdir(parents=True)
+            source.write_bytes(b"one exact orphan")
+            storage_key = store.storage_key(source)
+            original_link = os.link
+            barrier = Barrier(2)
+
+            def racing_link(source_path, destination_path, **kwargs):
+                original_link(source_path, destination_path, **kwargs)
+                barrier.wait(timeout=5)
+
+            def claim(reason):
+                return store.quarantine(
+                    RECOVERY_WORKSPACE,
+                    RUN,
+                    storage_key,
+                    category="recovery",
+                    reason=reason,
+                )
+
+            with mock.patch(
+                "services.v4_platform.artifact_recovery.os.link",
+                side_effect=racing_link,
+            ):
+                with ThreadPoolExecutor(max_workers=2) as executor:
+                    futures = [
+                        executor.submit(claim, "first-claim"),
+                        executor.submit(claim, "second-claim"),
+                    ]
+                    for future in futures:
+                        with self.assertRaises(ArtifactRecoveryStoreError):
+                            future.result(timeout=10)
+
+            self.assertTrue(source.is_file())
+            self.assertEqual(source.stat().st_nlink, 1)
+            self.assertEqual(list(run_root.glob("quarantine/**/*.mp4")), [])
 
     def test_failed_new_claim_rolls_back_the_destination_link(self):
         with tempfile.TemporaryDirectory() as directory:
