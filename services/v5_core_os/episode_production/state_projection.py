@@ -6,7 +6,11 @@ from collections import Counter
 from copy import deepcopy
 from typing import Any, Mapping
 
-from .evidence import EpisodeProductionEvidenceRepository, EvidenceSnapshot
+from .evidence import (
+    EpisodeProductionEvidenceRepository,
+    EvidenceSnapshot,
+    validated_evidence_snapshot,
+)
 from .foundation import RepositoryUnavailableError
 from .media_candidate_review import K2MediaCandidateReviewService
 
@@ -456,11 +460,11 @@ class K2ProductionStateProjectionService:
         snapshot = evidence_snapshot or self.evidence.read_snapshot(
             workspace_ref, production_run_ref
         )
-        if (
-            snapshot.workspaceRef != workspace_ref
-            or snapshot.productionRunRef != production_run_ref
-        ):
-            raise RepositoryUnavailableError("evidence snapshot scope is invalid")
+        snapshot = validated_evidence_snapshot(
+            snapshot,
+            workspace_ref=workspace_ref,
+            run_ref=production_run_ref,
+        )
         gates = [deepcopy(dict(item)) for item in snapshot.gates]
         production_state = snapshot.currentState
         candidates = self.candidate_review.get_projection(

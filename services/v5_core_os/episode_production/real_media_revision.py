@@ -23,6 +23,7 @@ from .evidence import (
     EvidenceRecord,
     EvidenceSnapshot,
     GateAppend,
+    validated_evidence_snapshot,
 )
 from .foundation import (
     EpisodeProductionError,
@@ -5825,6 +5826,11 @@ class K2RealMediaRevisionService:
                 "admission replay gate scope is invalid"
             )
         snapshot = self.evidence.read_snapshot(workspace, run_ref)
+        snapshot = validated_evidence_snapshot(
+            snapshot,
+            workspace_ref=workspace,
+            run_ref=run_ref,
+        )
         matches = [
             item for item in snapshot.gates if item.get("gateName") == gate_name
         ]
@@ -6180,11 +6186,11 @@ class K2RealMediaRevisionService:
         snapshot = evidence_snapshot or self.evidence.read_snapshot(
             workspace_ref, production_run_ref
         )
-        if (
-            snapshot.workspaceRef != workspace_ref
-            or snapshot.productionRunRef != production_run_ref
-        ):
-            raise RepositoryUnavailableError("evidence snapshot scope is invalid")
+        snapshot = validated_evidence_snapshot(
+            snapshot,
+            workspace_ref=workspace_ref,
+            run_ref=production_run_ref,
+        )
         gates = {item.get("gateName"): item for item in snapshot.gates}
         gate = gates.get(REAL_IMAGE_PLAN_GATE)
         if gate is None:

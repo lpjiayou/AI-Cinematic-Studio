@@ -1,6 +1,8 @@
 import unittest
 
-from services.v5_core_os.episode_production.evidence import EvidenceSnapshot
+from services.v5_core_os.episode_production.evidence import (
+    InMemoryEpisodeProductionEvidenceAdapter,
+)
 from services.v5_core_os.episode_production.public import (
     EpisodeProductionPublicBoundary,
 )
@@ -24,17 +26,11 @@ class ReturningOperation:
 class SnapshotEvidence:
     def __init__(self):
         self.calls = 0
+        self.repository = InMemoryEpisodeProductionEvidenceAdapter()
 
     def read_snapshot(self, workspace_ref, run_ref):
         self.calls += 1
-        return EvidenceSnapshot(
-            workspace_ref,
-            run_ref,
-            "REAL_VIDEO_PLAN_READY",
-            (),
-            (),
-            "4" * 64,
-        )
+        return self.repository.read_snapshot(workspace_ref, run_ref)
 
 
 class K2PublicMediaSanitizationTests(unittest.TestCase):

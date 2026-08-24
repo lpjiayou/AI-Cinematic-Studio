@@ -220,17 +220,21 @@ def _snapshot_revision_token(
 
     return _digest(
         {
-            "schemaVersion": "v5.episode-production-evidence-snapshot.v1",
+            "schemaVersion": "v5.episode-production-evidence-snapshot.v2",
             "workspaceRef": _required_ref(workspace_ref, "workspaceRef"),
             "productionRunRef": _required_ref(run_ref, "productionRunRef"),
             "currentState": current_state,
             "gates": [
                 {
+                    "workspaceRef": item.get("workspaceRef"),
+                    "productionRunRef": item.get("productionRunRef"),
                     "gateName": item.get("gateName"),
+                    "idempotencyKey": item.get("idempotencyKey"),
                     "rootPayloadDigest": item.get("rootPayloadDigest"),
                     "requestDigest": item.get("requestDigest"),
                     "fromState": item.get("fromState"),
                     "toState": item.get("toState"),
+                    "createdAt": item.get("createdAt"),
                     "facts": [
                         {
                             "factKind": fact.get("factKind"),
@@ -246,9 +250,14 @@ def _snapshot_revision_token(
             ],
             "records": [
                 {
+                    "workspaceRef": item.get("workspaceRef"),
+                    "productionRunRef": item.get("productionRunRef"),
                     "recordKind": item.get("recordKind"),
                     "recordRef": item.get("recordRef"),
                     "recordVersion": item.get("recordVersion"),
+                    "idempotencyKey": item.get("idempotencyKey"),
+                    "requestDigest": item.get("requestDigest"),
+                    "createdAt": item.get("createdAt"),
                     "payloadDigest": item.get("payloadDigest"),
                 }
                 for item in records
@@ -430,6 +439,160 @@ def _gate_from_mapping(value: Mapping[str, Any]) -> GateAppend:
         raise RepositoryUnavailableError(
             "episode evidence digest verification failed"
         ) from exc
+
+
+def _record_from_mapping(value: Mapping[str, Any]) -> EvidenceRecord:
+    try:
+        record = EvidenceRecord(
+            workspaceRef=value["workspaceRef"],
+            productionRunRef=value["productionRunRef"],
+            recordKind=value["recordKind"],
+            recordRef=value["recordRef"],
+            recordVersion=value["recordVersion"],
+            idempotencyKey=value["idempotencyKey"],
+            requestDigest=value["requestDigest"],
+            createdAt=value["createdAt"],
+            payload=value["payload"],
+            payloadDigest=value["payloadDigest"],
+        )
+        _validate_record(record)
+        return record
+    except (KeyError, TypeError, EpisodeProductionError) as exc:
+        raise RepositoryUnavailableError(
+            "episode evidence record verification failed"
+        ) from exc
+
+
+def validated_evidence_snapshot(
+    snapshot: EvidenceSnapshot,
+    *,
+    workspace_ref: str | None = None,
+    run_ref: str | None = None,
+) -> EvidenceSnapshot:
+    """Return a private, fully verified copy of one evidence read revision.
+
+    ``EvidenceSnapshot`` is frozen only at its dataclass boundary; its canonical
+    JSON-shaped gate and record payloads remain mutable.  Every consumer must
+    therefore verify the complete nested value before trusting its revision
+    token, then operate on this private copy rather than on caller-owned data.
+    """
+
+    if not isinstance(snapshot, EvidenceSnapshot):
+        raise RepositoryUnavailableError("evidence snapshot is invalid")
+    try:
+        observed_workspace = _required_ref(
+            snapshot.workspaceRef, "workspaceRef"
+        )
+        observed_run = _required_ref(
+            snapshot.productionRunRef, "productionRunRef"
+        )
+        if workspace_ref is not None and observed_workspace != _required_ref(
+            workspace_ref, "workspaceRef"
+        ):
+            raise RepositoryUnavailableError("evidence snapshot scope is invalid")
+        if run_ref is not None and observed_run != _required_ref(
+            run_ref, "productionRunRef"
+        ):
+            raise RepositoryUnavailableError("evidence snapshot scope is invalid")
+        if snapshot.currentState not in K2_STATES:
+            raise RepositoryUnavailableError("evidence snapshot state is invalid")
+        _validate_digest(snapshot.revisionToken, "evidenceRevisionToken")
+        if not isinstance(snapshot.gates, tuple) or not isinstance(
+            snapshot.records, tuple
+        ):
+            raise RepositoryUnavailableError("evidence snapshot journals are invalid")
+
+        canonical_gates: list[dict[str, Any]] = []
+        gate_names: set[str] = set()
+        gate_idempotency_keys: set[str] = set()
+        expected_state = ROOTS_READY
+        for value in snapshot.gates:
+            if not isinstance(value, Mapping):
+                raise RepositoryUnavailableError(
+                    "evidence snapshot gate is invalid"
+                )
+            copied = deepcopy(dict(value))
+            gate = _gate_from_mapping(copied)
+            canonical = _gate_mapping(gate)
+            if copied != canonical:
+                raise RepositoryUnavailableError(
+                    "evidence snapshot gate shape is invalid"
+                )
+            if (
+                gate.workspaceRef != observed_workspace
+                or gate.productionRunRef != observed_run
+                or gate.gateName in gate_names
+                or gate.idempotencyKey in gate_idempotency_keys
+                or gate.fromState != expected_state
+            ):
+                raise RepositoryUnavailableError(
+                    "evidence snapshot gate journal is invalid"
+                )
+            gate_names.add(gate.gateName)
+            gate_idempotency_keys.add(gate.idempotencyKey)
+            expected_state = gate.toState
+            canonical_gates.append(canonical)
+        if snapshot.currentState != expected_state:
+            raise RepositoryUnavailableError(
+                "evidence snapshot current state is invalid"
+            )
+
+        canonical_records: list[dict[str, Any]] = []
+        record_identities: set[tuple[str, int]] = set()
+        idempotency_keys: set[str] = set()
+        latest_versions: dict[str, int] = {}
+        for value in snapshot.records:
+            if not isinstance(value, Mapping):
+                raise RepositoryUnavailableError(
+                    "evidence snapshot record is invalid"
+                )
+            copied = deepcopy(dict(value))
+            record = _record_from_mapping(copied)
+            canonical = _record_mapping(record)
+            identity = (record.recordRef, record.recordVersion)
+            prior_version = latest_versions.get(record.recordRef)
+            if (
+                copied != canonical
+                or record.workspaceRef != observed_workspace
+                or record.productionRunRef != observed_run
+                or identity in record_identities
+                or record.idempotencyKey in idempotency_keys
+                or (
+                    prior_version is not None
+                    and record.recordVersion <= prior_version
+                )
+            ):
+                raise RepositoryUnavailableError(
+                    "evidence snapshot record journal is invalid"
+                )
+            record_identities.add(identity)
+            idempotency_keys.add(record.idempotencyKey)
+            latest_versions[record.recordRef] = record.recordVersion
+            canonical_records.append(canonical)
+
+        expected_token = _snapshot_revision_token(
+            observed_workspace,
+            observed_run,
+            snapshot.currentState,
+            canonical_gates,
+            canonical_records,
+        )
+        if snapshot.revisionToken != expected_token:
+            raise RepositoryUnavailableError(
+                "evidence snapshot revision token is invalid"
+            )
+        return EvidenceSnapshot(
+            observed_workspace,
+            observed_run,
+            snapshot.currentState,
+            tuple(canonical_gates),
+            tuple(canonical_records),
+            expected_token,
+        )
+    except RepositoryUnavailableError:
+        raise
+    except (TypeError, ValueError, EpisodeProductionError) as exc:
+        raise RepositoryUnavailableError("evidence snapshot is invalid") from exc
 
 
 class InMemoryEpisodeProductionEvidenceAdapter:
@@ -671,7 +834,7 @@ class InMemoryEpisodeProductionEvidenceAdapter:
             )
             transitions = self._transitions.get((workspace_ref, run_ref), [])
             current_state = transitions[-1][1] if transitions else ROOTS_READY
-            return EvidenceSnapshot(
+            snapshot = EvidenceSnapshot(
                 workspace_ref,
                 run_ref,
                 current_state,
@@ -684,6 +847,11 @@ class InMemoryEpisodeProductionEvidenceAdapter:
                     gates,
                     records,
                 ),
+            )
+            return validated_evidence_snapshot(
+                snapshot,
+                workspace_ref=workspace_ref,
+                run_ref=run_ref,
             )
 
     def append_records_and_gate(
@@ -1645,7 +1813,11 @@ class SqliteEpisodeProductionEvidenceAdapter:
                 ),
             )
             connection.rollback()
-            return snapshot
+            return validated_evidence_snapshot(
+                snapshot,
+                workspace_ref=workspace_ref,
+                run_ref=run_ref,
+            )
         except EpisodeProductionError:
             connection.rollback()
             raise

@@ -2,9 +2,11 @@ import unittest
 from unittest.mock import patch
 
 from services.v5_core_os.episode_production.evidence import (
-    EvidenceSnapshot,
+    EvidenceFact,
+    GateAppend,
     InMemoryEpisodeProductionEvidenceAdapter,
 )
+from services.v5_core_os.episode_production.foundation import _digest
 from services.v5_core_os.episode_production.media_candidate_review import (
     ASSET_VERSION,
     K2MediaCandidateReviewService,
@@ -44,75 +46,97 @@ class EvidenceWithCurrentVideoPlan(InMemoryEpisodeProductionEvidenceAdapter):
         super().__init__()
         self.revision_ref = revision_ref
         self.expected_count = expected_count
-
-    def current_state(self, workspace_ref, run_ref):
-        return "REAL_VIDEO_PLAN_READY"
-
-    def list_gates(self, workspace_ref, run_ref):
-        return [
-            {
-                "gateName": "M11_REAL_VIDEO_PLAN",
-                "requestDigest": "9" * 64,
-                "toState": "REAL_VIDEO_PLAN_READY",
-                "facts": [
-                    {
-                        "factKind": "RealVideoPlan",
-                        "factRef": self.revision_ref,
-                        "factVersion": 1,
-                        "payload": {
-                            "realVideoPlanRef": self.revision_ref,
-                            **(
-                                {"expectedRequestCount": self.expected_count}
-                                if self.expected_count is not None
-                                else {}
-                            ),
-                        },
-                        "payloadDigest": "8" * 64,
-                    }
-                ],
-            }
-        ]
-
-    def read_snapshot(self, workspace_ref, run_ref):
-        stored = super().read_snapshot(workspace_ref, run_ref)
-        return EvidenceSnapshot(
-            workspace_ref,
-            run_ref,
-            self.current_state(workspace_ref, run_ref),
-            tuple(self.list_gates(workspace_ref, run_ref)),
-            stored.records,
-            stored.revisionToken,
+        transitions = (
+            ("ROOTS_READY", "AUTHORITY_READY"),
+            ("AUTHORITY_READY", "SCRIPT_VALIDATED"),
+            ("SCRIPT_VALIDATED", "SHOTS_COMPILED"),
+            ("SHOTS_COMPILED", "ASSETS_READY"),
+            ("ASSETS_READY", "MEDIA_READY"),
+            ("MEDIA_READY", "PREVIEW_READY"),
+            ("PREVIEW_READY", "QC_READY"),
+            ("QC_READY", "REAL_IMAGE_PLAN_READY"),
+            ("REAL_IMAGE_PLAN_READY", "REAL_IMAGE_READY"),
+            ("REAL_IMAGE_READY", "REAL_VIDEO_PLAN_READY"),
         )
+        for index, (from_state, to_state) in enumerate(transitions, start=1):
+            is_plan = to_state == "REAL_VIDEO_PLAN_READY"
+            payload = (
+                {
+                    "realVideoPlanRef": self.revision_ref,
+                    **(
+                        {"expectedRequestCount": self.expected_count}
+                        if self.expected_count is not None
+                        else {}
+                    ),
+                }
+                if is_plan
+                else {"transitionOrdinal": index}
+            )
+            self.append_gate(
+                GateAppend(
+                    workspaceRef=WORKSPACE,
+                    productionRunRef=RUN,
+                    gateName=(
+                        "M11_REAL_VIDEO_PLAN"
+                        if is_plan
+                        else f"SNAPSHOT_TEST_GATE_{index}"
+                    ),
+                    idempotencyKey=f"snapshot-test-gate-{index}",
+                    rootPayloadDigest="7" * 64,
+                    requestDigest=_digest(
+                        {"transitionOrdinal": index, "payload": payload}
+                    ),
+                    fromState=from_state,
+                    toState=to_state,
+                    createdAt=f"2026-08-25T00:00:{index:02d}Z",
+                    facts=(
+                        EvidenceFact(
+                            factKind=(
+                                "RealVideoPlan"
+                                if is_plan
+                                else f"SnapshotTestFact:{index}"
+                            ),
+                            factRef=(
+                                self.revision_ref
+                                if is_plan
+                                else f"snapshot-test-fact-{index}"
+                            ),
+                            factVersion=1,
+                            payload=payload,
+                            payloadDigest=_digest(payload),
+                        ),
+                    ),
+                )
+            )
 
 
 class EvidenceWithAdmittedSuccessor(EvidenceWithCurrentVideoPlan):
     def __init__(self, plan_revision_ref, admitted_revision_ref):
         super().__init__(plan_revision_ref, expected_count=1)
         self.admitted_revision_ref = admitted_revision_ref
-
-    def current_state(self, workspace_ref, run_ref):
-        return "REAL_VIDEO_READY"
-
-    def list_gates(self, workspace_ref, run_ref):
-        return [
-            *super().list_gates(workspace_ref, run_ref),
-            {
-                "gateName": "M11_REAL_VIDEO_ADMISSION",
-                "requestDigest": "6" * 64,
-                "toState": "REAL_VIDEO_READY",
-                "facts": [
-                    {
-                        "factKind": "RealVideoAdmissionManifest",
-                        "factRef": "manifest-successor",
-                        "factVersion": 1,
-                        "payload": {
-                            "revisionRef": self.admitted_revision_ref,
-                        },
-                        "payloadDigest": "5" * 64,
-                    }
-                ],
-            },
-        ]
+        payload = {"revisionRef": self.admitted_revision_ref}
+        self.append_gate(
+            GateAppend(
+                workspaceRef=WORKSPACE,
+                productionRunRef=RUN,
+                gateName="M11_REAL_VIDEO_ADMISSION",
+                idempotencyKey="snapshot-test-video-admission",
+                rootPayloadDigest="7" * 64,
+                requestDigest=_digest(payload),
+                fromState="REAL_VIDEO_PLAN_READY",
+                toState="REAL_VIDEO_READY",
+                createdAt="2026-08-25T00:00:11Z",
+                facts=(
+                    EvidenceFact(
+                        factKind="RealVideoAdmissionManifest",
+                        factRef="manifest-successor",
+                        factVersion=1,
+                        payload=payload,
+                        payloadDigest=_digest(payload),
+                    ),
+                ),
+            )
+        )
 
 
 class CandidateProjectionWithLatestRevision:
