@@ -7,6 +7,7 @@ can be replayed safely after a process restart.
 
 from __future__ import annotations
 
+import ctypes
 import errno
 import fcntl
 from hashlib import sha256
@@ -16,6 +17,14 @@ import re
 import stat
 import sys
 from typing import Any, Callable, Iterable
+
+
+class _OpenHow(ctypes.Structure):
+    _fields_ = (
+        ("flags", ctypes.c_uint64),
+        ("mode", ctypes.c_uint64),
+        ("resolve", ctypes.c_uint64),
+    )
 
 
 class ArtifactRecoveryStoreError(RuntimeError):
@@ -375,6 +384,60 @@ class ArtifactRecoveryStore:
             | getattr(os, "O_NOFOLLOW", 0)
         )
 
+    @staticmethod
+    def _openat2_no_symlinks(
+        base_fd: int,
+        relative_path: str,
+        flags: int,
+    ) -> int:
+        syscall_number = {
+            "x86_64": 437,
+            "amd64": 437,
+            "aarch64": 437,
+            "arm64": 437,
+            "riscv64": 437,
+        }.get(os.uname().machine.lower() if hasattr(os, "uname") else "")
+        if (
+            os.name != "posix"
+            or not sys.platform.startswith("linux")
+            or syscall_number is None
+        ):
+            raise OSError(errno.ENOSYS, "openat2 is unavailable")
+        if (
+            not relative_path
+            or relative_path.startswith("/")
+            or "\0" in relative_path
+            or any(part in {"", ".", ".."} for part in relative_path.split("/"))
+        ):
+            raise OSError(errno.EINVAL, "openat2 path is invalid")
+
+        resolve_beneath = 0x08
+        resolve_no_magiclinks = 0x02
+        resolve_no_symlinks = 0x04
+        how = _OpenHow(
+            flags=flags,
+            mode=0,
+            resolve=(
+                resolve_beneath
+                | resolve_no_magiclinks
+                | resolve_no_symlinks
+            ),
+        )
+        libc = ctypes.CDLL(None, use_errno=True)
+        syscall = libc.syscall
+        syscall.restype = ctypes.c_long
+        result = syscall(
+            ctypes.c_long(syscall_number),
+            ctypes.c_int(base_fd),
+            ctypes.c_char_p(os.fsencode(relative_path)),
+            ctypes.byref(how),
+            ctypes.c_size_t(ctypes.sizeof(how)),
+        )
+        if result < 0:
+            error_number = ctypes.get_errno()
+            raise OSError(error_number, os.strerror(error_number), relative_path)
+        return int(result)
+
     @classmethod
     def _open_directory_chain(
         cls,
@@ -500,6 +563,50 @@ class ArtifactRecoveryStore:
                         "absolute binding descriptor cleanup failed"
                     ) from cleanup_exc
 
+    def _assert_absolute_regular_file_binding(
+        self,
+        path: Path,
+        *,
+        locked_fd: int,
+        expected: os.stat_result,
+        required_nlink: int,
+    ) -> None:
+        absolute = self._assert_under_root(path)
+        descriptors: list[int] = []
+        try:
+            slash_fd = os.open(os.sep, self._directory_open_flags())
+            descriptors.append(slash_fd)
+            relative = absolute.relative_to(Path(os.sep)).as_posix()
+            try:
+                reopened_fd = self._openat2_no_symlinks(
+                    slash_fd,
+                    relative,
+                    self._publication_file_open_flags(),
+                )
+            except OSError as exc:
+                if exc.errno in {errno.ENOSYS, errno.EINVAL, errno.E2BIG}:
+                    raise ArtifactRecoveryStoreError(
+                        "required openat2 artifact binding is unavailable"
+                    ) from exc
+                raise
+            descriptors.append(reopened_fd)
+            reopened = os.fstat(reopened_fd)
+            locked = os.fstat(locked_fd)
+            if any(
+                not self._same_regular_inode(value, expected)
+                or value.st_nlink != required_nlink
+                for value in (reopened, locked)
+            ):
+                raise ArtifactRecoveryStoreError(
+                    "artifact file lost its absolute namespace binding"
+                )
+        finally:
+            self._close_artifact_descriptors(
+                descriptors,
+                active_error=sys.exception(),
+                operation="absolute artifact binding",
+            )
+
     @staticmethod
     def _stat_at(directory_fd: int | None, name: str) -> os.stat_result | None:
         if directory_fd is None:
@@ -572,6 +679,19 @@ class ArtifactRecoveryStore:
             destination_parent_fd,
         )
         self._assert_absolute_directory_binding(self.root, root_fd)
+        if source_parent_fd is not None:
+            self._assert_absolute_directory_binding(
+                self.root.joinpath(
+                    *(run_parts + relative_source_parent_parts)
+                ),
+                source_parent_fd,
+            )
+        self._assert_absolute_directory_binding(
+            self.root.joinpath(
+                *(run_parts + ("quarantine", category))
+            ),
+            destination_parent_fd,
+        )
 
     def _assert_publication_namespace_binding(
         self,
@@ -594,6 +714,14 @@ class ArtifactRecoveryStore:
             destination_parent_fd,
         )
         self._assert_absolute_directory_binding(self.root, root_fd)
+        self._assert_absolute_directory_binding(
+            self.root.joinpath(*source_parent_parts),
+            source_parent_fd,
+        )
+        self._assert_absolute_directory_binding(
+            self.root.joinpath(*destination_parent_parts),
+            destination_parent_fd,
+        )
 
     @staticmethod
     def _same_regular_inode(
@@ -868,6 +996,12 @@ class ArtifactRecoveryStore:
                 destination_parent_parts=destination_parent_parts,
                 destination_parent_fd=destination_parent_fd,
             )
+            self._assert_absolute_regular_file_binding(
+                destination_path,
+                locked_fd=locked_fd,
+                expected=locked_stat,
+                required_nlink=1,
+            )
             return destination_path
         except BaseException as exc:
             if created_link and locked_stat is not None:
@@ -1006,6 +1140,12 @@ class ArtifactRecoveryStore:
                 source_parent_fd=candidate_parent_fd,
                 destination_parent_parts=final_parent_parts,
                 destination_parent_fd=final_parent_fd,
+            )
+            self._assert_absolute_regular_file_binding(
+                final_path,
+                locked_fd=locked_fd,
+                expected=locked_stat,
+                required_nlink=1,
             )
             return final_path
         except BaseException as exc:
@@ -1168,6 +1308,7 @@ class ArtifactRecoveryStore:
             destination_name,
         )
         destination_key = PurePosixPath(*destination_parts).as_posix()
+        destination_path = self.root.joinpath(*destination_parts)
 
         descriptors: list[int] = []
         source_parent_fd: int | None = None
@@ -1286,6 +1427,12 @@ class ArtifactRecoveryStore:
                         raise ArtifactRecoveryStoreError(
                             "quarantine replay target lost its namespace binding"
                         )
+                    self._assert_absolute_regular_file_binding(
+                        destination_path,
+                        locked_fd=locked_fd,
+                        expected=locked_stat,
+                        required_nlink=1,
+                    )
                     return entry
 
                 if not exact_artifact(source_stat):
@@ -1422,6 +1569,12 @@ class ArtifactRecoveryStore:
                     raise ArtifactRecoveryStoreError(
                         "quarantine target lost its namespace binding"
                     )
+                self._assert_absolute_regular_file_binding(
+                    destination_path,
+                    locked_fd=locked_fd,
+                    expected=locked_stat,
+                    required_nlink=1,
+                )
                 return entry
             except (ArtifactRecoveryStoreError, OSError) as exc:
                 if created_link:
