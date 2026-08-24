@@ -268,8 +268,12 @@ class CreatorRequestHandler(BaseHTTPRequestHandler):
         super().__init__(*args, **kwargs)
 
     def do_POST(self) -> None:
-        requested_path = urlsplit(self.path).path
+        parsed = urlsplit(self.path)
+        requested_path = parsed.path
         if not self._authorize_route_class(requested_path):
+            return
+        query = parse_qs(parsed.query, keep_blank_values=True)
+        if self._reject_client_workspace_query(requested_path, query):
             return
         path = _normalize_public_path(requested_path)
         production_subresource = _episode_production_subresource(requested_path)
@@ -871,13 +875,20 @@ class CreatorRequestHandler(BaseHTTPRequestHandler):
         self, path: str, query: dict[str, list[str]]
     ) -> str | None:
         if self._is_public_path(path):
-            if "workspaceRef" in query:
-                self._send_application_error(
-                    400, "client_workspace_scope_forbidden"
-                )
+            if self._reject_client_workspace_query(path, query):
                 return None
             return self._authenticated_workspace_ref()
         return query.get("workspaceRef", [""])[0]
+
+    def _reject_client_workspace_query(
+        self, path: str, query: dict[str, list[str]]
+    ) -> bool:
+        if self._is_public_path(path) and "workspaceRef" in query:
+            self._send_application_error(
+                400, "client_workspace_scope_forbidden"
+            )
+            return True
+        return False
 
     def _handle_series_intelligence_post(
         self, path: str, payload: MappingLike
