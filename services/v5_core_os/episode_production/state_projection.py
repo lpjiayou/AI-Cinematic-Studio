@@ -187,11 +187,11 @@ class K2ProductionStateProjectionService:
                 and item.get("applicabilityState", "CURRENT") == "CURRENT"
             ):
                 current_candidates.append(item)
-        latest_refs = candidate_projection.get("latestCandidateRevisionRefs", {})
+        latest_refs = candidate_projection.get("latestCandidateRevisionRefs")
         candidate_revision = (
             latest_refs.get(media_kind) if isinstance(latest_refs, Mapping) else None
         )
-        if candidate_revision is None:
+        if not isinstance(latest_refs, Mapping):
             candidate_revision = candidate_projection.get(
                 "latestCandidateRevisionRef"
             )

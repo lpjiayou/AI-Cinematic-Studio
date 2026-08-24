@@ -163,6 +163,24 @@ class CandidateProjectionWithLatestRevision:
         }
 
 
+class CandidateProjectionWithOnlyImageRevision(
+    CandidateProjectionWithLatestRevision
+):
+    def get_projection(
+        self, workspace_ref, production_run_ref, *, records=None, gates=None
+    ):
+        projection = super().get_projection(
+            workspace_ref,
+            production_run_ref,
+            records=records,
+            gates=gates,
+        )
+        projection["latestCandidateRevisionRefs"] = {
+            "IMAGE": self.latest_revision_ref
+        }
+        return projection
+
+
 class ValidatedActivationReader:
     def __init__(self, revision_ref):
         self.revision_ref = revision_ref
@@ -386,6 +404,23 @@ class K2StateProjectionTests(unittest.TestCase):
         )
         self.assertEqual(
             projection["productionState"], "REAL_VIDEO_PLAN_READY"
+        )
+
+    def test_video_plan_does_not_fall_back_to_latest_image_revision(self):
+        plan_revision = "real-video-plan-current-v1"
+        projection = K2ProductionStateProjectionService(
+            self.root,
+            EvidenceWithCurrentVideoPlan(plan_revision),
+            CandidateProjectionWithOnlyImageRevision(
+                "real-image-plan-current-v1"
+            ),
+        ).get_projection(WORKSPACE, RUN)
+
+        self.assertEqual(
+            projection["activeRevision"]["revisionRef"], plan_revision
+        )
+        self.assertEqual(
+            projection["activeRevision"]["mediaKind"], "VIDEO"
         )
 
     def test_admission_manifest_keeps_admitted_successor_revision_active(self):
