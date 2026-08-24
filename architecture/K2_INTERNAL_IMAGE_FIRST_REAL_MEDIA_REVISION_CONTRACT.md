@@ -398,6 +398,13 @@ directly. The response exposes no absolute/internal path, ComfyUI endpoint,
 credential, raw provider payload or authority evidence body. No parallel
 review/admin frontend is authorized.
 
+The opaque `approvalRef`, actor/authority refs, authority-decision ref/digest/time
+and `subjectDigest` recorded in a canonical `HumanSelectionDecision` are public
+lineage pins, not an authority evidence body. Core may return those sealed scalar
+pins so the Frontend can fail closed on a broken chain. It must never return the
+external authority bundle, its `approvals` collection, nested subject body, raw
+bundle bytes, credentials or operator configuration location.
+
 This is a non-GPU control-plane correction. It authorizes governance, contract,
 append-only persistence/projection, public API compatibility and their verification
 work only. It does not authorize GPU dispatch, candidate generation, waiver-based
