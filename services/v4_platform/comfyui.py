@@ -13,6 +13,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from hashlib import sha256
 import json
+from math import isfinite
 import os
 from pathlib import Path, PurePosixPath
 import shutil
@@ -764,6 +765,7 @@ def _m11_camera_prompt(value: Any) -> str:
         or not isinstance(lens, (int, float))
         or lens < 8
         or lens > 200
+        or not isfinite(float(lens))
     ):
         raise ComfyUIConfigurationError("M11 camera lens is invalid")
     lens_text = f"{lens:g}"
