@@ -11,7 +11,9 @@ import tempfile
 from apps.creator_workspace_mvp.ai_director import AiDirectorService
 from apps.creator_workspace_mvp.public_auth import PublicApiAuthenticator
 from apps.creator_workspace_mvp.public_contract import (
+    PUBLIC_AI_DIRECTOR_ENDPOINT,
     PUBLIC_EPISODE_PRODUCTION_RUNS_ENDPOINT,
+    PUBLIC_M6_BIBLE_CANDIDATE_ENDPOINT,
 )
 from apps.creator_workspace_mvp.server import create_server
 from services.v5_core_os.episode_production import (
@@ -229,6 +231,35 @@ class CreatorEpisodeProductionK2HttpTests(unittest.TestCase):
         self.assertEqual(caught.exception.code, 409)
         payload = json.loads(caught.exception.read().decode("utf-8"))
         self.assertEqual(payload["error"]["code"], "upstream_not_confirmed")
+
+    def test_every_public_post_route_class_rejects_query_workspace_scope(self):
+        run_ref = parse.quote("episode-production-run-query-scope", safe="")
+        paths = (
+            f"{PUBLIC_AI_DIRECTOR_ENDPOINT}?workspaceRef=forged",
+            f"{PUBLIC_M6_BIBLE_CANDIDATE_ENDPOINT}?workspaceRef=",
+            (
+                f"{PUBLIC_EPISODE_PRODUCTION_RUNS_ENDPOINT}"
+                "?workspaceRef=forged&workspaceRef=other"
+            ),
+            (
+                f"{PUBLIC_EPISODE_PRODUCTION_RUNS_ENDPOINT}/{run_ref}/"
+                "real-image-candidates?workspaceRef=forged"
+            ),
+            (
+                f"{PUBLIC_EPISODE_PRODUCTION_RUNS_ENDPOINT}/{run_ref}/"
+                "real-video-candidates?%77orkspaceRef=forged"
+            ),
+        )
+        for path in paths:
+            with self.subTest(path=path):
+                with self.assertRaises(error.HTTPError) as caught:
+                    self.post(path, {})
+                self.assertEqual(caught.exception.code, 400)
+                payload = json.loads(caught.exception.read().decode("utf-8"))
+                self.assertEqual(
+                    payload["error"]["code"],
+                    "client_workspace_scope_forbidden",
+                )
 
     def test_public_g2_authority_identity_route_is_scoped_and_replay_safe(self):
         public_run_command = {

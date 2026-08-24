@@ -1,4 +1,5 @@
 import unittest
+from pathlib import Path
 
 from apps.creator_workspace_mvp import public_contract
 
@@ -94,6 +95,31 @@ class CreatorPublicHttpV1ContractTests(unittest.TestCase):
                 for resource in capability["publicResources"]
             )
         )
+
+    def test_document_covers_control_plane_and_breaking_selection_migration(self):
+        document = (
+            Path(__file__).resolve().parents[2]
+            / "docs"
+            / "04-interface-contract"
+            / "creator-public-http-v1.md"
+        ).read_text(encoding="utf-8")
+        for required_term in (
+            "production_policy_required",
+            "real-image-candidates",
+            "real-image-admission",
+            "real-image-successor-admission",
+            "real-video-candidates",
+            "semantic-visual-qc",
+            "media-selection",
+            "real-video-admission",
+            "state-projection",
+            "visualQcRef",
+            "approvalRef",
+            "BREAKING",
+            "client_workspace_scope_forbidden",
+        ):
+            with self.subTest(required_term=required_term):
+                self.assertIn(required_term, document)
 
 
 if __name__ == "__main__":
