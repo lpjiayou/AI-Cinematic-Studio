@@ -119,6 +119,23 @@ class EvidenceRecord:
     payloadDigest: str
 
 
+@dataclass(frozen=True, slots=True)
+class EvidenceSnapshot:
+    """One atomically observed append-only evidence revision.
+
+    Projection services must consume one of these values instead of combining
+    separately observed gates, transitions and records.  The V4 runtime is a
+    different authority and is deliberately not part of this snapshot.
+    """
+
+    workspaceRef: str
+    productionRunRef: str
+    currentState: str
+    gates: tuple[dict[str, Any], ...]
+    records: tuple[dict[str, Any], ...]
+    revisionToken: str
+
+
 class EpisodeProductionEvidenceRepository(Protocol):
     def current_state(self, workspace_ref: str, run_ref: str) -> str: ...
     def get_gate(self, workspace_ref: str, run_ref: str, gate_name: str) -> dict[str, Any] | None: ...
@@ -126,6 +143,9 @@ class EpisodeProductionEvidenceRepository(Protocol):
     def append_gate(self, gate: GateAppend) -> tuple[dict[str, Any], bool]: ...
     def get_record(
         self, workspace_ref: str, run_ref: str, record_ref: str, record_version: int
+    ) -> dict[str, Any] | None: ...
+    def get_record_by_idempotency_key(
+        self, workspace_ref: str, run_ref: str, idempotency_key: str
     ) -> dict[str, Any] | None: ...
     def list_records(
         self, workspace_ref: str, run_ref: str, *, record_kind: str | None = None
@@ -138,6 +158,9 @@ class EpisodeProductionEvidenceRepository(Protocol):
         expected_record_journal_head: str | None = None,
     ) -> tuple[list[dict[str, Any]], bool]: ...
     def record_journal_head(self, workspace_ref: str, run_ref: str) -> str: ...
+    def read_snapshot(
+        self, workspace_ref: str, run_ref: str
+    ) -> EvidenceSnapshot: ...
     def append_records_and_gate(
         self,
         records: Sequence[EvidenceRecord],
@@ -184,6 +207,54 @@ def _record_mapping(record: EvidenceRecord) -> dict[str, Any]:
         "payload": deepcopy(dict(record.payload)),
         "payloadDigest": record.payloadDigest,
     }
+
+
+def _snapshot_revision_token(
+    workspace_ref: str,
+    run_ref: str,
+    current_state: str,
+    gates: Sequence[Mapping[str, Any]],
+    records: Sequence[Mapping[str, Any]],
+) -> str:
+    """Seal both append-only journals into one opaque read revision."""
+
+    return _digest(
+        {
+            "schemaVersion": "v5.episode-production-evidence-snapshot.v1",
+            "workspaceRef": _required_ref(workspace_ref, "workspaceRef"),
+            "productionRunRef": _required_ref(run_ref, "productionRunRef"),
+            "currentState": current_state,
+            "gates": [
+                {
+                    "gateName": item.get("gateName"),
+                    "rootPayloadDigest": item.get("rootPayloadDigest"),
+                    "requestDigest": item.get("requestDigest"),
+                    "fromState": item.get("fromState"),
+                    "toState": item.get("toState"),
+                    "facts": [
+                        {
+                            "factKind": fact.get("factKind"),
+                            "factRef": fact.get("factRef"),
+                            "factVersion": fact.get("factVersion"),
+                            "payloadDigest": fact.get("payloadDigest"),
+                        }
+                        for fact in item.get("facts", [])
+                        if isinstance(fact, Mapping)
+                    ],
+                }
+                for item in gates
+            ],
+            "records": [
+                {
+                    "recordKind": item.get("recordKind"),
+                    "recordRef": item.get("recordRef"),
+                    "recordVersion": item.get("recordVersion"),
+                    "payloadDigest": item.get("payloadDigest"),
+                }
+                for item in records
+            ],
+        }
+    )
 
 
 def _validate_digest(value: str, field: str) -> None:
@@ -432,6 +503,22 @@ class InMemoryEpisodeProductionEvidenceAdapter:
             )
             return None if record is None else _record_mapping(record)
 
+    def get_record_by_idempotency_key(
+        self, workspace_ref: str, run_ref: str, idempotency_key: str
+    ) -> dict[str, Any] | None:
+        key = _idempotency_key(idempotency_key)
+        with self._lock:
+            identity = self._record_idempotency.get(
+                (workspace_ref, run_ref, key)
+            )
+            if identity is None:
+                return None
+            return _record_mapping(
+                self._records[
+                    (workspace_ref, run_ref, identity[0], identity[1])
+                ]
+            )
+
     def list_records(
         self, workspace_ref: str, run_ref: str, *, record_kind: str | None = None
     ) -> list[dict[str, Any]]:
@@ -560,6 +647,43 @@ class InMemoryEpisodeProductionEvidenceAdapter:
                 latest_record_ref=latest.recordRef,
                 latest_record_version=latest.recordVersion,
                 latest_payload_digest=latest.payloadDigest,
+            )
+
+    def read_snapshot(
+        self, workspace_ref: str, run_ref: str
+    ) -> EvidenceSnapshot:
+        _required_ref(workspace_ref, "workspaceRef")
+        _required_ref(run_ref, "productionRunRef")
+        with self._lock:
+            gate_names = self._gate_order.get((workspace_ref, run_ref), [])
+            gates = tuple(
+                _gate_mapping(self._gates[(workspace_ref, run_ref, name)])
+                for name in gate_names
+            )
+            record_keys = self._record_order.get((workspace_ref, run_ref), [])
+            records = tuple(
+                _record_mapping(
+                    self._records[
+                        (workspace_ref, run_ref, record_ref, record_version)
+                    ]
+                )
+                for record_ref, record_version in record_keys
+            )
+            transitions = self._transitions.get((workspace_ref, run_ref), [])
+            current_state = transitions[-1][1] if transitions else ROOTS_READY
+            return EvidenceSnapshot(
+                workspace_ref,
+                run_ref,
+                current_state,
+                gates,
+                records,
+                _snapshot_revision_token(
+                    workspace_ref,
+                    run_ref,
+                    current_state,
+                    gates,
+                    records,
+                ),
             )
 
     def append_records_and_gate(
@@ -1030,6 +1154,25 @@ class SqliteEpisodeProductionEvidenceAdapter:
         finally:
             connection.close()
 
+    def get_record_by_idempotency_key(
+        self, workspace_ref: str, run_ref: str, idempotency_key: str
+    ) -> dict[str, Any] | None:
+        key = _idempotency_key(idempotency_key)
+        connection = self._connect()
+        try:
+            row = connection.execute(
+                "SELECT * FROM v5_episode_production_records WHERE workspace_ref=? "
+                "AND production_run_ref=? AND idempotency_key=?",
+                (workspace_ref, run_ref, key),
+            ).fetchone()
+            return None if row is None else self._decode_record(row)
+        except sqlite3.DatabaseError as exc:
+            raise RepositoryUnavailableError(
+                "episode evidence record read failed"
+            ) from exc
+        finally:
+            connection.close()
+
     @staticmethod
     def _decode_gate(connection: sqlite3.Connection, row: sqlite3.Row) -> dict[str, Any]:
         facts = connection.execute(
@@ -1443,6 +1586,73 @@ class SqliteEpisodeProductionEvidenceAdapter:
             connection.rollback()
             raise RepositoryUnavailableError(
                 "episode evidence record journal read failed"
+            ) from exc
+        finally:
+            connection.close()
+
+    def read_snapshot(
+        self, workspace_ref: str, run_ref: str
+    ) -> EvidenceSnapshot:
+        _required_ref(workspace_ref, "workspaceRef")
+        _required_ref(run_ref, "productionRunRef")
+        connection = self._connect()
+        try:
+            # SQLite fixes the read view on the first statement in this
+            # transaction.  All three journals are therefore observed at one
+            # database revision even while another connection appends.
+            connection.execute("BEGIN")
+            transition = connection.execute(
+                "SELECT to_state FROM v5_episode_production_transitions "
+                "WHERE workspace_ref=? AND production_run_ref=? "
+                "ORDER BY sequence DESC LIMIT 1",
+                (workspace_ref, run_ref),
+            ).fetchone()
+            current_state = (
+                ROOTS_READY
+                if transition is None
+                else str(transition["to_state"])
+            )
+            gate_rows = connection.execute(
+                "SELECT g.* FROM v5_episode_production_gates g "
+                "JOIN v5_episode_production_transitions t USING "
+                "(workspace_ref,production_run_ref,gate_name) "
+                "WHERE g.workspace_ref=? AND g.production_run_ref=? "
+                "ORDER BY t.sequence",
+                (workspace_ref, run_ref),
+            ).fetchall()
+            gates = tuple(
+                self._decode_gate(connection, row) for row in gate_rows
+            )
+            record_rows = connection.execute(
+                "SELECT * FROM v5_episode_production_records "
+                "WHERE workspace_ref=? AND production_run_ref=? "
+                "ORDER BY sequence",
+                (workspace_ref, run_ref),
+            ).fetchall()
+            records = tuple(self._decode_record(row) for row in record_rows)
+            snapshot = EvidenceSnapshot(
+                workspace_ref,
+                run_ref,
+                current_state,
+                gates,
+                records,
+                _snapshot_revision_token(
+                    workspace_ref,
+                    run_ref,
+                    current_state,
+                    gates,
+                    records,
+                ),
+            )
+            connection.rollback()
+            return snapshot
+        except EpisodeProductionError:
+            connection.rollback()
+            raise
+        except sqlite3.DatabaseError as exc:
+            connection.rollback()
+            raise RepositoryUnavailableError(
+                "episode evidence snapshot read failed"
             ) from exc
         finally:
             connection.close()

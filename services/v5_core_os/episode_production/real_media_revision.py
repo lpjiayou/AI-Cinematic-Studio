@@ -21,6 +21,7 @@ from .evidence import (
     EpisodeProductionEvidenceRepository,
     EvidenceFact,
     EvidenceRecord,
+    EvidenceSnapshot,
     GateAppend,
 )
 from .foundation import (
@@ -605,29 +606,55 @@ class K2RealMediaRevisionService:
             )
             for item in requests
         )
-        gate, replay = self.evidence.append_gate(
-            GateAppend(
-                workspace,
-                run_ref,
-                REAL_IMAGE_PLAN_GATE,
-                gate_key,
-                root["payloadDigest"],
-                request_digest,
-                "QC_READY",
-                "REAL_IMAGE_PLAN_READY",
-                now,
-                (
-                    EvidenceFact(
-                        "RealImagePlan",
-                        plan["realImagePlanRef"],
-                        1,
-                        plan,
-                        plan["payloadDigest"],
+        try:
+            gate, replay = self.evidence.append_gate(
+                GateAppend(
+                    workspace,
+                    run_ref,
+                    REAL_IMAGE_PLAN_GATE,
+                    gate_key,
+                    root["payloadDigest"],
+                    request_digest,
+                    "QC_READY",
+                    "REAL_IMAGE_PLAN_READY",
+                    now,
+                    (
+                        EvidenceFact(
+                            "RealImagePlan",
+                            plan["realImagePlanRef"],
+                            1,
+                            plan,
+                            plan["payloadDigest"],
+                        ),
+                        *facts,
                     ),
-                    *facts,
-                ),
+                )
             )
-        )
+        except IdempotencyConflictError:
+            # Concurrent exact planners may create different ephemeral refs
+            # before either observes the gate.  The committed gate is the
+            # canonical winner when its operation key and immutable inputs are
+            # identical; generated loser refs are not an idempotency conflict.
+            winner = self.evidence.get_gate(
+                workspace, run_ref, REAL_IMAGE_PLAN_GATE
+            )
+            if winner is None or winner.get("idempotencyKey") != gate_key:
+                raise
+            winner_bundle = self._bundle(winner)
+            winner_plan = winner_bundle["realImagePlan"]
+            if (
+                winner_plan.get("rootPayloadDigest") != root["payloadDigest"]
+                or winner_plan.get("identityLockDigest")
+                != verified["identityLock"]["payloadDigest"]
+                or winner_plan.get("executableShotGraphDigest")
+                != verified["executableShotGraph"]["payloadDigest"]
+                or winner_plan.get("sourceQcReportDigest")
+                != qc["payloadDigest"]
+            ):
+                raise StaleInputError(
+                    "concurrent M10 image plan lineage changed"
+                )
+            return {**winner_bundle, "idempotentReplay": True}
         return {**self._bundle(gate), "idempotentReplay": replay}
 
     def _verified_plan(
@@ -879,8 +906,12 @@ class K2RealMediaRevisionService:
                 {
                     "clientIdempotencyKey": client_key,
                     "stage": "m10-candidate",
-                    "candidateRef": source_candidate_ref,
-                    "artifactDigest": artifact_digest,
+                    # Batch membership keys are derived only from immutable
+                    # operation inputs.  Provider-owned candidate identity and
+                    # bytes belong in the request digest, never in the key.
+                    "generationRequestRef": request["generationRequestRef"],
+                    "generationRequestDigest": request["payloadDigest"],
+                    "ordinal": request["ordinal"],
                 }
             )[:48]
             candidate_ref = source_candidate_ref
@@ -903,7 +934,15 @@ class K2RealMediaRevisionService:
                 {
                     "workspaceRef": workspace,
                     "productionRunRef": run_ref,
-                    "idempotencyKey": f"m10-candidate-{candidate_key}",
+                    # The first canonical record reserves the public operation
+                    # key for the complete eight-record handoff batch.  Any
+                    # changed member then produces either a changed first
+                    # request digest or a forbidden partial replay.
+                    "idempotencyKey": (
+                        client_key
+                        if request["ordinal"] == 1
+                        else f"m10-candidate-{candidate_key}"
+                    ),
                     "candidateRef": candidate_ref,
                     "candidateVersion": 1,
                     "revisionRef": candidate_revision_ref,
@@ -924,8 +963,9 @@ class K2RealMediaRevisionService:
                 {
                     "clientIdempotencyKey": client_key,
                     "stage": "m10-technical-validation",
-                    "candidateRef": candidate_ref,
-                    "candidateDigest": candidate_record.payloadDigest,
+                    "generationRequestRef": request["generationRequestRef"],
+                    "generationRequestDigest": request["payloadDigest"],
+                    "ordinal": request["ordinal"],
                 }
             )[:48]
             validation_record = (
@@ -1233,6 +1273,20 @@ class K2RealMediaRevisionService:
         if (
             [value[0] for value in prepared] != [1, 2, 3, 4]
             or len({value[2]["candidateRef"] for value in prepared}) != 4
+            or len(
+                {
+                    value[1].payload["authorityDecisionRef"]
+                    for value in prepared
+                }
+            )
+            != 4
+            or len(
+                {
+                    value[1].payload["authorityDecisionDigest"]
+                    for value in prepared
+                }
+            )
+            != 4
         ):
             raise RealImageCandidateRejectedError(
                 "M10 admission does not cover four unique timeline slots"
@@ -1470,15 +1524,10 @@ class K2RealMediaRevisionService:
         selection_command = {
             "workspaceRef": workspace,
             "productionRunRef": run_ref,
-            "idempotencyKey": (
-                "m10-successor-selection-"
-                + _digest(
-                    {
-                        "clientIdempotencyKey": client_key,
-                        "selectionRef": selection_input.get("selectionRef"),
-                    }
-                )[:40]
-            ),
+            # HumanSelectionDecision is the first durable fact of this
+            # non-transitioning operation and therefore reserves the public
+            # operation key without introducing a seventh record kind.
+            "idempotencyKey": client_key,
             "visualQcRef": _required_ref(
                 selection_input.get("visualQcRef"), "visualQcRef"
             ),
@@ -2072,13 +2121,19 @@ class K2RealMediaRevisionService:
         workspace: str,
         run_ref: str,
         baseline_assets: Sequence[Mapping[str, Any]],
+        *,
+        records: Sequence[Mapping[str, Any]] | None = None,
+        gates: Sequence[Mapping[str, Any]] | None = None,
     ) -> list[dict[str, Any]]:
         """Return one canonical latest image AssetVersion for every M11 slot."""
 
         canonical = [
             item
             for item in self.candidate_review.asset_versions.list_asset_versions(
-                workspace, run_ref
+                workspace,
+                run_ref,
+                records=records,
+                gates=gates,
             )
             if str(item.get("mediaKind", "")).lower() == "image"
         ]
@@ -2143,6 +2198,8 @@ class K2RealMediaRevisionService:
         run_ref: str,
         plan: Mapping[str, Any],
         baseline_requests: Sequence[Mapping[str, Any]],
+        *,
+        records: Sequence[Mapping[str, Any]] | None = None,
     ) -> tuple[list[dict[str, Any]], dict[str, Any] | None]:
         """Read the latest server-sealed successor request set from Candidates."""
 
@@ -2161,9 +2218,16 @@ class K2RealMediaRevisionService:
         latest_revision: dict[str, Any] | None = None
         seen_revision_digests: set[str] = set()
         prior_requests = [deepcopy(dict(item)) for item in baseline_requests]
-        for record in self.evidence.list_records(
-            workspace, run_ref, record_kind=CANDIDATE
-        ):
+        candidate_records = (
+            self.evidence.list_records(
+                workspace, run_ref, record_kind=CANDIDATE
+            )
+            if records is None
+            else [
+                item for item in records if item.get("recordKind") == CANDIDATE
+            ]
+        )
+        for record in candidate_records:
             payload = record.get("payload")
             if (
                 not isinstance(payload, Mapping)
@@ -2502,24 +2566,48 @@ class K2RealMediaRevisionService:
         workspace: str,
         run_ref: str,
         plan_bundle: Mapping[str, Any],
+        *,
+        records: Sequence[Mapping[str, Any]] | None = None,
+        gates: Sequence[Mapping[str, Any]] | None = None,
     ) -> tuple[list[dict[str, Any]], dict[str, Any]]:
         plan = plan_bundle["realVideoPlan"]
         baseline_requests = plan_bundle["generationRequests"]
-        image_gate = self.evidence.get_gate(
-            workspace, run_ref, REAL_IMAGE_ADMISSION_GATE
+        image_gate = (
+            self.evidence.get_gate(
+                workspace, run_ref, REAL_IMAGE_ADMISSION_GATE
+            )
+            if gates is None
+            else next(
+                (
+                    item
+                    for item in gates
+                    if item.get("gateName") == REAL_IMAGE_ADMISSION_GATE
+                ),
+                None,
+            )
         )
         if image_gate is None:
             raise UpstreamNotReadyError("M10 image admission is required")
-        baseline_assets = self._admission_bundle(image_gate)["assetVersions"]
+        baseline_assets = self._admission_bundle(
+            image_gate, records=records
+        )["assetVersions"]
         baseline_by_slot = {item["creativeShotVersionRef"]: item for item in baseline_assets}
         current_assets = self._current_image_assets_for_video(
-            workspace, run_ref, baseline_assets
+            workspace,
+            run_ref,
+            baseline_assets,
+            records=records,
+            gates=gates,
         )
         current_by_slot = {
             item["creativeShotVersionRef"]: item for item in current_assets
         }
         prior_requests, prior_revision = self._persisted_video_revision(
-            workspace, run_ref, plan, baseline_requests
+            workspace,
+            run_ref,
+            plan,
+            baseline_requests,
+            records=records,
         )
         prior_by_slot = {
             item["creativeShotVersionRef"]: item for item in prior_requests
@@ -2617,7 +2705,12 @@ class K2RealMediaRevisionService:
         return requests, revision
 
     def _active_video_admission(
-        self, workspace: str, run_ref: str
+        self,
+        workspace: str,
+        run_ref: str,
+        *,
+        records: Sequence[Mapping[str, Any]] | None = None,
+        gates: Sequence[Mapping[str, Any]] | None = None,
     ) -> dict[str, Any] | None:
         """Resolve the one strictly validated atomic four-slot VIDEO chain.
 
@@ -2629,10 +2722,29 @@ class K2RealMediaRevisionService:
         active four-slot set.
         """
 
-        gate = self.evidence.get_gate(workspace, run_ref, REAL_VIDEO_ADMISSION_GATE)
+        gate_values = (
+            self.evidence.list_gates(workspace, run_ref)
+            if gates is None
+            else gates
+        )
+        gate = next(
+            (
+                item
+                for item in gate_values
+                if item.get("gateName") == REAL_VIDEO_ADMISSION_GATE
+            ),
+            None,
+        )
         if gate is None:
             return None
-        plan_gate = self.evidence.get_gate(workspace, run_ref, REAL_VIDEO_PLAN_GATE)
+        plan_gate = next(
+            (
+                item
+                for item in gate_values
+                if item.get("gateName") == REAL_VIDEO_PLAN_GATE
+            ),
+            None,
+        )
         if plan_gate is None:
             raise RepositoryUnavailableError("M11 video plan evidence is missing")
         plan_bundle = self._video_bundle(plan_gate)
@@ -2644,6 +2756,7 @@ class K2RealMediaRevisionService:
             run_ref,
             plan,
             plan_bundle["generationRequests"],
+            records=records,
         )
         gate_bundle = self._video_admission_bundle(gate)
         manifest = self._assert_sealed_payload(
@@ -2694,8 +2807,14 @@ class K2RealMediaRevisionService:
                 "initial M11 video activation is inconsistent"
             )
 
-        records = self.evidence.list_records(workspace, run_ref)
-        positions = {id(record): index for index, record in enumerate(records)}
+        journal_records = (
+            self.evidence.list_records(workspace, run_ref)
+            if records is None
+            else list(records)
+        )
+        positions = {
+            id(record): index for index, record in enumerate(journal_records)
+        }
 
         def sealed_record_payload(
             record: Mapping[str, Any], field: str
@@ -2715,7 +2834,7 @@ class K2RealMediaRevisionService:
             return payload
 
         full_index: dict[tuple[str, str, str], list[dict[str, Any]]] = {}
-        for record in records:
+        for record in journal_records:
             payload = record.get("payload")
             digest = record.get("payloadDigest")
             if isinstance(payload, Mapping) and isinstance(digest, str):
@@ -3081,7 +3200,7 @@ class K2RealMediaRevisionService:
                     ).append(item)
             return result
 
-        prior_records = list(records[: initial_cut + 1])
+        prior_records = list(journal_records[: initial_cut + 1])
         prior_index = build_index(prior_records)
         initial_resolved: list[
             tuple[dict[str, Any], dict[str, Any], dict[str, Any]]
@@ -3141,7 +3260,7 @@ class K2RealMediaRevisionService:
             "revisionSupersessionDigest": plan["payloadDigest"],
         }
 
-        for record in records[initial_cut + 1 :]:
+        for record in journal_records[initial_cut + 1 :]:
             payload = record.get("payload")
             if (
                 record.get("recordKind") == ASSET_ADMISSION
@@ -3419,7 +3538,11 @@ class K2RealMediaRevisionService:
             prior_records.append(record)
             prior_index = build_index(prior_records)
         current["lineageCurrent"] = self._video_activation_is_current(
-            workspace, run_ref, current
+            workspace,
+            run_ref,
+            current,
+            records=journal_records,
+            gates=gate_values,
         )
         return current
 
@@ -3428,6 +3551,9 @@ class K2RealMediaRevisionService:
         workspace: str,
         run_ref: str,
         active: Mapping[str, Any],
+        *,
+        records: Sequence[Mapping[str, Any]] | None = None,
+        gates: Sequence[Mapping[str, Any]] | None = None,
     ) -> bool:
         """Bind every active slot to the journal-current canonical chain."""
 
@@ -3441,12 +3567,20 @@ class K2RealMediaRevisionService:
         ):
             return False
         current_candidates = self._current_video_candidates_by_slot(
-            workspace, run_ref
+            workspace, run_ref, records=records
         )
         if len(current_candidates) != 4:
             return False
-        selections = self.evidence.list_records(
-            workspace, run_ref, record_kind=HUMAN_SELECTION
+        selections = (
+            self.evidence.list_records(
+                workspace, run_ref, record_kind=HUMAN_SELECTION
+            )
+            if records is None
+            else [
+                item
+                for item in records
+                if item.get("recordKind") == HUMAN_SELECTION
+            ]
         )
         latest_selection_by_candidate: dict[
             tuple[str, str], dict[str, Any]
@@ -3464,7 +3598,10 @@ class K2RealMediaRevisionService:
                     (candidate_ref, candidate_digest)
                 ] = record
         canonical = self.candidate_review.asset_versions.list_asset_versions(
-            workspace, run_ref
+            workspace,
+            run_ref,
+            records=records,
+            gates=gates,
         )
         latest_asset_by_logical_ref: dict[str, dict[str, Any]] = {}
         for asset in canonical:
@@ -3491,7 +3628,10 @@ class K2RealMediaRevisionService:
                 return False
             try:
                 qc = self.candidate_review._applicable_visual_qc(
-                    workspace, run_ref, str(slot.get("candidateRef"))
+                    workspace,
+                    run_ref,
+                    str(slot.get("candidateRef")),
+                    records=records,
                 )
             except EpisodeProductionError:
                 return False
@@ -3528,11 +3668,21 @@ class K2RealMediaRevisionService:
         return True
 
     def get_video_activation_projection(
-        self, workspace: str, run_ref: str
+        self,
+        workspace: str,
+        run_ref: str,
+        *,
+        records: Sequence[Mapping[str, Any]] | None = None,
+        gates: Sequence[Mapping[str, Any]] | None = None,
     ) -> dict[str, Any] | None:
         """Expose only the result of the strict activation validator."""
 
-        active = self._active_video_admission(workspace, run_ref)
+        active = self._active_video_admission(
+            workspace,
+            run_ref,
+            records=records,
+            gates=gates,
+        )
         if active is None:
             return None
         manifest = active["manifest"]
@@ -3557,18 +3707,32 @@ class K2RealMediaRevisionService:
         }
 
     def _current_video_candidates_by_slot(
-        self, workspace: str, run_ref: str
+        self,
+        workspace: str,
+        run_ref: str,
+        *,
+        records: Sequence[Mapping[str, Any]] | None = None,
     ) -> dict[str, dict[str, Any]]:
         current: dict[str, dict[str, Any]] = {}
-        for record in self.evidence.list_records(
-            workspace, run_ref, record_kind=CANDIDATE
-        ):
+        candidate_records = (
+            self.evidence.list_records(
+                workspace, run_ref, record_kind=CANDIDATE
+            )
+            if records is None
+            else [
+                item for item in records if item.get("recordKind") == CANDIDATE
+            ]
+        )
+        for record in candidate_records:
             payload = record.get("payload")
             if (
                 not isinstance(payload, Mapping)
                 or payload.get("mediaKind") != "VIDEO"
                 or self.candidate_review._current_candidate_record(
-                    workspace, run_ref, str(payload.get("candidateRef", ""))
+                    workspace,
+                    run_ref,
+                    str(payload.get("candidateRef", "")),
+                    records=records,
                 )
                 is None
             ):
@@ -3789,29 +3953,49 @@ class K2RealMediaRevisionService:
             )
             for item in requests
         )
-        gate, replay = self.evidence.append_gate(
-            GateAppend(
-                workspace,
-                run_ref,
-                REAL_VIDEO_PLAN_GATE,
-                gate_key,
-                root["payloadDigest"],
-                request_digest,
-                "REAL_IMAGE_READY",
-                "REAL_VIDEO_PLAN_READY",
-                now,
-                (
-                    EvidenceFact(
-                        "RealVideoPlan",
-                        plan["realVideoPlanRef"],
-                        1,
-                        plan,
-                        plan["payloadDigest"],
+        try:
+            gate, replay = self.evidence.append_gate(
+                GateAppend(
+                    workspace,
+                    run_ref,
+                    REAL_VIDEO_PLAN_GATE,
+                    gate_key,
+                    root["payloadDigest"],
+                    request_digest,
+                    "REAL_IMAGE_READY",
+                    "REAL_VIDEO_PLAN_READY",
+                    now,
+                    (
+                        EvidenceFact(
+                            "RealVideoPlan",
+                            plan["realVideoPlanRef"],
+                            1,
+                            plan,
+                            plan["payloadDigest"],
+                        ),
+                        *facts,
                     ),
-                    *facts,
-                ),
+                )
             )
-        )
+        except IdempotencyConflictError:
+            winner = self.evidence.get_gate(
+                workspace, run_ref, REAL_VIDEO_PLAN_GATE
+            )
+            if winner is None or winner.get("idempotencyKey") != gate_key:
+                raise
+            winner_bundle = self._video_bundle(winner)
+            winner_plan = winner_bundle["realVideoPlan"]
+            if (
+                winner_plan.get("rootPayloadDigest") != root["payloadDigest"]
+                or winner_plan.get("realImageAdmissionManifestDigest")
+                != admission_manifest["payloadDigest"]
+                or winner_plan.get("sourceImageAssetVersionDigests")
+                != [item["payloadDigest"] for item in assets]
+            ):
+                raise StaleInputError(
+                    "concurrent M11 video plan lineage changed"
+                )
+            return {**winner_bundle, "idempotentReplay": True}
         return {**self._video_bundle(gate), "idempotentReplay": replay}
 
     def record_real_video_candidates(
@@ -3928,7 +4112,9 @@ class K2RealMediaRevisionService:
                 {
                     "clientIdempotencyKey": client_key,
                     "stage": "m11-candidate",
-                    "candidateRef": source_candidate_ref,
+                    "generationRequestRef": request["generationRequestRef"],
+                    "generationRequestDigest": request["payloadDigest"],
+                    "ordinal": request["ordinal"],
                 }
             )[:48]
             candidate_ref = source_candidate_ref
@@ -4001,8 +4187,9 @@ class K2RealMediaRevisionService:
                 {
                     "clientIdempotencyKey": client_key,
                     "stage": "m11-technical-validation",
-                    "candidateRef": candidate["candidateRef"],
-                    "candidateDigest": candidate["payloadDigest"],
+                    "generationRequestRef": request["generationRequestRef"],
+                    "generationRequestDigest": request["payloadDigest"],
+                    "ordinal": request["ordinal"],
                 }
             )[:48]
             validation_record = (
@@ -4381,6 +4568,20 @@ class K2RealMediaRevisionService:
         if (
             [item[0] for item in prepared] != [1, 2, 3, 4]
             or len({item[2]["candidateRef"] for item in prepared}) != 4
+            or len(
+                {
+                    item[1].payload["authorityDecisionRef"]
+                    for item in prepared
+                }
+            )
+            != 4
+            or len(
+                {
+                    item[1].payload["authorityDecisionDigest"]
+                    for item in prepared
+                }
+            )
+            != 4
         ):
             raise RealVideoCandidateRejectedError(
                 "M11 admission does not cover four unique timeline slots"
@@ -5237,7 +5438,12 @@ class K2RealMediaRevisionService:
             "state": gate["toState"],
         }
 
-    def _admission_bundle(self, gate: Mapping[str, Any]) -> dict[str, Any]:
+    def _admission_bundle(
+        self,
+        gate: Mapping[str, Any],
+        *,
+        records: Sequence[Mapping[str, Any]] | None = None,
+    ) -> dict[str, Any]:
         manifest = _fact(gate, "RealImageAdmissionManifest")
         if (
             manifest.get("schemaVersion")
@@ -5268,12 +5474,24 @@ class K2RealMediaRevisionService:
             )
         selections: list[dict[str, Any]] = []
         candidates: list[dict[str, Any]] = []
+        record_index = (
+            None
+            if records is None
+            else {
+                (item.get("recordRef"), item.get("recordVersion")): item
+                for item in records
+            }
+        )
         for ref, version, digest in zip(refs, versions, digests):
-            record = self.evidence.get_record(
-                gate["workspaceRef"],
-                gate["productionRunRef"],
-                ref,
-                version,
+            record = (
+                self.evidence.get_record(
+                    gate["workspaceRef"],
+                    gate["productionRunRef"],
+                    ref,
+                    version,
+                )
+                if record_index is None
+                else record_index.get((ref, version))
             )
             if (
                 record is None
@@ -5285,11 +5503,20 @@ class K2RealMediaRevisionService:
                     "unified M10 selection evidence is invalid"
                 )
             selection = deepcopy(dict(record["payload"]))
-            candidate_record = self.evidence.get_record(
-                gate["workspaceRef"],
-                gate["productionRunRef"],
-                selection.get("candidateRef"),
-                selection.get("candidateVersion"),
+            candidate_record = (
+                self.evidence.get_record(
+                    gate["workspaceRef"],
+                    gate["productionRunRef"],
+                    selection.get("candidateRef"),
+                    selection.get("candidateVersion"),
+                )
+                if record_index is None
+                else record_index.get(
+                    (
+                        selection.get("candidateRef"),
+                        selection.get("candidateVersion"),
+                    )
+                )
             )
             if (
                 candidate_record is None
@@ -5334,33 +5561,46 @@ class K2RealMediaRevisionService:
         }
 
     def get_revision_bundle(
-        self, workspace_ref: str, production_run_ref: str
+        self,
+        workspace_ref: str,
+        production_run_ref: str,
+        *,
+        evidence_snapshot: EvidenceSnapshot | None = None,
     ) -> dict[str, Any]:
         self.shot_graph.root_service.get_run(workspace_ref, production_run_ref)
-        gate = self.evidence.get_gate(
-            workspace_ref, production_run_ref, REAL_IMAGE_PLAN_GATE
+        snapshot = evidence_snapshot or self.evidence.read_snapshot(
+            workspace_ref, production_run_ref
         )
+        if (
+            snapshot.workspaceRef != workspace_ref
+            or snapshot.productionRunRef != production_run_ref
+        ):
+            raise RepositoryUnavailableError("evidence snapshot scope is invalid")
+        gates = {item.get("gateName"): item for item in snapshot.gates}
+        gate = gates.get(REAL_IMAGE_PLAN_GATE)
         if gate is None:
             raise UpstreamNotReadyError("M10 real image plan is not ready")
         plan_bundle = self._bundle(gate)
-        admission = self.evidence.get_gate(
-            workspace_ref,
-            production_run_ref,
-            REAL_IMAGE_ADMISSION_GATE,
-        )
+        admission = gates.get(REAL_IMAGE_ADMISSION_GATE)
         if admission is None:
-            return plan_bundle
-        result = {**plan_bundle, **self._admission_bundle(admission)}
-        video_plan = self.evidence.get_gate(
-            workspace_ref,
-            production_run_ref,
-            REAL_VIDEO_PLAN_GATE,
-        )
+            return {
+                **plan_bundle,
+                "evidenceRevisionToken": snapshot.revisionToken,
+            }
+        result = {
+            **plan_bundle,
+            **self._admission_bundle(admission, records=snapshot.records),
+        }
+        video_plan = gates.get(REAL_VIDEO_PLAN_GATE)
         if video_plan is not None:
             video_bundle = self._video_bundle(video_plan)
             current_video_requests, current_video_revision = (
                 self._current_video_request_set(
-                    workspace_ref, production_run_ref, video_bundle
+                    workspace_ref,
+                    production_run_ref,
+                    video_bundle,
+                    records=snapshot.records,
+                    gates=snapshot.gates,
                 )
             )
             result.update(
@@ -5372,7 +5612,10 @@ class K2RealMediaRevisionService:
                 }
             )
         active_video_admission = self._active_video_admission(
-            workspace_ref, production_run_ref
+            workspace_ref,
+            production_run_ref,
+            records=snapshot.records,
+            gates=snapshot.gates,
         )
         if active_video_admission is not None:
             active_manifest = active_video_admission["manifest"]
@@ -5380,7 +5623,9 @@ class K2RealMediaRevisionService:
             active_assets = active_video_admission["assets"]
             current_revision = result.get("realVideoRevision")
             current_video_candidates = self._current_video_candidates_by_slot(
-                workspace_ref, production_run_ref
+                workspace_ref,
+                production_run_ref,
+                records=snapshot.records,
             )
             activation_is_current = (
                 active_video_admission.get("lineageCurrent") is True
@@ -5454,13 +5699,15 @@ class K2RealMediaRevisionService:
                         ],
                         "publicationAllowed": False,
                     },
-                    "state": self.evidence.current_state(
-                        workspace_ref, production_run_ref
-                    ),
+                    "state": snapshot.currentState,
                 }
             )
         result["candidateLifecycle"] = self.candidate_review.get_projection(
-            workspace_ref, production_run_ref
+            workspace_ref,
+            production_run_ref,
+            records=snapshot.records,
+            gates=snapshot.gates,
         )
+        result["evidenceRevisionToken"] = snapshot.revisionToken
         result["publicationAllowed"] = False
         return result

@@ -15,6 +15,7 @@ from services.v5_core_os.episode_production import (
     create_in_memory_boundary,
 )
 from services.v5_core_os.episode_production.media_candidate_review import (
+    RejectingMediaSelectionApprovalAuthority,
     VerifiedMediaSelection,
 )
 from tests.unit.test_episode_production_k2 import (
@@ -299,6 +300,31 @@ class K2RealImageSelectionTests(unittest.TestCase):
         self.assertEqual(replay["assetVersions"], first["assetVersions"])
         self.assertEqual(self.candidate_evidence.calls, 2)
 
+    def test_candidate_handoff_key_pins_complete_batch_and_replays_exactly(self):
+        replay = self.boundary.record_real_image_candidates(
+            {
+                "workspaceRef": WORKSPACE,
+                "productionRunRef": self.run["productionRunRef"],
+                "idempotencyKey": "m10-image-candidate-handoff-tests",
+            }
+        )
+        self.assertTrue(replay["idempotentReplay"])
+        self.assertEqual(replay["candidates"], self.recorded["candidates"])
+
+        self.candidate_evidence.generation = 2
+        with self.assertRaises(EpisodeProductionPublicError) as conflict:
+            self.boundary.record_real_image_candidates(
+                {
+                    "workspaceRef": WORKSPACE,
+                    "productionRunRef": self.run["productionRunRef"],
+                    "idempotencyKey": "m10-image-candidate-handoff-tests",
+                }
+            )
+        self.assertEqual(
+            (conflict.exception.status, conflict.exception.code),
+            (409, "idempotency_conflict"),
+        )
+
     def test_rejects_one_changed_candidate_digest_atomically(self):
         command = self.selection_command()
         command["selections"][2]["visualQcDigest"] = _digest(
@@ -377,21 +403,20 @@ class K2RealImageSelectionTests(unittest.TestCase):
                 "result": "PASS",
             }
         )["semanticVisualQc"]
-        admitted = self.boundary.admit_real_image_successor(
-            {
-                "workspaceRef": WORKSPACE,
-                "productionRunRef": self.run["productionRunRef"],
-                "idempotencyKey": "m10-image-successor-admission-v2",
-                "selection": {
-                    "visualQcRef": qc["visualQcRef"],
-                    "visualQcVersion": qc["visualQcVersion"],
-                    "visualQcDigest": qc["payloadDigest"],
-                    "selectionRef": "m10-successor-selection-1-v1",
-                    "selectionVersion": 1,
-                    "approvalRef": "m10-successor-approval-1-v1",
-                },
-            }
-        )
+        successor_command = {
+            "workspaceRef": WORKSPACE,
+            "productionRunRef": self.run["productionRunRef"],
+            "idempotencyKey": "m10-image-successor-admission-v2",
+            "selection": {
+                "visualQcRef": qc["visualQcRef"],
+                "visualQcVersion": qc["visualQcVersion"],
+                "visualQcDigest": qc["payloadDigest"],
+                "selectionRef": "m10-successor-selection-1-v1",
+                "selectionVersion": 1,
+                "approvalRef": "m10-successor-approval-1-v1",
+            },
+        }
+        admitted = self.boundary.admit_real_image_successor(successor_command)
         self.assertEqual(admitted["state"], "REAL_IMAGE_READY")
         self.assertEqual(admitted["assetVersion"]["version"], 2)
         self.assertEqual(
@@ -409,6 +434,67 @@ class K2RealImageSelectionTests(unittest.TestCase):
             projection["productionState"], "REAL_IMAGE_READY"
         )
         self.assertEqual(len(projection["candidates"]), 4)
+
+        duplicate = json.loads(json.dumps(successor_command))
+        duplicate["idempotencyKey"] = "m10-image-successor-duplicate-v2"
+        duplicate["selection"]["selectionRef"] = (
+            "m10-successor-selection-duplicate-v1"
+        )
+        with self.assertRaises(EpisodeProductionPublicError) as conflict:
+            self.boundary.admit_real_image_successor(duplicate)
+        self.assertEqual(
+            (conflict.exception.status, conflict.exception.code),
+            (409, "idempotency_conflict"),
+        )
+
+        self.revision.candidate_review.record_semantic_visual_qc(
+            {
+                "workspaceRef": WORKSPACE,
+                "productionRunRef": self.run["productionRunRef"],
+                "idempotencyKey": "m10-successor-visual-qc-1-v2",
+                "technicalValidationRef": validation[
+                    "technicalValidationRef"
+                ],
+                "technicalValidationVersion": validation[
+                    "technicalValidationVersion"
+                ],
+                "technicalValidationDigest": validation["payloadDigest"],
+                "visualQcRef": "m10-successor-visual-qc-1-v2",
+                "visualQcVersion": 2,
+                "reviewerRef": "reviewer-project-lead",
+                "reviewProfile": "k2-semantic-visual-qc-v1",
+                "evidence": [
+                    {
+                        "evidenceRef": "m10-successor-review-frame-1-v2",
+                        "evidenceDigest": "9" * 64,
+                    }
+                ],
+                "supersedesVisualQc": {
+                    "visualQcRef": qc["visualQcRef"],
+                    "visualQcVersion": qc["visualQcVersion"],
+                    "visualQcDigest": qc["payloadDigest"],
+                    "staleReason": "newer canonical review",
+                },
+                "checks": {
+                    name: {"result": "FAIL", "note": "new evidence"}
+                    for name in (
+                        "identity",
+                        "wardrobe",
+                        "location",
+                        "action",
+                        "prop",
+                        "motion",
+                    )
+                },
+                "result": "FAIL",
+            }
+        )
+        self.revision.candidate_review.selection_authority = (
+            RejectingMediaSelectionApprovalAuthority()
+        )
+        replay = self.boundary.admit_real_image_successor(successor_command)
+        self.assertTrue(replay["idempotentReplay"])
+        self.assertEqual(replay["assetVersion"], admitted["assetVersion"])
 
     def test_intervening_candidate_append_cannot_partially_admit_assets(self):
         review = self.revision.candidate_review
