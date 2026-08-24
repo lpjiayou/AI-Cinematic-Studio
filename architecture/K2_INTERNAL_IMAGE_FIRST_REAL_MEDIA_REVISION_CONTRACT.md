@@ -128,20 +128,21 @@ REAL_IMAGE_PLAN_READY → REAL_IMAGE_READY
 The authenticated command surface is:
 
 ```text
-POST /creator/api/v1/episode-production-runs/{runRef}/real-image-selection
+POST /creator/api/v1/episode-production-runs/{runRef}/real-image-admission
 ```
 
-It accepts only `idempotencyKey` plus exactly four closed-world selection items
-(`generationRequestRef`, `candidateRef`, `candidateContentDigest`). Workspace,
-production-run scope and `actorRef` are server-injected from the authenticated
-principal; a client-supplied actor or private path is rejected. Before the single
-append-only admission gate, V4 revalidates the digest-pinned execution receipt,
-technical-smoke receipt, four workflow graphs, both G2 reference bytes and all four
-PNG artifacts. V5 revalidates the applicable visual-QC refs/digests and
-ApprovalAuthority evidence refs/digests, then records four `RealImageCandidate`
-facts, four `MediaSelectionDecision` facts, four immutable image `AssetVersion`
-facts and one admission manifest. The batch is atomic: no partial selection or
-partial asset admission is allowed.
+`/real-image-selection` is retained only as a read-compatible and write-schema
+compatible alias. The command accepts `idempotencyKey` plus exactly four
+closed-world selection items. Each item contains only `visualQcRef`,
+`visualQcVersion`, `visualQcDigest`, `selectionRef`, `selectionVersion` and
+`approvalRef`. Workspace, production-run scope and actor/authority facts are
+server-resolved; client actor, reviewer, subject, authority or private-path claims
+are rejected. Before the single append-only admission gate, V4 revalidates the
+digest-pinned execution receipt, technical-smoke receipt, four workflow graphs,
+both G2 reference bytes and all four PNG artifacts. V5 revalidates the applicable
+visual-QC and ApprovalAuthority evidence, then atomically appends four typed
+`HumanSelectionDecision → AssetAdmission → AssetVersion` lineages and one admission
+manifest. Partial, duplicate, missing, extra or cross-slot coverage fails closed.
 
 M10 v1 remains immutable historical admission under the original exact-selection
 contract. ADR-0013 does not rewrite that history or fabricate retrospective
@@ -157,13 +158,25 @@ atomic for its exact scoped candidate; it does not activate a complete replaceme
 image set or advance the production state. Complete four-shot image-manifest
 activation remains one atomic append-only batch.
 
-The same rule applies to the four M11 video candidates. A valid exact selection may
-create video successor AssetVersions and advance only after canonical visual QC and
-digest-pinned ApprovalAuthority both pass:
+The first M11 video admission requires exactly four unique current slots. It appends
+four typed selection/admission/AssetVersion lineages and advances exactly once,
+only after canonical visual QC and digest-pinned ApprovalAuthority both pass:
 
 ```text
 REAL_VIDEO_PLAN_READY → REAL_VIDEO_READY
 ```
+
+After `REAL_VIDEO_READY`, a successor command contains exactly the changed-slot set
+(one to four selections). Unchanged slots reuse their current Candidate,
+AssetAdmission and AssetVersion. The atomic append contains the new changed-slot
+lineages plus one four-slot `v5.k2-real-video-batch-activation.v2`; every activation
+slot is marked `NEW_ADMISSION` or `REUSED_CURRENT`. Each activation directly
+supersedes the preceding activation and supports immediate request/revision
+successors such as v2→v3. It creates no new production gate, does not rewind state
+and does not advance `REAL_VIDEO_READY` again. A changed current source image,
+GenerationRequest or candidate byte lineage makes the old activation
+`STALE_BLOCKED`; canonical video admissions/assets remain hidden until another
+complete four-slot activation is current.
 
 General instructions to continue automatically, technical QC, Project Lead code
 authorization and successful GPU execution are not substitutes for choosing unseen
@@ -256,6 +269,12 @@ manifest or advancing production state. Complete successor image-manifest
 activation and `REAL_VIDEO_READY` each remain reserved for one atomic manifest
 covering all four exact current shots.
 
+M11 follows the same non-rewinding rule. Initial admission covers four newly
+admitted slots. A post-ready successor may append one to four changed-slot
+admissions, but its activation always covers four unique slots by combining
+`NEW_ADMISSION` with `REUSED_CURRENT`. A stale activation remains immutable audit
+history and never remains visible as the canonical current video manifest.
+
 ## 8. Internal authority policy
 
 For this exact internal self-hosted, non-publishing run, Rights Manifest, external
@@ -337,17 +356,36 @@ owns runtime lease/attempt recovery, while V5 restart reprojects from immutable
 roots, append-only evidence and V4 runtime facts without inventing approval,
 duplicating AssetVersions or trusting unrehashable bytes.
 
+Every V5 real-media read consumes one immutable `EvidenceSnapshot`: `currentState`,
+all gates and all typed records are observed under one in-memory lock or one SQLite
+read transaction and sealed by `evidenceRevisionToken`. The real-media bundle and
+four-axis state projection must consume that same snapshot rather than combine
+separate reads. V4 runtime is an independently observed authority and is deliberately
+outside the evidence token; its value cannot be used to infer or mutate V5 state.
+
+Before success or replay, each typed write validates the complete ordered batch:
+record kind/ref/version, idempotency key, request digest and sealed payload digest
+must match exactly. Partial prior existence, missing or extra records, duplicate refs,
+wrong ordering and mismatched slot coverage all fail closed. Initial M10/M11
+admission covers exactly four unique selections, admissions and AssetVersions; an
+M11 successor selection set equals the changed slots while its activation still
+covers all four unique slots.
+
 The authenticated Creator Public API and the single existing Creator Frontend are
 the only user-facing control plane. The existing read projection adds, without
 removing or rebinding fields:
 
 ```text
 state                         # retained; exactly productionState
+evidenceRevisionToken
 rootState
 productionState
 runtimeState
 visualQcState
 activeRevision
+activeRevision.activationState
+videoLineageState
+activeVideoAdmission          # immutable history; not canonical assets when stale
 candidates[*].technicalState
 candidates[*].visualQcState
 candidates[*].selectionState
@@ -364,7 +402,8 @@ This is a non-GPU control-plane correction. It authorizes governance, contract,
 append-only persistence/projection, public API compatibility and their verification
 work only. It does not authorize GPU dispatch, candidate generation, waiver-based
 admission, Master/Export, publication, deployment or merge to `main`. Implementation
-and test verification remain pending; this contract update claims no test result.
+and test results must be reported against an exact repository, SHA, command and
+scope; this contract text itself makes no acceptance claim.
 
 ## 12. Typed evidence ledger and additive migration
 
@@ -399,6 +438,13 @@ keys, old row counts/digests and typed readback. Application services execute no
 An admission batch emits `AssetAdmission` and the canonical `AssetVersion` together
 only through V5. Neither is a caller-selected record kind, and the new ledger is not
 a second asset registry.
+
+Typed replay never trusts an operation key alone. It reconstructs and compares the
+complete expected ordered record batch, including kind/ref/version, idempotency key,
+request digest, payload digest and exact slot set. Initial admission requires four
+unique selection/admission/AssetVersion chains. An M11 successor contains exactly
+the changed-slot chains and one activation whose four unique slots are the exact
+union of those new chains and the reusable current chains.
 
 ## 13. Initial convergence and stop state
 
