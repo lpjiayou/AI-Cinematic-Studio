@@ -10,11 +10,13 @@ from services.v5_core_os.episode_production.foundation import (
     StaleInputError,
 )
 from services.v5_core_os.episode_production.media_candidate_review import (
+    ASSET_VERSION,
     CandidateLifecycleError,
     CandidateNotSelectableError,
     K2MediaCandidateReviewService,
     MediaSelectionApprovalRequiredError,
     VerifiedMediaSelection,
+    _record,
 )
 
 
@@ -55,8 +57,34 @@ class CandidateReviewMixin:
     def evidence(self):
         raise NotImplementedError
 
+    def seed_source_asset(self, evidence):
+        source = _record(
+            workspace_ref=WORKSPACE,
+            run_ref=RUN,
+            kind=ASSET_VERSION,
+            ref="source-image-version-shot-0001-v1",
+            version=1,
+            idempotency_key="source-image-version-shot-0001-v1",
+            created_at="2026-08-23T12:59:00Z",
+            payload={
+                "schemaVersion": "v5.k2-real-image-asset-version.v1",
+                "assetRef": "source-image-shot-0001",
+                "assetVersionRef": "source-image-version-shot-0001-v1",
+                "version": 1,
+                "mediaKind": "image",
+                "creativeShotVersionRef": "shot-0001",
+                "state": "REGISTERED",
+                "immutable": True,
+                "publicationAllowed": False,
+            },
+        )
+        evidence.append_record(source)
+        self.source_asset_digest = source.payloadDigest
+        return source
+
     def service(self):
         evidence = self.evidence()
+        self.seed_source_asset(evidence)
         return (
             K2MediaCandidateReviewService(
                 RootService(),
@@ -67,8 +95,7 @@ class CandidateReviewMixin:
             evidence,
         )
 
-    @staticmethod
-    def candidate_command():
+    def candidate_command(self):
         return {
             "workspaceRef": WORKSPACE,
             "productionRunRef": RUN,
@@ -86,7 +113,7 @@ class CandidateReviewMixin:
             "sourceAssetVersions": [
                 {
                     "assetVersionRef": "source-image-version-shot-0001-v1",
-                    "assetVersionDigest": "3" * 64,
+                    "assetVersionDigest": self.source_asset_digest,
                 }
             ],
             "provenance": "SELF_HOSTED_AI_GENERATED",
@@ -212,7 +239,8 @@ class CandidateReviewMixin:
             projection["candidates"][0]["visualQcState"], "SEMANTIC_QC_FAILED"
         )
         self.assertEqual(
-            evidence.list_records(WORKSPACE, RUN, record_kind="AssetVersion"), []
+            len(evidence.list_records(WORKSPACE, RUN, record_kind="AssetVersion")),
+            1,
         )
 
     def test_failed_technical_validation_cannot_reach_visual_qc(self):
@@ -285,7 +313,75 @@ class CandidateReviewMixin:
             for item in projection["candidates"]
             if item["candidateRef"] == candidate["candidateRef"]
         )
-        self.assertEqual(old_projection["visualQcState"], "NOT_STARTED")
+        self.assertEqual(old_projection["visualQcState"], "STALE")
+
+    def test_new_source_asset_version_stales_video_qc_without_new_candidate(self):
+        service, evidence = self.service()
+        source_v1 = evidence.get_record(
+            WORKSPACE, RUN, "source-image-version-shot-0001-v1", 1
+        )
+        command = dict(self.candidate_command())
+        command["sourceAssetVersions"] = [
+            {
+                "assetVersionRef": source_v1["recordRef"],
+                "assetVersionDigest": source_v1["payloadDigest"],
+            }
+        ]
+        candidate = service.register_candidate(command)["candidate"]
+        validation = self.record_validation(service, candidate)
+        qc = self.record_qc(service, validation)
+
+        source_v2 = _record(
+            workspace_ref=WORKSPACE,
+            run_ref=RUN,
+            kind=ASSET_VERSION,
+            ref="source-image-version-shot-0001-v2",
+            version=2,
+            idempotency_key="source-image-version-shot-0001-v2",
+            created_at="2026-08-24T00:01:00Z",
+            payload={
+                "assetRef": "source-image-shot-0001",
+                "assetVersionRef": "source-image-version-shot-0001-v2",
+                "version": 2,
+                "mediaKind": "image",
+                "creativeShotVersionRef": "shot-0001",
+                "supersedesAssetVersionRef": source_v1["recordRef"],
+                "supersedesAssetVersionDigest": source_v1["payloadDigest"],
+                "state": "REGISTERED",
+                "immutable": True,
+                "publicationAllowed": False,
+            },
+        )
+        evidence.append_record(source_v2)
+
+        with self.assertRaises(CandidateNotSelectableError):
+            service.prepare_human_selection_record(
+                self.selection_command(qc, suffix="stale-source")
+            )
+        projected = service.get_projection(WORKSPACE, RUN)
+        item = next(
+            value
+            for value in projected["candidates"]
+            if value["candidateRef"] == candidate["candidateRef"]
+        )
+        self.assertEqual(item["applicabilityState"], "STALE")
+        self.assertEqual(item["visualQcState"], "STALE")
+
+    def test_missing_canonical_source_asset_fails_video_currentness_closed(self):
+        evidence = self.evidence()
+        service = K2MediaCandidateReviewService(
+            RootService(),
+            evidence,
+            clock=lambda: "2026-08-24T00:00:00Z",
+            selection_authority=SelectionAuthority(),
+        )
+        self.source_asset_digest = "3" * 64
+        candidate = service.register_candidate(self.candidate_command())["candidate"]
+        validation = self.record_validation(service, candidate)
+        with self.assertRaises(StaleInputError):
+            self.record_qc(service, validation)
+        projected = service.get_projection(WORKSPACE, RUN)["candidates"][0]
+        self.assertEqual(projected["applicabilityState"], "STALE")
 
     def test_visual_qc_cas_rejects_intervening_candidate_append(self):
         service, evidence = self.service()
@@ -332,6 +428,7 @@ class CandidateReviewMixin:
         service = K2MediaCandidateReviewService(
             RootService(), evidence, clock=lambda: "2026-08-23T13:00:00Z"
         )
+        self.seed_source_asset(evidence)
         candidate = self.record_candidate(service)
         validation = self.record_validation(service, candidate)
         qc = self.record_qc(service, validation)
@@ -348,7 +445,8 @@ class CandidateReviewMixin:
         )["humanSelection"]
         self.assertEqual(rejected["decision"], "REJECTED")
         self.assertEqual(
-            evidence.list_records(WORKSPACE, RUN, record_kind="AssetVersion"), []
+            len(evidence.list_records(WORKSPACE, RUN, record_kind="AssetVersion")),
+            1,
         )
 
     def test_all_stages_replay_without_duplicate_records(self):
@@ -357,7 +455,7 @@ class CandidateReviewMixin:
         replay = service.register_candidate(self.candidate_command())
         self.assertFalse(first["idempotentReplay"])
         self.assertTrue(replay["idempotentReplay"])
-        self.assertEqual(len(evidence.list_records(WORKSPACE, RUN)), 1)
+        self.assertEqual(len(evidence.list_records(WORKSPACE, RUN)), 2)
 
 
 class InMemoryCandidateReviewTests(CandidateReviewMixin, unittest.TestCase):

@@ -60,12 +60,129 @@ REAL_IMAGE_UNIFIED_ADMISSION_MANIFEST_SCHEMA_VERSION = (
     "v5.k2-real-image-admission-manifest.v2"
 )
 REAL_VIDEO_REQUEST_SCHEMA_VERSION = "v5.k2-real-shot-video-request.v1"
+REAL_VIDEO_SUCCESSOR_REQUEST_SCHEMA_VERSION = "v5.k2-real-shot-video-request.v2"
 REAL_VIDEO_PLAN_SCHEMA_VERSION = "v5.k2-real-video-plan.v1"
 REAL_VIDEO_ADMISSION_SCHEMA_VERSION = "v5.k2-real-video-admission-manifest.v1"
+REAL_VIDEO_SUCCESSOR_ACTIVATION_SCHEMA_VERSION = (
+    "v5.k2-real-video-batch-activation.v2"
+)
 REAL_VIDEO_ASSET_VERSION_SCHEMA_VERSION = "v5.k2-real-video-asset-version.v1"
 REAL_IMAGE_PLANNER_ID = "v5.k2.real-image-planner.v1"
 REAL_IMAGE_ADMISSION_ID = "v5.k2.real-image-admission.v1"
 REAL_VIDEO_PLANNER_ID = "v5.k2.real-video-planner.v1"
+REAL_VIDEO_SUCCESSOR_PLANNER_ID = "v5.k2.real-video-successor-planner.v1"
+REAL_VIDEO_SUCCESSOR_REVISION_SCHEMA_VERSION = (
+    "v5.k2-real-video-successor-revision.v1"
+)
+_REAL_VIDEO_SUCCESSOR_REVISION_FIELDS = frozenset(
+    {
+        "schemaVersion",
+        "workspaceRef",
+        "productionRunRef",
+        "realVideoRevisionRef",
+        "version",
+        "isSuccessor",
+        "sourceRealVideoPlanRef",
+        "sourceRealVideoPlanDigest",
+        "supersedesRealVideoRevisionRef",
+        "supersedesRealVideoRevisionDigest",
+        "sourceImageAssetVersionRefs",
+        "sourceImageAssetVersionDigests",
+        "generationRequestRefs",
+        "generationRequestVersionRefs",
+        "generationRequestDigests",
+        "generationRequestCount",
+        "generationRequests",
+        "changedSlotRefs",
+        "publicationAllowed",
+        "payloadDigest",
+    }
+)
+_REAL_VIDEO_SUCCESSOR_REQUEST_EXTENSION = frozenset(
+    {
+        "realVideoRevisionRef",
+        "sourceRealVideoPlanRef",
+        "sourceRealVideoPlanDigest",
+        "supersedesGenerationRequestVersionRef",
+        "supersedesGenerationRequestDigest",
+    }
+)
+_REAL_VIDEO_INITIAL_ACTIVATION_FIELDS = frozenset(
+    {
+        "schemaVersion",
+        "workspaceRef",
+        "productionRunRef",
+        "realVideoAdmissionManifestRef",
+        "version",
+        "realVideoPlanRef",
+        "realVideoPlanDigest",
+        "revisionRef",
+        "realVideoRevisionRef",
+        "realVideoRevisionDigest",
+        "selectionRequestDigest",
+        "candidateRefs",
+        "candidateDigests",
+        "selectionRefs",
+        "selectionDigests",
+        "assetVersionRefs",
+        "assetVersionDigests",
+        "admittedCount",
+        "state",
+        "publicationAllowed",
+        "createdAt",
+        "payloadDigest",
+    }
+)
+_REAL_VIDEO_SUCCESSOR_ACTIVATION_FIELDS = frozenset(
+    {
+        "schemaVersion",
+        "workspaceRef",
+        "productionRunRef",
+        "admissionRef",
+        "version",
+        "admissionState",
+        "realVideoPlanRef",
+        "realVideoPlanDigest",
+        "realVideoRevisionRef",
+        "realVideoRevisionDigest",
+        "supersedesActivationRef",
+        "supersedesActivationDigest",
+        "operationIdempotencyKey",
+        "selectionRequestDigest",
+        "changedSlotRefs",
+        "slotActivations",
+        "assetVersionRefs",
+        "assetVersionDigests",
+        "newAdmissionRefs",
+        "newAdmissionDigests",
+        "newAdmissionCount",
+        "reusedAdmissionCount",
+        "state",
+        "publicationAllowed",
+        "createdAt",
+        "payloadDigest",
+    }
+)
+_REAL_VIDEO_ACTIVATION_SLOT_FIELDS = frozenset(
+    {
+        "ordinal",
+        "slotRef",
+        "generationRequestRef",
+        "generationRequestVersionRef",
+        "generationRequestDigest",
+        "candidateRef",
+        "candidateDigest",
+        "semanticVisualQcRef",
+        "semanticVisualQcDigest",
+        "humanSelectionRef",
+        "humanSelectionDigest",
+        "assetAdmissionRef",
+        "assetAdmissionDigest",
+        "assetVersionRef",
+        "assetVersionDigest",
+        "activationSource",
+    }
+)
 REAL_IMAGE_CAPABILITY = "self-hosted-multi-reference-shot-image-v1"
 REAL_VIDEO_CAPABILITY = "self-hosted-wan22-image-to-video-v1"
 
@@ -1950,6 +2067,1520 @@ class K2RealMediaRevisionService:
             ),
         }
 
+    def _current_image_assets_for_video(
+        self,
+        workspace: str,
+        run_ref: str,
+        baseline_assets: Sequence[Mapping[str, Any]],
+    ) -> list[dict[str, Any]]:
+        """Return one canonical latest image AssetVersion for every M11 slot."""
+
+        canonical = [
+            item
+            for item in self.candidate_review.asset_versions.list_asset_versions(
+                workspace, run_ref
+            )
+            if str(item.get("mediaKind", "")).lower() == "image"
+        ]
+        result: list[dict[str, Any]] = []
+        for baseline in baseline_assets:
+            logical = [
+                item
+                for item in canonical
+                if item.get("assetRef") == baseline.get("assetRef")
+                and item.get("creativeShotVersionRef")
+                == baseline.get("creativeShotVersionRef")
+            ]
+            if not logical:
+                raise UpstreamNotReadyError(
+                    "a canonical M10 image AssetVersion is unavailable"
+                )
+            latest_version = max(int(item.get("version", 0)) for item in logical)
+            latest_matches = [
+                item
+                for item in logical
+                if int(item.get("version", 0)) == latest_version
+            ]
+            if len(latest_matches) != 1:
+                raise StaleInputError(
+                    "canonical M10 image lineage has an ambiguous current version"
+                )
+            latest = latest_matches[0]
+            if (
+                latest.get("assetRef") != baseline.get("assetRef")
+                or int(latest.get("version", 0)) < int(baseline.get("version", 0))
+                or latest.get("state") != "REGISTERED"
+                or latest.get("immutable") is not True
+                or latest.get("publicationAllowed") is not False
+            ):
+                raise StaleInputError("canonical M10 image lineage is invalid")
+            result.append(deepcopy(dict(latest)))
+        result.sort(key=lambda item: int(item.get("ordinal", 0)))
+        if (
+            len(result) != 4
+            or [item.get("ordinal") for item in result] != [1, 2, 3, 4]
+            or len({item.get("creativeShotVersionRef") for item in result}) != 4
+        ):
+            raise StaleInputError(
+                "canonical M10 image versions do not cover four exact slots"
+            )
+        return result
+
+    @staticmethod
+    def _assert_sealed_payload(value: Any, field: str) -> dict[str, Any]:
+        if not isinstance(value, Mapping):
+            raise RepositoryUnavailableError(f"{field} is invalid")
+        payload = deepcopy(dict(value))
+        digest = payload.pop("payloadDigest", None)
+        if not isinstance(digest, str) or digest != _digest(payload):
+            raise RepositoryUnavailableError(f"{field} digest is invalid")
+        payload["payloadDigest"] = digest
+        return payload
+
+    def _persisted_video_revision(
+        self,
+        workspace: str,
+        run_ref: str,
+        plan: Mapping[str, Any],
+        baseline_requests: Sequence[Mapping[str, Any]],
+    ) -> tuple[list[dict[str, Any]], dict[str, Any] | None]:
+        """Read the latest server-sealed successor request set from Candidates."""
+
+        baseline_by_slot = {
+            item["creativeShotVersionRef"]: deepcopy(dict(item))
+            for item in baseline_requests
+        }
+        if (
+            len(baseline_by_slot) != 4
+            or [item.get("ordinal") for item in baseline_requests]
+            != [1, 2, 3, 4]
+        ):
+            raise RepositoryUnavailableError(
+                "baseline M11 request coverage is invalid"
+            )
+        latest_revision: dict[str, Any] | None = None
+        seen_revision_digests: set[str] = set()
+        prior_requests = [deepcopy(dict(item)) for item in baseline_requests]
+        for record in self.evidence.list_records(
+            workspace, run_ref, record_kind=CANDIDATE
+        ):
+            payload = record.get("payload")
+            if (
+                not isinstance(payload, Mapping)
+                or payload.get("mediaKind") != "VIDEO"
+                or "consumedGenerationRequest" not in payload
+                or "consumedRealVideoRevision" not in payload
+            ):
+                continue
+            request = self._assert_sealed_payload(
+                payload["consumedGenerationRequest"],
+                "persisted successor video request",
+            )
+            revision = self._assert_sealed_payload(
+                payload["consumedRealVideoRevision"],
+                "persisted successor video revision",
+            )
+            requests = revision.get("generationRequests")
+            if (
+                revision.get("schemaVersion")
+                != REAL_VIDEO_SUCCESSOR_REVISION_SCHEMA_VERSION
+                or revision.get("workspaceRef") != workspace
+                or revision.get("productionRunRef") != run_ref
+                or revision.get("sourceRealVideoPlanRef")
+                != plan.get("realVideoPlanRef")
+                or revision.get("sourceRealVideoPlanDigest")
+                != plan.get("payloadDigest")
+                or not isinstance(requests, list)
+                or len(requests) != 4
+                or not all(isinstance(item, Mapping) for item in requests)
+                or revision.get("generationRequestCount") != 4
+                or [item.get("payloadDigest") for item in requests]
+                != revision.get("generationRequestDigests")
+                or [item.get("generationRequestVersionRef") for item in requests]
+                != revision.get("generationRequestVersionRefs")
+                or request.get("payloadDigest")
+                not in revision.get("generationRequestDigests", [])
+                or payload.get("revisionRef")
+                != revision.get("realVideoRevisionRef")
+                or payload.get("sourceRequestRef")
+                != request.get("generationRequestRef")
+                or payload.get("sourceRequestDigest")
+                != request.get("payloadDigest")
+                or payload.get("slotRef")
+                != request.get("creativeShotVersionRef")
+                or payload.get("sourceAssetVersions")
+                != [
+                    {
+                        "assetVersionRef": request.get(
+                            "sourceImageAssetVersionRef"
+                        ),
+                        "assetVersionDigest": request.get(
+                            "sourceImageAssetVersionDigest"
+                        ),
+                    }
+                ]
+            ):
+                raise RepositoryUnavailableError(
+                    "persisted successor video consumption lineage is invalid"
+                )
+            normalized_requests = [
+                self._assert_sealed_payload(item, "persisted successor request")
+                for item in requests
+            ]
+            if (
+                set(revision) != _REAL_VIDEO_SUCCESSOR_REVISION_FIELDS
+                or [item.get("ordinal") for item in normalized_requests]
+                != [1, 2, 3, 4]
+                or {
+                    item.get("creativeShotVersionRef")
+                    for item in normalized_requests
+                }
+                != set(baseline_by_slot)
+            ):
+                raise RepositoryUnavailableError(
+                    "persisted successor request coverage is invalid"
+                )
+            revision_digest = revision["payloadDigest"]
+            if revision_digest in seen_revision_digests:
+                if (
+                    latest_revision is None
+                    or revision_digest != latest_revision.get("payloadDigest")
+                ):
+                    raise RepositoryUnavailableError(
+                        "a historical successor video revision was revisited"
+                    )
+                selected = next(
+                    (
+                        item
+                        for item in normalized_requests
+                        if item.get("creativeShotVersionRef")
+                        == payload.get("slotRef")
+                    ),
+                    None,
+                )
+                if selected != request:
+                    raise RepositoryUnavailableError(
+                        "persisted successor candidate request changed"
+                    )
+                if payload.get("slotRef") not in revision.get(
+                    "changedSlotRefs", []
+                ):
+                    raise RepositoryUnavailableError(
+                        "persisted successor candidate did not consume a changed request"
+                    )
+                continue
+            prior_by_slot = {
+                item["creativeShotVersionRef"]: item for item in prior_requests
+            }
+            if latest_revision is None:
+                if (
+                    revision.get("version") != 2
+                    or revision.get("supersedesRealVideoRevisionRef")
+                    != plan.get("realVideoPlanRef")
+                    or revision.get("supersedesRealVideoRevisionDigest")
+                    != plan.get("payloadDigest")
+                ):
+                    raise RepositoryUnavailableError(
+                        "first successor video revision does not supersede the plan"
+                    )
+            elif (
+                revision.get("version") != int(latest_revision.get("version", 0)) + 1
+                or revision.get("supersedesRealVideoRevisionRef")
+                != latest_revision.get("realVideoRevisionRef")
+                or revision.get("supersedesRealVideoRevisionDigest")
+                != latest_revision.get("payloadDigest")
+            ):
+                raise RepositoryUnavailableError(
+                    "successor video revision lineage is not immediate"
+                )
+            changed_slots: list[str] = []
+            for current_request in normalized_requests:
+                slot_ref = current_request.get("creativeShotVersionRef")
+                prior_request = prior_by_slot.get(slot_ref)
+                baseline_request = baseline_by_slot.get(slot_ref)
+                if not isinstance(prior_request, Mapping) or not isinstance(
+                    baseline_request, Mapping
+                ):
+                    raise RepositoryUnavailableError(
+                        "successor video request slot is unknown"
+                    )
+                if (
+                    current_request.get("workspaceRef") != workspace
+                    or current_request.get("productionRunRef") != run_ref
+                    or current_request.get("generationRequestRef")
+                    != baseline_request.get("generationRequestRef")
+                    or current_request.get("ordinal")
+                    != baseline_request.get("ordinal")
+                    or current_request.get("creativeShotVersionRef")
+                    != baseline_request.get("creativeShotVersionRef")
+                    or current_request.get("sourceImageAssetRef")
+                    != baseline_request.get("sourceImageAssetRef")
+                ):
+                    raise RepositoryUnavailableError(
+                        "successor video request immutable scope changed"
+                    )
+                if current_request == prior_request:
+                    continue
+                changed_slots.append(slot_ref)
+                if (
+                    set(current_request)
+                    != set(baseline_request)
+                    | _REAL_VIDEO_SUCCESSOR_REQUEST_EXTENSION
+                    or current_request.get("schemaVersion")
+                    != REAL_VIDEO_SUCCESSOR_REQUEST_SCHEMA_VERSION
+                    or current_request.get("version")
+                    != int(prior_request.get("version", 0)) + 1
+                    or current_request.get(
+                        "supersedesGenerationRequestVersionRef"
+                    )
+                    != prior_request.get("generationRequestVersionRef")
+                    or current_request.get("supersedesGenerationRequestDigest")
+                    != prior_request.get("payloadDigest")
+                    or current_request.get("realVideoRevisionRef")
+                    != revision.get("realVideoRevisionRef")
+                    or current_request.get("sourceRealVideoPlanRef")
+                    != plan.get("realVideoPlanRef")
+                    or current_request.get("sourceRealVideoPlanDigest")
+                    != plan.get("payloadDigest")
+                    or (
+                        current_request.get("sourceImageAssetVersionRef"),
+                        current_request.get("sourceImageAssetVersionDigest"),
+                    )
+                    == (
+                        prior_request.get("sourceImageAssetVersionRef"),
+                        prior_request.get("sourceImageAssetVersionDigest"),
+                    )
+                ):
+                    raise RepositoryUnavailableError(
+                        "successor video request lineage is not immediate"
+                    )
+            if not changed_slots:
+                raise RepositoryUnavailableError(
+                    "successor video revision did not change a request"
+                )
+            if (
+                revision.get("isSuccessor") is not True
+                or revision.get("publicationAllowed") is not False
+                or revision.get("generationRequestCount") != 4
+                or revision.get("generationRequestRefs")
+                != [item["generationRequestRef"] for item in normalized_requests]
+                or revision.get("generationRequestVersionRefs")
+                != [
+                    item["generationRequestVersionRef"]
+                    for item in normalized_requests
+                ]
+                or revision.get("generationRequestDigests")
+                != [item["payloadDigest"] for item in normalized_requests]
+                or revision.get("sourceImageAssetVersionRefs")
+                != [
+                    item["sourceImageAssetVersionRef"]
+                    for item in normalized_requests
+                ]
+                or revision.get("sourceImageAssetVersionDigests")
+                != [
+                    item["sourceImageAssetVersionDigest"]
+                    for item in normalized_requests
+                ]
+                or revision.get("changedSlotRefs") != sorted(changed_slots)
+            ):
+                raise RepositoryUnavailableError(
+                    "successor video revision arrays are inconsistent"
+                )
+            selected = next(
+                (
+                    item
+                    for item in normalized_requests
+                    if item.get("creativeShotVersionRef")
+                    == payload.get("slotRef")
+                ),
+                None,
+            )
+            if selected != request or payload.get("slotRef") not in changed_slots:
+                raise RepositoryUnavailableError(
+                    "persisted successor candidate did not consume a changed request"
+                )
+            seen_revision_digests.add(revision_digest)
+            latest_revision = revision
+            prior_requests = normalized_requests
+        if latest_revision is None:
+            return [deepcopy(dict(item)) for item in baseline_requests], None
+        return [
+            deepcopy(dict(item))
+            for item in latest_revision["generationRequests"]
+        ], latest_revision
+
+    def _derive_video_request_for_asset(
+        self,
+        *,
+        prior_request: Mapping[str, Any],
+        current_asset: Mapping[str, Any],
+        real_video_revision_ref: str,
+        source_real_video_plan_ref: str,
+        source_real_video_plan_digest: str,
+    ) -> dict[str, Any]:
+        """Derive one exact immediate successor of the persisted request."""
+
+        if (
+            current_asset.get("assetRef")
+            != prior_request.get("sourceImageAssetRef")
+            or current_asset.get("creativeShotVersionRef")
+            != prior_request.get("creativeShotVersionRef")
+            or current_asset.get("mediaKind") != "image"
+            or current_asset.get("mediaType") != "image/png"
+        ):
+            raise StaleInputError("successor image AssetVersion scope changed")
+        if (
+            current_asset.get("assetVersionRef")
+            == prior_request.get("sourceImageAssetVersionRef")
+            and current_asset.get("payloadDigest")
+            == prior_request.get("sourceImageAssetVersionDigest")
+        ):
+            return deepcopy(dict(prior_request))
+        prior_version = int(prior_request.get("version", 0))
+        if prior_version < 1:
+            raise StaleInputError("prior video request version is invalid")
+        request_version = prior_version + 1
+        payload = deepcopy(dict(prior_request))
+        payload.pop("payloadDigest", None)
+        payload.update(
+            {
+                "schemaVersion": REAL_VIDEO_SUCCESSOR_REQUEST_SCHEMA_VERSION,
+                "generationRequestVersionRef": (
+                    f"{prior_request['generationRequestRef']}-v{request_version}-"
+                    + _digest(
+                        {
+                            "priorGenerationRequestDigest": prior_request[
+                                "payloadDigest"
+                            ],
+                            "sourceImageAssetVersionDigest": current_asset[
+                                "payloadDigest"
+                            ],
+                            "realVideoRevisionRef": real_video_revision_ref,
+                        }
+                    )[:16]
+                ),
+                "version": request_version,
+                "realVideoRevisionRef": real_video_revision_ref,
+                "sourceRealVideoPlanRef": source_real_video_plan_ref,
+                "sourceRealVideoPlanDigest": source_real_video_plan_digest,
+                "supersedesGenerationRequestVersionRef": prior_request[
+                    "generationRequestVersionRef"
+                ],
+                "supersedesGenerationRequestDigest": prior_request[
+                    "payloadDigest"
+                ],
+                "sourceImageAssetVersionRef": current_asset["assetVersionRef"],
+                "sourceImageAssetVersionDigest": current_asset["payloadDigest"],
+                "sourceImageContentDigest": current_asset["sha256"],
+                "sourceImageMediaType": current_asset["mediaType"],
+                "sourceImageProbe": deepcopy(current_asset["probe"]),
+                "parameters": self._video_profile(
+                    {
+                        "output": {
+                            "width": prior_request["parameters"]["width"],
+                            "height": prior_request["parameters"]["height"],
+                            "frameRate": prior_request["parameters"][
+                                "frameRate"
+                            ],
+                        }
+                    },
+                    {
+                        "durationFrames": prior_request["parameters"][
+                            "durationFrames"
+                        ]
+                    },
+                    current_asset,
+                ),
+                "createdBy": REAL_VIDEO_SUCCESSOR_PLANNER_ID,
+                "createdAt": current_asset.get("createdAt"),
+            }
+        )
+        return _sealed(payload)
+
+    def _current_video_request_set(
+        self,
+        workspace: str,
+        run_ref: str,
+        plan_bundle: Mapping[str, Any],
+    ) -> tuple[list[dict[str, Any]], dict[str, Any]]:
+        plan = plan_bundle["realVideoPlan"]
+        baseline_requests = plan_bundle["generationRequests"]
+        image_gate = self.evidence.get_gate(
+            workspace, run_ref, REAL_IMAGE_ADMISSION_GATE
+        )
+        if image_gate is None:
+            raise UpstreamNotReadyError("M10 image admission is required")
+        baseline_assets = self._admission_bundle(image_gate)["assetVersions"]
+        baseline_by_slot = {item["creativeShotVersionRef"]: item for item in baseline_assets}
+        current_assets = self._current_image_assets_for_video(
+            workspace, run_ref, baseline_assets
+        )
+        current_by_slot = {
+            item["creativeShotVersionRef"]: item for item in current_assets
+        }
+        prior_requests, prior_revision = self._persisted_video_revision(
+            workspace, run_ref, plan, baseline_requests
+        )
+        prior_by_slot = {
+            item["creativeShotVersionRef"]: item for item in prior_requests
+        }
+        changed_slots = [
+            slot_ref
+            for slot_ref, current_asset in current_by_slot.items()
+            if (
+                prior_by_slot[slot_ref].get("sourceImageAssetVersionRef")
+                != current_asset.get("assetVersionRef")
+                or prior_by_slot[slot_ref].get("sourceImageAssetVersionDigest")
+                != current_asset.get("payloadDigest")
+            )
+        ]
+        if not changed_slots and prior_revision is not None:
+            return prior_requests, deepcopy(prior_revision)
+        if not changed_slots:
+            revision_ref = plan["realVideoPlanRef"]
+            revision_version = 1
+            supersedes_ref = None
+            supersedes_digest = None
+            requests = prior_requests
+        else:
+            previous_revision_ref = (
+                prior_revision["realVideoRevisionRef"]
+                if prior_revision is not None
+                else plan["realVideoPlanRef"]
+            )
+            previous_revision_digest = (
+                prior_revision["payloadDigest"]
+                if prior_revision is not None
+                else plan["payloadDigest"]
+            )
+            revision_version = (
+                int(prior_revision["version"]) + 1
+                if prior_revision is not None
+                else 2
+            )
+            revision_ref = (
+                f"m11-video-revision-v{revision_version}-"
+                + _digest(
+                    {
+                        "supersedesRealVideoRevisionDigest": previous_revision_digest,
+                        "sourceImageAssetVersionDigests": [
+                            item["payloadDigest"] for item in current_assets
+                        ],
+                    }
+                )[:32]
+            )
+            supersedes_ref = previous_revision_ref
+            supersedes_digest = previous_revision_digest
+            requests = [
+                self._derive_video_request_for_asset(
+                    prior_request=prior_by_slot[item["creativeShotVersionRef"]],
+                    current_asset=current_by_slot[item["creativeShotVersionRef"]],
+                    real_video_revision_ref=revision_ref,
+                    source_real_video_plan_ref=plan["realVideoPlanRef"],
+                    source_real_video_plan_digest=plan["payloadDigest"],
+                )
+                for item in baseline_requests
+            ]
+        revision = _sealed(
+            {
+                "schemaVersion": REAL_VIDEO_SUCCESSOR_REVISION_SCHEMA_VERSION,
+                "workspaceRef": workspace,
+                "productionRunRef": run_ref,
+                "realVideoRevisionRef": revision_ref,
+                "version": revision_version,
+                "isSuccessor": bool(changed_slots or prior_revision),
+                "sourceRealVideoPlanRef": plan["realVideoPlanRef"],
+                "sourceRealVideoPlanDigest": plan["payloadDigest"],
+                "supersedesRealVideoRevisionRef": supersedes_ref,
+                "supersedesRealVideoRevisionDigest": supersedes_digest,
+                "sourceImageAssetVersionRefs": [
+                    item["assetVersionRef"] for item in current_assets
+                ],
+                "sourceImageAssetVersionDigests": [
+                    item["payloadDigest"] for item in current_assets
+                ],
+                "generationRequestRefs": [
+                    item["generationRequestRef"] for item in requests
+                ],
+                "generationRequestVersionRefs": [
+                    item["generationRequestVersionRef"] for item in requests
+                ],
+                "generationRequestDigests": [
+                    item["payloadDigest"] for item in requests
+                ],
+                "generationRequestCount": 4,
+                "generationRequests": deepcopy(requests),
+                "changedSlotRefs": sorted(changed_slots),
+                "publicationAllowed": False,
+            }
+        )
+        return requests, revision
+
+    def _active_video_admission(
+        self, workspace: str, run_ref: str
+    ) -> dict[str, Any] | None:
+        """Resolve the one strictly validated atomic four-slot VIDEO chain.
+
+        Successor activations are ordinary ``AssetAdmission`` records under
+        ADR-0013.  This validator is intentionally the sole interpreter of
+        their typed payload.  It walks the append journal in order, so an
+        activation cannot make a forward reference to a record later in the
+        log, and it proves every NEW/REUSED slot against the immediately prior
+        active four-slot set.
+        """
+
+        gate = self.evidence.get_gate(workspace, run_ref, REAL_VIDEO_ADMISSION_GATE)
+        if gate is None:
+            return None
+        plan_gate = self.evidence.get_gate(workspace, run_ref, REAL_VIDEO_PLAN_GATE)
+        if plan_gate is None:
+            raise RepositoryUnavailableError("M11 video plan evidence is missing")
+        plan_bundle = self._video_bundle(plan_gate)
+        plan = plan_bundle["realVideoPlan"]
+        # This validates every persisted v2/v3 request/revision carrier, not
+        # merely the latest one, before any activation payload is consumed.
+        self._persisted_video_revision(
+            workspace,
+            run_ref,
+            plan,
+            plan_bundle["generationRequests"],
+        )
+        gate_bundle = self._video_admission_bundle(gate)
+        manifest = self._assert_sealed_payload(
+            gate_bundle["realVideoAdmissionManifest"],
+            "initial M11 video activation",
+        )
+        admissions = [
+            self._assert_sealed_payload(item, "initial M11 item admission")
+            for item in gate_bundle["assetAdmissions"]
+        ]
+        assets = [
+            self._assert_sealed_payload(item, "initial M11 AssetVersion")
+            for item in gate_bundle["assetVersions"]
+        ]
+        if (
+            set(manifest) != _REAL_VIDEO_INITIAL_ACTIVATION_FIELDS
+            or manifest.get("schemaVersion") != REAL_VIDEO_ADMISSION_SCHEMA_VERSION
+            or manifest.get("workspaceRef") != workspace
+            or manifest.get("productionRunRef") != run_ref
+            or manifest.get("version") != 1
+            or manifest.get("realVideoPlanRef") != plan.get("realVideoPlanRef")
+            or manifest.get("realVideoPlanDigest") != plan.get("payloadDigest")
+            or manifest.get("admittedCount") != 4
+            or manifest.get("state") != "REAL_VIDEO_ADMITTED"
+            or manifest.get("publicationAllowed") is not False
+            or len(assets) != 4
+            or len(admissions) != 4
+            or [item.get("ordinal") for item in assets] != [1, 2, 3, 4]
+            or [item.get("ordinal") for item in admissions] != [1, 2, 3, 4]
+            or manifest.get("candidateRefs")
+            != [item.get("sourceCandidateRef") for item in assets]
+            or manifest.get("candidateDigests")
+            != [item.get("sourceCandidateDigest") for item in assets]
+            or manifest.get("selectionRefs")
+            != [item.get("humanSelectionRef") for item in assets]
+            or manifest.get("selectionDigests")
+            != [item.get("humanSelectionDigest") for item in assets]
+            or manifest.get("assetVersionRefs")
+            != [item.get("assetVersionRef") for item in assets]
+            or manifest.get("assetVersionDigests")
+            != [item.get("payloadDigest") for item in assets]
+            or [item.get("assetVersionRef") for item in admissions]
+            != [item.get("assetVersionRef") for item in assets]
+            or [item.get("assetVersionDigest") for item in admissions]
+            != [item.get("payloadDigest") for item in assets]
+        ):
+            raise RepositoryUnavailableError(
+                "initial M11 video activation is inconsistent"
+            )
+
+        records = self.evidence.list_records(workspace, run_ref)
+        positions = {id(record): index for index, record in enumerate(records)}
+
+        def sealed_record_payload(
+            record: Mapping[str, Any], field: str
+        ) -> dict[str, Any]:
+            if (
+                record.get("workspaceRef") != workspace
+                or record.get("productionRunRef") != run_ref
+                or not isinstance(record.get("payload"), Mapping)
+            ):
+                raise RepositoryUnavailableError(f"{field} scope is invalid")
+            payload = self._assert_sealed_payload(record["payload"], field)
+            if (
+                record.get("payloadDigest") != payload.get("payloadDigest")
+                or record.get("createdAt") is None
+            ):
+                raise RepositoryUnavailableError(f"{field} envelope is invalid")
+            return payload
+
+        full_index: dict[tuple[str, str, str], list[dict[str, Any]]] = {}
+        for record in records:
+            payload = record.get("payload")
+            digest = record.get("payloadDigest")
+            if isinstance(payload, Mapping) and isinstance(digest, str):
+                full_index.setdefault(
+                    (str(record.get("recordKind")), str(record.get("recordRef")), digest),
+                    [],
+                ).append(record)
+
+        def exact_record(
+            index: Mapping[tuple[str, str, str], Sequence[dict[str, Any]]],
+            kind: str,
+            ref: Any,
+            digest: Any,
+            field: str,
+        ) -> tuple[dict[str, Any], dict[str, Any]]:
+            matches = index.get((kind, str(ref), str(digest)), ())
+            if len(matches) != 1:
+                raise RepositoryUnavailableError(f"{field} is missing or ambiguous")
+            record = matches[0]
+            payload = sealed_record_payload(record, field)
+            return record, payload
+
+        def assert_record_identity(
+            record: Mapping[str, Any],
+            payload: Mapping[str, Any],
+            *,
+            kind: str,
+            ref_field: str,
+            version_field: str,
+            field: str,
+        ) -> None:
+            if (
+                record.get("recordKind") != kind
+                or record.get("recordRef") != payload.get(ref_field)
+                or record.get("recordVersion") != payload.get(version_field)
+                or record.get("createdAt") != payload.get("createdAt", record.get("createdAt"))
+            ):
+                raise RepositoryUnavailableError(f"{field} identity is invalid")
+
+        def applicable_qc(
+            prior_records: Sequence[dict[str, Any]],
+            candidate_ref: str,
+            candidate_digest: str,
+        ) -> tuple[dict[str, Any], dict[str, Any]] | None:
+            decisions: list[tuple[dict[str, Any], dict[str, Any]]] = []
+            for item in prior_records:
+                if item.get("recordKind") != "SemanticVisualQCDecision":
+                    continue
+                payload = sealed_record_payload(item, "M11 semantic visual QC")
+                if (
+                    payload.get("candidateRef") == candidate_ref
+                    and payload.get("candidateDigest") == candidate_digest
+                ):
+                    decisions.append((item, payload))
+            identities = {
+                (item.get("recordRef"), item.get("recordVersion"), item.get("payloadDigest"))
+                for item, _ in decisions
+            }
+            superseded: set[tuple[Any, Any, Any]] = set()
+            for _, payload in decisions:
+                prior = payload.get("supersedesVisualQc")
+                if prior is None:
+                    continue
+                if not isinstance(prior, Mapping):
+                    raise RepositoryUnavailableError("M11 QC supersession is invalid")
+                identity = (
+                    prior.get("visualQcRef"),
+                    prior.get("visualQcVersion"),
+                    prior.get("visualQcDigest"),
+                )
+                if identity not in identities:
+                    raise RepositoryUnavailableError("M11 QC supersession is stale")
+                superseded.add(identity)
+            current = [
+                (item, payload)
+                for item, payload in decisions
+                if (
+                    item.get("recordRef"),
+                    item.get("recordVersion"),
+                    item.get("payloadDigest"),
+                )
+                not in superseded
+            ]
+            if len(current) > 1:
+                raise RepositoryUnavailableError("M11 current QC is ambiguous")
+            return current[0] if current else None
+
+        def latest_candidate_by_slot(
+            prior_records: Sequence[dict[str, Any]],
+        ) -> dict[str, dict[str, Any]]:
+            latest: dict[str, dict[str, Any]] = {}
+            for item in prior_records:
+                if item.get("recordKind") != CANDIDATE:
+                    continue
+                payload = sealed_record_payload(item, "M11 Candidate")
+                if payload.get("mediaKind") == "VIDEO" and isinstance(
+                    payload.get("slotRef"), str
+                ):
+                    latest[payload["slotRef"]] = item
+            return latest
+
+        def resolve_chain(
+            slot: Mapping[str, Any],
+            prior_records: Sequence[dict[str, Any]],
+            prior_index: Mapping[tuple[str, str, str], Sequence[dict[str, Any]]],
+            *,
+            require_current: bool,
+        ) -> tuple[dict[str, Any], dict[str, Any], dict[str, Any]]:
+            candidate_record, candidate = exact_record(
+                prior_index,
+                CANDIDATE,
+                slot.get("candidateRef"),
+                slot.get("candidateDigest"),
+                "M11 activation Candidate",
+            )
+            qc_record, qc = exact_record(
+                prior_index,
+                "SemanticVisualQCDecision",
+                slot.get("semanticVisualQcRef"),
+                slot.get("semanticVisualQcDigest"),
+                "M11 activation semantic visual QC",
+            )
+            selection_record, selection = exact_record(
+                prior_index,
+                HUMAN_SELECTION,
+                slot.get("humanSelectionRef"),
+                slot.get("humanSelectionDigest"),
+                "M11 activation HumanSelection",
+            )
+            admission_record, admission = exact_record(
+                prior_index,
+                ASSET_ADMISSION,
+                slot.get("assetAdmissionRef"),
+                slot.get("assetAdmissionDigest"),
+                "M11 activation item admission",
+            )
+            asset_record, asset = exact_record(
+                prior_index,
+                ASSET_VERSION,
+                slot.get("assetVersionRef"),
+                slot.get("assetVersionDigest"),
+                "M11 activation AssetVersion",
+            )
+            assert_record_identity(
+                candidate_record,
+                candidate,
+                kind=CANDIDATE,
+                ref_field="candidateRef",
+                version_field="candidateVersion",
+                field="M11 activation Candidate",
+            )
+            assert_record_identity(
+                qc_record,
+                qc,
+                kind="SemanticVisualQCDecision",
+                ref_field="visualQcRef",
+                version_field="visualQcVersion",
+                field="M11 activation semantic visual QC",
+            )
+            assert_record_identity(
+                selection_record,
+                selection,
+                kind=HUMAN_SELECTION,
+                ref_field="selectionRef",
+                version_field="selectionVersion",
+                field="M11 activation HumanSelection",
+            )
+            assert_record_identity(
+                admission_record,
+                admission,
+                kind=ASSET_ADMISSION,
+                ref_field="admissionRef",
+                version_field="version",
+                field="M11 activation item admission",
+            )
+            assert_record_identity(
+                asset_record,
+                asset,
+                kind=ASSET_VERSION,
+                ref_field="assetVersionRef",
+                version_field="version",
+                field="M11 activation AssetVersion",
+            )
+            validation_record, validation = exact_record(
+                prior_index,
+                TECHNICAL_VALIDATION,
+                qc.get("technicalValidationRef"),
+                qc.get("technicalValidationDigest"),
+                "M11 activation TechnicalValidation",
+            )
+            assert_record_identity(
+                validation_record,
+                validation,
+                kind=TECHNICAL_VALIDATION,
+                ref_field="technicalValidationRef",
+                version_field="technicalValidationVersion",
+                field="M11 activation TechnicalValidation",
+            )
+            current_qc = applicable_qc(
+                prior_records,
+                str(slot.get("candidateRef")),
+                str(slot.get("candidateDigest")),
+            )
+            latest_candidate = latest_candidate_by_slot(prior_records).get(
+                str(slot.get("slotRef"))
+            )
+            if (
+                candidate.get("mediaKind") != "VIDEO"
+                or candidate.get("slotRef") != slot.get("slotRef")
+                or candidate.get("sourceRequestRef")
+                != slot.get("generationRequestRef")
+                or candidate.get("sourceRequestDigest")
+                != slot.get("generationRequestDigest")
+                or candidate.get("sourceAssetVersions")
+                != [
+                    {
+                        "assetVersionRef": asset.get(
+                            "sourceImageAssetVersionRef"
+                        ),
+                        "assetVersionDigest": asset.get(
+                            "sourceImageAssetVersionDigest"
+                        ),
+                    }
+                ]
+                or validation.get("candidateRef") != candidate.get("candidateRef")
+                or validation.get("candidateDigest") != candidate.get("payloadDigest")
+                or validation.get("result") != "PASS"
+                or qc.get("candidateRef") != candidate.get("candidateRef")
+                or qc.get("candidateDigest") != candidate.get("payloadDigest")
+                or qc.get("technicalValidationRef")
+                != validation.get("technicalValidationRef")
+                or qc.get("technicalValidationDigest")
+                != validation.get("payloadDigest")
+                or qc.get("result") != "PASS"
+                or selection.get("candidateRef") != candidate.get("candidateRef")
+                or selection.get("candidateDigest") != candidate.get("payloadDigest")
+                or selection.get("visualQcRef") != qc.get("visualQcRef")
+                or selection.get("visualQcDigest") != qc.get("payloadDigest")
+                or selection.get("decision") != "SELECTED"
+                or admission.get("schemaVersion") != "v5.k2-asset-admission.v1"
+                or admission.get("ordinal") != slot.get("ordinal")
+                or admission.get("candidateRef") != candidate.get("candidateRef")
+                or admission.get("candidateDigest") != candidate.get("payloadDigest")
+                or admission.get("selectionRef") != selection.get("selectionRef")
+                or admission.get("selectionDigest") != selection.get("payloadDigest")
+                or admission.get("assetVersionRef") != asset.get("assetVersionRef")
+                or admission.get("assetVersionDigest") != asset.get("payloadDigest")
+                or admission.get("admissionState") != "ADMITTED"
+                or admission.get("publicationAllowed") is not False
+                or asset.get("schemaVersion") != REAL_VIDEO_ASSET_VERSION_SCHEMA_VERSION
+                or asset.get("ordinal") != slot.get("ordinal")
+                or asset.get("creativeShotVersionRef") != slot.get("slotRef")
+                or asset.get("generationRequestRef")
+                != slot.get("generationRequestRef")
+                or asset.get("generationRequestVersionRef")
+                != slot.get("generationRequestVersionRef")
+                or asset.get("generationRequestDigest")
+                != slot.get("generationRequestDigest")
+                or asset.get("sourceCandidateRef") != candidate.get("candidateRef")
+                or asset.get("sourceCandidateDigest") != candidate.get("payloadDigest")
+                or asset.get("semanticVisualQcRef") != qc.get("visualQcRef")
+                or asset.get("semanticVisualQcDigest") != qc.get("payloadDigest")
+                or asset.get("humanSelectionRef") != selection.get("selectionRef")
+                or asset.get("humanSelectionVersion")
+                != selection.get("selectionVersion")
+                or asset.get("humanSelectionDigest") != selection.get("payloadDigest")
+                or asset.get("state") != "REGISTERED"
+                or asset.get("immutable") is not True
+                or asset.get("publicationAllowed") is not False
+                or (
+                    require_current
+                    and (
+                        latest_candidate is None
+                        or latest_candidate.get("recordRef")
+                        != candidate_record.get("recordRef")
+                        or latest_candidate.get("recordVersion")
+                        != candidate_record.get("recordVersion")
+                        or latest_candidate.get("payloadDigest")
+                        != candidate_record.get("payloadDigest")
+                        or current_qc is None
+                        or current_qc[0].get("recordRef") != qc_record.get("recordRef")
+                        or current_qc[0].get("recordVersion")
+                        != qc_record.get("recordVersion")
+                        or current_qc[0].get("payloadDigest")
+                        != qc_record.get("payloadDigest")
+                    )
+                )
+            ):
+                raise RepositoryUnavailableError(
+                    "M11 activation Candidate-to-AssetVersion chain is invalid"
+                )
+            return deepcopy(admission), deepcopy(asset), deepcopy(candidate)
+
+        # Locate the atomically appended initial item records and use their
+        # last journal position as the gate's record cut.  Successor manifests
+        # must occur strictly after this cut.
+        initial_record_positions: list[int] = []
+        initial_slots: list[dict[str, Any]] = []
+        for admission, asset in zip(admissions, assets):
+            admission_record, _ = exact_record(
+                full_index,
+                ASSET_ADMISSION,
+                admission.get("admissionRef"),
+                admission.get("payloadDigest"),
+                "initial M11 item admission",
+            )
+            asset_record, _ = exact_record(
+                full_index,
+                ASSET_VERSION,
+                asset.get("assetVersionRef"),
+                asset.get("payloadDigest"),
+                "initial M11 AssetVersion",
+            )
+            selection_record, _ = exact_record(
+                full_index,
+                HUMAN_SELECTION,
+                asset.get("humanSelectionRef"),
+                asset.get("humanSelectionDigest"),
+                "initial M11 HumanSelection",
+            )
+            initial_record_positions.extend(
+                [positions[id(admission_record)], positions[id(asset_record)], positions[id(selection_record)]]
+            )
+            initial_slots.append(
+                {
+                    "ordinal": asset.get("ordinal"),
+                    "slotRef": asset.get("creativeShotVersionRef"),
+                    "generationRequestRef": asset.get("generationRequestRef"),
+                    "generationRequestVersionRef": asset.get(
+                        "generationRequestVersionRef"
+                    ),
+                    "generationRequestDigest": asset.get("generationRequestDigest"),
+                    "candidateRef": asset.get("sourceCandidateRef"),
+                    "candidateDigest": asset.get("sourceCandidateDigest"),
+                    "semanticVisualQcRef": asset.get("semanticVisualQcRef"),
+                    "semanticVisualQcDigest": asset.get("semanticVisualQcDigest"),
+                    "humanSelectionRef": asset.get("humanSelectionRef"),
+                    "humanSelectionDigest": asset.get("humanSelectionDigest"),
+                    "assetAdmissionRef": admission.get("admissionRef"),
+                    "assetAdmissionDigest": admission.get("payloadDigest"),
+                    "assetVersionRef": asset.get("assetVersionRef"),
+                    "assetVersionDigest": asset.get("payloadDigest"),
+                    "activationSource": "INITIAL_ADMISSION",
+                }
+            )
+        if not initial_record_positions:
+            raise RepositoryUnavailableError("initial M11 activation records are missing")
+        initial_cut = max(initial_record_positions)
+
+        def build_index(
+            prior_records: Sequence[dict[str, Any]],
+        ) -> dict[tuple[str, str, str], list[dict[str, Any]]]:
+            result: dict[tuple[str, str, str], list[dict[str, Any]]] = {}
+            for item in prior_records:
+                if isinstance(item.get("payloadDigest"), str):
+                    result.setdefault(
+                        (
+                            str(item.get("recordKind")),
+                            str(item.get("recordRef")),
+                            str(item.get("payloadDigest")),
+                        ),
+                        [],
+                    ).append(item)
+            return result
+
+        prior_records = list(records[: initial_cut + 1])
+        prior_index = build_index(prior_records)
+        initial_resolved: list[
+            tuple[dict[str, Any], dict[str, Any], dict[str, Any]]
+        ] = [
+            resolve_chain(slot, prior_records, prior_index, require_current=True)
+            for slot in initial_slots
+        ]
+        if _digest(
+            {
+                "selections": sorted(
+                    [
+                        {
+                            "visualQcRef": slot["semanticVisualQcRef"],
+                            "visualQcVersion": exact_record(
+                                prior_index,
+                                "SemanticVisualQCDecision",
+                                slot["semanticVisualQcRef"],
+                                slot["semanticVisualQcDigest"],
+                                "initial M11 semantic visual QC",
+                            )[0]["recordVersion"],
+                            "visualQcDigest": slot["semanticVisualQcDigest"],
+                            "selectionRef": slot["humanSelectionRef"],
+                            "selectionVersion": exact_record(
+                                prior_index,
+                                HUMAN_SELECTION,
+                                slot["humanSelectionRef"],
+                                slot["humanSelectionDigest"],
+                                "initial M11 HumanSelection",
+                            )[0]["recordVersion"],
+                            "approvalRef": exact_record(
+                                prior_index,
+                                HUMAN_SELECTION,
+                                slot["humanSelectionRef"],
+                                slot["humanSelectionDigest"],
+                                "initial M11 HumanSelection",
+                            )[1].get("approvalRef"),
+                        }
+                        for slot in initial_slots
+                    ],
+                    key=lambda item: item["selectionRef"],
+                )
+            }
+        ) != manifest.get("selectionRequestDigest"):
+            raise RepositoryUnavailableError(
+                "initial M11 selection request digest is invalid"
+            )
+        current = {
+            "manifest": manifest,
+            "admissions": [item[0] for item in initial_resolved],
+            "assets": [item[1] for item in initial_resolved],
+            "candidates": [item[2] for item in initial_resolved],
+            "slots": deepcopy(initial_slots),
+            "manifestRef": manifest["realVideoAdmissionManifestRef"],
+            "manifestDigest": manifest["payloadDigest"],
+            "revisionVersion": 1,
+            "revisionSupersessionRef": plan["realVideoPlanRef"],
+            "revisionSupersessionDigest": plan["payloadDigest"],
+        }
+
+        for record in records[initial_cut + 1 :]:
+            payload = record.get("payload")
+            if (
+                record.get("recordKind") == ASSET_ADMISSION
+                and isinstance(payload, Mapping)
+                and payload.get("schemaVersion")
+                == REAL_VIDEO_SUCCESSOR_ACTIVATION_SCHEMA_VERSION
+            ):
+                activation = sealed_record_payload(
+                    record, "successor M11 activation"
+                )
+                slots = activation.get("slotActivations")
+                if (
+                    set(activation) != _REAL_VIDEO_SUCCESSOR_ACTIVATION_FIELDS
+                    or record.get("recordRef") != activation.get("admissionRef")
+                    or record.get("recordVersion") != activation.get("version")
+                    or record.get("createdAt") != activation.get("createdAt")
+                    or activation.get("workspaceRef") != workspace
+                    or activation.get("productionRunRef") != run_ref
+                    or activation.get("version")
+                    != int(current["manifest"].get("version", 0)) + 1
+                    or activation.get("admissionState") != "ACTIVATED"
+                    or activation.get("realVideoPlanRef")
+                    != plan.get("realVideoPlanRef")
+                    or activation.get("realVideoPlanDigest")
+                    != plan.get("payloadDigest")
+                    or activation.get("supersedesActivationRef")
+                    != current["manifestRef"]
+                    or activation.get("supersedesActivationDigest")
+                    != current["manifestDigest"]
+                    or not isinstance(slots, list)
+                    or len(slots) != 4
+                    or not all(isinstance(item, Mapping) for item in slots)
+                    or any(
+                        set(item) != _REAL_VIDEO_ACTIVATION_SLOT_FIELDS
+                        for item in slots
+                    )
+                    or [item.get("ordinal") for item in slots] != [1, 2, 3, 4]
+                    or len({item.get("slotRef") for item in slots}) != 4
+                    or activation.get("assetVersionRefs")
+                    != [item.get("assetVersionRef") for item in slots]
+                    or activation.get("assetVersionDigests")
+                    != [item.get("assetVersionDigest") for item in slots]
+                    or activation.get("state") != "REAL_VIDEO_ADMITTED"
+                    or activation.get("publicationAllowed") is not False
+                ):
+                    raise RepositoryUnavailableError(
+                        "successor M11 activation manifest is invalid"
+                    )
+                prior_by_slot = {
+                    item["slotRef"]: item for item in current["slots"]
+                }
+                resolved_admissions: list[dict[str, Any]] = []
+                resolved_assets: list[dict[str, Any]] = []
+                resolved_candidates: list[dict[str, Any]] = []
+                new_slots: list[dict[str, Any]] = []
+                for slot in slots:
+                    prior_slot = prior_by_slot.get(slot.get("slotRef"))
+                    if not isinstance(prior_slot, Mapping):
+                        raise RepositoryUnavailableError(
+                            "successor M11 activation slot is unknown"
+                        )
+                    if slot.get("activationSource") == "REUSED_CURRENT":
+                        if any(
+                            slot.get(field) != prior_slot.get(field)
+                            for field in _REAL_VIDEO_ACTIVATION_SLOT_FIELDS
+                            - {"activationSource"}
+                        ):
+                            raise RepositoryUnavailableError(
+                                "successor M11 reused slot changed"
+                            )
+                        admission, asset, candidate = resolve_chain(
+                            slot,
+                            prior_records,
+                            prior_index,
+                            require_current=False,
+                        )
+                    elif slot.get("activationSource") == "NEW_ADMISSION":
+                        admission, asset, candidate = resolve_chain(
+                            slot,
+                            prior_records,
+                            prior_index,
+                            require_current=True,
+                        )
+                        predecessor_asset = current["assets"][
+                            int(slot["ordinal"]) - 1
+                        ]
+                        if (
+                            asset.get("assetRef")
+                            != predecessor_asset.get("assetRef")
+                            or asset.get("version")
+                            != int(predecessor_asset.get("version", 0)) + 1
+                            or asset.get("supersedesAssetVersionRef")
+                            != predecessor_asset.get("assetVersionRef")
+                            or asset.get("supersedesAssetVersionDigest")
+                            != predecessor_asset.get("payloadDigest")
+                            or asset.get("revisionRef")
+                            != activation.get("realVideoRevisionRef")
+                        ):
+                            raise RepositoryUnavailableError(
+                                "successor M11 AssetVersion lineage is not immediate"
+                            )
+                        new_slots.append(dict(slot))
+                    else:
+                        raise RepositoryUnavailableError(
+                            "successor M11 activation source is invalid"
+                        )
+                    resolved_admissions.append(admission)
+                    resolved_assets.append(asset)
+                    resolved_candidates.append(candidate)
+                changed_slot_refs = sorted(item["slotRef"] for item in new_slots)
+                if (
+                    not new_slots
+                    or activation.get("changedSlotRefs") != changed_slot_refs
+                    or activation.get("newAdmissionCount") != len(new_slots)
+                    or activation.get("reusedAdmissionCount") != 4 - len(new_slots)
+                    or activation.get("newAdmissionRefs")
+                    != [item["assetAdmissionRef"] for item in new_slots]
+                    or activation.get("newAdmissionDigests")
+                    != [item["assetAdmissionDigest"] for item in new_slots]
+                ):
+                    raise RepositoryUnavailableError(
+                        "successor M11 activation counts are inconsistent"
+                    )
+                selection_inputs: list[dict[str, Any]] = []
+                for slot in new_slots:
+                    selection_record, selection = exact_record(
+                        prior_index,
+                        HUMAN_SELECTION,
+                        slot["humanSelectionRef"],
+                        slot["humanSelectionDigest"],
+                        "successor M11 HumanSelection",
+                    )
+                    qc_record, _ = exact_record(
+                        prior_index,
+                        "SemanticVisualQCDecision",
+                        slot["semanticVisualQcRef"],
+                        slot["semanticVisualQcDigest"],
+                        "successor M11 semantic visual QC",
+                    )
+                    selection_inputs.append(
+                        {
+                            "visualQcRef": slot["semanticVisualQcRef"],
+                            "visualQcVersion": qc_record["recordVersion"],
+                            "visualQcDigest": slot["semanticVisualQcDigest"],
+                            "selectionRef": slot["humanSelectionRef"],
+                            "selectionVersion": selection_record["recordVersion"],
+                            "approvalRef": selection.get("approvalRef"),
+                        }
+                    )
+                anchors = [
+                    item
+                    for item in prior_records
+                    if item.get("idempotencyKey")
+                    == activation.get("operationIdempotencyKey")
+                ]
+                if (
+                    _digest(
+                        {
+                            "selections": sorted(
+                                selection_inputs,
+                                key=lambda item: item["selectionRef"],
+                            )
+                        }
+                    )
+                    != activation.get("selectionRequestDigest")
+                    or len(anchors) != 1
+                    or anchors[0].get("recordKind") != HUMAN_SELECTION
+                    or not any(
+                        anchors[0].get("recordRef") == item["humanSelectionRef"]
+                        and anchors[0].get("payloadDigest")
+                        == item["humanSelectionDigest"]
+                        for item in new_slots
+                    )
+                ):
+                    raise RepositoryUnavailableError(
+                        "successor M11 operation anchor is invalid"
+                    )
+                revision_identity = (
+                    activation.get("realVideoRevisionRef"),
+                    activation.get("realVideoRevisionDigest"),
+                )
+                predecessor_revision_identity = (
+                    current["manifest"].get(
+                        "realVideoRevisionRef", current["manifest"].get("revisionRef")
+                    ),
+                    current["manifest"].get("realVideoRevisionDigest"),
+                )
+                if revision_identity != predecessor_revision_identity:
+                    revision_carriers = []
+                    for candidate in resolved_candidates:
+                        value = candidate.get("consumedRealVideoRevision")
+                        if isinstance(value, Mapping):
+                            sealed_revision = self._assert_sealed_payload(
+                                value, "successor M11 consumed revision"
+                            )
+                            if (
+                                sealed_revision.get("realVideoRevisionRef"),
+                                sealed_revision.get("payloadDigest"),
+                            ) == revision_identity:
+                                revision_carriers.append(sealed_revision)
+                    if not revision_carriers or any(
+                        item != revision_carriers[0] for item in revision_carriers
+                    ):
+                        raise RepositoryUnavailableError(
+                            "successor M11 activation revision is not persisted"
+                        )
+                    sealed_revision = revision_carriers[0]
+                    if (
+                        set(sealed_revision)
+                        != _REAL_VIDEO_SUCCESSOR_REVISION_FIELDS
+                        or sealed_revision.get("schemaVersion")
+                        != REAL_VIDEO_SUCCESSOR_REVISION_SCHEMA_VERSION
+                        or sealed_revision.get("workspaceRef") != workspace
+                        or sealed_revision.get("productionRunRef") != run_ref
+                        or sealed_revision.get("version")
+                        != int(current["revisionVersion"]) + 1
+                        or sealed_revision.get("isSuccessor") is not True
+                        or sealed_revision.get("sourceRealVideoPlanRef")
+                        != plan.get("realVideoPlanRef")
+                        or sealed_revision.get("sourceRealVideoPlanDigest")
+                        != plan.get("payloadDigest")
+                        or sealed_revision.get("supersedesRealVideoRevisionRef")
+                        != current["revisionSupersessionRef"]
+                        or sealed_revision.get(
+                            "supersedesRealVideoRevisionDigest"
+                        )
+                        != current["revisionSupersessionDigest"]
+                        or sealed_revision.get("publicationAllowed") is not False
+                    ):
+                        raise RepositoryUnavailableError(
+                            "successor M11 activation revision is not immediate"
+                        )
+                    for slot, candidate in zip(slots, resolved_candidates):
+                        if slot.get("activationSource") != "NEW_ADMISSION":
+                            continue
+                        request = candidate.get("consumedGenerationRequest")
+                        if (
+                            not isinstance(request, Mapping)
+                            or candidate.get("consumedRealVideoRevision")
+                            != revision_carriers[0]
+                            or request.get("generationRequestRef")
+                            != slot.get("generationRequestRef")
+                            or request.get("generationRequestVersionRef")
+                            != slot.get("generationRequestVersionRef")
+                            or request.get("payloadDigest")
+                            != slot.get("generationRequestDigest")
+                        ):
+                            raise RepositoryUnavailableError(
+                                "successor M11 activation request is not sealed"
+                            )
+                current = {
+                    "manifest": activation,
+                    "admissions": resolved_admissions,
+                    "assets": resolved_assets,
+                    "candidates": resolved_candidates,
+                    "slots": [deepcopy(dict(item)) for item in slots],
+                    "manifestRef": activation["admissionRef"],
+                    "manifestDigest": activation["payloadDigest"],
+                    "revisionVersion": (
+                        current["revisionVersion"]
+                        if revision_identity == predecessor_revision_identity
+                        else revision_carriers[0]["version"]
+                    ),
+                    "revisionSupersessionRef": (
+                        current["revisionSupersessionRef"]
+                        if revision_identity == predecessor_revision_identity
+                        else revision_identity[0]
+                    ),
+                    "revisionSupersessionDigest": (
+                        current["revisionSupersessionDigest"]
+                        if revision_identity == predecessor_revision_identity
+                        else revision_identity[1]
+                    ),
+                }
+            prior_records.append(record)
+            prior_index = build_index(prior_records)
+        current["lineageCurrent"] = self._video_activation_is_current(
+            workspace, run_ref, current
+        )
+        return current
+
+    def _video_activation_is_current(
+        self,
+        workspace: str,
+        run_ref: str,
+        active: Mapping[str, Any],
+    ) -> bool:
+        """Bind every active slot to the journal-current canonical chain."""
+
+        slots = active.get("slots")
+        assets = active.get("assets")
+        if (
+            not isinstance(slots, list)
+            or not isinstance(assets, list)
+            or len(slots) != 4
+            or len(assets) != 4
+        ):
+            return False
+        current_candidates = self._current_video_candidates_by_slot(
+            workspace, run_ref
+        )
+        if len(current_candidates) != 4:
+            return False
+        selections = self.evidence.list_records(
+            workspace, run_ref, record_kind=HUMAN_SELECTION
+        )
+        latest_selection_by_candidate: dict[
+            tuple[str, str], dict[str, Any]
+        ] = {}
+        for record in selections:
+            payload = record.get("payload")
+            if not isinstance(payload, Mapping):
+                return False
+            candidate_ref = payload.get("candidateRef")
+            candidate_digest = payload.get("candidateDigest")
+            if isinstance(candidate_ref, str) and isinstance(
+                candidate_digest, str
+            ):
+                latest_selection_by_candidate[
+                    (candidate_ref, candidate_digest)
+                ] = record
+        canonical = self.candidate_review.asset_versions.list_asset_versions(
+            workspace, run_ref
+        )
+        latest_asset_by_logical_ref: dict[str, dict[str, Any]] = {}
+        for asset in canonical:
+            if str(asset.get("mediaKind", "")).lower() != "video":
+                continue
+            logical_ref = asset.get("assetRef")
+            if not isinstance(logical_ref, str):
+                return False
+            prior = latest_asset_by_logical_ref.get(logical_ref)
+            if prior is None or int(asset.get("version", 0)) > int(
+                prior.get("version", 0)
+            ):
+                latest_asset_by_logical_ref[logical_ref] = asset
+            elif int(asset.get("version", 0)) == int(prior.get("version", 0)):
+                return False
+        for slot, asset in zip(slots, assets):
+            slot_ref = slot.get("slotRef")
+            candidate = current_candidates.get(slot_ref)
+            if (
+                not isinstance(candidate, Mapping)
+                or candidate.get("candidateRef") != slot.get("candidateRef")
+                or candidate.get("payloadDigest") != slot.get("candidateDigest")
+            ):
+                return False
+            try:
+                qc = self.candidate_review._applicable_visual_qc(
+                    workspace, run_ref, str(slot.get("candidateRef"))
+                )
+            except EpisodeProductionError:
+                return False
+            if (
+                qc is None
+                or qc[0].get("recordRef") != slot.get("semanticVisualQcRef")
+                or qc[0].get("payloadDigest")
+                != slot.get("semanticVisualQcDigest")
+                or qc[1].get("result") != "PASS"
+            ):
+                return False
+            current_selection = latest_selection_by_candidate.get(
+                (str(slot.get("candidateRef")), str(slot.get("candidateDigest")))
+            )
+            if (
+                current_selection is None
+                or current_selection.get("recordRef")
+                != slot.get("humanSelectionRef")
+                or current_selection.get("payloadDigest")
+                != slot.get("humanSelectionDigest")
+                or not isinstance(current_selection.get("payload"), Mapping)
+                or current_selection["payload"].get("decision") != "SELECTED"
+            ):
+                return False
+            current_asset = latest_asset_by_logical_ref.get(asset.get("assetRef"))
+            if (
+                current_asset is None
+                or current_asset.get("assetVersionRef")
+                != slot.get("assetVersionRef")
+                or current_asset.get("payloadDigest")
+                != slot.get("assetVersionDigest")
+            ):
+                return False
+        return True
+
+    def get_video_activation_projection(
+        self, workspace: str, run_ref: str
+    ) -> dict[str, Any] | None:
+        """Expose only the result of the strict activation validator."""
+
+        active = self._active_video_admission(workspace, run_ref)
+        if active is None:
+            return None
+        manifest = active["manifest"]
+        slots = active["slots"]
+        return {
+            "manifestRef": active["manifestRef"],
+            "manifestDigest": active["manifestDigest"],
+            "revisionRef": manifest.get(
+                "realVideoRevisionRef", manifest.get("revisionRef")
+            ),
+            "revisionDigest": manifest.get("realVideoRevisionDigest"),
+            "candidateIdentities": [
+                {
+                    "slotRef": item["slotRef"],
+                    "candidateRef": item["candidateRef"],
+                    "candidateDigest": item["candidateDigest"],
+                }
+                for item in slots
+            ],
+            "lineageCurrent": active["lineageCurrent"],
+            "mediaKind": "VIDEO",
+        }
+
+    def _current_video_candidates_by_slot(
+        self, workspace: str, run_ref: str
+    ) -> dict[str, dict[str, Any]]:
+        current: dict[str, dict[str, Any]] = {}
+        for record in self.evidence.list_records(
+            workspace, run_ref, record_kind=CANDIDATE
+        ):
+            payload = record.get("payload")
+            if (
+                not isinstance(payload, Mapping)
+                or payload.get("mediaKind") != "VIDEO"
+                or self.candidate_review._current_candidate_record(
+                    workspace, run_ref, str(payload.get("candidateRef", ""))
+                )
+                is None
+            ):
+                continue
+            slot_ref = payload.get("slotRef")
+            if not isinstance(slot_ref, str) or slot_ref in current:
+                raise RepositoryUnavailableError(
+                    "current M11 candidate coverage is ambiguous"
+                )
+            current[slot_ref] = deepcopy(dict(payload))
+        return current
+
     def plan_videos(self, command: Mapping[str, Any]) -> dict[str, Any]:
         if not isinstance(command, Mapping) or set(command) != {
             "workspaceRef",
@@ -2207,12 +3838,14 @@ class K2RealMediaRevisionService:
             raise UpstreamNotReadyError("M11 real video plan is not ready")
         bundle = self._video_bundle(gate)
         plan = bundle["realVideoPlan"]
-        requests = bundle["generationRequests"]
+        requests, current_revision = self._current_video_request_set(
+            workspace, run_ref, bundle
+        )
         try:
             resolved = self.video_candidate_evidence.resolve_candidates(
                 workspace,
                 run_ref,
-                plan["realVideoPlanRef"],
+                current_revision["realVideoRevisionRef"],
                 requests,
             )
         except RealVideoCandidateEvidenceError as exc:
@@ -2239,67 +3872,19 @@ class K2RealMediaRevisionService:
             if (
                 isinstance(payload, Mapping)
                 and payload.get("mediaKind") == "VIDEO"
+                and self.candidate_review._current_candidate_record(
+                    workspace, run_ref, str(payload.get("candidateRef", ""))
+                )
+                is not None
             ):
-                source_ref = payload.get("sourceCandidateRef") or payload.get(
-                    "candidateRef"
-                )
-                if isinstance(source_ref, str):
-                    existing_video_candidates[source_ref] = deepcopy(
-                        dict(payload)
-                    )
-        exact_existing = bool(existing_video_candidates) and all(
-            isinstance(existing_video_candidates.get(item.get("candidateRef")), Mapping)
-            and existing_video_candidates[item.get("candidateRef")].get(
-                "artifactDigest"
-            )
-            == item.get("artifactDigest")
-            and existing_video_candidates[item.get("candidateRef")].get(
-                "sourceRequestDigest"
-            )
-            == item.get("sourceRequestDigest")
-            for item in candidates
-        )
-        if exact_existing:
-            revision_refs = {
-                existing_video_candidates[item.get("candidateRef")].get(
-                    "revisionRef"
-                )
-                for item in candidates
-            }
-            if len(revision_refs) != 1:
-                raise StaleInputError(
-                    "M11 candidate handoff revision is ambiguous"
-                )
-            candidate_revision_ref = next(iter(revision_refs))
-        elif not existing_video_candidates:
-            candidate_revision_ref = plan["realVideoPlanRef"]
-        else:
-            candidate_revision_ref = (
-                "m11-video-revision-"
-                + _digest(
-                    {
-                        "realVideoPlanDigest": plan["payloadDigest"],
-                        "handoffDigest": handoff.get("payloadDigest"),
-                        "candidates": [
-                            {
-                                "candidateRef": item.get("candidateRef"),
-                                "sourceRequestDigest": item.get(
-                                    "sourceRequestDigest"
-                                ),
-                                "artifactDigest": item.get("artifactDigest"),
-                            }
-                            for item in sorted(
-                                candidates,
-                                key=lambda value: value.get("ordinal", 0),
-                            )
-                        ],
-                    }
-                )[:32]
-            )
+                slot_ref = payload.get("slotRef")
+                if isinstance(slot_ref, str):
+                    existing_video_candidates[slot_ref] = deepcopy(dict(payload))
         expected_record_journal_head = self.evidence.record_journal_head(
             workspace, run_ref
         )
         prepared_records: list[EvidenceRecord] = []
+        reused_candidates: list[dict[str, Any]] = []
         requests_by_ref = {
             item["generationRequestRef"]: item for item in requests
         }
@@ -2312,6 +3897,33 @@ class K2RealMediaRevisionService:
             source_candidate_ref = _required_ref(
                 item.get("candidateRef"), "candidateRef"
             )
+            existing = existing_video_candidates.get(item.get("slotRef"))
+            if (
+                isinstance(existing, Mapping)
+                and existing.get("sourceRequestRef")
+                == item.get("sourceRequestRef")
+                and existing.get("sourceRequestDigest")
+                == item.get("sourceRequestDigest")
+                and existing.get("artifactRef") == item.get("artifactRef")
+                and existing.get("artifactDigest") == item.get("artifactDigest")
+                and existing.get("artifactByteSize")
+                == item.get("artifactByteSize")
+                and existing.get("storageKey") == item.get("storageKey")
+                and existing.get("provenance") == item.get("provenance")
+                and existing.get("sourceAssetVersions")
+                == [
+                    {
+                        "assetVersionRef": request[
+                            "sourceImageAssetVersionRef"
+                        ],
+                        "assetVersionDigest": request[
+                            "sourceImageAssetVersionDigest"
+                        ],
+                    }
+                ]
+            ):
+                reused_candidates.append(deepcopy(dict(existing)))
+                continue
             candidate_key = _digest(
                 {
                     "clientIdempotencyKey": client_key,
@@ -2320,17 +3932,18 @@ class K2RealMediaRevisionService:
                 }
             )[:48]
             candidate_ref = source_candidate_ref
-            if exact_existing:
-                candidate_ref = existing_video_candidates[
-                    source_candidate_ref
-                ]["candidateRef"]
-            elif existing_video_candidates:
+            if existing_video_candidates or current_revision.get("isSuccessor"):
                 candidate_ref = (
                     "m11-video-candidate-"
                     + _digest(
                         {
-                            "revisionRef": candidate_revision_ref,
+                            "revisionRef": current_revision[
+                                "realVideoRevisionRef"
+                            ],
                             "sourceCandidateRef": source_candidate_ref,
+                            "sourceRequestDigest": item.get(
+                                "sourceRequestDigest"
+                            ),
                             "artifactDigest": item.get("artifactDigest"),
                         }
                     )[:32]
@@ -2339,10 +3952,16 @@ class K2RealMediaRevisionService:
                 {
                     "workspaceRef": workspace,
                     "productionRunRef": run_ref,
-                    "idempotencyKey": f"m11-candidate-{candidate_key}",
+                    "idempotencyKey": (
+                        client_key
+                        if not prepared_records
+                        else f"m11-candidate-{candidate_key}"
+                    ),
                     "candidateRef": candidate_ref,
                     "candidateVersion": item.get("candidateVersion", 1),
-                    "revisionRef": candidate_revision_ref,
+                    "revisionRef": current_revision[
+                        "realVideoRevisionRef"
+                    ],
                     "mediaKind": "VIDEO",
                     "slotRef": item.get("slotRef"),
                     "sourceRequestRef": item.get("sourceRequestRef"),
@@ -2363,6 +3982,18 @@ class K2RealMediaRevisionService:
                     "storageKey": item.get("storageKey"),
                     "sourceCandidateRef": source_candidate_ref,
                     "provenance": item.get("provenance"),
+                    **(
+                        {
+                            "consumedGenerationRequest": deepcopy(
+                                dict(request)
+                            ),
+                            "consumedRealVideoRevision": deepcopy(
+                                dict(current_revision)
+                            ),
+                        }
+                        if current_revision.get("isSuccessor")
+                        else {}
+                    ),
                 }
             )
             candidate = deepcopy(dict(candidate_record.payload))
@@ -2395,10 +4026,14 @@ class K2RealMediaRevisionService:
                 )
             )
             prepared_records.extend((candidate_record, validation_record))
-        stored, replayed = self.evidence.append_records(
-            prepared_records,
-            expected_record_journal_head=expected_record_journal_head,
-        )
+        if prepared_records:
+            stored, replayed = self.evidence.append_records(
+                prepared_records,
+                expected_record_journal_head=expected_record_journal_head,
+            )
+        else:
+            stored = []
+            replayed = True
         candidate_results = [
             deepcopy(dict(item["payload"]))
             for item in stored
@@ -2419,6 +4054,9 @@ class K2RealMediaRevisionService:
             "state": self.evidence.current_state(workspace, run_ref),
             "candidateHandoff": deepcopy(dict(handoff)),
             "candidates": candidate_results,
+            "reusedCandidates": sorted(
+                reused_candidates, key=lambda item: item.get("slotRef", "")
+            ),
             "technicalValidations": validation_results,
             "candidateLifecycle": lifecycle,
             "idempotentReplay": replayed,
@@ -2445,10 +4083,12 @@ class K2RealMediaRevisionService:
         selections = command.get("selections")
         if (
             not isinstance(selections, list)
-            or len(selections) != 4
+            or not 1 <= len(selections) <= 4
             or not all(isinstance(item, Mapping) for item in selections)
         ):
-            raise EpisodeProductionError("M11 requires four exact selections")
+            raise EpisodeProductionError(
+                "M11 requires one to four exact selections"
+            )
         selection_fields = {
             "visualQcRef",
             "visualQcVersion",
@@ -2494,7 +4134,7 @@ class K2RealMediaRevisionService:
             )
         if len(
             {item["selectionRef"] for item in normalized_selection_requests}
-        ) != 4:
+        ) != len(normalized_selection_requests):
             raise EpisodeProductionError("M11 selection refs are ambiguous")
         selection_request_digest = _digest(
             {
@@ -2511,7 +4151,9 @@ class K2RealMediaRevisionService:
             raise UpstreamNotReadyError("M11 real video plan is not ready")
         plan_bundle = self._video_bundle(plan_gate)
         plan = plan_bundle["realVideoPlan"]
-        requests = plan_bundle["generationRequests"]
+        requests, current_revision = self._current_video_request_set(
+            workspace, run_ref, plan_bundle
+        )
         gate_key = _digest(
             {
                 "clientIdempotencyKey": client_key,
@@ -2521,9 +4163,8 @@ class K2RealMediaRevisionService:
         existing = self.evidence.get_gate(
             workspace, run_ref, REAL_VIDEO_ADMISSION_GATE
         )
-        if existing is not None:
-            if existing.get("idempotencyKey") != gate_key:
-                raise IdempotencyConflictError("M11 admission command conflicts")
+        production_state = self.evidence.current_state(workspace, run_ref)
+        if existing is not None and existing.get("idempotencyKey") == gate_key:
             replay_bundle = self._video_admission_bundle(existing)
             if (
                 replay_bundle["realVideoAdmissionManifest"].get(
@@ -2535,16 +4176,28 @@ class K2RealMediaRevisionService:
                     "M11 admission selection content changed"
                 )
             return {**replay_bundle, "idempotentReplay": True}
-        if self.evidence.current_state(workspace, run_ref) != "REAL_VIDEO_PLAN_READY":
+        if production_state == "REAL_VIDEO_READY":
+            return self._admit_real_video_successor(
+                workspace=workspace,
+                run_ref=run_ref,
+                client_key=client_key,
+                selections=normalized_selection_requests,
+                selection_request_digest=selection_request_digest,
+                plan=plan,
+                requests=requests,
+                current_revision=current_revision,
+            )
+        if existing is not None:
+            raise IdempotencyConflictError("M11 admission command conflicts")
+        if production_state != "REAL_VIDEO_PLAN_READY":
             raise StaleInputError("M11 admission state changed")
+        if len(normalized_selection_requests) != 4:
+            raise EpisodeProductionError(
+                "initial M11 admission requires four exact selections"
+            )
         expected_record_journal_head = self.evidence.record_journal_head(
             workspace, run_ref
         )
-        active_candidate_revision_ref = self.candidate_review.get_projection(
-            workspace, run_ref
-        ).get("latestCandidateRevisionRefs", {}).get("VIDEO")
-        if not isinstance(active_candidate_revision_ref, str):
-            raise StaleInputError("M11 current video candidate revision is missing")
         requests_by_ref = {
             item["generationRequestRef"]: item for item in requests
         }
@@ -2605,14 +4258,19 @@ class K2RealMediaRevisionService:
             ):
                 raise StaleInputError("M11 selected candidate changed")
             candidate = deepcopy(dict(candidate_record["payload"]))
+            current_candidate = self.candidate_review._current_candidate_record(
+                workspace, run_ref, candidate["candidateRef"]
+            )
             request = requests_by_ref.get(candidate.get("sourceRequestRef"))
             if (
                 not isinstance(request, Mapping)
+                or current_candidate is None
+                or current_candidate.get("payloadDigest")
+                != candidate.get("payloadDigest")
                 or candidate.get("sourceRequestDigest")
                 != request.get("payloadDigest")
                 or candidate.get("slotRef")
                 != request.get("creativeShotVersionRef")
-                or candidate.get("revisionRef") != active_candidate_revision_ref
                 or candidate.get("artifactDigest")
                 != selection.get("artifactDigest")
                 or candidate.get("sourceAssetVersions")
@@ -2655,6 +4313,9 @@ class K2RealMediaRevisionService:
                     "creativeShotDigest": request["creativeShotDigest"],
                     "generationRequestRef": request[
                         "generationRequestRef"
+                    ],
+                    "generationRequestVersionRef": request[
+                        "generationRequestVersionRef"
                     ],
                     "generationRequestDigest": request["payloadDigest"],
                     "sourceImageAssetVersionRef": request[
@@ -2734,7 +4395,7 @@ class K2RealMediaRevisionService:
             live_handoff = self.video_candidate_evidence.resolve_candidates(
                 workspace,
                 run_ref,
-                plan["realVideoPlanRef"],
+                current_revision["realVideoRevisionRef"],
                 requests,
             )
         except RealVideoCandidateEvidenceError as exc:
@@ -2784,6 +4445,23 @@ class K2RealMediaRevisionService:
         selection_records = [item[1] for item in prepared]
         admissions = [item[3] for item in prepared]
         admitted = [item[4] for item in prepared]
+        manifest_revision_ref = (
+            prepared[0][4]["revisionRef"]
+            if len({item[4]["revisionRef"] for item in prepared}) == 1
+            else (
+                "m11-video-admission-revision-"
+                + _digest(
+                    {
+                        "realVideoRevisionDigest": current_revision[
+                            "payloadDigest"
+                        ],
+                        "candidateDigests": [
+                            item[4]["sourceCandidateDigest"] for item in prepared
+                        ],
+                    }
+                )[:32]
+            )
+        )
         manifest = _sealed(
             {
                 "schemaVersion": REAL_VIDEO_ADMISSION_SCHEMA_VERSION,
@@ -2796,8 +4474,18 @@ class K2RealMediaRevisionService:
                 "version": 1,
                 "realVideoPlanRef": plan["realVideoPlanRef"],
                 "realVideoPlanDigest": plan["payloadDigest"],
-                "revisionRef": active_candidate_revision_ref,
+                "revisionRef": manifest_revision_ref,
+                "realVideoRevisionRef": current_revision[
+                    "realVideoRevisionRef"
+                ],
+                "realVideoRevisionDigest": current_revision["payloadDigest"],
                 "selectionRequestDigest": selection_request_digest,
+                "candidateRefs": [
+                    item[4]["sourceCandidateRef"] for item in prepared
+                ],
+                "candidateDigests": [
+                    item[4]["sourceCandidateDigest"] for item in prepared
+                ],
                 "selectionRefs": [item.recordRef for item in selection_records],
                 "selectionDigests": [
                     item.payloadDigest for item in selection_records
@@ -2814,6 +4502,7 @@ class K2RealMediaRevisionService:
             {
                 "clientIdempotencyKey": client_key,
                 "realVideoPlanDigest": plan["payloadDigest"],
+                "realVideoRevisionDigest": current_revision["payloadDigest"],
                 "selectionDigests": [
                     item.payloadDigest for item in selection_records
                 ],
@@ -2926,6 +4615,619 @@ class K2RealMediaRevisionService:
             gate = concurrent
             replayed = True
         return {**self._video_admission_bundle(gate), "idempotentReplay": replayed}
+
+    def _video_successor_replay(
+        self,
+        workspace: str,
+        run_ref: str,
+        client_key: str,
+        selection_request_digest: str,
+    ) -> dict[str, Any] | None:
+        matches = [
+            item
+            for item in self.evidence.list_records(workspace, run_ref)
+            if item.get("idempotencyKey") == client_key
+        ]
+        if not matches:
+            return None
+        if len(matches) != 1:
+            raise RepositoryUnavailableError(
+                "M11 successor operation idempotency is ambiguous"
+            )
+        operation_record = matches[0]
+        activations = [
+            item
+            for item in self.evidence.list_records(
+                workspace, run_ref, record_kind=ASSET_ADMISSION
+            )
+            if isinstance(item.get("payload"), Mapping)
+            and item["payload"].get("schemaVersion")
+            == REAL_VIDEO_SUCCESSOR_ACTIVATION_SCHEMA_VERSION
+            and item["payload"].get("operationIdempotencyKey") == client_key
+        ]
+        if (
+            operation_record.get("recordKind") != HUMAN_SELECTION
+            or len(activations) != 1
+            or activations[0]["payload"].get("selectionRequestDigest")
+            != selection_request_digest
+        ):
+            raise IdempotencyConflictError(
+                "M11 successor admission command conflicts"
+            )
+        payload = activations[0]["payload"]
+        activation = self._assert_sealed_payload(
+            payload, "M11 successor replay activation"
+        )
+        raw_payload = operation_record.get("payload")
+        if (
+            not isinstance(raw_payload, Mapping)
+            or not any(
+                item.get("humanSelectionRef")
+                == operation_record.get("recordRef")
+                and item.get("humanSelectionDigest")
+                == operation_record.get("payloadDigest")
+                for item in activation.get("slotActivations", [])
+                if isinstance(item, Mapping)
+            )
+        ):
+            raise RepositoryUnavailableError(
+                "M11 successor operation anchor is not in the activation"
+            )
+        canonical = {
+            item["assetVersionRef"]: item
+            for item in self.candidate_review.asset_versions.list_asset_versions(
+                workspace, run_ref
+            )
+            if str(item.get("mediaKind", "")).lower() == "video"
+        }
+        assets = [canonical.get(ref) for ref in activation["assetVersionRefs"]]
+        if (
+            any(not isinstance(item, Mapping) for item in assets)
+            or [item.get("payloadDigest") for item in assets]
+            != activation.get("assetVersionDigests")
+        ):
+            raise RepositoryUnavailableError(
+                "M11 successor replay AssetVersions are incomplete"
+            )
+        active = self._active_video_admission(workspace, run_ref)
+        if (
+            active is None
+            or active.get("manifestRef") != activation.get("admissionRef")
+            or active.get("manifestDigest") != activation.get("payloadDigest")
+        ):
+            # Historical replay remains addressable after a later activation.
+            admission_index: dict[str, dict[str, Any]] = {}
+            gate = self.evidence.get_gate(
+                workspace, run_ref, REAL_VIDEO_ADMISSION_GATE
+            )
+            if gate is not None:
+                for item in self._video_admission_bundle(gate)["assetAdmissions"]:
+                    admission_index[item["admissionRef"]] = item
+            for item in self.evidence.list_records(
+                workspace, run_ref, record_kind=ASSET_ADMISSION
+            ):
+                item_payload = item.get("payload")
+                if (
+                    isinstance(item_payload, Mapping)
+                    and item_payload.get("schemaVersion")
+                    == "v5.k2-asset-admission.v1"
+                ):
+                    admission_index[item_payload["admissionRef"]] = deepcopy(
+                        dict(item_payload)
+                    )
+            item_admissions = [
+                admission_index.get(item.get("assetAdmissionRef"))
+                for item in activation.get("slotActivations", [])
+            ]
+        else:
+            item_admissions = active["admissions"]
+        if (
+            len(item_admissions) != 4
+            or any(not isinstance(item, Mapping) for item in item_admissions)
+            or [item.get("payloadDigest") for item in item_admissions]
+            != [
+                item.get("assetAdmissionDigest")
+                for item in activation.get("slotActivations", [])
+            ]
+        ):
+            raise RepositoryUnavailableError(
+                "M11 successor replay item admissions are incomplete"
+            )
+        return {
+            "realVideoAdmissionManifest": activation,
+            "assetAdmissions": [deepcopy(dict(item)) for item in item_admissions],
+            "assetVersions": [deepcopy(dict(item)) for item in assets],
+            "state": self.evidence.current_state(workspace, run_ref),
+            "idempotentReplay": True,
+            "publicationAllowed": False,
+        }
+
+    def _admit_real_video_successor(
+        self,
+        *,
+        workspace: str,
+        run_ref: str,
+        client_key: str,
+        selections: Sequence[Mapping[str, Any]],
+        selection_request_digest: str,
+        plan: Mapping[str, Any],
+        requests: Sequence[Mapping[str, Any]],
+        current_revision: Mapping[str, Any],
+    ) -> dict[str, Any]:
+        """Atomically activate changed slots while reusing three current chains."""
+
+        replay = self._video_successor_replay(
+            workspace, run_ref, client_key, selection_request_digest
+        )
+        if replay is not None:
+            return replay
+        active = self._active_video_admission(workspace, run_ref)
+        if active is None:
+            raise UpstreamNotReadyError(
+                "an admitted M11 video baseline is required"
+            )
+        active_by_slot = {
+            item["creativeShotVersionRef"]: item for item in active["assets"]
+        }
+        requests_by_slot = {
+            item["creativeShotVersionRef"]: item for item in requests
+        }
+        if len(active_by_slot) != 4 or len(requests_by_slot) != 4:
+            raise RepositoryUnavailableError(
+                "M11 active or requested slot coverage is invalid"
+            )
+        current_candidates_by_slot = self._current_video_candidates_by_slot(
+            workspace, run_ref
+        )
+        changed_slots = {
+            slot_ref
+            for slot_ref, request in requests_by_slot.items()
+            if (
+                active_by_slot[slot_ref].get("generationRequestDigest")
+                != request.get("payloadDigest")
+                or active_by_slot[slot_ref].get("sourceImageAssetVersionRef")
+                != request.get("sourceImageAssetVersionRef")
+                or active_by_slot[slot_ref].get("sourceImageAssetVersionDigest")
+                != request.get("sourceImageAssetVersionDigest")
+                or not isinstance(current_candidates_by_slot.get(slot_ref), Mapping)
+                or active_by_slot[slot_ref].get("sourceCandidateRef")
+                != current_candidates_by_slot.get(slot_ref, {}).get("candidateRef")
+                or active_by_slot[slot_ref].get("sourceCandidateDigest")
+                != current_candidates_by_slot.get(slot_ref, {}).get("payloadDigest")
+            )
+        }
+        if not changed_slots:
+            raise IdempotencyConflictError(
+                "M11 successor admission has no changed current slot"
+            )
+        if len(selections) != len(changed_slots):
+            raise EpisodeProductionError(
+                "M11 successor selections must cover exactly the changed slots"
+            )
+        expected_record_journal_head = self.evidence.record_journal_head(
+            workspace, run_ref
+        )
+        now = self._clock()
+        prepared: list[
+            tuple[int, EvidenceRecord, dict[str, Any], dict[str, Any], dict[str, Any]]
+        ] = []
+        for selection_input in selections:
+            selection_key = _digest(
+                {
+                    "clientIdempotencyKey": client_key,
+                    "stage": "m11-successor-selection",
+                    "selectionRef": selection_input["selectionRef"],
+                    "selectionRequestDigest": selection_request_digest,
+                }
+            )[:48]
+            selection_record = self.candidate_review.prepare_human_selection_record(
+                {
+                    "workspaceRef": workspace,
+                    "productionRunRef": run_ref,
+                    "idempotencyKey": f"m11-successor-selected-{selection_key}",
+                    **dict(selection_input),
+                    "decision": "SELECTED",
+                }
+            )
+            selection = deepcopy(dict(selection_record.payload))
+            candidate_record = self.evidence.get_record(
+                workspace,
+                run_ref,
+                selection["candidateRef"],
+                selection["candidateVersion"],
+            )
+            if (
+                candidate_record is None
+                or candidate_record.get("recordKind") != CANDIDATE
+                or candidate_record.get("payloadDigest")
+                != selection.get("candidateDigest")
+                or not isinstance(candidate_record.get("payload"), Mapping)
+            ):
+                raise StaleInputError("M11 successor candidate changed")
+            candidate = deepcopy(dict(candidate_record["payload"]))
+            slot_ref = candidate.get("slotRef")
+            request = requests_by_slot.get(slot_ref)
+            current_candidate = self.candidate_review._current_candidate_record(
+                workspace, run_ref, candidate.get("candidateRef")
+            )
+            if (
+                slot_ref not in changed_slots
+                or not isinstance(request, Mapping)
+                or current_candidate is None
+                or current_candidate.get("payloadDigest")
+                != candidate.get("payloadDigest")
+                or candidate.get("revisionRef")
+                != current_revision.get("realVideoRevisionRef")
+                or candidate.get("sourceRequestRef")
+                != request.get("generationRequestRef")
+                or candidate.get("sourceRequestDigest")
+                != request.get("payloadDigest")
+                or candidate.get("sourceAssetVersions")
+                != [
+                    {
+                        "assetVersionRef": request.get(
+                            "sourceImageAssetVersionRef"
+                        ),
+                        "assetVersionDigest": request.get(
+                            "sourceImageAssetVersionDigest"
+                        ),
+                    }
+                ]
+                or (
+                    current_revision.get("isSuccessor") is True
+                    and (
+                        candidate.get("consumedGenerationRequest") != request
+                        or candidate.get("consumedRealVideoRevision")
+                        != current_revision
+                    )
+                )
+                or (
+                    current_revision.get("isSuccessor") is not True
+                    and (
+                        "consumedGenerationRequest" in candidate
+                        or "consumedRealVideoRevision" in candidate
+                    )
+                )
+            ):
+                raise StaleInputError(
+                    "M11 successor candidate request lineage changed"
+                )
+            predecessor = active_by_slot[slot_ref]
+            ordinal = int(request["ordinal"])
+            asset = _sealed(
+                {
+                    "schemaVersion": REAL_VIDEO_ASSET_VERSION_SCHEMA_VERSION,
+                    "workspaceRef": workspace,
+                    "productionRunRef": run_ref,
+                    "assetRef": predecessor["assetRef"],
+                    "assetVersionRef": _required_ref(
+                        self._ref_factory("real-video-asset-version"),
+                        "assetVersionRef",
+                    ),
+                    "version": int(predecessor["version"]) + 1,
+                    "ordinal": ordinal,
+                    "creativeShotRef": request["creativeShotRef"],
+                    "creativeShotVersionRef": slot_ref,
+                    "creativeShotDigest": request["creativeShotDigest"],
+                    "generationRequestRef": request["generationRequestRef"],
+                    "generationRequestVersionRef": request[
+                        "generationRequestVersionRef"
+                    ],
+                    "generationRequestDigest": request["payloadDigest"],
+                    "sourceImageAssetVersionRef": request[
+                        "sourceImageAssetVersionRef"
+                    ],
+                    "sourceImageAssetVersionDigest": request[
+                        "sourceImageAssetVersionDigest"
+                    ],
+                    "sourceCandidateRef": candidate["candidateRef"],
+                    "sourceCandidateDigest": candidate["payloadDigest"],
+                    "revisionRef": current_revision["realVideoRevisionRef"],
+                    "sourceRuntimeCandidateRef": candidate.get(
+                        "sourceCandidateRef", candidate["candidateRef"]
+                    ),
+                    "semanticVisualQcRef": selection["visualQcRef"],
+                    "semanticVisualQcDigest": selection["visualQcDigest"],
+                    "humanSelectionRef": selection_record.recordRef,
+                    "humanSelectionVersion": selection_record.recordVersion,
+                    "humanSelectionDigest": selection_record.payloadDigest,
+                    "supersedesAssetVersionRef": predecessor[
+                        "assetVersionRef"
+                    ],
+                    "supersedesAssetVersionDigest": predecessor[
+                        "payloadDigest"
+                    ],
+                    "mediaKind": "video",
+                    "mediaType": "video/mp4",
+                    "artifactRef": candidate["artifactRef"],
+                    "storageKey": candidate.get("storageKey"),
+                    "byteSize": candidate["artifactByteSize"],
+                    "sha256": candidate["artifactDigest"],
+                    "provenance": candidate["provenance"],
+                    "state": "REGISTERED",
+                    "immutable": True,
+                    "publicationAllowed": False,
+                    "createdBy": "v5.k2.real-video-successor-admission.v2",
+                    "createdAt": now,
+                }
+            )
+            admission = _sealed(
+                {
+                    "schemaVersion": "v5.k2-asset-admission.v1",
+                    "admissionRef": _required_ref(
+                        self._ref_factory("real-video-successor-admission"),
+                        "admissionRef",
+                    ),
+                    "version": 1,
+                    "ordinal": ordinal,
+                    "candidateRef": candidate["candidateRef"],
+                    "candidateDigest": candidate["payloadDigest"],
+                    "selectionRef": selection_record.recordRef,
+                    "selectionVersion": selection_record.recordVersion,
+                    "selectionDigest": selection_record.payloadDigest,
+                    "assetVersionRef": asset["assetVersionRef"],
+                    "assetVersionVersion": asset["version"],
+                    "assetVersionDigest": asset["payloadDigest"],
+                    "admissionState": "ADMITTED",
+                    "publicationAllowed": False,
+                    "createdAt": now,
+                }
+            )
+            prepared.append(
+                (ordinal, selection_record, candidate, admission, asset)
+            )
+        prepared.sort(key=lambda item: item[0])
+        if {item[2]["slotRef"] for item in prepared} != changed_slots:
+            raise RealVideoCandidateRejectedError(
+                "M11 successor admission does not cover changed slots"
+            )
+
+        final_by_slot = {slot: deepcopy(asset) for slot, asset in active_by_slot.items()}
+        active_admission_by_ordinal = {
+            item["ordinal"]: item for item in active["admissions"]
+        }
+        final_admission_by_ordinal = {
+            ordinal: deepcopy(item)
+            for ordinal, item in active_admission_by_ordinal.items()
+        }
+        for _, _, candidate, _, asset in prepared:
+            final_by_slot[candidate["slotRef"]] = asset
+        for ordinal, _, _, admission, _ in prepared:
+            final_admission_by_ordinal[ordinal] = admission
+        final_assets = sorted(final_by_slot.values(), key=lambda item: item["ordinal"])
+        final_admissions = [
+            final_admission_by_ordinal[ordinal] for ordinal in (1, 2, 3, 4)
+        ]
+
+        # Every activated artifact, including the three reused chains, is
+        # rehashed/re-probed by V4 immediately before the atomic V5 append.
+        try:
+            live_handoff = self.video_candidate_evidence.resolve_candidates(
+                workspace,
+                run_ref,
+                current_revision["realVideoRevisionRef"],
+                requests,
+            )
+        except RealVideoCandidateEvidenceError as exc:
+            raise RealVideoCandidateRejectedError(
+                "M11 successor artifact bytes are no longer verifiable"
+            ) from exc
+        live_candidates = (
+            live_handoff.get("candidates")
+            if isinstance(live_handoff, Mapping)
+            else None
+        )
+        if (
+            not isinstance(live_candidates, list)
+            or len(live_candidates) != 4
+            or not all(isinstance(item, Mapping) for item in live_candidates)
+        ):
+            raise RealVideoCandidateRejectedError(
+                "M11 successor admission handoff is incomplete"
+            )
+        live_by_ref = {item.get("candidateRef"): item for item in live_candidates}
+        for asset in final_assets:
+            live = live_by_ref.get(
+                asset.get(
+                    "sourceRuntimeCandidateRef", asset["sourceCandidateRef"]
+                )
+            )
+            if (
+                not isinstance(live, Mapping)
+                or live.get("artifactDigest") != asset.get("sha256")
+                or live.get("artifactByteSize") != asset.get("byteSize")
+                or live.get("storageKey") != asset.get("storageKey")
+                or live.get("artifactRef") != asset.get("artifactRef")
+                or live.get("sourceRequestRef")
+                != asset.get("generationRequestRef")
+                or live.get("sourceRequestDigest")
+                != asset.get("generationRequestDigest")
+                or live.get("slotRef")
+                != asset.get("creativeShotVersionRef")
+                or live.get("provenance") != asset.get("provenance")
+            ):
+                raise RealVideoCandidateRejectedError(
+                    "M11 successor artifact bytes or lineage changed"
+                )
+
+        changed_by_slot = {item[2]["slotRef"]: item for item in prepared}
+        admission_by_ordinal = {
+            item["ordinal"]: item for item in final_admissions
+        }
+        slots: list[dict[str, Any]] = []
+        for asset in final_assets:
+            slot_ref = asset["creativeShotVersionRef"]
+            request = requests_by_slot[slot_ref]
+            slots.append(
+                {
+                    "ordinal": asset["ordinal"],
+                    "slotRef": slot_ref,
+                    "generationRequestRef": request["generationRequestRef"],
+                    "generationRequestVersionRef": request[
+                        "generationRequestVersionRef"
+                    ],
+                    "generationRequestDigest": request["payloadDigest"],
+                    "candidateRef": asset["sourceCandidateRef"],
+                    "candidateDigest": asset["sourceCandidateDigest"],
+                    "semanticVisualQcRef": asset["semanticVisualQcRef"],
+                    "semanticVisualQcDigest": asset[
+                        "semanticVisualQcDigest"
+                    ],
+                    "humanSelectionRef": asset["humanSelectionRef"],
+                    "humanSelectionDigest": asset["humanSelectionDigest"],
+                    "assetAdmissionRef": admission_by_ordinal[
+                        asset["ordinal"]
+                    ]["admissionRef"],
+                    "assetAdmissionDigest": admission_by_ordinal[
+                        asset["ordinal"]
+                    ]["payloadDigest"],
+                    "assetVersionRef": asset["assetVersionRef"],
+                    "assetVersionDigest": asset["payloadDigest"],
+                    "activationSource": (
+                        "NEW_ADMISSION"
+                        if slot_ref in changed_by_slot
+                        else "REUSED_CURRENT"
+                    ),
+                }
+            )
+        activation_version = int(active["manifest"].get("version", 1)) + 1
+        activation = _sealed(
+            {
+                "schemaVersion": REAL_VIDEO_SUCCESSOR_ACTIVATION_SCHEMA_VERSION,
+                "workspaceRef": workspace,
+                "productionRunRef": run_ref,
+                "admissionRef": _required_ref(
+                    self._ref_factory("real-video-batch-activation"),
+                    "admissionRef",
+                ),
+                "version": activation_version,
+                "admissionState": "ACTIVATED",
+                "realVideoPlanRef": plan["realVideoPlanRef"],
+                "realVideoPlanDigest": plan["payloadDigest"],
+                "realVideoRevisionRef": current_revision[
+                    "realVideoRevisionRef"
+                ],
+                "realVideoRevisionDigest": current_revision["payloadDigest"],
+                "supersedesActivationRef": active["manifestRef"],
+                "supersedesActivationDigest": active["manifestDigest"],
+                "operationIdempotencyKey": client_key,
+                "selectionRequestDigest": selection_request_digest,
+                "changedSlotRefs": sorted(changed_slots),
+                "slotActivations": slots,
+                "assetVersionRefs": [
+                    item["assetVersionRef"] for item in final_assets
+                ],
+                "assetVersionDigests": [
+                    item["payloadDigest"] for item in final_assets
+                ],
+                "newAdmissionRefs": [item[3]["admissionRef"] for item in prepared],
+                "newAdmissionDigests": [
+                    item[3]["payloadDigest"] for item in prepared
+                ],
+                "newAdmissionCount": len(prepared),
+                "reusedAdmissionCount": 4 - len(prepared),
+                "state": "REAL_VIDEO_ADMITTED",
+                "publicationAllowed": False,
+                "createdAt": now,
+            }
+        )
+        activation_record = _record(
+            workspace_ref=workspace,
+            production_run_ref=run_ref,
+            record_kind=ASSET_ADMISSION,
+            record_ref=activation["admissionRef"],
+            record_version=activation["version"],
+            idempotency_key=(
+                "m11-successor-activation-"
+                + _digest(
+                    {
+                        "clientIdempotencyKey": client_key,
+                        "activationDigest": activation["payloadDigest"],
+                    }
+                )[:40]
+            ),
+            created_at=now,
+            payload=activation,
+        )
+        selection_records = [item[1] for item in prepared]
+        first_selection = selection_records[0]
+        selection_records[0] = _record(
+            workspace_ref=workspace,
+            production_run_ref=run_ref,
+            record_kind=HUMAN_SELECTION,
+            record_ref=first_selection.recordRef,
+            record_version=first_selection.recordVersion,
+            idempotency_key=client_key,
+            created_at=first_selection.createdAt,
+            payload=first_selection.payload,
+        )
+        admission_records = [
+            _record(
+                workspace_ref=workspace,
+                production_run_ref=run_ref,
+                record_kind=ASSET_ADMISSION,
+                record_ref=item[3]["admissionRef"],
+                record_version=item[3]["version"],
+                idempotency_key=(
+                    "m11-successor-admission-"
+                    + _digest(
+                        {
+                            "clientIdempotencyKey": client_key,
+                            "admissionDigest": item[3]["payloadDigest"],
+                        }
+                    )[:40]
+                ),
+                created_at=now,
+                payload=item[3],
+            )
+            for item in prepared
+        ]
+        asset_records = [
+            _record(
+                workspace_ref=workspace,
+                production_run_ref=run_ref,
+                record_kind=ASSET_VERSION,
+                record_ref=item[4]["assetVersionRef"],
+                record_version=item[4]["version"],
+                idempotency_key=(
+                    "m11-successor-asset-"
+                    + _digest(
+                        {
+                            "clientIdempotencyKey": client_key,
+                            "assetVersionDigest": item[4]["payloadDigest"],
+                        }
+                    )[:40]
+                ),
+                created_at=now,
+                payload=item[4],
+            )
+            for item in prepared
+        ]
+        try:
+            _, replayed = self.evidence.append_records(
+                (
+                    *selection_records,
+                    *admission_records,
+                    *asset_records,
+                    activation_record,
+                ),
+                expected_record_journal_head=expected_record_journal_head,
+            )
+        except (IdempotencyConflictError, StaleInputError):
+            replay = self._video_successor_replay(
+                workspace, run_ref, client_key, selection_request_digest
+            )
+            if replay is None:
+                raise
+            return replay
+        return {
+            "realVideoAdmissionManifest": activation,
+            "assetAdmissions": final_admissions,
+            "assetVersions": final_assets,
+            "state": self.evidence.current_state(workspace, run_ref),
+            "idempotentReplay": replayed,
+            "publicationAllowed": False,
+        }
 
     @staticmethod
     def _bundle(gate: Mapping[str, Any]) -> dict[str, Any]:
@@ -3056,32 +5358,105 @@ class K2RealMediaRevisionService:
         )
         if video_plan is not None:
             video_bundle = self._video_bundle(video_plan)
+            current_video_requests, current_video_revision = (
+                self._current_video_request_set(
+                    workspace_ref, production_run_ref, video_bundle
+                )
+            )
             result.update(
                 {
                     "realVideoPlan": video_bundle["realVideoPlan"],
-                    "videoGenerationRequests": video_bundle[
-                        "generationRequests"
-                    ],
+                    "realVideoRevision": current_video_revision,
+                    "videoGenerationRequests": current_video_requests,
                     "state": video_bundle["state"],
                 }
             )
-        video_admission = self.evidence.get_gate(
-            workspace_ref,
-            production_run_ref,
-            REAL_VIDEO_ADMISSION_GATE,
+        active_video_admission = self._active_video_admission(
+            workspace_ref, production_run_ref
         )
-        if video_admission is not None:
-            admission_bundle = self._video_admission_bundle(video_admission)
+        if active_video_admission is not None:
+            active_manifest = active_video_admission["manifest"]
+            active_admissions = active_video_admission["admissions"]
+            active_assets = active_video_admission["assets"]
+            current_revision = result.get("realVideoRevision")
+            current_video_candidates = self._current_video_candidates_by_slot(
+                workspace_ref, production_run_ref
+            )
+            activation_is_current = (
+                active_video_admission.get("lineageCurrent") is True
+                and isinstance(current_revision, Mapping)
+                and active_manifest.get("realVideoRevisionRef")
+                == current_revision.get("realVideoRevisionRef")
+                and active_manifest.get("realVideoRevisionDigest")
+                == current_revision.get("payloadDigest")
+                and active_manifest.get("assetVersionRefs")
+                == [item.get("assetVersionRef") for item in active_assets]
+                and active_manifest.get("assetVersionDigests")
+                == [item.get("payloadDigest") for item in active_assets]
+                and len(current_video_candidates) == 4
+                and all(
+                    isinstance(
+                        current_video_candidates.get(
+                            item.get("creativeShotVersionRef")
+                        ),
+                        Mapping,
+                    )
+                    and item.get("sourceCandidateRef")
+                    == current_video_candidates[
+                        item["creativeShotVersionRef"]
+                    ].get("candidateRef")
+                    and item.get("sourceCandidateDigest")
+                    == current_video_candidates[
+                        item["creativeShotVersionRef"]
+                    ].get("payloadDigest")
+                    for item in active_assets
+                )
+            )
             result.update(
                 {
-                    "realVideoAdmissionManifest": admission_bundle[
-                        "realVideoAdmissionManifest"
-                    ],
-                    "videoAssetAdmissions": admission_bundle[
-                        "assetAdmissions"
-                    ],
-                    "videoAssetVersions": admission_bundle["assetVersions"],
-                    "state": admission_bundle["state"],
+                    "realVideoAdmissionManifest": (
+                        active_manifest if activation_is_current else None
+                    ),
+                    "videoAssetAdmissions": (
+                        active_admissions if activation_is_current else []
+                    ),
+                    "videoAssetVersions": (
+                        active_assets if activation_is_current else []
+                    ),
+                    "activeVideoAdmission": {
+                        "realVideoAdmissionManifest": active_manifest,
+                        "assetAdmissions": active_admissions,
+                        "assetVersions": active_assets,
+                    },
+                    "videoLineageState": {
+                        "state": (
+                            "CURRENT" if activation_is_current else "STALE_BLOCKED"
+                        ),
+                        "requestedRevisionRef": (
+                            current_revision.get("realVideoRevisionRef")
+                            if isinstance(current_revision, Mapping)
+                            else None
+                        ),
+                        "requestedRevisionDigest": (
+                            current_revision.get("payloadDigest")
+                            if isinstance(current_revision, Mapping)
+                            else None
+                        ),
+                        "activeRevisionRef": active_manifest.get(
+                            "realVideoRevisionRef",
+                            active_manifest.get("revisionRef"),
+                        ),
+                        "activeActivationManifestRef": active_video_admission[
+                            "manifestRef"
+                        ],
+                        "activeActivationManifestDigest": active_video_admission[
+                            "manifestDigest"
+                        ],
+                        "publicationAllowed": False,
+                    },
+                    "state": self.evidence.current_state(
+                        workspace_ref, production_run_ref
+                    ),
                 }
             )
         result["candidateLifecycle"] = self.candidate_review.get_projection(

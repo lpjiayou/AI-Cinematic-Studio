@@ -552,6 +552,7 @@ def _services(
         evidence_repository,
         real_media_revision.candidate_review,
         media.execution if hasattr(media.execution, "list_jobs") else None,
+        real_media_revision,
     )
     return (
         service,
