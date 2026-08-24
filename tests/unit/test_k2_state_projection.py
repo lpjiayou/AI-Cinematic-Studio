@@ -1,4 +1,5 @@
 import unittest
+from unittest.mock import patch
 
 from services.v5_core_os.episode_production.evidence import (
     EvidenceSnapshot,
@@ -384,6 +385,116 @@ class K2StateProjectionTests(unittest.TestCase):
         self.assertEqual(
             projection["candidateLifecycle"]["historicalCandidateCount"], 1
         )
+
+    def test_frozen_snapshot_projection_is_stable_after_image_successor_append(self):
+        candidate = self._register_candidate(
+            self.candidates,
+            self.evidence,
+            "real-video-plan-frozen-snapshot-v1",
+            "frozen-snapshot",
+        )
+        self._record_qc(
+            self.candidates,
+            candidate,
+            "frozen-snapshot",
+            "PASS",
+        )
+        snapshot = self.evidence.read_snapshot(WORKSPACE, RUN)
+        lifecycle_before = self.candidates.get_projection(
+            WORKSPACE,
+            RUN,
+            records=snapshot.records,
+            gates=snapshot.gates,
+        )
+        state_service = K2ProductionStateProjectionService(
+            self.root,
+            self.evidence,
+            self.candidates,
+        )
+        state_before = state_service.get_projection(
+            WORKSPACE,
+            RUN,
+            evidence_snapshot=snapshot,
+        )
+
+        source_v1 = self.evidence.get_record(
+            WORKSPACE,
+            RUN,
+            "source-asset-frozen-snapshot",
+            1,
+        )
+        self.assertIsNotNone(source_v1)
+        source_v2 = _record(
+            workspace_ref=WORKSPACE,
+            run_ref=RUN,
+            kind=ASSET_VERSION,
+            ref="source-asset-frozen-snapshot-v2",
+            version=2,
+            idempotency_key="source-asset-frozen-snapshot-v2",
+            created_at="2026-08-24T01:01:00Z",
+            payload={
+                "schemaVersion": "v5.k2-real-image-asset-version.v1",
+                "assetRef": "source-image-frozen-snapshot",
+                "assetVersionRef": "source-asset-frozen-snapshot-v2",
+                "version": 2,
+                "mediaKind": "image",
+                "creativeShotVersionRef": "shot-frozen-snapshot",
+                "supersedesAssetVersionRef": source_v1["recordRef"],
+                "supersedesAssetVersionDigest": source_v1["payloadDigest"],
+                "state": "REGISTERED",
+                "immutable": True,
+                "publicationAllowed": False,
+            },
+        )
+        self.evidence.append_record(source_v2)
+        self.assertNotEqual(
+            snapshot.revisionToken,
+            self.evidence.read_snapshot(WORKSPACE, RUN).revisionToken,
+        )
+
+        blocked_live_read = AssertionError(
+            "a frozen EvidenceSnapshot projection attempted a live V5 read"
+        )
+        with (
+            patch.object(
+                self.evidence,
+                "list_records",
+                side_effect=blocked_live_read,
+            ),
+            patch.object(
+                self.evidence,
+                "list_gates",
+                side_effect=blocked_live_read,
+            ),
+            patch.object(
+                self.evidence,
+                "get_record",
+                side_effect=blocked_live_read,
+            ),
+            patch.object(
+                self.evidence,
+                "get_gate",
+                side_effect=blocked_live_read,
+            ),
+            patch.object(
+                self.evidence,
+                "current_state",
+                side_effect=blocked_live_read,
+            ),
+        ):
+            lifecycle_after = self.candidates.get_projection(
+                WORKSPACE,
+                RUN,
+                records=snapshot.records,
+                gates=snapshot.gates,
+            )
+            state_after = state_service.get_projection(
+                WORKSPACE,
+                RUN,
+                evidence_snapshot=snapshot,
+            )
+        self.assertEqual(lifecycle_after, lifecycle_before)
+        self.assertEqual(state_after, state_before)
 
     def test_latest_candidate_journal_lineage_precedes_one_time_plan_fact(self):
         plan_revision = "real-video-plan-original-v1"

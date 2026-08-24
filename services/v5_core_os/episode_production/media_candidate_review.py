@@ -751,6 +751,7 @@ class K2MediaCandidateReviewService:
         candidate_ref: str,
         *,
         records: Sequence[Mapping[str, Any]] | None = None,
+        gates: Sequence[Mapping[str, Any]] | None = None,
     ) -> dict[str, Any] | None:
         """Return the journal-current candidate record for the requested ref.
 
@@ -798,7 +799,11 @@ class K2MediaCandidateReviewService:
         ):
             return None
         if not self._source_asset_versions_are_current(
-            workspace, run_ref, selected_payload
+            workspace,
+            run_ref,
+            selected_payload,
+            records=records,
+            gates=gates,
         ):
             return None
         return selected_record
@@ -808,6 +813,9 @@ class K2MediaCandidateReviewService:
         workspace: str,
         run_ref: str,
         candidate: Mapping[str, Any],
+        *,
+        records: Sequence[Mapping[str, Any]] | None = None,
+        gates: Sequence[Mapping[str, Any]] | None = None,
     ) -> bool:
         """Verify that a VIDEO candidate still uses the canonical image version.
 
@@ -824,7 +832,12 @@ class K2MediaCandidateReviewService:
         source_versions = candidate.get("sourceAssetVersions")
         if not isinstance(source_versions, list) or len(source_versions) != 1:
             return False
-        canonical = self.asset_versions.list_asset_versions(workspace, run_ref)
+        canonical = self.asset_versions.list_asset_versions(
+            workspace,
+            run_ref,
+            records=records,
+            gates=gates,
+        )
         if not canonical:
             return False
         source = source_versions[0]
@@ -871,9 +884,14 @@ class K2MediaCandidateReviewService:
         candidate_ref: str,
         *,
         records: Sequence[Mapping[str, Any]] | None = None,
+        gates: Sequence[Mapping[str, Any]] | None = None,
     ) -> tuple[dict[str, Any], dict[str, Any]] | None:
         current_candidate = self._current_candidate_record(
-            workspace, run_ref, candidate_ref, records=records
+            workspace,
+            run_ref,
+            candidate_ref,
+            records=records,
+            gates=gates,
         )
         if current_candidate is None:
             return None
@@ -1664,6 +1682,7 @@ class K2MediaCandidateReviewService:
                     production_run_ref,
                     candidate_ref,
                     records=record_values,
+                    gates=gate_values,
                 )
                 is not None
                 else "STALE"
@@ -1673,6 +1692,7 @@ class K2MediaCandidateReviewService:
                 production_run_ref,
                 candidate_ref,
                 records=record_values,
+                gates=gate_values,
             )
             if current_qc is None:
                 historical_qc = [
@@ -1687,6 +1707,7 @@ class K2MediaCandidateReviewService:
                     production_run_ref,
                     candidate_ref,
                     records=record_values,
+                    gates=gate_values,
                 ) is None:
                     item["visualQcState"] = "STALE"
                     item["latestHistoricalSemanticVisualQc"] = historical_qc[-1]
