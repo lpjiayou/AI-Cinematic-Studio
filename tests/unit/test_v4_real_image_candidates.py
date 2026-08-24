@@ -233,6 +233,24 @@ class PinnedRealImageCandidateEvidenceTests(unittest.TestCase):
                 self.requests,
             )
 
+    def test_rehashes_the_exact_receipt_bytes_on_every_resolution(self):
+        replacement = json.loads(self.receipt_path.read_text(encoding="utf-8"))
+        replacement["repositoryCommit"] = "b" * 40
+        self.receipt_path.write_text(
+            json.dumps(replacement, ensure_ascii=False, sort_keys=True),
+            encoding="utf-8",
+        )
+        with self.assertRaisesRegex(
+            RealImageCandidateEvidenceError,
+            "candidate evidence digest mismatch",
+        ):
+            self.adapter.resolve_candidates(
+                "workspace-test",
+                "production-run-test",
+                "real-image-plan-test",
+                self.requests,
+            )
+
     def test_environment_configuration_is_all_or_nothing(self):
         self.assertIsNone(real_image_candidate_evidence_from_environment({}))
         with self.assertRaises(RealImageCandidateEvidenceConfigurationError):
