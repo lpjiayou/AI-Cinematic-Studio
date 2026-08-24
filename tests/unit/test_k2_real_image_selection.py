@@ -1,8 +1,11 @@
 import json
+from concurrent.futures import ThreadPoolExecutor
 from hashlib import sha256
 from pathlib import Path
 import tempfile
+from threading import Barrier
 import unittest
+from unittest.mock import patch
 
 from services.v4_platform import (
     DeterministicLocalFfmpegAdapter,
@@ -13,10 +16,14 @@ from services.v4_platform import (
 from services.v5_core_os.episode_production import (
     EpisodeProductionPublicError,
     create_in_memory_boundary,
+    create_local_development_boundary,
 )
 from services.v5_core_os.episode_production.media_candidate_review import (
     RejectingMediaSelectionApprovalAuthority,
     VerifiedMediaSelection,
+)
+from services.v5_core_os.episode_production.foundation import (
+    RepositoryUnavailableError,
 )
 from tests.unit.test_episode_production_k2 import (
     WORKSPACE,
@@ -248,6 +255,162 @@ class K2RealImageSelectionTests(unittest.TestCase):
             ],
         }
 
+    def _prepare_successor_command(self, suffix):
+        baseline = self.boundary.select_real_images(self.selection_command())
+        self.candidate_evidence.generation = 2
+        successor_candidates = self.boundary.record_real_image_candidates(
+            {
+                "workspaceRef": WORKSPACE,
+                "productionRunRef": self.run["productionRunRef"],
+                "idempotencyKey": f"m10-successor-handoff-{suffix}",
+            }
+        )
+        validation = successor_candidates["technicalValidations"][0]
+        qc = self.revision.candidate_review.record_semantic_visual_qc(
+            {
+                "workspaceRef": WORKSPACE,
+                "productionRunRef": self.run["productionRunRef"],
+                "idempotencyKey": f"m10-successor-qc-{suffix}",
+                "technicalValidationRef": validation[
+                    "technicalValidationRef"
+                ],
+                "technicalValidationVersion": validation[
+                    "technicalValidationVersion"
+                ],
+                "technicalValidationDigest": validation["payloadDigest"],
+                "visualQcRef": f"m10-successor-qc-{suffix}",
+                "visualQcVersion": 1,
+                "reviewerRef": "reviewer-project-lead",
+                "reviewProfile": "k2-semantic-visual-qc-v1",
+                "evidence": [
+                    {
+                        "evidenceRef": f"m10-successor-frame-{suffix}",
+                        "evidenceDigest": "8" * 64,
+                    }
+                ],
+                "supersedesVisualQc": None,
+                "checks": {
+                    name: {"result": "PASS", "note": ""}
+                    for name in (
+                        "identity",
+                        "wardrobe",
+                        "location",
+                        "action",
+                        "prop",
+                        "motion",
+                    )
+                },
+                "result": "PASS",
+            }
+        )["semanticVisualQc"]
+        return baseline, {
+            "workspaceRef": WORKSPACE,
+            "productionRunRef": self.run["productionRunRef"],
+            "idempotencyKey": f"m10-successor-admission-{suffix}",
+            "selection": {
+                "visualQcRef": qc["visualQcRef"],
+                "visualQcVersion": qc["visualQcVersion"],
+                "visualQcDigest": qc["payloadDigest"],
+                "selectionRef": f"m10-successor-selection-{suffix}",
+                "selectionVersion": 1,
+                "approvalRef": f"m10-successor-approval-{suffix}",
+            },
+        }
+
+    def _assert_concurrent_exact_successor_replays_complete_batch(self, suffix):
+        _, command = self._prepare_successor_command(suffix)
+        evidence = self.revision.evidence
+        original_append_records = evidence.append_records
+        append_barrier = Barrier(2)
+
+        def interleaved_append(records, **kwargs):
+            if len(records) == 3:
+                append_barrier.wait(timeout=10)
+            return original_append_records(records, **kwargs)
+
+        evidence.append_records = interleaved_append
+        try:
+            with ThreadPoolExecutor(max_workers=2) as pool:
+                results = list(
+                    pool.map(
+                        lambda _: self.boundary.admit_real_image_successor(
+                            command
+                        ),
+                        range(2),
+                    )
+                )
+        finally:
+            evidence.append_records = original_append_records
+
+        self.assertEqual(
+            sorted(item["idempotentReplay"] for item in results),
+            [False, True],
+        )
+        self.assertEqual(results[0]["humanSelection"], results[1]["humanSelection"])
+        self.assertEqual(results[0]["assetAdmission"], results[1]["assetAdmission"])
+        self.assertEqual(results[0]["assetVersion"], results[1]["assetVersion"])
+        selection = results[0]["humanSelection"]
+        admission = results[0]["assetAdmission"]
+        asset = results[0]["assetVersion"]
+        selection_records = [
+            item
+            for item in evidence.list_records(
+                WORKSPACE,
+                self.run["productionRunRef"],
+                record_kind="HumanSelectionDecision",
+            )
+            if item["idempotencyKey"] == command["idempotencyKey"]
+        ]
+        admission_records = [
+            item
+            for item in evidence.list_records(
+                WORKSPACE,
+                self.run["productionRunRef"],
+                record_kind="AssetAdmission",
+            )
+            if item["payload"].get("selectionRef")
+            == selection["selectionRef"]
+            and item["payload"].get("selectionDigest")
+            == selection["payloadDigest"]
+        ]
+        asset_records = [
+            item
+            for item in evidence.list_records(
+                WORKSPACE,
+                self.run["productionRunRef"],
+                record_kind="AssetVersion",
+            )
+            if item["recordRef"] == admission["assetVersionRef"]
+            and item["payloadDigest"] == admission["assetVersionDigest"]
+        ]
+        self.assertEqual(
+            (len(selection_records), len(admission_records), len(asset_records)),
+            (1, 1, 1),
+        )
+        self.assertEqual(
+            {
+                field: asset_records[0]["payload"][field]
+                for field in (
+                    "assetVersionRef",
+                    "version",
+                    "sha256",
+                    "payloadDigest",
+                )
+            },
+            {
+                field: asset[field]
+                for field in (
+                    "assetVersionRef",
+                    "version",
+                    "sha256",
+                    "payloadDigest",
+                )
+            },
+        )
+
+    def test_concurrent_exact_successor_replays_one_complete_three_record_batch(self):
+        self._assert_concurrent_exact_successor_replays_complete_batch("memory")
+
     def test_records_exact_human_selections_and_four_immutable_assets(self):
         result = self.boundary.select_real_images(self.selection_command())
         self.assertEqual(result["state"], "REAL_IMAGE_READY")
@@ -323,6 +486,50 @@ class K2RealImageSelectionTests(unittest.TestCase):
         self.assertEqual(
             (conflict.exception.status, conflict.exception.code),
             (409, "idempotency_conflict"),
+        )
+
+    def test_candidate_handoff_rejects_incomplete_typed_batch_readback(self):
+        evidence = self.revision.evidence
+        original_append_records = evidence.append_records
+
+        def incomplete_readback(records, **kwargs):
+            stored, replayed = original_append_records(records, **kwargs)
+            if len(records) == 8:
+                return stored[:-1], replayed
+            return stored, replayed
+
+        evidence.append_records = incomplete_readback
+        try:
+            with self.assertRaises(RepositoryUnavailableError):
+                self.revision.record_real_image_candidates(
+                    {
+                        "workspaceRef": WORKSPACE,
+                        "productionRunRef": self.run["productionRunRef"],
+                        "idempotencyKey": "m10-image-candidate-handoff-tests",
+                    }
+                )
+        finally:
+            evidence.append_records = original_append_records
+
+    def test_image_admission_replay_rejects_incomplete_typed_bundle(self):
+        command = self.selection_command()
+        self.boundary.select_real_images(command)
+        original_bundle = self.revision._admission_bundle
+
+        def incomplete_bundle(gate, **kwargs):
+            bundle = original_bundle(gate, **kwargs)
+            bundle["assetAdmissions"] = bundle["assetAdmissions"][:-1]
+            return bundle
+
+        self.revision._admission_bundle = incomplete_bundle
+        try:
+            with self.assertRaises(EpisodeProductionPublicError) as caught:
+                self.boundary.select_real_images(command)
+        finally:
+            self.revision._admission_bundle = original_bundle
+        self.assertEqual(
+            (caught.exception.status, caught.exception.code),
+            (503, "episode_production_unavailable"),
         )
 
     def test_rejects_one_changed_candidate_digest_atomically(self):
@@ -559,6 +766,42 @@ class K2RealImageSelectionTests(unittest.TestCase):
             ),
             "REAL_IMAGE_PLAN_READY",
         )
+
+
+class K2RealImageSuccessorSqliteConcurrencyTests(unittest.TestCase):
+    def test_concurrent_exact_successor_replays_one_complete_three_record_batch(self):
+        with tempfile.TemporaryDirectory() as directory:
+            database_root = Path(directory)
+
+            def sqlite_boundary(**kwargs):
+                return create_local_development_boundary(
+                    database_root / "episode-production.sqlite3",
+                    evidence_database_path=(
+                        database_root / "episode-production-evidence.sqlite3"
+                    ),
+                    production_policy_database_path=(
+                        database_root / "production-policy.sqlite3"
+                    ),
+                    provider_experiment_database_path=(
+                        database_root / "provider-experiments.sqlite3"
+                    ),
+                    **kwargs,
+                )
+
+            fixture = K2RealImageSelectionTests(
+                "test_concurrent_exact_successor_replays_one_complete_three_record_batch"
+            )
+            with patch(
+                f"{__name__}.create_in_memory_boundary",
+                side_effect=sqlite_boundary,
+            ):
+                fixture.setUp()
+            try:
+                fixture._assert_concurrent_exact_successor_replays_complete_batch(
+                    "sqlite"
+                )
+            finally:
+                fixture.tearDown()
 
 
 if __name__ == "__main__":

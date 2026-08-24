@@ -1405,23 +1405,27 @@ class K2MediaCandidateReviewService:
         by_identity = self.evidence.get_record(
             workspace, run_ref, selection_ref, version
         )
-        existing = by_key or by_identity
-        if existing is not None:
-            if (
-                by_key is not None
-                and by_identity is not None
-                and (
-                    by_key.get("recordRef") != by_identity.get("recordRef")
-                    or by_key.get("recordVersion")
-                    != by_identity.get("recordVersion")
-                    or by_key.get("payloadDigest")
-                    != by_identity.get("payloadDigest")
-                )
+        if by_key is not None:
+            if by_identity is not None and (
+                by_key.get("recordRef") != by_identity.get("recordRef")
+                or by_key.get("recordVersion")
+                != by_identity.get("recordVersion")
+                or by_key.get("payloadDigest")
+                != by_identity.get("payloadDigest")
             ):
                 raise IdempotencyConflictError(
                     "human selection idempotency content changed"
                 )
-            return replay_existing(existing)
+            return replay_existing(by_key)
+        if by_identity is not None:
+            # The identity lookup covers the narrow race where the exact winner
+            # commits between the key lookup and this read.  A different key is
+            # never an alias for the already committed operation.
+            if by_identity.get("idempotencyKey") != key:
+                raise IdempotencyConflictError(
+                    "human selection record identity belongs to another operation"
+                )
+            return replay_existing(by_identity)
 
         qc, qc_payload = self._exact(
             workspace,
@@ -1656,7 +1660,10 @@ class K2MediaCandidateReviewService:
             item["applicabilityState"] = (
                 "CURRENT"
                 if self._current_candidate_record(
-                    workspace_ref, production_run_ref, candidate_ref
+                    workspace_ref,
+                    production_run_ref,
+                    candidate_ref,
+                    records=record_values,
                 )
                 is not None
                 else "STALE"
@@ -1670,13 +1677,16 @@ class K2MediaCandidateReviewService:
             if current_qc is None:
                 historical_qc = [
                     _payload(record)
-                    for record in records
+                    for record in record_values
                     if record.get("recordKind") == SEMANTIC_VISUAL_QC
                     and isinstance(record.get("payload"), Mapping)
                     and record["payload"].get("candidateRef") == candidate_ref
                 ]
                 if historical_qc and self._current_candidate_record(
-                    workspace_ref, production_run_ref, candidate_ref
+                    workspace_ref,
+                    production_run_ref,
+                    candidate_ref,
+                    records=record_values,
                 ) is None:
                     item["visualQcState"] = "STALE"
                     item["latestHistoricalSemanticVisualQc"] = historical_qc[-1]

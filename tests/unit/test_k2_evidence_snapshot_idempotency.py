@@ -153,7 +153,10 @@ class EvidenceSnapshotIdempotencyMixin:
             winner,
         )
 
-    def test_first_record_reserves_complete_batch_membership(self):
+    def test_exact_supplied_batch_replays_and_changed_member_conflicts(self):
+        # The repository guarantees atomicity and exact replay for the records
+        # supplied to this call.  Typed services, not this generic primitive,
+        # own and verify their closed-world operation membership.
         repository = self.repository()
         first_batch, replayed = repository.append_records(
             (record(), second_record())

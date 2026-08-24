@@ -271,6 +271,58 @@ def _record(
     )
 
 
+def _assert_typed_closed_world_batch(
+    stored: Sequence[Mapping[str, Any]],
+    expected: Sequence[EvidenceRecord],
+    *,
+    operation: str,
+    expected_kind_counts: Mapping[str, int],
+) -> None:
+    """Verify the complete typed batch supplied by one closed-world service.
+
+    The generic evidence repository atomically appends exactly the records it is
+    given; it does not persist a caller-defined batch manifest.  Typed V5 services
+    therefore own their fixed membership and must verify the complete canonical
+    readback before returning success or replay.
+    """
+
+    actual_signatures = [
+        (
+            item.get("recordKind"),
+            item.get("recordRef"),
+            item.get("recordVersion"),
+            item.get("idempotencyKey"),
+            item.get("requestDigest"),
+            item.get("payloadDigest"),
+        )
+        for item in stored
+    ]
+    expected_signatures = [
+        (
+            item.recordKind,
+            item.recordRef,
+            item.recordVersion,
+            item.idempotencyKey,
+            item.requestDigest,
+            item.payloadDigest,
+        )
+        for item in expected
+    ]
+    actual_kind_counts = {
+        kind: sum(item.get("recordKind") == kind for item in stored)
+        for kind in expected_kind_counts
+    }
+    if (
+        len(stored) != len(expected)
+        or actual_signatures != expected_signatures
+        or actual_kind_counts != dict(expected_kind_counts)
+        or sum(actual_kind_counts.values()) != len(stored)
+    ):
+        raise RepositoryUnavailableError(
+            f"{operation} canonical record batch is incomplete"
+        )
+
+
 def _fact(gate: Mapping[str, Any], kind: str) -> dict[str, Any]:
     matches = [
         item
@@ -998,6 +1050,12 @@ class K2RealMediaRevisionService:
             prepared,
             expected_record_journal_head=expected_record_journal_head,
         )
+        _assert_typed_closed_world_batch(
+            stored,
+            prepared,
+            operation="M10 candidate handoff",
+            expected_kind_counts={CANDIDATE: 4, TECHNICAL_VALIDATION: 4},
+        )
         lifecycle = self.candidate_review.get_projection(workspace, run_ref)
         projection_service = getattr(self, "state_projection", None)
         if projection_service is not None:
@@ -1124,7 +1182,13 @@ class K2RealMediaRevisionService:
                 raise IdempotencyConflictError(
                     "M10 image admission command conflicts"
                 )
-            return {**self._admission_bundle(existing), "idempotentReplay": True}
+            return {
+                **self._validated_image_admission_replay(
+                    existing,
+                    expected_selection_request_digest=selection_request_digest,
+                ),
+                "idempotentReplay": True,
+            }
         if self.evidence.current_state(workspace, run_ref) != "REAL_IMAGE_PLAN_READY":
             raise StaleInputError("M10 admission state changed")
         expected_record_journal_head = self.evidence.record_journal_head(
@@ -1456,11 +1520,28 @@ class K2RealMediaRevisionService:
             now,
             facts,
         )
+        admission_record_batch = (
+            *selections_records,
+            *admission_records,
+            *asset_records,
+        )
         try:
-            _, stored_gate, replayed = self.evidence.append_records_and_gate(
-                (*selections_records, *admission_records, *asset_records),
-                gate_append,
-                expected_record_journal_head=expected_record_journal_head,
+            stored_records, stored_gate, replayed = (
+                self.evidence.append_records_and_gate(
+                    admission_record_batch,
+                    gate_append,
+                    expected_record_journal_head=expected_record_journal_head,
+                )
+            )
+            _assert_typed_closed_world_batch(
+                stored_records,
+                admission_record_batch,
+                operation="M10 image admission",
+                expected_kind_counts={
+                    HUMAN_SELECTION: 4,
+                    ASSET_ADMISSION: 4,
+                    ASSET_VERSION: 4,
+                },
             )
         except IdempotencyConflictError:
             concurrent = self.evidence.get_gate(
@@ -1478,7 +1559,10 @@ class K2RealMediaRevisionService:
             stored_gate = concurrent
             replayed = True
         return {
-            **self._admission_bundle(stored_gate),
+            **self._validated_image_admission_replay(
+                stored_gate,
+                expected_selection_request_digest=selection_request_digest,
+            ),
             "idempotentReplay": replayed,
         }
 
@@ -1488,6 +1572,125 @@ class K2RealMediaRevisionService:
         """Compatibility name for the unified, authority-backed M10 admission."""
 
         return self.admit_real_images(command)
+
+    def _image_successor_replay_bundle(
+        self,
+        workspace: str,
+        run_ref: str,
+        expected_selection: EvidenceRecord,
+    ) -> dict[str, Any]:
+        """Read one complete canonical successor operation by its raw key."""
+
+        selection_record = self.evidence.get_record_by_idempotency_key(
+            workspace,
+            run_ref,
+            expected_selection.idempotencyKey,
+        )
+        if (
+            selection_record is None
+            or selection_record.get("recordKind") != HUMAN_SELECTION
+            or selection_record.get("recordRef") != expected_selection.recordRef
+            or selection_record.get("recordVersion")
+            != expected_selection.recordVersion
+            or selection_record.get("idempotencyKey")
+            != expected_selection.idempotencyKey
+            or selection_record.get("requestDigest")
+            != expected_selection.requestDigest
+            or selection_record.get("payloadDigest")
+            != expected_selection.payloadDigest
+            or not isinstance(selection_record.get("payload"), Mapping)
+        ):
+            raise IdempotencyConflictError(
+                "image successor operation content changed"
+            )
+        selection = deepcopy(dict(selection_record["payload"]))
+        matching_admissions = [
+            item
+            for item in self.evidence.list_records(
+                workspace, run_ref, record_kind=ASSET_ADMISSION
+            )
+            if isinstance(item.get("payload"), Mapping)
+            and item["payload"].get("selectionRef")
+            == selection_record["recordRef"]
+            and item["payload"].get("selectionVersion")
+            == selection_record["recordVersion"]
+            and item["payload"].get("selectionDigest")
+            == selection_record["payloadDigest"]
+        ]
+        if len(matching_admissions) != 1:
+            raise RepositoryUnavailableError(
+                "image successor replay admission batch is incomplete"
+            )
+        admission_record = matching_admissions[0]
+        admission = deepcopy(dict(admission_record["payload"]))
+        expected_admission_key = (
+            "m10-successor-admission-"
+            + _digest(
+                {
+                    "clientIdempotencyKey": expected_selection.idempotencyKey,
+                    "selectionDigest": expected_selection.payloadDigest,
+                }
+            )[:40]
+        )
+        asset_record = self.evidence.get_record(
+            workspace,
+            run_ref,
+            admission.get("assetVersionRef"),
+            admission.get("assetVersionVersion"),
+        )
+        expected_asset_key = (
+            "m10-successor-asset-"
+            + _digest(
+                {
+                    "clientIdempotencyKey": expected_selection.idempotencyKey,
+                    "selectionDigest": expected_selection.payloadDigest,
+                }
+            )[:40]
+        )
+        if (
+            admission_record.get("idempotencyKey") != expected_admission_key
+            or admission_record.get("recordKind") != ASSET_ADMISSION
+            or admission_record.get("payloadDigest")
+            != admission.get("payloadDigest")
+            or asset_record is None
+            or asset_record.get("idempotencyKey") != expected_asset_key
+            or asset_record.get("recordKind") != ASSET_VERSION
+            or asset_record.get("payloadDigest")
+            != admission.get("assetVersionDigest")
+            or not isinstance(asset_record.get("payload"), Mapping)
+        ):
+            raise RepositoryUnavailableError(
+                "image successor replay AssetVersion batch is incomplete"
+            )
+        asset = deepcopy(dict(asset_record["payload"]))
+        if (
+            admission.get("candidateRef") != selection.get("candidateRef")
+            or admission.get("candidateDigest")
+            != selection.get("candidateDigest")
+            or admission.get("assetVersionRef") != asset.get("assetVersionRef")
+            or admission.get("assetVersionVersion") != asset.get("version")
+            or admission.get("assetVersionDigest") != asset.get("payloadDigest")
+            or asset.get("humanSelectionRef")
+            != selection_record.get("recordRef")
+            or asset.get("humanSelectionVersion")
+            != selection_record.get("recordVersion")
+            or asset.get("humanSelectionDigest")
+            != selection_record.get("payloadDigest")
+            or asset.get("sourceCandidateRef") != selection.get("candidateRef")
+            or asset.get("sourceCandidateDigest")
+            != selection.get("candidateDigest")
+        ):
+            raise RepositoryUnavailableError(
+                "image successor replay canonical lineage is inconsistent"
+            )
+        return {
+            "state": self.evidence.current_state(workspace, run_ref),
+            "humanSelection": selection,
+            "assetAdmission": admission,
+            "assetVersion": asset,
+            "idempotentReplay": True,
+            "publicationAllowed": False,
+        }
 
     def admit_real_image_successor(
         self, command: Mapping[str, Any]
@@ -1568,59 +1771,17 @@ class K2RealMediaRevisionService:
             selection_command
         )
         selection = deepcopy(dict(record.payload))
-        existing_selection = self.evidence.get_record(
+        existing_operation = self.evidence.get_record_by_idempotency_key(
             workspace,
             run_ref,
-            record.recordRef,
-            record.recordVersion,
+            client_key,
         )
-        if existing_selection is not None:
-            if (
-                existing_selection.get("recordKind") != HUMAN_SELECTION
-                or existing_selection.get("payloadDigest") != record.payloadDigest
-            ):
-                raise IdempotencyConflictError(
-                    "image successor selection content changed"
-                )
-            admissions = [
-                item
-                for item in self.evidence.list_records(
-                    workspace, run_ref, record_kind=ASSET_ADMISSION
-                )
-                if isinstance(item.get("payload"), Mapping)
-                and item["payload"].get("selectionRef") == record.recordRef
-                and item["payload"].get("selectionDigest")
-                == record.payloadDigest
-            ]
-            if len(admissions) != 1:
-                raise RepositoryUnavailableError(
-                    "image successor replay is incomplete"
-                )
-            admission = deepcopy(dict(admissions[0]["payload"]))
-            asset_record = self.evidence.get_record(
+        if existing_operation is not None:
+            return self._image_successor_replay_bundle(
                 workspace,
                 run_ref,
-                admission.get("assetVersionRef"),
-                admission.get("assetVersionVersion"),
+                record,
             )
-            if (
-                asset_record is None
-                or asset_record.get("recordKind") != ASSET_VERSION
-                or asset_record.get("payloadDigest")
-                != admission.get("assetVersionDigest")
-                or not isinstance(asset_record.get("payload"), Mapping)
-            ):
-                raise RepositoryUnavailableError(
-                    "image successor replay AssetVersion is incomplete"
-                )
-            return {
-                "state": self.evidence.current_state(workspace, run_ref),
-                "humanSelection": deepcopy(dict(existing_selection["payload"])),
-                "assetAdmission": admission,
-                "assetVersion": deepcopy(dict(asset_record["payload"])),
-                "idempotentReplay": True,
-                "publicationAllowed": False,
-            }
         candidate_record = self.evidence.get_record(
             workspace,
             run_ref,
@@ -1812,10 +1973,37 @@ class K2RealMediaRevisionService:
             created_at=now,
             payload=asset,
         )
-        _, replayed = self.evidence.append_records(
-            (record, admission_record, asset_record),
-            expected_record_journal_head=expected_record_journal_head,
-        )
+        successor_record_batch = (record, admission_record, asset_record)
+        try:
+            stored, replayed = self.evidence.append_records(
+                successor_record_batch,
+                expected_record_journal_head=expected_record_journal_head,
+            )
+            _assert_typed_closed_world_batch(
+                stored,
+                successor_record_batch,
+                operation="M10 image successor admission",
+                expected_kind_counts={
+                    HUMAN_SELECTION: 1,
+                    ASSET_ADMISSION: 1,
+                    ASSET_VERSION: 1,
+                },
+            )
+        except IdempotencyConflictError:
+            # Exact concurrent retries may create different ephemeral admission
+            # and AssetVersion refs before either observes the winner.  Only a
+            # complete, exact three-record operation under the raw key is replay.
+            return self._image_successor_replay_bundle(
+                workspace,
+                run_ref,
+                record,
+            )
+        if replayed:
+            return self._image_successor_replay_bundle(
+                workspace,
+                run_ref,
+                record,
+            )
         return {
             "state": self.evidence.current_state(workspace, run_ref),
             "humanSelection": selection,
@@ -4063,7 +4251,7 @@ class K2RealMediaRevisionService:
             ):
                 slot_ref = payload.get("slotRef")
                 if isinstance(slot_ref, str):
-                    existing_video_candidates[slot_ref] = deepcopy(dict(payload))
+                    existing_video_candidates[slot_ref] = deepcopy(dict(record))
         expected_record_journal_head = self.evidence.record_journal_head(
             workspace, run_ref
         )
@@ -4081,7 +4269,26 @@ class K2RealMediaRevisionService:
             source_candidate_ref = _required_ref(
                 item.get("candidateRef"), "candidateRef"
             )
-            existing = existing_video_candidates.get(item.get("slotRef"))
+            candidate_key = _digest(
+                {
+                    "clientIdempotencyKey": client_key,
+                    "stage": "m11-candidate",
+                    "generationRequestRef": request["generationRequestRef"],
+                    "generationRequestDigest": request["payloadDigest"],
+                    "ordinal": request["ordinal"],
+                }
+            )[:48]
+            existing_record = existing_video_candidates.get(item.get("slotRef"))
+            existing = (
+                existing_record.get("payload")
+                if isinstance(existing_record, Mapping)
+                else None
+            )
+            replay_record = bool(
+                isinstance(existing_record, Mapping)
+                and existing_record.get("idempotencyKey")
+                in {client_key, f"m11-candidate-{candidate_key}"}
+            )
             if (
                 isinstance(existing, Mapping)
                 and existing.get("sourceRequestRef")
@@ -4105,20 +4312,14 @@ class K2RealMediaRevisionService:
                         ],
                     }
                 ]
+                and not replay_record
             ):
                 reused_candidates.append(deepcopy(dict(existing)))
                 continue
-            candidate_key = _digest(
-                {
-                    "clientIdempotencyKey": client_key,
-                    "stage": "m11-candidate",
-                    "generationRequestRef": request["generationRequestRef"],
-                    "generationRequestDigest": request["payloadDigest"],
-                    "ordinal": request["ordinal"],
-                }
-            )[:48]
             candidate_ref = source_candidate_ref
-            if existing_video_candidates or current_revision.get("isSuccessor"):
+            if replay_record and isinstance(existing, Mapping):
+                candidate_ref = str(existing.get("candidateRef"))
+            elif existing_video_candidates or current_revision.get("isSuccessor"):
                 candidate_ref = (
                     "m11-video-candidate-"
                     + _digest(
@@ -4139,9 +4340,14 @@ class K2RealMediaRevisionService:
                     "workspaceRef": workspace,
                     "productionRunRef": run_ref,
                     "idempotencyKey": (
-                        client_key
-                        if not prepared_records
-                        else f"m11-candidate-{candidate_key}"
+                        str(existing_record.get("idempotencyKey"))
+                        if replay_record
+                        and isinstance(existing_record, Mapping)
+                        else (
+                            client_key
+                            if not prepared_records
+                            else f"m11-candidate-{candidate_key}"
+                        )
                     ),
                     "candidateRef": candidate_ref,
                     "candidateVersion": item.get("candidateVersion", 1),
@@ -4217,6 +4423,16 @@ class K2RealMediaRevisionService:
             stored, replayed = self.evidence.append_records(
                 prepared_records,
                 expected_record_journal_head=expected_record_journal_head,
+            )
+            changed_count = len(prepared_records) // 2
+            _assert_typed_closed_world_batch(
+                stored,
+                prepared_records,
+                operation="M11 candidate handoff",
+                expected_kind_counts={
+                    CANDIDATE: changed_count,
+                    TECHNICAL_VALIDATION: changed_count,
+                },
             )
         else:
             stored = []
@@ -4352,16 +4568,10 @@ class K2RealMediaRevisionService:
         )
         production_state = self.evidence.current_state(workspace, run_ref)
         if existing is not None and existing.get("idempotencyKey") == gate_key:
-            replay_bundle = self._video_admission_bundle(existing)
-            if (
-                replay_bundle["realVideoAdmissionManifest"].get(
-                    "selectionRequestDigest"
-                )
-                != selection_request_digest
-            ):
-                raise IdempotencyConflictError(
-                    "M11 admission selection content changed"
-                )
+            replay_bundle = self._validated_video_admission_replay(
+                existing,
+                expected_selection_request_digest=selection_request_digest,
+            )
             return {**replay_bundle, "idempotentReplay": True}
         if production_state == "REAL_VIDEO_READY":
             return self._admit_real_video_successor(
@@ -4791,11 +5001,28 @@ class K2RealMediaRevisionService:
             now,
             facts,
         )
+        admission_record_batch = (
+            *selection_records,
+            *admission_records,
+            *asset_records,
+        )
         try:
-            _, gate, replayed = self.evidence.append_records_and_gate(
-                (*selection_records, *admission_records, *asset_records),
-                gate_append,
-                expected_record_journal_head=expected_record_journal_head,
+            stored_records, gate, replayed = (
+                self.evidence.append_records_and_gate(
+                    admission_record_batch,
+                    gate_append,
+                    expected_record_journal_head=expected_record_journal_head,
+                )
+            )
+            _assert_typed_closed_world_batch(
+                stored_records,
+                admission_record_batch,
+                operation="M11 video admission",
+                expected_kind_counts={
+                    HUMAN_SELECTION: 4,
+                    ASSET_ADMISSION: 4,
+                    ASSET_VERSION: 4,
+                },
             )
         except IdempotencyConflictError:
             # A concurrent exact retry may win after the pre-read but before
@@ -4815,7 +5042,13 @@ class K2RealMediaRevisionService:
                 raise
             gate = concurrent
             replayed = True
-        return {**self._video_admission_bundle(gate), "idempotentReplay": replayed}
+        return {
+            **self._validated_video_admission_replay(
+                gate,
+                expected_selection_request_digest=selection_request_digest,
+            ),
+            "idempotentReplay": replayed,
+        }
 
     def _video_successor_replay(
         self,
@@ -5539,6 +5772,104 @@ class K2RealMediaRevisionService:
             "state": gate["toState"],
         }
 
+    def _validated_image_admission_replay(
+        self,
+        gate: Mapping[str, Any],
+        *,
+        expected_selection_request_digest: str,
+    ) -> dict[str, Any]:
+        bundle = self._admission_bundle(gate)
+        manifest = bundle["realImageAdmissionManifest"]
+        if (
+            manifest.get("selectionRequestDigest")
+            != expected_selection_request_digest
+        ):
+            raise IdempotencyConflictError(
+                "M10 image admission selection content changed"
+            )
+        candidates = bundle.get("candidates")
+        selections = bundle.get("selectionDecisions")
+        admissions = bundle.get("assetAdmissions")
+        assets = bundle.get("assetVersions")
+        if not all(
+            isinstance(items, list) and len(items) == 4
+            for items in (candidates, selections, admissions, assets)
+        ):
+            raise RepositoryUnavailableError(
+                "M10 image admission canonical batch is incomplete"
+            )
+        candidate_index = {
+            item.get("candidateRef"): item
+            for item in candidates
+            if isinstance(item, Mapping)
+        }
+        selection_index = {
+            item.get("selectionRef"): item
+            for item in selections
+            if isinstance(item, Mapping)
+        }
+        asset_index = {
+            item.get("assetVersionRef"): item
+            for item in assets
+            if isinstance(item, Mapping)
+        }
+        if (
+            len(candidate_index) != 4
+            or len(selection_index) != 4
+            or len(asset_index) != 4
+            or manifest.get("selectionRefs")
+            != [item.get("selectionRef") for item in selections]
+            or manifest.get("selectionVersions")
+            != [item.get("selectionVersion") for item in selections]
+            or manifest.get("selectionDigests")
+            != [item.get("payloadDigest") for item in selections]
+            or manifest.get("assetVersionRefs")
+            != [item.get("assetVersionRef") for item in assets]
+            or manifest.get("assetVersionDigests")
+            != [item.get("payloadDigest") for item in assets]
+            or manifest.get("admittedCount") != 4
+        ):
+            raise RepositoryUnavailableError(
+                "M10 image admission canonical batch digest is inconsistent"
+            )
+        for selection in selections:
+            candidate = candidate_index.get(selection.get("candidateRef"))
+            if (
+                not isinstance(candidate, Mapping)
+                or selection.get("candidateDigest")
+                != candidate.get("payloadDigest")
+            ):
+                raise RepositoryUnavailableError(
+                    "M10 image admission selection lineage is inconsistent"
+                )
+        for admission in admissions:
+            selection = selection_index.get(admission.get("selectionRef"))
+            asset = asset_index.get(admission.get("assetVersionRef"))
+            if (
+                not isinstance(selection, Mapping)
+                or not isinstance(asset, Mapping)
+                or admission.get("selectionVersion")
+                != selection.get("selectionVersion")
+                or admission.get("selectionDigest")
+                != selection.get("payloadDigest")
+                or admission.get("candidateRef")
+                != selection.get("candidateRef")
+                or admission.get("candidateDigest")
+                != selection.get("candidateDigest")
+                or admission.get("assetVersionDigest")
+                != asset.get("payloadDigest")
+                or asset.get("humanSelectionRef")
+                != selection.get("selectionRef")
+                or asset.get("humanSelectionVersion")
+                != selection.get("selectionVersion")
+                or asset.get("humanSelectionDigest")
+                != selection.get("payloadDigest")
+            ):
+                raise RepositoryUnavailableError(
+                    "M10 image admission record lineage is inconsistent"
+                )
+        return bundle
+
     @staticmethod
     def _video_bundle(gate: Mapping[str, Any]) -> dict[str, Any]:
         return {
@@ -5559,6 +5890,83 @@ class K2RealMediaRevisionService:
             "assetVersions": _facts(gate, "AssetVersion:M11:"),
             "state": gate["toState"],
         }
+
+    def _validated_video_admission_replay(
+        self,
+        gate: Mapping[str, Any],
+        *,
+        expected_selection_request_digest: str,
+    ) -> dict[str, Any]:
+        bundle = self._video_admission_bundle(gate)
+        manifest = bundle["realVideoAdmissionManifest"]
+        if (
+            manifest.get("selectionRequestDigest")
+            != expected_selection_request_digest
+        ):
+            raise IdempotencyConflictError(
+                "M11 admission selection content changed"
+            )
+        admissions = bundle.get("assetAdmissions")
+        assets = bundle.get("assetVersions")
+        selection_refs = manifest.get("selectionRefs")
+        selection_digests = manifest.get("selectionDigests")
+        asset_refs = manifest.get("assetVersionRefs")
+        asset_digests = manifest.get("assetVersionDigests")
+        if (
+            not isinstance(admissions, list)
+            or len(admissions) != 4
+            or not isinstance(assets, list)
+            or len(assets) != 4
+            or not isinstance(selection_refs, list)
+            or len(selection_refs) != 4
+            or len(set(selection_refs)) != 4
+            or not isinstance(selection_digests, list)
+            or len(selection_digests) != 4
+            or not isinstance(asset_refs, list)
+            or len(asset_refs) != 4
+            or len(set(asset_refs)) != 4
+            or not isinstance(asset_digests, list)
+            or len(asset_digests) != 4
+            or manifest.get("admittedCount") != 4
+            or asset_refs != [item.get("assetVersionRef") for item in assets]
+            or asset_digests != [item.get("payloadDigest") for item in assets]
+        ):
+            raise RepositoryUnavailableError(
+                "M11 admission canonical batch is incomplete"
+            )
+        selection_index = dict(zip(selection_refs, selection_digests))
+        asset_index = {
+            item.get("assetVersionRef"): item
+            for item in assets
+            if isinstance(item, Mapping)
+        }
+        if len(asset_index) != 4:
+            raise RepositoryUnavailableError(
+                "M11 admission canonical AssetVersion batch is ambiguous"
+            )
+        for admission in admissions:
+            asset = asset_index.get(admission.get("assetVersionRef"))
+            if (
+                not isinstance(asset, Mapping)
+                or selection_index.get(admission.get("selectionRef"))
+                != admission.get("selectionDigest")
+                or admission.get("assetVersionDigest")
+                != asset.get("payloadDigest")
+                or asset.get("humanSelectionRef")
+                != admission.get("selectionRef")
+                or asset.get("humanSelectionVersion")
+                != admission.get("selectionVersion")
+                or asset.get("humanSelectionDigest")
+                != admission.get("selectionDigest")
+                or asset.get("sourceCandidateRef")
+                != admission.get("candidateRef")
+                or asset.get("sourceCandidateDigest")
+                != admission.get("candidateDigest")
+            ):
+                raise RepositoryUnavailableError(
+                    "M11 admission canonical record lineage is inconsistent"
+                )
+        return bundle
 
     def get_revision_bundle(
         self,

@@ -1161,6 +1161,53 @@ class K2RealVideoSelectionTests(unittest.TestCase):
         with self.assertRaises(IdempotencyConflictError):
             self.record_candidates()
 
+    def test_candidate_handoff_rejects_incomplete_typed_batch_readback(self):
+        self.record_candidates()
+        evidence = self.revision.evidence
+        original_append_records = evidence.append_records
+
+        def incomplete_readback(records, **kwargs):
+            stored, replayed = original_append_records(records, **kwargs)
+            if len(records) == 8:
+                return stored[:-1], replayed
+            return stored, replayed
+
+        evidence.append_records = incomplete_readback
+        try:
+            with self.assertRaises(RepositoryUnavailableError):
+                self.record_candidates()
+        finally:
+            evidence.append_records = original_append_records
+
+    def test_video_admission_replay_rejects_incomplete_typed_bundle(self):
+        recorded = self.record_candidates()
+        selections = [
+            self.selection_request(self.visual_qc(validation, ordinal), ordinal)
+            for ordinal, validation in enumerate(
+                recorded["technicalValidations"], start=1
+            )
+        ]
+        command = {
+            "workspaceRef": WORKSPACE,
+            "productionRunRef": self.run["productionRunRef"],
+            "idempotencyKey": "m11-incomplete-replay-audit",
+            "selections": selections,
+        }
+        self.revision.admit_real_videos(command)
+        original_bundle = self.revision._video_admission_bundle
+
+        def incomplete_bundle(gate):
+            bundle = original_bundle(gate)
+            bundle["assetAdmissions"] = bundle["assetAdmissions"][:-1]
+            return bundle
+
+        self.revision._video_admission_bundle = incomplete_bundle
+        try:
+            with self.assertRaises(RepositoryUnavailableError):
+                self.revision.admit_real_videos(command)
+        finally:
+            self.revision._video_admission_bundle = original_bundle
+
     def test_semantic_qc_fail_cannot_select_or_advance_production(self):
         recorded = self.record_candidates()
         qc = self.visual_qc(recorded["technicalValidations"][0], 1, result="FAIL")

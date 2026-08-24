@@ -624,6 +624,37 @@ class CandidateReviewMixin:
         with self.assertRaises(IdempotencyConflictError):
             service.record_human_selection(duplicate_authority)
 
+    def test_selection_identity_cannot_alias_a_different_operation_key(self):
+        service, evidence = self.service()
+        candidate = self.record_candidate(service)
+        validation = self.record_validation(service, candidate)
+        qc = self.record_qc(service, validation)
+        command = self.selection_command(
+            qc, decision="REJECTED", suffix="identity-key"
+        )
+        first = service.record_human_selection(command)
+
+        alias = dict(command)
+        alias["idempotencyKey"] = "selection-different-operation-key"
+        with self.assertRaises(IdempotencyConflictError):
+            service.record_human_selection(alias)
+
+        self.assertIsNone(
+            evidence.get_record_by_idempotency_key(
+                WORKSPACE,
+                RUN,
+                alias["idempotencyKey"],
+            )
+        )
+        self.assertEqual(
+            evidence.get_record_by_idempotency_key(
+                WORKSPACE,
+                RUN,
+                command["idempotencyKey"],
+            )["payload"],
+            first["humanSelection"],
+        )
+
 
 class InMemoryCandidateReviewTests(CandidateReviewMixin, unittest.TestCase):
     def evidence(self):
