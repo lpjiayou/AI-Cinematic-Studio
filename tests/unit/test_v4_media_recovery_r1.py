@@ -553,6 +553,246 @@ class V4SqliteSchemaR1Tests(unittest.TestCase):
                 SqliteMediaJobAdapter(path, initialize_if_missing=False)
 
 
+class V4DurablePublicationR1Tests(unittest.TestCase):
+    def test_durable_replace_publishes_one_exact_final_file(self):
+        with tempfile.TemporaryDirectory() as directory:
+            store = ArtifactRecoveryStore(Path(directory) / "artifacts")
+            run_root = store.run_root(RECOVERY_WORKSPACE, RUN)
+            publication_parent = run_root / "jobs" / "request" / "job"
+            publication_parent.mkdir(parents=True)
+            source = publication_parent / "candidate.part.mp4"
+            destination = publication_parent / "final.mp4"
+            payload = b"durable publication payload"
+            source.write_bytes(payload)
+            source_inode = source.stat().st_ino
+
+            self.assertEqual(
+                store.durable_replace(source, destination),
+                destination,
+            )
+
+            self.assertFalse(source.exists())
+            self.assertEqual(destination.read_bytes(), payload)
+            self.assertEqual(destination.stat().st_ino, source_inode)
+            self.assertEqual(destination.stat().st_nlink, 1)
+
+    def test_parent_rename_with_inode_alias_is_rejected_by_link_count(self):
+        with tempfile.TemporaryDirectory() as directory:
+            store = ArtifactRecoveryStore(Path(directory) / "artifacts")
+            run_root = store.run_root(RECOVERY_WORKSPACE, RUN)
+            publication_parent = run_root / "jobs" / "request" / "job"
+            publication_parent.mkdir(parents=True)
+            source = publication_parent / "candidate.part.mp4"
+            destination = publication_parent / "final.mp4"
+            payload = b"one exact durable publication candidate"
+            source.write_bytes(payload)
+
+            jobs_parent = run_root / "jobs"
+            moved_jobs = Path(directory) / "moved-jobs"
+            replacement_jobs = Path(directory) / "replacement-jobs"
+            replacement_parent = replacement_jobs / "request" / "job"
+            replacement_parent.mkdir(parents=True)
+            original_link = os.link
+            renamed = False
+
+            def rename_parent_before_link(source_path, destination_path, **kwargs):
+                nonlocal renamed
+                if not renamed:
+                    renamed = True
+                    os.rename(jobs_parent, moved_jobs)
+                    original_source = moved_jobs / "request" / "job" / source.name
+                    original_link(original_source, replacement_parent / source.name)
+                    os.symlink(replacement_jobs, jobs_parent)
+                return original_link(source_path, destination_path, **kwargs)
+
+            with mock.patch(
+                "services.v4_platform.artifact_recovery.os.link",
+                side_effect=rename_parent_before_link,
+            ):
+                with self.assertRaisesRegex(
+                    ArtifactRecoveryStoreError,
+                    "artifact changed during no-clobber publication",
+                ):
+                    store.durable_replace(source, destination)
+
+            moved_source = moved_jobs / "request" / "job" / source.name
+            aliased_source = replacement_parent / source.name
+            self.assertEqual(moved_source.read_bytes(), payload)
+            self.assertEqual(
+                moved_source.stat().st_ino,
+                aliased_source.stat().st_ino,
+            )
+            self.assertEqual(moved_source.stat().st_nlink, 2)
+            self.assertEqual(aliased_source.stat().st_nlink, 2)
+            self.assertFalse((replacement_parent / destination.name).exists())
+
+    def test_parent_rename_immediately_after_link_restores_single_candidate(self):
+        with tempfile.TemporaryDirectory() as directory:
+            store = ArtifactRecoveryStore(Path(directory) / "artifacts")
+            run_root = store.run_root(RECOVERY_WORKSPACE, RUN)
+            publication_parent = run_root / "jobs" / "request" / "job"
+            publication_parent.mkdir(parents=True)
+            source = publication_parent / "candidate.part.mp4"
+            destination = publication_parent / "final.mp4"
+            payload = b"restore candidate after linked parent rename"
+            source.write_bytes(payload)
+
+            jobs_parent = run_root / "jobs"
+            moved_jobs = Path(directory) / "moved-jobs"
+            replacement_jobs = Path(directory) / "replacement-jobs"
+            (replacement_jobs / "request" / "job").mkdir(parents=True)
+            original_link = os.link
+            renamed = False
+
+            def rename_parent_after_link(source_path, destination_path, **kwargs):
+                nonlocal renamed
+                result = original_link(source_path, destination_path, **kwargs)
+                if not renamed:
+                    renamed = True
+                    os.rename(jobs_parent, moved_jobs)
+                    os.symlink(replacement_jobs, jobs_parent)
+                return result
+
+            with mock.patch(
+                "services.v4_platform.artifact_recovery.os.link",
+                side_effect=rename_parent_after_link,
+            ):
+                with self.assertRaises(ArtifactRecoveryStoreError):
+                    store.durable_replace(source, destination)
+
+            moved_parent = moved_jobs / "request" / "job"
+            restored_source = moved_parent / source.name
+            self.assertEqual(restored_source.read_bytes(), payload)
+            self.assertEqual(restored_source.stat().st_nlink, 1)
+            self.assertFalse((moved_parent / destination.name).exists())
+            self.assertEqual(
+                list((replacement_jobs / "request" / "job").iterdir()),
+                [],
+            )
+
+    def test_parent_rename_after_source_unlink_restores_single_candidate(self):
+        with tempfile.TemporaryDirectory() as directory:
+            store = ArtifactRecoveryStore(Path(directory) / "artifacts")
+            run_root = store.run_root(RECOVERY_WORKSPACE, RUN)
+            publication_parent = run_root / "jobs" / "request" / "job"
+            publication_parent.mkdir(parents=True)
+            source = publication_parent / "candidate.part.mp4"
+            destination = publication_parent / "final.mp4"
+            payload = b"restore candidate after parent rename"
+            source.write_bytes(payload)
+
+            jobs_parent = run_root / "jobs"
+            moved_jobs = Path(directory) / "moved-jobs"
+            replacement_jobs = Path(directory) / "replacement-jobs"
+            (replacement_jobs / "request" / "job").mkdir(parents=True)
+            original_binding_check = store._assert_directory_binding
+            parent_binding_checks = 0
+
+            def rename_after_unlink(root_fd, parts, expected_fd):
+                nonlocal parent_binding_checks
+                result = original_binding_check(root_fd, parts, expected_fd)
+                if tuple(parts)[-3:] == ("jobs", "request", "job"):
+                    parent_binding_checks += 1
+                    if parent_binding_checks == 7:
+                        os.rename(jobs_parent, moved_jobs)
+                        os.symlink(replacement_jobs, jobs_parent)
+                return result
+
+            with mock.patch.object(
+                store,
+                "_assert_directory_binding",
+                side_effect=rename_after_unlink,
+            ):
+                with self.assertRaises(ArtifactRecoveryStoreError):
+                    store.durable_replace(source, destination)
+
+            moved_parent = moved_jobs / "request" / "job"
+            restored_source = moved_parent / source.name
+            self.assertEqual(restored_source.read_bytes(), payload)
+            self.assertEqual(restored_source.stat().st_nlink, 1)
+            self.assertFalse((moved_parent / destination.name).exists())
+            self.assertEqual(
+                list((replacement_jobs / "request" / "job").iterdir()),
+                [],
+            )
+
+    def test_complete_linked_publication_converges_to_one_final_file(self):
+        with tempfile.TemporaryDirectory() as directory:
+            store = ArtifactRecoveryStore(Path(directory) / "artifacts")
+            run_root = store.run_root(RECOVERY_WORKSPACE, RUN)
+            publication_parent = run_root / "jobs" / "request" / "job"
+            publication_parent.mkdir(parents=True)
+            candidate = publication_parent / "candidate.part.mp4"
+            final = publication_parent / "final.mp4"
+            payload = b"interrupted publication payload"
+            candidate.write_bytes(payload)
+            os.link(candidate, final)
+            candidate_inode = candidate.stat().st_ino
+
+            self.assertEqual(
+                store.complete_linked_publication(candidate, final),
+                final,
+            )
+
+            self.assertFalse(candidate.exists())
+            self.assertEqual(final.read_bytes(), payload)
+            self.assertEqual(final.stat().st_ino, candidate_inode)
+            self.assertEqual(final.stat().st_nlink, 1)
+
+    def test_complete_linked_publication_parent_rename_restores_two_links(self):
+        with tempfile.TemporaryDirectory() as directory:
+            store = ArtifactRecoveryStore(Path(directory) / "artifacts")
+            run_root = store.run_root(RECOVERY_WORKSPACE, RUN)
+            publication_parent = run_root / "jobs" / "request" / "job"
+            publication_parent.mkdir(parents=True)
+            candidate = publication_parent / "candidate.part.mp4"
+            final = publication_parent / "final.mp4"
+            payload = b"restore interrupted publication after parent rename"
+            candidate.write_bytes(payload)
+            os.link(candidate, final)
+
+            jobs_parent = run_root / "jobs"
+            moved_jobs = Path(directory) / "moved-jobs"
+            replacement_jobs = Path(directory) / "replacement-jobs"
+            (replacement_jobs / "request" / "job").mkdir(parents=True)
+            original_binding_check = store._assert_directory_binding
+            parent_binding_checks = 0
+
+            def rename_after_candidate_unlink(root_fd, parts, expected_fd):
+                nonlocal parent_binding_checks
+                result = original_binding_check(root_fd, parts, expected_fd)
+                if tuple(parts)[-3:] == ("jobs", "request", "job"):
+                    parent_binding_checks += 1
+                    if parent_binding_checks == 5:
+                        os.rename(jobs_parent, moved_jobs)
+                        os.symlink(replacement_jobs, jobs_parent)
+                return result
+
+            with mock.patch.object(
+                store,
+                "_assert_directory_binding",
+                side_effect=rename_after_candidate_unlink,
+            ):
+                with self.assertRaises(ArtifactRecoveryStoreError):
+                    store.complete_linked_publication(candidate, final)
+
+            moved_parent = moved_jobs / "request" / "job"
+            restored_candidate = moved_parent / candidate.name
+            restored_final = moved_parent / final.name
+            self.assertEqual(restored_candidate.read_bytes(), payload)
+            self.assertEqual(restored_final.read_bytes(), payload)
+            self.assertEqual(
+                restored_candidate.stat().st_ino,
+                restored_final.stat().st_ino,
+            )
+            self.assertEqual(restored_candidate.stat().st_nlink, 2)
+            self.assertEqual(restored_final.stat().st_nlink, 2)
+            self.assertEqual(
+                list((replacement_jobs / "request" / "job").iterdir()),
+                [],
+            )
+
+
 class V4QuarantineR1Tests(unittest.TestCase):
     def test_directory_binding_cleanup_preserves_primary_mismatch(self):
         with tempfile.TemporaryDirectory() as directory:
