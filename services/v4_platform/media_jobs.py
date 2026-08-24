@@ -319,6 +319,7 @@ def _validate_m11_video_request(request: Mapping[str, Any]) -> None:
         or not isinstance(camera_instruction.get("lensMm"), (int, float))
         or camera_instruction["lensMm"] < 8
         or camera_instruction["lensMm"] > 200
+        or not isfinite(float(camera_instruction["lensMm"]))
         or not isinstance(prompt_spec.get("action"), str)
         or not prompt_spec["action"].strip()
         or len(prompt_spec["action"]) > 1000

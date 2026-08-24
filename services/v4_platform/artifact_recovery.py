@@ -8,11 +8,13 @@ can be replayed safely after a process restart.
 from __future__ import annotations
 
 import errno
+import fcntl
 from hashlib import sha256
 import os
 from pathlib import Path, PurePosixPath
 import re
 import stat
+import sys
 from typing import Any, Callable, Iterable
 
 
@@ -467,242 +469,685 @@ class ArtifactRecoveryStore:
         category: str,
         reason: str,
     ) -> dict[str, Any]:
+        return self._quarantine_with_directory_descriptors(
+            workspace_ref,
+            run_ref,
+            storage_key,
+            category=category,
+            reason=reason,
+        )
+
+    @staticmethod
+    def _directory_open_flags() -> int:
+        return (
+            os.O_RDONLY
+            | getattr(os, "O_CLOEXEC", 0)
+            | getattr(os, "O_DIRECTORY", 0)
+            | getattr(os, "O_NOFOLLOW", 0)
+        )
+
+    @classmethod
+    def _open_directory_chain(
+        cls,
+        base_fd: int,
+        parts: Iterable[str],
+        *,
+        create: bool = False,
+    ) -> int:
+        current_fd = os.dup(base_fd)
+        try:
+            for part in parts:
+                created = False
+                if create:
+                    try:
+                        os.mkdir(part, mode=0o700, dir_fd=current_fd)
+                        created = True
+                    except FileExistsError:
+                        pass
+                next_fd = os.open(
+                    part,
+                    cls._directory_open_flags(),
+                    dir_fd=current_fd,
+                )
+                try:
+                    if created:
+                        os.fsync(current_fd)
+                        os.fsync(next_fd)
+                    os.close(current_fd)
+                except BaseException as exc:
+                    try:
+                        os.close(next_fd)
+                    except OSError as cleanup_exc:
+                        exc.add_note(
+                            "new directory descriptor cleanup also failed: "
+                            f"{cleanup_exc}"
+                        )
+                    raise
+                current_fd = next_fd
+            return current_fd
+        except BaseException as exc:
+            try:
+                os.close(current_fd)
+            except OSError as cleanup_exc:
+                exc.add_note(
+                    "directory chain cleanup also failed: "
+                    f"{cleanup_exc}"
+                )
+            raise
+
+    @classmethod
+    def _open_absolute_directory(cls, path: Path) -> int:
+        absolute = Path(os.path.abspath(os.fspath(path)))
+        root_fd = os.open(os.sep, cls._directory_open_flags())
+        opened_fd: int | None = None
+        active_error: BaseException | None = None
+        try:
+            opened_fd = cls._open_directory_chain(
+                root_fd,
+                absolute.parts[1:],
+            )
+        except BaseException as exc:
+            active_error = exc
+            raise
+        finally:
+            try:
+                os.close(root_fd)
+            except OSError as cleanup_exc:
+                if active_error is not None:
+                    active_error.add_note(
+                        "absolute root descriptor cleanup also failed: "
+                        f"{cleanup_exc}"
+                    )
+                else:
+                    if opened_fd is not None:
+                        try:
+                            os.close(opened_fd)
+                        except OSError as opened_cleanup_exc:
+                            cleanup_exc.add_note(
+                                "opened absolute directory descriptor cleanup "
+                                f"also failed: {opened_cleanup_exc}"
+                            )
+                    raise ArtifactRecoveryStoreError(
+                        "absolute root descriptor cleanup failed"
+                    ) from cleanup_exc
+        if opened_fd is None:
+            raise ArtifactRecoveryStoreError(
+                "absolute directory could not be opened"
+            )
+        return opened_fd
+
+    @classmethod
+    def _assert_absolute_directory_binding(
+        cls,
+        path: Path,
+        expected_fd: int,
+    ) -> None:
+        current_fd = cls._open_absolute_directory(path)
+        active_error: BaseException | None = None
+        try:
+            current = os.fstat(current_fd)
+            expected = os.fstat(expected_fd)
+            if (
+                current.st_dev != expected.st_dev
+                or current.st_ino != expected.st_ino
+            ):
+                raise ArtifactRecoveryStoreError(
+                    "artifact root binding changed"
+                )
+        except BaseException as exc:
+            active_error = exc
+            raise
+        finally:
+            try:
+                os.close(current_fd)
+            except OSError as cleanup_exc:
+                if active_error is not None:
+                    active_error.add_note(
+                        "absolute binding descriptor cleanup also failed: "
+                        f"{cleanup_exc}"
+                    )
+                else:
+                    raise ArtifactRecoveryStoreError(
+                        "absolute binding descriptor cleanup failed"
+                    ) from cleanup_exc
+
+    @staticmethod
+    def _stat_at(directory_fd: int | None, name: str) -> os.stat_result | None:
+        if directory_fd is None:
+            return None
+        try:
+            return os.stat(
+                name,
+                dir_fd=directory_fd,
+                follow_symlinks=False,
+            )
+        except FileNotFoundError:
+            return None
+
+    @classmethod
+    def _assert_directory_binding(
+        cls,
+        root_fd: int,
+        parts: Iterable[str],
+        expected_fd: int,
+    ) -> None:
+        current_fd = cls._open_directory_chain(root_fd, parts)
+        active_error: BaseException | None = None
+        try:
+            current = os.fstat(current_fd)
+            expected = os.fstat(expected_fd)
+            if (
+                current.st_dev != expected.st_dev
+                or current.st_ino != expected.st_ino
+            ):
+                raise ArtifactRecoveryStoreError(
+                    "artifact directory binding changed"
+                )
+        except BaseException as exc:
+            active_error = exc
+            raise
+        finally:
+            try:
+                os.close(current_fd)
+            except OSError as cleanup_exc:
+                if active_error is not None:
+                    active_error.add_note(
+                        "directory binding descriptor cleanup also failed: "
+                        f"{cleanup_exc}"
+                    )
+                else:
+                    raise ArtifactRecoveryStoreError(
+                        "directory binding descriptor cleanup failed"
+                    ) from cleanup_exc
+
+    def _assert_quarantine_namespace_binding(
+        self,
+        *,
+        root_fd: int,
+        run_parts: tuple[str, str],
+        relative_source_parent_parts: tuple[str, ...],
+        source_parent_fd: int | None,
+        category: str,
+        destination_parent_fd: int,
+    ) -> None:
+        self._assert_absolute_directory_binding(self.root, root_fd)
+        if source_parent_fd is not None:
+            self._assert_directory_binding(
+                root_fd,
+                run_parts + relative_source_parent_parts,
+                source_parent_fd,
+            )
+        self._assert_directory_binding(
+            root_fd,
+            run_parts + ("quarantine", category),
+            destination_parent_fd,
+        )
+        self._assert_absolute_directory_binding(self.root, root_fd)
+
+    @staticmethod
+    def _sync_locked_file(descriptor: int) -> os.stat_result:
+        opened = os.fstat(descriptor)
+        if not stat.S_ISREG(opened.st_mode):
+            raise ArtifactRecoveryStoreError(
+                "artifact fsync target is not a regular file"
+            )
+        os.fsync(descriptor)
+        return opened
+
+    @staticmethod
+    def _quarantine_entry_from_descriptor(
+        descriptor: int,
+        *,
+        storage_key: str,
+        original_storage_key: str,
+        reason: str,
+        replay: bool,
+    ) -> dict[str, Any]:
+        opened = os.fstat(descriptor)
+        if not stat.S_ISREG(opened.st_mode) or opened.st_nlink != 1:
+            raise ArtifactRecoveryStoreError(
+                "quarantine target is not one exact regular file"
+            )
+        digest = sha256()
+        byte_size = 0
+        while byte_size < opened.st_size:
+            chunk = os.pread(
+                descriptor,
+                min(1024 * 1024, opened.st_size - byte_size),
+                byte_size,
+            )
+            if not chunk:
+                raise ArtifactRecoveryStoreError(
+                    "quarantine target changed while being inventoried"
+                )
+            digest.update(chunk)
+            byte_size += len(chunk)
+        closed_over = os.fstat(descriptor)
+        if (
+            closed_over.st_dev != opened.st_dev
+            or closed_over.st_ino != opened.st_ino
+            or closed_over.st_size != opened.st_size
+            or closed_over.st_mtime_ns != opened.st_mtime_ns
+            or byte_size != opened.st_size
+        ):
+            raise ArtifactRecoveryStoreError(
+                "quarantine target changed while being inventoried"
+            )
+        return {
+            "storageKey": storage_key,
+            "entryType": "REGULAR_FILE",
+            "inventoryState": "QUARANTINED",
+            "referenced": False,
+            "sha256": digest.hexdigest(),
+            "byteSize": byte_size,
+            "originalStorageKey": original_storage_key,
+            "quarantineReason": reason,
+            "idempotentReplay": replay,
+        }
+
+    @staticmethod
+    def _close_quarantine_descriptors(
+        descriptors: Iterable[int],
+        *,
+        active_error: BaseException | None,
+    ) -> None:
+        cleanup_error: OSError | None = None
+        for descriptor in reversed(tuple(descriptors)):
+            try:
+                os.close(descriptor)
+            except OSError as exc:
+                if cleanup_error is None:
+                    cleanup_error = exc
+        if cleanup_error is None:
+            return
+        if active_error is not None:
+            active_error.add_note(
+                "artifact quarantine descriptor cleanup also failed: "
+                f"{cleanup_error}"
+            )
+            return
+        raise ArtifactRecoveryStoreError(
+            "artifact quarantine descriptor cleanup failed"
+        ) from cleanup_error
+
+    def _quarantine_with_directory_descriptors(
+        self,
+        workspace_ref: str,
+        run_ref: str,
+        storage_key: str,
+        *,
+        category: str,
+        reason: str,
+    ) -> dict[str, Any]:
         if not re.fullmatch(r"[a-z][a-z0-9_-]{0,31}", category):
             raise ArtifactRecoveryStoreError("quarantine category is invalid")
         if not isinstance(reason, str) or not reason or len(reason) > 200:
             raise ArtifactRecoveryStoreError("quarantine reason is invalid")
-        parts = self._validate_storage_key(storage_key)
-        normalized_key = PurePosixPath(*parts).as_posix()
-        source = self.root.joinpath(*parts)
-        run_root = self.run_root(workspace_ref, run_ref)
-        try:
-            source.relative_to(run_root)
-        except ValueError as exc:
+        if not isinstance(workspace_ref, str) or not workspace_ref:
+            raise ArtifactRecoveryStoreError("workspace scope is invalid")
+        if not isinstance(run_ref, str) or not run_ref:
+            raise ArtifactRecoveryStoreError("production-run scope is invalid")
+
+        source_parts = self._validate_storage_key(storage_key)
+        normalized_key = PurePosixPath(*source_parts).as_posix()
+        run_parts = (
+            self._scope_hash(workspace_ref),
+            self._scope_hash(run_ref),
+        )
+        if (
+            len(source_parts) <= len(run_parts)
+            or source_parts[: len(run_parts)] != run_parts
+        ):
             raise ArtifactRecoveryStoreError(
                 "artifact is outside the requested production run"
-            ) from exc
-        if "quarantine" in source.relative_to(run_root).parts:
+            )
+        relative_source_parts = source_parts[len(run_parts) :]
+        if "quarantine" in relative_source_parts:
             raise ArtifactRecoveryStoreError("artifact is already quarantined")
-        suffix = source.suffix if len(source.suffix) <= 16 else ""
+
+        source_name = relative_source_parts[-1]
+        suffix = Path(source_name).suffix
+        if len(suffix) > 16:
+            suffix = ""
         key_hash = sha256(
             f"{normalized_key}\0{category}\0{reason}".encode("utf-8")
         ).hexdigest()[:24]
-        destination = run_root / "quarantine" / category / f"artifact-{key_hash}{suffix}"
-        self._assert_no_symlinks(destination.parent)
-        destination.parent.mkdir(parents=True, exist_ok=True)
-        self._assert_no_symlinks(destination.parent)
-        self._assert_no_symlinks(destination)
+        destination_name = f"artifact-{key_hash}{suffix}"
+        destination_parts = run_parts + (
+            "quarantine",
+            category,
+            destination_name,
+        )
+        destination_key = PurePosixPath(*destination_parts).as_posix()
 
-        if not os.path.lexists(source):
-            if os.path.lexists(destination):
-                self._assert_no_symlinks(destination)
-                destination_stat = os.lstat(destination)
-                if (
-                    not stat.S_ISREG(destination_stat.st_mode)
-                    or destination_stat.st_nlink != 1
-                ):
-                    raise ArtifactRecoveryStoreError(
-                        "quarantine replay target is unsafe"
-                    )
-                entry = self._entry(run_root, destination, set())
-                entry.update(
-                    {
-                        "originalStorageKey": normalized_key,
-                        "quarantineReason": reason,
-                        "idempotentReplay": True,
-                    }
+        descriptors: list[int] = []
+        source_parent_fd: int | None = None
+        destination_parent_fd: int | None = None
+        locked_fd: int | None = None
+        try:
+            root_fd = self._open_absolute_directory(self.root)
+            descriptors.append(root_fd)
+            run_fd = self._open_directory_chain(root_fd, run_parts)
+            descriptors.append(run_fd)
+            try:
+                source_parent_fd = self._open_directory_chain(
+                    run_fd,
+                    relative_source_parts[:-1],
                 )
-                return entry
-            raise ArtifactRecoveryStoreError("artifact to quarantine is unavailable")
-
-        self._assert_no_symlinks(source)
-        source_stat = os.lstat(source)
-        if not stat.S_ISREG(source_stat.st_mode):
-            raise ArtifactRecoveryStoreError(
-                "only one exact regular artifact may be quarantined"
+            except FileNotFoundError:
+                source_parent_fd = None
+            if source_parent_fd is not None:
+                descriptors.append(source_parent_fd)
+            destination_parent_fd = self._open_directory_chain(
+                run_fd,
+                ("quarantine", category),
+                create=True,
             )
-        interrupted_link = False
-        if source_stat.st_nlink != 1:
-            if source_stat.st_nlink == 2 and os.path.lexists(destination):
-                destination_stat = os.lstat(destination)
-                interrupted_link = (
-                    stat.S_ISREG(destination_stat.st_mode)
-                    and destination_stat.st_dev == source_stat.st_dev
-                    and destination_stat.st_ino == source_stat.st_ino
-                    and destination_stat.st_nlink == 2
+            descriptors.append(destination_parent_fd)
+
+            file_flags = os.O_RDONLY | getattr(os, "O_CLOEXEC", 0)
+            file_flags |= getattr(os, "O_NOFOLLOW", 0)
+            for parent_fd, name in (
+                (source_parent_fd, source_name),
+                (destination_parent_fd, destination_name),
+            ):
+                if parent_fd is None:
+                    continue
+                try:
+                    locked_fd = os.open(name, file_flags, dir_fd=parent_fd)
+                    break
+                except FileNotFoundError:
+                    continue
+            if locked_fd is None:
+                raise ArtifactRecoveryStoreError(
+                    "artifact to quarantine is unavailable"
                 )
-            if not interrupted_link:
+            descriptors.append(locked_fd)
+            locked_stat = os.fstat(locked_fd)
+            if not stat.S_ISREG(locked_stat.st_mode):
                 raise ArtifactRecoveryStoreError(
                     "only one exact regular artifact may be quarantined"
                 )
-        created_link = False
-        replay = interrupted_link or os.path.lexists(destination)
-        completed_elsewhere = False
-        try:
-            try:
-                synced_source = self._fsync_file(source)
-            except FileNotFoundError:
-                if not os.path.lexists(destination):
-                    raise
-                completed_destination = os.lstat(destination)
-                if (
-                    not stat.S_ISREG(completed_destination.st_mode)
-                    or completed_destination.st_dev != source_stat.st_dev
-                    or completed_destination.st_ino != source_stat.st_ino
-                    or completed_destination.st_nlink != 1
-                ):
-                    raise ArtifactRecoveryStoreError(
-                        "quarantine target already exists"
-                    )
-                synced_source = source_stat
-                interrupted_link = True
-                replay = True
-                completed_elsewhere = True
-            if (
-                synced_source.st_dev != source_stat.st_dev
-                or synced_source.st_ino != source_stat.st_ino
-                or not stat.S_ISREG(synced_source.st_mode)
-                or synced_source.st_nlink not in {1, 2}
+            fcntl.flock(locked_fd, fcntl.LOCK_EX)
+
+            def exact_artifact(value: os.stat_result | None) -> bool:
+                return bool(
+                    value is not None
+                    and stat.S_ISREG(value.st_mode)
+                    and value.st_dev == locked_stat.st_dev
+                    and value.st_ino == locked_stat.st_ino
+                )
+
+            def current_state() -> tuple[
+                os.stat_result | None,
+                os.stat_result | None,
+            ]:
+                return (
+                    self._stat_at(source_parent_fd, source_name),
+                    self._stat_at(destination_parent_fd, destination_name),
+                )
+
+            source_stat, destination_stat = current_state()
+            if not exact_artifact(source_stat) and not exact_artifact(
+                destination_stat
             ):
                 raise ArtifactRecoveryStoreError(
-                    "artifact changed before quarantine claim"
+                    "quarantine claim conflicts with the committed reason"
                 )
-            if not completed_elsewhere and synced_source.st_nlink == 2:
-                if not os.path.lexists(destination):
-                    raise ArtifactRecoveryStoreError(
-                        "artifact has an unclaimed hard link"
-                    )
-                linked_destination = os.lstat(destination)
-                if (
-                    not stat.S_ISREG(linked_destination.st_mode)
-                    or linked_destination.st_dev != synced_source.st_dev
-                    or linked_destination.st_ino != synced_source.st_ino
-                    or linked_destination.st_nlink != 2
-                ):
-                    raise ArtifactRecoveryStoreError(
-                        "artifact has an unsafe hard link"
-                    )
-                interrupted_link = True
-                replay = True
-            if not interrupted_link:
-                try:
-                    os.link(source, destination, follow_symlinks=False)
-                    created_link = True
-                except OSError as exc:
-                    if exc.errno == errno.EEXIST:
-                        replay = True
-                    elif exc.errno == errno.ENOENT and os.path.lexists(
-                        destination
-                    ):
-                        replay = True
-                    else:
-                        raise
 
-            for _ in range(4):
-                source_exists = os.path.lexists(source)
-                destination_exists = os.path.lexists(destination)
-                if not destination_exists:
-                    raise ArtifactRecoveryStoreError(
-                        "quarantine claim disappeared"
+            replay = destination_stat is not None
+            created_link = False
+            try:
+                if source_stat is None:
+                    if (
+                        not exact_artifact(destination_stat)
+                        or destination_stat.st_nlink != 1
+                    ):
+                        raise ArtifactRecoveryStoreError(
+                            "quarantine replay target is unsafe"
+                        )
+                    synced = self._sync_locked_file(locked_fd)
+                    if synced.st_nlink != 1:
+                        raise ArtifactRecoveryStoreError(
+                            "quarantine replay target is unsafe"
+                        )
+                    os.fsync(destination_parent_fd)
+                    entry = self._quarantine_entry_from_descriptor(
+                        locked_fd,
+                        storage_key=destination_key,
+                        original_storage_key=normalized_key,
+                        reason=reason,
+                        replay=True,
                     )
-                destination_stat = os.lstat(destination)
-                if (
-                    not stat.S_ISREG(destination_stat.st_mode)
-                    or destination_stat.st_dev != synced_source.st_dev
-                    or destination_stat.st_ino != synced_source.st_ino
-                ):
+                    self._assert_quarantine_namespace_binding(
+                        root_fd=root_fd,
+                        run_parts=run_parts,
+                        relative_source_parent_parts=relative_source_parts[:-1],
+                        source_parent_fd=source_parent_fd,
+                        category=category,
+                        destination_parent_fd=destination_parent_fd,
+                    )
+                    published_destination = self._stat_at(
+                        destination_parent_fd, destination_name
+                    )
+                    if (
+                        not exact_artifact(published_destination)
+                        or published_destination.st_nlink != 1
+                    ):
+                        raise ArtifactRecoveryStoreError(
+                            "quarantine replay target lost its namespace binding"
+                        )
+                    return entry
+
+                if not exact_artifact(source_stat):
+                    raise ArtifactRecoveryStoreError(
+                        "only one exact regular artifact may be quarantined"
+                    )
+                if destination_stat is None:
+                    if source_stat.st_nlink != 1:
+                        raise ArtifactRecoveryStoreError(
+                            "only one exact regular artifact may be quarantined"
+                        )
+                    self._assert_quarantine_namespace_binding(
+                        root_fd=root_fd,
+                        run_parts=run_parts,
+                        relative_source_parent_parts=relative_source_parts[:-1],
+                        source_parent_fd=source_parent_fd,
+                        category=category,
+                        destination_parent_fd=destination_parent_fd,
+                    )
+                    try:
+                        os.link(
+                            source_name,
+                            destination_name,
+                            src_dir_fd=source_parent_fd,
+                            dst_dir_fd=destination_parent_fd,
+                            follow_symlinks=False,
+                        )
+                        created_link = True
+                    except OSError as exc:
+                        if exc.errno not in {errno.EEXIST, errno.ENOENT}:
+                            raise
+                        replay = True
+                elif not exact_artifact(destination_stat):
                     raise ArtifactRecoveryStoreError(
                         "quarantine target already exists"
                     )
-                if not source_exists:
-                    if destination_stat.st_nlink != 1:
+
+                source_stat, destination_stat = current_state()
+                if source_stat is None:
+                    if (
+                        not exact_artifact(destination_stat)
+                        or destination_stat.st_nlink != 1
+                    ):
                         raise ArtifactRecoveryStoreError(
                             "quarantine move did not converge"
                         )
-                    self._fsync_file(destination)
-                    self._fsync_directory(destination.parent)
-                    break
-                current_source = os.lstat(source)
-                if (
-                    not stat.S_ISREG(current_source.st_mode)
-                    or current_source.st_dev != synced_source.st_dev
-                    or current_source.st_ino != synced_source.st_ino
-                    or current_source.st_nlink != 2
-                    or destination_stat.st_nlink != 2
-                ):
-                    raise ArtifactRecoveryStoreError(
-                        "artifact changed during quarantine"
-                    )
-                synced_destination = self._fsync_file(destination)
-                if (
-                    synced_destination.st_dev != synced_source.st_dev
-                    or synced_destination.st_ino != synced_source.st_ino
-                    or synced_destination.st_nlink != 2
-                ):
-                    raise ArtifactRecoveryStoreError(
-                        "quarantine target changed"
-                    )
-                self._fsync_directory(destination.parent)
-                try:
-                    os.unlink(source)
-                except FileNotFoundError:
-                    continue
-                self._fsync_directory(source.parent)
-            else:
-                raise ArtifactRecoveryStoreError(
-                    "quarantine move did not converge"
-                )
-        except ArtifactRecoveryStoreError:
-            if created_link:
-                try:
-                    if os.path.lexists(source) and os.path.lexists(destination):
-                        current_source = os.lstat(source)
-                        current_destination = os.lstat(destination)
+                    replay = True
+                else:
+                    if (
+                        not exact_artifact(source_stat)
+                        or not exact_artifact(destination_stat)
+                        or source_stat.st_nlink != 2
+                        or destination_stat.st_nlink != 2
+                    ):
+                        raise ArtifactRecoveryStoreError(
+                            "artifact changed during quarantine"
+                        )
+                    synced = self._sync_locked_file(locked_fd)
+                    if synced.st_nlink == 1:
+                        completed_source, completed_destination = current_state()
                         if (
-                            stat.S_ISREG(current_source.st_mode)
-                            and stat.S_ISREG(current_destination.st_mode)
-                            and current_source.st_dev == synced_source.st_dev
-                            and current_source.st_ino == synced_source.st_ino
-                            and current_destination.st_dev == synced_source.st_dev
-                            and current_destination.st_ino == synced_source.st_ino
+                            completed_source is not None
+                            or not exact_artifact(completed_destination)
+                            or completed_destination.st_nlink != 1
                         ):
-                            os.unlink(destination)
-                            self._fsync_directory(destination.parent)
-                except OSError as rollback_exc:
+                            raise ArtifactRecoveryStoreError(
+                                "quarantine target changed"
+                            )
+                        replay = True
+                    else:
+                        if synced.st_nlink != 2:
+                            raise ArtifactRecoveryStoreError(
+                                "quarantine target changed"
+                            )
+                        os.fsync(destination_parent_fd)
+                        self._assert_quarantine_namespace_binding(
+                            root_fd=root_fd,
+                            run_parts=run_parts,
+                            relative_source_parent_parts=relative_source_parts[:-1],
+                            source_parent_fd=source_parent_fd,
+                            category=category,
+                            destination_parent_fd=destination_parent_fd,
+                        )
+                        try:
+                            os.unlink(source_name, dir_fd=source_parent_fd)
+                        except FileNotFoundError:
+                            replay = True
+                        os.fsync(source_parent_fd)
+                        os.fsync(destination_parent_fd)
+
+                self._assert_quarantine_namespace_binding(
+                    root_fd=root_fd,
+                    run_parts=run_parts,
+                    relative_source_parent_parts=relative_source_parts[:-1],
+                    source_parent_fd=source_parent_fd,
+                    category=category,
+                    destination_parent_fd=destination_parent_fd,
+                )
+                final_source, final_destination = current_state()
+                if (
+                    final_source is not None
+                    or not exact_artifact(final_destination)
+                    or final_destination.st_nlink != 1
+                ):
                     raise ArtifactRecoveryStoreError(
-                        "artifact quarantine rollback failed"
-                    ) from rollback_exc
+                        "quarantine move did not converge"
+                    )
+                synced = self._sync_locked_file(locked_fd)
+                if synced.st_nlink != 1:
+                    raise ArtifactRecoveryStoreError(
+                        "quarantine move did not converge"
+                    )
+                entry = self._quarantine_entry_from_descriptor(
+                    locked_fd,
+                    storage_key=destination_key,
+                    original_storage_key=normalized_key,
+                    reason=reason,
+                    replay=replay,
+                )
+                self._assert_quarantine_namespace_binding(
+                    root_fd=root_fd,
+                    run_parts=run_parts,
+                    relative_source_parent_parts=relative_source_parts[:-1],
+                    source_parent_fd=source_parent_fd,
+                    category=category,
+                    destination_parent_fd=destination_parent_fd,
+                )
+                published_source, published_destination = current_state()
+                if (
+                    published_source is not None
+                    or not exact_artifact(published_destination)
+                    or published_destination.st_nlink != 1
+                ):
+                    raise ArtifactRecoveryStoreError(
+                        "quarantine target lost its namespace binding"
+                    )
+                return entry
+            except (ArtifactRecoveryStoreError, OSError) as exc:
+                if created_link:
+                    try:
+                        rollback_source, rollback_destination = current_state()
+                        if (
+                            exact_artifact(rollback_source)
+                            and exact_artifact(rollback_destination)
+                        ):
+                            os.unlink(
+                                destination_name,
+                                dir_fd=destination_parent_fd,
+                            )
+                            os.fsync(destination_parent_fd)
+                        elif (
+                            rollback_source is None
+                            and exact_artifact(rollback_destination)
+                            and rollback_destination.st_nlink == 1
+                        ):
+                            self._assert_directory_binding(
+                                root_fd,
+                                run_parts + relative_source_parts[:-1],
+                                source_parent_fd,
+                            )
+                            os.link(
+                                destination_name,
+                                source_name,
+                                src_dir_fd=destination_parent_fd,
+                                dst_dir_fd=source_parent_fd,
+                                follow_symlinks=False,
+                            )
+                            os.fsync(source_parent_fd)
+                            self._assert_directory_binding(
+                                root_fd,
+                                run_parts + relative_source_parts[:-1],
+                                source_parent_fd,
+                            )
+                            os.unlink(
+                                destination_name,
+                                dir_fd=destination_parent_fd,
+                            )
+                            os.fsync(destination_parent_fd)
+                            restored_source = self._stat_at(
+                                source_parent_fd, source_name
+                            )
+                            if (
+                                not exact_artifact(restored_source)
+                                or restored_source.st_nlink != 1
+                            ):
+                                raise ArtifactRecoveryStoreError(
+                                    "artifact quarantine restore did not converge"
+                                )
+                    except (
+                        ArtifactRecoveryStoreError,
+                        OSError,
+                    ) as rollback_exc:
+                        raise ArtifactRecoveryStoreError(
+                            "artifact quarantine rollback failed"
+                        ) from rollback_exc
+                if isinstance(exc, ArtifactRecoveryStoreError):
+                    raise
+                raise ArtifactRecoveryStoreError(
+                    "artifact quarantine failed"
+                ) from exc
+        except ArtifactRecoveryStoreError:
             raise
         except OSError as exc:
-            if created_link:
-                try:
-                    if os.path.lexists(source) and os.path.lexists(destination):
-                        current_source = os.lstat(source)
-                        current_destination = os.lstat(destination)
-                        if (
-                            stat.S_ISREG(current_source.st_mode)
-                            and stat.S_ISREG(current_destination.st_mode)
-                            and current_source.st_dev == synced_source.st_dev
-                            and current_source.st_ino == synced_source.st_ino
-                            and current_destination.st_dev == synced_source.st_dev
-                            and current_destination.st_ino == synced_source.st_ino
-                        ):
-                            os.unlink(destination)
-                            self._fsync_directory(destination.parent)
-                except OSError as rollback_exc:
-                    raise ArtifactRecoveryStoreError(
-                        "artifact quarantine rollback failed"
-                    ) from rollback_exc
-            raise ArtifactRecoveryStoreError("artifact quarantine failed") from exc
-        entry = self._entry(run_root, destination, set())
-        entry.update(
-            {
-                "originalStorageKey": normalized_key,
-                "quarantineReason": reason,
-                "idempotentReplay": replay,
-            }
-        )
-        return entry
+            raise ArtifactRecoveryStoreError(
+                "artifact quarantine failed"
+            ) from exc
+        finally:
+            self._close_quarantine_descriptors(
+                descriptors,
+                active_error=sys.exception(),
+            )
 
 
 __all__ = ["ArtifactRecoveryStore", "ArtifactRecoveryStoreError"]

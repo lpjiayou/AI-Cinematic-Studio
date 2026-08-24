@@ -2,12 +2,13 @@ from __future__ import annotations
 
 from concurrent.futures import ThreadPoolExecutor
 from copy import deepcopy
+import fcntl
 from hashlib import sha256
 import json
 import os
 from pathlib import Path
 import sqlite3
-from threading import Barrier
+from threading import Event, Lock
 import tempfile
 import time
 import unittest
@@ -292,6 +293,18 @@ class V4M11SuccessorRequestR1Tests(unittest.TestCase):
                 empty_negative["parameters"]["negativePrompt"] = ""
                 cases.append(empty_negative)
 
+                non_finite_lens = deepcopy(source)
+                non_finite_lens["promptSpec"]["cameraInstruction"][
+                    "lensMm"
+                ] = float("nan")
+                cases.append(non_finite_lens)
+
+                oversized_integer_lens = deepcopy(source)
+                oversized_integer_lens["promptSpec"]["cameraInstruction"][
+                    "lensMm"
+                ] = 10**400
+                cases.append(oversized_integer_lens)
+
                 for value in cases:
                     value.pop("payloadDigest")
                     value["payloadDigest"] = sha256(_canonical(value)).hexdigest()
@@ -541,6 +554,101 @@ class V4SqliteSchemaR1Tests(unittest.TestCase):
 
 
 class V4QuarantineR1Tests(unittest.TestCase):
+    def test_directory_binding_cleanup_preserves_primary_mismatch(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            child = root / "child"
+            expected = root / "expected"
+            child.mkdir()
+            expected.mkdir()
+            root_fd = os.open(
+                root,
+                os.O_RDONLY | getattr(os, "O_DIRECTORY", 0),
+            )
+            expected_fd = os.open(
+                expected,
+                os.O_RDONLY | getattr(os, "O_DIRECTORY", 0),
+            )
+            child_stat = child.stat()
+            original_close = os.close
+            failed_descriptor = None
+
+            def fail_child_descriptor_close(descriptor):
+                nonlocal failed_descriptor
+                opened = os.fstat(descriptor)
+                if (
+                    opened.st_dev == child_stat.st_dev
+                    and opened.st_ino == child_stat.st_ino
+                ):
+                    failed_descriptor = descriptor
+                    raise OSError("injected binding descriptor close failure")
+                return original_close(descriptor)
+
+            try:
+                with mock.patch(
+                    "services.v4_platform.artifact_recovery.os.close",
+                    side_effect=fail_child_descriptor_close,
+                ):
+                    with self.assertRaisesRegex(
+                        ArtifactRecoveryStoreError,
+                        "artifact directory binding changed",
+                    ) as raised:
+                        ArtifactRecoveryStore._assert_directory_binding(
+                            root_fd,
+                            ("child",),
+                            expected_fd,
+                        )
+                self.assertTrue(
+                    any(
+                        "binding descriptor cleanup also failed" in note
+                        for note in getattr(raised.exception, "__notes__", [])
+                    )
+                )
+            finally:
+                if failed_descriptor is not None:
+                    original_close(failed_descriptor)
+                original_close(expected_fd)
+                original_close(root_fd)
+
+    def test_directory_chain_creation_failure_does_not_leak_descriptor(self):
+        if not Path("/proc/self/fd").is_dir():
+            self.skipTest("descriptor inventory requires Linux /proc")
+        with tempfile.TemporaryDirectory() as directory:
+            base_fd = os.open(
+                directory,
+                os.O_RDONLY | getattr(os, "O_DIRECTORY", 0),
+            )
+            before = len(tuple(Path("/proc/self/fd").iterdir()))
+            original_fsync = os.fsync
+            fsync_calls = 0
+
+            def fail_new_directory_fsync(descriptor):
+                nonlocal fsync_calls
+                fsync_calls += 1
+                if fsync_calls == 2:
+                    raise OSError("injected new-directory fsync failure")
+                return original_fsync(descriptor)
+
+            try:
+                with mock.patch(
+                    "services.v4_platform.artifact_recovery.os.fsync",
+                    side_effect=fail_new_directory_fsync,
+                ):
+                    with self.assertRaisesRegex(
+                        OSError, "injected new-directory fsync failure"
+                    ):
+                        ArtifactRecoveryStore._open_directory_chain(
+                            base_fd,
+                            ("new-child",),
+                            create=True,
+                        )
+                self.assertEqual(
+                    len(tuple(Path("/proc/self/fd").iterdir())),
+                    before,
+                )
+            finally:
+                os.close(base_fd)
+
     def test_two_concurrent_claims_converge_to_one_safe_quarantine_file(self):
         with tempfile.TemporaryDirectory() as directory:
             store = ArtifactRecoveryStore(Path(directory) / "artifacts")
@@ -550,29 +658,56 @@ class V4QuarantineR1Tests(unittest.TestCase):
             source.write_bytes(b"one exact orphan")
             storage_key = store.storage_key(source)
             original_link = os.link
-            barrier = Barrier(2)
+            original_flock = fcntl.flock
+            first_linked = Event()
+            release_first = Event()
+            second_lock_attempted = Event()
+            lock_counter_guard = Lock()
+            exclusive_lock_calls = 0
 
             def racing_link(source_path, destination_path, **kwargs):
-                barrier.wait(timeout=5)
-                return original_link(source_path, destination_path, **kwargs)
+                original_link(source_path, destination_path, **kwargs)
+                first_linked.set()
+                if not release_first.wait(timeout=5):
+                    raise TimeoutError("first quarantine claim was not released")
+
+            def observed_flock(fd, operation):
+                nonlocal exclusive_lock_calls
+                if operation == fcntl.LOCK_EX:
+                    with lock_counter_guard:
+                        exclusive_lock_calls += 1
+                        if exclusive_lock_calls == 2:
+                            second_lock_attempted.set()
+                return original_flock(fd, operation)
 
             with mock.patch(
                 "services.v4_platform.artifact_recovery.os.link",
                 side_effect=racing_link,
+            ), mock.patch(
+                "services.v4_platform.artifact_recovery.fcntl.flock",
+                side_effect=observed_flock,
             ):
                 with ThreadPoolExecutor(max_workers=2) as executor:
-                    futures = [
-                        executor.submit(
-                            store.quarantine,
-                            RECOVERY_WORKSPACE,
-                            RUN,
-                            storage_key,
-                            category="recovery",
-                            reason="concurrent-claim",
-                        )
-                        for _ in range(2)
-                    ]
-                    results = [future.result(timeout=10) for future in futures]
+                    first = executor.submit(
+                        store.quarantine,
+                        RECOVERY_WORKSPACE,
+                        RUN,
+                        storage_key,
+                        category="recovery",
+                        reason="concurrent-claim",
+                    )
+                    self.assertTrue(first_linked.wait(timeout=5))
+                    second = executor.submit(
+                        store.quarantine,
+                        RECOVERY_WORKSPACE,
+                        RUN,
+                        storage_key,
+                        category="recovery",
+                        reason="concurrent-claim",
+                    )
+                    self.assertTrue(second_lock_attempted.wait(timeout=5))
+                    release_first.set()
+                    results = [first.result(timeout=10), second.result(timeout=10)]
             self.assertEqual(
                 len({result["storageKey"] for result in results}), 1
             )
@@ -584,7 +719,7 @@ class V4QuarantineR1Tests(unittest.TestCase):
                 any(result["idempotentReplay"] for result in results)
             )
 
-    def test_two_distinct_concurrent_claims_roll_back_only_their_own_links(self):
+    def test_two_distinct_concurrent_claims_are_serialized_first_reason_wins(self):
         with tempfile.TemporaryDirectory() as directory:
             store = ArtifactRecoveryStore(Path(directory) / "artifacts")
             run_root = store.run_root(RECOVERY_WORKSPACE, RUN)
@@ -593,11 +728,27 @@ class V4QuarantineR1Tests(unittest.TestCase):
             source.write_bytes(b"one exact orphan")
             storage_key = store.storage_key(source)
             original_link = os.link
-            barrier = Barrier(2)
+            original_flock = fcntl.flock
+            first_linked = Event()
+            release_first = Event()
+            second_lock_attempted = Event()
+            lock_counter_guard = Lock()
+            exclusive_lock_calls = 0
 
             def racing_link(source_path, destination_path, **kwargs):
                 original_link(source_path, destination_path, **kwargs)
-                barrier.wait(timeout=5)
+                first_linked.set()
+                if not release_first.wait(timeout=5):
+                    raise TimeoutError("first quarantine claim was not released")
+
+            def observed_flock(fd, operation):
+                nonlocal exclusive_lock_calls
+                if operation == fcntl.LOCK_EX:
+                    with lock_counter_guard:
+                        exclusive_lock_calls += 1
+                        if exclusive_lock_calls == 2:
+                            second_lock_attempted.set()
+                return original_flock(fd, operation)
 
             def claim(reason):
                 return store.quarantine(
@@ -611,19 +762,25 @@ class V4QuarantineR1Tests(unittest.TestCase):
             with mock.patch(
                 "services.v4_platform.artifact_recovery.os.link",
                 side_effect=racing_link,
+            ), mock.patch(
+                "services.v4_platform.artifact_recovery.fcntl.flock",
+                side_effect=observed_flock,
             ):
                 with ThreadPoolExecutor(max_workers=2) as executor:
-                    futures = [
-                        executor.submit(claim, "first-claim"),
-                        executor.submit(claim, "second-claim"),
-                    ]
-                    for future in futures:
-                        with self.assertRaises(ArtifactRecoveryStoreError):
-                            future.result(timeout=10)
+                    first = executor.submit(claim, "first-claim")
+                    self.assertTrue(first_linked.wait(timeout=5))
+                    second = executor.submit(claim, "second-claim")
+                    self.assertTrue(second_lock_attempted.wait(timeout=5))
+                    release_first.set()
+                    winner = first.result(timeout=10)
+                    with self.assertRaises(ArtifactRecoveryStoreError):
+                        second.result(timeout=10)
 
-            self.assertTrue(source.is_file())
-            self.assertEqual(source.stat().st_nlink, 1)
-            self.assertEqual(list(run_root.glob("quarantine/**/*.mp4")), [])
+            self.assertFalse(source.exists())
+            self.assertEqual(winner["quarantineReason"], "first-claim")
+            destinations = list(run_root.glob("quarantine/**/*.mp4"))
+            self.assertEqual(len(destinations), 1)
+            self.assertEqual(destinations[0].stat().st_nlink, 1)
 
     def test_failed_new_claim_rolls_back_the_destination_link(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -633,15 +790,13 @@ class V4QuarantineR1Tests(unittest.TestCase):
             source.parent.mkdir(parents=True)
             source.write_bytes(b"rollback exact orphan")
             storage_key = store.storage_key(source)
-            original_fsync = store._fsync_file
-
-            def fail_destination(path):
-                if Path(path) != source:
-                    raise ArtifactRecoveryStoreError("injected destination fsync")
-                return original_fsync(path)
 
             with mock.patch.object(
-                store, "_fsync_file", side_effect=fail_destination
+                store,
+                "_sync_locked_file",
+                side_effect=ArtifactRecoveryStoreError(
+                    "injected destination fsync"
+                ),
             ):
                 with self.assertRaises(ArtifactRecoveryStoreError):
                     store.quarantine(
@@ -665,18 +820,20 @@ class V4QuarantineR1Tests(unittest.TestCase):
             source.write_bytes(b"original orphan")
             replacement.write_bytes(b"replacement bytes")
             storage_key = store.storage_key(source)
-            original_fsync = store._fsync_file
+            original_flock = fcntl.flock
             replaced = False
 
-            def replace_before_fsync(path):
+            def replace_after_lock(descriptor, operation):
                 nonlocal replaced
-                if Path(path) == source and not replaced:
+                result = original_flock(descriptor, operation)
+                if operation == fcntl.LOCK_EX and not replaced:
                     replaced = True
                     os.replace(replacement, source)
-                return original_fsync(path)
+                return result
 
-            with mock.patch.object(
-                store, "_fsync_file", side_effect=replace_before_fsync
+            with mock.patch(
+                "services.v4_platform.artifact_recovery.fcntl.flock",
+                side_effect=replace_after_lock,
             ):
                 with self.assertRaises(ArtifactRecoveryStoreError):
                     store.quarantine(
@@ -708,20 +865,20 @@ class V4QuarantineR1Tests(unittest.TestCase):
                 / "recovery"
                 / f"artifact-{key_hash}.mp4"
             )
-            original_fsync = store._fsync_file
+            original_fsync = store._sync_locked_file
             completed = False
 
-            def finish_other_claim(path):
+            def finish_other_claim(descriptor):
                 nonlocal completed
-                if Path(path) == source and not completed:
+                if not completed:
                     completed = True
-                    os.link(source, destination)
                     os.unlink(source)
-                    raise FileNotFoundError(source)
-                return original_fsync(path)
+                return original_fsync(descriptor)
 
             with mock.patch.object(
-                store, "_fsync_file", side_effect=finish_other_claim
+                store,
+                "_sync_locked_file",
+                side_effect=finish_other_claim,
             ):
                 result = store.quarantine(
                     RECOVERY_WORKSPACE,
@@ -738,6 +895,254 @@ class V4QuarantineR1Tests(unittest.TestCase):
             self.assertFalse(source.exists())
             self.assertEqual(destination.read_bytes(), b"late concurrent claim")
             self.assertEqual(destination.stat().st_nlink, 1)
+
+    def test_lock_open_race_falls_back_to_same_reason_replay_target(self):
+        with tempfile.TemporaryDirectory() as directory:
+            store = ArtifactRecoveryStore(Path(directory) / "artifacts")
+            run_root = store.run_root(RECOVERY_WORKSPACE, RUN)
+            source = run_root / "jobs" / "open-race.part.mp4"
+            source.parent.mkdir(parents=True)
+            source.write_bytes(b"open race replay")
+            storage_key = store.storage_key(source)
+            reason = "open-race-replay"
+            key_hash = sha256(
+                f"{storage_key}\0recovery\0{reason}".encode("utf-8")
+            ).hexdigest()[:24]
+            destination = (
+                run_root
+                / "quarantine"
+                / "recovery"
+                / f"artifact-{key_hash}.mp4"
+            )
+            destination.parent.mkdir(parents=True)
+            original_open = os.open
+            moved = False
+
+            def finish_move_before_source_open(path, flags, *args, **kwargs):
+                nonlocal moved
+                if path == source.name and not moved:
+                    moved = True
+                    os.link(source, destination)
+                    os.unlink(source)
+                    raise FileNotFoundError(source)
+                return original_open(path, flags, *args, **kwargs)
+
+            with mock.patch(
+                "services.v4_platform.artifact_recovery.os.open",
+                side_effect=finish_move_before_source_open,
+            ):
+                replay = store.quarantine(
+                    RECOVERY_WORKSPACE,
+                    RUN,
+                    storage_key,
+                    category="recovery",
+                    reason=reason,
+                )
+
+            self.assertTrue(replay["idempotentReplay"])
+            self.assertFalse(source.exists())
+            self.assertEqual(destination.read_bytes(), b"open race replay")
+            self.assertEqual(destination.stat().st_nlink, 1)
+
+    def test_lock_cleanup_failure_preserves_primary_store_error(self):
+        with tempfile.TemporaryDirectory() as directory:
+            store = ArtifactRecoveryStore(Path(directory) / "artifacts")
+            run_root = store.run_root(RECOVERY_WORKSPACE, RUN)
+            source = run_root / "jobs" / "cleanup-error.part.mp4"
+            source.parent.mkdir(parents=True)
+            source.write_bytes(b"cleanup error")
+            storage_key = store.storage_key(source)
+            original_flock = fcntl.flock
+            original_close = os.close
+            locked_descriptor = None
+
+            def remember_lock(descriptor, operation):
+                nonlocal locked_descriptor
+                if operation == fcntl.LOCK_EX:
+                    locked_descriptor = descriptor
+                return original_flock(descriptor, operation)
+
+            def fail_locked_close(descriptor):
+                if descriptor == locked_descriptor:
+                    raise OSError("injected descriptor close failure")
+                return original_close(descriptor)
+
+            with mock.patch.object(
+                store,
+                "_sync_locked_file",
+                side_effect=ArtifactRecoveryStoreError("primary store error"),
+            ), mock.patch(
+                "services.v4_platform.artifact_recovery.fcntl.flock",
+                side_effect=remember_lock,
+            ), mock.patch(
+                "services.v4_platform.artifact_recovery.os.close",
+                side_effect=fail_locked_close,
+            ):
+                with self.assertRaisesRegex(
+                    ArtifactRecoveryStoreError, "primary store error"
+                ) as raised:
+                    store.quarantine(
+                        RECOVERY_WORKSPACE,
+                        RUN,
+                        storage_key,
+                        category="recovery",
+                        reason="cleanup-error",
+                    )
+
+            self.assertTrue(
+                any(
+                    "descriptor cleanup also failed" in note
+                    for note in getattr(raised.exception, "__notes__", [])
+                )
+            )
+            if locked_descriptor is not None:
+                original_close(locked_descriptor)
+
+    def test_parent_namespace_swap_is_rejected_without_following_decoy(self):
+        with tempfile.TemporaryDirectory() as directory:
+            store = ArtifactRecoveryStore(Path(directory) / "artifacts")
+            run_root = store.run_root(RECOVERY_WORKSPACE, RUN)
+            source = run_root / "jobs" / "namespace-swap.part.mp4"
+            source.parent.mkdir(parents=True)
+            source.write_bytes(b"original scoped artifact")
+            storage_key = store.storage_key(source)
+            moved_parent = store.root / "moved-outside-run"
+            decoy_parent = Path(directory) / "untrusted-decoy"
+            decoy_parent.mkdir()
+            decoy = decoy_parent / source.name
+            decoy.write_bytes(b"must remain untouched")
+            original_binding_check = store._assert_directory_binding
+            source_binding_checks = 0
+
+            def swap_after_first_source_binding(
+                root_fd,
+                parts,
+                expected_fd,
+            ):
+                nonlocal source_binding_checks
+                result = original_binding_check(root_fd, parts, expected_fd)
+                if tuple(parts)[-1:] == ("jobs",):
+                    source_binding_checks += 1
+                    if source_binding_checks == 1:
+                        os.rename(source.parent, moved_parent)
+                        os.symlink(decoy_parent, source.parent)
+                return result
+
+            with mock.patch.object(
+                store,
+                "_assert_directory_binding",
+                side_effect=swap_after_first_source_binding,
+            ):
+                with self.assertRaises(ArtifactRecoveryStoreError):
+                    store.quarantine(
+                        RECOVERY_WORKSPACE,
+                        RUN,
+                        storage_key,
+                        category="recovery",
+                        reason="namespace-swap",
+                    )
+
+            moved_source = moved_parent / source.name
+            self.assertEqual(moved_source.read_bytes(), b"original scoped artifact")
+            self.assertEqual(decoy.read_bytes(), b"must remain untouched")
+            self.assertEqual(list(run_root.glob("quarantine/**/*.mp4")), [])
+
+    def test_destination_swap_at_commit_is_rejected_and_source_is_restored(self):
+        with tempfile.TemporaryDirectory() as directory:
+            store = ArtifactRecoveryStore(Path(directory) / "artifacts")
+            run_root = store.run_root(RECOVERY_WORKSPACE, RUN)
+            source = run_root / "jobs" / "destination-swap.part.mp4"
+            source.parent.mkdir(parents=True)
+            payload = b"restore exact source after destination namespace swap"
+            source.write_bytes(payload)
+            storage_key = store.storage_key(source)
+            destination_parent = run_root / "quarantine" / "recovery"
+            moved_parent = store.root / "moved-quarantine-parent"
+            decoy_parent = Path(directory) / "untrusted-quarantine-decoy"
+            decoy_parent.mkdir()
+            original_binding_check = store._assert_directory_binding
+            destination_binding_checks = 0
+
+            def swap_after_pre_unlink_destination_check(
+                root_fd,
+                parts,
+                expected_fd,
+            ):
+                nonlocal destination_binding_checks
+                result = original_binding_check(root_fd, parts, expected_fd)
+                if tuple(parts)[-2:] == ("quarantine", "recovery"):
+                    destination_binding_checks += 1
+                    if destination_binding_checks == 2:
+                        os.rename(destination_parent, moved_parent)
+                        os.symlink(decoy_parent, destination_parent)
+                return result
+
+            with mock.patch.object(
+                store,
+                "_assert_directory_binding",
+                side_effect=swap_after_pre_unlink_destination_check,
+            ):
+                with self.assertRaises(ArtifactRecoveryStoreError):
+                    store.quarantine(
+                        RECOVERY_WORKSPACE,
+                        RUN,
+                        storage_key,
+                        category="recovery",
+                        reason="destination-namespace-swap",
+                    )
+
+            self.assertEqual(source.read_bytes(), payload)
+            self.assertEqual(source.stat().st_nlink, 1)
+            self.assertEqual(list(moved_parent.glob("*.mp4")), [])
+            self.assertEqual(list(decoy_parent.glob("*.mp4")), [])
+
+    def test_artifact_root_swap_at_commit_is_rejected_and_source_is_restored(self):
+        with tempfile.TemporaryDirectory() as directory:
+            store = ArtifactRecoveryStore(Path(directory) / "artifacts")
+            run_root = store.run_root(RECOVERY_WORKSPACE, RUN)
+            source = run_root / "jobs" / "root-swap.part.mp4"
+            source.parent.mkdir(parents=True)
+            payload = b"restore exact source after artifact root swap"
+            source.write_bytes(payload)
+            storage_key = store.storage_key(source)
+            original_root = store.root
+            moved_root = Path(directory) / "moved-artifact-root"
+            original_binding_check = store._assert_directory_binding
+            destination_binding_checks = 0
+
+            def swap_root_after_pre_unlink_destination_check(
+                root_fd,
+                parts,
+                expected_fd,
+            ):
+                nonlocal destination_binding_checks
+                result = original_binding_check(root_fd, parts, expected_fd)
+                if tuple(parts)[-2:] == ("quarantine", "recovery"):
+                    destination_binding_checks += 1
+                    if destination_binding_checks == 2:
+                        os.rename(original_root, moved_root)
+                        original_root.mkdir()
+                return result
+
+            with mock.patch.object(
+                store,
+                "_assert_directory_binding",
+                side_effect=swap_root_after_pre_unlink_destination_check,
+            ):
+                with self.assertRaises(ArtifactRecoveryStoreError):
+                    store.quarantine(
+                        RECOVERY_WORKSPACE,
+                        RUN,
+                        storage_key,
+                        category="recovery",
+                        reason="artifact-root-swap",
+                    )
+
+            moved_source = moved_root.joinpath(*source.relative_to(original_root).parts)
+            self.assertEqual(moved_source.read_bytes(), payload)
+            self.assertEqual(moved_source.stat().st_nlink, 1)
+            self.assertEqual(list(original_root.rglob("*.mp4")), [])
+            self.assertEqual(list(moved_root.glob("**/quarantine/**/*.mp4")), [])
 
 
 if __name__ == "__main__":

@@ -24,6 +24,7 @@ from services.v4_platform import (
 from services.v5_core_os.episode_production import (
     create_local_development_boundary_from_environment,
 )
+from services.v4_platform.comfyui import _m11_camera_prompt
 
 
 UNET = "wan2.2_ti2v_5B_fp16.safetensors"
@@ -579,6 +580,19 @@ class V4ComfyUIWan22AdapterTests(unittest.TestCase):
                 batch_idempotency_key="m11-missing-start-image-capability",
             )
         self.assertIsNone(self.server.last_prompt)
+
+    def test_m11_camera_prompt_rejects_invalid_numeric_lens(self):
+        camera = m11_request("a" * 64)["promptSpec"]["cameraInstruction"]
+        for lens in (
+            float("nan"),
+            float("inf"),
+            float("-inf"),
+            10**400,
+        ):
+            with self.subTest(lens=lens):
+                invalid = dict(camera, lensMm=lens)
+                with self.assertRaises(ComfyUIConfigurationError):
+                    _m11_camera_prompt(invalid)
 
     def test_capability_probe_fails_closed_when_model_is_not_recognized(self):
         self.server.omit_unet = True
