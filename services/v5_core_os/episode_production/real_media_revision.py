@@ -41,7 +41,12 @@ from .media_candidate_review import (
     CANDIDATE,
     HUMAN_SELECTION,
     K2MediaCandidateReviewService,
+    MediaSelectionSubject,
+    SEMANTIC_VISUAL_QC,
     TECHNICAL_VALIDATION,
+    VerifiedMediaSelection,
+    VISUAL_QC_PROFILE,
+    VISUAL_QC_PROFILE_DIGEST,
 )
 from .shot_graph import K2ShotGraphService
 
@@ -354,6 +359,298 @@ def _typed_record_payload(
     return deepcopy(dict(matches[0]["payload"]))
 
 
+def _typed_admission_chain(
+    records: Sequence[Mapping[str, Any]],
+    *,
+    workspace_ref: str,
+    production_run_ref: str,
+    selection: Mapping[str, Any],
+    expected_media_kind: str,
+    operation: str,
+) -> tuple[dict[str, Any], dict[str, Any], dict[str, Any]]:
+    """Reconstruct one exact Candidate→Technical→QC→Selection chain.
+
+    Admission replay is historical, so evidence appended after selection may
+    make the candidate or QC stale without invalidating the already committed
+    admission.  Currentness is therefore evaluated at the selection record's
+    journal position, not against the live tail of the journal.
+    """
+
+    def exact_record(
+        *,
+        kind: str,
+        ref: Any,
+        version: Any,
+        digest: Any,
+    ) -> tuple[dict[str, Any], dict[str, Any], int]:
+        matches = [
+            (index, item)
+            for index, item in enumerate(records)
+            if item.get("recordRef") == ref
+            and item.get("recordVersion") == version
+        ]
+        if len(matches) != 1:
+            raise RepositoryUnavailableError(
+                f"{operation} canonical record membership is inconsistent"
+            )
+        index, record = matches[0]
+        payload = record.get("payload")
+        if (
+            record.get("workspaceRef") != workspace_ref
+            or record.get("productionRunRef") != production_run_ref
+            or record.get("recordKind") != kind
+            or record.get("payloadDigest") != digest
+            or not isinstance(payload, Mapping)
+            or payload.get("payloadDigest") != digest
+        ):
+            raise RepositoryUnavailableError(
+                f"{operation} canonical record membership is inconsistent"
+            )
+        return deepcopy(dict(record)), deepcopy(dict(payload)), index
+
+    selection_record, persisted_selection, selection_index = exact_record(
+        kind=HUMAN_SELECTION,
+        ref=selection.get("selectionRef"),
+        version=selection.get("selectionVersion"),
+        digest=selection.get("payloadDigest"),
+    )
+    if persisted_selection != dict(selection):
+        raise RepositoryUnavailableError(
+            f"{operation} canonical selection payload is inconsistent"
+        )
+    qc_record, qc, qc_index = exact_record(
+        kind=SEMANTIC_VISUAL_QC,
+        ref=selection.get("visualQcRef"),
+        version=selection.get("visualQcVersion"),
+        digest=selection.get("visualQcDigest"),
+    )
+    technical_record, technical, technical_index = exact_record(
+        kind=TECHNICAL_VALIDATION,
+        ref=qc.get("technicalValidationRef"),
+        version=qc.get("technicalValidationVersion"),
+        digest=qc.get("technicalValidationDigest"),
+    )
+    candidate_record, candidate, candidate_index = exact_record(
+        kind=CANDIDATE,
+        ref=selection.get("candidateRef"),
+        version=selection.get("candidateVersion"),
+        digest=selection.get("candidateDigest"),
+    )
+
+    if (
+        candidate_index >= technical_index
+        or technical_index >= qc_index
+        or qc_index >= selection_index
+        or candidate.get("schemaVersion")
+        not in (
+            {"v5.k2-media-candidate.v1"}
+            if expected_media_kind == "IMAGE"
+            else {
+                "v5.k2-media-candidate.v1",
+                "v5.k2-media-candidate.v2",
+            }
+        )
+        or candidate.get("candidateRef") != candidate_record.get("recordRef")
+        or candidate.get("candidateVersion")
+        != candidate_record.get("recordVersion")
+        or candidate.get("mediaKind") != expected_media_kind
+        or candidate.get("lifecycleState") != "CANDIDATE_RECORDED"
+        or candidate.get("publicationAllowed") is not False
+        or technical.get("schemaVersion")
+        != "v5.k2-technical-validation.v1"
+        or technical.get("technicalValidationRef")
+        != technical_record.get("recordRef")
+        or technical.get("technicalValidationVersion")
+        != technical_record.get("recordVersion")
+        or technical.get("candidateRef") != candidate.get("candidateRef")
+        or technical.get("candidateVersion")
+        != candidate.get("candidateVersion")
+        or technical.get("candidateDigest") != candidate.get("payloadDigest")
+        or technical.get("artifactDigest") != candidate.get("artifactDigest")
+        or technical.get("result") != "PASS"
+        or technical.get("lifecycleState") != "TECHNICALLY_VERIFIED"
+        or technical.get("publicationAllowed") is not False
+        or qc.get("schemaVersion")
+        != "v5.k2-semantic-visual-qc-decision.v1"
+        or qc.get("visualQcRef") != qc_record.get("recordRef")
+        or qc.get("visualQcVersion") != qc_record.get("recordVersion")
+        or qc.get("technicalValidationRef")
+        != technical_record.get("recordRef")
+        or qc.get("technicalValidationVersion")
+        != technical_record.get("recordVersion")
+        or qc.get("technicalValidationDigest")
+        != technical_record.get("payloadDigest")
+        or qc.get("candidateRef") != candidate.get("candidateRef")
+        or qc.get("candidateVersion") != candidate.get("candidateVersion")
+        or qc.get("candidateDigest") != candidate.get("payloadDigest")
+        or qc.get("artifactDigest") != candidate.get("artifactDigest")
+        or qc.get("revisionRef") != candidate.get("revisionRef")
+        or qc.get("slotRef") != candidate.get("slotRef")
+        or qc.get("sourceRequestRef") != candidate.get("sourceRequestRef")
+        or qc.get("sourceRequestDigest")
+        != candidate.get("sourceRequestDigest")
+        or qc.get("sourceAssetVersions")
+        != candidate.get("sourceAssetVersions")
+        or qc.get("assessmentProfile") != VISUAL_QC_PROFILE
+        or qc.get("assessmentProfileDigest") != VISUAL_QC_PROFILE_DIGEST
+        or qc.get("result") != "PASS"
+        or qc.get("lifecycleState") != "SEMANTIC_QC_PASSED"
+        or qc.get("publicationAllowed") is not False
+        or selection.get("schemaVersion")
+        != "v5.k2-human-selection-decision.v1"
+        or selection.get("selectionRef")
+        != selection_record.get("recordRef")
+        or selection.get("selectionVersion")
+        != selection_record.get("recordVersion")
+        or selection.get("candidateRef") != candidate.get("candidateRef")
+        or selection.get("candidateVersion")
+        != candidate.get("candidateVersion")
+        or selection.get("candidateDigest") != candidate.get("payloadDigest")
+        or selection.get("artifactDigest") != candidate.get("artifactDigest")
+        or selection.get("visualQcRef") != qc_record.get("recordRef")
+        or selection.get("visualQcVersion") != qc_record.get("recordVersion")
+        or selection.get("visualQcDigest") != qc_record.get("payloadDigest")
+        or selection.get("decision") != "SELECTED"
+        or selection.get("lifecycleState") != "SELECTED_BY_HUMAN"
+        or selection.get("publicationAllowed") is not False
+    ):
+        raise RepositoryUnavailableError(
+            f"{operation} canonical typed chain is inconsistent"
+        )
+
+    try:
+        subject = MediaSelectionSubject.create(
+            workspace_ref=workspace_ref,
+            production_run_ref=production_run_ref,
+            revision_ref=candidate["revisionRef"],
+            slot_ref=candidate["slotRef"],
+            source_request_ref=candidate["sourceRequestRef"],
+            source_request_digest=candidate["sourceRequestDigest"],
+            candidate_ref=candidate["candidateRef"],
+            candidate_version=candidate["candidateVersion"],
+            candidate_digest=candidate["payloadDigest"],
+            artifact_digest=candidate["artifactDigest"],
+            visual_qc_ref=qc_record["recordRef"],
+            visual_qc_version=qc_record["recordVersion"],
+            visual_qc_digest=qc_record["payloadDigest"],
+        )
+        authority = VerifiedMediaSelection.create(
+            authority_ref=selection.get("authorityRef"),
+            approval_ref=selection.get("approvalRef"),
+            actor_ref=selection.get("actorRef"),
+            actor_kind=selection.get("actorKind"),
+            decision=selection.get("decision"),
+            authority_decision_ref=selection.get("authorityDecisionRef"),
+            authority_decision_digest=selection.get(
+                "authorityDecisionDigest"
+            ),
+            decided_at=selection.get("authorityDecidedAt"),
+            subject_digest=selection.get("subjectDigest"),
+        )
+    except EpisodeProductionError as exc:
+        raise RepositoryUnavailableError(
+            f"{operation} selection authority evidence is inconsistent"
+        ) from exc
+    if (
+        selection.get("subjectDigest") != subject.subject_digest
+        or not authority.matches(
+            subject=subject,
+            approval_ref=selection.get("approvalRef"),
+            decision="SELECTED",
+        )
+    ):
+        raise RepositoryUnavailableError(
+            f"{operation} selection authority evidence is inconsistent"
+        )
+
+    # Reconstruct candidate and QC currentness immediately before selection.
+    prior_records = records[:selection_index]
+    same_slot_candidates = [
+        item
+        for item in prior_records
+        if item.get("recordKind") == CANDIDATE
+        and isinstance(item.get("payload"), Mapping)
+        and item["payload"].get("mediaKind") == expected_media_kind
+        and item["payload"].get("slotRef") == candidate.get("slotRef")
+    ]
+    if (
+        not same_slot_candidates
+        or same_slot_candidates[-1].get("recordRef")
+        != candidate_record.get("recordRef")
+        or same_slot_candidates[-1].get("recordVersion")
+        != candidate_record.get("recordVersion")
+        or same_slot_candidates[-1].get("payloadDigest")
+        != candidate_record.get("payloadDigest")
+    ):
+        raise RepositoryUnavailableError(
+            f"{operation} candidate was not current at selection"
+        )
+
+    candidate_qcs = [
+        item
+        for item in prior_records
+        if item.get("recordKind") == SEMANTIC_VISUAL_QC
+        and isinstance(item.get("payload"), Mapping)
+        and item["payload"].get("candidateRef") == candidate.get("candidateRef")
+        and item["payload"].get("candidateVersion")
+        == candidate.get("candidateVersion")
+        and item["payload"].get("candidateDigest")
+        == candidate.get("payloadDigest")
+    ]
+    identities = {
+        (
+            item.get("recordRef"),
+            item.get("recordVersion"),
+            item.get("payloadDigest"),
+        )
+        for item in candidate_qcs
+    }
+    superseded: set[tuple[Any, Any, Any]] = set()
+    for item in candidate_qcs:
+        prior = item["payload"].get("supersedesVisualQc")
+        if prior is None:
+            continue
+        if not isinstance(prior, Mapping):
+            raise RepositoryUnavailableError(
+                f"{operation} semantic QC supersession is inconsistent"
+            )
+        identity = (
+            prior.get("visualQcRef"),
+            prior.get("visualQcVersion"),
+            prior.get("visualQcDigest"),
+        )
+        if identity not in identities:
+            raise RepositoryUnavailableError(
+                f"{operation} semantic QC supersession is inconsistent"
+            )
+        superseded.add(identity)
+    applicable_qcs = [
+        item
+        for item in candidate_qcs
+        if (
+            item.get("recordRef"),
+            item.get("recordVersion"),
+            item.get("payloadDigest"),
+        )
+        not in superseded
+        and item["payload"].get("assessmentProfile") == VISUAL_QC_PROFILE
+        and item["payload"].get("assessmentProfileDigest")
+        == VISUAL_QC_PROFILE_DIGEST
+    ]
+    if (
+        len(applicable_qcs) != 1
+        or applicable_qcs[0].get("recordRef") != qc_record.get("recordRef")
+        or applicable_qcs[0].get("recordVersion")
+        != qc_record.get("recordVersion")
+        or applicable_qcs[0].get("payloadDigest")
+        != qc_record.get("payloadDigest")
+    ):
+        raise RepositoryUnavailableError(
+            f"{operation} semantic QC was not current at selection"
+        )
+    return candidate, technical, qc
+
+
 def _fact(gate: Mapping[str, Any], kind: str) -> dict[str, Any]:
     matches = [
         item
@@ -387,6 +684,26 @@ def _facts(gate: Mapping[str, Any], prefix: str) -> list[dict[str, Any]]:
         and isinstance(item.get("payload"), Mapping)
     ]
     return sorted(values, key=lambda item: item["ordinal"])
+
+
+def _snapshot_gate(
+    gates: Sequence[Mapping[str, Any]],
+    *,
+    workspace_ref: str,
+    production_run_ref: str,
+    gate_name: str,
+    operation: str,
+) -> dict[str, Any]:
+    matches = [item for item in gates if item.get("gateName") == gate_name]
+    if (
+        len(matches) != 1
+        or matches[0].get("workspaceRef") != workspace_ref
+        or matches[0].get("productionRunRef") != production_run_ref
+    ):
+        raise RepositoryUnavailableError(
+            f"{operation} canonical plan gate is inconsistent"
+        )
+    return deepcopy(dict(matches[0]))
 
 
 def _content_digest(value: object, field: str) -> str:
@@ -1609,16 +1926,33 @@ class K2RealMediaRevisionService:
         workspace: str,
         run_ref: str,
         expected_selection: EvidenceRecord,
+        *,
+        records: Sequence[Mapping[str, Any]] | None = None,
+        gates: Sequence[Mapping[str, Any]] | None = None,
+        current_state: str | None = None,
     ) -> dict[str, Any]:
         """Read one complete canonical successor operation by its raw key."""
 
-        selection_record = self.evidence.get_record_by_idempotency_key(
-            workspace,
-            run_ref,
-            expected_selection.idempotencyKey,
-        )
+        supplied = (records is not None, gates is not None, current_state is not None)
+        if any(supplied) and not all(supplied):
+            raise RepositoryUnavailableError(
+                "image successor replay snapshot inputs are incomplete"
+            )
+        if records is None and gates is None and current_state is None:
+            snapshot = self.evidence.read_snapshot(workspace, run_ref)
+            records = snapshot.records
+            gates = snapshot.gates
+            current_state = snapshot.currentState
+        selection_matches = [
+            item
+            for item in records or ()
+            if item.get("idempotencyKey") == expected_selection.idempotencyKey
+        ]
+        selection_record = selection_matches[0] if len(selection_matches) == 1 else None
         if (
             selection_record is None
+            or selection_record.get("workspaceRef") != workspace
+            or selection_record.get("productionRunRef") != run_ref
             or selection_record.get("recordKind") != HUMAN_SELECTION
             or selection_record.get("recordRef") != expected_selection.recordRef
             or selection_record.get("recordVersion")
@@ -1635,11 +1969,95 @@ class K2RealMediaRevisionService:
                 "image successor operation content changed"
             )
         selection = deepcopy(dict(selection_record["payload"]))
+        candidate, _, _ = _typed_admission_chain(
+            records or (),
+            workspace_ref=workspace,
+            production_run_ref=run_ref,
+            selection=selection,
+            expected_media_kind="IMAGE",
+            operation="M10 image successor admission",
+        )
+        plan_gate = _snapshot_gate(
+            gates or (),
+            workspace_ref=workspace,
+            production_run_ref=run_ref,
+            gate_name=REAL_IMAGE_PLAN_GATE,
+            operation="M10 image successor admission",
+        )
+        plan_bundle = self._bundle(plan_gate)
+        plan = plan_bundle["realImagePlan"]
+        requests = plan_bundle["generationRequests"]
+        if (
+            plan.get("schemaVersion") != REAL_IMAGE_PLAN_SCHEMA_VERSION
+            or plan.get("workspaceRef") != workspace
+            or plan.get("productionRunRef") != run_ref
+            or plan.get("rootPayloadDigest")
+            != plan_gate.get("rootPayloadDigest")
+            or not isinstance(requests, list)
+            or len(requests) != 4
+            or [item.get("ordinal") for item in requests] != [1, 2, 3, 4]
+            or len({item.get("generationRequestRef") for item in requests}) != 4
+            or len({item.get("creativeShotVersionRef") for item in requests})
+            != 4
+        ):
+            raise RepositoryUnavailableError(
+                "image successor replay plan is inconsistent"
+            )
+        requests_by_ref = {
+            item.get("generationRequestRef"): item for item in requests
+        }
+        request = requests_by_ref.get(candidate.get("sourceRequestRef"))
+        selection_index = next(
+            index
+            for index, item in enumerate(records or ())
+            if item.get("recordRef") == selection_record.get("recordRef")
+            and item.get("recordVersion")
+            == selection_record.get("recordVersion")
+        )
+        latest_by_slot: dict[Any, Mapping[str, Any]] = {}
+        expected_slots = {
+            item.get("creativeShotVersionRef") for item in requests
+        }
+        for item in (records or ())[:selection_index]:
+            payload = item.get("payload")
+            if (
+                item.get("recordKind") == CANDIDATE
+                and isinstance(payload, Mapping)
+                and payload.get("mediaKind") == "IMAGE"
+                and payload.get("slotRef") in expected_slots
+            ):
+                latest_by_slot[payload.get("slotRef")] = payload
+        if (
+            not isinstance(request, Mapping)
+            or candidate.get("revisionRef") == plan.get("realImagePlanRef")
+            or candidate.get("slotRef")
+            != request.get("creativeShotVersionRef")
+            or candidate.get("sourceRequestDigest")
+            != request.get("payloadDigest")
+            or candidate.get("sourceAssetVersions") != []
+            or set(latest_by_slot) != expected_slots
+            or any(
+                value.get("revisionRef") != candidate.get("revisionRef")
+                for value in latest_by_slot.values()
+            )
+            or any(
+                value.get("sourceRequestRef")
+                != requests[index - 1].get("generationRequestRef")
+                or value.get("sourceRequestDigest")
+                != requests[index - 1].get("payloadDigest")
+                for index, value in (
+                    (item["ordinal"], latest_by_slot[item["creativeShotVersionRef"]])
+                    for item in requests
+                )
+            )
+        ):
+            raise RepositoryUnavailableError(
+                "image successor replay candidate revision is inconsistent"
+            )
         matching_admissions = [
             item
-            for item in self.evidence.list_records(
-                workspace, run_ref, record_kind=ASSET_ADMISSION
-            )
+            for item in records or ()
+            if item.get("recordKind") == ASSET_ADMISSION
             if isinstance(item.get("payload"), Mapping)
             and item["payload"].get("selectionRef")
             == selection_record["recordRef"]
@@ -1663,12 +2081,14 @@ class K2RealMediaRevisionService:
                 }
             )[:40]
         )
-        asset_record = self.evidence.get_record(
-            workspace,
-            run_ref,
-            admission.get("assetVersionRef"),
-            admission.get("assetVersionVersion"),
-        )
+        asset_matches = [
+            item
+            for item in records or ()
+            if item.get("recordRef") == admission.get("assetVersionRef")
+            and item.get("recordVersion")
+            == admission.get("assetVersionVersion")
+        ]
+        asset_record = asset_matches[0] if len(asset_matches) == 1 else None
         expected_asset_key = (
             "m10-successor-asset-"
             + _digest(
@@ -1694,8 +2114,27 @@ class K2RealMediaRevisionService:
                 "image successor replay AssetVersion batch is incomplete"
             )
         asset = deepcopy(dict(asset_record["payload"]))
+        predecessor_matches = [
+            item
+            for item in records or ()
+            if item.get("recordKind") == ASSET_VERSION
+            and item.get("recordRef") == asset.get("supersedesAssetVersionRef")
+            and item.get("payloadDigest")
+            == asset.get("supersedesAssetVersionDigest")
+            and isinstance(item.get("payload"), Mapping)
+        ]
+        predecessor = (
+            predecessor_matches[0]["payload"]
+            if len(predecessor_matches) == 1
+            else None
+        )
         if (
-            admission.get("candidateRef") != selection.get("candidateRef")
+            admission.get("schemaVersion") != "v5.k2-asset-admission.v1"
+            or admission.get("version") != 1
+            or admission.get("ordinal") != request.get("ordinal")
+            or admission.get("admissionState") != "ADMITTED"
+            or admission.get("publicationAllowed") is not False
+            or admission.get("candidateRef") != selection.get("candidateRef")
             or admission.get("candidateDigest")
             != selection.get("candidateDigest")
             or admission.get("assetVersionRef") != asset.get("assetVersionRef")
@@ -1710,12 +2149,48 @@ class K2RealMediaRevisionService:
             or asset.get("sourceCandidateRef") != selection.get("candidateRef")
             or asset.get("sourceCandidateDigest")
             != selection.get("candidateDigest")
+            or asset.get("schemaVersion")
+            != REAL_IMAGE_ASSET_VERSION_SCHEMA_VERSION
+            or asset.get("workspaceRef") != workspace
+            or asset.get("productionRunRef") != run_ref
+            or not isinstance(predecessor, Mapping)
+            or asset.get("assetRef") != predecessor.get("assetRef")
+            or asset.get("version") != int(predecessor.get("version", 0)) + 1
+            or asset.get("ordinal") != request.get("ordinal")
+            or asset.get("generationRequestRef")
+            != request.get("generationRequestRef")
+            or asset.get("generationRequestVersionRef")
+            != request.get("generationRequestVersionRef")
+            or asset.get("generationRequestDigest")
+            != request.get("payloadDigest")
+            or asset.get("creativeShotRef") != request.get("creativeShotRef")
+            or asset.get("creativeShotVersionRef")
+            != request.get("creativeShotVersionRef")
+            or asset.get("creativeShotDigest")
+            != request.get("creativeShotDigest")
+            or asset.get("revisionRef") != candidate.get("revisionRef")
+            or asset.get("semanticVisualQcRef")
+            != selection.get("visualQcRef")
+            or asset.get("semanticVisualQcDigest")
+            != selection.get("visualQcDigest")
+            or asset.get("artifactRef") != candidate.get("artifactRef")
+            or asset.get("storageKey") != candidate.get("storageKey")
+            or asset.get("byteSize") != candidate.get("artifactByteSize")
+            or asset.get("sha256") != candidate.get("artifactDigest")
+            or asset.get("provenance") != candidate.get("provenance")
+            or asset.get("mediaKind") != "image"
+            or asset.get("state") != "REGISTERED"
+            or asset.get("immutable") is not True
+            or asset.get("publicationAllowed") is not False
+            or predecessor.get("creativeShotVersionRef")
+            != request.get("creativeShotVersionRef")
+            or str(predecessor.get("mediaKind", "")).lower() != "image"
         ):
             raise RepositoryUnavailableError(
                 "image successor replay canonical lineage is inconsistent"
             )
         return {
-            "state": self.evidence.current_state(workspace, run_ref),
+            "state": current_state,
             "humanSelection": selection,
             "assetAdmission": admission,
             "assetVersion": asset,
@@ -5094,9 +5569,19 @@ class K2RealMediaRevisionService:
         client_key: str,
         selection_request_digest: str,
     ) -> dict[str, Any] | None:
+        snapshot = self.evidence.read_snapshot(workspace, run_ref)
+        if (
+            snapshot.workspaceRef != workspace
+            or snapshot.productionRunRef != run_ref
+        ):
+            raise RepositoryUnavailableError(
+                "M11 successor replay snapshot scope is invalid"
+            )
+        records = snapshot.records
+        gates = snapshot.gates
         matches = [
             item
-            for item in self.evidence.list_records(workspace, run_ref)
+            for item in records
             if item.get("idempotencyKey") == client_key
         ]
         if not matches:
@@ -5108,9 +5593,8 @@ class K2RealMediaRevisionService:
         operation_record = matches[0]
         activations = [
             item
-            for item in self.evidence.list_records(
-                workspace, run_ref, record_kind=ASSET_ADMISSION
-            )
+            for item in records
+            if item.get("recordKind") == ASSET_ADMISSION
             if isinstance(item.get("payload"), Mapping)
             and item["payload"].get("schemaVersion")
             == REAL_VIDEO_SUCCESSOR_ACTIVATION_SCHEMA_VERSION
@@ -5147,7 +5631,10 @@ class K2RealMediaRevisionService:
         canonical = {
             item["assetVersionRef"]: item
             for item in self.candidate_review.asset_versions.list_asset_versions(
-                workspace, run_ref
+                workspace,
+                run_ref,
+                records=records,
+                gates=gates,
             )
             if str(item.get("mediaKind", "")).lower() == "video"
         }
@@ -5160,7 +5647,12 @@ class K2RealMediaRevisionService:
             raise RepositoryUnavailableError(
                 "M11 successor replay AssetVersions are incomplete"
             )
-        active = self._active_video_admission(workspace, run_ref)
+        active = self._active_video_admission(
+            workspace,
+            run_ref,
+            records=records,
+            gates=gates,
+        )
         if (
             active is None
             or active.get("manifestRef") != activation.get("admissionRef")
@@ -5168,15 +5660,20 @@ class K2RealMediaRevisionService:
         ):
             # Historical replay remains addressable after a later activation.
             admission_index: dict[str, dict[str, Any]] = {}
-            gate = self.evidence.get_gate(
-                workspace, run_ref, REAL_VIDEO_ADMISSION_GATE
+            gate = next(
+                (
+                    item
+                    for item in gates
+                    if item.get("gateName") == REAL_VIDEO_ADMISSION_GATE
+                ),
+                None,
             )
             if gate is not None:
                 for item in self._video_admission_bundle(gate)["assetAdmissions"]:
                     admission_index[item["admissionRef"]] = item
-            for item in self.evidence.list_records(
-                workspace, run_ref, record_kind=ASSET_ADMISSION
-            ):
+            for item in records:
+                if item.get("recordKind") != ASSET_ADMISSION:
+                    continue
                 item_payload = item.get("payload")
                 if (
                     isinstance(item_payload, Mapping)
@@ -5208,7 +5705,7 @@ class K2RealMediaRevisionService:
             "realVideoAdmissionManifest": activation,
             "assetAdmissions": [deepcopy(dict(item)) for item in item_admissions],
             "assetVersions": [deepcopy(dict(item)) for item in assets],
-            "state": self.evidence.current_state(workspace, run_ref),
+            "state": snapshot.currentState,
             "idempotentReplay": True,
             "publicationAllowed": False,
         }
@@ -5812,7 +6309,11 @@ class K2RealMediaRevisionService:
     def _canonical_admission_snapshot(
         self,
         gate: Mapping[str, Any],
-    ) -> tuple[dict[str, Any], tuple[dict[str, Any], ...]]:
+    ) -> tuple[
+        dict[str, Any],
+        tuple[dict[str, Any], ...],
+        tuple[dict[str, Any], ...],
+    ]:
         """Bind replay validation to one immutable gate/record snapshot."""
 
         workspace = gate.get("workspaceRef")
@@ -5838,7 +6339,7 @@ class K2RealMediaRevisionService:
             raise RepositoryUnavailableError(
                 "admission replay gate is not canonical in the evidence snapshot"
             )
-        return deepcopy(dict(matches[0])), snapshot.records
+        return deepcopy(dict(matches[0])), snapshot.records, snapshot.gates
 
     def _validated_image_admission_replay(
         self,
@@ -5846,9 +6347,14 @@ class K2RealMediaRevisionService:
         *,
         expected_selection_request_digest: str,
         records: Sequence[Mapping[str, Any]] | None = None,
+        gates: Sequence[Mapping[str, Any]] | None = None,
     ) -> dict[str, Any]:
-        if records is None:
-            gate, records = self._canonical_admission_snapshot(gate)
+        if (records is None) != (gates is None):
+            raise RepositoryUnavailableError(
+                "M10 image admission snapshot inputs are incomplete"
+            )
+        if records is None and gates is None:
+            gate, records, gates = self._canonical_admission_snapshot(gate)
         bundle = self._admission_bundle(gate, records=records)
         manifest = bundle["realImageAdmissionManifest"]
         if (
@@ -5869,6 +6375,56 @@ class K2RealMediaRevisionService:
             raise RepositoryUnavailableError(
                 "M10 image admission canonical batch is incomplete"
             )
+        workspace = gate["workspaceRef"]
+        run_ref = gate["productionRunRef"]
+        plan_gate = _snapshot_gate(
+            gates or (),
+            workspace_ref=workspace,
+            production_run_ref=run_ref,
+            gate_name=REAL_IMAGE_PLAN_GATE,
+            operation="M10 image admission",
+        )
+        plan_bundle = self._bundle(plan_gate)
+        plan = plan_bundle["realImagePlan"]
+        requests = plan_bundle["generationRequests"]
+        if (
+            manifest.get("schemaVersion")
+            != REAL_IMAGE_UNIFIED_ADMISSION_MANIFEST_SCHEMA_VERSION
+            or manifest.get("workspaceRef") != workspace
+            or manifest.get("productionRunRef") != run_ref
+            or manifest.get("version") != 2
+            or manifest.get("state") != "REAL_IMAGE_READY"
+            or manifest.get("publicationAllowed") is not False
+            or plan.get("schemaVersion") != REAL_IMAGE_PLAN_SCHEMA_VERSION
+            or plan.get("workspaceRef") != workspace
+            or plan.get("productionRunRef") != run_ref
+            or plan.get("realImagePlanRef") != manifest.get("realImagePlanRef")
+            or plan.get("payloadDigest") != manifest.get("realImagePlanDigest")
+            or plan.get("rootPayloadDigest")
+            != plan_gate.get("rootPayloadDigest")
+            or plan_gate.get("rootPayloadDigest")
+            != manifest.get("rootPayloadDigest")
+            or gate.get("rootPayloadDigest")
+            != plan_gate.get("rootPayloadDigest")
+            or manifest.get("revisionRef") != plan.get("realImagePlanRef")
+            or not isinstance(requests, list)
+            or len(requests) != 4
+            or [item.get("ordinal") for item in requests] != [1, 2, 3, 4]
+            or len({item.get("generationRequestRef") for item in requests}) != 4
+            or len(
+                {item.get("generationRequestVersionRef") for item in requests}
+            )
+            != 4
+            or len({item.get("payloadDigest") for item in requests}) != 4
+            or len({item.get("creativeShotVersionRef") for item in requests})
+            != 4
+        ):
+            raise RepositoryUnavailableError(
+                "M10 image admission canonical plan is inconsistent"
+            )
+        requests_by_ref = {
+            item.get("generationRequestRef"): item for item in requests
+        }
         candidate_index = {
             item.get("candidateRef"): item
             for item in candidates
@@ -5929,22 +6485,81 @@ class K2RealMediaRevisionService:
             raise RepositoryUnavailableError(
                 "M10 image admission canonical batch digest is inconsistent"
             )
+        technical_identities: set[tuple[Any, Any, Any]] = set()
+        qc_identities: set[tuple[Any, Any, Any]] = set()
         for selection in selections:
             candidate = candidate_index.get(selection.get("candidateRef"))
+            chain_candidate, technical, qc = _typed_admission_chain(
+                records,
+                workspace_ref=workspace,
+                production_run_ref=run_ref,
+                selection=selection,
+                expected_media_kind="IMAGE",
+                operation="M10 image admission",
+            )
+            request = (
+                requests_by_ref.get(candidate.get("sourceRequestRef"))
+                if isinstance(candidate, Mapping)
+                else None
+            )
             if (
                 not isinstance(candidate, Mapping)
+                or not isinstance(request, Mapping)
+                or chain_candidate != candidate
                 or selection.get("candidateDigest")
                 != candidate.get("payloadDigest")
+                or candidate.get("revisionRef") != manifest.get("revisionRef")
+                or candidate.get("slotRef")
+                != request.get("creativeShotVersionRef")
+                or candidate.get("sourceRequestDigest")
+                != request.get("payloadDigest")
+                or candidate.get("sourceAssetVersions") != []
             ):
                 raise RepositoryUnavailableError(
                     "M10 image admission selection lineage is inconsistent"
                 )
+            technical_identities.add(
+                (
+                    technical.get("technicalValidationRef"),
+                    technical.get("technicalValidationVersion"),
+                    technical.get("payloadDigest"),
+                )
+            )
+            qc_identities.add(
+                (
+                    qc.get("visualQcRef"),
+                    qc.get("visualQcVersion"),
+                    qc.get("payloadDigest"),
+                )
+            )
+        if len(technical_identities) != 4 or len(qc_identities) != 4:
+            raise RepositoryUnavailableError(
+                "M10 image admission typed chain coverage is ambiguous"
+            )
         for admission in admissions:
             selection = selection_index.get(admission.get("selectionRef"))
             asset = asset_index.get(admission.get("assetVersionRef"))
+            candidate = (
+                candidate_index.get(selection.get("candidateRef"))
+                if isinstance(selection, Mapping)
+                else None
+            )
+            request = (
+                requests_by_ref.get(candidate.get("sourceRequestRef"))
+                if isinstance(candidate, Mapping)
+                else None
+            )
             if (
                 not isinstance(selection, Mapping)
                 or not isinstance(asset, Mapping)
+                or not isinstance(candidate, Mapping)
+                or not isinstance(request, Mapping)
+                or admission.get("schemaVersion")
+                != "v5.k2-asset-admission.v1"
+                or admission.get("version") != 1
+                or admission.get("ordinal") != request.get("ordinal")
+                or admission.get("admissionState") != "ADMITTED"
+                or admission.get("publicationAllowed") is not False
                 or admission.get("selectionVersion")
                 != selection.get("selectionVersion")
                 or admission.get("selectionDigest")
@@ -5961,6 +6576,42 @@ class K2RealMediaRevisionService:
                 != selection.get("selectionVersion")
                 or asset.get("humanSelectionDigest")
                 != selection.get("payloadDigest")
+                or asset.get("schemaVersion")
+                != REAL_IMAGE_ASSET_VERSION_SCHEMA_VERSION
+                or asset.get("workspaceRef") != workspace
+                or asset.get("productionRunRef") != run_ref
+                or asset.get("version") != 1
+                or asset.get("ordinal") != request.get("ordinal")
+                or asset.get("generationRequestRef")
+                != request.get("generationRequestRef")
+                or asset.get("generationRequestVersionRef")
+                != request.get("generationRequestVersionRef")
+                or asset.get("generationRequestDigest")
+                != request.get("payloadDigest")
+                or asset.get("creativeShotRef")
+                != request.get("creativeShotRef")
+                or asset.get("creativeShotVersionRef")
+                != request.get("creativeShotVersionRef")
+                or asset.get("creativeShotDigest")
+                != request.get("creativeShotDigest")
+                or asset.get("revisionRef") != candidate.get("revisionRef")
+                or asset.get("sourceCandidateRef")
+                != candidate.get("candidateRef")
+                or asset.get("sourceCandidateDigest")
+                != candidate.get("payloadDigest")
+                or asset.get("semanticVisualQcRef")
+                != selection.get("visualQcRef")
+                or asset.get("semanticVisualQcDigest")
+                != selection.get("visualQcDigest")
+                or asset.get("artifactRef") != candidate.get("artifactRef")
+                or asset.get("storageKey") != candidate.get("storageKey")
+                or asset.get("byteSize") != candidate.get("artifactByteSize")
+                or asset.get("sha256") != candidate.get("artifactDigest")
+                or asset.get("provenance") != candidate.get("provenance")
+                or asset.get("mediaKind") != "image"
+                or asset.get("state") != "REGISTERED"
+                or asset.get("immutable") is not True
+                or asset.get("publicationAllowed") is not False
             ):
                 raise RepositoryUnavailableError(
                     "M10 image admission record lineage is inconsistent"
@@ -5985,6 +6636,18 @@ class K2RealMediaRevisionService:
                 raise RepositoryUnavailableError(
                     "M10 image admission snapshot payload is inconsistent"
                 )
+        if (
+            [item.get("ordinal") for item in admissions] != [1, 2, 3, 4]
+            or [item.get("ordinal") for item in assets] != [1, 2, 3, 4]
+            or [
+                candidate_index[item.get("candidateRef")].get("slotRef")
+                for item in selections
+            ]
+            != [item.get("creativeShotVersionRef") for item in requests]
+        ):
+            raise RepositoryUnavailableError(
+                "M10 image admission ordered slot coverage is inconsistent"
+            )
         return bundle
 
     @staticmethod
@@ -6014,9 +6677,14 @@ class K2RealMediaRevisionService:
         *,
         expected_selection_request_digest: str,
         records: Sequence[Mapping[str, Any]] | None = None,
+        gates: Sequence[Mapping[str, Any]] | None = None,
     ) -> dict[str, Any]:
-        if records is None:
-            gate, records = self._canonical_admission_snapshot(gate)
+        if (records is None) != (gates is None):
+            raise RepositoryUnavailableError(
+                "M11 video admission snapshot inputs are incomplete"
+            )
+        if records is None and gates is None:
+            gate, records, gates = self._canonical_admission_snapshot(gate)
         bundle = self._video_admission_bundle(gate)
         manifest = bundle["realVideoAdmissionManifest"]
         if (
@@ -6025,6 +6693,76 @@ class K2RealMediaRevisionService:
         ):
             raise IdempotencyConflictError(
                 "M11 admission selection content changed"
+            )
+        workspace = gate["workspaceRef"]
+        run_ref = gate["productionRunRef"]
+        plan_gate = _snapshot_gate(
+            gates or (),
+            workspace_ref=workspace,
+            production_run_ref=run_ref,
+            gate_name=REAL_VIDEO_PLAN_GATE,
+            operation="M11 video admission",
+        )
+        plan_bundle = self._video_bundle(plan_gate)
+        plan = plan_bundle["realVideoPlan"]
+        baseline_requests = plan_bundle["generationRequests"]
+        if (
+            manifest.get("schemaVersion") != REAL_VIDEO_ADMISSION_SCHEMA_VERSION
+            or manifest.get("workspaceRef") != workspace
+            or manifest.get("productionRunRef") != run_ref
+            or plan.get("schemaVersion") != REAL_VIDEO_PLAN_SCHEMA_VERSION
+            or plan.get("workspaceRef") != workspace
+            or plan.get("productionRunRef") != run_ref
+            or manifest.get("realVideoPlanRef") != plan.get("realVideoPlanRef")
+            or manifest.get("realVideoPlanDigest") != plan.get("payloadDigest")
+            or manifest.get("version") != 1
+            or manifest.get("state") != "REAL_VIDEO_ADMITTED"
+            or manifest.get("publicationAllowed") is not False
+            or plan.get("rootPayloadDigest")
+            != plan_gate.get("rootPayloadDigest")
+            or gate.get("rootPayloadDigest")
+            != plan_gate.get("rootPayloadDigest")
+            or not isinstance(baseline_requests, list)
+            or len(baseline_requests) != 4
+            or [item.get("ordinal") for item in baseline_requests]
+            != [1, 2, 3, 4]
+            or plan.get("generationRequestRefs")
+            != [
+                item.get("generationRequestRef")
+                for item in baseline_requests
+            ]
+            or plan.get("generationRequestDigests")
+            != [item.get("payloadDigest") for item in baseline_requests]
+            or plan.get("sourceImageAssetVersionRefs")
+            != [
+                item.get("sourceImageAssetVersionRef")
+                for item in baseline_requests
+            ]
+            or plan.get("sourceImageAssetVersionDigests")
+            != [
+                item.get("sourceImageAssetVersionDigest")
+                for item in baseline_requests
+            ]
+            or len(
+                {item.get("generationRequestRef") for item in baseline_requests}
+            )
+            != 4
+            or len(
+                {
+                    item.get("generationRequestVersionRef")
+                    for item in baseline_requests
+                }
+            )
+            != 4
+            or len({item.get("payloadDigest") for item in baseline_requests})
+            != 4
+            or len(
+                {item.get("creativeShotVersionRef") for item in baseline_requests}
+            )
+            != 4
+        ):
+            raise RepositoryUnavailableError(
+                "M11 admission canonical plan is inconsistent"
             )
         admissions = bundle.get("assetAdmissions")
         assets = bundle.get("assetVersions")
@@ -6082,6 +6820,48 @@ class K2RealMediaRevisionService:
             raise RepositoryUnavailableError(
                 "M11 admission canonical batch is incomplete"
             )
+        asset_positions = [
+            index
+            for index, item in enumerate(records or ())
+            if item.get("recordKind") == ASSET_VERSION
+            and any(
+                item.get("recordRef") == ref
+                and item.get("payloadDigest") == digest
+                for ref, digest in zip(asset_refs, asset_digests)
+            )
+        ]
+        if len(asset_positions) != 4:
+            raise RepositoryUnavailableError(
+                "M11 admission canonical record cut is inconsistent"
+            )
+        admission_records = (records or ())[: max(asset_positions) + 1]
+        requests, current_revision = self._current_video_request_set(
+            workspace,
+            run_ref,
+            plan_bundle,
+            records=admission_records,
+            gates=gates,
+        )
+        if (
+            current_revision.get("realVideoRevisionRef")
+            != manifest.get("realVideoRevisionRef")
+            or current_revision.get("payloadDigest")
+            != manifest.get("realVideoRevisionDigest")
+            or current_revision.get("generationRequestRefs")
+            != [item.get("generationRequestRef") for item in requests]
+            or current_revision.get("generationRequestVersionRefs")
+            != [item.get("generationRequestVersionRef") for item in requests]
+            or current_revision.get("generationRequestDigests")
+            != [item.get("payloadDigest") for item in requests]
+            or current_revision.get("generationRequestCount") != 4
+            or [item.get("ordinal") for item in requests] != [1, 2, 3, 4]
+        ):
+            raise RepositoryUnavailableError(
+                "M11 admission canonical revision is inconsistent"
+            )
+        requests_by_ref = {
+            item.get("generationRequestRef"): item for item in requests
+        }
         selection_index = dict(zip(selection_refs, selection_digests))
         asset_index = {
             item.get("assetVersionRef"): item
@@ -6093,6 +6873,11 @@ class K2RealMediaRevisionService:
                 "M11 admission canonical AssetVersion batch is ambiguous"
             )
         candidate_identities: set[tuple[Any, Any, Any]] = set()
+        technical_identities: set[tuple[Any, Any, Any]] = set()
+        qc_identities: set[tuple[Any, Any, Any]] = set()
+        ordered_candidate_refs: list[Any] = []
+        ordered_candidate_digests: list[Any] = []
+        ordered_slot_refs: list[Any] = []
         for admission in admissions:
             asset = asset_index.get(admission.get("assetVersionRef"))
             selection = _typed_record_payload(
@@ -6103,18 +6888,26 @@ class K2RealMediaRevisionService:
                 payload_digest=admission.get("selectionDigest"),
                 operation="M11 video admission",
             )
-            candidate = _typed_record_payload(
+            candidate, technical, qc = _typed_admission_chain(
                 records,
-                record_kind=CANDIDATE,
-                record_ref=selection.get("candidateRef"),
-                record_version=selection.get("candidateVersion"),
-                payload_digest=selection.get("candidateDigest"),
+                workspace_ref=workspace,
+                production_run_ref=run_ref,
+                selection=selection,
+                expected_media_kind="VIDEO",
                 operation="M11 video admission",
             )
+            request = requests_by_ref.get(candidate.get("sourceRequestRef"))
             if (
                 not isinstance(asset, Mapping)
+                or not isinstance(request, Mapping)
                 or selection_index.get(admission.get("selectionRef"))
                 != admission.get("selectionDigest")
+                or admission.get("schemaVersion")
+                != "v5.k2-asset-admission.v1"
+                or admission.get("version") != 1
+                or admission.get("ordinal") != request.get("ordinal")
+                or admission.get("admissionState") != "ADMITTED"
+                or admission.get("publicationAllowed") is not False
                 or selection.get("selectionRef") != admission.get("selectionRef")
                 or selection.get("selectionVersion")
                 != admission.get("selectionVersion")
@@ -6126,6 +6919,38 @@ class K2RealMediaRevisionService:
                 != selection.get("candidateVersion")
                 or candidate.get("payloadDigest")
                 != selection.get("candidateDigest")
+                or candidate.get("slotRef")
+                != request.get("creativeShotVersionRef")
+                or candidate.get("sourceRequestDigest")
+                != request.get("payloadDigest")
+                or candidate.get("sourceAssetVersions")
+                != [
+                    {
+                        "assetVersionRef": request.get(
+                            "sourceImageAssetVersionRef"
+                        ),
+                        "assetVersionDigest": request.get(
+                            "sourceImageAssetVersionDigest"
+                        ),
+                    }
+                ]
+                or (
+                    candidate.get("schemaVersion")
+                    == "v5.k2-media-candidate.v2"
+                    and (
+                        candidate.get("consumedGenerationRequest") != request
+                        or candidate.get("consumedRealVideoRevision")
+                        != current_revision
+                    )
+                )
+                or (
+                    candidate.get("schemaVersion")
+                    == "v5.k2-media-candidate.v1"
+                    and (
+                        "consumedGenerationRequest" in candidate
+                        or "consumedRealVideoRevision" in candidate
+                    )
+                )
                 or admission.get("assetVersionDigest")
                 != asset.get("payloadDigest")
                 or asset.get("humanSelectionRef")
@@ -6138,6 +6963,44 @@ class K2RealMediaRevisionService:
                 != admission.get("candidateRef")
                 or asset.get("sourceCandidateDigest")
                 != admission.get("candidateDigest")
+                or asset.get("schemaVersion")
+                != REAL_VIDEO_ASSET_VERSION_SCHEMA_VERSION
+                or asset.get("workspaceRef") != workspace
+                or asset.get("productionRunRef") != run_ref
+                or isinstance(asset.get("version"), bool)
+                or not isinstance(asset.get("version"), int)
+                or asset.get("version") < 1
+                or asset.get("ordinal") != request.get("ordinal")
+                or asset.get("generationRequestRef")
+                != request.get("generationRequestRef")
+                or asset.get("generationRequestVersionRef")
+                != request.get("generationRequestVersionRef")
+                or asset.get("generationRequestDigest")
+                != request.get("payloadDigest")
+                or asset.get("creativeShotRef")
+                != request.get("creativeShotRef")
+                or asset.get("creativeShotVersionRef")
+                != request.get("creativeShotVersionRef")
+                or asset.get("creativeShotDigest")
+                != request.get("creativeShotDigest")
+                or asset.get("sourceImageAssetVersionRef")
+                != request.get("sourceImageAssetVersionRef")
+                or asset.get("sourceImageAssetVersionDigest")
+                != request.get("sourceImageAssetVersionDigest")
+                or asset.get("revisionRef") != candidate.get("revisionRef")
+                or asset.get("semanticVisualQcRef")
+                != selection.get("visualQcRef")
+                or asset.get("semanticVisualQcDigest")
+                != selection.get("visualQcDigest")
+                or asset.get("artifactRef") != candidate.get("artifactRef")
+                or asset.get("storageKey") != candidate.get("storageKey")
+                or asset.get("byteSize") != candidate.get("artifactByteSize")
+                or asset.get("sha256") != candidate.get("artifactDigest")
+                or asset.get("provenance") != candidate.get("provenance")
+                or asset.get("mediaKind") != "video"
+                or asset.get("state") != "REGISTERED"
+                or asset.get("immutable") is not True
+                or asset.get("publicationAllowed") is not False
             ):
                 raise RepositoryUnavailableError(
                     "M11 admission canonical record lineage is inconsistent"
@@ -6149,6 +7012,23 @@ class K2RealMediaRevisionService:
                     selection.get("candidateDigest"),
                 )
             )
+            technical_identities.add(
+                (
+                    technical.get("technicalValidationRef"),
+                    technical.get("technicalValidationVersion"),
+                    technical.get("payloadDigest"),
+                )
+            )
+            qc_identities.add(
+                (
+                    qc.get("visualQcRef"),
+                    qc.get("visualQcVersion"),
+                    qc.get("payloadDigest"),
+                )
+            )
+            ordered_candidate_refs.append(candidate.get("candidateRef"))
+            ordered_candidate_digests.append(candidate.get("payloadDigest"))
+            ordered_slot_refs.append(candidate.get("slotRef"))
             persisted_admission = _typed_record_payload(
                 records,
                 record_kind=ASSET_ADMISSION,
@@ -6172,6 +7052,43 @@ class K2RealMediaRevisionService:
         if len(candidate_identities) != 4:
             raise RepositoryUnavailableError(
                 "M11 admission candidate coverage is ambiguous"
+            )
+        asset_revision_refs = {
+            item.get("revisionRef") for item in assets
+        }
+        expected_manifest_revision_ref = (
+            assets[0].get("revisionRef")
+            if len(asset_revision_refs) == 1
+            else (
+                "m11-video-admission-revision-"
+                + _digest(
+                    {
+                        "realVideoRevisionDigest": current_revision[
+                            "payloadDigest"
+                        ],
+                        "candidateDigests": [
+                            item.get("sourceCandidateDigest") for item in assets
+                        ],
+                    }
+                )[:32]
+            )
+        )
+        if (
+            len(technical_identities) != 4
+            or len(qc_identities) != 4
+            or manifest.get("revisionRef")
+            != expected_manifest_revision_ref
+            or manifest.get("candidateRefs")
+            != ordered_candidate_refs
+            or manifest.get("candidateDigests")
+            != ordered_candidate_digests
+            or [item.get("ordinal") for item in admissions] != [1, 2, 3, 4]
+            or [item.get("ordinal") for item in assets] != [1, 2, 3, 4]
+            or ordered_slot_refs
+            != [item.get("creativeShotVersionRef") for item in requests]
+        ):
+            raise RepositoryUnavailableError(
+                "M11 admission ordered typed chain coverage is inconsistent"
             )
         return bundle
 

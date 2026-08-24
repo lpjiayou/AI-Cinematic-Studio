@@ -8,7 +8,10 @@ from dataclasses import replace
 from hashlib import sha256
 from pathlib import Path
 
-from services.v5_core_os.episode_production import create_local_development_boundary
+from services.v5_core_os.episode_production import (
+    EpisodeProductionPublicError,
+    create_local_development_boundary,
+)
 from services.v5_core_os.episode_production.media_candidate_review import (
     CandidateNotSelectableError,
     VerifiedMediaSelection,
@@ -1151,6 +1154,35 @@ class K2RealVideoSelectionTests(unittest.TestCase):
             WORKSPACE, self.run["productionRunRef"]
         )
         self.assertEqual(projection["activeRevision"]["state"], "STALE_BLOCKED")
+        historical_selections = []
+        for admission in admitted["assetAdmissions"]:
+            selection_record = self.revision.evidence.get_record(
+                WORKSPACE,
+                self.run["productionRunRef"],
+                admission["selectionRef"],
+                admission["selectionVersion"],
+            )
+            selection = selection_record["payload"]
+            historical_selections.append(
+                {
+                    "visualQcRef": selection["visualQcRef"],
+                    "visualQcVersion": selection["visualQcVersion"],
+                    "visualQcDigest": selection["visualQcDigest"],
+                    "selectionRef": selection["selectionRef"],
+                    "selectionVersion": selection["selectionVersion"],
+                    "approvalRef": selection["approvalRef"],
+                }
+            )
+        historical_replay = self.revision.admit_real_videos(
+            {
+                "workspaceRef": WORKSPACE,
+                "productionRunRef": self.run["productionRunRef"],
+                "idempotencyKey": "m11-post-ready-qc-baseline-admit",
+                "selections": historical_selections,
+            }
+        )
+        self.assertTrue(historical_replay["idempotentReplay"])
+        self.assertEqual(historical_replay["assetVersions"], admitted["assetVersions"])
 
     def test_candidate_handoff_key_pins_complete_batch_and_replays_exactly(self):
         first = self.record_candidates()
@@ -1250,6 +1282,9 @@ class K2RealVideoSelectionTests(unittest.TestCase):
                     "selectionRequestDigest"
                 ],
                 records=records,
+                gates=evidence.read_snapshot(
+                    WORKSPACE, self.run["productionRunRef"]
+                ).gates,
             )
 
     def test_video_admission_replay_rejects_duplicate_selection_coverage(self):
@@ -1285,6 +1320,184 @@ class K2RealVideoSelectionTests(unittest.TestCase):
                 self.revision.admit_real_videos(command)
         finally:
             self.revision._video_admission_bundle = original_bundle
+
+    def _assert_public_video_replay_rejects_missing_typed_record(
+        self, record_kind
+    ):
+        recorded = self.record_candidates()
+        selections = [
+            self.selection_request(self.visual_qc(validation, ordinal), ordinal)
+            for ordinal, validation in enumerate(
+                recorded["technicalValidations"], start=1
+            )
+        ]
+        command = {
+            "workspaceRef": WORKSPACE,
+            "productionRunRef": self.run["productionRunRef"],
+            "idempotencyKey": f"m11-missing-{record_kind}-public-replay",
+            "selections": selections,
+        }
+        admitted = self.boundary.admit_real_videos(command)
+        missing_ref = (
+            recorded["technicalValidations"][0]["technicalValidationRef"]
+            if record_kind == "TechnicalValidation"
+            else selections[0]["visualQcRef"]
+        )
+        evidence = self.revision.evidence
+        original_read_snapshot = evidence.read_snapshot
+        snapshot = original_read_snapshot(
+            WORKSPACE, self.run["productionRunRef"]
+        )
+        admission_gate = next(
+            item
+            for item in snapshot.gates
+            if item.get("gateName") == REAL_VIDEO_ADMISSION_GATE
+        )
+        incomplete_records = tuple(
+            item
+            for item in snapshot.records
+            if not (
+                item.get("recordKind") == record_kind
+                and item.get("recordRef") == missing_ref
+            )
+        )
+        with self.assertRaises(RepositoryUnavailableError):
+            self.revision._validated_video_admission_replay(
+                admission_gate,
+                expected_selection_request_digest=admitted[
+                    "realVideoAdmissionManifest"
+                ]["selectionRequestDigest"],
+                records=incomplete_records,
+                gates=snapshot.gates,
+            )
+
+        def incomplete_snapshot(workspace_ref, production_run_ref):
+            snapshot = original_read_snapshot(workspace_ref, production_run_ref)
+            return replace(
+                snapshot,
+                records=incomplete_records,
+            )
+
+        evidence.read_snapshot = incomplete_snapshot
+        try:
+            with self.assertRaises(EpisodeProductionPublicError) as caught:
+                self.boundary.admit_real_videos(command)
+        finally:
+            evidence.read_snapshot = original_read_snapshot
+        self.assertEqual(
+            (caught.exception.status, caught.exception.code),
+            (503, "episode_production_unavailable"),
+        )
+
+    def test_public_video_replay_requires_exact_technical_validation(self):
+        self._assert_public_video_replay_rejects_missing_typed_record(
+            "TechnicalValidation"
+        )
+
+    def test_public_video_replay_requires_exact_semantic_visual_qc(self):
+        self._assert_public_video_replay_rejects_missing_typed_record(
+            "SemanticVisualQCDecision"
+        )
+
+    def _assert_public_video_successor_replay_rejects_missing_typed_record(
+        self, record_kind
+    ):
+        baseline_handoff = self.record_candidates()
+        self.admit_video_handoff(
+            baseline_handoff, prefix=f"m11-{record_kind}-successor-baseline"
+        )
+        self.admit_shot_one_image_successor(
+            prefix=f"m11-{record_kind}-successor-image"
+        )
+        successor_handoff = self.revision.record_real_video_candidates(
+            {
+                "workspaceRef": WORKSPACE,
+                "productionRunRef": self.run["productionRunRef"],
+                "idempotencyKey": f"m11-{record_kind}-successor-handoff",
+            }
+        )
+        prefix = f"m11-{record_kind}-successor"
+        successor = self.admit_video_handoff(
+            successor_handoff, prefix=prefix
+        )
+        changed_admission = next(
+            item
+            for item in successor["assetAdmissions"]
+            if item.get("selectionRef", "").startswith(
+                f"{prefix}-selection-"
+            )
+        )
+        selection_record = self.revision.evidence.get_record(
+            WORKSPACE,
+            self.run["productionRunRef"],
+            changed_admission["selectionRef"],
+            changed_admission["selectionVersion"],
+        )
+        selection = selection_record["payload"]
+        command = {
+            "workspaceRef": WORKSPACE,
+            "productionRunRef": self.run["productionRunRef"],
+            "idempotencyKey": f"{prefix}-admit",
+            "selections": [
+                {
+                    "visualQcRef": selection["visualQcRef"],
+                    "visualQcVersion": selection["visualQcVersion"],
+                    "visualQcDigest": selection["visualQcDigest"],
+                    "selectionRef": selection["selectionRef"],
+                    "selectionVersion": selection["selectionVersion"],
+                    "approvalRef": selection["approvalRef"],
+                }
+            ],
+        }
+        evidence = self.revision.evidence
+        original_read_snapshot = evidence.read_snapshot
+        snapshot = original_read_snapshot(
+            WORKSPACE, self.run["productionRunRef"]
+        )
+        qc_record = next(
+            item
+            for item in snapshot.records
+            if item.get("recordKind") == "SemanticVisualQCDecision"
+            and item.get("recordRef") == selection["visualQcRef"]
+        )
+        missing_ref = (
+            qc_record["payload"]["technicalValidationRef"]
+            if record_kind == "TechnicalValidation"
+            else qc_record["recordRef"]
+        )
+        incomplete_records = tuple(
+            item
+            for item in snapshot.records
+            if not (
+                item.get("recordKind") == record_kind
+                and item.get("recordRef") == missing_ref
+            )
+        )
+
+        def incomplete_snapshot(workspace_ref, production_run_ref):
+            current = original_read_snapshot(workspace_ref, production_run_ref)
+            return replace(current, records=incomplete_records)
+
+        evidence.read_snapshot = incomplete_snapshot
+        try:
+            with self.assertRaises(EpisodeProductionPublicError) as caught:
+                self.boundary.admit_real_videos(command)
+        finally:
+            evidence.read_snapshot = original_read_snapshot
+        self.assertEqual(
+            (caught.exception.status, caught.exception.code),
+            (503, "episode_production_unavailable"),
+        )
+
+    def test_public_video_successor_replay_requires_exact_technical_validation(self):
+        self._assert_public_video_successor_replay_rejects_missing_typed_record(
+            "TechnicalValidation"
+        )
+
+    def test_public_video_successor_replay_requires_exact_semantic_visual_qc(self):
+        self._assert_public_video_successor_replay_rejects_missing_typed_record(
+            "SemanticVisualQCDecision"
+        )
 
     def test_semantic_qc_fail_cannot_select_or_advance_production(self):
         recorded = self.record_candidates()

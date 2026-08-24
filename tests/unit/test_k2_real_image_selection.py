@@ -1,5 +1,6 @@
 import json
 from concurrent.futures import ThreadPoolExecutor
+from dataclasses import replace
 from hashlib import sha256
 from pathlib import Path
 import tempfile
@@ -463,6 +464,56 @@ class K2RealImageSelectionTests(unittest.TestCase):
         self.assertEqual(replay["assetVersions"], first["assetVersions"])
         self.assertEqual(self.candidate_evidence.calls, 2)
 
+    def test_exact_replay_preserves_historical_selection_after_later_qc_fail(self):
+        first = self.boundary.select_real_images(self.selection_command())
+        prior_qc = self.qcs[0]
+        validation = self.recorded["technicalValidations"][0]
+        self.revision.candidate_review.record_semantic_visual_qc(
+            {
+                "workspaceRef": WORKSPACE,
+                "productionRunRef": self.run["productionRunRef"],
+                "idempotencyKey": "m10-post-ready-qc-fail-v2",
+                "technicalValidationRef": validation[
+                    "technicalValidationRef"
+                ],
+                "technicalValidationVersion": validation[
+                    "technicalValidationVersion"
+                ],
+                "technicalValidationDigest": validation["payloadDigest"],
+                "visualQcRef": "m10-post-ready-qc-fail-v2",
+                "visualQcVersion": 2,
+                "reviewerRef": "reviewer-project-lead",
+                "reviewProfile": "k2-semantic-visual-qc-v1",
+                "evidence": [
+                    {
+                        "evidenceRef": "m10-post-ready-qc-fail-frame-v2",
+                        "evidenceDigest": "f" * 64,
+                    }
+                ],
+                "supersedesVisualQc": {
+                    "visualQcRef": prior_qc["visualQcRef"],
+                    "visualQcVersion": prior_qc["visualQcVersion"],
+                    "visualQcDigest": prior_qc["payloadDigest"],
+                    "staleReason": "new semantic evidence failed",
+                },
+                "checks": {
+                    name: {"result": "FAIL", "note": "new evidence"}
+                    for name in (
+                        "identity",
+                        "wardrobe",
+                        "location",
+                        "action",
+                        "prop",
+                        "motion",
+                    )
+                },
+                "result": "FAIL",
+            }
+        )
+        replay = self.boundary.select_real_images(self.selection_command())
+        self.assertTrue(replay["idempotentReplay"])
+        self.assertEqual(replay["assetVersions"], first["assetVersions"])
+
     def test_candidate_handoff_key_pins_complete_batch_and_replays_exactly(self):
         replay = self.boundary.record_real_image_candidates(
             {
@@ -551,6 +602,71 @@ class K2RealImageSelectionTests(unittest.TestCase):
         self.assertEqual(
             (caught.exception.status, caught.exception.code),
             (503, "episode_production_unavailable"),
+        )
+
+    def _assert_public_image_replay_rejects_missing_typed_record(
+        self, record_kind, record_ref
+    ):
+        command = self.selection_command()
+        admitted = self.boundary.select_real_images(command)
+        evidence = self.revision.evidence
+        original_read_snapshot = evidence.read_snapshot
+        snapshot = original_read_snapshot(
+            WORKSPACE, self.run["productionRunRef"]
+        )
+        admission_gate = next(
+            item
+            for item in snapshot.gates
+            if item.get("gateName") == "M10_REAL_IMAGE_ADMISSION"
+        )
+        incomplete_records = tuple(
+            item
+            for item in snapshot.records
+            if not (
+                item.get("recordKind") == record_kind
+                and item.get("recordRef") == record_ref
+            )
+        )
+        with self.assertRaises(RepositoryUnavailableError):
+            self.revision._validated_image_admission_replay(
+                admission_gate,
+                expected_selection_request_digest=admitted[
+                    "realImageAdmissionManifest"
+                ]["selectionRequestDigest"],
+                records=incomplete_records,
+                gates=snapshot.gates,
+            )
+
+        def incomplete_snapshot(workspace_ref, production_run_ref):
+            snapshot = original_read_snapshot(workspace_ref, production_run_ref)
+            return replace(
+                snapshot,
+                records=incomplete_records,
+            )
+
+        evidence.read_snapshot = incomplete_snapshot
+        try:
+            with self.assertRaises(EpisodeProductionPublicError) as caught:
+                self.boundary.select_real_images(command)
+        finally:
+            evidence.read_snapshot = original_read_snapshot
+        self.assertEqual(
+            (caught.exception.status, caught.exception.code),
+            (503, "episode_production_unavailable"),
+        )
+
+    def test_public_image_replay_requires_exact_technical_validation(self):
+        self._assert_public_image_replay_rejects_missing_typed_record(
+            "TechnicalValidation",
+            self.recorded["technicalValidations"][0][
+                "technicalValidationRef"
+            ],
+        )
+
+    def test_public_image_replay_requires_exact_semantic_visual_qc(self):
+        self._assert_public_image_replay_rejects_missing_typed_record(
+            "SemanticVisualQCDecision",
+            self.qcs[0]["visualQcRef"],
         )
 
     def test_rejects_one_changed_candidate_digest_atomically(self):
@@ -723,6 +839,85 @@ class K2RealImageSelectionTests(unittest.TestCase):
         replay = self.boundary.admit_real_image_successor(successor_command)
         self.assertTrue(replay["idempotentReplay"])
         self.assertEqual(replay["assetVersion"], admitted["assetVersion"])
+
+    def _assert_public_image_successor_replay_rejects_missing_typed_record(
+        self, record_kind
+    ):
+        _, command = self._prepare_successor_command(
+            f"missing-{record_kind}-replay"
+        )
+        admitted = self.boundary.admit_real_image_successor(command)
+        evidence = self.revision.evidence
+        original_read_snapshot = evidence.read_snapshot
+        snapshot = original_read_snapshot(
+            WORKSPACE, self.run["productionRunRef"]
+        )
+        qc_record = next(
+            item
+            for item in snapshot.records
+            if item.get("recordKind") == "SemanticVisualQCDecision"
+            and item.get("recordRef")
+            == admitted["humanSelection"]["visualQcRef"]
+        )
+        missing_ref = (
+            qc_record["payload"]["technicalValidationRef"]
+            if record_kind == "TechnicalValidation"
+            else qc_record["recordRef"]
+        )
+        incomplete_records = tuple(
+            item
+            for item in snapshot.records
+            if not (
+                item.get("recordKind") == record_kind
+                and item.get("recordRef") == missing_ref
+            )
+        )
+        selection_input = command["selection"]
+        expected_selection = (
+            self.revision.candidate_review.prepare_human_selection_record(
+                {
+                    "workspaceRef": WORKSPACE,
+                    "productionRunRef": self.run["productionRunRef"],
+                    "idempotencyKey": command["idempotencyKey"],
+                    **selection_input,
+                    "decision": "SELECTED",
+                }
+            )
+        )
+        with self.assertRaises(RepositoryUnavailableError):
+            self.revision._image_successor_replay_bundle(
+                WORKSPACE,
+                self.run["productionRunRef"],
+                expected_selection,
+                records=incomplete_records,
+                gates=snapshot.gates,
+                current_state=snapshot.currentState,
+            )
+
+        def incomplete_snapshot(workspace_ref, production_run_ref):
+            current = original_read_snapshot(workspace_ref, production_run_ref)
+            return replace(current, records=incomplete_records)
+
+        evidence.read_snapshot = incomplete_snapshot
+        try:
+            with self.assertRaises(EpisodeProductionPublicError) as caught:
+                self.boundary.admit_real_image_successor(command)
+        finally:
+            evidence.read_snapshot = original_read_snapshot
+        self.assertEqual(
+            (caught.exception.status, caught.exception.code),
+            (503, "episode_production_unavailable"),
+        )
+
+    def test_public_image_successor_replay_requires_exact_technical_validation(self):
+        self._assert_public_image_successor_replay_rejects_missing_typed_record(
+            "TechnicalValidation"
+        )
+
+    def test_public_image_successor_replay_requires_exact_semantic_visual_qc(self):
+        self._assert_public_image_successor_replay_rejects_missing_typed_record(
+            "SemanticVisualQCDecision"
+        )
 
     def test_intervening_candidate_append_cannot_partially_admit_assets(self):
         review = self.revision.candidate_review
