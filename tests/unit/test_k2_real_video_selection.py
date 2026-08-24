@@ -20,6 +20,7 @@ from services.v5_core_os.episode_production.foundation import (
     _digest,
 )
 from services.v5_core_os.episode_production.real_media_revision import (
+    REAL_VIDEO_ADMISSION_GATE,
     RealVideoCandidateRejectedError,
 )
 from tests.unit.test_episode_production_k2 import WORKSPACE
@@ -1202,6 +1203,83 @@ class K2RealVideoSelectionTests(unittest.TestCase):
             return bundle
 
         self.revision._video_admission_bundle = incomplete_bundle
+        try:
+            with self.assertRaises(RepositoryUnavailableError):
+                self.revision.admit_real_videos(command)
+        finally:
+            self.revision._video_admission_bundle = original_bundle
+
+    def test_video_admission_replay_requires_all_four_selection_records(self):
+        recorded = self.record_candidates()
+        selections = [
+            self.selection_request(self.visual_qc(validation, ordinal), ordinal)
+            for ordinal, validation in enumerate(
+                recorded["technicalValidations"], start=1
+            )
+        ]
+        command = {
+            "workspaceRef": WORKSPACE,
+            "productionRunRef": self.run["productionRunRef"],
+            "idempotencyKey": "m11-missing-selection-replay-audit",
+            "selections": selections,
+        }
+        self.revision.admit_real_videos(command)
+        evidence = self.revision.evidence
+        gate = evidence.get_gate(
+            WORKSPACE,
+            self.run["productionRunRef"],
+            REAL_VIDEO_ADMISSION_GATE,
+        )
+        bundle = self.revision._video_admission_bundle(gate)
+        manifest = bundle["realVideoAdmissionManifest"]
+        missing_ref = manifest["selectionRefs"][0]
+        records = tuple(
+            item
+            for item in evidence.read_snapshot(
+                WORKSPACE, self.run["productionRunRef"]
+            ).records
+            if not (
+                item.get("recordKind") == "HumanSelectionDecision"
+                and item.get("recordRef") == missing_ref
+            )
+        )
+        with self.assertRaises(RepositoryUnavailableError):
+            self.revision._validated_video_admission_replay(
+                gate,
+                expected_selection_request_digest=manifest[
+                    "selectionRequestDigest"
+                ],
+                records=records,
+            )
+
+    def test_video_admission_replay_rejects_duplicate_selection_coverage(self):
+        recorded = self.record_candidates()
+        selections = [
+            self.selection_request(self.visual_qc(validation, ordinal), ordinal)
+            for ordinal, validation in enumerate(
+                recorded["technicalValidations"], start=1
+            )
+        ]
+        command = {
+            "workspaceRef": WORKSPACE,
+            "productionRunRef": self.run["productionRunRef"],
+            "idempotencyKey": "m11-duplicate-coverage-replay-audit",
+            "selections": selections,
+        }
+        self.revision.admit_real_videos(command)
+        original_bundle = self.revision._video_admission_bundle
+
+        def duplicate_coverage(gate):
+            bundle = original_bundle(gate)
+            admissions = [dict(item) for item in bundle["assetAdmissions"]]
+            admissions[1]["selectionRef"] = admissions[0]["selectionRef"]
+            admissions[1]["selectionDigest"] = admissions[0][
+                "selectionDigest"
+            ]
+            bundle["assetAdmissions"] = admissions
+            return bundle
+
+        self.revision._video_admission_bundle = duplicate_coverage
         try:
             with self.assertRaises(RepositoryUnavailableError):
                 self.revision.admit_real_videos(command)
