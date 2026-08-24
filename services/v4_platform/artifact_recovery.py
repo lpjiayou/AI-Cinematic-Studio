@@ -207,36 +207,6 @@ class ArtifactRecoveryStore:
                 "deterministic artifact path is already occupied"
             )
 
-    @staticmethod
-    def _fsync_file(path: Path) -> os.stat_result:
-        descriptor = os.open(
-            path,
-            os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0),
-        )
-        try:
-            opened = os.fstat(descriptor)
-            if not stat.S_ISREG(opened.st_mode):
-                raise ArtifactRecoveryStoreError(
-                    "artifact fsync target is not a regular file"
-                )
-            os.fsync(descriptor)
-            return opened
-        finally:
-            os.close(descriptor)
-
-    @staticmethod
-    def _fsync_directory(path: Path) -> None:
-        descriptor = os.open(
-            path,
-            os.O_RDONLY
-            | getattr(os, "O_DIRECTORY", 0)
-            | getattr(os, "O_NOFOLLOW", 0),
-        )
-        try:
-            os.fsync(descriptor)
-        finally:
-            os.close(descriptor)
-
     def durable_replace(
         self,
         source: Path | str,
@@ -244,101 +214,20 @@ class ArtifactRecoveryStore:
         *,
         assert_fence: Callable[[], None] | None = None,
     ) -> Path:
-        source_path = self._assert_under_root(Path(source))
-        destination_path = self._assert_under_root(Path(destination))
-        self._assert_no_symlinks(source_path)
-        self._assert_no_symlinks(destination_path)
-        try:
-            source_stat = self._fsync_file(source_path)
-        except (ArtifactRecoveryStoreError, OSError) as exc:
-            raise ArtifactRecoveryStoreError("candidate artifact is unavailable") from exc
-        if not stat.S_ISREG(source_stat.st_mode) or source_stat.st_nlink != 1:
-            raise ArtifactRecoveryStoreError("candidate artifact is not a regular file")
-        if os.path.lexists(destination_path):
-            raise ArtifactRecoveryStoreError("final artifact path is already occupied")
-        self._assert_no_symlinks(destination_path.parent)
-        destination_path.parent.mkdir(parents=True, exist_ok=True)
-        self._assert_no_symlinks(destination_path.parent)
-        try:
-            if assert_fence is not None:
-                assert_fence()
-            os.link(source_path, destination_path, follow_symlinks=False)
-            destination_stat = self._fsync_file(destination_path)
-            current_source_stat = os.lstat(source_path)
-            if (
-                destination_stat.st_dev != source_stat.st_dev
-                or destination_stat.st_ino != source_stat.st_ino
-                or current_source_stat.st_dev != source_stat.st_dev
-                or current_source_stat.st_ino != source_stat.st_ino
-            ):
-                raise ArtifactRecoveryStoreError(
-                    "artifact changed during no-clobber publication"
-                )
-            self._fsync_directory(destination_path.parent)
-            os.unlink(source_path)
-            self._fsync_directory(source_path.parent)
-        except ArtifactRecoveryStoreError:
-            raise
-        except OSError as exc:
-            raise ArtifactRecoveryStoreError(
-                "artifact no-clobber publication failed"
-            ) from exc
-        return destination_path
+        return self._durable_replace_with_directory_descriptors(
+            source,
+            destination,
+            assert_fence=assert_fence,
+        )
 
     def complete_linked_publication(
         self, candidate: Path | str, final: Path | str
     ) -> Path:
         """Finish only the exact hard-link state left by ``durable_replace``."""
-
-        candidate_path = self._assert_under_root(Path(candidate))
-        final_path = self._assert_under_root(Path(final))
-        self._assert_no_symlinks(candidate_path)
-        self._assert_no_symlinks(final_path)
-        try:
-            candidate_stat = os.lstat(candidate_path)
-            final_stat = os.lstat(final_path)
-            if (
-                not stat.S_ISREG(candidate_stat.st_mode)
-                or not stat.S_ISREG(final_stat.st_mode)
-                or candidate_stat.st_dev != final_stat.st_dev
-                or candidate_stat.st_ino != final_stat.st_ino
-                or candidate_stat.st_nlink != 2
-                or final_stat.st_nlink != 2
-            ):
-                raise ArtifactRecoveryStoreError(
-                    "publication paths are not one exact interrupted hard link"
-                )
-            synced_final = self._fsync_file(final_path)
-            current_candidate = os.lstat(candidate_path)
-            current_final = os.lstat(final_path)
-            if any(
-                item.st_dev != final_stat.st_dev
-                or item.st_ino != final_stat.st_ino
-                for item in (synced_final, current_candidate, current_final)
-            ):
-                raise ArtifactRecoveryStoreError(
-                    "interrupted publication changed during recovery"
-                )
-            self._fsync_directory(final_path.parent)
-            os.unlink(candidate_path)
-            self._fsync_directory(candidate_path.parent)
-            committed = os.lstat(final_path)
-            if (
-                not stat.S_ISREG(committed.st_mode)
-                or committed.st_dev != final_stat.st_dev
-                or committed.st_ino != final_stat.st_ino
-                or committed.st_nlink != 1
-            ):
-                raise ArtifactRecoveryStoreError(
-                    "interrupted publication did not converge"
-                )
-        except ArtifactRecoveryStoreError:
-            raise
-        except OSError as exc:
-            raise ArtifactRecoveryStoreError(
-                "interrupted publication could not be completed"
-            ) from exc
-        return final_path
+        return self._complete_linked_publication_with_directory_descriptors(
+            candidate,
+            final,
+        )
 
     @staticmethod
     def _file_digest_and_size(path: Path) -> tuple[str, int]:
@@ -684,6 +573,465 @@ class ArtifactRecoveryStore:
         )
         self._assert_absolute_directory_binding(self.root, root_fd)
 
+    def _assert_publication_namespace_binding(
+        self,
+        *,
+        root_fd: int,
+        source_parent_parts: tuple[str, ...],
+        source_parent_fd: int,
+        destination_parent_parts: tuple[str, ...],
+        destination_parent_fd: int,
+    ) -> None:
+        self._assert_absolute_directory_binding(self.root, root_fd)
+        self._assert_directory_binding(
+            root_fd,
+            source_parent_parts,
+            source_parent_fd,
+        )
+        self._assert_directory_binding(
+            root_fd,
+            destination_parent_parts,
+            destination_parent_fd,
+        )
+        self._assert_absolute_directory_binding(self.root, root_fd)
+
+    @staticmethod
+    def _same_regular_inode(
+        value: os.stat_result | None,
+        expected: os.stat_result,
+    ) -> bool:
+        return bool(
+            value is not None
+            and stat.S_ISREG(value.st_mode)
+            and value.st_dev == expected.st_dev
+            and value.st_ino == expected.st_ino
+        )
+
+    @staticmethod
+    def _publication_file_open_flags() -> int:
+        return (
+            os.O_RDONLY
+            | getattr(os, "O_CLOEXEC", 0)
+            | getattr(os, "O_NOFOLLOW", 0)
+        )
+
+    def _rollback_created_publication_link(
+        self,
+        *,
+        source_parent_fd: int,
+        source_name: str,
+        destination_parent_fd: int,
+        destination_name: str,
+        locked_stat: os.stat_result,
+        primary_error: BaseException,
+    ) -> None:
+        try:
+            source_stat = self._stat_at(source_parent_fd, source_name)
+            destination_stat = self._stat_at(
+                destination_parent_fd,
+                destination_name,
+            )
+            exact_source = self._same_regular_inode(source_stat, locked_stat)
+            exact_destination = self._same_regular_inode(
+                destination_stat,
+                locked_stat,
+            )
+            if not exact_destination:
+                raise ArtifactRecoveryStoreError(
+                    "artifact publication rollback lost its destination link"
+                )
+            if source_stat is None:
+                os.link(
+                    destination_name,
+                    source_name,
+                    src_dir_fd=destination_parent_fd,
+                    dst_dir_fd=source_parent_fd,
+                    follow_symlinks=False,
+                )
+                os.fsync(source_parent_fd)
+                exact_source = True
+            elif not exact_source:
+                raise ArtifactRecoveryStoreError(
+                    "artifact publication rollback source is occupied"
+                )
+            os.unlink(destination_name, dir_fd=destination_parent_fd)
+            os.fsync(destination_parent_fd)
+            restored_source = self._stat_at(source_parent_fd, source_name)
+            removed_destination = self._stat_at(
+                destination_parent_fd,
+                destination_name,
+            )
+            if (
+                not exact_source
+                or not self._same_regular_inode(restored_source, locked_stat)
+                or restored_source.st_nlink != 1
+                or removed_destination is not None
+            ):
+                raise ArtifactRecoveryStoreError(
+                    "artifact publication rollback did not restore one source file"
+                )
+        except (ArtifactRecoveryStoreError, OSError) as rollback_error:
+            primary_error.add_note(
+                "artifact publication rollback also failed: "
+                f"{rollback_error}"
+            )
+
+    def _restore_interrupted_publication(
+        self,
+        *,
+        candidate_parent_fd: int,
+        candidate_name: str,
+        final_parent_fd: int,
+        final_name: str,
+        locked_stat: os.stat_result,
+        primary_error: BaseException,
+    ) -> None:
+        try:
+            candidate_stat = self._stat_at(
+                candidate_parent_fd,
+                candidate_name,
+            )
+            final_stat = self._stat_at(final_parent_fd, final_name)
+            if candidate_stat is None and self._same_regular_inode(
+                final_stat,
+                locked_stat,
+            ):
+                os.link(
+                    final_name,
+                    candidate_name,
+                    src_dir_fd=final_parent_fd,
+                    dst_dir_fd=candidate_parent_fd,
+                    follow_symlinks=False,
+                )
+                os.fsync(candidate_parent_fd)
+                candidate_stat = self._stat_at(
+                    candidate_parent_fd,
+                    candidate_name,
+                )
+                final_stat = self._stat_at(final_parent_fd, final_name)
+            if (
+                not self._same_regular_inode(candidate_stat, locked_stat)
+                or not self._same_regular_inode(final_stat, locked_stat)
+                or candidate_stat.st_nlink != 2
+                or final_stat.st_nlink != 2
+            ):
+                raise ArtifactRecoveryStoreError(
+                    "interrupted publication rollback did not restore both links"
+                )
+        except (ArtifactRecoveryStoreError, OSError) as rollback_error:
+            primary_error.add_note(
+                "interrupted publication rollback also failed: "
+                f"{rollback_error}"
+            )
+
+    def _durable_replace_with_directory_descriptors(
+        self,
+        source: Path | str,
+        destination: Path | str,
+        *,
+        assert_fence: Callable[[], None] | None,
+    ) -> Path:
+        source_path = self._assert_under_root(Path(source))
+        destination_path = self._assert_under_root(Path(destination))
+        source_parts = source_path.relative_to(self.root).parts
+        destination_parts = destination_path.relative_to(self.root).parts
+        if not source_parts or not destination_parts:
+            raise ArtifactRecoveryStoreError("artifact publication path is invalid")
+
+        source_parent_parts = tuple(source_parts[:-1])
+        destination_parent_parts = tuple(destination_parts[:-1])
+        source_name = source_parts[-1]
+        destination_name = destination_parts[-1]
+        descriptors: list[int] = []
+        created_link = False
+        locked_stat: os.stat_result | None = None
+        try:
+            root_fd = self._open_absolute_directory(self.root)
+            descriptors.append(root_fd)
+            source_parent_fd = self._open_directory_chain(
+                root_fd,
+                source_parent_parts,
+            )
+            descriptors.append(source_parent_fd)
+            destination_parent_fd = self._open_directory_chain(
+                root_fd,
+                destination_parent_parts,
+                create=True,
+            )
+            descriptors.append(destination_parent_fd)
+            locked_fd = os.open(
+                source_name,
+                self._publication_file_open_flags(),
+                dir_fd=source_parent_fd,
+            )
+            descriptors.append(locked_fd)
+            fcntl.flock(locked_fd, fcntl.LOCK_EX)
+            locked_stat = self._sync_locked_file(locked_fd)
+            source_stat = self._stat_at(source_parent_fd, source_name)
+            if (
+                not self._same_regular_inode(source_stat, locked_stat)
+                or locked_stat.st_nlink != 1
+                or source_stat.st_nlink != 1
+            ):
+                raise ArtifactRecoveryStoreError(
+                    "candidate artifact is not one exact regular file"
+                )
+            if self._stat_at(destination_parent_fd, destination_name) is not None:
+                raise ArtifactRecoveryStoreError(
+                    "final artifact path is already occupied"
+                )
+
+            self._assert_publication_namespace_binding(
+                root_fd=root_fd,
+                source_parent_parts=source_parent_parts,
+                source_parent_fd=source_parent_fd,
+                destination_parent_parts=destination_parent_parts,
+                destination_parent_fd=destination_parent_fd,
+            )
+            if assert_fence is not None:
+                assert_fence()
+            self._assert_publication_namespace_binding(
+                root_fd=root_fd,
+                source_parent_parts=source_parent_parts,
+                source_parent_fd=source_parent_fd,
+                destination_parent_parts=destination_parent_parts,
+                destination_parent_fd=destination_parent_fd,
+            )
+            os.link(
+                source_name,
+                destination_name,
+                src_dir_fd=source_parent_fd,
+                dst_dir_fd=destination_parent_fd,
+                follow_symlinks=False,
+            )
+            created_link = True
+
+            source_stat = self._stat_at(source_parent_fd, source_name)
+            destination_stat = self._stat_at(
+                destination_parent_fd,
+                destination_name,
+            )
+            synced = self._sync_locked_file(locked_fd)
+            if (
+                not self._same_regular_inode(source_stat, locked_stat)
+                or not self._same_regular_inode(destination_stat, locked_stat)
+                or not self._same_regular_inode(synced, locked_stat)
+                or source_stat.st_nlink != 2
+                or destination_stat.st_nlink != 2
+                or synced.st_nlink != 2
+            ):
+                raise ArtifactRecoveryStoreError(
+                    "artifact changed during no-clobber publication"
+                )
+            os.fsync(destination_parent_fd)
+            self._assert_publication_namespace_binding(
+                root_fd=root_fd,
+                source_parent_parts=source_parent_parts,
+                source_parent_fd=source_parent_fd,
+                destination_parent_parts=destination_parent_parts,
+                destination_parent_fd=destination_parent_fd,
+            )
+
+            os.unlink(source_name, dir_fd=source_parent_fd)
+            os.fsync(source_parent_fd)
+            os.fsync(destination_parent_fd)
+            self._assert_publication_namespace_binding(
+                root_fd=root_fd,
+                source_parent_parts=source_parent_parts,
+                source_parent_fd=source_parent_fd,
+                destination_parent_parts=destination_parent_parts,
+                destination_parent_fd=destination_parent_fd,
+            )
+            committed_source = self._stat_at(source_parent_fd, source_name)
+            committed_destination = self._stat_at(
+                destination_parent_fd,
+                destination_name,
+            )
+            committed_locked = os.fstat(locked_fd)
+            if (
+                committed_source is not None
+                or not self._same_regular_inode(
+                    committed_destination,
+                    locked_stat,
+                )
+                or committed_destination.st_nlink != 1
+                or not self._same_regular_inode(committed_locked, locked_stat)
+                or committed_locked.st_nlink != 1
+            ):
+                raise ArtifactRecoveryStoreError(
+                    "artifact no-clobber publication did not converge"
+                )
+            self._assert_publication_namespace_binding(
+                root_fd=root_fd,
+                source_parent_parts=source_parent_parts,
+                source_parent_fd=source_parent_fd,
+                destination_parent_parts=destination_parent_parts,
+                destination_parent_fd=destination_parent_fd,
+            )
+            return destination_path
+        except BaseException as exc:
+            if created_link and locked_stat is not None:
+                self._rollback_created_publication_link(
+                    source_parent_fd=source_parent_fd,
+                    source_name=source_name,
+                    destination_parent_fd=destination_parent_fd,
+                    destination_name=destination_name,
+                    locked_stat=locked_stat,
+                    primary_error=exc,
+                )
+            if isinstance(exc, ArtifactRecoveryStoreError):
+                raise
+            if isinstance(exc, OSError):
+                raise ArtifactRecoveryStoreError(
+                    "artifact no-clobber publication failed"
+                ) from exc
+            raise
+        finally:
+            self._close_artifact_descriptors(
+                descriptors,
+                active_error=sys.exception(),
+                operation="artifact publication",
+            )
+
+    def _complete_linked_publication_with_directory_descriptors(
+        self,
+        candidate: Path | str,
+        final: Path | str,
+    ) -> Path:
+        candidate_path = self._assert_under_root(Path(candidate))
+        final_path = self._assert_under_root(Path(final))
+        candidate_parts = candidate_path.relative_to(self.root).parts
+        final_parts = final_path.relative_to(self.root).parts
+        if not candidate_parts or not final_parts:
+            raise ArtifactRecoveryStoreError("artifact publication path is invalid")
+
+        candidate_parent_parts = tuple(candidate_parts[:-1])
+        final_parent_parts = tuple(final_parts[:-1])
+        candidate_name = candidate_parts[-1]
+        final_name = final_parts[-1]
+        descriptors: list[int] = []
+        candidate_unlinked = False
+        locked_stat: os.stat_result | None = None
+        try:
+            root_fd = self._open_absolute_directory(self.root)
+            descriptors.append(root_fd)
+            candidate_parent_fd = self._open_directory_chain(
+                root_fd,
+                candidate_parent_parts,
+            )
+            descriptors.append(candidate_parent_fd)
+            final_parent_fd = self._open_directory_chain(
+                root_fd,
+                final_parent_parts,
+            )
+            descriptors.append(final_parent_fd)
+            locked_fd = os.open(
+                candidate_name,
+                self._publication_file_open_flags(),
+                dir_fd=candidate_parent_fd,
+            )
+            descriptors.append(locked_fd)
+            fcntl.flock(locked_fd, fcntl.LOCK_EX)
+            locked_stat = os.fstat(locked_fd)
+            candidate_stat = self._stat_at(
+                candidate_parent_fd,
+                candidate_name,
+            )
+            final_stat = self._stat_at(final_parent_fd, final_name)
+            if (
+                not self._same_regular_inode(candidate_stat, locked_stat)
+                or not self._same_regular_inode(final_stat, locked_stat)
+                or candidate_stat.st_nlink != 2
+                or final_stat.st_nlink != 2
+                or locked_stat.st_nlink != 2
+            ):
+                raise ArtifactRecoveryStoreError(
+                    "publication paths are not one exact interrupted hard link"
+                )
+
+            self._assert_publication_namespace_binding(
+                root_fd=root_fd,
+                source_parent_parts=candidate_parent_parts,
+                source_parent_fd=candidate_parent_fd,
+                destination_parent_parts=final_parent_parts,
+                destination_parent_fd=final_parent_fd,
+            )
+            synced = self._sync_locked_file(locked_fd)
+            if (
+                not self._same_regular_inode(synced, locked_stat)
+                or synced.st_nlink != 2
+            ):
+                raise ArtifactRecoveryStoreError(
+                    "interrupted publication changed during recovery"
+                )
+            os.fsync(final_parent_fd)
+            self._assert_publication_namespace_binding(
+                root_fd=root_fd,
+                source_parent_parts=candidate_parent_parts,
+                source_parent_fd=candidate_parent_fd,
+                destination_parent_parts=final_parent_parts,
+                destination_parent_fd=final_parent_fd,
+            )
+
+            os.unlink(candidate_name, dir_fd=candidate_parent_fd)
+            candidate_unlinked = True
+            os.fsync(candidate_parent_fd)
+            os.fsync(final_parent_fd)
+            self._assert_publication_namespace_binding(
+                root_fd=root_fd,
+                source_parent_parts=candidate_parent_parts,
+                source_parent_fd=candidate_parent_fd,
+                destination_parent_parts=final_parent_parts,
+                destination_parent_fd=final_parent_fd,
+            )
+            committed_candidate = self._stat_at(
+                candidate_parent_fd,
+                candidate_name,
+            )
+            committed_final = self._stat_at(final_parent_fd, final_name)
+            committed_locked = os.fstat(locked_fd)
+            if (
+                committed_candidate is not None
+                or not self._same_regular_inode(committed_final, locked_stat)
+                or committed_final.st_nlink != 1
+                or not self._same_regular_inode(committed_locked, locked_stat)
+                or committed_locked.st_nlink != 1
+            ):
+                raise ArtifactRecoveryStoreError(
+                    "interrupted publication did not converge"
+                )
+            self._assert_publication_namespace_binding(
+                root_fd=root_fd,
+                source_parent_parts=candidate_parent_parts,
+                source_parent_fd=candidate_parent_fd,
+                destination_parent_parts=final_parent_parts,
+                destination_parent_fd=final_parent_fd,
+            )
+            return final_path
+        except BaseException as exc:
+            if candidate_unlinked and locked_stat is not None:
+                self._restore_interrupted_publication(
+                    candidate_parent_fd=candidate_parent_fd,
+                    candidate_name=candidate_name,
+                    final_parent_fd=final_parent_fd,
+                    final_name=final_name,
+                    locked_stat=locked_stat,
+                    primary_error=exc,
+                )
+            if isinstance(exc, ArtifactRecoveryStoreError):
+                raise
+            if isinstance(exc, OSError):
+                raise ArtifactRecoveryStoreError(
+                    "interrupted publication could not be completed"
+                ) from exc
+            raise
+        finally:
+            self._close_artifact_descriptors(
+                descriptors,
+                active_error=sys.exception(),
+                operation="interrupted publication",
+            )
+
     @staticmethod
     def _sync_locked_file(descriptor: int) -> os.stat_result:
         opened = os.fstat(descriptor)
@@ -746,10 +1094,11 @@ class ArtifactRecoveryStore:
         }
 
     @staticmethod
-    def _close_quarantine_descriptors(
+    def _close_artifact_descriptors(
         descriptors: Iterable[int],
         *,
         active_error: BaseException | None,
+        operation: str,
     ) -> None:
         cleanup_error: OSError | None = None
         for descriptor in reversed(tuple(descriptors)):
@@ -762,12 +1111,12 @@ class ArtifactRecoveryStore:
             return
         if active_error is not None:
             active_error.add_note(
-                "artifact quarantine descriptor cleanup also failed: "
+                f"{operation} descriptor cleanup also failed: "
                 f"{cleanup_error}"
             )
             return
         raise ArtifactRecoveryStoreError(
-            "artifact quarantine descriptor cleanup failed"
+            f"{operation} descriptor cleanup failed"
         ) from cleanup_error
 
     def _quarantine_with_directory_descriptors(
@@ -1144,9 +1493,10 @@ class ArtifactRecoveryStore:
                 "artifact quarantine failed"
             ) from exc
         finally:
-            self._close_quarantine_descriptors(
+            self._close_artifact_descriptors(
                 descriptors,
                 active_error=sys.exception(),
+                operation="artifact quarantine",
             )
 
 
