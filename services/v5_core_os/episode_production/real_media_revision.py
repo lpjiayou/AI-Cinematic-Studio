@@ -323,6 +323,36 @@ def _assert_typed_closed_world_batch(
         )
 
 
+def _typed_record_payload(
+    records: Sequence[Mapping[str, Any]],
+    *,
+    record_kind: str,
+    record_ref: Any,
+    record_version: Any,
+    payload_digest: Any,
+    operation: str,
+) -> dict[str, Any]:
+    """Resolve one exact typed record from a single evidence snapshot."""
+
+    matches = [
+        item
+        for item in records
+        if item.get("recordRef") == record_ref
+        and item.get("recordVersion") == record_version
+    ]
+    if (
+        len(matches) != 1
+        or matches[0].get("recordKind") != record_kind
+        or matches[0].get("payloadDigest") != payload_digest
+        or not isinstance(matches[0].get("payload"), Mapping)
+        or matches[0]["payload"].get("payloadDigest") != payload_digest
+    ):
+        raise RepositoryUnavailableError(
+            f"{operation} canonical record membership is inconsistent"
+        )
+    return deepcopy(dict(matches[0]["payload"]))
+
+
 def _fact(gate: Mapping[str, Any], kind: str) -> dict[str, Any]:
     matches = [
         item
@@ -5772,13 +5802,42 @@ class K2RealMediaRevisionService:
             "state": gate["toState"],
         }
 
+    def _canonical_admission_snapshot(
+        self,
+        gate: Mapping[str, Any],
+    ) -> tuple[dict[str, Any], tuple[dict[str, Any], ...]]:
+        """Bind replay validation to one immutable gate/record snapshot."""
+
+        workspace = gate.get("workspaceRef")
+        run_ref = gate.get("productionRunRef")
+        gate_name = gate.get("gateName")
+        if not all(
+            isinstance(value, str) and value
+            for value in (workspace, run_ref, gate_name)
+        ):
+            raise RepositoryUnavailableError(
+                "admission replay gate scope is invalid"
+            )
+        snapshot = self.evidence.read_snapshot(workspace, run_ref)
+        matches = [
+            item for item in snapshot.gates if item.get("gateName") == gate_name
+        ]
+        if len(matches) != 1 or matches[0] != dict(gate):
+            raise RepositoryUnavailableError(
+                "admission replay gate is not canonical in the evidence snapshot"
+            )
+        return deepcopy(dict(matches[0])), snapshot.records
+
     def _validated_image_admission_replay(
         self,
         gate: Mapping[str, Any],
         *,
         expected_selection_request_digest: str,
+        records: Sequence[Mapping[str, Any]] | None = None,
     ) -> dict[str, Any]:
-        bundle = self._admission_bundle(gate)
+        if records is None:
+            gate, records = self._canonical_admission_snapshot(gate)
+        bundle = self._admission_bundle(gate, records=records)
         manifest = bundle["realImageAdmissionManifest"]
         if (
             manifest.get("selectionRequestDigest")
@@ -5813,10 +5872,31 @@ class K2RealMediaRevisionService:
             for item in assets
             if isinstance(item, Mapping)
         }
+        admission_refs = [item.get("admissionRef") for item in admissions]
+        admission_selection_refs = [
+            item.get("selectionRef") for item in admissions
+        ]
+        admission_selection_digests = [
+            item.get("selectionDigest") for item in admissions
+        ]
+        admission_asset_refs = [
+            item.get("assetVersionRef") for item in admissions
+        ]
+        admission_asset_digests = [
+            item.get("assetVersionDigest") for item in admissions
+        ]
+        selection_candidate_refs = [
+            item.get("candidateRef") for item in selections
+        ]
+        admission_candidate_refs = [
+            item.get("candidateRef") for item in admissions
+        ]
         if (
             len(candidate_index) != 4
             or len(selection_index) != 4
             or len(asset_index) != 4
+            or len(set(admission_refs)) != 4
+            or len(set(selection_candidate_refs)) != 4
             or manifest.get("selectionRefs")
             != [item.get("selectionRef") for item in selections]
             or manifest.get("selectionVersions")
@@ -5827,6 +5907,11 @@ class K2RealMediaRevisionService:
             != [item.get("assetVersionRef") for item in assets]
             or manifest.get("assetVersionDigests")
             != [item.get("payloadDigest") for item in assets]
+            or admission_selection_refs != manifest.get("selectionRefs")
+            or admission_selection_digests != manifest.get("selectionDigests")
+            or admission_asset_refs != manifest.get("assetVersionRefs")
+            or admission_asset_digests != manifest.get("assetVersionDigests")
+            or admission_candidate_refs != selection_candidate_refs
             or manifest.get("admittedCount") != 4
         ):
             raise RepositoryUnavailableError(
@@ -5868,6 +5953,26 @@ class K2RealMediaRevisionService:
                 raise RepositoryUnavailableError(
                     "M10 image admission record lineage is inconsistent"
                 )
+            persisted_admission = _typed_record_payload(
+                records,
+                record_kind=ASSET_ADMISSION,
+                record_ref=admission.get("admissionRef"),
+                record_version=admission.get("version"),
+                payload_digest=admission.get("payloadDigest"),
+                operation="M10 image admission",
+            )
+            persisted_asset = _typed_record_payload(
+                records,
+                record_kind=ASSET_VERSION,
+                record_ref=asset.get("assetVersionRef"),
+                record_version=asset.get("version"),
+                payload_digest=asset.get("payloadDigest"),
+                operation="M10 image admission",
+            )
+            if persisted_admission != admission or persisted_asset != asset:
+                raise RepositoryUnavailableError(
+                    "M10 image admission snapshot payload is inconsistent"
+                )
         return bundle
 
     @staticmethod
@@ -5896,7 +6001,10 @@ class K2RealMediaRevisionService:
         gate: Mapping[str, Any],
         *,
         expected_selection_request_digest: str,
+        records: Sequence[Mapping[str, Any]] | None = None,
     ) -> dict[str, Any]:
+        if records is None:
+            gate, records = self._canonical_admission_snapshot(gate)
         bundle = self._video_admission_bundle(gate)
         manifest = bundle["realVideoAdmissionManifest"]
         if (
@@ -5912,6 +6020,27 @@ class K2RealMediaRevisionService:
         selection_digests = manifest.get("selectionDigests")
         asset_refs = manifest.get("assetVersionRefs")
         asset_digests = manifest.get("assetVersionDigests")
+        admission_values = admissions if isinstance(admissions, list) else []
+        admission_refs = [
+            item.get("admissionRef") if isinstance(item, Mapping) else None
+            for item in admission_values
+        ]
+        admission_selection_refs = [
+            item.get("selectionRef") if isinstance(item, Mapping) else None
+            for item in admission_values
+        ]
+        admission_selection_digests = [
+            item.get("selectionDigest") if isinstance(item, Mapping) else None
+            for item in admission_values
+        ]
+        admission_asset_refs = [
+            item.get("assetVersionRef") if isinstance(item, Mapping) else None
+            for item in admission_values
+        ]
+        admission_asset_digests = [
+            item.get("assetVersionDigest") if isinstance(item, Mapping) else None
+            for item in admission_values
+        ]
         if (
             not isinstance(admissions, list)
             or len(admissions) != 4
@@ -5922,11 +6051,18 @@ class K2RealMediaRevisionService:
             or len(set(selection_refs)) != 4
             or not isinstance(selection_digests, list)
             or len(selection_digests) != 4
+            or len(set(selection_digests)) != 4
             or not isinstance(asset_refs, list)
             or len(asset_refs) != 4
             or len(set(asset_refs)) != 4
             or not isinstance(asset_digests, list)
             or len(asset_digests) != 4
+            or len(set(asset_digests)) != 4
+            or len(set(admission_refs)) != 4
+            or admission_selection_refs != selection_refs
+            or admission_selection_digests != selection_digests
+            or admission_asset_refs != asset_refs
+            or admission_asset_digests != asset_digests
             or manifest.get("admittedCount") != 4
             or asset_refs != [item.get("assetVersionRef") for item in assets]
             or asset_digests != [item.get("payloadDigest") for item in assets]
@@ -5944,12 +6080,40 @@ class K2RealMediaRevisionService:
             raise RepositoryUnavailableError(
                 "M11 admission canonical AssetVersion batch is ambiguous"
             )
+        candidate_identities: set[tuple[Any, Any, Any]] = set()
         for admission in admissions:
             asset = asset_index.get(admission.get("assetVersionRef"))
+            selection = _typed_record_payload(
+                records,
+                record_kind=HUMAN_SELECTION,
+                record_ref=admission.get("selectionRef"),
+                record_version=admission.get("selectionVersion"),
+                payload_digest=admission.get("selectionDigest"),
+                operation="M11 video admission",
+            )
+            candidate = _typed_record_payload(
+                records,
+                record_kind=CANDIDATE,
+                record_ref=selection.get("candidateRef"),
+                record_version=selection.get("candidateVersion"),
+                payload_digest=selection.get("candidateDigest"),
+                operation="M11 video admission",
+            )
             if (
                 not isinstance(asset, Mapping)
                 or selection_index.get(admission.get("selectionRef"))
                 != admission.get("selectionDigest")
+                or selection.get("selectionRef") != admission.get("selectionRef")
+                or selection.get("selectionVersion")
+                != admission.get("selectionVersion")
+                or selection.get("candidateRef") != admission.get("candidateRef")
+                or selection.get("candidateDigest")
+                != admission.get("candidateDigest")
+                or candidate.get("candidateRef") != selection.get("candidateRef")
+                or candidate.get("candidateVersion")
+                != selection.get("candidateVersion")
+                or candidate.get("payloadDigest")
+                != selection.get("candidateDigest")
                 or admission.get("assetVersionDigest")
                 != asset.get("payloadDigest")
                 or asset.get("humanSelectionRef")
@@ -5966,6 +6130,37 @@ class K2RealMediaRevisionService:
                 raise RepositoryUnavailableError(
                     "M11 admission canonical record lineage is inconsistent"
                 )
+            candidate_identities.add(
+                (
+                    selection.get("candidateRef"),
+                    selection.get("candidateVersion"),
+                    selection.get("candidateDigest"),
+                )
+            )
+            persisted_admission = _typed_record_payload(
+                records,
+                record_kind=ASSET_ADMISSION,
+                record_ref=admission.get("admissionRef"),
+                record_version=admission.get("version"),
+                payload_digest=admission.get("payloadDigest"),
+                operation="M11 video admission",
+            )
+            persisted_asset = _typed_record_payload(
+                records,
+                record_kind=ASSET_VERSION,
+                record_ref=asset.get("assetVersionRef"),
+                record_version=asset.get("version"),
+                payload_digest=asset.get("payloadDigest"),
+                operation="M11 video admission",
+            )
+            if persisted_admission != admission or persisted_asset != asset:
+                raise RepositoryUnavailableError(
+                    "M11 admission snapshot payload is inconsistent"
+                )
+        if len(candidate_identities) != 4:
+            raise RepositoryUnavailableError(
+                "M11 admission candidate coverage is ambiguous"
+            )
         return bundle
 
     def get_revision_bundle(

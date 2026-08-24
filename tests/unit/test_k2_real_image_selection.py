@@ -532,6 +532,27 @@ class K2RealImageSelectionTests(unittest.TestCase):
             (503, "episode_production_unavailable"),
         )
 
+    def test_image_admission_replay_rejects_duplicate_admission_coverage(self):
+        command = self.selection_command()
+        self.boundary.select_real_images(command)
+        original_bundle = self.revision._admission_bundle
+
+        def duplicate_bundle(gate, **kwargs):
+            bundle = original_bundle(gate, **kwargs)
+            bundle["assetAdmissions"] = [bundle["assetAdmissions"][0]] * 4
+            return bundle
+
+        self.revision._admission_bundle = duplicate_bundle
+        try:
+            with self.assertRaises(EpisodeProductionPublicError) as caught:
+                self.boundary.select_real_images(command)
+        finally:
+            self.revision._admission_bundle = original_bundle
+        self.assertEqual(
+            (caught.exception.status, caught.exception.code),
+            (503, "episode_production_unavailable"),
+        )
+
     def test_rejects_one_changed_candidate_digest_atomically(self):
         command = self.selection_command()
         command["selections"][2]["visualQcDigest"] = _digest(
