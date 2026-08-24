@@ -222,14 +222,16 @@ class EpisodeProductionPublicBoundary:
             return EpisodeProductionPublicError(exc.code, 503)
         return EpisodeProductionPublicError(exc.code, 400)
 
-    def _invoke(self, operation, *args):
+    def _invoke(self, operation, *args, **kwargs):
         try:
-            return operation(*args)
+            return operation(*args, **kwargs)
         except EpisodeProductionError as exc:
             raise self._error(exc) from None
 
-    def _invoke_public_media(self, operation, *args):
-        return _strip_internal_media_locators(self._invoke(operation, *args))
+    def _invoke_public_media(self, operation, *args, **kwargs):
+        return _strip_internal_media_locators(
+            self._invoke(operation, *args, **kwargs)
+        )
 
     def create_run(self, command: Mapping[str, Any]) -> dict[str, Any]:
         run = self._invoke(self.__service.create_run, command)
@@ -384,13 +386,22 @@ class EpisodeProductionPublicBoundary:
     def get_real_media_revision(
         self, workspace_ref: str, run_ref: str
     ) -> dict[str, Any]:
+        snapshot = self._invoke(
+            self.__real_media_revision.evidence.read_snapshot,
+            workspace_ref,
+            run_ref,
+        )
         revision = self._invoke(
             self.__real_media_revision.get_revision_bundle,
             workspace_ref,
             run_ref,
+            evidence_snapshot=snapshot,
         )
         axes = self._invoke(
-            self.__state_projection.get_projection, workspace_ref, run_ref
+            self.__state_projection.get_projection,
+            workspace_ref,
+            run_ref,
+            evidence_snapshot=snapshot,
         )
         # ADR-0013 extends the existing real-media projection; the dedicated
         # state query remains a compatibility/convenience view, not a second

@@ -6,7 +6,7 @@ from collections import Counter
 from copy import deepcopy
 from typing import Any, Mapping
 
-from .evidence import EpisodeProductionEvidenceRepository
+from .evidence import EpisodeProductionEvidenceRepository, EvidenceSnapshot
 from .foundation import RepositoryUnavailableError
 from .media_candidate_review import K2MediaCandidateReviewService
 
@@ -444,24 +444,40 @@ class K2ProductionStateProjectionService:
         }
 
     def get_projection(
-        self, workspace_ref: str, production_run_ref: str
+        self,
+        workspace_ref: str,
+        production_run_ref: str,
+        *,
+        evidence_snapshot: EvidenceSnapshot | None = None,
     ) -> dict[str, Any]:
         root = deepcopy(
             dict(self.root_service.get_run(workspace_ref, production_run_ref))
         )
-        gates = self.evidence.list_gates(workspace_ref, production_run_ref)
-        production_state = self.evidence.current_state(
+        snapshot = evidence_snapshot or self.evidence.read_snapshot(
             workspace_ref, production_run_ref
         )
+        if (
+            snapshot.workspaceRef != workspace_ref
+            or snapshot.productionRunRef != production_run_ref
+        ):
+            raise RepositoryUnavailableError("evidence snapshot scope is invalid")
+        gates = [deepcopy(dict(item)) for item in snapshot.gates]
+        production_state = snapshot.currentState
         candidates = self.candidate_review.get_projection(
-            workspace_ref, production_run_ref
+            workspace_ref,
+            production_run_ref,
+            records=snapshot.records,
+            gates=snapshot.gates,
         )
         video_activation = None
         if self.activation_reader is not None and hasattr(
             self.activation_reader, "get_video_activation_projection"
         ):
             video_activation = self.activation_reader.get_video_activation_projection(
-                workspace_ref, production_run_ref
+                workspace_ref,
+                production_run_ref,
+                records=snapshot.records,
+                gates=snapshot.gates,
             )
         active_revision = self._active_revision(
             candidates, gates, production_state, video_activation
@@ -476,6 +492,8 @@ class K2ProductionStateProjectionService:
             len(all_candidates) - len(active_candidates)
         )
         latest = gates[-1] if gates else None
+        runtime = self._runtime(workspace_ref, production_run_ref)
+        runtime["observedSeparatelyFromEvidenceRevision"] = True
         return {
             "schemaVersion": "v5.k2-production-state-projection.v1",
             "workspaceRef": workspace_ref,
@@ -497,7 +515,7 @@ class K2ProductionStateProjectionService:
                 "latestGateName": None if latest is None else latest["gateName"],
                 "latestGateDigest": None if latest is None else latest["requestDigest"],
             },
-            "runtimeState": self._runtime(workspace_ref, production_run_ref),
+            "runtimeState": runtime,
             "visualQcState": self._visual(candidates, active_revision, gates),
             "activeRevision": active_revision,
             "candidates": active_candidates,
@@ -508,6 +526,7 @@ class K2ProductionStateProjectionService:
                 "assetVersionAuthority": "V5_CANONICAL_EVIDENCE_ONLY",
                 "publicationAllowed": False,
             },
+            "evidenceRevisionToken": snapshot.revisionToken,
             "publicationAllowed": False,
         }
 

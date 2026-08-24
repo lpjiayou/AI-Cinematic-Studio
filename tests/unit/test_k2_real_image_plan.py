@@ -2,6 +2,8 @@ import json
 from pathlib import Path
 import tempfile
 import unittest
+from concurrent.futures import ThreadPoolExecutor
+from threading import Barrier
 
 from services.v4_platform import (
     DeterministicLocalFfmpegAdapter,
@@ -147,6 +149,31 @@ class K2RealImagePlanTests(unittest.TestCase):
         self.assertEqual(projected["state"], "REAL_IMAGE_PLAN_READY")
         self.assertEqual(projected["productionState"], projected["state"])
         self.assertEqual(projected["visualQcState"]["state"], "NOT_RECORDED")
+
+    def test_concurrent_exact_plan_returns_committed_winner_as_replay(self):
+        revision = (
+            self.boundary._EpisodeProductionPublicBoundary__real_media_revision
+        )
+        original_append = revision.evidence.append_gate
+        barrier = Barrier(2)
+
+        def append_after_both_planned(gate):
+            barrier.wait(timeout=5)
+            return original_append(gate)
+
+        revision.evidence.append_gate = append_after_both_planned
+        with ThreadPoolExecutor(max_workers=2) as pool:
+            results = list(
+                pool.map(lambda _: self.boundary.plan_real_images(self.command()), range(2))
+            )
+        self.assertEqual(
+            sorted(item["idempotentReplay"] for item in results),
+            [False, True],
+        )
+        self.assertEqual(results[0]["realImagePlan"], results[1]["realImagePlan"])
+        self.assertEqual(
+            results[0]["generationRequests"], results[1]["generationRequests"]
+        )
 
     def test_public_command_is_closed_world_and_cannot_supply_paths(self):
         with self.assertRaises(EpisodeProductionPublicError) as caught:

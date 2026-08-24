@@ -1,6 +1,7 @@
 import unittest
 
 from services.v5_core_os.episode_production.evidence import (
+    EvidenceSnapshot,
     InMemoryEpisodeProductionEvidenceAdapter,
 )
 from services.v5_core_os.episode_production.media_candidate_review import (
@@ -71,6 +72,17 @@ class EvidenceWithCurrentVideoPlan(InMemoryEpisodeProductionEvidenceAdapter):
             }
         ]
 
+    def read_snapshot(self, workspace_ref, run_ref):
+        stored = super().read_snapshot(workspace_ref, run_ref)
+        return EvidenceSnapshot(
+            workspace_ref,
+            run_ref,
+            self.current_state(workspace_ref, run_ref),
+            tuple(self.list_gates(workspace_ref, run_ref)),
+            stored.records,
+            stored.revisionToken,
+        )
+
 
 class EvidenceWithAdmittedSuccessor(EvidenceWithCurrentVideoPlan):
     def __init__(self, plan_revision_ref, admitted_revision_ref):
@@ -110,7 +122,10 @@ class CandidateProjectionWithLatestRevision:
         self.visual_result = visual_result
         self.admission_state = admission_state
 
-    def get_projection(self, workspace_ref, production_run_ref):
+    def get_projection(
+        self, workspace_ref, production_run_ref, *, records=None, gates=None
+    ):
+        del records, gates
         return {
             "schemaVersion": "v5.k2-candidate-lifecycle-projection.v1",
             "workspaceRef": workspace_ref,
@@ -152,7 +167,14 @@ class ValidatedActivationReader:
     def __init__(self, revision_ref):
         self.revision_ref = revision_ref
 
-    def get_video_activation_projection(self, workspace_ref, production_run_ref):
+    def get_video_activation_projection(
+        self,
+        workspace_ref,
+        production_run_ref,
+        *,
+        records=None,
+        gates=None,
+    ):
         return {
             "manifestRef": "manifest-successor",
             "manifestDigest": "5" * 64,

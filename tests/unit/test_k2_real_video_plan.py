@@ -1,5 +1,7 @@
 import json
 import unittest
+from concurrent.futures import ThreadPoolExecutor
+from threading import Barrier
 
 from services.v5_core_os.episode_production import EpisodeProductionPublicError
 from tests.unit.test_episode_production_k2 import WORKSPACE
@@ -122,6 +124,31 @@ class K2RealVideoPlanTests(unittest.TestCase):
             first["generationRequests"],
         )
         self.assertEqual(len(restored["assetVersions"]), 4)
+
+    def test_concurrent_exact_plan_returns_committed_winner_as_replay(self):
+        revision = (
+            self.boundary._EpisodeProductionPublicBoundary__real_media_revision
+        )
+        original_append = revision.evidence.append_gate
+        barrier = Barrier(2)
+
+        def append_after_both_planned(gate):
+            barrier.wait(timeout=5)
+            return original_append(gate)
+
+        revision.evidence.append_gate = append_after_both_planned
+        with ThreadPoolExecutor(max_workers=2) as pool:
+            results = list(
+                pool.map(lambda _: self.boundary.plan_real_videos(self.command()), range(2))
+            )
+        self.assertEqual(
+            sorted(item["idempotentReplay"] for item in results),
+            [False, True],
+        )
+        self.assertEqual(results[0]["realVideoPlan"], results[1]["realVideoPlan"])
+        self.assertEqual(
+            results[0]["generationRequests"], results[1]["generationRequests"]
+        )
 
     def test_public_command_rejects_client_paths_and_provider_claims(self):
         with self.assertRaises(EpisodeProductionPublicError) as caught:

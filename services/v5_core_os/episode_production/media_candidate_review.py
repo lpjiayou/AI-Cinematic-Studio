@@ -15,6 +15,7 @@ from typing import Any, Callable, Mapping, Protocol, Sequence
 from .evidence import EpisodeProductionEvidenceRepository, EvidenceRecord
 from .foundation import (
     EpisodeProductionError,
+    IdempotencyConflictError,
     RecordNotFoundError,
     StaleInputError,
     UpstreamNotReadyError,
@@ -429,6 +430,28 @@ def _payload(record: Mapping[str, Any]) -> dict[str, Any]:
     return deepcopy(dict(value))
 
 
+def _evidence_record(record: Mapping[str, Any]) -> EvidenceRecord:
+    """Rehydrate one repository-verified record for an atomic replay batch."""
+
+    try:
+        return EvidenceRecord(
+            workspaceRef=record["workspaceRef"],
+            productionRunRef=record["productionRunRef"],
+            recordKind=record["recordKind"],
+            recordRef=record["recordRef"],
+            recordVersion=record["recordVersion"],
+            idempotencyKey=record["idempotencyKey"],
+            requestDigest=record["requestDigest"],
+            createdAt=record["createdAt"],
+            payload=deepcopy(dict(record["payload"])),
+            payloadDigest=record["payloadDigest"],
+        )
+    except (KeyError, TypeError, ValueError) as exc:
+        raise CandidateLifecycleError(
+            "canonical candidate evidence is invalid"
+        ) from exc
+
+
 def _sealed(value: Mapping[str, Any]) -> tuple[dict[str, Any], str]:
     payload = deepcopy(dict(value))
     digest = _digest(payload)
@@ -477,10 +500,20 @@ class CanonicalAssetVersionAuthority:
         self.evidence = evidence
 
     def list_asset_versions(
-        self, workspace_ref: str, production_run_ref: str
+        self,
+        workspace_ref: str,
+        production_run_ref: str,
+        *,
+        gates: Sequence[Mapping[str, Any]] | None = None,
+        records: Sequence[Mapping[str, Any]] | None = None,
     ) -> list[dict[str, Any]]:
         versions: dict[str, dict[str, Any]] = {}
-        for gate in self.evidence.list_gates(workspace_ref, production_run_ref):
+        gate_values = (
+            self.evidence.list_gates(workspace_ref, production_run_ref)
+            if gates is None
+            else gates
+        )
+        for gate in gate_values:
             for fact in gate.get("facts", []):
                 if not isinstance(fact, Mapping):
                     continue
@@ -489,9 +522,18 @@ class CanonicalAssetVersionAuthority:
                 payload = fact.get("payload")
                 if isinstance(payload, Mapping):
                     self._add(versions, dict(payload))
-        for record in self.evidence.list_records(
-            workspace_ref, production_run_ref, record_kind=ASSET_VERSION
-        ):
+        record_values = (
+            self.evidence.list_records(
+                workspace_ref, production_run_ref, record_kind=ASSET_VERSION
+            )
+            if records is None
+            else [
+                item
+                for item in records
+                if item.get("recordKind") == ASSET_VERSION
+            ]
+        )
+        for record in record_values:
             self._add(versions, _payload(record))
         return sorted(
             versions.values(),
@@ -707,6 +749,8 @@ class K2MediaCandidateReviewService:
         workspace: str,
         run_ref: str,
         candidate_ref: str,
+        *,
+        records: Sequence[Mapping[str, Any]] | None = None,
     ) -> dict[str, Any] | None:
         """Return the journal-current candidate record for the requested ref.
 
@@ -719,8 +763,16 @@ class K2MediaCandidateReviewService:
         selected_record: dict[str, Any] | None = None
         selected_payload: dict[str, Any] | None = None
         latest: dict[str, Any] | None = None
-        candidates = self.evidence.list_records(
-            workspace, run_ref, record_kind=CANDIDATE
+        candidates = (
+            self.evidence.list_records(
+                workspace, run_ref, record_kind=CANDIDATE
+            )
+            if records is None
+            else [
+                item
+                for item in records
+                if item.get("recordKind") == CANDIDATE
+            ]
         )
         for record in candidates:
             payload = _payload(record)
@@ -813,17 +865,31 @@ class K2MediaCandidateReviewService:
         )
 
     def _applicable_visual_qc(
-        self, workspace: str, run_ref: str, candidate_ref: str
+        self,
+        workspace: str,
+        run_ref: str,
+        candidate_ref: str,
+        *,
+        records: Sequence[Mapping[str, Any]] | None = None,
     ) -> tuple[dict[str, Any], dict[str, Any]] | None:
         current_candidate = self._current_candidate_record(
-            workspace, run_ref, candidate_ref
+            workspace, run_ref, candidate_ref, records=records
         )
         if current_candidate is None:
             return None
         decisions: list[tuple[dict[str, Any], dict[str, Any]]] = []
-        for record in self.evidence.list_records(
-            workspace, run_ref, record_kind=SEMANTIC_VISUAL_QC
-        ):
+        qc_records = (
+            self.evidence.list_records(
+                workspace, run_ref, record_kind=SEMANTIC_VISUAL_QC
+            )
+            if records is None
+            else [
+                item
+                for item in records
+                if item.get("recordKind") == SEMANTIC_VISUAL_QC
+            ]
+        )
+        for record in qc_records:
             payload = _payload(record)
             if (
                 payload.get("candidateRef") == candidate_ref
@@ -995,33 +1061,27 @@ class K2MediaCandidateReviewService:
                 "semantic visual QC command fields are invalid"
             )
         workspace, run_ref, key = self._scope(command)
-        expected_record_journal_head = self.evidence.record_journal_head(
-            workspace, run_ref
-        )
-        validation, validation_payload = self._exact(
-            workspace,
-            run_ref,
-            command.get("technicalValidationRef"),
-            command.get("technicalValidationVersion", 1),
-            command.get("technicalValidationDigest"),
-            TECHNICAL_VALIDATION,
-        )
-        if validation_payload.get("result") != "PASS":
-            raise CandidateNotSelectableError("technical validation did not pass")
-        candidate_record, candidate_payload = self._exact(
-            workspace,
-            run_ref,
-            validation_payload.get("candidateRef"),
-            validation_payload.get("candidateVersion"),
-            validation_payload.get("candidateDigest"),
-            CANDIDATE,
-        )
-        if self._current_candidate_record(
-            workspace, run_ref, candidate_payload["candidateRef"]
-        ) is None:
-            raise StaleInputError("Candidate evidence is no longer current")
         if command.get("reviewProfile") != VISUAL_QC_PROFILE["assessmentProfileRef"]:
             raise CandidateLifecycleError("semantic visual QC profile is invalid")
+        validation_ref = _required_ref(
+            command.get("technicalValidationRef"), "technicalValidationRef"
+        )
+        validation_version = _positive_int(
+            command.get("technicalValidationVersion"),
+            "technicalValidationVersion",
+            maximum=1_000_000,
+        )
+        validation_digest = _digest_value(
+            command.get("technicalValidationDigest"),
+            "technicalValidationDigest",
+        )
+        qc_ref = _required_ref(command.get("visualQcRef"), "visualQcRef")
+        version = _positive_int(
+            command.get("visualQcVersion"),
+            "visualQcVersion",
+            maximum=1_000_000,
+        )
+        reviewer_ref = _required_ref(command.get("reviewerRef"), "reviewerRef")
         raw_evidence = command.get("evidence")
         if (
             not isinstance(raw_evidence, list)
@@ -1052,18 +1112,9 @@ class K2MediaCandidateReviewService:
             raise CandidateLifecycleError(
                 "semantic visual QC evidence is ambiguous"
             )
-        current = self._applicable_visual_qc(
-            workspace, run_ref, candidate_payload["candidateRef"]
-        )
         requested_supersession = command.get("supersedesVisualQc")
         supersession: dict[str, Any] | None = None
-        if current is None:
-            if requested_supersession is not None:
-                raise CandidateLifecycleError(
-                    "semantic visual QC has nothing to supersede"
-                )
-        else:
-            current_record, _ = current
+        if requested_supersession is not None:
             if not isinstance(requested_supersession, Mapping) or set(
                 requested_supersession
             ) != {
@@ -1094,16 +1145,9 @@ class K2MediaCandidateReviewService:
                     maximum=500,
                 ),
             }
-            if (
-                supersession["visualQcRef"] != current_record["recordRef"]
-                or supersession["visualQcVersion"]
-                != current_record["recordVersion"]
-                or supersession["visualQcDigest"]
-                != current_record["payloadDigest"]
-                or not supersession["staleReason"]
-            ):
-                raise StaleInputError(
-                    "semantic visual QC supersession changed"
+            if not supersession["staleReason"]:
+                raise CandidateLifecycleError(
+                    "semantic visual QC stale reason is required"
                 )
         result = _enum(command.get("result"), "result", {"PASS", "FAIL"})
         checks = command.get("checks")
@@ -1121,10 +1165,121 @@ class K2MediaCandidateReviewService:
         all_pass = all(item["result"] == "PASS" for item in normalized.values())
         if (result == "PASS") != all_pass:
             raise CandidateLifecycleError("semantic visual QC result is inconsistent")
-        qc_ref = _required_ref(command.get("visualQcRef"), "visualQcRef")
-        version = _positive_int(
-            command.get("visualQcVersion", 1), "visualQcVersion", maximum=1_000_000
+
+        # Historical replay is resolved before currentness/supersession checks.
+        # Once committed, the exact command must remain replayable after a later
+        # QC supersedes it or a successor Candidate makes its lineage stale.
+        expected_input = {
+            "recordKind": SEMANTIC_VISUAL_QC,
+            "recordRef": qc_ref,
+            "recordVersion": version,
+            "technicalValidationRef": validation_ref,
+            "technicalValidationVersion": validation_version,
+            "technicalValidationDigest": validation_digest,
+            "reviewerRef": reviewer_ref,
+            "assessmentProfile": VISUAL_QC_PROFILE,
+            "assessmentProfileDigest": VISUAL_QC_PROFILE_DIGEST,
+            "evidence": evidence_items,
+            "supersedesVisualQc": supersession,
+            "checks": normalized,
+            "result": result,
+        }
+
+        def replay_existing(existing: Mapping[str, Any]) -> dict[str, Any]:
+            existing_payload = _payload(existing)
+            actual_input = {
+                "recordKind": existing.get("recordKind"),
+                "recordRef": existing.get("recordRef"),
+                "recordVersion": existing.get("recordVersion"),
+                "technicalValidationRef": existing_payload.get(
+                    "technicalValidationRef"
+                ),
+                "technicalValidationVersion": existing_payload.get(
+                    "technicalValidationVersion"
+                ),
+                "technicalValidationDigest": existing_payload.get(
+                    "technicalValidationDigest"
+                ),
+                "reviewerRef": existing_payload.get("reviewerRef"),
+                "assessmentProfile": existing_payload.get("assessmentProfile"),
+                "assessmentProfileDigest": existing_payload.get(
+                    "assessmentProfileDigest"
+                ),
+                "evidence": existing_payload.get("evidence"),
+                "supersedesVisualQc": existing_payload.get(
+                    "supersedesVisualQc"
+                ),
+                "checks": existing_payload.get("checks"),
+                "result": existing_payload.get("result"),
+            }
+            if actual_input != expected_input:
+                raise IdempotencyConflictError(
+                    "semantic visual QC idempotency content changed"
+                )
+            return {
+                "semanticVisualQc": existing_payload,
+                "idempotentReplay": True,
+            }
+
+        existing = self.evidence.get_record_by_idempotency_key(
+            workspace, run_ref, key
         )
+        if existing is not None:
+            return replay_existing(existing)
+
+        expected_record_journal_head = self.evidence.record_journal_head(
+            workspace, run_ref
+        )
+        validation, validation_payload = self._exact(
+            workspace,
+            run_ref,
+            validation_ref,
+            validation_version,
+            validation_digest,
+            TECHNICAL_VALIDATION,
+        )
+        if validation_payload.get("result") != "PASS":
+            raise CandidateNotSelectableError("technical validation did not pass")
+        _, candidate_payload = self._exact(
+            workspace,
+            run_ref,
+            validation_payload.get("candidateRef"),
+            validation_payload.get("candidateVersion"),
+            validation_payload.get("candidateDigest"),
+            CANDIDATE,
+        )
+        if self._current_candidate_record(
+            workspace, run_ref, candidate_payload["candidateRef"]
+        ) is None:
+            raise StaleInputError("Candidate evidence is no longer current")
+        current = self._applicable_visual_qc(
+            workspace, run_ref, candidate_payload["candidateRef"]
+        )
+        if current is None:
+            if supersession is not None:
+                raise CandidateLifecycleError(
+                    "semantic visual QC has nothing to supersede"
+                )
+        else:
+            current_record, _ = current
+            if supersession is None:
+                # The exact concurrent winner can become current between the
+                # initial idempotency lookup and this currentness read.  Treat
+                # that committed record as the canonical replay rather than as
+                # an unrelated supersession requirement.
+                if current_record.get("idempotencyKey") == key:
+                    return replay_existing(current_record)
+                raise CandidateLifecycleError(
+                    "semantic visual QC must explicitly supersede current evidence"
+                )
+            if (
+                supersession["visualQcRef"] != current_record["recordRef"]
+                or supersession["visualQcVersion"]
+                != current_record["recordVersion"]
+                or supersession["visualQcDigest"]
+                != current_record["payloadDigest"]
+            ):
+                raise StaleInputError("semantic visual QC supersession changed")
         payload = {
             "schemaVersion": "v5.k2-semantic-visual-qc-decision.v1",
             "visualQcRef": qc_ref,
@@ -1143,7 +1298,7 @@ class K2MediaCandidateReviewService:
             "technicalValidationRef": validation["recordRef"],
             "technicalValidationVersion": validation["recordVersion"],
             "technicalValidationDigest": validation["payloadDigest"],
-            "reviewerRef": _required_ref(command.get("reviewerRef"), "reviewerRef"),
+            "reviewerRef": reviewer_ref,
             "assessorKind": "HUMAN_ASSISTED_REVIEW",
             "assessmentProfile": deepcopy(VISUAL_QC_PROFILE),
             "assessmentProfileDigest": VISUAL_QC_PROFILE_DIGEST,
@@ -1196,15 +1351,86 @@ class K2MediaCandidateReviewService:
         if not isinstance(command, Mapping) or set(command) != required_fields:
             raise CandidateLifecycleError("human selection command fields are invalid")
         workspace, run_ref, key = self._scope(command)
+        qc_ref = _required_ref(command.get("visualQcRef"), "visualQcRef")
+        qc_version = _positive_int(
+            command.get("visualQcVersion"),
+            "visualQcVersion",
+            maximum=1_000_000,
+        )
+        qc_digest = _digest_value(command.get("visualQcDigest"), "visualQcDigest")
+        selection_ref = _required_ref(command.get("selectionRef"), "selectionRef")
+        version = _positive_int(
+            command.get("selectionVersion"),
+            "selectionVersion",
+            maximum=1_000_000,
+        )
+        approval_ref = _required_ref(command.get("approvalRef"), "approvalRef")
+        decision = _enum(command.get("decision"), "decision", {"SELECTED", "REJECTED"})
+
+        expected_replay_input = {
+            "recordKind": HUMAN_SELECTION,
+            "selectionRef": selection_ref,
+            "selectionVersion": version,
+            "visualQcRef": qc_ref,
+            "visualQcVersion": qc_version,
+            "visualQcDigest": qc_digest,
+            "approvalRef": approval_ref,
+            "decision": decision,
+        }
+
+        def replay_existing(existing: Mapping[str, Any]) -> EvidenceRecord:
+            existing_payload = _payload(existing)
+            actual = {
+                "recordKind": existing.get("recordKind"),
+                "selectionRef": existing.get("recordRef"),
+                "selectionVersion": existing.get("recordVersion"),
+                "visualQcRef": existing_payload.get("visualQcRef"),
+                "visualQcVersion": existing_payload.get("visualQcVersion"),
+                "visualQcDigest": existing_payload.get("visualQcDigest"),
+                "approvalRef": existing_payload.get("approvalRef"),
+                "decision": existing_payload.get("decision"),
+            }
+            if actual != expected_replay_input:
+                raise IdempotencyConflictError(
+                    "human selection idempotency content changed"
+                )
+            return _evidence_record(existing)
+
+        # Resolve a committed command before consulting live QC applicability or
+        # the external authority.  A durable decision remains replayable after
+        # supersession and while the authority service is unavailable.
+        by_key = self.evidence.get_record_by_idempotency_key(
+            workspace, run_ref, key
+        )
+        by_identity = self.evidence.get_record(
+            workspace, run_ref, selection_ref, version
+        )
+        existing = by_key or by_identity
+        if existing is not None:
+            if (
+                by_key is not None
+                and by_identity is not None
+                and (
+                    by_key.get("recordRef") != by_identity.get("recordRef")
+                    or by_key.get("recordVersion")
+                    != by_identity.get("recordVersion")
+                    or by_key.get("payloadDigest")
+                    != by_identity.get("payloadDigest")
+                )
+            ):
+                raise IdempotencyConflictError(
+                    "human selection idempotency content changed"
+                )
+            return replay_existing(existing)
+
         qc, qc_payload = self._exact(
             workspace,
             run_ref,
-            command.get("visualQcRef"),
-            command.get("visualQcVersion", 1),
-            command.get("visualQcDigest"),
+            qc_ref,
+            qc_version,
+            qc_digest,
             SEMANTIC_VISUAL_QC,
         )
-        decision = _enum(command.get("decision"), "decision", {"SELECTED", "REJECTED"})
         if decision == "SELECTED" and qc_payload.get("result") != "PASS":
             raise CandidateNotSelectableError("semantic visual QC did not pass")
         current = self._applicable_visual_qc(
@@ -1234,7 +1460,6 @@ class K2MediaCandidateReviewService:
             visual_qc_version=qc["recordVersion"],
             visual_qc_digest=qc["payloadDigest"],
         )
-        approval_ref = _required_ref(command.get("approvalRef"), "approvalRef")
         authority = self.selection_authority.verify(
             subject=subject,
             approval_ref=approval_ref,
@@ -1251,10 +1476,40 @@ class K2MediaCandidateReviewService:
             raise MediaSelectionApprovalRequiredError(
                 "media selection authority returned mismatched evidence"
             )
-        selection_ref = _required_ref(command.get("selectionRef"), "selectionRef")
-        version = _positive_int(
-            command.get("selectionVersion", 1), "selectionVersion", maximum=1_000_000
-        )
+
+        for existing_selection in self.evidence.list_records(
+            workspace, run_ref, record_kind=HUMAN_SELECTION
+        ):
+            existing_payload = _payload(existing_selection)
+            # The exact concurrent winner may commit after the first key read
+            # but before this uniqueness scan.  Replay it; only a different
+            # command is forbidden from consuming the same authority fact.
+            if existing_selection.get("idempotencyKey") == key:
+                return replay_existing(existing_selection)
+            same_subject_approval = (
+                existing_payload.get("candidateRef")
+                == qc_payload["candidateRef"]
+                and existing_payload.get("candidateVersion")
+                == qc_payload["candidateVersion"]
+                and existing_payload.get("candidateDigest")
+                == qc_payload["candidateDigest"]
+                and existing_payload.get("visualQcRef") == qc["recordRef"]
+                and existing_payload.get("visualQcVersion")
+                == qc["recordVersion"]
+                and existing_payload.get("visualQcDigest")
+                == qc["payloadDigest"]
+                and existing_payload.get("approvalRef") == approval_ref
+            )
+            same_authority_decision = (
+                existing_payload.get("authorityDecisionRef")
+                == authority.authority_decision_ref
+                or existing_payload.get("authorityDecisionDigest")
+                == authority.authority_decision_digest
+            )
+            if same_subject_approval or same_authority_decision:
+                raise IdempotencyConflictError(
+                    "human selection authority decision was already consumed"
+                )
         payload = {
             "schemaVersion": "v5.k2-human-selection-decision.v1",
             "selectionRef": selection_ref,
@@ -1311,14 +1566,23 @@ class K2MediaCandidateReviewService:
         return {"humanSelection": _payload(stored), "idempotentReplay": replayed}
 
     def get_projection(
-        self, workspace_ref: str, production_run_ref: str
+        self,
+        workspace_ref: str,
+        production_run_ref: str,
+        *,
+        records: Sequence[Mapping[str, Any]] | None = None,
+        gates: Sequence[Mapping[str, Any]] | None = None,
     ) -> dict[str, Any]:
         self.root_service.get_run(workspace_ref, production_run_ref)
-        records = self.evidence.list_records(workspace_ref, production_run_ref)
+        record_values = (
+            self.evidence.list_records(workspace_ref, production_run_ref)
+            if records is None
+            else [deepcopy(dict(item)) for item in records]
+        )
         candidates: dict[str, dict[str, Any]] = {}
         latest_candidate_revision_ref: str | None = None
         latest_candidate_revision_refs: dict[str, str] = {}
-        for record in records:
+        for record in record_values:
             payload = _payload(record)
             candidate_ref = payload.get("candidateRef")
             if record["recordKind"] == CANDIDATE:
@@ -1354,7 +1618,12 @@ class K2MediaCandidateReviewService:
             elif record["recordKind"] == ASSET_ADMISSION:
                 item["admissionState"] = payload["admissionState"]
                 item["assetVersionRef"] = payload["assetVersionRef"]
-        for gate in self.evidence.list_gates(workspace_ref, production_run_ref):
+        gate_values = (
+            self.evidence.list_gates(workspace_ref, production_run_ref)
+            if gates is None
+            else gates
+        )
+        for gate in gate_values:
             for fact in gate.get("facts", []):
                 if (
                     not isinstance(fact, Mapping)
@@ -1393,7 +1662,10 @@ class K2MediaCandidateReviewService:
                 else "STALE"
             )
             current_qc = self._applicable_visual_qc(
-                workspace_ref, production_run_ref, candidate_ref
+                workspace_ref,
+                production_run_ref,
+                candidate_ref,
+                records=record_values,
             )
             if current_qc is None:
                 historical_qc = [
@@ -1422,7 +1694,10 @@ class K2MediaCandidateReviewService:
             ),
             "candidates": sorted(candidates.values(), key=lambda item: item["candidateRef"]),
             "assetVersions": self.asset_versions.list_asset_versions(
-                workspace_ref, production_run_ref
+                workspace_ref,
+                production_run_ref,
+                gates=gate_values,
+                records=record_values,
             ),
             "publicationAllowed": False,
         }

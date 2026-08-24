@@ -1,5 +1,6 @@
 import tempfile
 import unittest
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 from services.v5_core_os.episode_production.evidence import (
@@ -7,6 +8,7 @@ from services.v5_core_os.episode_production.evidence import (
     SqliteEpisodeProductionEvidenceAdapter,
 )
 from services.v5_core_os.episode_production.foundation import (
+    IdempotencyConflictError,
     StaleInputError,
 )
 from services.v5_core_os.episode_production.media_candidate_review import (
@@ -15,6 +17,7 @@ from services.v5_core_os.episode_production.media_candidate_review import (
     CandidateNotSelectableError,
     K2MediaCandidateReviewService,
     MediaSelectionApprovalRequiredError,
+    RejectingMediaSelectionApprovalAuthority,
     VerifiedMediaSelection,
     _record,
 )
@@ -153,7 +156,23 @@ class CandidateReviewMixin:
         supersedes=None,
     ):
         return service.record_semantic_visual_qc(
-            {
+            self.qc_command(
+                validation,
+                result=result,
+                version=version,
+                supersedes=supersedes,
+            )
+        )["semanticVisualQc"]
+
+    def qc_command(
+        self,
+        validation,
+        *,
+        result="PASS",
+        version=1,
+        supersedes=None,
+    ):
+        return {
                 "workspaceRef": WORKSPACE,
                 "productionRunRef": RUN,
                 "idempotencyKey": f"visual-qc-shot-0001-v{version}",
@@ -184,7 +203,6 @@ class CandidateReviewMixin:
                 },
                 "result": result,
             }
-        )["semanticVisualQc"]
 
     @staticmethod
     def selection_command(qc, *, decision="SELECTED", suffix="v1"):
@@ -457,6 +475,155 @@ class CandidateReviewMixin:
         self.assertTrue(replay["idempotentReplay"])
         self.assertEqual(len(evidence.list_records(WORKSPACE, RUN)), 2)
 
+    def test_exact_qc_replays_after_supersession_without_revalidating_currentness(self):
+        service, evidence = self.service()
+        candidate = self.record_candidate(service)
+        validation = self.record_validation(service, candidate)
+        original_command = self.qc_command(validation)
+        first = service.record_semantic_visual_qc(original_command)
+        self.record_qc(
+            service,
+            validation,
+            version=2,
+            supersedes={
+                "visualQcRef": first["semanticVisualQc"]["visualQcRef"],
+                "visualQcVersion": first["semanticVisualQc"]["visualQcVersion"],
+                "visualQcDigest": first["semanticVisualQc"]["payloadDigest"],
+                "staleReason": "newer canonical review",
+            },
+        )
+        replay = service.record_semantic_visual_qc(original_command)
+        self.assertTrue(replay["idempotentReplay"])
+        self.assertEqual(replay["semanticVisualQc"], first["semanticVisualQc"])
+        self.assertEqual(
+            len(
+                evidence.list_records(
+                    WORKSPACE, RUN, record_kind="SemanticVisualQCDecision"
+                )
+            ),
+            2,
+        )
+
+    def test_concurrent_exact_qc_has_one_winner_and_one_replay(self):
+        service, evidence = self.service()
+        candidate = self.record_candidate(service)
+        validation = self.record_validation(service, candidate)
+        command = self.qc_command(validation)
+        with ThreadPoolExecutor(max_workers=2) as pool:
+            results = list(
+                pool.map(
+                    lambda _: service.record_semantic_visual_qc(command),
+                    range(2),
+                )
+            )
+        self.assertEqual(
+            sorted(item["idempotentReplay"] for item in results),
+            [False, True],
+        )
+        self.assertEqual(
+            len(
+                evidence.list_records(
+                    WORKSPACE, RUN, record_kind="SemanticVisualQCDecision"
+                )
+            ),
+            1,
+        )
+
+    def test_same_qc_key_changed_payload_conflicts_after_supersession(self):
+        service, _ = self.service()
+        candidate = self.record_candidate(service)
+        validation = self.record_validation(service, candidate)
+        original = self.qc_command(validation)
+        first = service.record_semantic_visual_qc(original)["semanticVisualQc"]
+        self.record_qc(
+            service,
+            validation,
+            version=2,
+            supersedes={
+                "visualQcRef": first["visualQcRef"],
+                "visualQcVersion": first["visualQcVersion"],
+                "visualQcDigest": first["payloadDigest"],
+                "staleReason": "newer canonical review",
+            },
+        )
+        changed = self.qc_command(validation)
+        changed["evidence"] = [
+            {"evidenceRef": "changed-frame", "evidenceDigest": "9" * 64}
+        ]
+        with self.assertRaises(IdempotencyConflictError):
+            service.record_semantic_visual_qc(changed)
+
+    def test_selection_replays_after_qc_supersession_and_authority_outage(self):
+        service, evidence = self.service()
+        candidate = self.record_candidate(service)
+        validation = self.record_validation(service, candidate)
+        qc = self.record_qc(service, validation)
+        command = self.selection_command(qc, decision="REJECTED")
+        first = service.record_human_selection(command)
+        self.record_qc(
+            service,
+            validation,
+            version=2,
+            supersedes={
+                "visualQcRef": qc["visualQcRef"],
+                "visualQcVersion": qc["visualQcVersion"],
+                "visualQcDigest": qc["payloadDigest"],
+                "staleReason": "newer canonical review",
+            },
+        )
+        service.selection_authority = RejectingMediaSelectionApprovalAuthority()
+        replay = service.record_human_selection(command)
+        self.assertTrue(replay["idempotentReplay"])
+        self.assertEqual(replay["humanSelection"], first["humanSelection"])
+        self.assertEqual(
+            len(
+                evidence.list_records(
+                    WORKSPACE, RUN, record_kind="HumanSelectionDecision"
+                )
+            ),
+            1,
+        )
+
+    def test_concurrent_exact_rejected_selection_has_one_winner_and_one_replay(self):
+        service, evidence = self.service()
+        candidate = self.record_candidate(service)
+        validation = self.record_validation(service, candidate)
+        qc = self.record_qc(service, validation)
+        command = self.selection_command(qc, decision="REJECTED")
+        with ThreadPoolExecutor(max_workers=2) as pool:
+            results = list(
+                pool.map(
+                    lambda _: service.record_human_selection(command),
+                    range(2),
+                )
+            )
+        self.assertEqual(
+            sorted(item["idempotentReplay"] for item in results),
+            [False, True],
+        )
+        self.assertEqual(
+            len(
+                evidence.list_records(
+                    WORKSPACE, RUN, record_kind="HumanSelectionDecision"
+                )
+            ),
+            1,
+        )
+
+    def test_same_candidate_qc_approval_cannot_create_second_selection_identity(self):
+        service, _ = self.service()
+        candidate = self.record_candidate(service)
+        validation = self.record_validation(service, candidate)
+        qc = self.record_qc(service, validation)
+        first = self.selection_command(qc, decision="REJECTED", suffix="first")
+        service.record_human_selection(first)
+        duplicate_authority = self.selection_command(
+            qc, decision="REJECTED", suffix="second"
+        )
+        duplicate_authority["approvalRef"] = first["approvalRef"]
+        with self.assertRaises(IdempotencyConflictError):
+            service.record_human_selection(duplicate_authority)
+
 
 class InMemoryCandidateReviewTests(CandidateReviewMixin, unittest.TestCase):
     def evidence(self):
@@ -474,6 +641,48 @@ class SqliteCandidateReviewTests(CandidateReviewMixin, unittest.TestCase):
         return SqliteEpisodeProductionEvidenceAdapter(
             Path(self.temporary_directory.name) / "evidence.sqlite3",
             initialize_if_missing=True,
+        )
+
+    def test_restart_exact_qc_replay_uses_durable_operation_record(self):
+        service, _ = self.service()
+        candidate = self.record_candidate(service)
+        validation = self.record_validation(service, candidate)
+        command = self.qc_command(validation)
+        first = service.record_semantic_visual_qc(command)
+
+        restarted, evidence = self.service()
+        replay = restarted.record_semantic_visual_qc(command)
+        self.assertTrue(replay["idempotentReplay"])
+        self.assertEqual(replay["semanticVisualQc"], first["semanticVisualQc"])
+        self.assertEqual(
+            len(
+                evidence.list_records(
+                    WORKSPACE, RUN, record_kind="SemanticVisualQCDecision"
+                )
+            ),
+            1,
+        )
+
+    def test_restart_exact_selection_replay_skips_live_authority(self):
+        service, _ = self.service()
+        candidate = self.record_candidate(service)
+        validation = self.record_validation(service, candidate)
+        qc = self.record_qc(service, validation)
+        command = self.selection_command(qc, decision="REJECTED")
+        first = service.record_human_selection(command)
+
+        restarted, evidence = self.service()
+        restarted.selection_authority = RejectingMediaSelectionApprovalAuthority()
+        replay = restarted.record_human_selection(command)
+        self.assertTrue(replay["idempotentReplay"])
+        self.assertEqual(replay["humanSelection"], first["humanSelection"])
+        self.assertEqual(
+            len(
+                evidence.list_records(
+                    WORKSPACE, RUN, record_kind="HumanSelectionDecision"
+                )
+            ),
+            1,
         )
 
 if __name__ == "__main__":

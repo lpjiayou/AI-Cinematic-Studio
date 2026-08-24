@@ -1,5 +1,6 @@
 import unittest
 
+from services.v5_core_os.episode_production.evidence import EvidenceSnapshot
 from services.v5_core_os.episode_production.public import (
     EpisodeProductionPublicBoundary,
 )
@@ -8,14 +9,32 @@ from services.v5_core_os.episode_production.public import (
 class ReturningOperation:
     def __init__(self, response):
         self.response = response
+        self.query_kwargs = []
 
     def command(self, command):
         del command
         return self.response
 
-    def query(self, workspace_ref, run_ref):
+    def query(self, workspace_ref, run_ref, **kwargs):
+        self.query_kwargs.append(kwargs)
         del workspace_ref, run_ref
         return self.response
+
+
+class SnapshotEvidence:
+    def __init__(self):
+        self.calls = 0
+
+    def read_snapshot(self, workspace_ref, run_ref):
+        self.calls += 1
+        return EvidenceSnapshot(
+            workspace_ref,
+            run_ref,
+            "REAL_VIDEO_PLAN_READY",
+            (),
+            (),
+            "4" * 64,
+        )
 
 
 class K2PublicMediaSanitizationTests(unittest.TestCase):
@@ -37,6 +56,23 @@ class K2PublicMediaSanitizationTests(unittest.TestCase):
             },
         }
         self.operation = ReturningOperation(self.response)
+        self.snapshot_evidence = SnapshotEvidence()
+        self.axes_operation = ReturningOperation(
+            {
+                **self.response,
+                "rootState": {"state": "ROOTS_READY"},
+                "productionState": "REAL_VIDEO_PLAN_READY",
+                "runtimeState": {
+                    "state": "SUCCEEDED",
+                    "storageKey": "private/runtime.db",
+                },
+                "visualQcState": {"state": "FAIL"},
+                "activeRevision": {
+                    "state": "ACTIVE",
+                    "revisionRef": "revision-current",
+                },
+            }
+        )
         self.boundary = object.__new__(EpisodeProductionPublicBoundary)
         setattr(
             self.boundary,
@@ -45,6 +81,7 @@ class K2PublicMediaSanitizationTests(unittest.TestCase):
                 "RealMediaRevision",
                 (),
                 {
+                    "evidence": self.snapshot_evidence,
                     "plan_images": self.operation.command,
                     "select_and_admit_images": self.operation.command,
                     "record_real_image_candidates": self.operation.command,
@@ -76,22 +113,7 @@ class K2PublicMediaSanitizationTests(unittest.TestCase):
                 "StateProjection",
                 (),
                 {
-                    "get_projection": ReturningOperation(
-                        {
-                            **self.response,
-                            "rootState": {"state": "ROOTS_READY"},
-                            "productionState": "REAL_VIDEO_PLAN_READY",
-                            "runtimeState": {
-                                "state": "SUCCEEDED",
-                                "storageKey": "private/runtime.db",
-                            },
-                            "visualQcState": {"state": "FAIL"},
-                            "activeRevision": {
-                                "state": "ACTIVE",
-                                "revisionRef": "revision-current",
-                            },
-                        }
-                    ).query
+                    "get_projection": self.axes_operation.query
                 },
             )(),
         )
@@ -148,6 +170,10 @@ class K2PublicMediaSanitizationTests(unittest.TestCase):
             response["activeRevision"]["revisionRef"], "revision-current"
         )
         self.assertNotIn("storageKey", response["runtimeState"])
+        self.assertEqual(self.snapshot_evidence.calls, 1)
+        revision_snapshot = self.operation.query_kwargs[-1]["evidence_snapshot"]
+        axes_snapshot = self.axes_operation.query_kwargs[-1]["evidence_snapshot"]
+        self.assertIs(revision_snapshot, axes_snapshot)
 
 
 if __name__ == "__main__":

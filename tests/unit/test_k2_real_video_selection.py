@@ -1151,6 +1151,16 @@ class K2RealVideoSelectionTests(unittest.TestCase):
         )
         self.assertEqual(projection["activeRevision"]["state"], "STALE_BLOCKED")
 
+    def test_candidate_handoff_key_pins_complete_batch_and_replays_exactly(self):
+        first = self.record_candidates()
+        replay = self.record_candidates()
+        self.assertTrue(replay["idempotentReplay"])
+        self.assertEqual(replay["candidates"], first["candidates"])
+
+        self.video_candidate_evidence.tamper_after_recording = True
+        with self.assertRaises(IdempotencyConflictError):
+            self.record_candidates()
+
     def test_semantic_qc_fail_cannot_select_or_advance_production(self):
         recorded = self.record_candidates()
         qc = self.visual_qc(recorded["technicalValidations"][0], 1, result="FAIL")
