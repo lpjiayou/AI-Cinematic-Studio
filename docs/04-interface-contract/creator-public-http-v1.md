@@ -134,13 +134,13 @@ below are rooted at
 | Method | Subresource | Closed public input and behavior |
 | --- | --- | --- |
 | `POST` | `/real-image-candidates` | accepts only `idempotencyKey`; V4 privately resolves and rehashes the exact M10 handoff, then V5 appends `Candidate` and `TechnicalValidation` records |
-| `POST` | `/real-video-candidates` | accepts only `idempotencyKey`; V4 privately revalidates the exact M11 jobs, attempts, receipts, artifacts and probes before the same typed V5 append |
+| `POST` | `/real-video-candidates` | accepts only `idempotencyKey`; V4 privately revalidates the complete four-slot M11 input, while an initial handoff appends all four typed candidates and a successor appends only changed-slot Candidate/TechnicalValidation pairs and reports unchanged slots in `reusedCandidates` |
 | `POST` | `/semantic-visual-qc` | accepts an exact `TechnicalValidation` ref/version/digest, `visualQcRef`/version, the fixed review profile, evidence, checks, `PASS\|FAIL` and explicit supersession; Core injects the authenticated reviewer and seals all candidate/source digests |
 | `POST` | `/media-selection` | records only a non-admitting exact human `REJECTED` decision; it accepts the QC ref/version/digest, selection ref/version, `approvalRef` and decision, while actor/authority/subject fields are server-resolved and forbidden in the request |
 | `POST` | `/real-image-admission` | atomically records four authority-verified `SELECTED` decisions, admissions and image AssetVersions for the current exact four-shot manifest |
 | `POST` | `/real-image-successor-admission` | atomically records one authority-verified image successor for one exact shot without rewinding `productionState` or activating a complete replacement manifest |
-| `POST` | `/real-video-admission` | atomically records four authority-verified selections, admissions and video AssetVersions and is the only route here that can advance the complete video manifest to `REAL_VIDEO_READY` |
-| `GET` | `/state-projection` | returns orthogonal `rootState`, `productionState`, V4-only `runtimeState`, canonical `visualQcState`, `activeRevision` and per-candidate lifecycle; compatibility field `state` remains exactly `productionState` |
+| `POST` | `/real-video-admission` | initial admission requires four exact selections and advances once to `REAL_VIDEO_READY`; a post-ready successor accepts the exact one-to-four changed-slot set, reuses unchanged current chains and atomically activates one complete four-slot manifest without another gate transition |
+| `GET` | `/state-projection` | returns one V5 `evidenceRevisionToken`, orthogonal `rootState`, `productionState`, independently observed V4-only `runtimeState`, canonical `visualQcState`, `activeRevision` and per-candidate lifecycle; compatibility field `state` remains exactly `productionState` |
 | `GET` | any typed media subresource above | returns the sanitized real-media revision/projection; no internal path, storage locator, credential, raw provider payload or authority evidence body is exposed |
 
 The public caller cannot select an evidence `recordKind`, submit an internal path,
@@ -148,6 +148,31 @@ producer/runtime claim, `actorRef`, `subjectDigest` or authority claim. An initi
 append returns `201`; an exact idempotent replay returns `200`; the same operation key
 with changed canonical content conflicts. `AssetAdmission` and `AssetVersion` are
 always emitted together by V5, never by a generic record endpoint.
+
+### M11 initial and successor admission
+
+Every `/real-video-admission` selection uses the same six closed fields:
+`visualQcRef`, `visualQcVersion`, `visualQcDigest`, `selectionRef`,
+`selectionVersion` and `approvalRef`. Initial admission requires four distinct
+current slots and is the only call that advances
+`REAL_VIDEO_PLAN_READY → REAL_VIDEO_READY`.
+
+After readiness, the command contains one to four selections and must equal the
+exact changed-slot set. The response still exposes a complete four-slot activation:
+new slots append HumanSelectionDecision/AssetAdmission/AssetVersion chains; unchanged
+slots reuse the current chains. The v2 activation reports `newAdmissionCount` and
+`reusedAdmissionCount`, and each slot is `NEW_ADMISSION` or `REUSED_CURRENT`. It
+directly supersedes the prior activation, performs no state transition and remains
+exactly replayable only with the same closed batch.
+
+The real-media bundle and state projection consume the same atomic V5 evidence
+snapshot. If a current source image, request or candidate byte lineage changes, the
+prior activation projects `videoLineageState.state=STALE_BLOCKED` and
+`activeRevision.activationState=STALE`; canonical `videoAssetAdmissions` and
+`videoAssetVersions` are empty until a complete four-slot activation becomes
+current. `activeVideoAdmission` preserves the immutable historical activation for
+audit. V4 `runtimeState` is observed separately and is not covered by
+`evidenceRevisionToken`.
 
 ### BREAKING migration: `real-image-selection`
 
