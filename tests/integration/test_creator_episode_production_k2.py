@@ -150,12 +150,12 @@ class CreatorEpisodeProductionK2HttpTests(unittest.TestCase):
         with request.urlopen(req, timeout=5) as response:
             return response.status, json.loads(response.read().decode("utf-8"))
 
-    def get_bytes(self, path):
+    def get_bytes(self, path, *, timeout=DEFAULT_HTTP_TIMEOUT_SECONDS):
         req = request.Request(
             f"{self.base}{path}",
             headers={"Authorization": f"Bearer {self.token}"},
         )
-        with request.urlopen(req, timeout=10) as response:
+        with request.urlopen(req, timeout=timeout) as response:
             return response.status, response.headers, response.read()
 
     def test_public_run_create_replay_list_and_detail(self):
@@ -709,7 +709,8 @@ class CreatorEpisodeProductionK2HttpTests(unittest.TestCase):
         self.assertEqual(preview["state"], "QC_READY")
         self.assertEqual(preview["qcReport"]["result"], "PASS")
         status, headers, preview_content = self.get_bytes(
-            f"{base}/preview/content"
+            f"{base}/preview/content",
+            timeout=MEDIA_HTTP_TIMEOUT_SECONDS,
         )
         self.assertEqual(status, 200)
         self.assertEqual(headers.get_content_type(), "video/mp4")
@@ -739,7 +740,10 @@ class CreatorEpisodeProductionK2HttpTests(unittest.TestCase):
         download = (
             f"{base}/exports/{parse.quote(export['exportArtifactRef'])}/content"
         )
-        status, headers, content = self.get_bytes(download)
+        status, headers, content = self.get_bytes(
+            download,
+            timeout=MEDIA_HTTP_TIMEOUT_SECONDS,
+        )
         self.assertEqual(status, 200)
         self.assertEqual(headers.get_content_type(), "video/mp4")
         self.assertEqual(len(content), export["byteSize"])
