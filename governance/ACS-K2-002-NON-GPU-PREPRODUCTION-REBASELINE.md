@@ -5,7 +5,7 @@
 | Record ID | `ACS-K2-002-GOV-RB1` |
 | Record Type | Project priority, exact-scope Phase applicability, and execution authorization decision |
 | Decision Date | `2026-08-25` |
-| Status | `OWNER ACCEPTED / EXACT-SCOPE IMPLEMENTATION AUTHORIZED / ACTIVE` |
+| Status | `OWNER ACCEPTED / EXACT-SCOPE IMPLEMENTATION AUTHORIZED / PR #11 MAIN-MERGED AND MAIN-VERIFIED / ACTIVE` |
 | Decision Owner | Project Lead / Architecture Owner / Repository Governance Owner `蔺鹏` |
 | Architecture Baseline | AI Cinematic Studio V2.3; unchanged |
 | Governing ADR | [ADR-0014](ADR-0014-k2-001-archive-k2-002-changan-start.md) |
@@ -14,7 +14,7 @@
 | Active Work Package | `ACS-K2-002-CHANGAN-ONBOARDING-AND-EP01-CHAIN` |
 | Active Episode Set | `EP01` only |
 | Execution Boundary | Repository implementation, isolated verification, and zero-write preflight; non-GPU only |
-| Technical Candidate Acceptance | `NOT ACCEPTED / INDEPENDENT REVIEW REQUIRED` |
+| Technical Candidate Acceptance | `NO SEPARATE FINAL FEATURE ACCEPTANCE CLAIM; PR #11 MAIN-MERGED AFTER REQUIRED INDEPENDENT REVIEW` |
 | Live Production Authorization | `NOT GRANTED` |
 | Provider / GPU Dispatch | `NOT GRANTED` |
 | Release / Publication | `NOT GRANTED / publicationAllowed=false` |
@@ -265,7 +265,7 @@ true for one exact candidate SHA and tree:
 Automated or independent technical review is mandatory evidence, not Project Lead final
 feature acceptance and not a platform approval. `0 approvals` does not mean no review.
 
-The current remote configuration and PR state are:
+The decision-time pre-merge remote configuration and PR state were:
 
 ```text
 CORE_RULESET_ID=20544466
@@ -297,12 +297,42 @@ PR_11_REQUIRED_APPROVALS=0
 PR_11_MERGE=PENDING_EXACT_CANDIDATE_REVALIDATION
 ```
 
-The configuration is therefore `CONFIGURATION-CONFORMING / PARTIALLY VERIFIED`, not
-end-to-end behavior verified. The effective `main` ruleset is squash-only; the whole
-repository must not be described as squash-only while General settings still advertise
-all three methods. PR #11 has no platform approval-count blocker, but remains pending
-until the exact candidate satisfies every non-approval condition above. No bypass is
-authorized.
+At that decision-time snapshot, the configuration was
+`CONFIGURATION-CONFORMING / PARTIALLY VERIFIED`, not end-to-end behavior verified. The
+effective `main` ruleset was squash-only; the whole repository could not be described
+as squash-only while General settings still advertised all three methods. PR #11 had
+no platform approval-count blocker but remained pending until the exact candidate
+satisfied every non-approval condition above. No bypass was authorized.
+
+The current post-merge lifecycle overlay is:
+
+```text
+CORE_RULESET_ID=20544466
+CORE_RULESET_STATE=active
+REQUIRED_APPROVALS=0
+REQUIRED_CHECKS=Markdown,Documentation Links,Unit Tests,Contract Tests,Integration Tests
+REQUIRED_CHECKS_API_INTEGRATION_ID=15368
+ALLOWED_MERGE_METHODS=[squash]
+BYPASS_ACTORS=[]
+
+PR_11_EXACT_CANDIDATE_SHA=59588351d69ac5bef1a4c18a2c210b62388d986b
+PR_11_EXACT_CANDIDATE_TREE=51d25529f4781cd276f43c726a21c3046a28f74c
+PR_11_INDEPENDENT_TECHNICAL_REVIEW=PASS
+PR_11_REQUIRED_ACTIONS=5/5_SUCCESS
+PR_11_MERGE=SQUASH_MERGED
+PR_11_MAIN_SHA=af7f50a8dc7cdccdb7dd47cd425d33a288961cc9
+PR_11_MAIN_TREE=51d25529f4781cd276f43c726a21c3046a28f74c
+PR_11_CURSOR_SUITE=QUEUED_ZERO_CHECKS_NOT_REQUIRED_NOT_COMPLETE
+
+CONTROLLED_NEGATIVE_BEHAVIOR_VERIFICATION=PENDING
+FINAL_FEATURE_ACCEPTANCE=NOT_DECLARED_BY_TECHNICAL_REVIEW_OR_THIS_OVERLAY
+```
+
+This overlay closes PR #11's exact repository merge gate and records its positive
+protected-PR control. It does not reuse that exact-tree evidence for a later candidate,
+does not close the remaining controlled negative ruleset verification, and does not
+grant Script acceptance, ShotPlan approval, live canonical mutation, Provider/GPU
+dispatch, media selection/admission, production readiness, release or publication.
 
 Failure of any merge condition leaves the state:
 
@@ -358,6 +388,8 @@ append-only evidence, or fail-closed publication.
 
 ## 12. Final decision
 
+The following block is the decision-time state before independent technical review:
+
 ```text
 GOVERNANCE_REBASELINE=OWNER_ACCEPTED
 INDEPENDENT_PRIORITY_DECISION=COMPLETE
@@ -383,3 +415,27 @@ is:
 
 `GOVERNANCE REBASELINED / EXACT NON-GPU REPOSITORY CORRECTION AUTHORIZED /
 TECHNICAL CANDIDATE NOT ACCEPTED / LIVE PRODUCTION AND PUBLICATION CLOSED`.
+
+### 12.1 Post-merge verification overlay (`2026-08-26`)
+
+```text
+PR_11_REPOSITORY_MERGE_CONDITIONS=SATISFIED
+PR_11_MAIN_MERGE=SQUASH_MERGED
+PR_11_MAIN_SHA=af7f50a8dc7cdccdb7dd47cd425d33a288961cc9
+PR_11_MAIN_TREE=51d25529f4781cd276f43c726a21c3046a28f74c
+PR_11_MAIN_ACTIONS=5/5_SUCCESS
+PR_11_REPOSITORY_LIFECYCLE=MAIN_VERIFIED
+
+FINAL_FEATURE_ACCEPTANCE=NOT_DECLARED_BY_TECHNICAL_REVIEW_OR_THIS_OVERLAY
+SHOT_PLAN_APPROVAL=NOT_GRANTED
+EXECUTABLE_SHOT_GRAPH=NOT_COMPILED
+LIVE_CANONICAL_MUTATION=NOT_GRANTED
+PROVIDER_OR_GPU_DISPATCH=NOT_GRANTED
+MEDIA_SELECTION_OR_ADMISSION=NOT_GRANTED
+PUBLICATION_ALLOWED=false
+PRODUCTION_READY=NO
+```
+
+This is a repository lifecycle update only. The decision-time authority boundaries,
+future exact-candidate revalidation requirement and all non-GPU/non-publishing stop
+conditions remain unchanged.
