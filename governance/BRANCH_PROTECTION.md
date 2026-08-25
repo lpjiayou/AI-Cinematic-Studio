@@ -5,9 +5,9 @@
 | Task ID | `ACS-GIT-001` |
 | 文档类型 | GitHub Branch Protection Configuration Specification |
 | 首要保护目标 | `main` |
-| 配置状态 | `CORE RULESET ACTIVE / CONFIGURATION-CONFORMING UNDER OWNER-APPROVED SINGLE-OPERATOR ZERO-APPROVAL SCOPE / PARTIALLY VERIFIED`; `FRONTEND RULESET ACTIVE / EFFECTIVE / CONFIGURATION-CONFORMING`; `BOTH OPERATIONAL BEHAVIOR VERIFICATIONS PENDING` |
-| 当前核验 | `2026-08-25` 远端配置复读；Core ruleset `20544466`，Frontend `main-protection-v1` ruleset `21413134` |
-| 当前差异 | Core 已按 Owner 决定采用 `0 approvals`，因此 PR #11 不再有 Reviewer capacity blocker；仓库级 General settings 仍允许 merge/squash/rebase，只有生效的 Core `main` ruleset 是 squash-only，且 Core 受控行为验证仍未闭合；Frontend 继续要求两名批准且 Reviewer 容量/行为验证仍未闭合 |
+| 配置状态 | `CORE RULESET ACTIVE / CONFIGURATION-CONFORMING UNDER OWNER-APPROVED SINGLE-OPERATOR ZERO-APPROVAL SCOPE / PARTIALLY VERIFIED`; `FRONTEND RULESET ACTIVE / CONFIGURATION-CONFORMING UNDER SEPARATELY OWNER-APPROVED SINGLE-OPERATOR ZERO-APPROVAL SCOPE / PARTIALLY VERIFIED`; `BOTH OPERATIONAL BEHAVIOR VERIFICATIONS PENDING` |
+| 当前核验 | 截至 `2026-08-26` 的远端配置与 API 复读；Core ruleset `20544466`，Frontend `main-protection-v1` ruleset `21413134`；`2026-08-25` 中间快照保留为历史账本 |
+| 当前差异 | Core 与 Frontend 各自由独立 Owner 决定采用 `0 approvals`；approval-dependent 选项均关闭，独立技术审查仍是强制治理证据。两仓的受控行为验证仍未闭合；Core 仓库级 General settings 仍允许 merge/squash/rebase，只有生效的 Core `main` ruleset 是 squash-only；Frontend `delete_branch_on_merge=false` 仍是分支生命周期自动化缺口 |
 | 架构与 Phase 影响 | `NONE`；保护规则不授予实现、Release 或架构变化 |
 
 ## 1. 目的
@@ -30,8 +30,8 @@
 | GitHub 保护项 | 必需规则 | 通过条件 |
 | --- | --- | --- |
 | Pull Request | 合并前必须有 Pull Request；禁止直接推送 | 每次主线变化关联可访问 PR |
-| Approving Reviews | 通用 `main` Pull Request 至少 `2` 名非作者批准者；Core 当前只适用第 3B 节零批准精确例外 | Frontend 保持 `2 approvals`；Core 当前 GitHub ruleset 为 `0 approvals`，不得扩张到其他仓库 |
-| High-impact Reviews | 通用规则下，架构、安全、数据、全仓库治理、分支保护与 Release 变更的两名批准者中，至少一个来自对应责任职能 | Core 第 3B 节例外下由 Project Lead / Repository Governance Owner 显式决定并保留独立技术审查证据；这不降低其他仓库或专项授权 |
+| Approving Reviews | 通用 `main` Pull Request 至少 `2` 名非作者批准者；Core 当前适用第 3B 节、Frontend 当前适用第 3C 节各自独立的零批准精确例外 | Core 与 Frontend 当前 GitHub ruleset 均为 `0 approvals`；任一例外不得自动扩张到其他仓库或专项决定 |
+| High-impact Reviews | 通用规则下，架构、安全、数据、全仓库治理、分支保护与 Release 变更的两名批准者中，至少一个来自对应责任职能 | 当前单人运营精确例外下由 Project Lead / Repository Governance Owner 对各仓库分别作出明确决定，并保留独立技术审查证据；这不降低专项授权 |
 | Stale Approvals | 新 Commit 或实质性变更后撤销旧批准 | 最新修订重新获批 |
 | Conversation Resolution | 所有阻塞意见和未解决对话必须关闭 | 没有 Blocking thread |
 | Required Status Checks | 所有已注册且适用于变更的强制检查通过 | 没有 `FAIL`、`BLOCKED` 或强制 `NOT RUN` |
@@ -56,14 +56,29 @@ Reviewer capacity blocker。该配置与阻塞结论已由第 3B 节的后续 Ow
 Project Lead / Repository Governance Owner `蔺鹏` 于 `2026-08-25` 明确确认 Core
 当前为单人运营，并批准 [Git Workflow 第 4B 节](GIT_WORKFLOW.md#4b-core-单人运营零批准精确例外当前2026-08-25)
 所记录的精确例外：Core `main` ruleset 的平台最低批准数为 `0`，不是通用规范的
-`2`。该例外只适用于 Core 仓库当前单人运营期，不适用于 Frontend，也不降低
-Release、安全、风险接受、Phase Exit 或其他专项治理所需的决定。
+`2`。该例外只适用于 Core 仓库当前单人运营期，不自动适用于 Frontend，也不降低
+Release、安全、风险接受、Phase Exit 或其他专项治理所需的决定；Frontend 由第
+3C 节的独立决定治理。
 
 `0 approvals` 不是作者批准自己，也不是将自动化或独立技术审查计为 GitHub
 approval。Core 仍强制使用 Pull Request、精确候选独立技术审查、conversation
 resolution、五项 strict checks、linear history、squash-only、force/delete
 protection 和空 bypass。dismiss-stale、latest-push 与 unattributed-Copilot
 extra-approval 因平台批准计数为零而关闭；不得以此推导“无需审查”或“自动可合并”。
+
+### 3C. Frontend 单人运营零批准精确例外（当前）
+
+Project Lead / Repository Governance Owner `蔺鹏` 于 `2026-08-26` 对 Frontend
+作出独立单人运营决定，并批准 [Git Workflow 第 4C 节](GIT_WORKFLOW.md#4c-frontend-单人运营零批准精确例外当前2026-08-26)
+记录的精确例外。Frontend `main-protection-v1` ruleset（ID `21413134`）的平台
+最低批准数为 `0`。本例外不是 Core 第 3B 节的扩张或继承。
+
+Frontend 仍强制使用 Pull Request、精确候选独立技术审查、conversation
+resolution、strict up-to-date、linear history、有效 `main` ruleset 的
+squash-only 路径、deletion/non-fast-forward protection、三项 required checks 和
+空 bypass。dismiss-stale、latest-push 与 unattributed-Copilot extra-approval 因
+平台批准数为零而关闭。该配置不等于作者自批、无审查、自动可合并或治理端到端已
+验证，且不降低任何 Release、安全、风险接受、Phase Exit 或其他专项治理决定。
 
 ## 4. Required Checks 逻辑基线
 
@@ -86,8 +101,8 @@ GitHub 只能绑定已真实注册的 Check 名称。初始启用时，Repositor
 
 ## 5. Review 与 Ownership 规则
 
-1. 通用 `main` 最低审批数为二；Frontend 继续执行两名批准。Core 在第 3B 节的 Owner-approved 单人运营精确例外期执行零名平台批准。
-2. Core 的零批准例外不产生作者自批或 `0/0` 审批证据；精确候选独立技术审查仍是强制治理证据，但不是 GitHub approval。其他适用仓库和专项决定仍要求真实、合格且独立的批准者。
+1. 通用 `main` 最低审批数为二；Core 在第 3B 节、Frontend 在第 3C 节各自独立的 Owner-approved 单人运营精确例外期执行零名平台批准。
+2. 两项零批准例外均不产生作者自批或 `0/0` 审批证据；精确候选独立技术审查仍是强制治理证据，但不是 GitHub approval。其他适用仓库和专项决定仍要求真实、合格且独立的批准者。
 3. 当责任体系批准并创建 CODEOWNERS 后，启用 `Require review from Code Owners`；在此之前状态为 `PENDING`，不能虚构 Owner。
 4. 架构变化必须具有 Accepted ADR 或明确 `ADR NOT REQUIRED` 依据。
 5. 安全、数据、风险例外、Release 与 Phase Exit 由各自有权角色决定，普通 PR 批准不能代决。
@@ -102,21 +117,29 @@ GitHub 只能绑定已真实注册的 Check 名称。初始启用时，Repositor
 - 合并后如发现错误，使用 `revert` 或新修复 PR 恢复，不改写 `main` 历史。
 - 自动合并或 Merge Queue 只能在全部条件满足后执行，不能覆盖人工阻塞意见。
 
-## 6A. 2026-08-25 远端配置历史与当前差异账本
+## 6A. 远端配置历史与当前差异账本
+
+本账本保留 `2026-08-25` 的历史快照，并记录截至 `2026-08-26` 的当前复读结果。
 
 | Repository / Snapshot | 远端观察 | 剩余差异 / 限制 | 修复或关账验收条件 |
 | --- | --- | --- | --- |
 | Core / historical pre-fix snapshot | ruleset ID `20544466` 已 `active`，但 required approvals=`0`；仓库允许 merge/squash/rebase；ruleset 未要求 linear history、dismiss stale approvals、latest-push approval、conversation resolution 或 strict up-to-date，且缺少 `Integration Tests` | 这是修复前历史事实，不得继续作为当前配置结论，也不得删除其审计意义 | 已由下行 current snapshot 的 Owner-approved 配置取代 |
 | Core / historical one-approval snapshot | ruleset ID `20544466` 为 `active`；required approvals=`1`；dismiss stale=`true`；latest-push approval=`true`；unattributed-Copilot extra-approval=`true`；thread resolution=`true`；allowed merge methods=`[squash]`；strict=`true`；`do_not_enforce_on_create=false`；五项 required checks、linear/deletion/non-fast-forward 与 bypass=`[]` 均已配置 | 这是本日中间配置历史；PR #11 当时 author=`lpjiayou`、reviews=`[]`，故形成 `0/1` Reviewer capacity blocker。该配置已由下行当前零批准决定取代 | 保留为审计轨迹，不再作为当前合并条件 |
-| Core / current single-operator zero-approval snapshot | ruleset ID `20544466` 为 `active`；required approvals=`0`；dismiss stale=`false`；latest-push approval=`false`；unattributed-Copilot extra-approval=`false`；thread resolution=`true`；allowed merge methods=`[squash]`；strict=`true`；`do_not_enforce_on_create=false`；required checks 为 `Markdown`、`Documentation Links`、`Unit Tests`、`Contract Tests`、`Integration Tests`，且远端 UI 继续显示 GitHub Actions source；linear history、deletion protection、non-fast-forward protection 生效；bypass=`[]` | 配置符合第 3B 节 Core 单人运营零批准精确例外。远端设置页保存后已复读，但本轮变更后的 API integration ID 未独立复读；受控负向/正向行为验证尚未完成。Repository General settings 仍允许 merge/squash/rebase，因此只能称有效 `main` ruleset squash-only。PR #11 author=`lpjiayou`、reviews=`[]` 不再构成 approval blocker | 保持五项 required checks、thread resolution、strict、linear、no force/delete/bypass；在精确候选上完成独立技术审查和全部检查；完成直接推送/force/delete/失败检查/未解决 thread 的负向验证及正常 PR 正向对照。缺少 approval 的负向验证在本例外下为 `N/A` |
-| Frontend | 远端分支仅剩 `main`，并保留 `20` 个 annotated archive tags；`main-protection-v1` ruleset ID `21413134` 为 `active` 且对 `main` effective；要求 `2` approvals、dismiss stale approvals、latest-push approval、conversation resolution、linear history；仓库为 squash-only；严格要求 `verify`、`gate-c-k2-browser`、`gate-k2-control-plane-browser` 三项检查；bypass actor 为空 | 当前合格 Reviewer 容量不足，无法据此证明任一作者都能取得两名合格非作者批准；直接推送/force/delete/缺审批/失败检查/未解决对话的负向验证及正常受保护 PR 的正向验证尚未完成。`delete_branch_on_merge=false` 是仓库级分支生命周期自动化缺口；当前“仅 `main`”快照不证明未来自动清理 | 补足合格 Reviewer 容量；完成并留存负向/正向行为证据；决定并记录短期分支自动删除或等价受控清理机制。完成前只可称配置 active/effective，不可称端到端 `VERIFIED` |
+| Core / current single-operator zero-approval snapshot | ruleset ID `20544466` 为 `active`；required approvals=`0`；dismiss stale=`false`；latest-push approval=`false`；unattributed-Copilot extra-approval=`false`；thread resolution=`true`；allowed merge methods=`[squash]`；strict=`true`；`do_not_enforce_on_create=false`；required checks 为 `Markdown`、`Documentation Links`、`Unit Tests`、`Contract Tests`、`Integration Tests`，integration ID 均已由 API 复读为 `15368`；linear history、deletion protection、non-fast-forward protection 生效；bypass=`[]` | 配置符合第 3B 节 Core 单人运营零批准精确例外。Core PR #11 已完成精确候选独立技术审查、五项 required checks 和受保护 squash merge，并以 `af7f50a8dc7cdccdb7dd47cd425d33a288961cc9` 合入 `main`，可作为正常 PR 正向对照；直接推送/force/delete/失败检查/未解决对话的受控负向验证仍未完成。Repository General settings 仍允许 merge/squash/rebase，因此只能称有效 `main` ruleset squash-only | 保持五项 required checks、thread resolution、strict、linear、no force/delete/bypass；每个新精确候选重新完成独立技术审查和全部检查；完成适用的受控负向行为验证。缺少 approval 的负向验证在本例外下为 `N/A` |
+| Frontend / current single-operator zero-approval snapshot | 远端分支仅剩 `main`，并保留 `20` 个 annotated archive tags；`main-protection-v1` ruleset ID `21413134` 为 `active` 且对默认分支 effective；required approvals=`0`；dismiss stale=`false`；latest-push approval=`false`；unattributed-Copilot extra-approval=`false`；thread resolution=`true`；strict=`true`；`do_not_enforce_on_create=false`；allowed merge methods=`[squash]`；required checks 为 `verify`、`gate-c-k2-browser`、`gate-k2-control-plane-browser`，integration ID 均为 `15368`；linear history、deletion protection、non-fast-forward protection 生效；bypass=`[]` | 配置符合第 3C 节 Frontend 独立单人运营零批准精确例外。平台 approval capacity 与“缺少审批”负向项均为 `N/A / REQUIRED=0`；直接推送/force/delete/失败检查/未解决对话的受控负向验证尚未完成。Frontend PR #11 是正常受保护 PR 的成功正向对照，但不单独证明全部负向行为。`delete_branch_on_merge=false` 仍是仓库级分支生命周期自动化缺口；当前“仅 main”快照不证明未来自动清理 | 保持三项 required checks、thread resolution、strict、linear、no force/delete/bypass 和精确候选独立技术审查；完成适用的受控负向行为验证；决定并记录短期分支自动删除或等价受控清理机制。完成前只可称配置合规且部分验证，不可称端到端 `VERIFIED` |
 
 Core current snapshot 的配置结论是
 `CONFIGURATION-CONFORMING / PARTIALLY VERIFIED / BEHAVIOR VERIFICATION PENDING`。
-它不是 `END-TO-END VERIFIED`，也不使 PR #11 自动可合并。PR #11 的平台 approval
-gate 依 Owner 决定为 `N/A / REQUIRED=0`；精确候选仍须通过独立技术审查、五项
-required checks、conversation resolution 和线性 squash 路径，且 Core ruleset
-没有 bypass actor。
+它不是 `END-TO-END VERIFIED`。Core PR #11 已通过独立技术审查、五项 required
+checks、conversation resolution 和受保护 squash 路径合入 `main`，但该正向对照
+不替代尚未完成的受控负向行为验证；其平台 approval gate 依 Owner 决定为
+`N/A / REQUIRED=0`，bypass actor 为空。
+
+Frontend current snapshot 的配置结论同样是
+`CONFIGURATION-CONFORMING / PARTIALLY VERIFIED / BEHAVIOR VERIFICATION PENDING`。
+Frontend PR #11 已通过精确候选独立审查、三项 required checks、conversation
+resolution 和 squash 路径合入 `main`，但该正向对照不替代尚未完成的受控负向
+行为验证；其平台 approval gate 为 `N/A / REQUIRED=0`，bypass actor 为空。
 
 两个最终基线 SHA 的 GitHub Actions 均成功；但各有一个内容为空的 Cursor check
 suite 仍为 `queued`。该外部 suite 既不能被描述为已完成，也不应作为必需检查；
@@ -163,13 +186,13 @@ required checks 只绑定仓库真实存在、由 Actions 产生且有明确 Own
 ## 10. 配置应用顺序
 
 1. 创建并验证 GitHub Repository 和 `origin` remote；
-2. 指定 Repository Governance Owner 与通用规范要求的至少两名非作者 Reviewer；Core 单人运营零批准精确例外期将平台 Reviewer capacity 标记为 `N/A`，但仍须安排精确候选独立技术审查；
+2. 指定 Repository Governance Owner 与通用规范要求的至少两名非作者 Reviewer；Core 或 Frontend 处于各自单人运营零批准精确例外期时，将对应平台 Reviewer capacity 标记为 `N/A`，但仍须安排精确候选独立技术审查；
 3. 确认默认分支为 `main`；
 4. 配置 Pull Request、审批、对话、历史、删除、force-push 与 bypass 规则；
 5. 注册真实检查并记录逻辑门禁映射；
 6. 配置允许的合并策略和可选 Merge Queue；
 7. 使用非管理员账号验证直接推送被拒绝；
-8. 使用测试 Pull Request 验证缺少审批、失败检查和未解决对话均会阻塞；
+8. 使用测试 Pull Request 验证适用的缺少审批、失败检查和未解决对话均会阻塞；零批准精确例外期将“缺少审批”项标记为 `N/A`；
 9. 保存配置快照、验证结果、时间和责任人；
 10. 定期复核 Ruleset 漂移和 bypass 记录。
 
@@ -181,7 +204,7 @@ required checks 只绑定仓库真实存在、由 Actions 产生且有明确 Own
 - Ruleset/Branch Protection 配置导出或受控截图；
 - 配置修订、应用责任人和复核时间；
 - 直接推送、force push 和删除被拒绝的实际结果；
-- 适用的缺少审批、失败检查、未解决对话被阻塞的实际结果；Core 零批准精确例外将“缺少审批”负向项标记为 `N/A`；
+- 适用的缺少审批、失败检查、未解决对话被阻塞的实际结果；Core 与 Frontend 各自零批准精确例外均将“缺少审批”负向项标记为 `N/A`；
 - 正常 Pull Request 成功合并的对照结果；
 - bypass actor 清单和例外流程核对；
 - 对应 Evidence ID 与独立审查结论。
@@ -198,24 +221,24 @@ required checks 只绑定仓库真实存在、由 Actions 产生且有明确 Own
 | --- | --- |
 | 保护规范 | `DEFINED` |
 | Core GitHub Ruleset | `20544466 / ACTIVE / CONFIGURATION-CONFORMING UNDER SINGLE-OPERATOR ZERO-APPROVAL EXCEPTION / PARTIALLY VERIFIED` |
-| Frontend GitHub Ruleset | `main-protection-v1 / 21413134 / ACTIVE / EFFECTIVE / CONFIGURATION-CONFORMING` |
+| Frontend GitHub Ruleset | `main-protection-v1 / 21413134 / ACTIVE / EFFECTIVE / CONFIGURATION-CONFORMING UNDER SEPARATE SINGLE-OPERATOR ZERO-APPROVAL EXCEPTION / PARTIALLY VERIFIED` |
 | Frontend 远端分支归档 | `REMOTE BRANCHES=main ONLY / ANNOTATED ARCHIVE TAGS=20 / delete_branch_on_merge=false` |
-| 合格 Reviewer 容量 | `CORE PR #11: PLATFORM APPROVAL N/A, REQUIRED=0 / FRONTEND INSUFFICIENT FOR TWO ELIGIBLE NON-AUTHOR APPROVALS` |
-| `main` 直接推送、force、delete、审批/检查/thread 阻塞及正常 PR 对照行为 | `CONTROLLED NEGATIVE / POSITIVE VERIFICATION NOT COMPLETED` |
-| Required Checks | `CORE FIVE STRICT CHECKS CONFIGURED; PRIOR API SNAPSHOT integration_id=15368, NOT RE-READ AFTER ZERO-APPROVAL MUTATION / FRONTEND THREE STRICT CHECKS CONFIGURED` |
-| Merge methods | `CORE REPOSITORY GENERAL SETTINGS=merge+squash+rebase / EFFECTIVE main RULESET=squash-only`; `FRONTEND=squash-only` |
+| 合格 Reviewer 容量 | `CORE PLATFORM APPROVAL N/A, REQUIRED=0 / FRONTEND PLATFORM APPROVAL N/A, REQUIRED=0 / INDEPENDENT EXACT-CANDIDATE TECHNICAL REVIEW STILL REQUIRED` |
+| `main` 直接推送、force、delete、审批/检查/thread 阻塞及正常 PR 对照行为 | `CONTROLLED NEGATIVE VERIFICATION NOT COMPLETED / NORMAL PROTECTED PR POSITIVE CONTROLS COMPLETED FOR BOTH REPOSITORIES` |
+| Required Checks | `CORE FIVE STRICT CHECKS CONFIGURED, API integration_id=15368 RE-READ / FRONTEND THREE STRICT CHECKS CONFIGURED, API integration_id=15368 RE-READ` |
+| Merge methods | `CORE REPOSITORY GENERAL SETTINGS=merge+squash+rebase / EFFECTIVE main RULESET=squash-only`; `FRONTEND EFFECTIVE main RULESET=squash-only` |
 | Bypass | `CORE=[] / FRONTEND=[]` |
 | 外部 Cursor check suites | `EMPTY / QUEUED / NOT A REQUIRED CHECK / NOT COMPLETE` |
 | CODEOWNERS | `NOT REVERIFIED IN THIS SNAPSHOT` |
 | Baseline Tag / GitHub Release | `OUTSIDE THIS SNAPSHOT'S VERIFIED CLAIMS` |
 
-当前可以声称 Frontend `main` 的技术 ruleset 已 active/effective，配置字段满足本规范，
-且远端分支已清理为仅 `main` 并由 `20` 个 annotated tags 保留归档入口；不能因此声称
-Frontend 治理已端到端 `VERIFIED`，因为 Reviewer 容量和行为验证仍未关账。Core 可
-声称 ruleset 配置在 Owner-approved 单人运营零批准精确例外下合规，并已在远端设置
-页保存后复读；不能声称本轮变更后的 API integration ID 已独立复读，也不能声称行为
-或运营关账。PR #11 不再受 approval gate 阻塞，但仍受精确候选审查、检查、thread
-与 squash 合并条件约束。
+当前可以声称 Frontend `main` 的 ruleset 已 active/effective，并在独立
+Owner-approved 单人运营零批准精确例外下配置合规；远端分支已清理为仅 `main`，由
+`20` 个 annotated tags 保留归档入口。Frontend PR #11 已作为正常受保护 PR 正向
+对照完成，但尚不能声称治理端到端 `VERIFIED`，因为受控负向行为与分支自动清理机制
+仍未关账。Core 可声称 ruleset 配置在其独立单人运营零批准精确例外下合规；两仓
+required-check integration ID 均已通过 API 复读为 `15368`。这些事实仍不能代替行为
+或运营关账。
 两仓的空 Cursor suite 仍为 `queued`，不得扩张为“所有 check suites 已完成”。这些
 残余缺口继续在风险登记册中跟踪，不影响本文作为配置规范的有效性。
 
@@ -224,12 +247,13 @@ Frontend 治理已端到端 `VERIFIED`，因为 Reviewer 容量和行为验证�
 降低审批数、允许直接推送、开放 force push、允许 Tag 移动、扩大 bypass actor 或删除必需检查，均属于高影响治理变化，必须：
 
 1. 独立任务与风险评估；
-2. Repository Governance Owner 和独立 Reviewer 批准；若 Core 处于第 3B 节单人运营例外且不存在独立平台 Reviewer，必须由 Project Lead / Repository Governance Owner 显式作出精确决定，并保留不计为平台 approval 的独立技术审查证据；
+2. Repository Governance Owner 和独立 Reviewer 批准；若 Core 或 Frontend 处于各自单人运营例外且不存在独立平台 Reviewer，必须由 Project Lead / Repository Governance Owner 对该仓库显式作出精确决定，并保留不计为平台 approval 的独立技术审查证据；
 3. 说明有效期、迁移、回退和审计影响；
 4. 同步 Git Workflow、Baseline Process 和相关 Gate；
 5. 配置后重新执行保护验证。
 
-第 3B 节的 Core `0 approvals` 已由 Project Lead / Repository Governance Owner
-作为单人运营精确决定记录，并由远端设置页保存后复读。它不是 break-glass，不允许
-bypass，也不降低 Frontend 的 `2 approvals` 或任何通用 Release/安全/风险接受
-规范。扩大适用仓库、降低其他门禁或再次改变批准数仍须重新执行本节全部变更控制。
+第 3B 节 Core 与第 3C 节 Frontend 的 `0 approvals` 已分别由 Project Lead /
+Repository Governance Owner 作出独立单人运营精确决定，并经远端 ruleset API
+复读。两项决定都不是 break-glass，不允许 bypass，也不降低任何通用
+Release/安全/风险接受规范。扩大任一例外适用范围、降低其他门禁或再次改变批准数，
+仍须重新执行本节全部变更控制。
