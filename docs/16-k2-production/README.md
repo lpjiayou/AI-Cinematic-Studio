@@ -9,7 +9,7 @@ Creator Public API → Application → V5 → V4 → V3 → Compute 主链。
 | 工作项 | 仓库状态 | 媒体状态 |
 | --- | --- | --- |
 | K2-001 | [验证历史已归档](K2-001-HISTORICAL-VALIDATION-ARCHIVE.md) | `M10 V1 IMAGES ADMITTED AS HISTORY / M11 + R2–R7 FAILED OR UNSELECTED AND NOT_ADMITTED / NOT PUBLISHABLE / CLOSED TO NEW DISPATCH` |
-| K2-002《长安刮痕》 | [v1.3 审校修订候选](k2-002-changan/README.md) | `PREPRODUCTION / SCRIPT OWNER ACCEPTANCE PENDING / GENERATION NOT STARTED / NOT_ADMITTED / NOT PUBLISHABLE` |
+| K2-002《长安刮痕》 | [v1.4 仓库审校 rebase 候选](k2-002-changan/README.md) | `PREPRODUCTION / EXACT SOURCE PRESERVED / SCRIPT OWNER ACCEPTANCE PENDING / GENERATION NOT STARTED / NOT_ADMITTED / NOT PUBLISHABLE` |
 
 K2-001 与 K2-002 是两条不同 lineage。不得复用 K2-001 的 `workspaceRef`、
 `productionRunRef`、生成请求、候选、AssetVersion、决策或 ADR-0011 例外。
@@ -33,8 +33,11 @@ K2-001 与 K2-002 是两条不同 lineage。不得复用 K2-001 的 `workspaceRe
 
 - [K2-002 状态、剧本审校与链路准入矩阵](k2-002-changan/README.md)
 - [v1.2 LF-normalized 来源副本（双 digest 见说明）](k2-002-changan/source/K2-002-CHANGAN-SOURCE-v1.2.md)
-- [审校修订候选 v1.3](k2-002-changan/K2-002-CHANGAN-SERIES-AND-EP01-03-v1.3.md)
+- [上传 Owner revision v1.4 exact source](k2-002-changan/source/K2-002-CHANGAN-UPLOADED-OWNER-REVISION-v1.4.md)
+- [当前仓库审校 rebase 候选 v1.4](k2-002-changan/K2-002-CHANGAN-SERIES-AND-EP01-03-v1.4.md)
+- [历史仓库审校候选 v1.3](k2-002-changan/K2-002-CHANGAN-SERIES-AND-EP01-03-v1.3.md)
 - [ADR-0014：K2-001 归档与 K2-002 启动](../../governance/ADR-0014-k2-001-archive-k2-002-changan-start.md)
+- [ACS-K2-002-SCRIPT-RB2：v1.4 exact-source + Core rebase](../../governance/ACS-K2-002-SCRIPT-V1-4-EXACT-DIGEST-REBASELINE.md)
 
 “开始 K2-002”在当前阶段只表示：来源入库、审校修订、注册要求冻结，以及
 Shot/Profile 和零写 preflight 合同准备。Durable registration apply/receipt 与 Core-only

@@ -11,6 +11,12 @@
 - Production Ready: `NO`
 - Publication allowed: `false`
 
+> Additive script amendment — `2026-08-26`: [ACS-K2-002-SCRIPT-RB2](ACS-K2-002-SCRIPT-V1-4-EXACT-DIGEST-REBASELINE.md)
+> preserves this decision's v1.3 candidate as history and establishes a separate
+> repository-reviewed v1.4 rebase candidate plus versioned v2 EP01 ledger. Script
+> content acceptance, live registration, assets, Provider/GPU and publication remain
+> ungranted.
+
 ## Context
 
 K2-001 completed its bounded validation role. Its current M11 v1 video set failed

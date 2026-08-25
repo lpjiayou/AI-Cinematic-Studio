@@ -5,7 +5,7 @@ AI 影视生产系统。Core 仓库负责 Creator Server/Public API/Application�
 OS、V4 Platform、V3 Render Core、持久化与后端测试；客户 Commercial SaaS UI
 由独立 `AI-Cinematic-Studio-Frontend` 仓库承载。
 
-> 当前已验证基线：Core `main`
+> ADR-0013 接受时的已验证基线：Core `main`
 > `6d28a53f3a077f032e341a87412b19b37c00bb1e` / tree
 > `369c3b1479f3136cc32fcbc4efd0fa24e4964058`，Frontend `main`
 > `5b36aac09fc10db04455d9ee287060232a521e5f` / tree
@@ -14,13 +14,14 @@ OS、V4 Platform、V3 Render Core、持久化与后端测试；客户 Commercial
 > 历史验证档案；M10 v1 的四个图像 `AssetVersion` 保留为已准入历史，但不是当前
 > action-ready 来源；M11 v1 与 Shot 01 R2–R7 仍为失败或
 > `UNSELECTED / NOT_ADMITTED`，且整个项目不可发布。
-> ADR-0014 与 `ACS-K2-002-GOV-RB1` 已启动并正式重基线独立 K2-002《长安刮痕》
-> 非 GPU 预生产链：来源与 v1.3 审校候选已入库；当前候选只形成
+> ADR-0014、`ACS-K2-002-GOV-RB1` 与 `ACS-K2-002-SCRIPT-RB2` 已启动并正式重基线独立 K2-002《长安刮痕》
+> 非 GPU 预生产链：上传 v1.4 exact source 与从 Core v1.3 重放六项修正得到的
+> repository-reviewed v1.4 候选已入库；v1.3 作为历史保留。当前机器映射只形成
 > `StoryboardDraft / CreativeShotDraft / ShotPlanDraft`，状态停在
 > `SCRIPT_VALIDATED`，不会生成 `ExecutableShotGraph` 或进入 `SHOTS_COMPILED`；
 > authenticated dynamic-media preflight 只读取精确 draft refs/digests，保持零写、
 > `cameraContractState=NOT_READY` 和 `dispatchAllowed=false`。canonical 注册、M10/M11
-> gate append 与 V4 dispatch 尚未集成。剧本 Owner
+> gate append 与 V4 dispatch 尚未集成。仓库写入授权不等于剧本内容接受；剧本 Owner
 > Acceptance、durable receipt、M5 binding、精确 camera、真实引用、EP01 输入资产、
 > 后处理 manifest、rights、provider policy、budget 与 runtime authority 均是必要门禁；
 > 即使全部就绪，Provider/GPU dispatch 仍须单独的 Project Lead 授权。
@@ -39,7 +40,7 @@ OS、V4 Platform、V3 Render Core、持久化与后端测试；客户 Commercial
 | --- | --- |
 | ADR-0013 non-GPU control plane | `OWNER ACCEPTED / COMPLETE / MAIN-VERIFIED` |
 | K2-001 | `HISTORICAL VALIDATION / M10 V1 IMAGES ADMITTED AS HISTORY / M11 + R2–R7 UNSELECTED AND NOT_ADMITTED / NOT PUBLISHABLE` |
-| ADR-0014 / ACS-K2-002-GOV-RB1 / K2-002《长安刮痕》 | `GOVERNANCE REBASELINED / EXACT NON-GPU REPOSITORY WORK AUTHORIZED / SOURCE + v1.3 REVIEWED CORRECTION CANDIDATE IN REPOSITORY / SCRIPT OWNER ACCEPTANCE PENDING / TECHNICAL CANDIDATE NOT ACCEPTED / GENERATION NOT STARTED` |
+| ADR-0014 / ACS-K2-002-GOV-RB1 / ACS-K2-002-SCRIPT-RB2 / K2-002《长安刮痕》 | `GOVERNANCE REBASELINED / EXACT v1.4 SOURCE PRESERVED / CORE v1.3 + SIX FIXES → REPOSITORY-REVIEWED v1.4 CANDIDATE / SCRIPT OWNER ACCEPTANCE PENDING / GENERATION NOT STARTED` |
 | K2-002 shot authority | `LOCAL STRUCTURAL DRAFT ONLY / SCRIPT_VALIDATED / CAMERA NOT_READY / EXECUTABLE SHOT GRAPH NOT COMPILED` |
 | K2-002 generation admission | `BLOCKED: SCRIPT ACCEPTANCE + DURABLE REGISTRATION + M5 BINDING + SHOT/CAMERA APPROVAL + CANONICAL REFS/ASSETS + POSTPROCESS + RIGHTS/PROVIDER/BUDGET/RUNTIME + CANONICAL M10/M11 APPEND + SEPARATE GPU AUTHORIZATION` |
 
@@ -260,6 +261,7 @@ PYTHONDONTWRITEBYTECODE=1 python -m unittest discover -s tests -p 'test_*.py' -q
 - [UI Master Plan](AI_CINEMATIC_STUDIO_UI_MASTER_PLAN.md)
 - [Current Milestone](CURRENT_MILESTONE.md)
 - [K2-002 Non-GPU Preproduction Governance Rebaseline](governance/ACS-K2-002-NON-GPU-PREPRODUCTION-REBASELINE.md)
+- [K2-002 Script v1.4 Exact-Digest Repository Rebaseline](governance/ACS-K2-002-SCRIPT-V1-4-EXACT-DIGEST-REBASELINE.md)
 - [K2-002《长安刮痕》预生产包](docs/16-k2-production/k2-002-changan/README.md)
 - [K2 Publishable Media Production Contract](architecture/K2_PUBLISHABLE_MEDIA_PRODUCTION_CONTRACT.md)
 - [K2 Canonical Lineage Bootstrap Contract](architecture/K2_CANONICAL_LINEAGE_BOOTSTRAP_CONTRACT.md)

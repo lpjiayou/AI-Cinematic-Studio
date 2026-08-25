@@ -6,11 +6,11 @@
 >
 > Project Lead Authorization: `ADR-0013 NON-GPU IMPLEMENTATION OWNER ACCEPTED / K2-001 ARCHIVED AS VALIDATION HISTORY / K2-002-CHANGAN NON-GPU PREPRODUCTION ACTIVE / PUBLICATION CLOSED`
 >
-> Authorized Wave: `K2-002 REVIEWED PACKAGE IMPORT + REGISTRATION/LINEAGE AUDIT + VERTICAL EP01 SHOT/GENERATION CONTRACT CORRECTION / NON-GPU ONLY`
+> Authorized Wave: `K2-002 v1.4 EXACT-SOURCE PRESERVATION + CORE REVIEWED REBASE + VERSIONED EP01 MACHINE MAPPING / NON-GPU ONLY`
 >
 > Current Task: `ACS-K2-002-CHANGAN-ONBOARDING-AND-EP01-CHAIN`
 >
-> Current Work Package: `ACS-K2-002-GOV-RB1 OWNER ACCEPTED / ADR-0013 OWNER ACCEPTED / K2-001 CLOSED HISTORICAL / K2-002 v1.3 REVIEWED CORRECTION CANDIDATE / REGISTRATION + SHOTPLAN DRAFT + ZERO-WRITE PREFLIGHT CORRECTION / EP01 MEDIA NOT STARTED`
+> Current Work Package: `ACS-K2-002-GOV-RB1 + ACS-K2-002-SCRIPT-RB2 / K2-001 CLOSED HISTORICAL / K2-002 v1.4 REPOSITORY-REVIEWED REBASE CANDIDATE / SCRIPT CONTENT ACCEPTANCE PENDING / EP01 MEDIA NOT STARTED`
 >
 > M6 Authorization: `ACCEPTED SURFACES / K2-002 MUST CREATE DISTINCT SCOPE AND APPROVALS / NO K2-001 AUTHORITY INHERITANCE`
 >
@@ -20,13 +20,13 @@
 >
 > M17–M19 Authorization: `NOT AUTHORIZED`
 >
-> Integration Baseline: `CORE main 6d28a53f / TREE 369c3b14 / 851 PASS — FRONTEND main 5b36aac0 / TREE fd20b7d7 / 174 PASS + TYPECHECK + LINT + BUILD + TWO CHROMIUM GATES`
+> Historical ADR-0013 Acceptance Baseline: `CORE main 6d28a53f / TREE 369c3b14 / 851 PASS — FRONTEND main 5b36aac0 / TREE fd20b7d7 / 174 PASS + TYPECHECK + LINT + BUILD + TWO CHROMIUM GATES`
 >
-> Production Ready: `NO — K2-001 M11 FAILED AND ARCHIVED; K2-002 SCRIPT ACCEPTANCE, CANONICAL REGISTRATION, REFERENCE ASSETS, EXECUTABLE SHOT GRAPH, MEDIA CANDIDATES, SELECTION, ADMISSION, MASTER/EXPORT/PUBLICATION ABSENT`
+> Production Ready: `NO — K2-001 M11 FAILED AND ARCHIVED; K2-002 SCRIPT ACCEPTANCE, CANONICAL REGISTRATION, MAPPED/ADMITTED REFERENCE ASSETVERSIONS, EXECUTABLE SHOT GRAPH, MEDIA CANDIDATES, SELECTION, ADMISSION, MASTER/EXPORT/PUBLICATION ABSENT`
 
 ---
 
-## 0. 2026-08-25 current authority and transition
+## 0. 2026-08-26 current authority and transition
 
 The Project Lead accepted ADR-0013's non-GPU control-plane implementation as
 `OWNER ACCEPTED / COMPLETE / MAIN-VERIFIED` at Core
@@ -37,16 +37,21 @@ K2-001 is now `HISTORICAL VALIDATION EVIDENCE / CLOSED FOR FURTHER PRODUCTION`.
 Its M10 image history, failed M11 evidence, receipts, refs and exact ADR-0011
 exception remain immutable history and cannot be reused by another project.
 
-K2-002-CHANGAN / 《长安刮痕》 is the active Internal Content Lab project. The
-repository-reviewed correction candidate is v1.3, derived from source v1.2 digest
-`8dec72d6bde85768c846ec93dd7f06adfa1f5dd9bcddb0f118455b2f9abe37de`.
-Only EP01 is active. The exact repository authorization is
-[`ACS-K2-002-GOV-RB1`](governance/ACS-K2-002-NON-GPU-PREPRODUCTION-REBASELINE.md).
+K2-002-CHANGAN / 《长安刮痕》 is the active Internal Content Lab project. Uploaded
+Owner revision v1.4 is preserved exactly at SHA-256 `33067592eb3c0c632d10f2fea3ef20b77ab319ee5aec9990ad0b285bfb548580`.
+Because that source explicitly superseded only external v1.3, the current repository-reviewed
+v1.4 candidate was rebased from Core v1.3 and contains only the six directed logic fixes;
+Core v1.3 and its v1 machine ledger remain historical evidence. Only EP01 is active.
+The exact repository authority is [`ACS-K2-002-GOV-RB1`](governance/ACS-K2-002-NON-GPU-PREPRODUCTION-REBASELINE.md)
+plus [`ACS-K2-002-SCRIPT-RB2`](governance/ACS-K2-002-SCRIPT-V1-4-EXACT-DIGEST-REBASELINE.md).
 The current truthful state is:
 
 ```text
-SOURCE_PACKAGE=V1.3_REVIEWED_CORRECTION_CANDIDATE
-SCRIPT_OWNER_ACCEPTANCE=PENDING
+EXACT_OWNER_REVISION_SOURCE=V1.4@33067592eb3c0c632d10f2fea3ef20b77ab319ee5aec9990ad0b285bfb548580
+SOURCE_PACKAGE=V1.4_REPOSITORY_REVIEWED_REBASE_CANDIDATE
+REPOSITORY_INGEST_AUTHORIZATION=OWNER_AUTHORIZED
+SCRIPT_OWNER_ACCEPTANCE=PENDING_EXPLICIT_CONTENT_ACCEPTANCE
+MACHINE_LEDGER=V2 / V1.4 EP01 MAPPED FAIL_CLOSED
 EDITORIAL_SHOT_PLAN=LOCAL_STRUCTURAL_REPRESENTATION_ONLY
 SHOT_PLAN_APPROVAL=NOT_VERIFIED
 REPOSITORY_DRAFT_FACT_KINDS=StoryboardDraft/CreativeShotDraft:*/ShotPlanDraft
@@ -59,7 +64,8 @@ EXECUTABLE_SHOT_GRAPH=NOT_COMPILED
 G3_SHOT_GRAPH=NOT_APPENDED
 SHOTS_COMPILED=NOT_REACHED
 CAMERA_CONTRACT=NOT_READY
-REFERENCE_ASSET_FILES=MISSING
+REFERENCE_ASSET_EVIDENCE=EXTERNAL_PACKAGE_PRESENT_NOT_MAPPED_NOT_ADMITTED
+ASSET_REQUIREMENTS=24_TOTAL / EP01_16_BLOCKING / EP02_EP03_8_DEFERRED
 PRODUCTION_ASSETS=NOT_ADMITTED
 GPU_DISPATCH=NOT_STARTED
 BULK_GENERATION_ALLOWED=false
@@ -67,7 +73,7 @@ PUBLICATION_ALLOWED=false
 ```
 
 The current non-GPU repository candidate audits reviewed import and durable registration
-and implements the vertical output profile plus an explicit 12-shot local structural
+and maps the repository-reviewed v1.4 into the vertical output profile plus an explicit 12-shot local structural
 draft. For a v2 run in an isolated verification store, one atomic
 `G3_SCRIPT_VALIDATION` append records `ConsistencyValidation`, `StoryboardDraft`, twelve
 `CreativeShotDraft:*` facts and `ShotPlanDraft`, then stops at `SCRIPT_VALIDATED`. It
@@ -77,7 +83,9 @@ does not append `G3_SHOT_GRAPH`, create or project `ExecutableShotGraph`, or adv
 The authenticated dynamic-media preflight resolves the current `ShotPlanDraft` and
 `CreativeShotDraft` refs and digests server-side, keeps `cameraContractState=NOT_READY`,
 returns `CAMERA_CONTRACT_NOT_READY` as a blocker, and performs no evidence write,
-candidate admission or dispatch. Client-supplied shot budgets still have no accepted
+candidate admission or dispatch. The external asset archive is evidence only: it remains
+v1.3-bound, failed current semantic/visual suitability review, and has no verified rights,
+exact requirement mapping or admitted AssetVersion. Client-supplied shot budgets still have no accepted
 ShotPlan ref/version/digest/approval lineage and do not establish owner-reviewed shot or
 camera facts. Durable registration, live canonical draft/media append and V4 dispatch
 remain blocked/not integrated. Any future continuation must preserve the single Creator

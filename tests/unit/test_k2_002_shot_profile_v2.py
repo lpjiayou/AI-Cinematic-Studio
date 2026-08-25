@@ -32,7 +32,7 @@ from tests.unit.test_episode_production_k2 import (
 
 PACKAGE_PATH = (
     Path(__file__).resolve().parents[2]
-    / "experiments/k2-002-changan-preproduction/k2-002-changan-preproduction.v1.json"
+    / "experiments/k2-002-changan-preproduction/k2-002-changan-preproduction.v2.json"
 )
 
 
@@ -492,11 +492,12 @@ class K2002ShotProfileV2Tests(unittest.TestCase):
         self.assertEqual(
             draft["shots"][9]["dialogueRequirement"],
             {
-                "speaker": "裴昀",
-                "text": "你终于回来了。",
-                "sourceMode": "DIALOGUE",
+                "speaker": None,
+                "text": "一次克制吸气，无台词。",
+                "sourceMode": "SFX_OR_SILENCE",
             },
         )
+        self.assertEqual(draft["shots"][9]["dialogueSyncMode"], "NONE")
         self.assertEqual(
             shots[10]["postprocessRequirements"],
             [
@@ -645,7 +646,7 @@ class K2002ShotProfileV2Tests(unittest.TestCase):
         cases.append(missing_action)
 
         dialogue_drift = ep01_shot_budgets(self.generated["scriptVersion"])
-        dialogue_drift[9]["dialogueRequirement"]["text"] += "漂移"
+        dialogue_drift[10]["dialogueRequirement"]["text"] += "漂移"
         cases.append(dialogue_drift)
 
         narration_without_speaker = ep01_shot_budgets(
@@ -752,7 +753,7 @@ class K2002ShotProfileV2Tests(unittest.TestCase):
             validate_shot_plan_draft(action_drift)
 
         dialogue_mode_drift = copy.deepcopy(draft)
-        dialogue_mode_drift["shots"][9]["dialogueSyncMode"] = "NONE"
+        dialogue_mode_drift["shots"][10]["dialogueSyncMode"] = "NONE"
         dialogue_mode_drift = _reseal(dialogue_mode_drift)
         with self.assertRaisesRegex(Exception, "dialogue sync"):
             validate_shot_plan_draft(dialogue_mode_drift)

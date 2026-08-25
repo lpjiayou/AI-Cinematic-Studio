@@ -20,6 +20,13 @@
 | Release / Publication | `NOT GRANTED / publicationAllowed=false` |
 | Production Ready | `NO` |
 
+> Current additive overlay — `2026-08-26`: [ACS-K2-002-SCRIPT-RB2](ACS-K2-002-SCRIPT-V1-4-EXACT-DIGEST-REBASELINE.md)
+> preserves the uploaded v1.4 exact source, rebases the six directed logic changes onto
+> the Core-reviewed v1.3 predecessor, and establishes the versioned v2 EP01 mapping.
+> Its script/version/asset facts supersede this record's v1.3-only current projection;
+> all live mutation, ShotPlan, asset, Provider/GPU and publication limits below remain
+> unchanged.
+
 ## 1. Purpose
 
 This record closes one exact governance conflict without reopening the general ACS
