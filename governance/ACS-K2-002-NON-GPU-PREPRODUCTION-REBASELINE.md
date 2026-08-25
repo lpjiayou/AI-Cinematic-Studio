@@ -249,37 +249,39 @@ true for one exact candidate SHA and tree:
 4. the complete Core regression and all required GitHub Actions checks pass;
 5. an independent technical review reports no unresolved blocker, authority leak,
    hidden write, provider dispatch or proof inflation;
-6. Core ruleset `20544466` remains active with `1` approval under the Owner-approved
-   [single-operator exception](GIT_WORKFLOW.md#4a-core-单人运营精确例外2026-08-25),
-   dismiss-stale/latest-push approval, conversation resolution, strict up-to-date,
-   linear/deletion/non-fast-forward protection, five required checks and no bypass;
-7. the required `1/1` GitHub approval comes from an eligible non-author on the latest
-   push; no automated/independent technical review, author action or Owner decision is
-   counted as that platform approval, and no approval is fabricated or bypassed;
+6. Core ruleset `20544466` remains active with `0 approvals` under the Owner-approved
+   [single-operator zero-approval exception](GIT_WORKFLOW.md#4b-core-单人运营零批准精确例外当前2026-08-25),
+   approval-dependent dismiss-stale/latest-push/extra-approval options disabled,
+   conversation resolution, strict up-to-date, linear/deletion/non-fast-forward
+   protection, five required checks and no bypass;
+7. the zero-approval decision is represented as `NOT REQUIRED`, not as `0/0`, author
+   self-approval or fabricated review; the independent technical review in item 5
+   remains mandatory evidence and is not a GitHub approval;
 8. PR #11 remains based on the accepted Core `main` lineage without unrelated history;
 9. the merge uses the repository specification's `Squash and merge`, with no force
    push, ordinary merge commit or rebase merge; and
 10. post-merge `main` SHA/tree, Actions result and clean repository state are verified.
 
-Automated or independent technical review is evidence, not Project Lead final feature
-acceptance and not a substitute for GitHub reviewers required by the ruleset.
+Automated or independent technical review is mandatory evidence, not Project Lead final
+feature acceptance and not a platform approval. `0 approvals` does not mean no review.
 
 The current remote configuration and PR state are:
 
 ```text
 CORE_RULESET_ID=20544466
 CORE_RULESET_STATE=active
-CORE_CONFIGURATION=CONFORMING_UNDER_OWNER_APPROVED_SINGLE_OPERATOR_SCOPE
-CORE_VERIFICATION=PARTIAL_API_CONFIGURATION_ONLY
-REQUIRED_APPROVALS=1
-DISMISS_STALE_APPROVALS=true
-REQUIRE_LAST_PUSH_APPROVAL=true
+CORE_CONFIGURATION=CONFORMING_UNDER_OWNER_APPROVED_SINGLE_OPERATOR_ZERO_APPROVAL_SCOPE
+CORE_VERIFICATION=PARTIAL_REMOTE_SETTINGS_REREAD; POST_CHANGE_API_IDS_NOT_REREAD
+REQUIRED_APPROVALS=0
+DISMISS_STALE_APPROVALS=false
+REQUIRE_LAST_PUSH_APPROVAL=false
+REQUIRE_EXTRA_APPROVAL_FOR_UNATTRIBUTED_CHANGES=false
 REQUIRE_CONVERSATION_RESOLUTION=true
 ALLOWED_MERGE_METHODS=[squash]
 STRICT_REQUIRED_CHECKS=true
 DO_NOT_ENFORCE_ON_CREATE=false
 REQUIRED_CHECKS=Markdown,Documentation Links,Unit Tests,Contract Tests,Integration Tests
-REQUIRED_CHECKS_INTEGRATION_ID=15368
+REQUIRED_CHECKS_PRIOR_API_INTEGRATION_ID=15368; POST_CHANGE_API_IDS_NOT_REREAD
 LINEAR_HISTORY=true
 DELETION_PROTECTION=true
 NON_FAST_FORWARD_PROTECTION=true
@@ -290,16 +292,17 @@ EFFECTIVE_MAIN_MERGE_METHOD=squash
 
 PR_11_AUTHOR=lpjiayou
 PR_11_REVIEWS=[]
-PR_11_APPROVALS=0/1
-ELIGIBLE_NON_AUTHOR_ACCOUNT=NOT_AVAILABLE_IN_CURRENT_SINGLE_ACCOUNT_STATE
-PR_11_MERGE=BLOCKED
+PR_11_PLATFORM_APPROVAL=NOT_REQUIRED_BY_CURRENT_CORE_RULESET
+PR_11_REQUIRED_APPROVALS=0
+PR_11_MERGE=PENDING_EXACT_CANDIDATE_REVALIDATION
 ```
 
 The configuration is therefore `CONFIGURATION-CONFORMING / PARTIALLY VERIFIED`, not
 end-to-end behavior verified. The effective `main` ruleset is squash-only; the whole
 repository must not be described as squash-only while General settings still advertise
-all three methods. PR #11 remains blocked until a distinct eligible account supplies
-the latest-push platform approval. No bypass is authorized.
+all three methods. PR #11 has no platform approval-count blocker, but remains pending
+until the exact candidate satisfies every non-approval condition above. No bypass is
+authorized.
 
 Failure of any merge condition leaves the state:
 
@@ -317,7 +320,7 @@ PRODUCTION_AUTHORIZATION=NOT_GRANTED
 | Architecture Owner | `蔺鹏 / DECISION RECORDED` | Confirms exact V2.3/ADR boundary; cannot turn tests into production evidence |
 | Repository Governance Owner | `蔺鹏 / DECISION RECORDED` | Authorizes exact repository package and conditional merge path; cannot bypass active rules |
 | Implementation / Evidence Producer | Codex automation / bounded work package | May implement and test; cannot issue final feature, Script, media or publication acceptance |
-| Independent Technical Reviewer | Required before merge | Reviews exact candidate; does not replace Project Lead or eligible GitHub reviewers |
+| Independent Technical Reviewer | Required before merge | Reviews exact candidate; is mandatory evidence, not a platform approval, and does not replace Project Lead or any separately required specialized authority |
 | Script Owner Acceptance | `PENDING` | Separate Project Lead content decision |
 | ShotPlan / Camera Approval | `UNASSIGNED / NOT GRANTED` | Required before graph compilation or dispatch |
 | Rights / Provider / Budget / Runtime Authorities | `NOT CURRENT / NOT GRANTED` | Required independently before any Provider/GPU dispatch |
@@ -371,8 +374,8 @@ BULK_GENERATION_ALLOWED=false
 PUBLICATION_ALLOWED=false
 PRODUCTION_READY=NO
 
-TECHNICAL_CANDIDATE_ACCEPTANCE=PENDING_INDEPENDENT_REVIEW
-MAIN_MERGE=BLOCKED_PENDING_ELIGIBLE_NON_AUTHOR_PLATFORM_APPROVAL
+TECHNICAL_CANDIDATE_ACCEPTANCE=PENDING_EXACT_CANDIDATE_REVALIDATION
+MAIN_MERGE=PENDING_EXACT_CANDIDATE_REVALIDATION
 ```
 
 The highest truthful state after this decision and before independent technical review
