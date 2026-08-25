@@ -3,6 +3,8 @@
 - Status: `ACCEPTED / OWNER AUTHORIZED / NON-GPU PREPRODUCTION ACTIVE`
 - Date: `2026-08-25`
 - Decision owner: Project Lead / Architecture Owner `蔺鹏`
+- Phase governance alignment:
+  [ACS-K2-002 Non-GPU Preproduction Governance Rebaseline](ACS-K2-002-NON-GPU-PREPRODUCTION-REBASELINE.md)
 - Supersedes as current project: K2-001 production execution
 - Preserves: K2-001 immutable history, ADR-0013 control-plane authority,
   fail-closed selection/admission/publication rules
@@ -39,13 +41,16 @@ V5/V4 production spine.
    identical byte copy.
    The corrected repository review candidate is v1.3; final script acceptance remains
    a separate Project Lead decision.
-4. Human-authored content may enter Script Studio only as an unconfirmed reviewed
-   import; it must not be mislabeled as AI generation. The current route records an
-   authenticated actor's three external digest assertions and a server-computed
-   canonical Script-content digest, but it does not independently receive/re-hash the
-   source documents or prove their semantic binding. Generic confirmation is therefore
-   blocked for the complete reviewed-import lineage until a trusted Owner approval
-   resolver is implemented.
+4. A first whole-script import that claims reviewed-source provenance must enter Script
+   Studio as an unconfirmed `reviewed-import`; it must not be mislabeled as AI
+   generation. The current route records an authenticated service-credential reference,
+   that credential's three external digest declarations and a server-computed canonical
+   Script-content digest. It does not identify a human user through RBAC, independently
+   receive/re-hash the source documents or prove their semantic binding. Generic
+   confirmation is therefore blocked for the complete reviewed-import lineage until a
+   trusted Owner approval resolver is implemented. Existing generic generation and
+   manual-edit paths do not assert reviewed-source provenance and do not authorize a
+   K2-002 source import.
 5. Project registration must be idempotent and package-digest pinned. Replay with
    identical facts returns existing refs; a changed payload conflicts and fails
    closed.

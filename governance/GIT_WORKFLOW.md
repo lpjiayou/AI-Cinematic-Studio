@@ -79,13 +79,40 @@ Delete Working Branch + Preserve Audit Trail
 1. 禁止直接推送、强制推送和删除；所有变更通过 Pull Request。
 2. Pull Request 必须关联任务，说明范围、排除项、验证、风险、架构/数据/安全影响和回退方式。
 3. 所有适用强制检查必须通过，`FAIL`、`BLOCKED` 或强制 `NOT RUN` 不得合并。
-4. 至少取得两名非作者评审者批准；架构、安全、全仓库治理或 Release 高影响变更还必须确保其中一名来自对应责任职能。
+4. 通用规则至少取得两名非作者评审者批准；Frontend 继续执行该规则。Core 当前单人运营期只适用第 4A 节精确例外。架构、安全、全仓库治理或 Release 高影响变更仍须满足对应责任职能和专项治理要求。
 5. 所有阻塞意见和对话必须解决；实质性更新后重新执行检查并重新评审。
 6. 合并历史保持线性；仓库启用后默认使用 squash merge，并使最终提交符合 Commit Convention。
 7. 合并结果必须保留任务、Pull Request、验证证据和审批记录之间的追溯关系。
 8. 不允许用管理员绕过、紧急标签或临时关闭保护来替代正式例外流程。
 
 具体 GitHub 配置见 [分支保护规范](BRANCH_PROTECTION.md)。
+
+## 4A. Core 单人运营精确例外（2026-08-25）
+
+Project Lead / Repository Governance Owner `蔺鹏` 明确记录：项目当前只有一名
+运营者，Core `main` 的 GitHub ruleset 在该运营期采用 `1 approval`。这是 Core
+仓库级 Pull Request 入口的精确治理决定，不是通用审批规范降级，也不适用于
+Frontend；Frontend 继续要求 `2 approvals`。
+
+该精确例外的强制条件是：
+
+1. `1 approval` 必须来自 GitHub 认可的合格非作者；作者不能批准自己的 PR；
+2. 自动化检查、独立技术审查、Committer 身份、Project Lead 工作范围授权和
+   Owner Acceptance 均不计为平台 approval；
+3. 没有合格非作者账号时，PR 保持 merge blocked，不得把要求降为 `0`；
+4. dismiss stale approval、latest-push approval、conversation resolution、strict
+   required checks、linear history、force/delete protection 全部继续生效；
+5. bypass actor 必须为空，不能为解决单账号阻塞而临时增加；
+6. 有效 Core `main` ruleset 只允许 squash；仓库 General settings 即使仍显示
+   merge/squash/rebase，也不能被描述为整个仓库 squash-only，或被用来绕过
+   `main` ruleset；以及
+7. Release、安全、风险接受、Phase Exit、Script/ShotPlan、媒体准入和发布仍使用
+   各自通用或专项规范；本例外不满足、替代或降低那些决定。
+
+当前精确事实记录在 [Branch Protection](BRANCH_PROTECTION.md#6a-2026-08-25-远端配置历史与当前差异账本)。
+PR #11 author=`lpjiayou`、reviews=`[]`，因此当前为 `0/1`，且单账号现状没有合格
+非作者 Reviewer。Core ruleset 配置可以是 `CONFIGURATION-CONFORMING / PARTIALLY
+VERIFIED`，同时 PR #11 仍必须是 `MERGE BLOCKED`；两者不得混为一项结论。
 
 ## 5. `develop` 规则
 

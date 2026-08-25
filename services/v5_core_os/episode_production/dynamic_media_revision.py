@@ -1,4 +1,4 @@
-"""Fail-closed, zero-write image preflight for current K2 v2 shot graphs.
+"""Fail-closed, zero-write image preflight for a current K2 shot-plan draft.
 
 This module deliberately does not define a provider capability, executable
 GenerationRequest, V4 adapter handoff, candidate intake, video plan, admission,
@@ -13,9 +13,14 @@ from typing import Any, Mapping, Sequence
 
 from .foundation import (
     EpisodeProductionError,
+    LOCAL_EVIDENCE,
     UpstreamNotReadyError,
     _digest,
     _required_ref,
+)
+from .shot_graph import (
+    validate_creative_shot_draft,
+    validate_shot_plan_draft,
 )
 
 
@@ -23,16 +28,33 @@ DYNAMIC_MEDIA_PREFLIGHT_SCHEMA_VERSION = "v5.k2-dynamic-image-preflight.v1"
 _IMAGE_PLAN_PREVIEW_SCHEMA_VERSION = "v5.k2-image-plan-preview.v1"
 _IMAGE_REQUEST_PREVIEW_SCHEMA_VERSION = "v5.k2-shot-image-request-preview.v1"
 _OUTPUT_PROFILE_SCHEMA_VERSION = "k2.episode-output-profile.v2"
-_SHOT_GRAPH_SCHEMA_VERSION = "v5.executable-shot-graph.v2"
-_CREATIVE_SHOT_SCHEMA_VERSION = "v5.creative-shot-version.v2"
+_SHOT_PLAN_DRAFT_SCHEMA_VERSION = "v5.local-structural-shot-plan-draft.v1"
+_CREATIVE_SHOT_DRAFT_SCHEMA_VERSION = "v5.creative-shot-draft.v1"
 _PREFLIGHT_ONLY = "PREFLIGHT_ONLY_NOT_AUTHORIZED"
+_OUTPUT_PROFILE_FIELDS = (
+    "schemaVersion",
+    "orientation",
+    "targetAspectRatio",
+    "width",
+    "height",
+    "aspectRatio",
+    "frameRate",
+    "container",
+    "generationCanvas",
+    "editMaster",
+    "releaseMaster",
+    "controlledExtensionAlgorithmRef",
+    "controlledExtensionAlgorithmDigest",
+    "controlledExtensionAlgorithm",
+    "totalFrames",
+)
 
 _FIXED_DISPATCH_BLOCKER_TYPES = (
     "M10_CANONICAL_APPEND_NOT_IMPLEMENTED",
     "K2_002_REGISTRATION_PROVENANCE_NOT_VERIFIED_BY_PREFLIGHT",
     "SCRIPT_OWNER_ACCEPTANCE_NOT_VERIFIED_BY_PREFLIGHT",
     "SHOT_PLAN_APPROVAL_NOT_VERIFIED",
-    "CAMERA_APPROVAL_NOT_VERIFIED_BY_PREFLIGHT",
+    "CAMERA_CONTRACT_NOT_READY",
     "INPUT_ASSET_ADMISSION_NOT_VERIFIED",
     "RIGHTS_AUTHORITY_NOT_VERIFIED",
     "PROVIDER_POLICY_NOT_VERIFIED",
@@ -108,13 +130,15 @@ def _image_reference_media_type(value: Any) -> str:
     )
 
 
-def _profile(graph: Mapping[str, Any]) -> dict[str, Any]:
-    output = graph.get("output")
+def _profile(draft: Mapping[str, Any]) -> dict[str, Any]:
+    validate_shot_plan_draft(draft)
+    output = draft.get("output")
     if (
         not isinstance(output, Mapping)
+        or set(output) != set(_OUTPUT_PROFILE_FIELDS)
         or output.get("schemaVersion") != _OUTPUT_PROFILE_SCHEMA_VERSION
     ):
-        raise EpisodeProductionError("v2 shot graph output profile is invalid")
+        raise EpisodeProductionError("shot plan draft output profile is invalid")
     generation = output.get("generationCanvas")
     edit_master = output.get("editMaster")
     release_master = output.get("releaseMaster")
@@ -132,25 +156,21 @@ def _profile(graph: Mapping[str, Any]) -> dict[str, Any]:
     frame_rate = _positive_int(
         output.get("frameRate"), "output.frameRate", maximum=240
     )
-    graph_version_ref = _required_ref(
-        graph.get("executableShotGraphVersionRef"),
-        "executableShotGraphVersionRef",
+    draft_ref = _required_ref(
+        draft.get("shotPlanDraftRef"),
+        "shotPlanDraftRef",
     )
-    profile_payload = deepcopy(dict(output))
-    supplied_digest = profile_payload.pop("payloadDigest", None)
+    profile_payload = {
+        field: deepcopy(output[field]) for field in _OUTPUT_PROFILE_FIELDS
+    }
     profile_digest = _digest(profile_payload)
-    if supplied_digest is not None and supplied_digest != profile_digest:
-        raise EpisodeProductionError("output profile digest is invalid")
     return {
         "productionProfilePreviewRef": _required_ref(
-            output.get(
-                "productionProfileRef",
-                f"{graph_version_ref}:output-profile-preview",
-            ),
+            f"{draft_ref}:output-profile-preview",
             "productionProfilePreviewRef",
         ),
         "productionProfileDigest": profile_digest,
-        "outputProfile": deepcopy(dict(output)),
+        "outputProfile": profile_payload,
         "generationCanvas": {"width": width, "height": height},
         "editMaster": {
             "width": _positive_int(edit_master.get("width"), "editMaster.width"),
@@ -169,69 +189,70 @@ def _profile(graph: Mapping[str, Any]) -> dict[str, Any]:
 
 
 def _current_shots(
-    graph: Mapping[str, Any],
-    creative_shot_versions: Sequence[Mapping[str, Any]],
+    draft: Mapping[str, Any],
+    creative_shot_drafts: Sequence[Mapping[str, Any]],
 ) -> list[dict[str, Any]]:
-    if graph.get("schemaVersion") != _SHOT_GRAPH_SCHEMA_VERSION:
-        raise EpisodeProductionError("image preflight requires a v2 shot graph")
-    _verify_sealed(graph, "shotGraph")
-    raw_shots = graph.get("shots")
+    validate_shot_plan_draft(draft)
+    if draft.get("schemaVersion") != _SHOT_PLAN_DRAFT_SCHEMA_VERSION:
+        raise EpisodeProductionError("image preflight requires a shot plan draft")
+    _verify_sealed(draft, "shotPlanDraft")
+    raw_shots = draft.get("shots")
     if (
         not isinstance(raw_shots, list)
         or not raw_shots
         or len(raw_shots) > 120
         or not all(isinstance(item, Mapping) for item in raw_shots)
-        or not isinstance(creative_shot_versions, Sequence)
-        or isinstance(creative_shot_versions, (str, bytes, bytearray))
-        or len(creative_shot_versions) != len(raw_shots)
-        or not all(isinstance(item, Mapping) for item in creative_shot_versions)
+        or not isinstance(creative_shot_drafts, Sequence)
+        or isinstance(creative_shot_drafts, (str, bytes, bytearray))
+        or len(creative_shot_drafts) != len(raw_shots)
+        or not all(isinstance(item, Mapping) for item in creative_shot_drafts)
     ):
-        raise EpisodeProductionError("current CreativeShotVersion coverage is incomplete")
+        raise EpisodeProductionError("current CreativeShotDraft coverage is incomplete")
 
     creative_by_ref: dict[str, Mapping[str, Any]] = {}
-    for index, creative in enumerate(creative_shot_versions):
-        version_ref = _required_ref(
-            creative.get("creativeShotVersionRef"),
-            f"creativeShotVersions[{index}].creativeShotVersionRef",
+    for index, creative in enumerate(creative_shot_drafts):
+        validate_creative_shot_draft(creative)
+        draft_ref = _required_ref(
+            creative.get("creativeShotDraftRef"),
+            f"creativeShotDrafts[{index}].creativeShotDraftRef",
         )
-        if version_ref in creative_by_ref:
-            raise EpisodeProductionError("CreativeShotVersion coverage is ambiguous")
+        if draft_ref in creative_by_ref:
+            raise EpisodeProductionError("CreativeShotDraft coverage is ambiguous")
         if (
-            creative.get("schemaVersion") != _CREATIVE_SHOT_SCHEMA_VERSION
-            or creative.get("workspaceRef") != graph.get("workspaceRef")
-            or creative.get("productionRunRef") != graph.get("productionRunRef")
+            creative.get("schemaVersion") != _CREATIVE_SHOT_DRAFT_SCHEMA_VERSION
+            or creative.get("workspaceRef") != draft.get("workspaceRef")
+            or creative.get("productionRunRef") != draft.get("productionRunRef")
         ):
-            raise EpisodeProductionError("CreativeShotVersion lineage is invalid")
-        _verify_sealed(creative, f"creativeShotVersions[{index}]")
-        creative_by_ref[version_ref] = creative
+            raise EpisodeProductionError("CreativeShotDraft lineage is invalid")
+        _verify_sealed(creative, f"creativeShotDrafts[{index}]")
+        creative_by_ref[draft_ref] = creative
 
     shots = [deepcopy(dict(item)) for item in raw_shots]
     if [item.get("globalOrder") for item in shots] != list(
         range(1, len(shots) + 1)
     ):
-        raise EpisodeProductionError("v2 shot graph ordinals are not contiguous")
+        raise EpisodeProductionError("shot plan draft ordinals are not contiguous")
 
     frame_total = 0
     seen_slots: set[str] = set()
     for index, shot in enumerate(shots):
         slot_ref = _required_ref(
-            shot.get("creativeShotVersionRef"),
-            f"shots[{index}].creativeShotVersionRef",
+            shot.get("creativeShotDraftRef"),
+            f"shots[{index}].creativeShotDraftRef",
         )
         if slot_ref in seen_slots:
-            raise EpisodeProductionError("v2 shot graph repeats a slot")
+            raise EpisodeProductionError("shot plan draft repeats a slot")
         seen_slots.add(slot_ref)
         shot_digest = _sha256(
             shot.get("payloadDigest"), f"shots[{index}].payloadDigest"
         )
         creative = creative_by_ref.get(slot_ref)
         compared_fields = (
-            "creativeShotRef",
-            "creativeShotVersionRef",
+            "creativeShotDraftRef",
             "globalOrder",
             "durationFrames",
             "frameRate",
-            "cameraInstruction",
+            "editorialShotSize",
             "visibleIdentityMode",
             "visibleCharacterRefs",
             "visibleIdentityBindings",
@@ -249,7 +270,7 @@ def _current_shots(
             or creative.get("action") != shot.get("actionBeat")
         ):
             raise EpisodeProductionError(
-                "CreativeShotVersion does not match the executable shot graph"
+                "CreativeShotDraft does not match the shot plan draft"
             )
         duration = _positive_int(
             shot.get("durationFrames"),
@@ -278,8 +299,9 @@ def _current_shots(
             or shot.get("visibleIdentityMode") != _derived_identity_mode(locks)
         ):
             raise EpisodeProductionError("v2 shot visible identity lineage is invalid")
-        if not isinstance(shot.get("cameraInstruction"), Mapping):
-            raise EpisodeProductionError("v2 shot camera fields are invalid")
+        _text(shot.get("editorialShotSize"), f"shots[{index}].editorialShotSize")
+        if "cameraInstruction" in shot:
+            raise EpisodeProductionError("shot plan draft contains camera authority")
         _text(shot.get("actionBeat"), f"shots[{index}].actionBeat")
         continuity = shot.get("continuityConstraints")
         if not isinstance(continuity, list) or not continuity or not all(
@@ -308,8 +330,8 @@ def _current_shots(
             for item in postprocess
         ):
             raise EpisodeProductionError("v2 shot postprocess requirements are invalid")
-    if graph.get("output", {}).get("totalFrames") != frame_total:
-        raise EpisodeProductionError("v2 shot graph frame accounting is inconsistent")
+    if draft.get("output", {}).get("totalFrames") != frame_total:
+        raise EpisodeProductionError("shot plan draft frame accounting is inconsistent")
     return shots
 
 
@@ -442,10 +464,10 @@ def _postprocess_blockers(
     ]
 
 
-def _preview_ref(prefix: str, graph_digest: str, ordinal: int = 0) -> str:
+def _preview_ref(prefix: str, draft_digest: str, ordinal: int = 0) -> str:
     suffix = _digest(
         {
-            "executableShotGraphDigest": graph_digest,
+            "shotPlanDraftDigest": draft_digest,
             "previewKind": prefix,
             "ordinal": ordinal,
         }
@@ -457,31 +479,36 @@ def _build_image_preview(
     *,
     workspace_ref: str,
     production_run_ref: str,
-    graph: Mapping[str, Any],
-    creative_shot_versions: Sequence[Mapping[str, Any]],
+    draft: Mapping[str, Any],
+    creative_shot_drafts: Sequence[Mapping[str, Any]],
     identity_lock: Mapping[str, Any],
 ) -> dict[str, Any]:
-    graph_digest = _verify_sealed(graph, "shotGraph")
+    validate_shot_plan_draft(draft)
+    draft_digest = _verify_sealed(draft, "shotPlanDraft")
     identity_digest = _verify_sealed(identity_lock, "identityLock")
     if (
-        graph.get("workspaceRef") != workspace_ref
-        or graph.get("productionRunRef") != production_run_ref
-        or graph.get("identityLockRef") != identity_lock.get("identityLockRef")
-        or graph.get("identityLockVersionRef")
+        draft.get("workspaceRef") != workspace_ref
+        or draft.get("productionRunRef") != production_run_ref
+        or draft.get("identityLockRef") != identity_lock.get("identityLockRef")
+        or draft.get("identityLockVersionRef")
         != identity_lock.get("identityLockVersionRef")
-        or graph.get("identityLockDigest") != identity_digest
-        or graph.get("shotPlanAuthorityState")
+        or draft.get("identityLockDigest") != identity_digest
+        or draft.get("shotPlanAuthorityState")
         != "LOCAL_STRUCTURAL_REPRESENTATION_ONLY"
-        or graph.get("shotPlanApprovalState") != "NOT_VERIFIED"
-        or graph.get("cameraContractState") != "UNVERIFIED_COMMAND_INPUT"
-        or graph.get("executionAuthorizationState") != _PREFLIGHT_ONLY
-        or graph.get("dispatchAllowed") is not False
+        or draft.get("shotPlanApprovalState") != "NOT_VERIFIED"
+        or draft.get("cameraContractState") != "NOT_READY"
+        or draft.get("executionMode") != LOCAL_EVIDENCE
+        or draft.get("executionAuthorizationState") != _PREFLIGHT_ONLY
+        or draft.get("dispatchAllowed") is not False
+        or draft.get("publicationAllowed") is not False
     ):
         raise EpisodeProductionError("image preflight authority lineage is stale")
-    profile = _profile(graph)
-    shots = _current_shots(graph, creative_shot_versions)
+    profile = _profile(draft)
+    shots = _current_shots(draft, creative_shot_drafts)
     blockers = [*_fixed_blockers(), *_postprocess_blockers(shots)]
-    created_at = _text(graph.get("createdAt"), "shotGraph.createdAt", maximum=100)
+    created_at = _text(
+        draft.get("createdAt"), "shotPlanDraft.createdAt", maximum=100
+    )
     request_previews: list[dict[str, Any]] = []
     for shot in shots:
         ordinal = shot["globalOrder"]
@@ -492,18 +519,15 @@ def _build_image_preview(
                     "workspaceRef": workspace_ref,
                     "productionRunRef": production_run_ref,
                     "requestPreviewRef": _preview_ref(
-                        "k2-image-request-preview", graph_digest, ordinal
+                        "k2-image-request-preview", draft_digest, ordinal
                     ),
                     "ordinal": ordinal,
                     "mediaKind": "image",
                     "mediaType": "image/png",
-                    "creativeShotRef": shot["creativeShotRef"],
-                    "creativeShotVersionRef": shot["creativeShotVersionRef"],
-                    "creativeShotDigest": shot["payloadDigest"],
-                    "executableShotGraphVersionRef": graph[
-                        "executableShotGraphVersionRef"
-                    ],
-                    "executableShotGraphDigest": graph_digest,
+                    "creativeShotDraftRef": shot["creativeShotDraftRef"],
+                    "creativeShotDraftDigest": shot["payloadDigest"],
+                    "shotPlanDraftRef": draft["shotPlanDraftRef"],
+                    "shotPlanDraftDigest": draft_digest,
                     "productionProfilePreviewRef": profile[
                         "productionProfilePreviewRef"
                     ],
@@ -525,7 +549,8 @@ def _build_image_preview(
                         shot["postprocessRequirements"]
                     ),
                     "promptPreview": {
-                        "cameraInstruction": deepcopy(shot["cameraInstruction"]),
+                        "cameraContractState": "NOT_READY",
+                        "editorialShotSize": shot["editorialShotSize"],
                         "action": shot["actionBeat"],
                         "continuityConstraints": deepcopy(
                             shot["continuityConstraints"]
@@ -550,12 +575,10 @@ def _build_image_preview(
             "workspaceRef": workspace_ref,
             "productionRunRef": production_run_ref,
             "imagePlanPreviewRef": _preview_ref(
-                "k2-image-plan-preview", graph_digest
+                "k2-image-plan-preview", draft_digest
             ),
-            "executableShotGraphVersionRef": graph[
-                "executableShotGraphVersionRef"
-            ],
-            "executableShotGraphDigest": graph_digest,
+            "shotPlanDraftRef": draft["shotPlanDraftRef"],
+            "shotPlanDraftDigest": draft_digest,
             "identityLockVersionRef": identity_lock["identityLockVersionRef"],
             "identityLockDigest": identity_digest,
             "productionProfilePreviewRef": profile[
@@ -616,15 +639,17 @@ def _validate_image_preview_set(
         payload = deepcopy(dict(request))
         digest = payload.pop("payloadDigest", None)
         slot = _required_ref(
-            request.get("creativeShotVersionRef"), "creativeShotVersionRef"
+            request.get("creativeShotDraftRef"), "creativeShotDraftRef"
         )
         if (
             request.get("schemaVersion") != _IMAGE_REQUEST_PREVIEW_SCHEMA_VERSION
             or digest != _digest(payload)
             or request.get("workspaceRef") != plan.get("workspaceRef")
             or request.get("productionRunRef") != plan.get("productionRunRef")
-            or request.get("executableShotGraphDigest")
-            != plan.get("executableShotGraphDigest")
+            or request.get("shotPlanDraftRef")
+            != plan.get("shotPlanDraftRef")
+            or request.get("shotPlanDraftDigest")
+            != plan.get("shotPlanDraftDigest")
             or request.get("executionAuthorizationState") != _PREFLIGHT_ONLY
             or request.get("canonicalFact") is not False
             or request.get("dispatchAllowed") is not False
@@ -667,17 +692,19 @@ class K2DynamicMediaPreflightService:
         run_ref = _required_ref(
             command.get("productionRunRef"), "productionRunRef"
         )
-        verified = self.shot_graph.verify_shot_graph_current(workspace, run_ref)
+        verified = self.shot_graph.verify_shot_plan_draft_current(
+            workspace, run_ref
+        )
         root = verified.get("root")
-        graph = verified.get("executableShotGraph")
+        draft = verified.get("shotPlanDraft")
         identity_lock = verified.get("identityLock")
-        creative_shots = verified.get("creativeShotVersions")
+        creative_shots = verified.get("creativeShotDrafts")
         if (
             not isinstance(root, Mapping)
             or root.get("manifest", {}).get("schemaVersion")
             != "k2.golden-episode.manifest.v2"
-            or not isinstance(graph, Mapping)
-            or graph.get("schemaVersion") != _SHOT_GRAPH_SCHEMA_VERSION
+            or not isinstance(draft, Mapping)
+            or draft.get("schemaVersion") != _SHOT_PLAN_DRAFT_SCHEMA_VERSION
             or not isinstance(identity_lock, Mapping)
             or not isinstance(creative_shots, list)
             or root.get("manifest", {}).get("expectedShotCount")
@@ -689,8 +716,8 @@ class K2DynamicMediaPreflightService:
         preview = _build_image_preview(
             workspace_ref=workspace,
             production_run_ref=run_ref,
-            graph=graph,
-            creative_shot_versions=creative_shots,
+            draft=draft,
+            creative_shot_drafts=creative_shots,
             identity_lock=identity_lock,
         )
         plan = preview["imagePlanPreview"]
@@ -700,10 +727,8 @@ class K2DynamicMediaPreflightService:
                 "workspaceRef": workspace,
                 "productionRunRef": run_ref,
                 "rootPayloadDigest": root["payloadDigest"],
-                "executableShotGraphVersionRef": graph[
-                    "executableShotGraphVersionRef"
-                ],
-                "executableShotGraphDigest": graph["payloadDigest"],
+                "shotPlanDraftRef": draft["shotPlanDraftRef"],
+                "shotPlanDraftDigest": draft["payloadDigest"],
                 "identityLockVersionRef": identity_lock[
                     "identityLockVersionRef"
                 ],
@@ -715,9 +740,9 @@ class K2DynamicMediaPreflightService:
                 "observedCurrentFacts": {
                     "episodeProductionRun": "CURRENT",
                     "confirmedScriptVersion": "CURRENT",
-                    "v2ShotGraphRepresentation": "CURRENT",
+                    "shotPlanDraft": "CURRENT_LOCAL_STRUCTURAL_DRAFT",
                     "explicitShotFields": "LOCAL_STRUCTURAL_REPRESENTATION",
-                    "cameraFields": "UNVERIFIED_COMMAND_INPUT",
+                    "cameraContract": "NOT_READY",
                     "scriptOwnerAcceptance": "NOT_VERIFIED_BY_PREFLIGHT",
                     "shotPlanApproval": "NOT_VERIFIED_BY_PREFLIGHT",
                     "cameraApproval": "NOT_MODELED",

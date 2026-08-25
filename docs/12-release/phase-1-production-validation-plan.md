@@ -1,5 +1,15 @@
 # Phase 1 Production Validation Plan
 
+> Applicability notice — `2026-08-25`
+>
+> 本文正文保留早期 Phase 1 计划基线和当时的仓库/Gate 快照，不是当前
+> K2-002 开工授权。对唯一精确工作包
+> `ACS-K2-002-CHANGAN-ONBOARDING-AND-EP01-CHAIN`，以
+> [ACS-K2-002 Non-GPU Preproduction Governance Rebaseline](../../governance/ACS-K2-002-NON-GPU-PREPRODUCTION-REBASELINE.md)
+> 的 scope、Gate applicability 和禁止项为准。该后续决定不把本计划整体标记为
+> 已执行，不建立 Phase 1 Exit，也不授权 live production、Provider/GPU、批量、
+> Release 或 Publication。
+
 | 项目 | 内容 |
 | --- | --- |
 | Task ID | `ACS-P1-001` |

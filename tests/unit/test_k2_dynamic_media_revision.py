@@ -1,3 +1,4 @@
+import copy
 from hashlib import sha256
 import json
 import unittest
@@ -13,11 +14,13 @@ from services.v5_core_os.episode_production.foundation import _digest
 from tests.unit.test_episode_production_k2 import (
     WORKSPACE,
     g3_command,
+    g6_finalize_command,
     seed_k2_roots,
 )
 from tests.unit.test_k2_002_shot_profile_v2 import (
     PortraitProjectBoundary,
     _activate_k2_002_roots,
+    _reseal,
     ep01_shot_budgets,
 )
 
@@ -27,7 +30,7 @@ FIXED_BLOCKERS = {
     "K2_002_REGISTRATION_PROVENANCE_NOT_VERIFIED_BY_PREFLIGHT",
     "SCRIPT_OWNER_ACCEPTANCE_NOT_VERIFIED_BY_PREFLIGHT",
     "SHOT_PLAN_APPROVAL_NOT_VERIFIED",
-    "CAMERA_APPROVAL_NOT_VERIFIED_BY_PREFLIGHT",
+    "CAMERA_CONTRACT_NOT_READY",
     "INPUT_ASSET_ADMISSION_NOT_VERIFIED",
     "RIGHTS_AUTHORITY_NOT_VERIFIED",
     "PROVIDER_POLICY_NOT_VERIFIED",
@@ -93,8 +96,8 @@ class K2DynamicMediaPreflightTests(unittest.TestCase):
         )
         self.boundary.authorize_and_lock(self._authority_command(self.run))
         compiled = self.boundary.compile_shot_graph(g3_command(self.run))
-        self.graph = compiled["executableShotGraph"]
-        self.creative_shots = compiled["creativeShotVersions"]
+        self.draft = compiled["shotPlanDraft"]
+        self.creative_shots = compiled["creativeShotDrafts"]
 
     def _boundary(self):
         return create_in_memory_boundary(
@@ -179,7 +182,13 @@ class K2DynamicMediaPreflightTests(unittest.TestCase):
         run_before = self.boundary.get_run(
             WORKSPACE, self.run["productionRunRef"]
         )
-        graph_before = self.boundary.get_shot_graph_bundle(
+        draft_before = self.boundary.get_shot_graph_bundle(
+            WORKSPACE, self.run["productionRunRef"]
+        )
+        evidence = (
+            self.boundary._EpisodeProductionPublicBoundary__shot_graph.evidence
+        )
+        evidence_before = evidence.read_snapshot(
             WORKSPACE, self.run["productionRunRef"]
         )
         first = self._preflight()
@@ -187,13 +196,17 @@ class K2DynamicMediaPreflightTests(unittest.TestCase):
         run_after = self.boundary.get_run(
             WORKSPACE, self.run["productionRunRef"]
         )
-        graph_after = self.boundary.get_shot_graph_bundle(
+        draft_after = self.boundary.get_shot_graph_bundle(
+            WORKSPACE, self.run["productionRunRef"]
+        )
+        evidence_after = evidence.read_snapshot(
             WORKSPACE, self.run["productionRunRef"]
         )
 
         self.assertEqual(replay, first)
         self.assertEqual(run_after, run_before)
-        self.assertEqual(graph_after, graph_before)
+        self.assertEqual(draft_after, draft_before)
+        self.assertEqual(evidence_after, evidence_before)
         self.assertEqual(
             first["schemaVersion"], "v5.k2-dynamic-image-preflight.v1"
         )
@@ -218,7 +231,7 @@ class K2DynamicMediaPreflightTests(unittest.TestCase):
             "NOT_VERIFIED_BY_PREFLIGHT",
         )
         self.assertEqual(
-            first["observedCurrentFacts"]["cameraApproval"], "NOT_MODELED"
+            first["observedCurrentFacts"]["cameraContract"], "NOT_READY"
         )
         self.assertEqual(first["videoPlanState"], "OUT_OF_SCOPE_NOT_BUILT")
         self.assertEqual(first["audioPlanState"], "OUT_OF_SCOPE_NOT_BUILT")
@@ -301,14 +314,33 @@ class K2DynamicMediaPreflightTests(unittest.TestCase):
             "generationRequestRef",
             "realVideoPlan",
             "video/mp4",
+            "ExecutableShotGraph",
+            "executableShotGraph",
+            "CreativeShotVersion",
+            "creativeShotVersion",
+            "cameraInstruction",
+            "SHOTS_COMPILED",
         ):
             self.assertNotIn(forbidden, serialized)
+        self.assertTrue(
+            all(
+                request["shotPlanDraftDigest"]
+                == preflight["shotPlanDraftDigest"]
+                for request in requests
+            )
+        )
 
-    def test_v2_graph_is_rejected_by_every_legacy_mutation_entry(self):
+    def test_shot_plan_draft_is_rejected_by_every_legacy_mutation_entry(self):
         run_before = self.boundary.get_run(
             WORKSPACE, self.run["productionRunRef"]
         )
-        graph_before = self.boundary.get_shot_graph_bundle(
+        draft_before = self.boundary.get_shot_graph_bundle(
+            WORKSPACE, self.run["productionRunRef"]
+        )
+        evidence = (
+            self.boundary._EpisodeProductionPublicBoundary__shot_graph.evidence
+        )
+        evidence_before = evidence.read_snapshot(
             WORKSPACE, self.run["productionRunRef"]
         )
         scope = {
@@ -323,6 +355,17 @@ class K2DynamicMediaPreflightTests(unittest.TestCase):
             (
                 self.boundary.execute_media,
                 {**scope, "idempotencyKey": "blocked-v2-media"},
+            ),
+            (
+                self.boundary.compose_and_qc,
+                {**scope, "idempotencyKey": "blocked-v2-compose"},
+            ),
+            (
+                self.boundary.approve_and_finalize,
+                {
+                    **g6_finalize_command(self.run),
+                    "idempotencyKey": "blocked-v2-finalize",
+                },
             ),
             (
                 self.boundary.run_provider_experiment,
@@ -346,6 +389,14 @@ class K2DynamicMediaPreflightTests(unittest.TestCase):
                 {
                     **scope,
                     "idempotencyKey": "blocked-v2-image-admission",
+                    "selections": [],
+                },
+            ),
+            (
+                self.boundary.select_real_images,
+                {
+                    **scope,
+                    "idempotencyKey": "blocked-v2-image-selection-alias",
                     "selections": [],
                 },
             ),
@@ -426,7 +477,11 @@ class K2DynamicMediaPreflightTests(unittest.TestCase):
             self.boundary.get_shot_graph_bundle(
                 WORKSPACE, self.run["productionRunRef"]
             ),
-            graph_before,
+            draft_before,
+        )
+        self.assertEqual(
+            evidence.read_snapshot(WORKSPACE, self.run["productionRunRef"]),
+            evidence_before,
         )
 
     def test_preflight_rejects_client_authority_payloads(self):
@@ -435,12 +490,55 @@ class K2DynamicMediaPreflightTests(unittest.TestCase):
                 {
                     "workspaceRef": WORKSPACE,
                     "productionRunRef": self.run["productionRunRef"],
-                    "shotGraph": self.graph,
+                    "shotPlanDraft": self.draft,
                 }
             )
         self.assertEqual(
             (caught.exception.status, caught.exception.code),
             (400, "invalid_request"),
+        )
+
+    def test_internal_preview_rejects_resealed_draft_authority_injections_zero_write(self):
+        service = self.boundary._EpisodeProductionPublicBoundary__shot_graph
+        verified = service.verify_shot_plan_draft_current(
+            WORKSPACE, self.run["productionRunRef"]
+        )
+        evidence_before = service.evidence.read_snapshot(
+            WORKSPACE, self.run["productionRunRef"]
+        )
+
+        output_camera = copy.deepcopy(self.draft)
+        output_camera["output"]["cameraInstruction"] = "fabricated"
+        output_camera = _reseal(output_camera)
+        publication = copy.deepcopy(self.draft)
+        publication["publicationAllowed"] = True
+        publication = _reseal(publication)
+        creative_camera = copy.deepcopy(self.creative_shots)
+        creative_camera[0]["cameraInstruction"] = "fabricated"
+        creative_camera[0] = _reseal(creative_camera[0])
+
+        cases = (
+            (output_camera, self.creative_shots),
+            (publication, self.creative_shots),
+            (self.draft, creative_camera),
+        )
+        for draft, creative_shots in cases:
+            with self.subTest(draft=draft is not self.draft), self.assertRaises(
+                Exception
+            ):
+                dynamic_media_revision._build_image_preview(
+                    workspace_ref=WORKSPACE,
+                    production_run_ref=self.run["productionRunRef"],
+                    draft=draft,
+                    creative_shot_drafts=creative_shots,
+                    identity_lock=verified["identityLock"],
+                )
+
+        self.assertEqual(
+            service.evidence.read_snapshot(
+                WORKSPACE, self.run["productionRunRef"]
+            ),
+            evidence_before,
         )
 
     def test_face_lock_rejects_non_image_identity_reference(self):

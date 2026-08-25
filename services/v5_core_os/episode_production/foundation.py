@@ -30,6 +30,9 @@ DIALOGUE_SYNC_MODES = frozenset(
     {"NONE", "OFF_CAMERA_OR_NON_VISIBLE_MOUTH", "VERIFIED_LIP_SYNC"}
 )
 DIALOGUE_SOURCE_MODES = frozenset({"NARRATION", "DIALOGUE", "SFX_OR_SILENCE"})
+# Closed set used by every EP01-03 row in the repository-reviewed K2-002
+# v1.3 candidate/source package.
+K2_002_EDITORIAL_SHOT_SIZE_CODES = frozenset({"ECU", "CU", "MCU", "MS", "WS"})
 CONTROLLED_EXTENSION_ALGORITHM_REF = "controlled-horizontal-edge-extension-v1"
 CONTROLLED_EXTENSION_ALGORITHM = {
     "schemaVersion": "k2.controlled-extension-algorithm.v1",
@@ -141,19 +144,11 @@ def _required_text(value: Any, field: str) -> str:
     return value
 
 
-def _camera(value: Any, field: str) -> dict[str, Any]:
-    if not isinstance(value, Mapping) or set(value) != {
-        "shotSize", "movement", "angle", "lensMm", "intent"
-    }:
-        raise EpisodeProductionError(f"{field} is invalid")
-    lens = _positive_int(value.get("lensMm"), f"{field}.lensMm", maximum=500)
-    return {
-        "shotSize": _required_text(value.get("shotSize"), f"{field}.shotSize"),
-        "movement": _required_text(value.get("movement"), f"{field}.movement"),
-        "angle": _required_text(value.get("angle"), f"{field}.angle"),
-        "lensMm": lens,
-        "intent": _required_text(value.get("intent"), f"{field}.intent"),
-    }
+def _editorial_shot_size(value: Any, field: str) -> str:
+    normalized = _required_text(value, field)
+    if normalized not in K2_002_EDITORIAL_SHOT_SIZE_CODES:
+        raise EpisodeProductionError(f"{field} is not a K2-002 editorial shot size")
+    return normalized
 
 
 def _postprocess_requirements(value: Any, field: str) -> list[dict[str, Any]]:
@@ -779,6 +774,10 @@ class EpisodeProductionService:
             raise EpisodeProductionError(
                 "portrait K2 runs require explicit v2 shotBudgets"
             )
+        if explicit_shot_budgets is not None and not portrait:
+            raise EpisodeProductionError(
+                "K2-002 v2 shotBudgets require the portrait output contract"
+            )
         if explicit_shot_budgets is None:
             if not isinstance(shots_value, list) or len(shots_value) != len(scenes):
                 raise EpisodeProductionError("shotsPerScene must match confirmed scenes")
@@ -810,7 +809,8 @@ class EpisodeProductionService:
             for index, item in enumerate(explicit_shot_budgets):
                 field = f"shotBudgets[{index}]"
                 if not isinstance(item, Mapping) or set(item) != {
-                    "scriptSceneRef", "sceneOrder", "durationFrames", "camera",
+                    "scriptSceneRef", "sceneOrder", "durationFrames",
+                    "editorialShotSize",
                     "visibleIdentityBindings",
                     "actionBeat", "dialogueSyncMode", "dialogueRequirement",
                     "postprocessRequirements",
@@ -840,7 +840,10 @@ class EpisodeProductionService:
                     item.get("durationFrames"), f"{field}.durationFrames", maximum=216000
                 )
                 frame_totals[scene_index] += duration_frames
-                camera = _camera(item.get("camera"), f"{field}.camera")
+                editorial_shot_size = _editorial_shot_size(
+                    item.get("editorialShotSize"),
+                    f"{field}.editorialShotSize",
+                )
                 raw_identity_bindings = item.get("visibleIdentityBindings")
                 if not isinstance(raw_identity_bindings, list):
                     raise EpisodeProductionError(
@@ -918,7 +921,7 @@ class EpisodeProductionService:
                         "scriptSceneRef": scene_ref,
                         "sceneOrder": scene_order,
                         "durationFrames": duration_frames,
-                        "camera": camera,
+                        "editorialShotSize": editorial_shot_size,
                         "visibleIdentityBindings": visible_identity_bindings,
                         "actionBeat": action_beat,
                         "dialogueSyncMode": dialogue_sync_mode,
@@ -991,8 +994,7 @@ class EpisodeProductionService:
         for index, (scene, shot_count) in enumerate(zip(scenes, shots_per_scene)):
             if not isinstance(scene, Mapping):
                 raise RepositoryUnavailableError("confirmed scene is invalid")
-            scene_budgets.append(
-                {
+            scene_budget = {
                     "scriptSceneRef": _required_ref(
                         scene.get("scriptSceneRef"), f"scenes[{index}].scriptSceneRef"
                     ),
@@ -1001,7 +1003,9 @@ class EpisodeProductionService:
                     ),
                     "shotCount": shot_count,
                 }
-            )
+            if normalized_shot_budgets is not None:
+                scene_budget["durationFrames"] = frame_totals[index]
+            scene_budgets.append(scene_budget)
         manifest_schema = (
             MANIFEST_SCHEMA_VERSION_V2
             if portrait or normalized_shot_budgets is not None
@@ -1037,7 +1041,7 @@ class EpisodeProductionService:
                 "LOCAL_STRUCTURAL_REPRESENTATION_ONLY"
             )
             manifest["shotPlanApprovalState"] = "NOT_VERIFIED"
-            manifest["cameraContractState"] = "UNVERIFIED_COMMAND_INPUT"
+            manifest["cameraContractState"] = "NOT_READY"
             manifest["dispatchAllowed"] = False
         upstream = {
             "schemaVersion": UPSTREAM_SCHEMA_VERSION,

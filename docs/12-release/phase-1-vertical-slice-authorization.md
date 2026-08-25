@@ -1,5 +1,14 @@
 # Phase 1 Vertical Slice Authorization Review
 
+> Applicability notice — `2026-08-25`
+>
+> 本文正文是 `2026-08-06` 的 `REVIEW INPUT / NOT ACCEPTED` 时点记录，不得
+> 静默改写。其 X2/K2 与 Implementation 状态表不覆盖后续精确决定。当前唯一
+> K2-002 non-GPU repository work package 仅由
+> [ACS-K2-002 Non-GPU Preproduction Governance Rebaseline](../../governance/ACS-K2-002-NON-GPU-PREPRODUCTION-REBASELINE.md)
+> 授权；本文继续约束其 V2.3 相邻依赖、无重复 authority、无 live production、
+> 无 Provider/GPU、无 Release/Publication 等通用边界。
+
 | 项目 | 内容 |
 | --- | --- |
 | Task ID | `ACS-P1-007` |

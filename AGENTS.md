@@ -360,17 +360,23 @@ The PRE-M6 route is fixed as:
 → `M6 Preconditions`
 → `M6-P1`
 
-The active project and execution wave are defined only by `CURRENT_MILESTONE.md`.
-As of 2026-08-25, ADR-0013's non-GPU implementation is Owner Accepted, K2-001 is
-historical validation evidence, and K2-002-CHANGAN is the active non-GPU
-preproduction/onboarding project. K2-002 must create distinct Project, Series,
-Episode, production-run, authority, approval and asset lineages through the existing
-Public API → V5 → V4 → Compute spine. It may not reuse K2-001 refs, receipts,
-operator manifests, package IDs, media assets or exact-scope authority exceptions.
+The active project and exact execution authority are established by applicable
+Accepted ADRs and mandatory governance decisions in the source-of-truth order above.
+`CURRENT_MILESTONE.md` projects the current task, gates and execution state only; it
+does not independently supersede higher-order authority. As of 2026-08-25,
+[ADR-0014](governance/ADR-0014-k2-001-archive-k2-002-changan-start.md) and
+[ACS-K2-002-GOV-RB1](governance/ACS-K2-002-NON-GPU-PREPRODUCTION-REBASELINE.md)
+make K2-002-CHANGAN the sole active non-GPU preproduction/onboarding package after
+ADR-0013's non-GPU implementation was Owner Accepted and K2-001 became historical
+validation evidence. K2-002 must create distinct Project, Series, Episode,
+production-run, authority, approval and asset lineages through the existing Public
+API → V5 → V4 → Compute spine. It may not reuse K2-001 refs, receipts, operator
+manifests, package IDs, media assets or exact-scope authority exceptions.
 `publicationAllowed=false` remains invariant until an independent publication gate.
 
 The following K2 Internal P1 description and governance list are a dated historical
-snapshot. They do not override the current authority in `CURRENT_MILESTONE.md`:
+snapshot. They do not override ADR-0014 and ACS-K2-002-GOV-RB1; the current milestone
+may only project execution within that exact higher-order authority:
 
 For the one exact historical K2-001 workspace/run, external Rights Manifest,
 Provider Policy and Budget Authority were not P1 execution gates. That exception

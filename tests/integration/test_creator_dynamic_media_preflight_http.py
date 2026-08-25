@@ -62,7 +62,16 @@ class FakeEpisodeProductionBoundary:
     def execute_media(self, command):
         return self._reject_legacy_mutation(command)
 
+    def compose_and_qc(self, command):
+        return self._reject_legacy_mutation(command)
+
+    def approve_and_finalize(self, command):
+        return self._reject_legacy_mutation(command)
+
     def plan_real_images(self, command):
+        return self._reject_legacy_mutation(command)
+
+    def select_real_images(self, command):
         return self._reject_legacy_mutation(command)
 
 
@@ -137,6 +146,7 @@ class CreatorDynamicMediaPreflightHttpTests(unittest.TestCase):
             {"workspaceRef": "forged"},
             {"productionRunRef": "forged"},
             {"shotGraph": {}},
+            {"shotPlanDraft": {}},
             {"identityLock": {}},
         )
         for payload in cases:
@@ -162,12 +172,32 @@ class CreatorDynamicMediaPreflightHttpTests(unittest.TestCase):
             )
 
     def test_public_legacy_mutation_routes_preserve_the_v2_block(self):
-        for resource in ("assets", "media", "real-media-revision"):
+        cases = (
+            ("assets", {"idempotencyKey": "blocked-assets"}),
+            ("media", {"idempotencyKey": "blocked-media"}),
+            ("preview", {"idempotencyKey": "blocked-preview"}),
+            (
+                "finalize",
+                {"idempotencyKey": "blocked-finalize", "decisions": []},
+            ),
+            (
+                "real-image-selection",
+                {
+                    "idempotencyKey": "blocked-real-image-selection",
+                    "selections": [],
+                },
+            ),
+            (
+                "real-media-revision",
+                {"idempotencyKey": "blocked-real-media-revision"},
+            ),
+        )
+        for resource, command in cases:
             with self.subTest(resource=resource), self.assertRaises(
                 error.HTTPError
             ) as caught:
                 self.post(
-                    {"idempotencyKey": f"blocked-{resource}"},
+                    command,
                     url=f"{self.run_base}/{resource}",
                 )
             self.assertEqual(caught.exception.code, 409)
@@ -180,7 +210,7 @@ class CreatorDynamicMediaPreflightHttpTests(unittest.TestCase):
                 {
                     "workspaceRef": WORKSPACE,
                     "productionRunRef": "run-k2-002",
-                    "idempotencyKey": f"blocked-{resource}",
+                    **command,
                 },
             )
 

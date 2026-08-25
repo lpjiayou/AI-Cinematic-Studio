@@ -11,7 +11,7 @@ from .evidence import (
     EvidenceSnapshot,
     validated_evidence_snapshot,
 )
-from .foundation import RepositoryUnavailableError
+from .foundation import MANIFEST_SCHEMA_VERSION_V2, RepositoryUnavailableError
 from .media_candidate_review import K2MediaCandidateReviewService
 
 
@@ -465,6 +465,38 @@ class K2ProductionStateProjectionService:
             workspace_ref=workspace_ref,
             run_ref=production_run_ref,
         )
+        manifest = root.get("manifest")
+        if (
+            isinstance(manifest, Mapping)
+            and manifest.get("schemaVersion") == MANIFEST_SCHEMA_VERSION_V2
+        ):
+            executable_fact_kinds = {
+                "ExecutableShotGraph",
+                "StoryboardVersion",
+            }
+            has_executable_evidence = any(
+                gate.get("gateName") == "G3_SHOT_GRAPH"
+                or any(
+                    isinstance(fact, Mapping)
+                    and (
+                        fact.get("factKind") in executable_fact_kinds
+                        or str(fact.get("factKind", "")).startswith(
+                            "CreativeShotVersion:"
+                        )
+                    )
+                    for fact in gate.get("facts", [])
+                )
+                for gate in snapshot.gates
+                if isinstance(gate, Mapping)
+            )
+            if (
+                snapshot.currentState
+                not in {"ROOTS_READY", "AUTHORITY_READY", "SCRIPT_VALIDATED"}
+                or has_executable_evidence
+            ):
+                raise RepositoryUnavailableError(
+                    "v2 draft-only run contains executable shot graph evidence"
+                )
         gates = [deepcopy(dict(item)) for item in snapshot.gates]
         production_state = snapshot.currentState
         candidates = self.candidate_review.get_projection(

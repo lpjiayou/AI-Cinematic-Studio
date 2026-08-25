@@ -10,7 +10,7 @@
 >
 > Current Task: `ACS-K2-002-CHANGAN-ONBOARDING-AND-EP01-CHAIN`
 >
-> Current Work Package: `ADR-0013 OWNER ACCEPTED / K2-001 CLOSED HISTORICAL / K2-002 v1.3 REVIEWED CORRECTION CANDIDATE / REGISTRATION + SHOT PROFILE + DYNAMIC CANDIDATE CHAIN CORRECTION / EP01 MEDIA NOT STARTED`
+> Current Work Package: `ACS-K2-002-GOV-RB1 OWNER ACCEPTED / ADR-0013 OWNER ACCEPTED / K2-001 CLOSED HISTORICAL / K2-002 v1.3 REVIEWED CORRECTION CANDIDATE / REGISTRATION + SHOTPLAN DRAFT + ZERO-WRITE PREFLIGHT CORRECTION / EP01 MEDIA NOT STARTED`
 >
 > M6 Authorization: `ACCEPTED SURFACES / K2-002 MUST CREATE DISTINCT SCOPE AND APPROVALS / NO K2-001 AUTHORITY INHERITANCE`
 >
@@ -40,17 +40,24 @@ exception remain immutable history and cannot be reused by another project.
 K2-002-CHANGAN / 《长安刮痕》 is the active Internal Content Lab project. The
 repository-reviewed correction candidate is v1.3, derived from source v1.2 digest
 `8dec72d6bde85768c846ec93dd7f06adfa1f5dd9bcddb0f118455b2f9abe37de`.
-Only EP01 is active. The current truthful state is:
+Only EP01 is active. The exact repository authorization is
+[`ACS-K2-002-GOV-RB1`](governance/ACS-K2-002-NON-GPU-PREPRODUCTION-REBASELINE.md).
+The current truthful state is:
 
 ```text
 SOURCE_PACKAGE=V1.3_REVIEWED_CORRECTION_CANDIDATE
 SCRIPT_OWNER_ACCEPTANCE=PENDING
 EDITORIAL_SHOT_PLAN=LOCAL_STRUCTURAL_REPRESENTATION_ONLY
 SHOT_PLAN_APPROVAL=NOT_VERIFIED
+REPOSITORY_DRAFT_FACT_KINDS=StoryboardDraft/CreativeShotDraft:*/ShotPlanDraft
+REPOSITORY_DRAFT_TRANSITION=AUTHORITY_READY→SCRIPT_VALIDATED
+LIVE_CANONICAL_DRAFT_FACTS=NOT_APPLIED
 CANONICAL_PROJECT_REGISTRATION=NOT_APPLIED_TO_LIVE_HOST
 REGISTRATION_DURABILITY=NOT_IMPLEMENTED
 M5_EPISODE_PLAN_ITEM_BINDING=NOT_CREATED
 EXECUTABLE_SHOT_GRAPH=NOT_COMPILED
+G3_SHOT_GRAPH=NOT_APPENDED
+SHOTS_COMPILED=NOT_REACHED
 CAMERA_CONTRACT=NOT_READY
 REFERENCE_ASSET_FILES=MISSING
 PRODUCTION_ASSETS=NOT_ADMITTED
@@ -59,14 +66,23 @@ BULK_GENERATION_ALLOWED=false
 PUBLICATION_ALLOWED=false
 ```
 
-The current non-GPU task audits reviewed import and durable registration, and adds
-candidate contracts for the vertical output profile, an explicit 12-shot local
-structural representation and a zero-write dynamic-media preflight. The client-supplied
-shot budgets have no accepted ShotPlan ref/version/digest/approval lineage and therefore
-do not establish owner-reviewed shot or camera facts. Durable registration, canonical M10/M11 append
-and V4 dispatch remain blocked/not integrated. Any future continuation must preserve
-the single Creator Public API → V5 → V4 → Compute spine and must not create a
-K2-002-specific database or AssetVersion authority.
+The current non-GPU repository candidate audits reviewed import and durable registration
+and implements the vertical output profile plus an explicit 12-shot local structural
+draft. For a v2 run in an isolated verification store, one atomic
+`G3_SCRIPT_VALIDATION` append records `ConsistencyValidation`, `StoryboardDraft`, twelve
+`CreativeShotDraft:*` facts and `ShotPlanDraft`, then stops at `SCRIPT_VALIDATED`. It
+does not append `G3_SHOT_GRAPH`, create or project `ExecutableShotGraph`, or advance to
+`SHOTS_COMPILED`.
+
+The authenticated dynamic-media preflight resolves the current `ShotPlanDraft` and
+`CreativeShotDraft` refs and digests server-side, keeps `cameraContractState=NOT_READY`,
+returns `CAMERA_CONTRACT_NOT_READY` as a blocker, and performs no evidence write,
+candidate admission or dispatch. Client-supplied shot budgets still have no accepted
+ShotPlan ref/version/digest/approval lineage and do not establish owner-reviewed shot or
+camera facts. Durable registration, live canonical draft/media append and V4 dispatch
+remain blocked/not integrated. Any future continuation must preserve the single Creator
+Public API → V5 → V4 → Compute spine and must not create a K2-002-specific database or
+AssetVersion authority.
 
 Sections 0A–16 below are dated historical snapshots or inherited specifications.
 Their “current”, “next action”, “pending”, “authorized” and “not merged” sentences

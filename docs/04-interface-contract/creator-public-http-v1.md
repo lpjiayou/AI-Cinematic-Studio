@@ -23,7 +23,7 @@ Commercial Frontend → Frontend Experience Adapter → /creator/api/v1
 | M4 | `/projects`, `/project-contexts` | Project Context public boundary |
 | M5 | `/series-planning-workspaces`, `/series-plan-*` | Series Planning + Series Director boundaries |
 | M6 | `/series-intelligence-workspaces`, `/series-intelligence/*` | accepted Series Intelligence public boundary |
-| M7–M8 | `/episode-production-runs/{runRef}/shot-graph` | bounded K2 V5 Shot Graph service |
+| M7–M8 | `/episode-production-runs/{runRef}/shot-graph` | bounded K2 V5 legacy executable-graph service plus v2 local-draft compatibility transport |
 | M9 | `/episode-production-runs/{runRef}/assets` | bounded K2 V5 Asset Pipeline service |
 | M10 | `/episode-production-runs/{runRef}/dynamic-media-preflight`, `/real-media-revision`, `/real-image-candidates`, `/semantic-visual-qc`, `/media-selection`, `/real-image-admission`, `/real-image-successor-admission`, `/real-image-selection`, `/state-projection`, `/production-readiness` | bounded K2 V5 zero-write image preflight plus legacy image candidate, review, authority-backed admission and projection services |
 | M11 | `/episode-production-runs/{runRef}/real-video-revision`, `/real-video-candidates`, `/semantic-visual-qc`, `/media-selection`, `/real-video-admission`, `/state-projection`, `/provider-experiments`, `/media` | bounded K2 V5 exact start-image video candidate, review and admission services over V4 |
@@ -56,16 +56,18 @@ confirmation and must not mint or infer a source-plan reference.
 `POST /creator/api/v1/script-versions/reviewed-import` accepts exactly
 `seriesRef`, `episodeRef`, `uploadedSourceByteDigest`,
 `normalizedSourceDocumentDigest`, `reviewedDocumentDigest` and `content`.
-Authentication injects `workspaceRef` and the authenticated actor; clients cannot
-submit an actor or a first-version `scriptSceneRef`. Core generates scene refs and a
-canonical Script-content digest.
+Authentication injects `workspaceRef` and the authenticated service-credential ref;
+clients cannot submit that ref or a first-version `scriptSceneRef`. The current auth
+contract does not resolve a human user identity or RBAC role. Core generates scene refs
+and a canonical Script-content digest.
 
-The three document digests are authenticated-actor declarations only. This route
-does not receive or re-hash the source documents and does not prove their semantic
-binding to `content`. The result is an unconfirmed first ScriptVersion. Generic
-confirmation of any reviewed-import lineage returns `trusted_approval_required`
-until a trusted Owner approval resolver verifies the exact subject. The internal
-unauthenticated alias remains forbidden.
+The three document digests are authenticated-service-credential declarations only.
+This route does not receive or re-hash the source documents and does not prove their
+semantic binding to `content`. The result is an unconfirmed first ScriptVersion.
+Generic confirmation of any reviewed-import lineage returns
+`trusted_approval_required` until a trusted Owner approval resolver verifies the exact
+subject. Existing generic generation/manual-edit paths do not carry reviewed-source
+provenance. The internal unauthenticated alias remains forbidden.
 
 ## K2 provider experiment semantics
 
@@ -110,7 +112,7 @@ body. Authentication injects `workspaceRef`, and the path injects
 `productionRunRef`; client-supplied graph, identity, workspace, run, provider,
 rights, budget or execution authority is rejected.
 
-The operation reads one current v2 ShotGraph and IdentityLock and returns only
+The operation reads one current `ShotPlanDraft` and IdentityLock and returns only
 deterministic image request previews. It appends no gate or record, allocates no
 GenerationRequest/Candidate/AssetVersion ref, invokes no V4 adapter and performs no
 media write. Every plan/request level remains
@@ -118,8 +120,16 @@ media write. Every plan/request level remains
 `dispatchAllowed=false`, `candidateAdmissionAllowed=false` and
 `publicationAllowed=false`. M11/video and audio preflight are not implemented.
 
-The v2 ShotGraph is a local structural representation with unverified ShotPlan and
-camera authority. All legacy G4–G6, provider-experiment, M10/M11 candidate/review/
+For a v2 run, the historical `/shot-graph` route is transport compatibility only:
+`POST` prepares a discriminated `shotPlanDraft` response and `GET` reads that draft.
+It does not compile or return an `ExecutableShotGraph`, append `G3_SHOT_GRAPH`, create
+`StoryboardVersion`/`CreativeShotVersion` facts, or advance beyond
+`SCRIPT_VALIDATED`. The draft contains only the source package's
+`editorialShotSize`; camera lens, angle and movement remain absent and
+`cameraContractState=NOT_READY`.
+
+The draft is a local structural representation with unverified ShotPlan and camera
+authority. All legacy G4–G6, provider-experiment, M10/M11 candidate/review/
 admission mutation routes reject that run with `execution_not_authorized`. A future
 canonical M10 append or Provider/GPU dispatch requires a separate accepted contract,
 all listed authorities and explicit Project Lead authorization.

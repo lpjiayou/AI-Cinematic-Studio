@@ -228,7 +228,7 @@ class CreatorPublicHttpV1IntegrationTests(unittest.TestCase):
             self.assertEqual(caught.exception.code, 403)
             self.assertEqual(response["error"]["code"], "authority_unavailable")
 
-    def test_reviewed_import_is_actor_bound_with_unverified_digest_assertions(self):
+    def test_reviewed_import_is_service_credential_bound_with_unverified_digest_assertions(self):
         series = self.assembly.series_episode.create_series(
             {
                 "workspaceRef": WORKSPACE,
@@ -315,7 +315,7 @@ class CreatorPublicHttpV1IntegrationTests(unittest.TestCase):
         self.assertEqual(provenance["importedByRef"], "runtime-test-credential")
         self.assertEqual(
             provenance["digestAssertionState"],
-            "AUTHENTICATED_ACTOR_DECLARATION_UNVERIFIED",
+            "AUTHENTICATED_SERVICE_CREDENTIAL_DECLARATION_UNVERIFIED",
         )
         self.assertEqual(
             provenance["reviewedDocumentToContentBindingState"], "NOT_VERIFIED"

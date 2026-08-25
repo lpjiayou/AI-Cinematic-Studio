@@ -2,15 +2,17 @@
 
 > Document: `AI_CINEMATIC_STUDIO_SYSTEM_MASTER_PLAN.md`
 >
-> Status: `SYSTEM MASTER GOVERNANCE BASELINE / M6-P3-G1 OWNER ACCEPTED THROUGH G1-R1 / CORE MAIN CONVERGED / CCV-R1-R1 EVIDENCE-VALIDATOR HARDENING`
+> Status: `SYSTEM MASTER GOVERNANCE BASELINE / K2-002 EXACT NON-GPU PREPRODUCTION GOVERNANCE REBASELINED / LIVE PRODUCTION AND PUBLICATION CLOSED`
 >
-> Version: `v1.2`
+> Version: `v1.3`
 >
-> Date: `2026-08-14`
+> Date: `2026-08-25`
 >
-> Revision: `ACS-CCV-R1-R1-EVIDENCE-VALIDATOR-HARDENING`
+> Revision: `ACS-K2-002-GOV-RB1`
 >
-> Architecture Decisions: `ADR-0001 / Accepted`; `ADR-0005 — M6 Consumer Boundary / Accepted as architecture only`; `ADR-0006 — V5 Text Generation Capability Boundary / Accepted for bounded G1`
+> Architecture Decisions: `ADR-0001 / Accepted`; `ADR-0005 — M6 Consumer Boundary / Accepted as architecture only`; `ADR-0006 — V5 Text Generation Capability Boundary / Accepted for bounded G1`; `ADR-0014 — K2-001 archived and K2-002 non-GPU preproduction active / Accepted`
+>
+> Current Exact-Scope Governance: [ACS-K2-002-GOV-RB1](governance/ACS-K2-002-NON-GPU-PREPRODUCTION-REBASELINE.md)
 >
 > Scope: AI Cinematic Studio 全系统产品、Domain、生产链、技术分层、研发顺序与验收基线
 >
@@ -3004,6 +3006,79 @@ STOP。
 
 # 62. Current System State
 
+## 62.1 Current exact-scope overlay — 2026-08-25
+
+The Project Lead / Architecture Owner / Repository Governance Owner accepted
+[ADR-0014](governance/ADR-0014-k2-001-archive-k2-002-changan-start.md) and the
+[ACS-K2-002 non-GPU preproduction rebaseline](governance/ACS-K2-002-NON-GPU-PREPRODUCTION-REBASELINE.md).
+Those records, not a lower-order milestone projection by itself, establish the current
+exact execution authority.
+
+```text
+Accepted Core Base
+main@6d28a53f3a077f032e341a87412b19b37c00bb1e
+
+Current Work Package
+ACS-K2-002-CHANGAN-ONBOARDING-AND-EP01-CHAIN
+
+Governance Decision
+OWNER ACCEPTED / EXACT-SCOPE IMPLEMENTATION AUTHORIZED / ACTIVE
+
+Active Project
+K2-002-CHANGAN / EP01 ONLY
+
+K2-001
+HISTORICAL VALIDATION EVIDENCE / CLOSED FOR FURTHER PRODUCTION
+
+X2
+DEFERRED / NOT CANCELLED / NOT A SECOND ACTIVE PACKAGE
+
+Script
+V1.3 REVIEWED CORRECTION CANDIDATE / OWNER ACCEPTANCE PENDING
+
+Shot Authority
+EDITORIAL DRAFT ONLY / SHOTPLAN APPROVAL NOT GRANTED /
+EXECUTABLE SHOT GRAPH NOT COMPILED / CAMERA CONTRACT NOT READY
+
+Authorized Implementation
+REPOSITORY CONTRACT + ISOLATED VERIFICATION + ZERO-WRITE PREFLIGHT / NON-GPU ONLY
+
+Technical Candidate
+NOT ACCEPTED / INDEPENDENT REVIEW REQUIRED
+
+Live Canonical Mutation
+NOT GRANTED
+
+Provider / GPU Dispatch
+NOT GRANTED
+
+Media Selection / Admission
+NOT GRANTED
+
+Bulk Generation
+false
+
+Publication Allowed
+false
+
+Production Ready
+NO
+```
+
+This is one project-specific, exact work-package authorization inside the existing
+V2.3 Production Spine. It does not mark generic M7–M15 milestones as started or
+accepted, does not reopen general ACS Engineering Phase 1, and does not accept the
+deferred Generation 2 Charter. Any Script acceptance, approved ShotPlan compilation,
+live canonical registration, M10/M11 append, Provider/GPU dispatch, media selection or
+admission, batch expansion, Master/Export, Release or Publication requires a separate
+applicable decision and evidence.
+
+`CURRENT_MILESTONE.md` may describe the current task and gates only within this
+overlay. If a lower-order execution statement exceeds ADR-0014 or
+ACS-K2-002-GOV-RB1, the higher-order fail-closed limits apply.
+
+## 62.2 Historical snapshot — PRE-M6-RB1.3-CLOSEOUT-G1
+
 以下代码块严格保留 `PRE-M6-RB1.3-CLOSEOUT-G1` 决策时点的历史快照；后续
 执行状态不得回写或覆盖该快照。
 
@@ -3107,7 +3182,11 @@ M6 Series Intelligence baseline for the already authorized P1 implementation.
 `e38c75aa4ff26bdea80c82d8a24096f799dad860`. ADR-0004 accepts the bounded M6-P2
 local-development durable SQLite boundary.
 
-当前执行状态（不属于上述历史快照）：
+## 62.3 Historical snapshot — 2026-08-14 CCV/M6 overlay
+
+下列代码块保留 `2026-08-14` 时点曾被标作“当前执行状态”的 CCV/M6 快照。
+其 `Current`、`NOT AUTHORIZED`、Frontend 和 Production Ready 语句只描述该
+历史检查点，不覆盖第 62.1 节的当前精确状态：
 
 ```text
 Current Work Package

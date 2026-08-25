@@ -33,6 +33,21 @@ class K2002PreproductionPackageContractTests(unittest.TestCase):
         self.assertEqual(source["ownerAcceptanceState"], "PENDING")
         self.assertFalse(self.package["truthBoundary"]["domainFact"])
 
+    def test_repository_text_digests_are_lf_checkout_stable(self):
+        attributes = set(
+            (ROOT / ".gitattributes").read_text(encoding="utf-8").splitlines()
+        )
+        for path in (
+            "docs/16-k2-production/k2-002-changan/"
+            "K2-002-CHANGAN-SERIES-AND-EP01-03-v1.3.md",
+            "docs/16-k2-production/k2-002-changan/source/"
+            "K2-002-CHANGAN-SOURCE-v1.2.md",
+        ):
+            self.assertIn(
+                f"{path} text eol=lf whitespace=-trailing-space",
+                attributes,
+            )
+
     def test_ep01_has_twelve_exact_contiguous_shots_and_720_frames(self):
         shots = self.package["episode01"]["shots"]
         self.assertEqual(len(shots), 12)

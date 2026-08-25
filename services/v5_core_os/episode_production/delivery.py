@@ -831,9 +831,9 @@ class K2DeliveryService:
     def _verified_preview_qc(
         self, workspace: str, run_ref: str
     ) -> tuple[dict[str, Any], dict[str, Any], dict[str, Any], dict[str, Any]]:
+        verified = self.media.verify_media_current(workspace, run_ref)
         if self.composition is None:
             raise WorkerUnavailableError("composition execution is not configured")
-        verified = self.media.verify_media_current(workspace, run_ref)
         composition_gate = self.evidence.get_gate(workspace, run_ref, COMPOSITION_GATE)
         qc_gate = self.evidence.get_gate(workspace, run_ref, QC_GATE)
         if composition_gate is None or qc_gate is None:

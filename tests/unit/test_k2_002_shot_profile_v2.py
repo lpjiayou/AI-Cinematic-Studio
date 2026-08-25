@@ -1,13 +1,23 @@
 import copy
+from dataclasses import replace
 import json
 from hashlib import sha256
 from pathlib import Path
+import tempfile
 import unittest
 
 from services.v5_core_os.episode_production import (
     EpisodeProductionPublicError,
     create_in_memory_boundary,
-    validate_executable_shot_graph,
+    create_local_development_boundary,
+    validate_creative_shot_draft,
+    validate_shot_plan_draft,
+    validate_storyboard_draft,
+)
+from services.v5_core_os.episode_production.evidence import EvidenceFact
+from services.v5_core_os.episode_production.foundation import (
+    RepositoryUnavailableError,
+    _output_profile_v2,
 )
 from tests.unit.test_episode_production_k2 import (
     WORKSPACE,
@@ -86,6 +96,36 @@ def _digest(value):
             allow_nan=False,
         ).encode("utf-8")
     ).hexdigest()
+
+
+def _reseal(value):
+    result = copy.deepcopy(value)
+    result.pop("payloadDigest", None)
+    result["payloadDigest"] = _digest(result)
+    return result
+
+
+def _replace_gate_payloads(evidence, gate_key, replacements):
+    stored_gate = evidence._gates[gate_key]
+    stored_facts = []
+    for fact in stored_gate.facts:
+        payload = replacements.get(fact.factKind)
+        if payload is None:
+            stored_facts.append(fact)
+        else:
+            stored_facts.append(
+                EvidenceFact(
+                    factKind=fact.factKind,
+                    factRef=fact.factRef,
+                    factVersion=fact.factVersion,
+                    payload=payload,
+                    payloadDigest=payload["payloadDigest"],
+                )
+            )
+    evidence._gates[gate_key] = replace(
+        stored_gate,
+        facts=tuple(stored_facts),
+    )
 
 
 class PortraitProjectBoundary:
@@ -212,34 +252,6 @@ def _activate_k2_002_roots(assembly, project, series, episode, generated):
     return script
 
 
-SYNTHETIC_CAMERA_FIXTURE_INPUTS = [
-    {
-        "shotSize": size,
-        "movement": movement,
-        "angle": angle,
-        "lensMm": lens_mm,
-        "intent": f"synthetic-contract-fixture-shot-{index:02d}",
-    }
-    for index, (size, movement, angle, lens_mm) in enumerate(
-        [
-            ("ECU", "locked-off", "top-down", 65),
-            ("ECU", "micro-slide", "top-down", 65),
-            ("CU", "locked-off", "high-angle", 65),
-            ("MCU", "locked-off", "eye-level", 40),
-            ("CU", "locked-off", "high-angle", 65),
-            ("CU", "locked-off", "eye-level", 65),
-            ("MCU", "slow-tilt", "eye-level", 40),
-            ("WS", "locked-off", "eye-level", 40),
-            ("MS", "locked-off", "eye-level", 40),
-            ("MCU", "locked-off", "eye-level", 40),
-            ("ECU", "locked-off", "top-down", 65),
-            ("CU", "locked-off", "eye-level", 65),
-        ],
-        start=1,
-    )
-]
-
-
 def ep01_shot_budgets(script_version):
     scene_ref = script_version["scenes"][0]["scriptSceneRef"]
     result = []
@@ -250,11 +262,7 @@ def ep01_shot_budgets(script_version):
                 "scriptSceneRef": scene_ref,
                 "sceneOrder": global_order,
                 "durationFrames": item["durationFrames"],
-                # Synthetic command input for exercising the Core representation;
-                # the reviewed package explicitly says its camera contract is NOT_READY.
-                "camera": copy.deepcopy(
-                    SYNTHETIC_CAMERA_FIXTURE_INPUTS[global_order - 1]
-                ),
+                "editorialShotSize": item["editorialShotSize"],
                 "visibleIdentityBindings": copy.deepcopy(
                     item["visibleIdentityBindings"]
                 ),
@@ -335,7 +343,7 @@ class K2002ShotProfileV2Tests(unittest.TestCase):
         boundary.authorize_and_lock(self.g2_command(run))
         return run
 
-    def test_v2_represents_exact_ep01_with_synthetic_camera_fixture(self):
+    def test_v2_represents_exact_ep01_as_non_executable_local_draft(self):
         package = json.loads(PACKAGE_PATH.read_text(encoding="utf-8"))
         package_shots = package["episode01"]["shots"]
         self.assertEqual(package["episode01"]["cameraContractState"], "NOT_READY")
@@ -359,8 +367,8 @@ class K2002ShotProfileV2Tests(unittest.TestCase):
         boundary = self.boundary()
         run = self.prepare(boundary)
         result = boundary.compile_shot_graph(g3_command(run))
-        graph = result["executableShotGraph"]
-        shots = result["creativeShotVersions"]
+        draft = result["shotPlanDraft"]
+        shots = result["creativeShotDrafts"]
 
         self.assertEqual(run["manifest"]["schemaVersion"], "k2.golden-episode.manifest.v2")
         self.assertEqual(run["manifest"]["expectedShotCount"], 12)
@@ -370,7 +378,7 @@ class K2002ShotProfileV2Tests(unittest.TestCase):
         )
         self.assertEqual(run["manifest"]["shotPlanApprovalState"], "NOT_VERIFIED")
         self.assertEqual(
-            run["manifest"]["cameraContractState"], "UNVERIFIED_COMMAND_INPUT"
+            run["manifest"]["cameraContractState"], "NOT_READY"
         )
         self.assertFalse(run["manifest"]["dispatchAllowed"])
         output = run["manifest"]["output"]
@@ -386,22 +394,27 @@ class K2002ShotProfileV2Tests(unittest.TestCase):
             _digest(output["controlledExtensionAlgorithm"]),
         )
 
-        self.assertEqual(graph["schemaVersion"], "v5.executable-shot-graph.v2")
-        self.assertEqual(graph["status"], "LOCAL_STRUCTURAL_REPRESENTATION")
         self.assertEqual(
-            graph["executionAuthorizationState"],
+            draft["schemaVersion"],
+            "v5.local-structural-shot-plan-draft.v1",
+        )
+        self.assertEqual(draft["status"], "LOCAL_STRUCTURAL_DRAFT")
+        self.assertEqual(
+            draft["executionAuthorizationState"],
             "PREFLIGHT_ONLY_NOT_AUTHORIZED",
         )
-        self.assertFalse(graph["dispatchAllowed"])
+        self.assertFalse(draft["dispatchAllowed"])
+        self.assertEqual(result["state"], "SCRIPT_VALIDATED")
         self.assertEqual(
             [shot["durationFrames"] for shot in shots],
             [60, 60, 48, 60, 60, 48, 60, 60, 48, 72, 72, 72],
         )
         expected_budgets = ep01_shot_budgets(self.generated["scriptVersion"])
         self.assertEqual(
-            [shot["cameraInstruction"] for shot in shots],
-            SYNTHETIC_CAMERA_FIXTURE_INPUTS,
+            [shot["editorialShotSize"] for shot in shots],
+            [item["editorialShotSize"] for item in package_shots],
         )
+        self.assertTrue(all("cameraInstruction" not in shot for shot in shots))
         self.assertEqual(
             [shot["action"] for shot in shots],
             [item["actionBeat"] for item in expected_budgets],
@@ -427,8 +440,8 @@ class K2002ShotProfileV2Tests(unittest.TestCase):
                 for shot in shots
             )
         )
-        self.assertEqual(graph["output"]["totalFrames"], 720)
-        self.assertEqual(graph["output"]["generationCanvas"], output["generationCanvas"])
+        self.assertEqual(draft["output"]["totalFrames"], 720)
+        self.assertEqual(draft["output"]["generationCanvas"], output["generationCanvas"])
         self.assertEqual(shots[0]["requiredCharacterIdentityLocks"], [])
         self.assertEqual(shots[0]["visibleCharacterRefs"], [])
 
@@ -444,15 +457,15 @@ class K2002ShotProfileV2Tests(unittest.TestCase):
 
         face_binding = shots[3]["requiredCharacterIdentityLocks"][0]
         self.assertEqual(face_binding["bindingMode"], "FACE_LOCK")
-        self.assertEqual(face_binding["identityLockRef"], graph["identityLockRef"])
+        self.assertEqual(face_binding["identityLockRef"], draft["identityLockRef"])
         self.assertEqual(
-            face_binding["identityLockVersionRef"], graph["identityLockVersionRef"]
+            face_binding["identityLockVersionRef"], draft["identityLockVersionRef"]
         )
-        self.assertEqual(face_binding["identityLockDigest"], graph["identityLockDigest"])
-        self.assertNotIn("visibleCharacterNames", graph["shots"][3])
-        self.assertEqual(graph["shots"][3]["visibleCharacterRefs"], ["character-lin"])
+        self.assertEqual(face_binding["identityLockDigest"], draft["identityLockDigest"])
+        self.assertNotIn("visibleCharacterNames", draft["shots"][3])
+        self.assertEqual(draft["shots"][3]["visibleCharacterRefs"], ["character-lin"])
         self.assertEqual(
-            graph["shots"][3]["visibleIdentityBindings"],
+            draft["shots"][3]["visibleIdentityBindings"],
             [{"characterRef": "character-lin", "bindingMode": "FACE_LOCK"}],
         )
         self.assertEqual(shots[9]["visibleIdentityMode"], "MIXED")
@@ -477,7 +490,7 @@ class K2002ShotProfileV2Tests(unittest.TestCase):
             "identityLockRef", shots[9]["requiredCharacterIdentityLocks"][1]
         )
         self.assertEqual(
-            graph["shots"][9]["dialogueRequirement"],
+            draft["shots"][9]["dialogueRequirement"],
             {
                 "speaker": "裴昀",
                 "text": "你终于回来了。",
@@ -499,9 +512,41 @@ class K2002ShotProfileV2Tests(unittest.TestCase):
             ],
         )
         self.assertNotIn("assetVersionRef", shots[10]["postprocessRequirements"][0])
-        validate_executable_shot_graph(graph)
+        serialized = json.dumps(result, ensure_ascii=False)
+        for forbidden in (
+            "ExecutableShotGraph",
+            "executableShotGraph",
+            "CreativeShotVersion",
+            "creativeShotVersion",
+            "StoryboardVersion",
+            "storyboardVersion",
+            "cameraInstruction",
+            "SHOTS_COMPILED",
+        ):
+            self.assertNotIn(forbidden, serialized)
+        validate_shot_plan_draft(draft)
 
-    def test_v2_root_and_graph_replay_are_stable(self):
+        shot_graph_service = boundary._EpisodeProductionPublicBoundary__shot_graph
+        gates = shot_graph_service.evidence.list_gates(
+            WORKSPACE, run["productionRunRef"]
+        )
+        self.assertEqual(
+            [gate["gateName"] for gate in gates],
+            ["G2_AUTHORITY_IDENTITY", "G3_SCRIPT_VALIDATION"],
+        )
+        self.assertEqual(
+            shot_graph_service.evidence.current_state(
+                WORKSPACE, run["productionRunRef"]
+            ),
+            "SCRIPT_VALIDATED",
+        )
+        projection = boundary.get_state_projection(
+            WORKSPACE, run["productionRunRef"]
+        )
+        self.assertEqual(projection["productionState"], "SCRIPT_VALIDATED")
+        self.assertEqual(projection["state"], "SCRIPT_VALIDATED")
+
+    def test_v2_root_and_draft_replay_are_stable(self):
         boundary = self.boundary(aspect_ratio="portrait")
         first = boundary.create_run(self.command())
         replay = boundary.create_run(self.command())
@@ -513,7 +558,7 @@ class K2002ShotProfileV2Tests(unittest.TestCase):
         compiled_replay = boundary.compile_shot_graph(g3_command(first))
         self.assertTrue(compiled_replay["idempotentReplay"])
         self.assertEqual(
-            compiled_replay["executableShotGraph"], compiled["executableShotGraph"]
+            compiled_replay["shotPlanDraft"], compiled["shotPlanDraft"]
         )
 
         changed = self.command()
@@ -524,6 +569,49 @@ class K2002ShotProfileV2Tests(unittest.TestCase):
             (caught.exception.status, caught.exception.code),
             (409, "idempotency_conflict"),
         )
+
+    def test_v2_draft_survives_sqlite_restart_without_state_promotion(self):
+        with tempfile.TemporaryDirectory() as directory:
+            database = Path(directory) / "episode-production.sqlite3"
+            evidence = Path(directory) / "episode-evidence.sqlite3"
+            kwargs = {
+                "project_boundary": PortraitProjectBoundary(
+                    self.assembly.project_context
+                ),
+                "series_episode_boundary": self.assembly.series_episode,
+                "series_planning_boundary": self.assembly.series_planning,
+                "script_studio_boundary": self.assembly.script_studio,
+                "evidence_database_path": evidence,
+                "identity_reference_authority": k2_identity_authority(),
+                "ref_factory": self.refs,
+                "clock": lambda: "2026-08-25T00:00:00Z",
+            }
+            first = create_local_development_boundary(database, **kwargs)
+            run = first.create_run(self.command(idempotencyKey="sqlite-draft-run"))
+            first.authorize_and_lock(self.g2_command(run))
+            prepared = first.compile_shot_graph(
+                g3_command(run, idempotencyKey="sqlite-draft-g3")
+            )
+
+            restored = create_local_development_boundary(
+                database,
+                **{**kwargs, "initialize_if_missing": False},
+            )
+            bundle = restored.get_shot_graph_bundle(
+                WORKSPACE, run["productionRunRef"]
+            )
+            self.assertEqual(bundle["shotPlanDraft"], prepared["shotPlanDraft"])
+            self.assertEqual(bundle["state"], "SCRIPT_VALIDATED")
+            service = restored._EpisodeProductionPublicBoundary__shot_graph
+            self.assertEqual(
+                service.evidence.current_state(WORKSPACE, run["productionRunRef"]),
+                "SCRIPT_VALIDATED",
+            )
+            self.assertIsNone(
+                service.evidence.get_gate(
+                    WORKSPACE, run["productionRunRef"], "G3_SHOT_GRAPH"
+                )
+            )
 
     def test_invalid_explicit_budget_and_identity_claims_fail_closed(self):
         cases = []
@@ -574,11 +662,29 @@ class K2002ShotProfileV2Tests(unittest.TestCase):
         empty_sfx[6]["dialogueRequirement"]["text"] = ""
         cases.append(empty_sfx)
 
-        missing_explicit_camera = ep01_shot_budgets(
+        missing_editorial_shot_size = ep01_shot_budgets(
             self.generated["scriptVersion"]
         )
-        missing_explicit_camera[0].pop("camera")
-        cases.append(missing_explicit_camera)
+        missing_editorial_shot_size[0].pop("editorialShotSize")
+        cases.append(missing_editorial_shot_size)
+
+        fabricated_camera = ep01_shot_budgets(self.generated["scriptVersion"])
+        fabricated_camera[0]["camera"] = {
+            "shotSize": "ECU",
+            "movement": "locked-off",
+            "angle": "top-down",
+            "lensMm": 65,
+            "intent": "fabricated",
+        }
+        cases.append(fabricated_camera)
+
+        camera_like_editorial_size = ep01_shot_budgets(
+            self.generated["scriptVersion"]
+        )
+        camera_like_editorial_size[0]["editorialShotSize"] = (
+            "ECU 65mm top-down dolly-in"
+        )
+        cases.append(camera_like_editorial_size)
 
         for index, shot_budgets in enumerate(cases):
             with self.subTest(index=index):
@@ -594,68 +700,669 @@ class K2002ShotProfileV2Tests(unittest.TestCase):
                     (400, "invalid_request"),
                 )
 
-    def test_v2_graph_validator_rejects_profile_and_identity_tampering(self):
+        with self.assertRaises(EpisodeProductionPublicError) as caught:
+            self.boundary(aspect_ratio="16:9").create_run(
+                self.command(idempotencyKey="k2-002-landscape-explicit-budgets")
+            )
+        self.assertEqual(
+            (caught.exception.status, caught.exception.code),
+            (400, "invalid_request"),
+        )
+
+    def test_shot_plan_draft_validator_rejects_tampering(self):
         boundary = self.boundary()
         run = self.prepare(boundary)
-        graph = boundary.compile_shot_graph(g3_command(run))["executableShotGraph"]
+        compiled = boundary.compile_shot_graph(g3_command(run))
+        draft = compiled["shotPlanDraft"]
+        storyboard = compiled["storyboardDraft"]
+        creative_shots = compiled["creativeShotDrafts"]
 
-        digest_tamper = copy.deepcopy(graph)
+        digest_tamper = copy.deepcopy(draft)
         digest_tamper["output"]["controlledExtensionAlgorithmDigest"] = "0" * 64
+        digest_tamper = _reseal(digest_tamper)
         with self.assertRaisesRegex(Exception, "controlled extension"):
-            validate_executable_shot_graph(digest_tamper)
+            validate_shot_plan_draft(digest_tamper)
 
-        none_claims_lock = copy.deepcopy(graph)
+        none_claims_lock = copy.deepcopy(draft)
         none_claims_lock["shots"][0]["requiredCharacterIdentityLocks"] = copy.deepcopy(
             none_claims_lock["shots"][3]["requiredCharacterIdentityLocks"]
         )
+        none_claims_lock = _reseal(none_claims_lock)
         with self.assertRaisesRegex(Exception, "visible character binding"):
-            validate_executable_shot_graph(none_claims_lock)
+            validate_shot_plan_draft(none_claims_lock)
 
-        body_claims_face = copy.deepcopy(graph)
+        body_claims_face = copy.deepcopy(draft)
         body_claims_face["shots"][4]["requiredCharacterIdentityLocks"][0][
             "identityLockRef"
-        ] = graph["identityLockRef"]
+        ] = draft["identityLockRef"]
+        body_claims_face = _reseal(body_claims_face)
         with self.assertRaisesRegex(Exception, "BODY_ONLY"):
-            validate_executable_shot_graph(body_claims_face)
+            validate_shot_plan_draft(body_claims_face)
 
-        face_lock_missing = copy.deepcopy(graph)
+        face_lock_missing = copy.deepcopy(draft)
         face_lock_missing["shots"][3]["requiredCharacterIdentityLocks"] = []
+        face_lock_missing = _reseal(face_lock_missing)
         with self.assertRaisesRegex(Exception, "visible character binding"):
-            validate_executable_shot_graph(face_lock_missing)
+            validate_shot_plan_draft(face_lock_missing)
 
-        action_drift = copy.deepcopy(graph)
+        action_drift = copy.deepcopy(draft)
         action_drift["shots"][0]["actionBeat"] = " "
+        action_drift = _reseal(action_drift)
         with self.assertRaisesRegex(Exception, "action beat"):
-            validate_executable_shot_graph(action_drift)
+            validate_shot_plan_draft(action_drift)
 
-        dialogue_mode_drift = copy.deepcopy(graph)
+        dialogue_mode_drift = copy.deepcopy(draft)
         dialogue_mode_drift["shots"][9]["dialogueSyncMode"] = "NONE"
+        dialogue_mode_drift = _reseal(dialogue_mode_drift)
         with self.assertRaisesRegex(Exception, "dialogue sync"):
-            validate_executable_shot_graph(dialogue_mode_drift)
+            validate_shot_plan_draft(dialogue_mode_drift)
 
-        mixed_binding_drift = copy.deepcopy(graph)
+        mixed_binding_drift = copy.deepcopy(draft)
         mixed_binding_drift["shots"][9]["visibleIdentityBindings"][1][
             "bindingMode"
         ] = "FACE_LOCK"
+        mixed_binding_drift = _reseal(mixed_binding_drift)
         with self.assertRaisesRegex(Exception, "visible character binding"):
-            validate_executable_shot_graph(mixed_binding_drift)
+            validate_shot_plan_draft(mixed_binding_drift)
 
-        mixed_body_speaker_lip_sync = copy.deepcopy(graph)
+        mixed_body_speaker_lip_sync = copy.deepcopy(draft)
         mixed_body_speaker_lip_sync["shots"][9][
             "dialogueSyncMode"
         ] = "VERIFIED_LIP_SYNC"
+        mixed_body_speaker_lip_sync = _reseal(mixed_body_speaker_lip_sync)
         with self.assertRaisesRegex(Exception, "trusted evidence"):
-            validate_executable_shot_graph(mixed_body_speaker_lip_sync)
+            validate_shot_plan_draft(mixed_body_speaker_lip_sync)
 
-        mixed_face_speaker_lip_sync = copy.deepcopy(graph)
+        mixed_face_speaker_lip_sync = copy.deepcopy(draft)
         mixed_face_speaker_lip_sync["shots"][9][
             "dialogueSyncMode"
         ] = "VERIFIED_LIP_SYNC"
         mixed_face_speaker_lip_sync["shots"][9]["dialogueRequirement"][
             "speaker"
         ] = "沈知微"
+        mixed_face_speaker_lip_sync = _reseal(mixed_face_speaker_lip_sync)
         with self.assertRaisesRegex(Exception, "trusted evidence"):
-            validate_executable_shot_graph(mixed_face_speaker_lip_sync)
+            validate_shot_plan_draft(mixed_face_speaker_lip_sync)
+
+        camera_injection = copy.deepcopy(draft)
+        camera_injection["shots"][0]["cameraInstruction"] = {
+            "shotSize": "ECU",
+            "movement": "locked-off",
+            "angle": "top-down",
+            "lensMm": 65,
+            "intent": "fabricated",
+        }
+        camera_injection = _reseal(camera_injection)
+        with self.assertRaisesRegex(Exception, "canonical or camera"):
+            validate_shot_plan_draft(camera_injection)
+
+        canonical_ref_injection = copy.deepcopy(draft)
+        canonical_ref_injection["shots"][0][
+            "creativeShotVersionRef"
+        ] = "forged-creative-shot-version"
+        canonical_ref_injection = _reseal(canonical_ref_injection)
+        with self.assertRaisesRegex(Exception, "canonical or camera"):
+            validate_shot_plan_draft(canonical_ref_injection)
+
+        top_level_canonical_ref_injection = copy.deepcopy(draft)
+        top_level_canonical_ref_injection[
+            "creativeShotVersionRef"
+        ] = "forged-creative-shot-version"
+        top_level_canonical_ref_injection = _reseal(
+            top_level_canonical_ref_injection
+        )
+        with self.assertRaisesRegex(Exception, "canonical or camera"):
+            validate_shot_plan_draft(top_level_canonical_ref_injection)
+
+        production_camera_injection = copy.deepcopy(draft)
+        production_camera_injection["shots"][0]["lensMm"] = 65
+        production_camera_injection = _reseal(production_camera_injection)
+        with self.assertRaisesRegex(Exception, "canonical or camera"):
+            validate_shot_plan_draft(production_camera_injection)
+
+        editorial_camera_injection = copy.deepcopy(draft)
+        editorial_camera_injection["shots"][0]["editorialShotSize"] = (
+            "ECU 65mm top-down dolly-in"
+        )
+        editorial_camera_injection = _reseal(editorial_camera_injection)
+        with self.assertRaisesRegex(Exception, "editorial shot size"):
+            validate_shot_plan_draft(editorial_camera_injection)
+
+        output_camera_injection = copy.deepcopy(draft)
+        output_camera_injection["output"]["cameraInstruction"] = "fabricated"
+        output_camera_injection = _reseal(output_camera_injection)
+        with self.assertRaisesRegex(Exception, "canonical or camera"):
+            validate_shot_plan_draft(output_camera_injection)
+
+        publication_injection = copy.deepcopy(draft)
+        publication_injection["publicationAllowed"] = True
+        publication_injection = _reseal(publication_injection)
+        with self.assertRaisesRegex(Exception, "execution authority"):
+            validate_shot_plan_draft(publication_injection)
+
+        canonical_edge_injection = copy.deepcopy(draft)
+        canonical_edge_injection["edges"][0]["fromShotRef"] = (
+            canonical_edge_injection["edges"][0]["fromShotDraftRef"]
+        )
+        canonical_edge_injection = _reseal(canonical_edge_injection)
+        with self.assertRaisesRegex(Exception, "canonical or camera"):
+            validate_shot_plan_draft(canonical_edge_injection)
+
+        creative_camera_injection = copy.deepcopy(creative_shots[0])
+        creative_camera_injection["cameraInstruction"] = "fabricated"
+        creative_camera_injection = _reseal(creative_camera_injection)
+        with self.assertRaises(Exception):
+            validate_creative_shot_draft(creative_camera_injection)
+
+        creative_version_injection = copy.deepcopy(creative_shots[0])
+        creative_version_injection["creativeShotVersionRef"] = "forged-version"
+        creative_version_injection = _reseal(creative_version_injection)
+        with self.assertRaises(Exception):
+            validate_creative_shot_draft(creative_version_injection)
+
+        creative_extra_injection = copy.deepcopy(creative_shots[0])
+        creative_extra_injection["audioRequirements"]["unexpected"] = []
+        creative_extra_injection = _reseal(creative_extra_injection)
+        with self.assertRaises(Exception):
+            validate_creative_shot_draft(creative_extra_injection)
+
+        storyboard_version_injection = copy.deepcopy(storyboard)
+        storyboard_version_injection["storyboardVersionRef"] = "forged-version"
+        storyboard_version_injection = _reseal(storyboard_version_injection)
+        with self.assertRaises(Exception):
+            validate_storyboard_draft(storyboard_version_injection)
+
+        storyboard_scene_camera_injection = copy.deepcopy(storyboard)
+        storyboard_scene_camera_injection["scenes"][0][
+            "cameraInstruction"
+        ] = "fabricated"
+        storyboard_scene_camera_injection["scenes"][0] = _reseal(
+            storyboard_scene_camera_injection["scenes"][0]
+        )
+        storyboard_scene_camera_injection = _reseal(
+            storyboard_scene_camera_injection
+        )
+        with self.assertRaises(Exception):
+            validate_storyboard_draft(storyboard_scene_camera_injection)
+
+        storyboard_scene_extra_injection = copy.deepcopy(storyboard)
+        storyboard_scene_extra_injection["scenes"][0]["unexpected"] = False
+        storyboard_scene_extra_injection["scenes"][0] = _reseal(
+            storyboard_scene_extra_injection["scenes"][0]
+        )
+        storyboard_scene_extra_injection = _reseal(
+            storyboard_scene_extra_injection
+        )
+        with self.assertRaises(Exception):
+            validate_storyboard_draft(storyboard_scene_extra_injection)
+
+        service = boundary._EpisodeProductionPublicBoundary__shot_graph
+        evidence = service.evidence
+        gate_key = (
+            WORKSPACE,
+            run["productionRunRef"],
+            "G3_SCRIPT_VALIDATION",
+        )
+        stored_gate = evidence._gates[gate_key]
+        stored_facts = list(stored_gate.facts)
+        for index, fact in enumerate(stored_facts):
+            if fact.factKind == "CreativeShotDraft:0001":
+                stored_facts[index] = EvidenceFact(
+                    factKind=fact.factKind,
+                    factRef=fact.factRef,
+                    factVersion=fact.factVersion,
+                    payload=creative_camera_injection,
+                    payloadDigest=creative_camera_injection["payloadDigest"],
+                )
+                break
+        evidence._gates[gate_key] = replace(
+            stored_gate,
+            facts=tuple(stored_facts),
+        )
+        with self.assertRaises(EpisodeProductionPublicError) as caught:
+            boundary.get_shot_graph_bundle(WORKSPACE, run["productionRunRef"])
+        self.assertEqual(caught.exception.status, 503)
+
+    def test_resealed_consistency_validation_authority_injections_fail_closed(self):
+        injections = (
+            ("cameraInstruction", "fabricated"),
+            ("publicationAllowed", True),
+            ("unexpectedField", "forged"),
+            ("sceneCheckRef", "forged-script-scene"),
+        )
+        for field, value in injections:
+            with self.subTest(field=field):
+                boundary = self.boundary()
+                run = self.prepare(boundary)
+                boundary.compile_shot_graph(g3_command(run))
+                service = boundary._EpisodeProductionPublicBoundary__shot_graph
+                evidence = service.evidence
+                gate_key = (
+                    WORKSPACE,
+                    run["productionRunRef"],
+                    "G3_SCRIPT_VALIDATION",
+                )
+                stored_gate = evidence._gates[gate_key]
+                stored_facts = list(stored_gate.facts)
+                consistency = next(
+                    copy.deepcopy(dict(fact.payload))
+                    for fact in stored_facts
+                    if fact.factKind == "ConsistencyValidation"
+                )
+                draft = next(
+                    copy.deepcopy(dict(fact.payload))
+                    for fact in stored_facts
+                    if fact.factKind == "ShotPlanDraft"
+                )
+                if field == "sceneCheckRef":
+                    consistency["checks"][0]["scriptSceneRef"] = value
+                else:
+                    consistency[field] = value
+                consistency = _reseal(consistency)
+                draft["consistencyValidationDigest"] = consistency[
+                    "payloadDigest"
+                ]
+                draft = _reseal(draft)
+                for index, fact in enumerate(stored_facts):
+                    if fact.factKind == "ConsistencyValidation":
+                        stored_facts[index] = EvidenceFact(
+                            factKind=fact.factKind,
+                            factRef=fact.factRef,
+                            factVersion=fact.factVersion,
+                            payload=consistency,
+                            payloadDigest=consistency["payloadDigest"],
+                        )
+                    elif fact.factKind == "ShotPlanDraft":
+                        stored_facts[index] = EvidenceFact(
+                            factKind=fact.factKind,
+                            factRef=fact.factRef,
+                            factVersion=fact.factVersion,
+                            payload=draft,
+                            payloadDigest=draft["payloadDigest"],
+                        )
+                evidence._gates[gate_key] = replace(
+                    stored_gate,
+                    facts=tuple(stored_facts),
+                )
+                with self.assertRaises(EpisodeProductionPublicError) as caught:
+                    boundary.get_shot_graph_bundle(
+                        WORKSPACE, run["productionRunRef"]
+                    )
+                self.assertEqual(caught.exception.status, 503)
+                with self.assertRaises(RepositoryUnavailableError):
+                    service.verify_shot_plan_draft_current(
+                        WORKSPACE, run["productionRunRef"]
+                    )
+                self.assertEqual(
+                    evidence.current_state(WORKSPACE, run["productionRunRef"]),
+                    "SCRIPT_VALIDATED",
+                )
+
+    def test_coordinated_creative_and_plan_reseal_cannot_escape_root_budgets(self):
+        boundary = self.boundary()
+        run = self.prepare(boundary)
+        boundary.compile_shot_graph(g3_command(run))
+        service = boundary._EpisodeProductionPublicBoundary__shot_graph
+        evidence = service.evidence
+        gate_key = (
+            WORKSPACE,
+            run["productionRunRef"],
+            "G3_SCRIPT_VALIDATION",
+        )
+        stored_gate = evidence._gates[gate_key]
+        stored_facts = list(stored_gate.facts)
+        creative = next(
+            copy.deepcopy(dict(fact.payload))
+            for fact in stored_facts
+            if fact.factKind == "CreativeShotDraft:0001"
+        )
+        draft = next(
+            copy.deepcopy(dict(fact.payload))
+            for fact in stored_facts
+            if fact.factKind == "ShotPlanDraft"
+        )
+        creative["action"] = "协调重封后伪造的动作。"
+        creative["actionBeat"] = creative["action"]
+        creative = _reseal(creative)
+        draft["shots"][0]["actionBeat"] = creative["actionBeat"]
+        draft["shots"][0]["payloadDigest"] = creative["payloadDigest"]
+        draft = _reseal(draft)
+        for index, fact in enumerate(stored_facts):
+            if fact.factKind == "CreativeShotDraft:0001":
+                stored_facts[index] = EvidenceFact(
+                    factKind=fact.factKind,
+                    factRef=fact.factRef,
+                    factVersion=fact.factVersion,
+                    payload=creative,
+                    payloadDigest=creative["payloadDigest"],
+                )
+            elif fact.factKind == "ShotPlanDraft":
+                stored_facts[index] = EvidenceFact(
+                    factKind=fact.factKind,
+                    factRef=fact.factRef,
+                    factVersion=fact.factVersion,
+                    payload=draft,
+                    payloadDigest=draft["payloadDigest"],
+                )
+        evidence._gates[gate_key] = replace(
+            stored_gate,
+            facts=tuple(stored_facts),
+        )
+        with self.assertRaises(EpisodeProductionPublicError) as caught:
+            boundary.get_shot_graph_bundle(WORKSPACE, run["productionRunRef"])
+        self.assertEqual(caught.exception.status, 503)
+        with self.assertRaises(RepositoryUnavailableError):
+            service.verify_shot_plan_draft_current(
+                WORKSPACE, run["productionRunRef"]
+            )
+        self.assertEqual(
+            evidence.current_state(WORKSPACE, run["productionRunRef"]),
+            "SCRIPT_VALIDATED",
+        )
+
+    def test_storyboard_identity_reseal_fails_get_and_preflight(self):
+        boundary = self.boundary()
+        run = self.prepare(boundary)
+        compiled = boundary.compile_shot_graph(g3_command(run))
+        service = boundary._EpisodeProductionPublicBoundary__shot_graph
+        evidence = service.evidence
+        gate_key = (
+            WORKSPACE,
+            run["productionRunRef"],
+            "G3_SCRIPT_VALIDATION",
+        )
+        storyboard = copy.deepcopy(compiled["storyboardDraft"])
+        draft = copy.deepcopy(compiled["shotPlanDraft"])
+        storyboard["identityLockRef"] = "forged-identity-lock"
+        storyboard["identityLockVersionRef"] = "forged-identity-lock-version"
+        storyboard["identityLockDigest"] = "f" * 64
+        storyboard = _reseal(storyboard)
+        draft["storyboardDigest"] = storyboard["payloadDigest"]
+        draft = _reseal(draft)
+        _replace_gate_payloads(
+            evidence,
+            gate_key,
+            {"StoryboardDraft": storyboard, "ShotPlanDraft": draft},
+        )
+
+        for operation in (
+            lambda: boundary.get_shot_graph_bundle(
+                WORKSPACE, run["productionRunRef"]
+            ),
+            lambda: boundary.preflight_dynamic_real_media_plan(
+                {
+                    "workspaceRef": WORKSPACE,
+                    "productionRunRef": run["productionRunRef"],
+                }
+            ),
+        ):
+            with self.assertRaises(EpisodeProductionPublicError) as caught:
+                operation()
+            self.assertEqual(caught.exception.status, 503)
+        self.assertEqual(
+            evidence.current_state(WORKSPACE, run["productionRunRef"]),
+            "SCRIPT_VALIDATED",
+        )
+
+    def test_landscape_output_reseal_cannot_escape_frozen_portrait_root(self):
+        boundary = self.boundary()
+        run = self.prepare(boundary)
+        compiled = boundary.compile_shot_graph(g3_command(run))
+        service = boundary._EpisodeProductionPublicBoundary__shot_graph
+        evidence = service.evidence
+        gate_key = (
+            WORKSPACE,
+            run["productionRunRef"],
+            "G3_SCRIPT_VALIDATION",
+        )
+        draft = copy.deepcopy(compiled["shotPlanDraft"])
+        draft["output"] = {
+            **_output_profile_v2(portrait=False),
+            "totalFrames": draft["output"]["totalFrames"],
+        }
+        draft = _reseal(draft)
+        _replace_gate_payloads(
+            evidence,
+            gate_key,
+            {"ShotPlanDraft": draft},
+        )
+        with self.assertRaises(EpisodeProductionPublicError) as caught:
+            boundary.get_shot_graph_bundle(WORKSPACE, run["productionRunRef"])
+        self.assertEqual(caught.exception.status, 503)
+        self.assertEqual(
+            evidence.current_state(WORKSPACE, run["productionRunRef"]),
+            "SCRIPT_VALIDATED",
+        )
+
+    def test_forged_creative_identity_reseal_fails_get_and_preflight(self):
+        boundary = self.boundary()
+        run = self.prepare(boundary)
+        compiled = boundary.compile_shot_graph(g3_command(run))
+        service = boundary._EpisodeProductionPublicBoundary__shot_graph
+        evidence = service.evidence
+        gate_key = (
+            WORKSPACE,
+            run["productionRunRef"],
+            "G3_SCRIPT_VALIDATION",
+        )
+        creative = copy.deepcopy(compiled["creativeShotDrafts"][3])
+        draft = copy.deepcopy(compiled["shotPlanDraft"])
+        forged_ref = "forged-character-ref"
+        lock = creative["requiredCharacterIdentityLocks"][0]
+        lock["characterRef"] = forged_ref
+        creative["visibleCharacterRefs"] = [forged_ref]
+        creative["visibleIdentityBindings"] = [
+            {"characterRef": forged_ref, "bindingMode": "FACE_LOCK"}
+        ]
+        for seed in creative["assetRequirementSeeds"]:
+            if seed["requirementType"] == "character-identity":
+                seed["requirementKey"] = f"character:{forged_ref}"
+                seed["authorityRef"] = forged_ref
+        creative = _reseal(creative)
+        node = draft["shots"][3]
+        for field in (
+            "requiredCharacterIdentityLocks",
+            "assetRequirementSeeds",
+            "visibleCharacterRefs",
+            "visibleIdentityBindings",
+        ):
+            node[field] = copy.deepcopy(creative[field])
+        node["payloadDigest"] = creative["payloadDigest"]
+        draft = _reseal(draft)
+        _replace_gate_payloads(
+            evidence,
+            gate_key,
+            {
+                "CreativeShotDraft:0004": creative,
+                "ShotPlanDraft": draft,
+            },
+        )
+
+        for operation in (
+            lambda: boundary.get_shot_graph_bundle(
+                WORKSPACE, run["productionRunRef"]
+            ),
+            lambda: boundary.preflight_dynamic_real_media_plan(
+                {
+                    "workspaceRef": WORKSPACE,
+                    "productionRunRef": run["productionRunRef"],
+                }
+            ),
+        ):
+            with self.assertRaises(EpisodeProductionPublicError) as caught:
+                operation()
+            self.assertEqual(caught.exception.status, 503)
+        self.assertEqual(
+            evidence.current_state(WORKSPACE, run["productionRunRef"]),
+            "SCRIPT_VALIDATED",
+        )
+
+    def test_storyboard_scene_duration_reseal_is_bound_to_root_scene_budget(self):
+        boundary = self.boundary()
+        run = self.prepare(boundary)
+        compiled = boundary.compile_shot_graph(g3_command(run))
+        service = boundary._EpisodeProductionPublicBoundary__shot_graph
+        evidence = service.evidence
+        gate_key = (
+            WORKSPACE,
+            run["productionRunRef"],
+            "G3_SCRIPT_VALIDATION",
+        )
+        storyboard = copy.deepcopy(compiled["storyboardDraft"])
+        draft = copy.deepcopy(compiled["shotPlanDraft"])
+        storyboard["scenes"][0]["durationFrames"] += 24
+        storyboard["scenes"][0] = _reseal(storyboard["scenes"][0])
+        storyboard = _reseal(storyboard)
+        draft["storyboardDigest"] = storyboard["payloadDigest"]
+        draft = _reseal(draft)
+        _replace_gate_payloads(
+            evidence,
+            gate_key,
+            {"StoryboardDraft": storyboard, "ShotPlanDraft": draft},
+        )
+        snapshot = evidence.read_snapshot(WORKSPACE, run["productionRunRef"])
+
+        for operation in (
+            lambda: boundary.get_shot_graph_bundle(
+                WORKSPACE, run["productionRunRef"]
+            ),
+            lambda: boundary.preflight_dynamic_real_media_plan(
+                {
+                    "workspaceRef": WORKSPACE,
+                    "productionRunRef": run["productionRunRef"],
+                }
+            ),
+        ):
+            with self.assertRaises(EpisodeProductionPublicError) as caught:
+                operation()
+            self.assertEqual(caught.exception.status, 503)
+        with self.assertRaises(RepositoryUnavailableError):
+            service.verify_shot_plan_draft_current(
+                WORKSPACE, run["productionRunRef"]
+            )
+        self.assertEqual(
+            evidence.read_snapshot(WORKSPACE, run["productionRunRef"]),
+            snapshot,
+        )
+
+    def test_asset_seed_reseal_is_bound_to_current_g2_identity_lock(self):
+        boundary = self.boundary()
+        run = self.prepare(boundary)
+        compiled = boundary.compile_shot_graph(g3_command(run))
+        service = boundary._EpisodeProductionPublicBoundary__shot_graph
+        evidence = service.evidence
+        gate_key = (
+            WORKSPACE,
+            run["productionRunRef"],
+            "G3_SCRIPT_VALIDATION",
+        )
+        creative = copy.deepcopy(compiled["creativeShotDrafts"][3])
+        draft = copy.deepcopy(compiled["shotPlanDraft"])
+        identity_seed = next(
+            item
+            for item in creative["assetRequirementSeeds"]
+            if item["requirementType"] == "character-identity"
+        )
+        identity_seed["authorityRef"] = "forged-character-ref"
+        identity_seed["authorityVersionRef"] = "forged-reference-version"
+        identity_seed["authorityDigest"] = "f" * 64
+        creative = _reseal(creative)
+        draft["shots"][3]["assetRequirementSeeds"] = copy.deepcopy(
+            creative["assetRequirementSeeds"]
+        )
+        draft["shots"][3]["payloadDigest"] = creative["payloadDigest"]
+        draft = _reseal(draft)
+        _replace_gate_payloads(
+            evidence,
+            gate_key,
+            {
+                "CreativeShotDraft:0004": creative,
+                "ShotPlanDraft": draft,
+            },
+        )
+        snapshot = evidence.read_snapshot(WORKSPACE, run["productionRunRef"])
+
+        for operation in (
+            lambda: boundary.get_shot_graph_bundle(
+                WORKSPACE, run["productionRunRef"]
+            ),
+            lambda: boundary.preflight_dynamic_real_media_plan(
+                {
+                    "workspaceRef": WORKSPACE,
+                    "productionRunRef": run["productionRunRef"],
+                }
+            ),
+        ):
+            with self.assertRaises(EpisodeProductionPublicError) as caught:
+                operation()
+            self.assertEqual(caught.exception.status, 503)
+        with self.assertRaises(RepositoryUnavailableError):
+            service.verify_shot_plan_draft_current(
+                WORKSPACE, run["productionRunRef"]
+            )
+        self.assertEqual(
+            evidence.read_snapshot(WORKSPACE, run["productionRunRef"]),
+            snapshot,
+        )
+
+    def test_non_character_asset_seed_reseal_is_bound_to_current_m6_facts(self):
+        boundary = self.boundary()
+        run = self.prepare(boundary)
+        compiled = boundary.compile_shot_graph(g3_command(run))
+        service = boundary._EpisodeProductionPublicBoundary__shot_graph
+        evidence = service.evidence
+        gate_key = (
+            WORKSPACE,
+            run["productionRunRef"],
+            "G3_SCRIPT_VALIDATION",
+        )
+        creative = copy.deepcopy(compiled["creativeShotDrafts"][0])
+        draft = copy.deepcopy(compiled["shotPlanDraft"])
+        style_seed = next(
+            item
+            for item in creative["assetRequirementSeeds"]
+            if item["requirementType"] == "visual-style"
+        )
+        style_seed["authorityRef"] = "forged-visual-constraint"
+        style_seed["requirementKey"] = "style:forged-visual-constraint"
+        creative = _reseal(creative)
+        draft["shots"][0]["assetRequirementSeeds"] = copy.deepcopy(
+            creative["assetRequirementSeeds"]
+        )
+        draft["shots"][0]["payloadDigest"] = creative["payloadDigest"]
+        draft = _reseal(draft)
+        _replace_gate_payloads(
+            evidence,
+            gate_key,
+            {
+                "CreativeShotDraft:0001": creative,
+                "ShotPlanDraft": draft,
+            },
+        )
+        snapshot = evidence.read_snapshot(WORKSPACE, run["productionRunRef"])
+
+        for operation in (
+            lambda: boundary.get_shot_graph_bundle(
+                WORKSPACE, run["productionRunRef"]
+            ),
+            lambda: boundary.preflight_dynamic_real_media_plan(
+                {
+                    "workspaceRef": WORKSPACE,
+                    "productionRunRef": run["productionRunRef"],
+                }
+            ),
+        ):
+            with self.assertRaises(EpisodeProductionPublicError) as caught:
+                operation()
+            self.assertEqual(caught.exception.status, 503)
+        with self.assertRaises(RepositoryUnavailableError):
+            service.verify_shot_plan_draft_current(
+                WORKSPACE, run["productionRunRef"]
+            )
+        self.assertEqual(
+            evidence.read_snapshot(WORKSPACE, run["productionRunRef"]),
+            snapshot,
+        )
 
     def test_k2_001_legacy_command_and_v1_graph_remain_compatible(self):
         assembly, refs, project, series, episode, _ = seed_k2_roots(

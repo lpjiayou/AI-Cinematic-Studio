@@ -303,7 +303,7 @@ class ScriptStudioDurableHttpIntegrationTests(unittest.TestCase):
             )
             self.assertEqual(
                 provenance["digestAssertionState"],
-                "AUTHENTICATED_ACTOR_DECLARATION_UNVERIFIED",
+                "AUTHENTICATED_SERVICE_CREDENTIAL_DECLARATION_UNVERIFIED",
             )
             self.assertEqual(
                 provenance["reviewedDocumentToContentBindingState"],
@@ -323,13 +323,29 @@ class ScriptStudioDurableHttpIntegrationTests(unittest.TestCase):
         def alter_digest(content):
             content["importProvenance"]["uploadedSourceByteDigest"] = "f" * 64
 
-        def invalidate_actor(content):
-            content["importProvenance"]["importedByRef"] = "bad actor"
+        def invalidate_service_credential(content):
+            content["importProvenance"]["importedByRef"] = "bad credential"
+
+        def inject_workspace(content):
+            content["workspaceRef"] = "forged-workspace"
+
+        def inject_publication_authority(content):
+            content["publicationAllowed"] = True
+
+        def inject_canonical_authority(content):
+            content["canonicalExecutableScriptRef"] = "forged-canonical-script"
+
+        def inject_scene_authority(content):
+            content["scenes"][0]["canonicalShotRef"] = "forged-canonical-shot"
 
         for label, tamper in (
             ("removed", remove_provenance),
             ("digest_changed", alter_digest),
-            ("actor_invalid", invalidate_actor),
+            ("service_credential_invalid", invalidate_service_credential),
+            ("workspace_scope", inject_workspace),
+            ("publication_authority", inject_publication_authority),
+            ("canonical_authority", inject_canonical_authority),
+            ("scene_authority", inject_scene_authority),
         ):
             with self.subTest(label=label), tempfile.TemporaryDirectory() as directory:
                 database = Path(directory) / "creator.sqlite3"
@@ -392,6 +408,122 @@ class ScriptStudioDurableHttpIntegrationTests(unittest.TestCase):
                 self.assertEqual(
                     (caught.exception.status, caught.exception.code),
                     (500, "application_error"),
+                )
+
+    def test_corrupt_sqlite_parent_blocks_derived_version_before_any_write(self):
+        with tempfile.TemporaryDirectory() as directory:
+            database = Path(directory) / "creator.sqlite3"
+            series_boundary = create_local_series_boundary(database)
+            series, episode = seed_episode(series_boundary)
+            script_boundary = create_local_script_boundary(database, series_boundary)
+            scope = {
+                "workspaceRef": WORKSPACE,
+                "seriesRef": series["seriesRef"],
+                "episodeRef": episode["episodeRef"],
+            }
+            imported = script_boundary.create_version(
+                {
+                    **scope,
+                    "changeKind": "reviewed-import",
+                    "uploadedSourceByteDigest": "a" * 64,
+                    "normalizedSourceDocumentDigest": "b" * 64,
+                    "reviewedDocumentDigest": "c" * 64,
+                    "importedByRef": "creator-reviewer-credential",
+                    "content": {
+                        key: script_candidate()[key]
+                        for key in (
+                            "title",
+                            "logline",
+                            "synopsis",
+                            "targetDurationSec",
+                            "scenes",
+                        )
+                    },
+                }
+            )
+            script_ref = imported["script"]["scriptRef"]
+            version_ref = imported["scriptVersion"]["scriptVersionRef"]
+            derived_content = {
+                key: imported["scriptVersion"][key]
+                for key in (
+                    "title",
+                    "logline",
+                    "synopsis",
+                    "targetDurationSec",
+                    "scenes",
+                )
+            }
+            derived_content = json.loads(
+                json.dumps(derived_content, ensure_ascii=False)
+            )
+            derived_content["title"] = "不得写入的 SQLite 派生版本"
+
+            with sqlite3.connect(database) as connection:
+                before_script = connection.execute(
+                    "SELECT current_script_version_ref, version FROM v5_scripts "
+                    "WHERE workspace_ref = ? AND script_ref = ?",
+                    (WORKSPACE, script_ref),
+                ).fetchone()
+                before_count = connection.execute(
+                    "SELECT COUNT(*) FROM v5_script_versions "
+                    "WHERE workspace_ref = ? AND script_ref = ?",
+                    (WORKSPACE, script_ref),
+                ).fetchone()[0]
+                row = connection.execute(
+                    "SELECT content_json FROM v5_script_versions "
+                    "WHERE workspace_ref = ? AND script_ref = ? "
+                    "AND script_version_ref = ?",
+                    (WORKSPACE, script_ref, version_ref),
+                ).fetchone()
+                poisoned = json.loads(row[0])
+                poisoned["canonicalExecutableScriptRef"] = "forged-script"
+                connection.execute(
+                    "UPDATE v5_script_versions SET content_json = ? "
+                    "WHERE workspace_ref = ? AND script_ref = ? "
+                    "AND script_version_ref = ?",
+                    (
+                        json.dumps(
+                            poisoned,
+                            ensure_ascii=False,
+                            sort_keys=True,
+                            separators=(",", ":"),
+                        ),
+                        WORKSPACE,
+                        script_ref,
+                        version_ref,
+                    ),
+                )
+
+            with self.assertRaises(ScriptStudioPublicError) as caught:
+                script_boundary.create_version(
+                    {
+                        **scope,
+                        "scriptRef": script_ref,
+                        "baseScriptVersionRef": version_ref,
+                        "changeKind": "manual-edit",
+                        "content": derived_content,
+                    }
+                )
+            self.assertEqual(
+                (caught.exception.status, caught.exception.code),
+                (500, "application_error"),
+            )
+            with sqlite3.connect(database) as connection:
+                self.assertEqual(
+                    connection.execute(
+                        "SELECT current_script_version_ref, version FROM v5_scripts "
+                        "WHERE workspace_ref = ? AND script_ref = ?",
+                        (WORKSPACE, script_ref),
+                    ).fetchone(),
+                    before_script,
+                )
+                self.assertEqual(
+                    connection.execute(
+                        "SELECT COUNT(*) FROM v5_script_versions "
+                        "WHERE workspace_ref = ? AND script_ref = ?",
+                        (WORKSPACE, script_ref),
+                    ).fetchone()[0],
+                    before_count,
                 )
 
 

@@ -589,8 +589,7 @@ class K2MediaCandidateReviewService:
                 manifest.get("shotPlanAuthorityState")
                 != "LOCAL_STRUCTURAL_REPRESENTATION_ONLY"
                 or manifest.get("shotPlanApprovalState") != "NOT_VERIFIED"
-                or manifest.get("cameraContractState")
-                != "UNVERIFIED_COMMAND_INPUT"
+                or manifest.get("cameraContractState") != "NOT_READY"
                 or manifest.get("dispatchAllowed") is not False
             ):
                 raise StaleInputError(
