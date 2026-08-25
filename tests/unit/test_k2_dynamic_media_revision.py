@@ -272,7 +272,7 @@ class K2DynamicMediaPreflightTests(unittest.TestCase):
                 item["blockerType"] == "POSTPROCESS_REQUIREMENT_NOT_READY"
                 for item in first["dispatchBlockers"]
             ),
-            5,
+            9,
         )
         self.assertEqual(
             first["payloadDigest"],
@@ -300,8 +300,13 @@ class K2DynamicMediaPreflightTests(unittest.TestCase):
         self.assertNotIn("identityLockRef", requests[9]["identityInputs"][1])
         self.assertEqual(
             requests[9]["dialogueRequirement"],
-            {"speaker": "裴昀", "text": "你终于回来了。", "sourceMode": "DIALOGUE"},
+            {
+                "speaker": None,
+                "text": "一次克制吸气，无台词。",
+                "sourceMode": "SFX_OR_SILENCE",
+            },
         )
+        self.assertEqual(requests[9]["dialogueSyncMode"], "NONE")
 
         serialized = json.dumps(preflight, ensure_ascii=False)
         for forbidden in (

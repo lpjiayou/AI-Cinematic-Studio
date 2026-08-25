@@ -3006,11 +3006,13 @@ STOP。
 
 # 62. Current System State
 
-## 62.1 Current exact-scope overlay — 2026-08-25
+## 62.1 Current exact-scope overlay — 2026-08-26
 
 The Project Lead / Architecture Owner / Repository Governance Owner accepted
 [ADR-0014](governance/ADR-0014-k2-001-archive-k2-002-changan-start.md) and the
-[ACS-K2-002 non-GPU preproduction rebaseline](governance/ACS-K2-002-NON-GPU-PREPRODUCTION-REBASELINE.md).
+[ACS-K2-002 non-GPU preproduction rebaseline](governance/ACS-K2-002-NON-GPU-PREPRODUCTION-REBASELINE.md),
+with the mandatory
+[v1.4 exact-source and Core rebase overlay](governance/ACS-K2-002-SCRIPT-V1-4-EXACT-DIGEST-REBASELINE.md).
 Those records, not a lower-order milestone projection by itself, establish the current
 exact execution authority.
 
@@ -3034,7 +3036,12 @@ X2
 DEFERRED / NOT CANCELLED / NOT A SECOND ACTIVE PACKAGE
 
 Script
-V1.3 REVIEWED CORRECTION CANDIDATE / OWNER ACCEPTANCE PENDING
+EXACT UPLOADED V1.4 SOURCE PRESERVED /
+CORE V1.3 + SIX DIRECTED FIXES → V1.4 REPOSITORY-REVIEWED REBASE CANDIDATE /
+REPOSITORY INGEST OWNER AUTHORIZED / SCRIPT CONTENT ACCEPTANCE PENDING
+
+Machine Mapping
+V1 HISTORICAL / V2 CURRENT V1.4 EP01 FAIL-CLOSED MAPPING
 
 Shot Authority
 EDITORIAL DRAFT ONLY / SHOTPLAN APPROVAL NOT GRANTED /
@@ -3055,6 +3062,10 @@ NOT GRANTED
 Media Selection / Admission
 NOT GRANTED
 
+Asset Evidence
+EXTERNAL PACKAGE BYTES PRESENT / V1.3-BOUND / RIGHTS + EXACT MAPPING UNVERIFIED /
+NONE ADMITTED
+
 Bulk Generation
 false
 
@@ -3068,14 +3079,14 @@ NO
 This is one project-specific, exact work-package authorization inside the existing
 V2.3 Production Spine. It does not mark generic M7–M15 milestones as started or
 accepted, does not reopen general ACS Engineering Phase 1, and does not accept the
-deferred Generation 2 Charter. Any Script acceptance, approved ShotPlan compilation,
+deferred Generation 2 Charter. Any Script content acceptance, approved ShotPlan compilation,
 live canonical registration, M10/M11 append, Provider/GPU dispatch, media selection or
 admission, batch expansion, Master/Export, Release or Publication requires a separate
 applicable decision and evidence.
 
 `CURRENT_MILESTONE.md` may describe the current task and gates only within this
 overlay. If a lower-order execution statement exceeds ADR-0014 or
-ACS-K2-002-GOV-RB1, the higher-order fail-closed limits apply.
+ACS-K2-002-GOV-RB1 or ACS-K2-002-SCRIPT-RB2, the higher-order fail-closed limits apply.
 
 ## 62.2 Historical snapshot — PRE-M6-RB1.3-CLOSEOUT-G1
 

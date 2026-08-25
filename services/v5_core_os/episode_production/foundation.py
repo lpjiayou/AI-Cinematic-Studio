@@ -31,7 +31,7 @@ DIALOGUE_SYNC_MODES = frozenset(
 )
 DIALOGUE_SOURCE_MODES = frozenset({"NARRATION", "DIALOGUE", "SFX_OR_SILENCE"})
 # Closed set used by every EP01-03 row in the repository-reviewed K2-002
-# v1.3 candidate/source package.
+# v1.4 repository-reviewed rebase candidate package.
 K2_002_EDITORIAL_SHOT_SIZE_CODES = frozenset({"ECU", "CU", "MCU", "MS", "WS"})
 CONTROLLED_EXTENSION_ALGORITHM_REF = "controlled-horizontal-edge-extension-v1"
 CONTROLLED_EXTENSION_ALGORITHM = {

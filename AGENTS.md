@@ -374,8 +374,17 @@ API → V5 → V4 → Compute spine. It may not reuse K2-001 refs, receipts, ope
 manifests, package IDs, media assets or exact-scope authority exceptions.
 `publicationAllowed=false` remains invariant until an independent publication gate.
 
+As of 2026-08-26,
+[ACS-K2-002-SCRIPT-RB2](governance/ACS-K2-002-SCRIPT-V1-4-EXACT-DIGEST-REBASELINE.md)
+is the mandatory additive script overlay. It preserves the uploaded v1.4 exact bytes as
+source evidence, rebases the six Owner-directed logic fixes onto Core reviewed v1.3,
+keeps v1.3 and the v1 machine ledger immutable, and makes the versioned v2 EP01 ledger
+the current fail-closed repository mapping after protected merge. Repository ingest
+authorization is not Script content acceptance. The overlay does not create domain facts,
+approve a ShotPlan/camera contract, admit assets, or authorize Provider/GPU/publication.
+
 The following K2 Internal P1 description and governance list are a dated historical
-snapshot. They do not override ADR-0014 and ACS-K2-002-GOV-RB1; the current milestone
+snapshot. They do not override ADR-0014, ACS-K2-002-GOV-RB1 or ACS-K2-002-SCRIPT-RB2; the current milestone
 may only project execution within that exact higher-order authority:
 
 For the one exact historical K2-001 workspace/run, external Rights Manifest,
