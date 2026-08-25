@@ -5,8 +5,9 @@
 | Task ID | `ACS-GIT-001` |
 | 文档类型 | GitHub Branch Protection Configuration Specification |
 | 首要保护目标 | `main` |
-| 配置状态 | `DEFINED / NOT APPLIED / NOT VERIFIED` |
-| 当前限制 | 本地仓库没有 Git remote，无法应用或核验 GitHub Ruleset |
+| 配置状态 | `CORE PARTIALLY APPLIED / NONCONFORMING`; `FRONTEND NOT PROTECTED` |
+| 当前核验 | `2026-08-25` 远端只读快照；修复后必须重新导出并绑定精确配置 revision |
+| 当前差异 | Core 实际批准数 `0`、允许 merge/squash、缺少必需的 `Integration Tests`；Frontend `main` 没有生效的 branch protection 或 ruleset |
 | 架构与 Phase 影响 | `NONE`；保护规则不授予实现、Release 或架构变化 |
 
 ## 1. 目的
@@ -35,7 +36,7 @@
 | Conversation Resolution | 所有阻塞意见和未解决对话必须关闭 | 没有 Blocking thread |
 | Required Status Checks | 所有已注册且适用于变更的强制检查通过 | 没有 `FAIL`、`BLOCKED` 或强制 `NOT RUN` |
 | Up-to-date Requirement | 合并前基于最新目标分支重新验证；可由 Merge Queue 或等价规则保证 | 验证修订与合并候选一致 |
-| Linear History | 要求线性历史；禁用普通 merge commit | 使用 squash merge 或经批准的 rebase merge |
+| Linear History | 要求线性历史；禁用普通 merge commit | 按第 6 节当前规范使用 squash merge；若 Governance Owner 另行批准修改策略，可使用同样保持线性的 rebase merge |
 | Force Push | 禁止 | 无人拥有常规 force-push 权限 |
 | Branch Deletion | 禁止 | `main` 不可删除 |
 | Bypass | 默认禁止管理员、Repository Role 和 App 绕过 | 只有已记录 break-glass 例外 |
@@ -73,11 +74,22 @@ GitHub 只能绑定已真实注册的 Check 名称。初始启用时，Repositor
 
 ## 6. Merge 规则
 
-- GitHub 默认只启用 squash merge；最终标题遵守 Commit Convention。
+- GitHub 默认只启用 squash merge；普通 merge commit 与 rebase merge 均关闭。
 - Squash 后的 Commit body 或 footer 保留 `Refs: <task-id>`，并由 GitHub 保留 Pull Request 关系。
 - 合并前核对目标分支、候选 SHA、检查结果、审批状态和未解决对话。
 - 合并后如发现错误，使用 `revert` 或新修复 PR 恢复，不改写 `main` 历史。
 - 自动合并或 Merge Queue 只能在全部条件满足后执行，不能覆盖人工阻塞意见。
+
+## 6A. 2026-08-25 远端差异账本
+
+| Repository | 远端观察 | 与规范的差异 | 修复验收条件 |
+| --- | --- | --- | --- |
+| Core | `main` ruleset 已生效；required approvals=`0`；merge、squash、rebase 均在仓库设置中可用；`Integration Tests` 未列为必需检查 | 未满足两名独立批准、普通 merge 禁用、规范默认的 squash-only 和完整适用检查 | approvals=`2`；撤销旧批准；解决对话；线性历史；禁止 force/delete/bypass；按本规范只允许 squash（若要改为 rebase-only，须先由 Governance Owner 独立修订规范）；必需检查包含 Markdown、Documentation Links、Unit Tests、Contract Tests、Integration Tests |
+| Frontend | `main` 没有 branch protection 或生效 ruleset | 全部入口治理缺失 | 建立等价 `main` ruleset；必需检查绑定真实 Actions `verify`、`gate-c-k2-browser`、`gate-k2-control-plane-browser` |
+
+两个最终基线 SHA 的 GitHub Actions 均成功；但各有一个内容为空的 Cursor check
+suite 仍为 `queued`。该外部 suite 既不能被描述为已完成，也不应作为必需检查；
+required checks 只绑定仓库真实存在、由 Actions 产生且有明确 Owner 的检查。
 
 ## 7. `develop` 条件性保护
 
@@ -147,18 +159,23 @@ GitHub 只能绑定已真实注册的 Check 名称。初始启用时，Repositor
 
 ## 12. 当前状态与风险
 
-`ACS-GIT-001` 执行前没有 remote、GitHub 配置证据或 Tag，因此：
+本节的原始 `ACS-GIT-001` 初始快照曾记录“没有 remote / Ruleset 未应用”。
+2026-08-25 已有远端只读证据，当前状态由下表和第 6A 节覆盖；初始快照不再作为
+现状结论：
 
 | 项目 | 状态 |
 | --- | --- |
 | 保护规范 | `DEFINED` |
-| GitHub Ruleset | `NOT APPLIED / NOT VERIFIABLE` |
-| `main` 直接推送限制 | `NOT VERIFIED` |
-| Required Checks | `NOT CONFIGURED / NOT VERIFIED` |
-| CODEOWNERS | `NOT CONFIGURED` |
-| Baseline Tag / GitHub Release | `NOT CREATED` |
+| Core GitHub Ruleset | `ACTIVE / NONCONFORMING` |
+| Frontend GitHub Ruleset / Branch Protection | `NOT APPLIED` |
+| `main` 直接推送、force、delete、bypass 的负向行为 | `NOT FULLY VERIFIED BY CONTROLLED TEST` |
+| Required Checks | `CORE PARTIAL / FRONTEND NOT CONFIGURED` |
+| CODEOWNERS | `NOT REVERIFIED IN THIS SNAPSHOT` |
+| Baseline Tag / GitHub Release | `OUTSIDE THIS SNAPSHOT'S VERIFIED CLAIMS` |
 
-在这些状态关闭前，不得声称主分支已受 GitHub 技术保护。该缺口应继续作为 Repository Governance 风险跟踪，不影响本文作为配置规范的有效性。
+在这些差异关闭并经受控负向/正向验证前，只能声称 Core 存在一个生效但不合规的
+ruleset；不得声称 Core 治理合规，也不得声称 Frontend `main` 已受 GitHub 技术保护。
+该缺口继续作为 Repository Governance 风险跟踪，不影响本文作为配置规范的有效性。
 
 ## 13. 变更控制
 

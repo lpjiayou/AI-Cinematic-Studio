@@ -1,5 +1,8 @@
 # K2 Internal Self-hosted P1 Contract
 
+> Historical/closed as of 2026-08-25: this exception is bound to the original
+> exact K2-001 workspace/run. It does not govern or authorize K2-002.
+
 ## 1. Scope
 
 This contract governs one K2 Internal Content Lab, single-episode, video-only P1

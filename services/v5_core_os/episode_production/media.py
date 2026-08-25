@@ -25,6 +25,7 @@ from .foundation import (
     _idempotency_key,
     _required_ref,
 )
+from .shot_graph import require_legacy_executable_graph
 
 
 MEDIA_EXECUTION_GATE = "G5_MEDIA_EXECUTION"
@@ -168,6 +169,7 @@ class K2MediaExecutionService:
         verified = self.assets.verify_asset_plan_current(workspace, run_ref)
         root = verified["root"]
         graph = verified["executableShotGraph"]
+        require_legacy_executable_graph(graph)
         asset_manifest = verified["assetResolutionManifest"]
         requests = verified["generationRequests"]
         gate_key = _digest(

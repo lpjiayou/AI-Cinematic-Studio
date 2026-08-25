@@ -1,5 +1,10 @@
 # K2-001 开机前候选清单
 
+> `2026-08-25`：`HISTORICAL VALIDATION ONLY / CLOSED TO NEW DISPATCH`。不得用于
+> K2-002，不得从本目录推导选片、准入或发布。
+>
+> 下文“必须 / 开机后 / 当前”等措辞只描述原时点，不是当前授权；不得重放任何命令。
+
 本目录只有离线创作与实验计划，不含生成媒体、Provider 响应、secret、Authority bundle、
 Core domain ref、candidate selection 或 production admission。
 

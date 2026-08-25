@@ -1,13 +1,18 @@
 # ADR-0012 — K2 Internal Image-First Real-Media Revision
 
-- Status: `ACCEPTED / M10 COMPLETE / M11 VIDEO PLAN COMPLETE / REAL_VIDEO_PLAN_READY / GPU CANDIDATES NEXT`
+- Status: `ACCEPTED / K2-001 HISTORICAL VALIDATION / FOUR VIDEO CANDIDATES TECHNICALLY VERIFIED / UNSELECTED / NOT_ADMITTED / CLOSED TO NEW DISPATCH`
 - Date: `2026-08-23`
 - Decision owner: Project Lead / Architecture Owner `蔺鹏`
 - Required base: `1650c3462b32899151cdba795ddc10e5171ff1da`
 - Parent: ADR-0011
 - Contract: `architecture/K2_INTERNAL_IMAGE_FIRST_REAL_MEDIA_REVISION_CONTRACT.md`
 
-## Context
+> 2026-08-25 archive note: no further GPU dispatch is authorized under this ADR.
+> Its four K2-001 video candidates remain historical technical evidence only:
+> `UNSELECTED / NOT_ADMITTED / publicationAllowed=false`. ADR-0014 starts K2-002 as
+> a distinct lineage; no K2-001 request, candidate, asset or exception transfers.
+
+## Historical decision-time context
 
 The canonical K2-001 run has immutable G2-G6 facts and is at `QC_READY`. P1 proved
 one real Wan2.2/A100 video path but its candidate is unselected and not admitted.

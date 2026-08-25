@@ -1,4 +1,5 @@
 from contextlib import redirect_stderr
+import hashlib
 import io
 import json
 from pathlib import Path
@@ -188,6 +189,150 @@ class ScriptStudioDomainTests(unittest.TestCase):
         self.assertIsNone(script["confirmedScriptVersionRef"])
         self.assertEqual([item["sceneNumber"] for item in version["scenes"]], [1, 2])
         self.assertEqual(len({item["scriptSceneRef"] for item in version["scenes"]}), 2)
+
+    def test_reviewed_import_records_digest_assertions_and_remains_unconfirmed(self):
+        result = self.service.create_version(
+            {
+                **self.scope,
+                "changeKind": "reviewed-import",
+                "uploadedSourceByteDigest": "A" * 64,
+                "normalizedSourceDocumentDigest": "B" * 64,
+                "reviewedDocumentDigest": "C" * 64,
+                "importedByRef": "creator-reviewer-credential",
+                "content": content_from_candidate(),
+            }
+        )
+        version = result["scriptVersion"]
+        self.assertEqual(version["changeKind"], "reviewed-import")
+        self.assertIsNone(result["script"]["confirmedScriptVersionRef"])
+        normalized_content = {
+            key: version[key]
+            for key in (
+                "title",
+                "logline",
+                "synopsis",
+                "targetDurationSec",
+                "scenes",
+            )
+        }
+        canonical_digest = hashlib.sha256(
+            json.dumps(
+                normalized_content,
+                ensure_ascii=False,
+                sort_keys=True,
+                separators=(",", ":"),
+                allow_nan=False,
+            ).encode("utf-8")
+        ).hexdigest()
+        expected_provenance = {
+                "uploadedSourceByteDigest": "a" * 64,
+                "normalizedSourceDocumentDigest": "b" * 64,
+                "reviewedDocumentDigest": "c" * 64,
+                "importedByRef": "creator-reviewer-credential",
+                "digestAssertionState": (
+                    "AUTHENTICATED_ACTOR_DECLARATION_UNVERIFIED"
+                ),
+                "reviewedDocumentToContentBindingState": "NOT_VERIFIED",
+                "canonicalScriptContentDigest": canonical_digest,
+        }
+        expected_provenance["importProvenanceDigest"] = hashlib.sha256(
+            json.dumps(
+                expected_provenance,
+                ensure_ascii=False,
+                sort_keys=True,
+                separators=(",", ":"),
+                allow_nan=False,
+            ).encode("utf-8")
+        ).hexdigest()
+        self.assertEqual(version["importProvenance"], expected_provenance)
+
+    def test_reviewed_import_rejects_client_scene_refs_and_generic_confirmation(self):
+        content = content_from_candidate()
+        content["scenes"][0]["scriptSceneRef"] = "k2-001-reused-scene"
+        command = {
+            **self.scope,
+            "changeKind": "reviewed-import",
+            "uploadedSourceByteDigest": "a" * 64,
+            "normalizedSourceDocumentDigest": "b" * 64,
+            "reviewedDocumentDigest": "c" * 64,
+            "importedByRef": "creator-reviewer-credential",
+            "content": content,
+        }
+        with self.assertRaises(ScriptStudioError):
+            self.service.create_version(command)
+
+        command["content"] = content_from_candidate()
+        imported = self.service.create_version(command)
+        with self.assertRaises(ScriptStudioError):
+            self.service.confirm_version(
+                {
+                    **self.scope,
+                    "scriptRef": imported["script"]["scriptRef"],
+                    "scriptVersionRef": imported["scriptVersion"][
+                        "scriptVersionRef"
+                    ],
+                    "humanConfirmed": True,
+                }
+            )
+        self.assertIsNone(
+            self.repository.get_script(
+                WORKSPACE, self.series["seriesRef"], self.episode["episodeRef"]
+            ).confirmedScriptVersionRef
+        )
+
+    def test_reviewed_import_requires_all_source_digests_and_import_actor(self):
+        base = {
+            **self.scope,
+            "changeKind": "reviewed-import",
+            "uploadedSourceByteDigest": "a" * 64,
+            "normalizedSourceDocumentDigest": "b" * 64,
+            "reviewedDocumentDigest": "c" * 64,
+            "importedByRef": "creator-reviewer-credential",
+            "content": content_from_candidate(),
+        }
+        for field, value in (
+            ("uploadedSourceByteDigest", "bad"),
+            ("normalizedSourceDocumentDigest", "bad"),
+            ("reviewedDocumentDigest", "bad"),
+            ("importedByRef", ""),
+        ):
+            with self.subTest(field=field):
+                command = dict(base)
+                command[field] = value
+                with self.assertRaises(ScriptStudioError):
+                    self.service.create_version(command)
+        self.assertIsNone(
+            self.repository.get_script(
+                WORKSPACE, self.series["seriesRef"], self.episode["episodeRef"]
+            )
+        )
+
+    def test_reviewed_import_cannot_be_appended_to_existing_script(self):
+        first = self.create_initial()
+        with self.assertRaises(ScriptStudioError):
+            self.service.create_version(
+                {
+                    **self.scope,
+                    "scriptRef": first["script"]["scriptRef"],
+                    "baseScriptVersionRef": first["scriptVersion"][
+                        "scriptVersionRef"
+                    ],
+                    "changeKind": "reviewed-import",
+                    "uploadedSourceByteDigest": "a" * 64,
+                    "normalizedSourceDocumentDigest": "b" * 64,
+                    "reviewedDocumentDigest": "c" * 64,
+                    "importedByRef": "creator-reviewer-credential",
+                    "content": content_from_candidate(),
+                }
+            )
+        self.assertEqual(
+            len(
+                self.repository.list_versions(
+                    WORKSPACE, first["script"]["scriptRef"]
+                )
+            ),
+            1,
+        )
 
     def test_manual_edit_creates_immutable_second_version(self):
         first = self.create_initial()

@@ -261,7 +261,7 @@ def _identity_reference_authority(
                 "identity reference authority scope is duplicated"
             )
         media_type = raw["mediaType"]
-        if media_type not in {"image", "video", "identity-direction"}:
+        if media_type not in {"image", "image/png", "video", "identity-direction"}:
             raise ExternalAuthorityConfigurationError(
                 "identity reference media type is unsupported"
             )

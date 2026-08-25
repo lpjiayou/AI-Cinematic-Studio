@@ -16,6 +16,9 @@ PUBLIC_PROJECT_CONTEXT_ENDPOINT: Final = f"{PUBLIC_API_PREFIX}/project-contexts"
 PUBLIC_EPISODES_ENDPOINT: Final = f"{PUBLIC_API_PREFIX}/episodes"
 PUBLIC_SCRIPT_WORKSPACE_ENDPOINT: Final = f"{PUBLIC_API_PREFIX}/script-workspaces"
 PUBLIC_SCRIPT_GENERATE_ENDPOINT: Final = f"{PUBLIC_API_PREFIX}/script-versions/generate"
+PUBLIC_SCRIPT_REVIEWED_IMPORT_ENDPOINT: Final = (
+    f"{PUBLIC_API_PREFIX}/script-versions/reviewed-import"
+)
 PUBLIC_SCRIPT_MANUAL_VERSION_ENDPOINT: Final = f"{PUBLIC_API_PREFIX}/script-versions/manual"
 PUBLIC_SCRIPT_REWRITE_ENDPOINT: Final = f"{PUBLIC_API_PREFIX}/script-versions/rewrite-scene"
 PUBLIC_SCRIPT_CONFIRM_ENDPOINT: Final = f"{PUBLIC_API_PREFIX}/script-versions/confirm"
@@ -64,8 +67,19 @@ CAPABILITY_PROJECTION: Final = (
         "id": "M3",
         "name": "Script Studio",
         "state": "available",
-        "publicResources": ["script-workspaces", "script-versions"],
-        "requirements": ["confirmed_creative_plan", "text_generation_for_ai_generation"],
+        "publicResources": [
+            "script-workspaces",
+            "script-versions",
+            "script-versions/reviewed-import",
+        ],
+        "requirements": [
+            "confirmed_creative_plan",
+            "text_generation_for_ai_generation",
+            "reviewed_import_is_unconfirmed_and_server_actor_bound",
+            "authenticated_actor_document_digest_assertions_unverified",
+            "server_generated_scene_refs_and_canonical_content_digest",
+            "trusted_owner_approval_required_for_confirmation",
+        ],
     },
     {
         "id": "M4",
@@ -106,6 +120,7 @@ CAPABILITY_PROJECTION: Final = (
         "publicResources": [
             "episode-production-runs/production-readiness",
             "episode-production-runs/real-media-revision",
+            "episode-production-runs/dynamic-media-preflight",
             "episode-production-runs/real-image-candidates",
             "episode-production-runs/real-image-selection",
             "episode-production-runs/real-image-admission",
@@ -118,6 +133,7 @@ CAPABILITY_PROJECTION: Final = (
             "M9",
             "G6_local_qc_parent_for_same_run_revision",
             "live_multi_reference_image_capability_before_execution",
+            "dynamic_media_preflight_is_zero_write_and_non_dispatching",
         ],
     },
     {

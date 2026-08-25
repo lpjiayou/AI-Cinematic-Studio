@@ -1,5 +1,11 @@
 # K2 Internal Self-hosted P1 Runbook
 
+> `2026-08-25`: K2-001 historical runbook, `CLOSED TO NEW DISPATCH`. The exact-run
+> exception does not transfer to K2-002.
+>
+> Every “execute”, “current”, “must” or imperative below describes the historical
+> checkpoint only. It is not current authority, and none of the commands may be replayed.
+
 ## Purpose
 
 Execute one real Wan2.2 video smoke through the existing K2 Public API → V5 → V4 →

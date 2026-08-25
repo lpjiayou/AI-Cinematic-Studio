@@ -1,5 +1,6 @@
 import json
 from pathlib import Path
+import sqlite3
 import tempfile
 import threading
 import unittest
@@ -22,6 +23,7 @@ from apps.creator_workspace_mvp.server import (
 from services.v5_core_os.text_generation import TextGenerationTimeoutError
 from services.v5_core_os.text_generation.testing import FakeTextGenerationCapability
 from services.v5_core_os.script_studio import (
+    ScriptStudioPublicError,
     create_in_memory_boundary as create_script_boundary,
     create_local_development_boundary as create_local_script_boundary,
 )
@@ -253,6 +255,144 @@ class ScriptStudioDurableHttpIntegrationTests(unittest.TestCase):
             restarted_script = create_local_script_boundary(database, restarted_series)
             workspace = restarted_script.get_workspace(WORKSPACE, series["seriesRef"], episode["episodeRef"])
             self.assertEqual(workspace["script"]["confirmedScriptVersionRef"], generated["scriptVersion"]["scriptVersionRef"])
+
+    def test_reviewed_import_provenance_and_unconfirmed_state_survive_restart(self):
+        with tempfile.TemporaryDirectory() as directory:
+            database = Path(directory) / "creator.sqlite3"
+            series_boundary = create_local_series_boundary(database)
+            series, episode = seed_episode(series_boundary)
+            script_boundary = create_local_script_boundary(database, series_boundary)
+            imported = script_boundary.create_version(
+                {
+                    "workspaceRef": WORKSPACE,
+                    "seriesRef": series["seriesRef"],
+                    "episodeRef": episode["episodeRef"],
+                    "changeKind": "reviewed-import",
+                    "uploadedSourceByteDigest": "a" * 64,
+                    "normalizedSourceDocumentDigest": "b" * 64,
+                    "reviewedDocumentDigest": "d" * 64,
+                    "importedByRef": "creator-reviewer-credential",
+                    "content": {
+                        key: script_candidate()[key]
+                        for key in (
+                            "title",
+                            "logline",
+                            "synopsis",
+                            "targetDurationSec",
+                            "scenes",
+                        )
+                    },
+                }
+            )
+            restarted_series = create_local_series_boundary(database)
+            restarted_script = create_local_script_boundary(
+                database, restarted_series
+            )
+            workspace = restarted_script.get_workspace(
+                WORKSPACE, series["seriesRef"], episode["episodeRef"]
+            )
+            self.assertIsNone(workspace["script"]["confirmedScriptVersionRef"])
+            provenance = workspace["versions"][0]["importProvenance"]
+            self.assertEqual(provenance["uploadedSourceByteDigest"], "a" * 64)
+            self.assertEqual(
+                provenance["normalizedSourceDocumentDigest"], "b" * 64
+            )
+            self.assertEqual(provenance["reviewedDocumentDigest"], "d" * 64)
+            self.assertEqual(
+                provenance["importedByRef"], "creator-reviewer-credential"
+            )
+            self.assertEqual(
+                provenance["digestAssertionState"],
+                "AUTHENTICATED_ACTOR_DECLARATION_UNVERIFIED",
+            )
+            self.assertEqual(
+                provenance["reviewedDocumentToContentBindingState"],
+                "NOT_VERIFIED",
+            )
+            self.assertRegex(
+                provenance["canonicalScriptContentDigest"], r"^[0-9a-f]{64}$"
+            )
+            self.assertRegex(
+                provenance["importProvenanceDigest"], r"^[0-9a-f]{64}$"
+            )
+
+    def test_reviewed_import_sqlite_provenance_tampering_fails_closed(self):
+        def remove_provenance(content):
+            content.pop("importProvenance")
+
+        def alter_digest(content):
+            content["importProvenance"]["uploadedSourceByteDigest"] = "f" * 64
+
+        def invalidate_actor(content):
+            content["importProvenance"]["importedByRef"] = "bad actor"
+
+        for label, tamper in (
+            ("removed", remove_provenance),
+            ("digest_changed", alter_digest),
+            ("actor_invalid", invalidate_actor),
+        ):
+            with self.subTest(label=label), tempfile.TemporaryDirectory() as directory:
+                database = Path(directory) / "creator.sqlite3"
+                series_boundary = create_local_series_boundary(database)
+                series, episode = seed_episode(series_boundary)
+                script_boundary = create_local_script_boundary(
+                    database, series_boundary
+                )
+                imported = script_boundary.create_version(
+                    {
+                        "workspaceRef": WORKSPACE,
+                        "seriesRef": series["seriesRef"],
+                        "episodeRef": episode["episodeRef"],
+                        "changeKind": "reviewed-import",
+                        "uploadedSourceByteDigest": "a" * 64,
+                        "normalizedSourceDocumentDigest": "b" * 64,
+                        "reviewedDocumentDigest": "c" * 64,
+                        "importedByRef": "creator-reviewer-credential",
+                        "content": {
+                            key: script_candidate()[key]
+                            for key in (
+                                "title",
+                                "logline",
+                                "synopsis",
+                                "targetDurationSec",
+                                "scenes",
+                            )
+                        },
+                    }
+                )
+                with sqlite3.connect(database) as connection:
+                    row = connection.execute(
+                        "SELECT content_json FROM v5_script_versions "
+                        "WHERE script_version_ref = ?",
+                        (imported["scriptVersion"]["scriptVersionRef"],),
+                    ).fetchone()
+                    content = json.loads(row[0])
+                    tamper(content)
+                    connection.execute(
+                        "UPDATE v5_script_versions SET content_json = ? "
+                        "WHERE script_version_ref = ?",
+                        (
+                            json.dumps(
+                                content,
+                                ensure_ascii=False,
+                                sort_keys=True,
+                                separators=(",", ":"),
+                            ),
+                            imported["scriptVersion"]["scriptVersionRef"],
+                        ),
+                    )
+                restarted_series = create_local_series_boundary(database)
+                restarted_script = create_local_script_boundary(
+                    database, restarted_series
+                )
+                with self.assertRaises(ScriptStudioPublicError) as caught:
+                    restarted_script.get_workspace(
+                        WORKSPACE, series["seriesRef"], episode["episodeRef"]
+                    )
+                self.assertEqual(
+                    (caught.exception.status, caught.exception.code),
+                    (500, "application_error"),
+                )
 
 
 if __name__ == "__main__":

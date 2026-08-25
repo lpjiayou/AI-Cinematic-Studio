@@ -1,5 +1,11 @@
 # K2-001 canonical lineage bootstrap specification
 
+> `2026-08-25`: `HISTORICAL VALIDATION ONLY / DO NOT REAPPLY / NOT TRANSFERABLE
+> TO K2-002`.
+>
+> Every “must”, “apply” or imperative below describes the original checkpoint only.
+> Current apply is forbidden; validation may be used only for read-only historical review.
+
 This directory contains the exact, Project-Lead-authorized input for one new K2-001
 canonical root after the previous durable lineage was not found.
 
@@ -15,8 +21,9 @@ python scripts/k2_canonical_lineage_bootstrap.py \
   --target-dir /data/k2-core/k2-001-canonical-v1
 ```
 
-Formal apply must follow the GPU-host section of the K2 P1 runbook and requires the
-exact `NEW_CANONICAL_K2_LINEAGE_NOT_RECOVERY` acknowledgement.
+At the original checkpoint, formal apply had to follow the GPU-host section of the
+K2 P1 runbook and required the exact `NEW_CANONICAL_K2_LINEAGE_NOT_RECOVERY`
+acknowledgement. That apply is now closed and must not be repeated.
 
 After apply and the independent read-only scan, the same runbook starts a loopback
 Creator server with a workspace-scoped server credential and invokes

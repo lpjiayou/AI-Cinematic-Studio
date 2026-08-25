@@ -4,29 +4,77 @@
 >
 > Execution Mode: `AUTO-SEQUENTIAL / CONTRACT-FIRST / FAIL-CLOSED`
 >
-> Project Lead Authorization: `K2 INTERNAL P1 HOST-PASSED / IMAGE-FIRST M10→M11 HISTORY PRESERVED / ADR-0013 CONTROL-PLANE CONVERGENCE AUTHORIZED AS NON-GPU CORRECTION / COMMERCIAL PUBLICATION REMAINS CLOSED`
+> Project Lead Authorization: `ADR-0013 NON-GPU IMPLEMENTATION OWNER ACCEPTED / K2-001 ARCHIVED AS VALIDATION HISTORY / K2-002-CHANGAN NON-GPU PREPRODUCTION ACTIVE / PUBLICATION CLOSED`
 >
-> Authorized Wave: `ADR-0013 GOVERNANCE + CONTRACT → APPEND-ONLY CONTROL-PLANE IMPLEMENTATION + VERIFICATION / NO GPU EXECUTION IN THIS WAVE`
+> Authorized Wave: `K2-002 REVIEWED PACKAGE IMPORT + REGISTRATION/LINEAGE AUDIT + VERTICAL EP01 SHOT/GENERATION CONTRACT CORRECTION / NON-GPU ONLY`
 >
-> Current Task: `ACS-K2-CONTROL-PLANE-CONVERGENCE`
+> Current Task: `ACS-K2-002-CHANGAN-ONBOARDING-AND-EP01-CHAIN`
 >
-> Current Work Package: `ADR-0013 IMPLEMENTED + LOCALLY VERIFIED AS A TECHNICAL CANDIDATE / PROJECT LEAD ACCEPTANCE PENDING / M10 v1 ADMITTED HISTORY / M11 v1 TECHNICALLY VERIFIED BUT SEMANTIC VISUAL QC FAILED / SHOT 01 R2–R7 CLOSED WITHOUT ADMISSION`
+> Current Work Package: `ADR-0013 OWNER ACCEPTED / K2-001 CLOSED HISTORICAL / K2-002 v1.3 REVIEWED CORRECTION CANDIDATE / REGISTRATION + SHOT PROFILE + DYNAMIC CANDIDATE CHAIN CORRECTION / EP01 MEDIA NOT STARTED`
 >
-> M6 Authorization: `ACCEPTED SURFACES + K2 EXTERNAL AUTHORITY CONNECTION / NO M6 SCHEMA EXPANSION`
+> M6 Authorization: `ACCEPTED SURFACES / K2-002 MUST CREATE DISTINCT SCOPE AND APPROVALS / NO K2-001 AUTHORITY INHERITANCE`
 >
-> M7–M15 Authorization: `K2 PUBLISHABLE SINGLE-EPISODE SLICE ONLY / GATE-BY-GATE`
+> M7–M15 Authorization: `CONTRACT + READ-ONLY PREFLIGHT ONLY / PROVIDER OR GPU DISPATCH REQUIRES A SEPARATE PROJECT LEAD GATE`
 >
 > M16 Authorization: `BOUNDED 1 → 3 → 10 → 30 ONLY AFTER P9 + GATE A/B/C`
 >
 > M17–M19 Authorization: `NOT AUTHORIZED`
 >
-> Integration Baseline: `K2 G0→G7 PRESERVED — CORE 518 / FRONTEND 118 / LOCAL PLAYABLE EVIDENCE`
+> Integration Baseline: `CORE main 6d28a53f / TREE 369c3b14 / 851 PASS — FRONTEND main 5b36aac0 / TREE fd20b7d7 / 174 PASS + TYPECHECK + LINT + BUILD + TWO CHROMIUM GATES`
 >
-> Production Ready: `NO — M11 v1 SEMANTIC VISUAL QC FAILED; ACTION-READY M10 REPLACEMENTS, SELECTED REAL VIDEOS, MASTER/EXPORT/PUBLICATION ABSENT`
+> Production Ready: `NO — K2-001 M11 FAILED AND ARCHIVED; K2-002 SCRIPT ACCEPTANCE, CANONICAL REGISTRATION, REFERENCE ASSETS, EXECUTABLE SHOT GRAPH, MEDIA CANDIDATES, SELECTION, ADMISSION, MASTER/EXPORT/PUBLICATION ABSENT`
 
 ---
 
-## 0A. 2026-08-23 assisted visual-quality audit
+## 0. 2026-08-25 current authority and transition
+
+The Project Lead accepted ADR-0013's non-GPU control-plane implementation as
+`OWNER ACCEPTED / COMPLETE / MAIN-VERIFIED` at Core
+`6d28a53f3a077f032e341a87412b19b37c00bb1e`. Acceptance is code/control-plane
+only; it does not accept K2-001 media or prove a live canonical convergence append.
+
+K2-001 is now `HISTORICAL VALIDATION EVIDENCE / CLOSED FOR FURTHER PRODUCTION`.
+Its M10 image history, failed M11 evidence, receipts, refs and exact ADR-0011
+exception remain immutable history and cannot be reused by another project.
+
+K2-002-CHANGAN / 《长安刮痕》 is the active Internal Content Lab project. The
+repository-reviewed correction candidate is v1.3, derived from source v1.2 digest
+`8dec72d6bde85768c846ec93dd7f06adfa1f5dd9bcddb0f118455b2f9abe37de`.
+Only EP01 is active. The current truthful state is:
+
+```text
+SOURCE_PACKAGE=V1.3_REVIEWED_CORRECTION_CANDIDATE
+SCRIPT_OWNER_ACCEPTANCE=PENDING
+EDITORIAL_SHOT_PLAN=LOCAL_STRUCTURAL_REPRESENTATION_ONLY
+SHOT_PLAN_APPROVAL=NOT_VERIFIED
+CANONICAL_PROJECT_REGISTRATION=NOT_APPLIED_TO_LIVE_HOST
+REGISTRATION_DURABILITY=NOT_IMPLEMENTED
+M5_EPISODE_PLAN_ITEM_BINDING=NOT_CREATED
+EXECUTABLE_SHOT_GRAPH=NOT_COMPILED
+CAMERA_CONTRACT=NOT_READY
+REFERENCE_ASSET_FILES=MISSING
+PRODUCTION_ASSETS=NOT_ADMITTED
+GPU_DISPATCH=NOT_STARTED
+BULK_GENERATION_ALLOWED=false
+PUBLICATION_ALLOWED=false
+```
+
+The current non-GPU task audits reviewed import and durable registration, and adds
+candidate contracts for the vertical output profile, an explicit 12-shot local
+structural representation and a zero-write dynamic-media preflight. The client-supplied
+shot budgets have no accepted ShotPlan ref/version/digest/approval lineage and therefore
+do not establish owner-reviewed shot or camera facts. Durable registration, canonical M10/M11 append
+and V4 dispatch remain blocked/not integrated. Any future continuation must preserve
+the single Creator Public API → V5 → V4 → Compute spine and must not create a
+K2-002-specific database or AssetVersion authority.
+
+Sections 0A–16 below are dated historical snapshots or inherited specifications.
+Their “current”, “next action”, “pending”, “authorized” and “not merged” sentences
+describe their original checkpoints and are not current execution authority. Only
+section 0 states this file's current project/wave authority; Accepted ADRs and the
+master plans retain their higher source-of-truth priority.
+
+## 0A. Historical snapshot — 2026-08-23 assisted visual-quality audit
 
 This section records an assisted visual review requested by the project lead. It does not
 rewrite the append-only M10 selections, make a human approval decision, admit a replacement
@@ -99,7 +147,7 @@ Required next production step:
    videos, independently verify them, and request human selection;
 5. do not merge to main, create a master/export, or publish before those gates pass.
 
-## 0B. 2026-08-23 K2 control-plane convergence authorization
+## 0B. Historical snapshot — 2026-08-23 K2 control-plane convergence authorization
 
 ADR-0013 is the authorized governance prerequisite for the next K2 work package. It
 is a non-GPU control-plane correction. This document update does not claim that its
@@ -207,7 +255,7 @@ Current stop conditions remain unchanged:
 
 No tests were run or claimed for this documentation-only governance prerequisite.
 
-## 0C. 2026-08-24 K2 control-plane implementation candidate
+## 0C. Historical snapshot — 2026-08-24 K2 control-plane implementation candidate
 
 The non-GPU ADR-0013 Core implementation is complete as a technical candidate on
 `feature/k2-control-plane-convergence`. It does not change the production stop
@@ -253,7 +301,7 @@ No GPU dispatch, canonical production-data convergence append, media admission,
 Master/Export, publication, deployment or `main` merge occurred in this local
 implementation checkpoint.
 
-## 0. Accepted baselines
+## 0D. Historical accepted baselines
 
 Core accepted baseline:
 
@@ -1199,7 +1247,7 @@ candidate package:
 - the Project Lead's current K2 single-episode hard ceiling is recorded as
   `currency=CNY / maxTotalCostMinor=100000`, with zero committed spend, no provider
   sub-allocation and no implied `budgetAuthorityRef` or paid-call authorization;
-- K2-001 《记忆回声》 remains the current 30-second, 24-fps, two-scene, four-shot
+- at that P1-C snapshot, K2-001 《记忆回声》 was the current 30-second, 24-fps, two-scene, four-shot
   local-evidence target, with the exact `168 + 168 + 192 + 192 = 720` frame sequence;
 - script, storyboard, shot description, performance, continuity, image preflight,
   four Wan2.2 prompt pairs, audio cue sheet and two eight-view character-turnaround
@@ -1630,9 +1678,9 @@ SQLite integrity/foreign keys, a clean worktree, closed ports 8765/8188 and an i
 A100. The next connected stage is GPU execution of four unselected video
 candidates from these exact requests. It must not select or admit unseen videos.
 
-That was the historical next-stage statement at the plan checkpoint. Sections 0A
-and 0B supersede it for current execution: the candidates now exist, semantic visual
-QC is `FAIL`, and the next authorized wave is non-GPU control-plane convergence.
+That was the historical next-stage statement at the plan checkpoint. Section 0 and
+ADR-0014 now supersede it for current execution: K2-001 is archived, its M11 semantic
+visual QC is `FAIL`, and K2-002 non-GPU preproduction is the active wave.
 
 ### M11 exact start-image execution implementation candidate — 2026-08-23
 
@@ -1685,5 +1733,5 @@ Every candidate remains `TECHNICALLY_VERIFIED / UNSELECTED / NOT_ADMITTED`;
 publication remains disabled. ComfyUI was stopped after verification and the A100
 returned to zero allocated MiB. At that historical execution checkpoint, the next
 gate was human review of all four videos, not automatic selection, admission, master
-creation, publication or `main` merge. Section 0A now records that assisted review as
-`FAIL`; section 0B is the current non-GPU control-plane gate.
+creation, publication or `main` merge. Section 0A records that assisted review as
+`FAIL`; section 0 and ADR-0014 now make K2-002 non-GPU preproduction the current gate.

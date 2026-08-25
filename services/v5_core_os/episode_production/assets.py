@@ -15,7 +15,11 @@ from .foundation import (
     _idempotency_key,
     _required_ref,
 )
-from .shot_graph import K2ShotGraphService, ValidationFailedError
+from .shot_graph import (
+    K2ShotGraphService,
+    ValidationFailedError,
+    require_legacy_executable_graph,
+)
 
 
 ASSET_RESOLUTION_GATE = "G4_ASSET_RESOLUTION"
@@ -331,6 +335,7 @@ class K2AssetPipelineService:
         root = verified["root"]
         graph = verified["executableShotGraph"]
         shots = verified["creativeShotVersions"]
+        require_legacy_executable_graph(graph)
         created_at = self._clock()
         authority_requirements = self._authority_requirements(
             workspace=workspace,
@@ -461,8 +466,9 @@ class K2AssetPipelineService:
         verified = self.shot_graph.verify_shot_graph_current(
             workspace_ref, production_run_ref
         )
-        bundle = self.get_asset_plan(workspace_ref, production_run_ref)
         graph = verified["executableShotGraph"]
+        require_legacy_executable_graph(graph)
+        bundle = self.get_asset_plan(workspace_ref, production_run_ref)
         manifest = bundle["assetResolutionManifest"]
         if (
             manifest.get("rootPayloadDigest")

@@ -1,5 +1,8 @@
 # K2 Canonical Lineage Bootstrap Contract
 
+> Historical/closed as of 2026-08-25: this contract is K2-001-only evidence. Its
+> original authorization text below is not current and must not initialize K2-002.
+
 > Status: `NORMATIVE FOR ACS-K2-CANONICAL-BOOTSTRAP-G0 → G1`
 >
 > Scope: one new K2-001 canonical root lineage after the prior durable instance was

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from copy import deepcopy
 from dataclasses import dataclass
 from hashlib import sha256
 import json
@@ -11,14 +12,35 @@ import sqlite3
 from threading import RLock
 from typing import Any, Callable, Mapping, Protocol
 from datetime import datetime, timezone
+from decimal import Decimal, InvalidOperation
 from uuid import uuid4
 
 
 RUN_SCHEMA_VERSION = "v5.episode-production-run.v1"
 MANIFEST_SCHEMA_VERSION = "k2.golden-episode.manifest.v1"
+MANIFEST_SCHEMA_VERSION_V2 = "k2.golden-episode.manifest.v2"
+OUTPUT_PROFILE_SCHEMA_VERSION_V2 = "k2.episode-output-profile.v2"
 UPSTREAM_SCHEMA_VERSION = "v5.episode-production-upstream.v1"
 ROOTS_READY = "ROOTS_READY"
 LOCAL_EVIDENCE = "LOCAL_EVIDENCE"
+PORTRAIT_ASPECT_RATIOS = frozenset({"9:16", "portrait"})
+VISIBLE_IDENTITY_BINDING_MODES = frozenset({"BODY_ONLY", "FACE_LOCK"})
+VISIBLE_IDENTITY_MODES = frozenset({"NONE", "BODY_ONLY", "FACE_LOCK", "MIXED"})
+DIALOGUE_SYNC_MODES = frozenset(
+    {"NONE", "OFF_CAMERA_OR_NON_VISIBLE_MOUTH", "VERIFIED_LIP_SYNC"}
+)
+DIALOGUE_SOURCE_MODES = frozenset({"NARRATION", "DIALOGUE", "SFX_OR_SILENCE"})
+CONTROLLED_EXTENSION_ALGORITHM_REF = "controlled-horizontal-edge-extension-v1"
+CONTROLLED_EXTENSION_ALGORITHM = {
+    "schemaVersion": "k2.controlled-extension-algorithm.v1",
+    "controlledExtensionAlgorithmRef": CONTROLLED_EXTENSION_ALGORITHM_REF,
+    "sourceWidth": 704,
+    "targetWidth": 720,
+    "leftExtensionPixels": 8,
+    "rightExtensionPixels": 8,
+    "cropAllowed": False,
+    "stretchAllowed": False,
+}
 _REF = re.compile(r"[A-Za-z0-9][A-Za-z0-9._:-]{0,199}\Z")
 _IDEMPOTENCY = re.compile(r"[A-Za-z0-9][A-Za-z0-9._:-]{0,127}\Z")
 
@@ -37,6 +59,10 @@ class ScopeMismatchError(EpisodeProductionError):
 
 class UpstreamNotReadyError(EpisodeProductionError):
     code = "upstream_not_confirmed"
+
+
+class ExecutionNotAuthorizedError(EpisodeProductionError):
+    code = "execution_not_authorized"
 
 
 class IdempotencyConflictError(EpisodeProductionError):
@@ -94,6 +120,192 @@ def _positive_int(value: Any, field: str, *, maximum: int) -> int:
     if value < 1 or value > maximum:
         raise EpisodeProductionError(f"{field} is invalid")
     return value
+
+
+def _duration_frames(value: Any, frame_rate: int, field: str) -> int:
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        raise EpisodeProductionError(f"{field} is invalid")
+    try:
+        frames = Decimal(str(value)) * Decimal(frame_rate)
+    except (InvalidOperation, ValueError):
+        raise EpisodeProductionError(f"{field} is invalid") from None
+    integral = frames.to_integral_value()
+    if frames != integral or integral <= 0:
+        raise EpisodeProductionError(f"{field} must align to whole frames")
+    return int(integral)
+
+
+def _required_text(value: Any, field: str) -> str:
+    if not isinstance(value, str) or value != value.strip() or not value:
+        raise EpisodeProductionError(f"{field} is invalid")
+    return value
+
+
+def _camera(value: Any, field: str) -> dict[str, Any]:
+    if not isinstance(value, Mapping) or set(value) != {
+        "shotSize", "movement", "angle", "lensMm", "intent"
+    }:
+        raise EpisodeProductionError(f"{field} is invalid")
+    lens = _positive_int(value.get("lensMm"), f"{field}.lensMm", maximum=500)
+    return {
+        "shotSize": _required_text(value.get("shotSize"), f"{field}.shotSize"),
+        "movement": _required_text(value.get("movement"), f"{field}.movement"),
+        "angle": _required_text(value.get("angle"), f"{field}.angle"),
+        "lensMm": lens,
+        "intent": _required_text(value.get("intent"), f"{field}.intent"),
+    }
+
+
+def _postprocess_requirements(value: Any, field: str) -> list[dict[str, Any]]:
+    if not isinstance(value, list):
+        raise EpisodeProductionError(f"{field} is invalid")
+    result: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    for index, item in enumerate(value):
+        item_field = f"{field}[{index}]"
+        if not isinstance(item, Mapping) or set(item) != {
+            "requirementKey", "type", "inputAssetRequirementKeys", "status"
+        }:
+            raise EpisodeProductionError(f"{item_field} is invalid")
+        requirement_key = _required_ref(
+            item.get("requirementKey"), f"{item_field}.requirementKey"
+        )
+        requirement_type = _required_ref(item.get("type"), f"{item_field}.type")
+        raw_input_keys = item.get("inputAssetRequirementKeys")
+        if (
+            not isinstance(raw_input_keys, list)
+            or not raw_input_keys
+            or not all(isinstance(key, str) for key in raw_input_keys)
+            or len(raw_input_keys) != len(set(raw_input_keys))
+        ):
+            raise EpisodeProductionError(f"{item_field} is invalid")
+        input_keys = [
+            _required_ref(key, f"{item_field}.inputAssetRequirementKeys")
+            for key in raw_input_keys
+        ]
+        if item.get("status") != "NOT_READY" or requirement_key in seen:
+            raise EpisodeProductionError(f"{item_field} is invalid")
+        seen.add(requirement_key)
+        result.append(
+            {
+                "requirementKey": requirement_key,
+                "type": requirement_type,
+                "inputAssetRequirementKeys": input_keys,
+                "status": "NOT_READY",
+            }
+        )
+    return result
+
+
+def _dialogue_requirement(
+    value: Any,
+    field: str,
+    *,
+    scene_characters: list[str],
+    visible_identity_bindings: list[dict[str, str]],
+    dialogue_sync_mode: str,
+) -> dict[str, Any]:
+    if not isinstance(value, Mapping) or set(value) != {
+        "speaker", "text", "sourceMode"
+    }:
+        raise EpisodeProductionError(f"{field} is invalid")
+    source_mode = value.get("sourceMode")
+    if source_mode not in DIALOGUE_SOURCE_MODES:
+        raise EpisodeProductionError(f"{field}.sourceMode is invalid")
+    speaker = value.get("speaker")
+    text = value.get("text")
+    if speaker is not None and (
+        not isinstance(speaker, str) or speaker != speaker.strip() or not speaker
+    ):
+        raise EpisodeProductionError(f"{field}.speaker is invalid")
+    if (
+        not isinstance(text, str)
+        or text != text.strip()
+        or not text
+    ):
+        raise EpisodeProductionError(f"{field}.text is invalid")
+    if source_mode == "DIALOGUE":
+        if speaker is None or speaker not in scene_characters:
+            raise EpisodeProductionError(f"{field}.speaker is unresolved")
+        if dialogue_sync_mode == "NONE":
+            raise EpisodeProductionError(f"{field} requires a dialogue sync mode")
+        if dialogue_sync_mode == "VERIFIED_LIP_SYNC" and (
+            speaker
+            not in {
+                item["characterName"]
+                for item in visible_identity_bindings
+                if item["bindingMode"] == "FACE_LOCK"
+            }
+        ):
+            raise EpisodeProductionError(
+                f"{field} verified lip sync speaker is not face locked"
+            )
+    elif source_mode == "NARRATION":
+        if (
+            speaker is None
+            or speaker not in scene_characters
+            or dialogue_sync_mode != "OFF_CAMERA_OR_NON_VISIBLE_MOUTH"
+        ):
+            raise EpisodeProductionError(f"{field} narration sync is invalid")
+    else:
+        if speaker is not None or dialogue_sync_mode != "NONE":
+            raise EpisodeProductionError(f"{field} SFX/silence sync is invalid")
+    return {
+        "speaker": speaker,
+        "text": text,
+        "sourceMode": source_mode,
+    }
+
+
+def _output_profile_v2(*, portrait: bool) -> dict[str, Any]:
+    if not portrait:
+        return {
+            "schemaVersion": OUTPUT_PROFILE_SCHEMA_VERSION_V2,
+            "orientation": "LANDSCAPE",
+            "targetAspectRatio": "16:9",
+            "width": 1280,
+            "height": 720,
+            "aspectRatio": "16:9",
+            "frameRate": 24,
+            "container": "mp4",
+            "generationCanvas": {
+                "width": 1280, "height": 720, "aspectRatio": "16:9"
+            },
+            "editMaster": {
+                "width": 1280, "height": 720, "aspectRatio": "16:9"
+            },
+            "releaseMaster": {
+                "width": 1920, "height": 1080, "aspectRatio": "16:9"
+            },
+            "controlledExtensionAlgorithmRef": None,
+            "controlledExtensionAlgorithmDigest": None,
+            "controlledExtensionAlgorithm": None,
+        }
+    algorithm = deepcopy(CONTROLLED_EXTENSION_ALGORITHM)
+    return {
+        "schemaVersion": OUTPUT_PROFILE_SCHEMA_VERSION_V2,
+        "orientation": "PORTRAIT",
+        "targetAspectRatio": "9:16",
+        # Compatibility aliases identify the model-generation canvas.  The exact
+        # 9:16 edit and release profiles remain separate authoritative targets.
+        "width": 704,
+        "height": 1280,
+        "aspectRatio": "11:20",
+        "frameRate": 24,
+        "container": "mp4",
+        "generationCanvas": {
+            "width": 704, "height": 1280, "aspectRatio": "11:20"
+        },
+        "editMaster": {
+            "width": 720, "height": 1280, "aspectRatio": "9:16"
+        },
+        "releaseMaster": {
+            "width": 1080, "height": 1920, "aspectRatio": "9:16"
+        },
+        "controlledExtensionAlgorithmRef": CONTROLLED_EXTENSION_ALGORITHM_REF,
+        "controlledExtensionAlgorithmDigest": _digest(algorithm),
+        "controlledExtensionAlgorithm": algorithm,
+    }
 
 
 def _read_upstream(operation: Callable[[], Mapping[str, Any]]) -> Mapping[str, Any]:
@@ -466,8 +678,10 @@ class EpisodeProductionService:
             raise ScopeMismatchError("project and series authority projections disagree")
         if project.get("status") != "active" or series.get("status") != "active":
             raise UpstreamNotReadyError("project and series must be active")
-        if project.get("aspectRatio") != "16:9":
-            raise UpstreamNotReadyError("K2 requires the frozen 16:9 output contract")
+        project_aspect_ratio = project.get("aspectRatio")
+        if project_aspect_ratio not in {"16:9", *PORTRAIT_ASPECT_RATIOS}:
+            raise UpstreamNotReadyError("K2 project output contract is unsupported")
+        portrait = project_aspect_ratio in PORTRAIT_ASPECT_RATIOS
 
         planning = _read_upstream(
             lambda: self.planning_reader.get_workspace(workspace, project_ref, series_ref)
@@ -541,15 +755,6 @@ class EpisodeProductionService:
         if not isinstance(scenes, list) or not scenes:
             raise UpstreamNotReadyError("confirmed ScriptVersion has no scenes")
 
-        shots_value = command.get("shotsPerScene")
-        if not isinstance(shots_value, list) or len(shots_value) != len(scenes):
-            raise EpisodeProductionError("shotsPerScene must match confirmed scenes")
-        shots_per_scene = [
-            _positive_int(value, f"shotsPerScene[{index}]", maximum=12)
-            for index, value in enumerate(shots_value)
-        ]
-        if sum(shots_per_scene) > 120:
-            raise EpisodeProductionError("K2 shot budget exceeds 120")
         characters = sorted(
             {
                 name.strip()
@@ -566,6 +771,222 @@ class EpisodeProductionService:
             raise RepositoryUnavailableError("confirmed duration is unavailable")
         if target_duration <= 0 or target_duration > 3600:
             raise UpstreamNotReadyError("confirmed duration is outside K2 limits")
+
+        explicit_shot_budgets = command.get("shotBudgets")
+        shots_value = command.get("shotsPerScene")
+        normalized_shot_budgets: list[dict[str, Any]] | None = None
+        if portrait and explicit_shot_budgets is None:
+            raise EpisodeProductionError(
+                "portrait K2 runs require explicit v2 shotBudgets"
+            )
+        if explicit_shot_budgets is None:
+            if not isinstance(shots_value, list) or len(shots_value) != len(scenes):
+                raise EpisodeProductionError("shotsPerScene must match confirmed scenes")
+            shots_per_scene = [
+                _positive_int(value, f"shotsPerScene[{index}]", maximum=12)
+                for index, value in enumerate(shots_value)
+            ]
+        else:
+            if not isinstance(explicit_shot_budgets, list) or not explicit_shot_budgets:
+                raise EpisodeProductionError("shotBudgets must not be empty")
+            scenes_by_ref: dict[str, tuple[int, Mapping[str, Any]]] = {}
+            for index, scene in enumerate(scenes):
+                if not isinstance(scene, Mapping):
+                    raise RepositoryUnavailableError("confirmed scene is invalid")
+                scene_ref = _required_ref(
+                    scene.get("scriptSceneRef"), f"scenes[{index}].scriptSceneRef"
+                )
+                if scene_ref in scenes_by_ref:
+                    raise RepositoryUnavailableError("confirmed scene identity is ambiguous")
+                scenes_by_ref[scene_ref] = (index, scene)
+            normalized_shot_budgets = []
+            counts = [0 for _ in scenes]
+            frame_totals = [0 for _ in scenes]
+            dialogue_by_scene: list[list[dict[str, Any]]] = [
+                [] for _ in scenes
+            ]
+            narration_by_scene: list[list[str]] = [[] for _ in scenes]
+            expected_sequence: list[tuple[int, int]] = []
+            for index, item in enumerate(explicit_shot_budgets):
+                field = f"shotBudgets[{index}]"
+                if not isinstance(item, Mapping) or set(item) != {
+                    "scriptSceneRef", "sceneOrder", "durationFrames", "camera",
+                    "visibleIdentityBindings",
+                    "actionBeat", "dialogueSyncMode", "dialogueRequirement",
+                    "postprocessRequirements",
+                }:
+                    raise EpisodeProductionError(f"{field} is invalid")
+                scene_ref = _required_ref(
+                    item.get("scriptSceneRef"), f"{field}.scriptSceneRef"
+                )
+                scene_entry = scenes_by_ref.get(scene_ref)
+                if scene_entry is None:
+                    raise EpisodeProductionError(f"{field}.scriptSceneRef is unresolved")
+                scene_index, scene = scene_entry
+                scene_order = _positive_int(
+                    item.get("sceneOrder"), f"{field}.sceneOrder", maximum=120
+                )
+                counts[scene_index] += 1
+                if scene_order != counts[scene_index]:
+                    raise EpisodeProductionError(
+                        "shotBudgets scene order must be contiguous and script ordered"
+                    )
+                expected_sequence.append((scene_index, scene_order))
+                if expected_sequence != sorted(expected_sequence):
+                    raise EpisodeProductionError(
+                        "shotBudgets must follow confirmed Script scene order"
+                    )
+                duration_frames = _positive_int(
+                    item.get("durationFrames"), f"{field}.durationFrames", maximum=216000
+                )
+                frame_totals[scene_index] += duration_frames
+                camera = _camera(item.get("camera"), f"{field}.camera")
+                raw_identity_bindings = item.get("visibleIdentityBindings")
+                if not isinstance(raw_identity_bindings, list):
+                    raise EpisodeProductionError(
+                        f"{field}.visibleIdentityBindings is invalid"
+                    )
+                visible_identity_bindings: list[dict[str, str]] = []
+                visible_names: set[str] = set()
+                for binding_index, binding in enumerate(raw_identity_bindings):
+                    binding_field = (
+                        f"{field}.visibleIdentityBindings[{binding_index}]"
+                    )
+                    if not isinstance(binding, Mapping) or set(binding) != {
+                        "characterName", "bindingMode"
+                    }:
+                        raise EpisodeProductionError(f"{binding_field} is invalid")
+                    character_name = binding.get("characterName")
+                    binding_mode = binding.get("bindingMode")
+                    if (
+                        not isinstance(character_name, str)
+                        or character_name != character_name.strip()
+                        or not character_name
+                        or character_name in visible_names
+                        or character_name not in scene.get("characters", [])
+                        or binding_mode not in VISIBLE_IDENTITY_BINDING_MODES
+                    ):
+                        raise EpisodeProductionError(f"{binding_field} is invalid")
+                    visible_names.add(character_name)
+                    visible_identity_bindings.append(
+                        {
+                            "characterName": character_name,
+                            "bindingMode": binding_mode,
+                        }
+                    )
+                binding_modes = {
+                    item["bindingMode"] for item in visible_identity_bindings
+                }
+                visible_mode = (
+                    "NONE"
+                    if not binding_modes
+                    else (
+                        next(iter(binding_modes))
+                        if len(binding_modes) == 1
+                        else "MIXED"
+                    )
+                )
+                dialogue_sync_mode = item.get("dialogueSyncMode")
+                if dialogue_sync_mode not in DIALOGUE_SYNC_MODES:
+                    raise EpisodeProductionError(f"{field}.dialogueSyncMode is invalid")
+                if dialogue_sync_mode == "VERIFIED_LIP_SYNC":
+                    raise EpisodeProductionError(
+                        f"{field}.dialogueSyncMode requires trusted lip-sync evidence"
+                    )
+                action_beat = _required_text(
+                    item.get("actionBeat"), f"{field}.actionBeat"
+                )
+                dialogue_requirement = _dialogue_requirement(
+                    item.get("dialogueRequirement"),
+                    f"{field}.dialogueRequirement",
+                    scene_characters=list(scene.get("characters", [])),
+                    visible_identity_bindings=visible_identity_bindings,
+                    dialogue_sync_mode=dialogue_sync_mode,
+                )
+                if dialogue_requirement["sourceMode"] == "DIALOGUE":
+                    dialogue_by_scene[scene_index].append(dialogue_requirement)
+                elif dialogue_requirement["sourceMode"] == "NARRATION":
+                    narration_by_scene[scene_index].append(
+                        dialogue_requirement["text"]
+                    )
+                postprocess_requirements = _postprocess_requirements(
+                    item.get("postprocessRequirements"),
+                    f"{field}.postprocessRequirements",
+                )
+                normalized_shot_budgets.append(
+                    {
+                        "scriptSceneRef": scene_ref,
+                        "sceneOrder": scene_order,
+                        "durationFrames": duration_frames,
+                        "camera": camera,
+                        "visibleIdentityBindings": visible_identity_bindings,
+                        "actionBeat": action_beat,
+                        "dialogueSyncMode": dialogue_sync_mode,
+                        "dialogueRequirement": dialogue_requirement,
+                        "postprocessRequirements": postprocess_requirements,
+                    }
+                )
+            if any(count < 1 or count > 12 for count in counts):
+                raise EpisodeProductionError(
+                    "shotBudgets must provide 1 to 12 shots for every Script scene"
+                )
+            for index, scene in enumerate(scenes):
+                expected_frames = _duration_frames(
+                    scene.get("estimatedDurationSec"),
+                    24,
+                    f"scenes[{index}].estimatedDurationSec",
+                )
+                if frame_totals[index] != expected_frames:
+                    raise EpisodeProductionError(
+                        f"shotBudgets for scenes[{index}] do not match its duration"
+                    )
+                expected_dialogue = []
+                raw_dialogue = scene.get("dialogue")
+                if not isinstance(raw_dialogue, list):
+                    raise RepositoryUnavailableError(
+                        f"scenes[{index}].dialogue is invalid"
+                    )
+                for line_index, line in enumerate(raw_dialogue):
+                    if not isinstance(line, Mapping):
+                        raise RepositoryUnavailableError(
+                            f"scenes[{index}].dialogue[{line_index}] is invalid"
+                        )
+                    expected_dialogue.append(
+                        {
+                            "speaker": line.get("speaker"),
+                            "text": line.get("text"),
+                            "sourceMode": "DIALOGUE",
+                        }
+                    )
+                raw_narration = scene.get("narration")
+                if not isinstance(raw_narration, list) or not all(
+                    isinstance(text, str) for text in raw_narration
+                ):
+                    raise RepositoryUnavailableError(
+                        f"scenes[{index}].narration is invalid"
+                    )
+                if dialogue_by_scene[index] != expected_dialogue:
+                    raise EpisodeProductionError(
+                        f"shotBudgets for scenes[{index}] do not map Script dialogue exactly"
+                    )
+                if narration_by_scene[index] != raw_narration:
+                    raise EpisodeProductionError(
+                        f"shotBudgets for scenes[{index}] do not map Script narration exactly"
+                    )
+            if sum(frame_totals) != _duration_frames(
+                target_duration, 24, "targetDurationSec"
+            ):
+                raise EpisodeProductionError(
+                    "shotBudgets do not match the confirmed Script duration"
+                )
+            if shots_value is not None:
+                if not isinstance(shots_value, list) or list(shots_value) != counts:
+                    raise EpisodeProductionError(
+                        "shotsPerScene does not match explicit shotBudgets"
+                    )
+            shots_per_scene = counts
+        if sum(shots_per_scene) > 120:
+            raise EpisodeProductionError("K2 shot budget exceeds 120")
         scene_budgets = []
         for index, (scene, shot_count) in enumerate(zip(scenes, shots_per_scene)):
             if not isinstance(scene, Mapping):
@@ -581,8 +1002,24 @@ class EpisodeProductionService:
                     "shotCount": shot_count,
                 }
             )
+        manifest_schema = (
+            MANIFEST_SCHEMA_VERSION_V2
+            if portrait or normalized_shot_budgets is not None
+            else MANIFEST_SCHEMA_VERSION
+        )
+        output = (
+            _output_profile_v2(portrait=portrait)
+            if manifest_schema == MANIFEST_SCHEMA_VERSION_V2
+            else {
+                "width": 1280,
+                "height": 720,
+                "frameRate": 24,
+                "aspectRatio": "16:9",
+                "container": "mp4",
+            }
+        )
         manifest = {
-            "schemaVersion": MANIFEST_SCHEMA_VERSION,
+            "schemaVersion": manifest_schema,
             "executionMode": LOCAL_EVIDENCE,
             "title": str(episode.get("title") or "").strip(),
             "episodeNumber": episode.get("episodeNumber"),
@@ -591,15 +1028,17 @@ class EpisodeProductionService:
             "expectedShotCount": sum(shots_per_scene),
             "requiredCharacterNames": characters,
             "sceneBudgets": scene_budgets,
-            "output": {
-                "width": 1280,
-                "height": 720,
-                "frameRate": 24,
-                "aspectRatio": "16:9",
-                "container": "mp4",
-            },
+            "output": output,
             "publicationAllowed": False,
         }
+        if normalized_shot_budgets is not None:
+            manifest["shotBudgets"] = normalized_shot_budgets
+            manifest["shotPlanAuthorityState"] = (
+                "LOCAL_STRUCTURAL_REPRESENTATION_ONLY"
+            )
+            manifest["shotPlanApprovalState"] = "NOT_VERIFIED"
+            manifest["cameraContractState"] = "UNVERIFIED_COMMAND_INPUT"
+            manifest["dispatchAllowed"] = False
         upstream = {
             "schemaVersion": UPSTREAM_SCHEMA_VERSION,
             "workspaceRef": workspace,
@@ -632,11 +1071,16 @@ class EpisodeProductionService:
     def create_run(self, command: Mapping[str, Any]) -> dict[str, Any]:
         if not isinstance(command, Mapping):
             raise EpisodeProductionError("command must be an object")
-        allowed = {
+        base_fields = {
             "workspaceRef", "projectRef", "seriesRef", "episodeRef",
-            "idempotencyKey", "shotsPerScene",
+            "idempotencyKey",
         }
-        if set(command) != allowed:
+        allowed_contracts = {
+            frozenset({*base_fields, "shotsPerScene"}),
+            frozenset({*base_fields, "shotBudgets"}),
+            frozenset({*base_fields, "shotsPerScene", "shotBudgets"}),
+        }
+        if frozenset(command) not in allowed_contracts:
             raise EpisodeProductionError("command fields do not match the K2 contract")
         workspace = _required_ref(command.get("workspaceRef"), "workspaceRef")
         key = _idempotency_key(command.get("idempotencyKey"))
@@ -718,8 +1162,12 @@ class EpisodeProductionService:
             "seriesRef": current["seriesRef"],
             "episodeRef": current["episodeRef"],
             "idempotencyKey": current["idempotencyKey"],
-            "shotsPerScene": [item.get("shotCount") for item in budgets],
         }
+        shot_budgets = manifest.get("shotBudgets")
+        if shot_budgets is None:
+            command["shotsPerScene"] = [item.get("shotCount") for item in budgets]
+        else:
+            command["shotBudgets"] = deepcopy(shot_budgets)
         resolved_manifest, upstream = self._resolve(command)
         upstream_digest = _digest(upstream)
         payload_digest = _digest(

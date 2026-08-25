@@ -1,13 +1,19 @@
 # ADR-0011 — K2 Internal Self-hosted P1 Execution Rebaseline
 
-- Status: `PROJECT LEAD DECISION ACCEPTED / IMPLEMENTATION CANDIDATE / HOST NOT YET VERIFIED`
+- Status: `ACCEPTED / K2-001 HISTORICAL VALIDATION / HOST-VERIFIED FOR THE EXACT ARCHIVED RUN / NOT TRANSFERABLE TO K2-002`
 - Date: `2026-08-22`
 - Decision owner: Project Lead / Architecture Owner `蔺鹏`
 - Supersedes: `ADR-0009` only for the exact K2 Internal Content Lab P1 scope
 - Preserves: `ADR-0009` for commercial/publication execution
 - Contract: `architecture/K2_INTERNAL_SELF_HOSTED_P1_CONTRACT.md`
 
-## Context
+> 2026-08-25 archive note: this decision and its internal self-hosted exception are
+> closed as validation history for the exact K2-001 `workspaceRef` and
+> `productionRunRef`. They do not authorize K2-002, do not admit any K2-001 media,
+> and do not change `publicationAllowed=false`. The current transition is recorded
+> by ADR-0014 and the ADR-0013 main closeout.
+
+## Historical decision-time context
 
 The canonical K2-001 run has advanced through same-lineage G2–G6 host execution.
 The latest reported facts are:

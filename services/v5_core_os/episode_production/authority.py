@@ -109,7 +109,7 @@ def _identity_reference(value: Mapping[str, Any]) -> dict[str, Any]:
     except StaleInputError:
         raise AuthorityRequiredError("identity reference digest is invalid") from None
     media_type = value.get("mediaType")
-    if media_type not in {"image", "video", "identity-direction"}:
+    if media_type not in {"image", "image/png", "video", "identity-direction"}:
         raise AuthorityRequiredError("identity reference media type is unsupported")
     rights_state = value.get("rightsState")
     if rights_state not in {"APPROVED", "LOCAL_EVIDENCE_ONLY"}:

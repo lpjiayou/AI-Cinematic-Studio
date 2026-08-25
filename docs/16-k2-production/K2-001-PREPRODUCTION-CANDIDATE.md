@@ -1,6 +1,10 @@
 # K2-001《记忆回声》开机前创作候选包
 
-> 状态：`DRAFT / CANDIDATE / NOT CONFIRMED / NOT DOMAIN FACT`
+> 归档状态：`HISTORICAL VALIDATION ONLY / CLOSED TO NEW DISPATCH`
+>
+> 下文“当前 / 可直接 / 后续”等措辞只描述原时点，不是当前生产授权；不得重放。
+>
+> 原状态：`DRAFT / CANDIDATE / NOT CONFIRMED / NOT DOMAIN FACT`
 >
 > Gate：`P1 NOT PASSED`
 >

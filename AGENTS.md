@@ -360,16 +360,23 @@ The PRE-M6 route is fixed as:
 → `M6 Preconditions`
 → `M6-P1`
 
-The current phase is the Project-Lead-rebaselined K2 Internal Content Lab P1 wave
-defined by `CURRENT_MILESTONE.md` and ADR-0011. For the one exact configured K2
-workspace/run, external Rights Manifest, Provider Policy and Budget Authority are no
-longer P1 execution gates. P1 must run through the existing Public API → V5 → V4 →
-self-hosted ComfyUI path and pass only after one same-lineage video smoke is
-technically verified. The legacy commercial/publication path remains fail-closed and
-`publicationAllowed=false` remains invariant.
+The active project and execution wave are defined only by `CURRENT_MILESTONE.md`.
+As of 2026-08-25, ADR-0013's non-GPU implementation is Owner Accepted, K2-001 is
+historical validation evidence, and K2-002-CHANGAN is the active non-GPU
+preproduction/onboarding project. K2-002 must create distinct Project, Series,
+Episode, production-run, authority, approval and asset lineages through the existing
+Public API → V5 → V4 → Compute spine. It may not reuse K2-001 refs, receipts,
+operator manifests, package IDs, media assets or exact-scope authority exceptions.
+`publicationAllowed=false` remains invariant until an independent publication gate.
 
-Current and historical governance state (historical entries do not override the
-current K2 authorization above):
+The following K2 Internal P1 description and governance list are a dated historical
+snapshot. They do not override the current authority in `CURRENT_MILESTONE.md`:
+
+For the one exact historical K2-001 workspace/run, external Rights Manifest,
+Provider Policy and Budget Authority were not P1 execution gates. That exception
+does not apply to K2-002.
+
+Historical governance state (these entries do not override current execution):
 
 - PRE-M6-RB1.3-R2-P1: `ACCEPTED`;
 - PRE-M6-RB1.3-R2-P2: `OWNER ACCEPTED / COMPLETE / REMOTE-VERIFIED AT
@@ -386,7 +393,7 @@ current K2 authorization above):
 - M6 Preconditions: `SATISFIED FOR BOUNDED M6-P0/P1 AND M6-P2 LOCAL SQLITE ONLY`;
 - ACS-M6-P0-P1-R2: `OWNER ACCEPTED / COMPLETE / REMOTE-VERIFIED AT
   e38c75aa4ff26bdea80c82d8a24096f799dad860`;
-- current task: `ACS-K2-INTERNAL-SELF-HOSTED-P1-SAME-LINEAGE-VIDEO`;
+- historical task: `ACS-K2-INTERNAL-SELF-HOSTED-P1-SAME-LINEAGE-VIDEO`;
 - legacy repository capability provenance: `MEDIUM / OPEN / NON-BLOCKING`,
   Owner Gate `P3-RV1-003`;
 - M6-P0: `CONTRACT ACCEPTED / COMPLETE`;
@@ -456,9 +463,11 @@ current K2 authorization above):
   GATE A/B/C`;
 - M17-M19: `NOT AUTHORIZED`;
 - Formal 8765 Deployment: `UNTOUCHED / NOT DEPLOYED`;
-- Frontend: `PRESERVED / NOT A P1 EXECUTION PREREQUISITE / G7 DEFERRED`;
-- Production Ready: `NO — G6 LOCAL PREVIEW QC PASSED; INTERNAL SAME-LINEAGE P1
-  VIDEO NOT YET HOST-VERIFIED; MASTER/EXPORT/PUBLICATION ABSENT`.
+- historical Frontend checkpoint: `PRESERVED / NOT A P1 EXECUTION PREREQUISITE /
+  G7 DEFERRED`;
+- historical Production Ready statement: `NO — G6 LOCAL PREVIEW QC PASSED;
+  INTERNAL SAME-LINEAGE P1 VIDEO NOT YET HOST-VERIFIED;
+  MASTER/EXPORT/PUBLICATION ABSENT`.
 
 Legacy repository implementation must not be counted as current Core production
 capability. RB13-F001 and RB13-F002 are closed in the accepted current tested Core

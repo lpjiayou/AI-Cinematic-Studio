@@ -224,6 +224,26 @@ class K2G2ExternalAuthorityTests(unittest.TestCase):
                 character={"characterRef": "character-gu-yan"},
             )
 
+    def test_digest_pinned_identity_accepts_exact_png_media_type(self):
+        bundle = _identity_bundle()
+        bundle["references"][0]["mediaType"] = "image/png"
+        digest = _write(self.identity_path, bundle)
+        environment = self.environment()
+        environment["CREATOR_IDENTITY_REFERENCE_AUTHORITY_BUNDLE_SHA256"] = digest
+        authority = identity_reference_authority_from_environment(environment)
+        decision = authority.authorize_reference(
+            workspace_ref="workspace-k2",
+            production_run_ref="production-run-k2",
+            character={"characterRef": "character-lin-che"},
+        )
+        self.assertEqual(decision["mediaType"], "image/png")
+
+        bundle["references"][0]["mediaType"] = "image/svg+xml"
+        digest = _write(self.identity_path, bundle)
+        environment["CREATOR_IDENTITY_REFERENCE_AUTHORITY_BUNDLE_SHA256"] = digest
+        with self.assertRaises(ExternalAuthorityConfigurationError):
+            identity_reference_authority_from_environment(environment)
+
     def test_partial_tampered_and_closed_world_bundles_fail(self):
         with self.assertRaises(M6ExternalAuthorityConfigurationError):
             m6_external_authorities_from_environment(

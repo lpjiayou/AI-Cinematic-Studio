@@ -12,6 +12,8 @@ from apps.creator_workspace_mvp.public_contract import (
     PUBLIC_EPISODES_ENDPOINT,
     PUBLIC_M6_BIBLE_VERSION_ENDPOINT,
     PUBLIC_PROJECTS_ENDPOINT,
+    PUBLIC_SCRIPT_CONFIRM_ENDPOINT,
+    PUBLIC_SCRIPT_REVIEWED_IMPORT_ENDPOINT,
     PUBLIC_SERIES_ENDPOINT,
     PUBLIC_SERIES_INTELLIGENCE_WORKSPACE_ENDPOINT,
 )
@@ -23,6 +25,7 @@ from apps.creator_workspace_mvp.server import create_server
 from services.v5_core_os.lifecycle_integrity import LifecycleAssembly
 from services.v5_core_os.text_generation.testing import FakeTextGenerationCapability
 from tests.unit.test_ai_director_phase1 import valid_brief, valid_plan
+from tests.unit.test_script_studio_m3 import script_candidate
 
 
 WORKSPACE = "workspace-public-v1"
@@ -225,6 +228,122 @@ class CreatorPublicHttpV1IntegrationTests(unittest.TestCase):
             self.assertEqual(caught.exception.code, 403)
             self.assertEqual(response["error"]["code"], "authority_unavailable")
 
+    def test_reviewed_import_is_actor_bound_with_unverified_digest_assertions(self):
+        series = self.assembly.series_episode.create_series(
+            {
+                "workspaceRef": WORKSPACE,
+                "contentProfileRef": PROFILE,
+                "title": "Reviewed Import Series",
+                "plannedEpisodeCount": 1,
+            }
+        )
+        plan = self.assembly.series_episode.confirm_creative_plan(
+            {
+                "workspaceRef": WORKSPACE,
+                "humanConfirmed": True,
+                "sourcePlanRef": "reviewed-import-source-plan",
+                "sourcePlanSchemaVersion": "creator.ai-director.plan.v1",
+                "sourcePlanVersion": 1,
+                "brief": valid_brief(),
+                "sourcePlan": valid_plan(),
+            }
+        )
+        episode = self.assembly.series_episode.create_episode(
+            {
+                "workspaceRef": WORKSPACE,
+                "seriesRef": series["seriesRef"],
+                "creativePlanRef": plan["creativePlanRef"],
+                "episodeNumber": 1,
+                "title": "Reviewed Import Episode",
+            }
+        )
+        candidate = script_candidate()
+        content = {
+            key: candidate[key]
+            for key in (
+                "title",
+                "logline",
+                "synopsis",
+                "targetDurationSec",
+                "scenes",
+            )
+        }
+        command = {
+            "seriesRef": series["seriesRef"],
+            "episodeRef": episode["episodeRef"],
+            "uploadedSourceByteDigest": "a" * 64,
+            "normalizedSourceDocumentDigest": "b" * 64,
+            "reviewedDocumentDigest": "c" * 64,
+            "content": content,
+        }
+        for forged_field, forged_value in (
+            ("importedByRef", "client-actor"),
+            ("humanConfirmed", True),
+            ("reviewApprovalRef", "client-approval"),
+            ("canonicalScriptContentDigest", "d" * 64),
+        ):
+            with self.subTest(forged_field=forged_field), self.assertRaises(
+                error.HTTPError
+            ) as caught:
+                self.post(
+                    PUBLIC_SCRIPT_REVIEWED_IMPORT_ENDPOINT,
+                    {**command, forged_field: forged_value},
+                )
+            self.assertEqual(caught.exception.code, 400)
+            failure = json.loads(caught.exception.read().decode("utf-8"))
+            self.assertEqual(failure["error"]["code"], "invalid_request")
+
+        forged_scene_command = json.loads(json.dumps(command, ensure_ascii=False))
+        forged_scene_command["content"]["scenes"][0][
+            "scriptSceneRef"
+        ] = "k2-001-reused-scene"
+        with self.assertRaises(error.HTTPError) as caught:
+            self.post(PUBLIC_SCRIPT_REVIEWED_IMPORT_ENDPOINT, forged_scene_command)
+        self.assertEqual(caught.exception.code, 400)
+
+        status, imported = self.post(
+            PUBLIC_SCRIPT_REVIEWED_IMPORT_ENDPOINT, command
+        )
+        self.assertEqual(status, 201)
+        self.assertIsNone(imported["script"]["confirmedScriptVersionRef"])
+        provenance = imported["scriptVersion"]["importProvenance"]
+        self.assertEqual(provenance["uploadedSourceByteDigest"], "a" * 64)
+        self.assertEqual(
+            provenance["normalizedSourceDocumentDigest"], "b" * 64
+        )
+        self.assertEqual(provenance["reviewedDocumentDigest"], "c" * 64)
+        self.assertEqual(provenance["importedByRef"], "runtime-test-credential")
+        self.assertEqual(
+            provenance["digestAssertionState"],
+            "AUTHENTICATED_ACTOR_DECLARATION_UNVERIFIED",
+        )
+        self.assertEqual(
+            provenance["reviewedDocumentToContentBindingState"], "NOT_VERIFIED"
+        )
+        self.assertRegex(
+            provenance["canonicalScriptContentDigest"], r"^[0-9a-f]{64}$"
+        )
+        self.assertRegex(
+            provenance["importProvenanceDigest"], r"^[0-9a-f]{64}$"
+        )
+
+        with self.assertRaises(error.HTTPError) as caught:
+            self.post(
+                PUBLIC_SCRIPT_CONFIRM_ENDPOINT,
+                {
+                    "seriesRef": series["seriesRef"],
+                    "episodeRef": episode["episodeRef"],
+                    "scriptRef": imported["script"]["scriptRef"],
+                    "scriptVersionRef": imported["scriptVersion"][
+                        "scriptVersionRef"
+                    ],
+                    "humanConfirmed": True,
+                },
+            )
+        self.assertEqual(caught.exception.code, 403)
+        blocked = json.loads(caught.exception.read().decode("utf-8"))
+        self.assertEqual(blocked["error"]["code"], "trusted_approval_required")
+
     def test_unknown_public_route_is_stable_404(self):
         with self.assertRaises(error.HTTPError) as caught:
             self.get("/creator/api/v1/not-a-resource")
@@ -246,7 +365,7 @@ class CreatorPublicHttpV1IntegrationTests(unittest.TestCase):
                 )
             }
         )
-        self.assertEqual(len(declared), 28)
+        self.assertEqual(len(declared), 29)
         for path in declared:
             with self.subTest(path=path), self.assertRaises(error.HTTPError) as caught:
                 request.urlopen(f"{self.base_url}{path}", timeout=5)

@@ -5,8 +5,10 @@ from __future__ import annotations
 from contextlib import contextmanager
 from dataclasses import dataclass, replace
 from datetime import datetime, timezone
+import hashlib
 import json
 from pathlib import Path
+import re
 import sqlite3
 from threading import RLock
 from typing import Any, Callable, Mapping, Protocol
@@ -44,6 +46,10 @@ class ScriptNotConfirmedError(ScriptStudioError):
     code = "script_not_confirmed"
 
 
+class TrustedApprovalRequiredError(ScriptStudioError):
+    code = "trusted_approval_required"
+
+
 class RepositoryWriteError(ScriptStudioError):
     code = "application_error"
 
@@ -74,6 +80,13 @@ def _required_ref(value: Any, field: str) -> str:
     text = _required_text(value, field, limit=200)
     if not text.isprintable() or any(character.isspace() for character in text):
         raise ScriptStudioError(f"{field} is invalid")
+    return text
+
+
+def _sha256_digest(value: Any, field: str) -> str:
+    text = _required_text(value, field, limit=64).lower()
+    if re.fullmatch(r"[0-9a-f]{64}", text) is None:
+        raise ScriptStudioError(f"{field} must be a SHA-256 digest")
     return text
 
 
@@ -208,14 +221,22 @@ def _normalize_content(
             raise ScriptStudioError("scene numbers must be continuous")
         expected_number += 1
         supplied_ref = raw.get("scriptSceneRef")
-        if supplied_ref:
-            scene_ref = _required_ref(supplied_ref, "scriptSceneRef")
-            if existing_scene_refs is not None and scene_ref not in existing_scene_refs:
-                raise ScopeMismatchError("scriptSceneRef does not belong to the source ScriptVersion")
-        else:
-            if existing_scene_refs is not None:
-                raise ScriptStudioError("scriptSceneRef is required for a derived version")
+        if existing_scene_refs is None:
+            if "scriptSceneRef" in raw:
+                raise ScriptStudioError(
+                    "scriptSceneRef must be omitted from an initial ScriptVersion"
+                )
             scene_ref = ref_factory("script-scene")
+        else:
+            if not supplied_ref:
+                raise ScriptStudioError(
+                    "scriptSceneRef is required for a derived version"
+                )
+            scene_ref = _required_ref(supplied_ref, "scriptSceneRef")
+            if scene_ref not in existing_scene_refs:
+                raise ScopeMismatchError(
+                    "scriptSceneRef does not belong to the source ScriptVersion"
+                )
         if scene_ref in scene_refs:
             raise ScriptStudioError("scriptSceneRef values must be unique")
         scene_refs.add(scene_ref)
@@ -740,6 +761,91 @@ class ScriptStudioService:
     @staticmethod
     def _version_mapping(record: ScriptVersionRecord) -> dict[str, Any]:
         content = json.loads(record.contentJson)
+        provenance = content.get("importProvenance")
+        if record.changeKind == "reviewed-import":
+            expected_provenance_fields = {
+                "uploadedSourceByteDigest",
+                "normalizedSourceDocumentDigest",
+                "reviewedDocumentDigest",
+                "importedByRef",
+                "digestAssertionState",
+                "reviewedDocumentToContentBindingState",
+                "canonicalScriptContentDigest",
+                "importProvenanceDigest",
+            }
+            if (
+                not isinstance(provenance, Mapping)
+                or set(provenance) != expected_provenance_fields
+            ):
+                raise RepositoryWriteError("reviewed import provenance is invalid")
+            for field in (
+                "uploadedSourceByteDigest",
+                "normalizedSourceDocumentDigest",
+                "reviewedDocumentDigest",
+                "canonicalScriptContentDigest",
+                "importProvenanceDigest",
+            ):
+                try:
+                    _sha256_digest(provenance.get(field), field)
+                except ScriptStudioError as exc:
+                    raise RepositoryWriteError(
+                        "reviewed import provenance is invalid"
+                    ) from exc
+            try:
+                _required_ref(provenance.get("importedByRef"), "importedByRef")
+            except ScriptStudioError as exc:
+                raise RepositoryWriteError(
+                    "reviewed import provenance is invalid"
+                ) from exc
+            canonical_content = {
+                key: content[key]
+                for key in (
+                    "title",
+                    "logline",
+                    "synopsis",
+                    "targetDurationSec",
+                    "scenes",
+                )
+            }
+            expected_digest = hashlib.sha256(
+                json.dumps(
+                    canonical_content,
+                    ensure_ascii=False,
+                    sort_keys=True,
+                    separators=(",", ":"),
+                    allow_nan=False,
+                ).encode("utf-8")
+            ).hexdigest()
+            provenance_payload = {
+                key: value
+                for key, value in provenance.items()
+                if key != "importProvenanceDigest"
+            }
+            expected_provenance_digest = hashlib.sha256(
+                json.dumps(
+                    provenance_payload,
+                    ensure_ascii=False,
+                    sort_keys=True,
+                    separators=(",", ":"),
+                    allow_nan=False,
+                ).encode("utf-8")
+            ).hexdigest()
+            if (
+                provenance.get("canonicalScriptContentDigest") != expected_digest
+                or provenance.get("importProvenanceDigest")
+                != expected_provenance_digest
+                or provenance.get("digestAssertionState")
+                != "AUTHENTICATED_ACTOR_DECLARATION_UNVERIFIED"
+                or provenance.get("reviewedDocumentToContentBindingState")
+                != "NOT_VERIFIED"
+            ):
+                raise RepositoryWriteError(
+                    "reviewed import provenance verification failed"
+                )
+        elif "importProvenance" in content:
+            raise RepositoryWriteError(
+                "non-import ScriptVersion contains reviewed import provenance"
+            )
         return {
             "schemaVersion": record.schemaVersion,
             "workspaceRef": record.workspaceRef,
@@ -793,14 +899,42 @@ class ScriptStudioService:
         series = _required_ref(value.get("seriesRef"), "seriesRef")
         episode = _required_ref(value.get("episodeRef"), "episodeRef")
         change_kind = _required_text(value.get("changeKind"), "changeKind", limit=40)
-        if change_kind not in {"ai-generation", "manual-edit", "ai-scene-rewrite"}:
+        if change_kind not in {
+            "ai-generation",
+            "manual-edit",
+            "ai-scene-rewrite",
+            "reviewed-import",
+        }:
             raise ScriptStudioError("changeKind is invalid")
         bootstrap = self._bootstrap(workspace, series, episode)
         existing = self.repository.get_script(workspace, series, episode)
         now = self._clock()
         if existing is None:
-            if change_kind != "ai-generation":
+            if change_kind not in {"ai-generation", "reviewed-import"}:
                 raise RecordNotFoundError("Script must be generated before editing")
+            import_provenance = None
+            if change_kind == "reviewed-import":
+                import_provenance = {
+                    "uploadedSourceByteDigest": _sha256_digest(
+                        value.get("uploadedSourceByteDigest"),
+                        "uploadedSourceByteDigest",
+                    ),
+                    "normalizedSourceDocumentDigest": _sha256_digest(
+                        value.get("normalizedSourceDocumentDigest"),
+                        "normalizedSourceDocumentDigest",
+                    ),
+                    "reviewedDocumentDigest": _sha256_digest(
+                        value.get("reviewedDocumentDigest"),
+                        "reviewedDocumentDigest",
+                    ),
+                    "importedByRef": _required_ref(
+                        value.get("importedByRef"), "importedByRef"
+                    ),
+                    "digestAssertionState": (
+                        "AUTHENTICATED_ACTOR_DECLARATION_UNVERIFIED"
+                    ),
+                    "reviewedDocumentToContentBindingState": "NOT_VERIFIED",
+                }
             script_ref = self._ref_factory("script")
             version_ref = self._ref_factory("script-version")
             content = _normalize_content(
@@ -808,6 +942,26 @@ class ScriptStudioService:
                 bootstrap=bootstrap,
                 ref_factory=self._ref_factory,
             )
+            if import_provenance is not None:
+                import_provenance["canonicalScriptContentDigest"] = hashlib.sha256(
+                    json.dumps(
+                        content,
+                        ensure_ascii=False,
+                        sort_keys=True,
+                        separators=(",", ":"),
+                        allow_nan=False,
+                    ).encode("utf-8")
+                ).hexdigest()
+                import_provenance["importProvenanceDigest"] = hashlib.sha256(
+                    json.dumps(
+                        import_provenance,
+                        ensure_ascii=False,
+                        sort_keys=True,
+                        separators=(",", ":"),
+                        allow_nan=False,
+                    ).encode("utf-8")
+                ).hexdigest()
+                content["importProvenance"] = import_provenance
             script = ScriptRecord(
                 SCRIPT_SCHEMA_VERSION,
                 workspace,
@@ -839,6 +993,10 @@ class ScriptStudioService:
             )
             stored_script, stored_version = self.repository.create_script_with_version(script, version)
         else:
+            if change_kind == "reviewed-import":
+                raise DuplicateRecordError(
+                    "reviewed import is allowed only for the first ScriptVersion"
+                )
             supplied_script = _required_ref(value.get("scriptRef"), "scriptRef")
             if supplied_script != existing.scriptRef:
                 raise ScopeMismatchError("scriptRef does not belong to Episode")
@@ -905,6 +1063,11 @@ class ScriptStudioService:
         version = self.repository.get_version(workspace, script_ref, version_ref)
         if version is None or version.seriesRef != series or version.episodeRef != episode:
             raise RecordNotFoundError("ScriptVersion was not found")
+        versions = self.repository.list_versions(workspace, script_ref)
+        if versions and versions[0].changeKind == "reviewed-import":
+            raise TrustedApprovalRequiredError(
+                "reviewed-import lineage requires a trusted approval resolver"
+            )
         updated = replace(
             script,
             confirmedScriptVersionRef=version_ref,

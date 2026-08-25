@@ -1,5 +1,10 @@
 # K2 P1 从离线候选到受治理实验运行手册
 
+> `2026-08-25`：K2-001 历史运行手册，`CLOSED TO NEW DISPATCH`；不得用于 K2-002。
+>
+> 下文“当前 / 现在即可执行 / 必须”等措辞只描述原时点，不是当前授权；所有命令均
+> 禁止重放。
+>
 > 当前状态：`CANONICAL ROOT G1 HOST-VERIFIED / M6 + IDENTITY NOT CREATED / P1 NOT PASSED`
 
 > `2026-08-22` 范围说明：本手册保留为商业发布治理路径。当前 K2 内部自托管 P1

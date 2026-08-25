@@ -82,6 +82,10 @@ from .external_media_selection_approval import (
     media_selection_approval_authority_from_environment,
 )
 from .state_projection import K2ProductionStateProjectionService
+from .dynamic_media_revision import (
+    DYNAMIC_MEDIA_PREFLIGHT_SCHEMA_VERSION,
+    K2DynamicMediaPreflightService,
+)
 
 __all__ = [
     "EpisodeProductionPublicBoundary",
@@ -139,6 +143,8 @@ __all__ = [
     "DigestPinnedMediaSelectionApprovalAuthority",
     "media_selection_approval_authority_from_environment",
     "K2ProductionStateProjectionService",
+    "DYNAMIC_MEDIA_PREFLIGHT_SCHEMA_VERSION",
+    "K2DynamicMediaPreflightService",
     "create_in_memory_boundary",
     "create_local_development_boundary",
     "create_local_development_boundary_from_environment",
