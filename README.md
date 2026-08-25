@@ -5,21 +5,25 @@ AI 影视生产系统。Core 仓库负责 Creator Server/Public API/Application�
 OS、V4 Platform、V3 Render Core、持久化与后端测试；客户 Commercial SaaS UI
 由独立 `AI-Cinematic-Studio-Frontend` 仓库承载。
 
-> 当前主线基线：Core `main` 已在 `8d9ce52166cec27d2fefaa86548016130babdfff`
-> 合并 K2 G0→G7，Frontend `main` 已在
-> `277754a6e61e86bb1ed8109570aa19e4214f0d60` 合并连接式生产工作区。该基线
-> 仅为 `LOCAL_EVIDENCE`，`gpuUsed=false`、`publicationAllowed=false`，不代表
-> live provider、GPU、版权或发布就绪。当前已由 Project Lead 授权 K2
-> `P0→P10` 可发布生产波次：M7–M15 仅限同一 K2 单集纵切，M16 仅允许在 P9
-> 与 Gate A/B/C 通过后按 `1→3→10→30` 推进，M17–M19 未授权。
-> P0 的合同、权威端口、持久化与前端阻断映射已经实现；P1 的受控 Wan2.2
-> 视频候选适配器、V4 作业回传、V5 lineage 校验和只读实验接口也已完成安全
-> 前置实现。独立 A100/ComfyUI 操作烟测证明了技术运行时与模型可用，但它不在
-> 受治理的 K2 请求 lineage 内。新的 canonical K2 root 已经完成正式主机 apply、
-> 独立只读扫描和 authenticated API 七资源 exact-match，并严格停在 `ROOTS_READY`。
-> 当前仍缺 M6 Authority、Identity Lock、可核验版权事实及已批准的供应商、凭据、
-> 条款、预算和精确运行证明权威，因此 P0→P1 仍处于外部事实阻断；尚未通过
-> Core 链路发起受权 live provider 任务。
+> 当前已验证基线：Core `main`
+> `6d28a53f3a077f032e341a87412b19b37c00bb1e` / tree
+> `369c3b1479f3136cc32fcbc4efd0fa24e4964058`，Frontend `main`
+> `5b36aac09fc10db04455d9ee287060232a521e5f` / tree
+> `fd20b7d75c5ff379842462964d4e4f1d860d334d`。ADR-0013 非 GPU 控制平面已
+> 正式接受为 `OWNER ACCEPTED / COMPLETE / MAIN-VERIFIED`。K2-001 同时冻结为
+> 历史验证档案；M10 v1 的四个图像 `AssetVersion` 保留为已准入历史，但不是当前
+> action-ready 来源；M11 v1 与 Shot 01 R2–R7 仍为失败或
+> `UNSELECTED / NOT_ADMITTED`，且整个项目不可发布。
+> ADR-0014 与 `ACS-K2-002-GOV-RB1` 已启动并正式重基线独立 K2-002《长安刮痕》
+> 非 GPU 预生产链：来源与 v1.3 审校候选已入库；当前候选只形成
+> `StoryboardDraft / CreativeShotDraft / ShotPlanDraft`，状态停在
+> `SCRIPT_VALIDATED`，不会生成 `ExecutableShotGraph` 或进入 `SHOTS_COMPILED`；
+> authenticated dynamic-media preflight 只读取精确 draft refs/digests，保持零写、
+> `cameraContractState=NOT_READY` 和 `dispatchAllowed=false`。canonical 注册、M10/M11
+> gate append 与 V4 dispatch 尚未集成。剧本 Owner
+> Acceptance、durable receipt、M5 binding、精确 camera、真实引用、EP01 输入资产、
+> 后处理 manifest、rights、provider policy、budget 与 runtime authority 均是必要门禁；
+> 即使全部就绪，Provider/GPU dispatch 仍须单独的 Project Lead 授权。
 >
 > 历史状态：M1–M5 已接受；M6-P0/P1 与 bounded M6-P2 已 Owner Accepted；
 > G1-R1 `d44f471…` 已 Owner Accepted 并关闭 Architecture Remediation R1；
@@ -32,6 +36,20 @@ OS、V4 Platform、V3 Render Core、持久化与后端测试；客户 Commercial
 ## 当前活动工作包
 
 | 项目 | 状态 |
+| --- | --- |
+| ADR-0013 non-GPU control plane | `OWNER ACCEPTED / COMPLETE / MAIN-VERIFIED` |
+| K2-001 | `HISTORICAL VALIDATION / M10 V1 IMAGES ADMITTED AS HISTORY / M11 + R2–R7 UNSELECTED AND NOT_ADMITTED / NOT PUBLISHABLE` |
+| ADR-0014 / ACS-K2-002-GOV-RB1 / K2-002《长安刮痕》 | `GOVERNANCE REBASELINED / EXACT NON-GPU REPOSITORY WORK AUTHORIZED / SOURCE + v1.3 REVIEWED CORRECTION CANDIDATE IN REPOSITORY / SCRIPT OWNER ACCEPTANCE PENDING / TECHNICAL CANDIDATE NOT ACCEPTED / GENERATION NOT STARTED` |
+| K2-002 shot authority | `LOCAL STRUCTURAL DRAFT ONLY / SCRIPT_VALIDATED / CAMERA NOT_READY / EXECUTABLE SHOT GRAPH NOT COMPILED` |
+| K2-002 generation admission | `BLOCKED: SCRIPT ACCEPTANCE + DURABLE REGISTRATION + M5 BINDING + SHOT/CAMERA APPROVAL + CANONICAL REFS/ASSETS + POSTPROCESS + RIGHTS/PROVIDER/BUDGET/RUNTIME + CANONICAL M10/M11 APPEND + SEPARATE GPU AUTHORIZATION` |
+
+## 历史治理快照（不构成当前授权）
+
+下表保留各原始里程碑的历史措辞用于审计。其 `Current`、`AUTHORIZED` 或
+`NOT STARTED` 只描述当时检查点，不覆盖 `CURRENT_MILESTONE.md` 第 0 节与
+ADR-0014 的当前权威。
+
+| 历史项目 | 当时状态 |
 | --- | --- |
 | Accepted M6-P0/P1 baseline | `e38c75aa4ff26bdea80c82d8a24096f799dad860` |
 | M6-P0/P1 | `OWNER ACCEPTED / COMPLETE / REMOTE-VERIFIED` |
@@ -241,6 +259,8 @@ PYTHONDONTWRITEBYTECODE=1 python -m unittest discover -s tests -p 'test_*.py' -q
 - [System Master Plan](AI_CINEMATIC_STUDIO_SYSTEM_MASTER_PLAN.md)
 - [UI Master Plan](AI_CINEMATIC_STUDIO_UI_MASTER_PLAN.md)
 - [Current Milestone](CURRENT_MILESTONE.md)
+- [K2-002 Non-GPU Preproduction Governance Rebaseline](governance/ACS-K2-002-NON-GPU-PREPRODUCTION-REBASELINE.md)
+- [K2-002《长安刮痕》预生产包](docs/16-k2-production/k2-002-changan/README.md)
 - [K2 Publishable Media Production Contract](architecture/K2_PUBLISHABLE_MEDIA_PRODUCTION_CONTRACT.md)
 - [K2 Canonical Lineage Bootstrap Contract](architecture/K2_CANONICAL_LINEAGE_BOOTSTRAP_CONTRACT.md)
 - [ADR-0010 — K2 Canonical Lineage Bootstrap](governance/ADR-0010-k2-canonical-lineage-bootstrap.md)

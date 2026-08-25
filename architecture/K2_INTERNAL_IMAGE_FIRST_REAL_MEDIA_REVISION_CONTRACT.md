@@ -1,5 +1,9 @@
 # K2 Internal Image-First Real-Media Revision Contract
 
+> Historical/closed as of 2026-08-25: this exact-scope K2-001 contract remains
+> audit evidence only. It is not a current dispatch runbook and is not transferable
+> to K2-002.
+
 ## 1. Status and scope
 
 - Status: `M10 v1 ADMITTED / M11 v1 TECHNICALLY VERIFIED / SEMANTIC VISUAL QC FAIL / CONTROL-PLANE CORRECTION AUTHORIZED / NO VIDEO ADMISSION`

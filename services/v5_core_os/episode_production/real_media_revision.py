@@ -48,7 +48,7 @@ from .media_candidate_review import (
     VISUAL_QC_PROFILE,
     VISUAL_QC_PROFILE_DIGEST,
 )
-from .shot_graph import K2ShotGraphService
+from .shot_graph import K2ShotGraphService, require_legacy_executable_graph
 
 
 REAL_IMAGE_PLAN_GATE = "M10_REAL_IMAGE_PLAN"
@@ -746,6 +746,13 @@ class K2RealMediaRevisionService:
         self._ref_factory = ref_factory
         self._clock = clock
 
+    def _require_legacy_current(
+        self, workspace: str, run_ref: str
+    ) -> dict[str, Any]:
+        verified = self.shot_graph.verify_shot_graph_current(workspace, run_ref)
+        require_legacy_executable_graph(verified["executableShotGraph"])
+        return verified
+
     @staticmethod
     def _verified_qc(
         evidence: EpisodeProductionEvidenceRepository,
@@ -789,7 +796,8 @@ class K2RealMediaRevisionService:
             if not isinstance(reference, Mapping):
                 raise StaleInputError("G2 identity reference is unavailable")
             if (
-                reference.get("mediaType") not in {"image", "identity-direction"}
+                reference.get("mediaType")
+                not in {"image", "image/png", "identity-direction"}
                 or binding.get("identityLockRef")
                 != identity_lock.get("identityLockRef")
                 or binding.get("identityLockVersionRef")
@@ -913,7 +921,7 @@ class K2RealMediaRevisionService:
         workspace = _required_ref(command.get("workspaceRef"), "workspaceRef")
         run_ref = _required_ref(command.get("productionRunRef"), "productionRunRef")
         client_key = _idempotency_key(command.get("idempotencyKey"))
-        verified = self.shot_graph.verify_shot_graph_current(workspace, run_ref)
+        verified = self._require_legacy_current(workspace, run_ref)
         root = verified["root"]
         qc = self._verified_qc(self.evidence, workspace, run_ref)
         gate_key = _digest(
@@ -1060,7 +1068,7 @@ class K2RealMediaRevisionService:
     def _verified_plan(
         self, workspace: str, run_ref: str
     ) -> tuple[dict[str, Any], dict[str, Any]]:
-        verified = self.shot_graph.verify_shot_graph_current(workspace, run_ref)
+        verified = self._require_legacy_current(workspace, run_ref)
         qc = self._verified_qc(self.evidence, workspace, run_ref)
         gate = self.evidence.get_gate(
             workspace, run_ref, REAL_IMAGE_PLAN_GATE
@@ -1144,7 +1152,7 @@ class K2RealMediaRevisionService:
             command.get("productionRunRef"), "productionRunRef"
         )
         client_key = _idempotency_key(command.get("idempotencyKey"))
-        self.shot_graph.root_service.get_run(workspace, run_ref)
+        self._require_legacy_current(workspace, run_ref)
         plan_gate = self.evidence.get_gate(
             workspace, run_ref, REAL_IMAGE_PLAN_GATE
         )
@@ -1444,6 +1452,7 @@ class K2RealMediaRevisionService:
             command.get("productionRunRef"), "productionRunRef"
         )
         client_key = _idempotency_key(command.get("idempotencyKey"))
+        self._require_legacy_current(workspace, run_ref)
         raw_selections = command.get("selections")
         if (
             not isinstance(raw_selections, list)
@@ -2222,6 +2231,7 @@ class K2RealMediaRevisionService:
             command.get("productionRunRef"), "productionRunRef"
         )
         client_key = _idempotency_key(command.get("idempotencyKey"))
+        self._require_legacy_current(workspace, run_ref)
         selection_input = command.get("selection")
         fields = {
             "visualQcRef",
@@ -4464,6 +4474,7 @@ class K2RealMediaRevisionService:
             command.get("productionRunRef"), "productionRunRef"
         )
         client_key = _idempotency_key(command.get("idempotencyKey"))
+        self._require_legacy_current(workspace, run_ref)
         verified = self._verified_image_admission(workspace, run_ref)
         root = verified["root"]
         graph = verified["executableShotGraph"]
@@ -4721,7 +4732,7 @@ class K2RealMediaRevisionService:
             command.get("productionRunRef"), "productionRunRef"
         )
         client_key = _idempotency_key(command.get("idempotencyKey"))
-        self.shot_graph.root_service.get_run(workspace, run_ref)
+        self._require_legacy_current(workspace, run_ref)
         gate = self.evidence.get_gate(workspace, run_ref, REAL_VIDEO_PLAN_GATE)
         if gate is None or gate.get("toState") != "REAL_VIDEO_PLAN_READY":
             raise UpstreamNotReadyError("M11 real video plan is not ready")
@@ -5000,6 +5011,7 @@ class K2RealMediaRevisionService:
             command.get("productionRunRef"), "productionRunRef"
         )
         client_key = _idempotency_key(command.get("idempotencyKey"))
+        self._require_legacy_current(workspace, run_ref)
         selections = command.get("selections")
         if (
             not isinstance(selections, list)

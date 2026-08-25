@@ -47,6 +47,7 @@ from .production_policy import (
     K2ProductionPolicyService,
     ProductionPolicyRequiredError,
 )
+from .shot_graph import require_legacy_executable_graph
 
 
 EXPERIMENT_REQUEST_SCHEMA_VERSION = "v5.provider-experiment-request.v1"
@@ -743,6 +744,7 @@ class K2ProviderExperimentService:
             "sourceGenerationRequestRef",
         )
         verified = self.assets.verify_asset_plan_current(workspace, run_ref)
+        require_legacy_executable_graph(verified["executableShotGraph"])
         source, shot = self._select_source(verified, source_ref)
         if internal:
             assert grant is not None

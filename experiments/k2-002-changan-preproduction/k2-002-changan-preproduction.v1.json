@@ -1,0 +1,215 @@
+{
+  "schemaVersion": "k2.preproduction-package.v2",
+  "packageId": "k2-002-changan-preproduction-v1-3",
+  "source": {
+    "uploadedV12ByteSha256": "8dec72d6bde85768c846ec93dd7f06adfa1f5dd9bcddb0f118455b2f9abe37de",
+    "repositoryV12NormalizedPath": "docs/16-k2-production/k2-002-changan/source/K2-002-CHANGAN-SOURCE-v1.2.md",
+    "repositoryV12NormalizedSha256": "7773438973da8fa0b0bd5e51d7adac542cdadf273c4eaf1cc5afcc5504d87f8b",
+    "reviewedCandidatePath": "docs/16-k2-production/k2-002-changan/K2-002-CHANGAN-SERIES-AND-EP01-03-v1.3.md",
+    "reviewedCandidateSha256": "5e33f3469765a79c91ef0c4ffa150e259d500bc596d2eef94da1fc6441a7ae8f",
+    "reviewState": "REVIEWED_CORRECTION_CANDIDATE",
+    "ownerAcceptanceState": "PENDING"
+  },
+  "truthBoundary": {
+    "domainFact": false,
+    "canonicalRegistrationState": "NOT_APPLIED",
+    "durableRegistrationReceiptState": "NOT_IMPLEMENTED_FAIL_CLOSED",
+    "planBindingState": "PENDING_CORE_ONLY_BINDING",
+    "shotPlanAuthorityState": "LOCAL_STRUCTURAL_REPRESENTATION_NOT_APPROVED",
+    "shotPlanApprovalState": "NOT_VERIFIED",
+    "executableShotGraphState": "NOT_COMPILED",
+    "providerDispatchAllowed": false,
+    "legacyExecutionAllowed": false,
+    "candidateAdmissionAllowed": false,
+    "gpuDispatchStarted": false,
+    "bulkGenerationAllowed": false,
+    "publicationAllowed": false
+  },
+  "projectDesign": {
+    "projectKey": "K2-002-CHANGAN",
+    "seriesTitle": "长安刮痕",
+    "plannedEpisodeCount": 30,
+    "activeEpisodeNumbers": [1],
+    "targetDurationSec": 30,
+    "frameRate": 24,
+    "totalFrames": 720,
+    "targetAspectRatio": "9:16"
+  },
+  "outputProfile": {
+    "schemaVersion": "k2.episode-output-profile.v2",
+    "generationCanvas": {"width": 704, "height": 1280, "aspectRatio": "11:20"},
+    "editMaster": {"width": 720, "height": 1280, "aspectRatio": "9:16"},
+    "releaseMaster": {"width": 1080, "height": 1920, "aspectRatio": "9:16"},
+    "controlledExtensionAlgorithmRef": "controlled-horizontal-edge-extension-v1",
+    "controlledExtensionAlgorithmDigest": "dd665ea5b968b4e35302a775c075830b58f2d4cdb5ee52a3e032c3cd0d68dc22",
+    "controlledExtensionAlgorithm": {
+      "schemaVersion": "k2.controlled-extension-algorithm.v1",
+      "controlledExtensionAlgorithmRef": "controlled-horizontal-edge-extension-v1",
+      "sourceWidth": 704,
+      "targetWidth": 720,
+      "leftExtensionPixels": 8,
+      "rightExtensionPixels": 8,
+      "cropAllowed": false,
+      "stretchAllowed": false
+    }
+  },
+  "requiredAssets": [
+    {"requirementKey": "shen-front", "designFilename": "shen_front_CROP.png", "applicableEpisodeNumbers": [1, 2, 3], "status": "MISSING_NOT_ADMITTED"},
+    {"requirementKey": "shen-3q-a", "designFilename": "shen_3q_a_CROP.png", "applicableEpisodeNumbers": [1, 2, 3], "status": "MISSING_NOT_ADMITTED"},
+    {"requirementKey": "shen-3q-b", "designFilename": "shen_3q_b_CROP.png", "applicableEpisodeNumbers": [1, 2, 3], "status": "MISSING_NOT_ADMITTED"},
+    {"requirementKey": "pei-front", "designFilename": "pei_front_CROP.png", "applicableEpisodeNumbers": [1, 2, 3], "status": "MISSING_NOT_ADMITTED"},
+    {"requirementKey": "pei-3q", "designFilename": "pei_3q_CROP.png", "applicableEpisodeNumbers": [1, 2, 3], "status": "MISSING_NOT_ADMITTED"},
+    {"requirementKey": "pei-x", "designFilename": "pei_x_CROP.png", "applicableEpisodeNumbers": [1, 2, 3], "status": "MISSING_NOT_ADMITTED"},
+    {"requirementKey": "scene-l1-master", "designFilename": null, "applicableEpisodeNumbers": [1, 2, 3], "status": "NOT_READY"},
+    {"requirementKey": "scene-l2-master", "designFilename": null, "applicableEpisodeNumbers": [2, 3], "status": "NOT_READY"},
+    {"requirementKey": "lamp-primary-01", "designKey": "lamp_primary_01", "designFilename": null, "applicableEpisodeNumbers": [1, 2, 3], "status": "NOT_READY"},
+    {"requirementKey": "lamp-remote-01", "designKey": "lamp_remote_01", "designFilename": null, "applicableEpisodeNumbers": [1, 2, 3], "status": "NOT_READY"},
+    {"requirementKey": "lantern-entity-01", "designKey": "lantern_entity_01", "designFilename": null, "applicableEpisodeNumbers": [2, 3], "status": "NOT_READY"},
+    {"requirementKey": "glyph-zhen-v1", "designFilename": null, "applicableEpisodeNumbers": [1], "status": "NOT_READY"},
+    {"requirementKey": "shen-face-mark-overlay", "designFilename": null, "applicableEpisodeNumbers": [1, 2, 3], "status": "NOT_READY"},
+    {"requirementKey": "ep01-postprocess-manifest", "designFilename": null, "applicableEpisodeNumbers": [1], "status": "NOT_READY"}
+  ],
+  "episode01": {
+    "title": "刮痕",
+    "revealedCharacter": "贞",
+    "worldChange": "校书房远端一盏油灯永久熄灭",
+    "cameraContractState": "NOT_READY",
+    "shots": [
+      {
+        "shotKey": "K2-002-EP01-SH01",
+        "globalOrder": 1,
+        "durationFrames": 60,
+        "editorialShotSize": "ECU",
+        "actionBeat": "侧光从右向左扫过残卷纤维。",
+        "visibleIdentityBindings": [],
+        "dialogueRequirement": {"speaker": "沈知微", "text": "我以为，那只是一份残卷。", "sourceMode": "NARRATION"},
+        "dialogueSyncMode": "OFF_CAMERA_OR_NON_VISIBLE_MOUTH",
+        "postprocessRequirements": []
+      },
+      {
+        "shotKey": "K2-002-EP01-SH02",
+        "globalOrder": 2,
+        "durationFrames": 60,
+        "editorialShotSize": "ECU",
+        "actionBeat": "沈知微微调光角，刮痕残笔逐渐浮起。",
+        "visibleIdentityBindings": [],
+        "dialogueRequirement": {"speaker": "沈知微", "text": "直到刮痕下——", "sourceMode": "NARRATION"},
+        "dialogueSyncMode": "OFF_CAMERA_OR_NON_VISIBLE_MOUTH",
+        "postprocessRequirements": []
+      },
+      {
+        "shotKey": "K2-002-EP01-SH03",
+        "globalOrder": 3,
+        "durationFrames": 48,
+        "editorialShotSize": "CU",
+        "actionBeat": "镊子缓慢下压，停在纸纤维上方；镜尾以手势和构图匹配切入唐代长案。",
+        "visibleIdentityBindings": [],
+        "dialogueRequirement": {"speaker": "沈知微", "text": "浮出了一个不该存在的字。", "sourceMode": "NARRATION"},
+        "dialogueSyncMode": "OFF_CAMERA_OR_NON_VISIBLE_MOUTH",
+        "postprocessRequirements": []
+      },
+      {
+        "shotKey": "K2-002-EP01-SH04",
+        "globalOrder": 4,
+        "durationFrames": 60,
+        "editorialShotSize": "MCU",
+        "actionBeat": "唐装沈知微俯身靠近残卷，眉心收紧。",
+        "visibleIdentityBindings": [{"characterName": "沈知微", "bindingMode": "FACE_LOCK"}],
+        "dialogueRequirement": {"speaker": null, "text": "纸张轻响，呼吸变浅。", "sourceMode": "SFX_OR_SILENCE"},
+        "dialogueSyncMode": "NONE",
+        "postprocessRequirements": [{"requirementKey": "shen-face-mark-overlay", "type": "TRACKED_IDENTITY_MARK", "inputAssetRequirementKeys": ["shen-face-mark-overlay", "ep01-postprocess-manifest"], "status": "NOT_READY"}]
+      },
+      {
+        "shotKey": "K2-002-EP01-SH05",
+        "globalOrder": 5,
+        "durationFrames": 60,
+        "editorialShotSize": "CU",
+        "actionBeat": "沈知微主动转动油灯底座，把侧光对准刮痕。",
+        "visibleIdentityBindings": [{"characterName": "沈知微", "bindingMode": "BODY_ONLY"}],
+        "dialogueRequirement": {"speaker": null, "text": "铜座摩擦木案声。", "sourceMode": "SFX_OR_SILENCE"},
+        "dialogueSyncMode": "NONE",
+        "postprocessRequirements": []
+      },
+      {
+        "shotKey": "K2-002-EP01-SH06",
+        "globalOrder": 6,
+        "durationFrames": 48,
+        "editorialShotSize": "CU",
+        "actionBeat": "灯芯拉出细长暖色火焰，室内底噪骤然变空。",
+        "visibleIdentityBindings": [],
+        "dialogueRequirement": {"speaker": null, "text": "油灯噼啪停止半拍。", "sourceMode": "SFX_OR_SILENCE"},
+        "dialogueSyncMode": "NONE",
+        "postprocessRequirements": []
+      },
+      {
+        "shotKey": "K2-002-EP01-SH07",
+        "globalOrder": 7,
+        "durationFrames": 60,
+        "editorialShotSize": "MCU",
+        "actionBeat": "沈知微在长案东端固定站位缓慢抬头，望向西侧门。",
+        "visibleIdentityBindings": [{"characterName": "沈知微", "bindingMode": "FACE_LOCK"}],
+        "dialogueRequirement": {"speaker": null, "text": "无台词。", "sourceMode": "SFX_OR_SILENCE"},
+        "dialogueSyncMode": "NONE",
+        "postprocessRequirements": [{"requirementKey": "shen-face-mark-overlay", "type": "TRACKED_IDENTITY_MARK", "inputAssetRequirementKeys": ["shen-face-mark-overlay", "ep01-postprocess-manifest"], "status": "NOT_READY"}]
+      },
+      {
+        "shotKey": "K2-002-EP01-SH08",
+        "globalOrder": 8,
+        "durationFrames": 60,
+        "editorialShotSize": "WS",
+        "actionBeat": "校书房全景；西侧门口仍是一片暗色。",
+        "visibleIdentityBindings": [],
+        "dialogueRequirement": {"speaker": null, "text": "远处单次木响。", "sourceMode": "SFX_OR_SILENCE"},
+        "dialogueSyncMode": "NONE",
+        "postprocessRequirements": []
+      },
+      {
+        "shotKey": "K2-002-EP01-SH09",
+        "globalOrder": 9,
+        "durationFrames": 48,
+        "editorialShotSize": "MS",
+        "actionBeat": "裴昀从门外跨过门槛一步，停住。",
+        "visibleIdentityBindings": [{"characterName": "裴昀", "bindingMode": "BODY_ONLY"}],
+        "dialogueRequirement": {"speaker": null, "text": "衣料轻响。", "sourceMode": "SFX_OR_SILENCE"},
+        "dialogueSyncMode": "NONE",
+        "postprocessRequirements": []
+      },
+      {
+        "shotKey": "K2-002-EP01-SH10",
+        "globalOrder": 10,
+        "durationFrames": 72,
+        "editorialShotSize": "MCU",
+        "actionBeat": "沈知微听见身后的裴昀，画面保留她的反应与裴昀侧背轮廓。",
+        "visibleIdentityBindings": [
+          {"characterName": "沈知微", "bindingMode": "FACE_LOCK"},
+          {"characterName": "裴昀", "bindingMode": "BODY_ONLY"}
+        ],
+        "dialogueRequirement": {"speaker": "裴昀", "text": "你终于回来了。", "sourceMode": "DIALOGUE"},
+        "dialogueSyncMode": "OFF_CAMERA_OR_NON_VISIBLE_MOUTH",
+        "postprocessRequirements": [{"requirementKey": "shen-face-mark-overlay", "type": "TRACKED_IDENTITY_MARK", "inputAssetRequirementKeys": ["shen-face-mark-overlay", "ep01-postprocess-manifest"], "status": "NOT_READY"}]
+      },
+      {
+        "shotKey": "K2-002-EP01-SH11",
+        "globalOrder": 11,
+        "durationFrames": 72,
+        "editorialShotSize": "ECU",
+        "actionBeat": "沈知微重新压低灯角，指尖沿刮痕停住；贞字逐笔显形。",
+        "visibleIdentityBindings": [],
+        "dialogueRequirement": {"speaker": "裴昀", "text": "今夜，", "sourceMode": "DIALOGUE"},
+        "dialogueSyncMode": "OFF_CAMERA_OR_NON_VISIBLE_MOUTH",
+        "postprocessRequirements": [{"requirementKey": "glyph-zhen-progressive-reveal", "type": "TRACKED_GLYPH_COMPOSITE", "inputAssetRequirementKeys": ["glyph-zhen-v1", "ep01-postprocess-manifest"], "status": "NOT_READY"}]
+      },
+      {
+        "shotKey": "K2-002-EP01-SH12",
+        "globalOrder": 12,
+        "durationFrames": 72,
+        "editorialShotSize": "CU",
+        "actionBeat": "校书房远端一盏油灯熄灭，细烟升起。",
+        "visibleIdentityBindings": [],
+        "dialogueRequirement": {"speaker": "裴昀", "text": "你能认出几个字？", "sourceMode": "DIALOGUE"},
+        "dialogueSyncMode": "OFF_CAMERA_OR_NON_VISIBLE_MOUTH",
+        "postprocessRequirements": [{"requirementKey": "lamp-remote-01-extinguish", "type": "DETERMINISTIC_WORLD_STATE", "inputAssetRequirementKeys": ["lamp-remote-01", "ep01-postprocess-manifest"], "status": "NOT_READY"}]
+      }
+    ]
+  }
+}

@@ -1,5 +1,15 @@
 # Phase 1 Execution Authorization & Gen2 Alignment Review
 
+> Applicability notice — `2026-08-25`
+>
+> 本文正文完整保留 `2026-08-06` 时点的条件授权审查。对唯一精确工作包
+> `ACS-K2-002-CHANGAN-ONBOARDING-AND-EP01-CHAIN`，后续已接受的
+> [ACS-K2-002 Non-GPU Preproduction Governance Rebaseline](../../governance/ACS-K2-002-NON-GPU-PREPRODUCTION-REBASELINE.md)
+> 已完成本文第 4 节与第 10.1 节预留的 independent priority review 和 separate
+> K2 authorization。本文原 `BLOCKED / NOT GRANTED` 快照仍是历史事实，但不再
+> 否定该精确 non-GPU repository package；它仍不授予 live production、Provider、
+> GPU、Script/ShotPlan 接受、Asset admission、Release、Publication 或 Phase Exit。
+
 | 项目 | 内容 |
 | --- | --- |
 | Task ID | `ACS-P1-GOV-002` |

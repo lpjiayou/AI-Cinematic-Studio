@@ -22,6 +22,7 @@ from .foundation import (
     ScriptStudioError,
     ScriptStudioService,
     SqliteScriptStudioAdapter,
+    TrustedApprovalRequiredError,
     VersionConflictError,
 )
 
@@ -71,6 +72,8 @@ class ScriptStudioPublicBoundary:
             return ScriptStudioPublicError(exc.code, 409)
         if isinstance(exc, ScopeMismatchError):
             return ScriptStudioPublicError(exc.code, 400)
+        if isinstance(exc, TrustedApprovalRequiredError):
+            return ScriptStudioPublicError(exc.code, 403)
         if isinstance(exc, RepositoryWriteError):
             return ScriptStudioPublicError(exc.code, 500)
         return ScriptStudioPublicError(exc.code, 400)

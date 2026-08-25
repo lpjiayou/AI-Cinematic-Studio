@@ -1,6 +1,10 @@
 # K2-001 M6 分阶段草稿候选
 
-> 状态：`OPERATOR INPUT / NOT DOMAIN FACT / HUMAN REVIEW REQUIRED`
+> 状态：`HISTORICAL OPERATOR INPUT / NOT DOMAIN FACT / CLOSED TO NEW DISPATCH`
+>
+> `2026-08-25`：只保留为 K2-001 验证历史；不得用于 K2-002。
+>
+> 下文“必须 / 执行 / 当前”等措辞只描述原时点，不是当前授权；不得重放任何写操作。
 
 本目录把已审阅的 K2-001《记忆回声》创作候选整理为现有 M6 合同可以接收的
 Series Bible 与 Character Continuity 输入。它不创建审批、确认版本、激活 baseline、

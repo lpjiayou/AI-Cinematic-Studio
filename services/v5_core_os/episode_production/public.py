@@ -35,6 +35,7 @@ from .evidence import (
 from .foundation import (
     EpisodeProductionError,
     EpisodeProductionService,
+    ExecutionNotAuthorizedError,
     IdempotencyConflictError,
     InMemoryEpisodeProductionAdapter,
     RecordNotFoundError,
@@ -82,6 +83,7 @@ from .real_media_revision import (
     RealImageCandidateRejectedError,
     RealVideoCandidateRejectedError,
 )
+from .dynamic_media_revision import K2DynamicMediaPreflightService
 from .media_candidate_review import (
     CandidateLifecycleError,
     CandidateNotSelectableError,
@@ -172,6 +174,7 @@ class EpisodeProductionPublicBoundary:
         self.__media = media
         self.__delivery = delivery
         self.__real_media_revision = real_media_revision
+        self.__dynamic_media_preflight = K2DynamicMediaPreflightService(shot_graph)
         self.__candidate_review = real_media_revision.candidate_review
         self.__state_projection = real_media_revision.state_projection
 
@@ -187,6 +190,8 @@ class EpisodeProductionPublicBoundary:
             return EpisodeProductionPublicError(exc.code, 403)
         if isinstance(exc, ApprovalRequiredError):
             return EpisodeProductionPublicError(exc.code, 403)
+        if isinstance(exc, ExecutionNotAuthorizedError):
+            return EpisodeProductionPublicError(exc.code, 409)
         if isinstance(exc, MediaSelectionApprovalRequiredError):
             return EpisodeProductionPublicError(exc.code, 403)
         if isinstance(exc, ApprovalRejectedError):
@@ -320,6 +325,13 @@ class EpisodeProductionPublicBoundary:
     def plan_real_images(self, command: Mapping[str, Any]) -> dict[str, Any]:
         return self._invoke_public_media(
             self.__real_media_revision.plan_images, command
+        )
+
+    def preflight_dynamic_real_media_plan(
+        self, command: Mapping[str, Any]
+    ) -> dict[str, Any]:
+        return self._invoke_public_media(
+            self.__dynamic_media_preflight.preflight, command
         )
 
     def select_real_images(self, command: Mapping[str, Any]) -> dict[str, Any]:

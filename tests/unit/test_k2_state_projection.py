@@ -6,7 +6,12 @@ from services.v5_core_os.episode_production.evidence import (
     GateAppend,
     InMemoryEpisodeProductionEvidenceAdapter,
 )
-from services.v5_core_os.episode_production.foundation import _digest
+from services.v5_core_os.episode_production.foundation import (
+    MANIFEST_SCHEMA_VERSION,
+    MANIFEST_SCHEMA_VERSION_V2,
+    RepositoryUnavailableError,
+    _digest,
+)
 from services.v5_core_os.episode_production.media_candidate_review import (
     ASSET_VERSION,
     K2MediaCandidateReviewService,
@@ -22,14 +27,22 @@ RUN = "episode-production-run-state-projection"
 
 
 class RootService:
+    def __init__(self, manifest_schema_version=None):
+        self.manifest_schema_version = manifest_schema_version
+
     def get_run(self, workspace_ref, production_run_ref):
-        return {
+        value = {
             "workspaceRef": workspace_ref,
             "productionRunRef": production_run_ref,
             "state": "ROOTS_READY",
             "payloadDigest": "1" * 64,
             "version": 1,
         }
+        if self.manifest_schema_version is not None:
+            value["manifest"] = {
+                "schemaVersion": self.manifest_schema_version,
+            }
+        return value
 
 
 class RuntimeReader:
@@ -137,6 +150,60 @@ class EvidenceWithAdmittedSuccessor(EvidenceWithCurrentVideoPlan):
                 ),
             )
         )
+
+
+class EvidenceWithStaleShotGraph(InMemoryEpisodeProductionEvidenceAdapter):
+    def __init__(self):
+        super().__init__()
+        transitions = (
+            (
+                "G2_AUTHORITY_IDENTITY",
+                "ROOTS_READY",
+                "AUTHORITY_READY",
+                "AuthorityDecision",
+            ),
+            (
+                "G3_SCRIPT_VALIDATION",
+                "AUTHORITY_READY",
+                "SCRIPT_VALIDATED",
+                "ConsistencyValidation",
+            ),
+            (
+                "G3_SHOT_GRAPH",
+                "SCRIPT_VALIDATED",
+                "SHOTS_COMPILED",
+                "ExecutableShotGraph",
+            ),
+        )
+        for ordinal, (gate_name, from_state, to_state, fact_kind) in enumerate(
+            transitions, start=1
+        ):
+            payload = {
+                "transitionOrdinal": ordinal,
+                "factKind": fact_kind,
+            }
+            self.append_gate(
+                GateAppend(
+                    workspaceRef=WORKSPACE,
+                    productionRunRef=RUN,
+                    gateName=gate_name,
+                    idempotencyKey=f"stale-shot-graph-{ordinal}",
+                    rootPayloadDigest="1" * 64,
+                    requestDigest=_digest(payload),
+                    fromState=from_state,
+                    toState=to_state,
+                    createdAt=f"2026-08-25T00:00:0{ordinal}Z",
+                    facts=(
+                        EvidenceFact(
+                            factKind=fact_kind,
+                            factRef=f"stale-shot-graph-fact-{ordinal}",
+                            factVersion=1,
+                            payload=payload,
+                            payloadDigest=_digest(payload),
+                        ),
+                    ),
+                )
+            )
 
 
 class CandidateProjectionWithLatestRevision:
@@ -269,6 +336,44 @@ class K2StateProjectionTests(unittest.TestCase):
         self.assertEqual(projection["runtimeState"]["state"], "UNAVAILABLE")
         self.assertEqual(
             projection["runtimeState"]["authority"], "V4_RUNTIME_NON_CANONICAL"
+        )
+
+    def test_v2_root_fails_closed_over_stale_compiled_evidence(self):
+        root = RootService(MANIFEST_SCHEMA_VERSION_V2)
+        evidence = EvidenceWithStaleShotGraph()
+        candidates = K2MediaCandidateReviewService(
+            root,
+            evidence,
+            clock=lambda: "2026-08-25T00:00:00Z",
+        )
+        with self.assertRaisesRegex(
+            RepositoryUnavailableError,
+            "v2 draft-only run contains executable shot graph evidence",
+        ):
+            K2ProductionStateProjectionService(
+                root,
+                evidence,
+                candidates,
+            ).get_projection(WORKSPACE, RUN)
+
+    def test_v1_root_preserves_legacy_compiled_state_projection(self):
+        root = RootService(MANIFEST_SCHEMA_VERSION)
+        evidence = EvidenceWithStaleShotGraph()
+        candidates = K2MediaCandidateReviewService(
+            root,
+            evidence,
+            clock=lambda: "2026-08-25T00:00:00Z",
+        )
+        projection = K2ProductionStateProjectionService(
+            root,
+            evidence,
+            candidates,
+        ).get_projection(WORKSPACE, RUN)
+        self.assertEqual(projection["state"], "SHOTS_COMPILED")
+        self.assertEqual(projection["productionState"], "SHOTS_COMPILED")
+        self.assertIn(
+            "G3_SHOT_GRAPH",
+            projection["productionProjection"]["completedGates"],
         )
 
     @staticmethod

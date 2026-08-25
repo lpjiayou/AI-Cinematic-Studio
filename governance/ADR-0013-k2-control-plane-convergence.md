@@ -1,6 +1,6 @@
 # ADR-0013 — K2 Control-Plane Convergence
 
-- Status: `ACCEPTED ARCHITECTURE / NON-GPU IMPLEMENTATION TECHNICALLY VERIFIED CANDIDATE / PROJECT LEAD IMPLEMENTATION ACCEPTANCE PENDING`
+- Status: `ACCEPTED / IMPLEMENTATION OWNER ACCEPTED / COMPLETE / MAIN-VERIFIED AT 6d28a53f3a077f032e341a87412b19b37c00bb1e / NON-GPU / NON-PUBLISHING`
 - Date: `2026-08-23`
 - Decision owner: Project Lead / Architecture Owner `蔺鹏`
 - Required base: `0a6962be`
@@ -291,3 +291,25 @@ rules above without deleting or rewriting accepted history. Compatibility client
 may continue reading `state` as `productionState`; new clients can render all four
 axes explicitly. Only verified follow-on implementation may claim the persistence,
 replay, API and recovery gates complete.
+
+## Project Lead implementation acceptance — 2026-08-25
+
+The Project Lead accepts the non-GPU control-plane implementation as
+`OWNER ACCEPTED / COMPLETE / MAIN-VERIFIED` at Core commit
+`6d28a53f3a077f032e341a87412b19b37c00bb1e`, tree
+`369c3b1479f3136cc32fcbc4efd0fa24e4964058`.
+
+This acceptance supersedes this ADR's earlier implementation-pending and no-main-
+merge statements as current execution status. Those statements remain historical
+facts about the authorization checkpoint at which they were written.
+
+Acceptance is limited to the implemented ledger, four-axis projection, single V5
+AssetVersion authority, digest-pinned approval boundary, candidate lifecycle,
+recovery/replay controls, public API sanitization and verified tests. It does not
+claim that the bounded first convergence append ran against the live canonical host.
+It accepts no K2-001 media: semantic visual QC remains `FAIL`; all M11 v1 and Shot
+01 R2–R7 candidates remain unselected and not admitted; no video AssetVersion,
+EpisodeMaster, ExportArtifact or publication authorization exists.
+
+The complete acceptance and evidence boundary is recorded in
+`K2_001_ADR_0013_MAIN_CLOSEOUT_2026-08-25.md`.

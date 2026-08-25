@@ -1,5 +1,10 @@
 # K2 G2 M6 Authority 与 Identity Lock 准备运行手册
 
+> `2026-08-25`：K2-001 历史运行手册，`CLOSED TO NEW DISPATCH`；不得用于 K2-002。
+>
+> 下文“当前 / 必须 / 执行”等措辞只描述原时点，不是当前授权；不得重放任何命令或
+> authority apply。
+>
 > 当前上限：`VALIDATED EXTERNAL INPUTS / G2 NOT PASSED / publicationAllowed=false`
 
 本手册只准备现有 G2 主链需要的两类外部输入：M6 scope/approval authority 与

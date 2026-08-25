@@ -15,7 +15,9 @@ from typing import Any, Callable, Mapping, Protocol, Sequence
 from .evidence import EpisodeProductionEvidenceRepository, EvidenceRecord
 from .foundation import (
     EpisodeProductionError,
+    ExecutionNotAuthorizedError,
     IdempotencyConflictError,
+    MANIFEST_SCHEMA_VERSION_V2,
     RecordNotFoundError,
     StaleInputError,
     UpstreamNotReadyError,
@@ -578,7 +580,24 @@ class K2MediaCandidateReviewService:
             command.get("productionRunRef"), "productionRunRef"
         )
         key = _idempotency_key(command.get("idempotencyKey"))
-        self.root_service.get_run(workspace, run_ref)
+        root = self.root_service.get_run(workspace, run_ref)
+        manifest = root.get("manifest")
+        if isinstance(manifest, Mapping) and manifest.get(
+            "schemaVersion"
+        ) == MANIFEST_SCHEMA_VERSION_V2:
+            if (
+                manifest.get("shotPlanAuthorityState")
+                != "LOCAL_STRUCTURAL_REPRESENTATION_ONLY"
+                or manifest.get("shotPlanApprovalState") != "NOT_VERIFIED"
+                or manifest.get("cameraContractState") != "NOT_READY"
+                or manifest.get("dispatchAllowed") is not False
+            ):
+                raise StaleInputError(
+                    "v2 production run safety boundary is inconsistent"
+                )
+            raise ExecutionNotAuthorizedError(
+                "v2 production run is preflight-only and not eligible for review"
+            )
         return workspace, run_ref, key
 
     def _exact(

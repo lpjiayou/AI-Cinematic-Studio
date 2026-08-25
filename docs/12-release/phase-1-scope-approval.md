@@ -1,5 +1,15 @@
 # Phase 1 Scope Approval
 
+> Applicability notice — `2026-08-25`
+>
+> 本文正文完整保留 `2026-08-06` 时点的范围决定。对唯一精确工作包
+> `ACS-K2-002-CHANGAN-ONBOARDING-AND-EP01-CHAIN`，后续已接受的
+> [ACS-K2-002 Non-GPU Preproduction Governance Rebaseline](../../governance/ACS-K2-002-NON-GPU-PREPRODUCTION-REBASELINE.md)
+> 已依本文第 5 节和第 9.1 节允许的 independent priority decision 路径，取代
+> X2-first 与 K2 repository implementation 全面阻断条款。该取代不适用于其他
+> 工作包；本文其余单一事实源、单 active package、非生产、非 GPU、非发布和
+> 不得夸大证明层级等限制继续有效。
+
 | 项目 | 内容 |
 | --- | --- |
 | Task ID | `ACS-P1-GOV-005` |

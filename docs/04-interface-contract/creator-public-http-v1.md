@@ -1,6 +1,6 @@
 # Creator Public HTTP/API v1
 
-Status: `XR1 FROZEN / AUTH-W1 SECURITY AMENDMENT / ADR-0013 K2 CONTROL-PLANE CONVERGENCE`
+Status: `XR1 FROZEN / AUTH-W1 SECURITY AMENDMENT / ADR-0013 CONTROL PLANE / ADR-0014 K2-002 PREFLIGHT AMENDMENT`
 
 This contract is the only browser-facing Core HTTP surface for the separate Commercial
 Frontend. Existing `/creator/internal/*` endpoints remain compatibility-only and must
@@ -19,13 +19,13 @@ Commercial Frontend → Frontend Experience Adapter → /creator/api/v1
 | --- | --- | --- |
 | M1 | `/ai-director/candidates`, `/creative-plans/confirm` | AI Director Application + Series/Episode boundary |
 | M2 | `/series`, `/episodes` | Series/Episode public boundary |
-| M3 | `/script-workspaces`, `/script-versions/*` | Script Studio Application/public boundary |
+| M3 | `/script-workspaces`, `/script-versions/*`, `/script-versions/reviewed-import` | Script Studio Application/public boundary |
 | M4 | `/projects`, `/project-contexts` | Project Context public boundary |
 | M5 | `/series-planning-workspaces`, `/series-plan-*` | Series Planning + Series Director boundaries |
 | M6 | `/series-intelligence-workspaces`, `/series-intelligence/*` | accepted Series Intelligence public boundary |
-| M7–M8 | `/episode-production-runs/{runRef}/shot-graph` | bounded K2 V5 Shot Graph service |
+| M7–M8 | `/episode-production-runs/{runRef}/shot-graph` | bounded K2 V5 legacy executable-graph service plus v2 local-draft compatibility transport |
 | M9 | `/episode-production-runs/{runRef}/assets` | bounded K2 V5 Asset Pipeline service |
-| M10 | `/episode-production-runs/{runRef}/real-media-revision`, `/real-image-candidates`, `/semantic-visual-qc`, `/media-selection`, `/real-image-admission`, `/real-image-successor-admission`, `/real-image-selection`, `/state-projection`, `/production-readiness` | bounded K2 V5 image candidate, review, authority-backed admission and projection services |
+| M10 | `/episode-production-runs/{runRef}/dynamic-media-preflight`, `/real-media-revision`, `/real-image-candidates`, `/semantic-visual-qc`, `/media-selection`, `/real-image-admission`, `/real-image-successor-admission`, `/real-image-selection`, `/state-projection`, `/production-readiness` | bounded K2 V5 zero-write image preflight plus legacy image candidate, review, authority-backed admission and projection services |
 | M11 | `/episode-production-runs/{runRef}/real-video-revision`, `/real-video-candidates`, `/semantic-visual-qc`, `/media-selection`, `/real-video-admission`, `/state-projection`, `/provider-experiments`, `/media` | bounded K2 V5 exact start-image video candidate, review and admission services over V4 |
 | M12 | `/episode-production-runs/{runRef}/production-readiness`, `/media` | bounded K2 V5 media service; live audio remains blocked |
 | M13–M14 | `/episode-production-runs/{runRef}/preview`, `/finalize` | bounded K2 V5 delivery service over V4/V3 |
@@ -50,6 +50,24 @@ specific confirmation route. The Experience Adapter must preserve
 response. The M1 candidate response also carries the Core-issued opaque
 `sourcePlanRef` and `sourcePlanVersion`; browser code must return those exact values on
 confirmation and must not mint or infer a source-plan reference.
+
+### Human-authored reviewed Script import
+
+`POST /creator/api/v1/script-versions/reviewed-import` accepts exactly
+`seriesRef`, `episodeRef`, `uploadedSourceByteDigest`,
+`normalizedSourceDocumentDigest`, `reviewedDocumentDigest` and `content`.
+Authentication injects `workspaceRef` and the authenticated service-credential ref;
+clients cannot submit that ref or a first-version `scriptSceneRef`. The current auth
+contract does not resolve a human user identity or RBAC role. Core generates scene refs
+and a canonical Script-content digest.
+
+The three document digests are authenticated-service-credential declarations only.
+This route does not receive or re-hash the source documents and does not prove their
+semantic binding to `content`. The result is an unconfirmed first ScriptVersion.
+Generic confirmation of any reviewed-import lineage returns
+`trusted_approval_required` until a trusted Owner approval resolver verifies the exact
+subject. Existing generic generation/manual-edit paths do not carry reviewed-source
+provenance. The internal unauthenticated alias remains forbidden.
 
 ## K2 provider experiment semantics
 
@@ -86,6 +104,35 @@ video candidate satisfies the bounded P1 state
 `PASSED_INTERNAL_VIDEO_EXECUTION`; image/audio provider experiments and external
 Rights/Provider/Budget authorities are not blockers for that internal P1 checkpoint.
 This does not create an AssetVersion, Master, export, approval or publication fact.
+
+## K2-002 dynamic image preflight semantics
+
+`POST /episode-production-runs/{runRef}/dynamic-media-preflight` accepts an empty
+body. Authentication injects `workspaceRef`, and the path injects
+`productionRunRef`; client-supplied graph, identity, workspace, run, provider,
+rights, budget or execution authority is rejected.
+
+The operation reads one current `ShotPlanDraft` and IdentityLock and returns only
+deterministic image request previews. It appends no gate or record, allocates no
+GenerationRequest/Candidate/AssetVersion ref, invokes no V4 adapter and performs no
+media write. Every plan/request level remains
+`executionAuthorizationState=PREFLIGHT_ONLY_NOT_AUTHORIZED`,
+`dispatchAllowed=false`, `candidateAdmissionAllowed=false` and
+`publicationAllowed=false`. M11/video and audio preflight are not implemented.
+
+For a v2 run, the historical `/shot-graph` route is transport compatibility only:
+`POST` prepares a discriminated `shotPlanDraft` response and `GET` reads that draft.
+It does not compile or return an `ExecutableShotGraph`, append `G3_SHOT_GRAPH`, create
+`StoryboardVersion`/`CreativeShotVersion` facts, or advance beyond
+`SCRIPT_VALIDATED`. The draft contains only the source package's
+`editorialShotSize`; camera lens, angle and movement remain absent and
+`cameraContractState=NOT_READY`.
+
+The draft is a local structural representation with unverified ShotPlan and camera
+authority. All legacy G4–G6, provider-experiment, M10/M11 candidate/review/
+admission mutation routes reject that run with `execution_not_authorized`. A future
+canonical M10 append or Provider/GPU dispatch requires a separate accepted contract,
+all listed authorities and explicit Project Lead authorization.
 
 ## K2 M10 image-plan semantics
 

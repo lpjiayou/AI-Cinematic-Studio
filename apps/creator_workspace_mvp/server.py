@@ -58,6 +58,7 @@ from apps.creator_workspace_mvp.public_contract import (
     PUBLIC_PROJECTS_ENDPOINT,
     PUBLIC_SCRIPT_CONFIRM_ENDPOINT,
     PUBLIC_SCRIPT_GENERATE_ENDPOINT,
+    PUBLIC_SCRIPT_REVIEWED_IMPORT_ENDPOINT,
     PUBLIC_SCRIPT_MANUAL_VERSION_ENDPOINT,
     PUBLIC_SCRIPT_REWRITE_ENDPOINT,
     PUBLIC_SCRIPT_WORKSPACE_ENDPOINT,
@@ -110,6 +111,7 @@ CONFIRM_PLAN_ENDPOINT = "/creator/internal/creative-plans/confirm"
 EPISODES_ENDPOINT = "/creator/internal/episodes"
 SCRIPT_WORKSPACE_ENDPOINT = "/creator/internal/script-studio"
 SCRIPT_GENERATE_ENDPOINT = f"{SCRIPT_WORKSPACE_ENDPOINT}/generate"
+SCRIPT_REVIEWED_IMPORT_ENDPOINT = f"{SCRIPT_WORKSPACE_ENDPOINT}/reviewed-import"
 SCRIPT_MANUAL_VERSION_ENDPOINT = f"{SCRIPT_WORKSPACE_ENDPOINT}/manual-version"
 SCRIPT_REWRITE_ENDPOINT = f"{SCRIPT_WORKSPACE_ENDPOINT}/rewrite-scene"
 SCRIPT_CONFIRM_ENDPOINT = f"{SCRIPT_WORKSPACE_ENDPOINT}/confirm"
@@ -133,6 +135,7 @@ EPISODE_PRODUCTION_SUBRESOURCES = {
     "finalize",
     "delivery",
     "real-media-revision",
+    "dynamic-media-preflight",
     "real-image-candidates",
     "real-image-selection",
     "real-image-admission",
@@ -155,6 +158,7 @@ PUBLIC_EXACT_ALIASES = {
     PUBLIC_EPISODES_ENDPOINT: EPISODES_ENDPOINT,
     PUBLIC_SCRIPT_WORKSPACE_ENDPOINT: SCRIPT_WORKSPACE_ENDPOINT,
     PUBLIC_SCRIPT_GENERATE_ENDPOINT: SCRIPT_GENERATE_ENDPOINT,
+    PUBLIC_SCRIPT_REVIEWED_IMPORT_ENDPOINT: SCRIPT_REVIEWED_IMPORT_ENDPOINT,
     PUBLIC_SCRIPT_MANUAL_VERSION_ENDPOINT: SCRIPT_MANUAL_VERSION_ENDPOINT,
     PUBLIC_SCRIPT_REWRITE_ENDPOINT: SCRIPT_REWRITE_ENDPOINT,
     PUBLIC_SCRIPT_CONFIRM_ENDPOINT: SCRIPT_CONFIRM_ENDPOINT,
@@ -284,6 +288,7 @@ class CreatorRequestHandler(BaseHTTPRequestHandler):
             CONFIRM_PLAN_ENDPOINT,
             EPISODES_ENDPOINT,
             SCRIPT_GENERATE_ENDPOINT,
+            SCRIPT_REVIEWED_IMPORT_ENDPOINT,
             SCRIPT_MANUAL_VERSION_ENDPOINT,
             SCRIPT_REWRITE_ENDPOINT,
             SCRIPT_CONFIRM_ENDPOINT,
@@ -319,6 +324,21 @@ class CreatorRequestHandler(BaseHTTPRequestHandler):
                     400, "client_workspace_scope_forbidden"
                 )
                 return
+            if requested_path == PUBLIC_SCRIPT_REVIEWED_IMPORT_ENDPOINT:
+                if set(payload) != {
+                    "seriesRef",
+                    "episodeRef",
+                    "uploadedSourceByteDigest",
+                    "normalizedSourceDocumentDigest",
+                    "reviewedDocumentDigest",
+                    "content",
+                }:
+                    self._send_application_error(400, "invalid_request")
+                    return
+                payload = {
+                    **payload,
+                    "importedByRef": self._authenticated_credential_ref(),
+                }
             if production_subresource is not None and "productionRunRef" in payload:
                 self._send_application_error(400, "invalid_request")
                 return
@@ -402,6 +422,11 @@ class CreatorRequestHandler(BaseHTTPRequestHandler):
                     result = self.episode_production_boundary.plan_real_images(
                         command
                     )
+                elif resource == "dynamic-media-preflight":
+                    result = (
+                        self.episode_production_boundary
+                        .preflight_dynamic_real_media_plan(command)
+                    )
                 elif resource == "real-image-selection":
                     result = self.episode_production_boundary.select_real_images(
                         command
@@ -447,10 +472,13 @@ class CreatorRequestHandler(BaseHTTPRequestHandler):
             except EpisodeProductionPublicError as exc:
                 self._send_episode_production_error(exc)
                 return
-            self._send_json(
-                200 if result["idempotentReplay"] else 201,
-                {"ok": True, **result},
-            )
+            if resource == "dynamic-media-preflight":
+                self._send_json(200, {"ok": True, "preflight": result})
+            else:
+                self._send_json(
+                    200 if result["idempotentReplay"] else 201,
+                    {"ok": True, **result},
+                )
             return
         if path.startswith(SCRIPT_WORKSPACE_ENDPOINT):
             self._handle_script_post(path, payload)
@@ -983,6 +1011,27 @@ class CreatorRequestHandler(BaseHTTPRequestHandler):
                 result = self.script_studio_boundary.create_version(
                     {**scope, "changeKind": "ai-generation", "content": content}
                 )
+            elif path == SCRIPT_REVIEWED_IMPORT_ENDPOINT:
+                if self.authenticated_principal is None:
+                    self._send_application_error(403, "forbidden")
+                    return
+                result = self.script_studio_boundary.create_version(
+                    {
+                        **self._script_scope(payload),
+                        "changeKind": "reviewed-import",
+                        "uploadedSourceByteDigest": payload.get(
+                            "uploadedSourceByteDigest"
+                        ),
+                        "normalizedSourceDocumentDigest": payload.get(
+                            "normalizedSourceDocumentDigest"
+                        ),
+                        "reviewedDocumentDigest": payload.get(
+                            "reviewedDocumentDigest"
+                        ),
+                        "importedByRef": payload.get("importedByRef"),
+                        "content": payload.get("content"),
+                    }
+                )
             elif path == SCRIPT_MANUAL_VERSION_ENDPOINT:
                 result = self.script_studio_boundary.create_version(
                     {
@@ -1136,6 +1185,7 @@ class CreatorRequestHandler(BaseHTTPRequestHandler):
             "invalid_script_candidate": "剧本候选内容未通过校验。",
             "version_conflict": "剧本版本已更新，请刷新后重试。",
             "script_not_confirmed": "请先确认一个剧本版本。",
+            "trusted_approval_required": "该导入剧本需要可信的项目负责人审批后才能确认。",
             "dependent_script_exists": "该内容已有剧本版本，为保护制作链路暂不能删除。",
             "invalid_series_plan_candidate": "系列规划候选未通过本地结构校验。",
             "series_plan_not_confirmed": "请先完成人工确认。",
@@ -1147,6 +1197,7 @@ class CreatorRequestHandler(BaseHTTPRequestHandler):
             "invalid_reference": "内容引用无效，请刷新后重试。",
             "lifecycle_unavailable": "内容生命周期服务暂时不可用。",
             "upstream_not_confirmed": "请先确认系列规划、集数绑定和剧本版本。",
+            "execution_not_authorized": "当前镜头结构仅供预检，尚未获得媒体执行授权。",
             "authority_required": "请先连接并完成 M6 权威与身份参考授权。",
             "invalid_state_transition": "当前制作状态不能执行该操作，请刷新后重试。",
             "stale_input": "上游权威版本已变化，请重新建立本次单集制作链。",

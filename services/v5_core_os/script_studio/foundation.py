@@ -5,8 +5,10 @@ from __future__ import annotations
 from contextlib import contextmanager
 from dataclasses import dataclass, replace
 from datetime import datetime, timezone
+import hashlib
 import json
 from pathlib import Path
+import re
 import sqlite3
 from threading import RLock
 from typing import Any, Callable, Mapping, Protocol
@@ -18,6 +20,36 @@ SCRIPT_VERSION_SCHEMA_VERSION = "creator.script-studio.script-version.v1"
 STORYBOARD_BOOTSTRAP_SCHEMA_VERSION = "creator.storyboard.bootstrap-input.v1"
 SCRIPT_STUDIO_BOOTSTRAP_SCHEMA_VERSION = "creator.script-studio.bootstrap-input.v1"
 SQLITE_SCHEMA_VERSION = 1
+
+_SCRIPT_CONTENT_FIELDS = {
+    "title",
+    "logline",
+    "synopsis",
+    "targetDurationSec",
+    "scenes",
+}
+_PERSISTED_SCRIPT_SCENE_FIELDS = {
+    "scriptSceneRef",
+    "sceneNumber",
+    "heading",
+    "location",
+    "timeOfDay",
+    "characters",
+    "action",
+    "dialogue",
+    "narration",
+    "subtitleText",
+    "estimatedDurationSec",
+    "scenePurpose",
+    "continuityNotes",
+    "productionNotes",
+}
+_SCRIPT_CHANGE_KINDS = {
+    "ai-generation",
+    "manual-edit",
+    "ai-scene-rewrite",
+    "reviewed-import",
+}
 
 
 class ScriptStudioError(ValueError):
@@ -42,6 +74,10 @@ class VersionConflictError(ScriptStudioError):
 
 class ScriptNotConfirmedError(ScriptStudioError):
     code = "script_not_confirmed"
+
+
+class TrustedApprovalRequiredError(ScriptStudioError):
+    code = "trusted_approval_required"
 
 
 class RepositoryWriteError(ScriptStudioError):
@@ -74,6 +110,13 @@ def _required_ref(value: Any, field: str) -> str:
     text = _required_text(value, field, limit=200)
     if not text.isprintable() or any(character.isspace() for character in text):
         raise ScriptStudioError(f"{field} is invalid")
+    return text
+
+
+def _sha256_digest(value: Any, field: str) -> str:
+    text = _required_text(value, field, limit=64).lower()
+    if re.fullmatch(r"[0-9a-f]{64}", text) is None:
+        raise ScriptStudioError(f"{field} must be a SHA-256 digest")
     return text
 
 
@@ -208,14 +251,22 @@ def _normalize_content(
             raise ScriptStudioError("scene numbers must be continuous")
         expected_number += 1
         supplied_ref = raw.get("scriptSceneRef")
-        if supplied_ref:
-            scene_ref = _required_ref(supplied_ref, "scriptSceneRef")
-            if existing_scene_refs is not None and scene_ref not in existing_scene_refs:
-                raise ScopeMismatchError("scriptSceneRef does not belong to the source ScriptVersion")
-        else:
-            if existing_scene_refs is not None:
-                raise ScriptStudioError("scriptSceneRef is required for a derived version")
+        if existing_scene_refs is None:
+            if "scriptSceneRef" in raw:
+                raise ScriptStudioError(
+                    "scriptSceneRef must be omitted from an initial ScriptVersion"
+                )
             scene_ref = ref_factory("script-scene")
+        else:
+            if not supplied_ref:
+                raise ScriptStudioError(
+                    "scriptSceneRef is required for a derived version"
+                )
+            scene_ref = _required_ref(supplied_ref, "scriptSceneRef")
+            if scene_ref not in existing_scene_refs:
+                raise ScopeMismatchError(
+                    "scriptSceneRef does not belong to the source ScriptVersion"
+                )
         if scene_ref in scene_refs:
             raise ScriptStudioError("scriptSceneRef values must be unique")
         scene_refs.add(scene_ref)
@@ -249,6 +300,109 @@ def _normalize_content(
         "targetDurationSec": target_duration,
         "scenes": scenes,
     }
+
+
+def _normalize_persisted_content(
+    value: Any,
+    *,
+    reviewed_import: bool,
+) -> dict[str, Any]:
+    """Fail closed when immutable ScriptVersion content no longer matches storage shape."""
+
+    expected = set(_SCRIPT_CONTENT_FIELDS)
+    if reviewed_import:
+        expected.add("importProvenance")
+    if not isinstance(value, Mapping) or set(value) != expected:
+        raise RepositoryWriteError("persisted ScriptVersion content is invalid")
+
+    try:
+        target_duration = _positive_number(
+            value.get("targetDurationSec"), "targetDurationSec"
+        )
+        scenes_value = value.get("scenes")
+        if not isinstance(scenes_value, list) or not scenes_value:
+            raise ScriptStudioError("scenes must be a non-empty array")
+        scenes: list[dict[str, Any]] = []
+        scene_refs: set[str] = set()
+        for index, raw in enumerate(scenes_value):
+            if not isinstance(raw, Mapping) or set(raw) != _PERSISTED_SCRIPT_SCENE_FIELDS:
+                raise ScriptStudioError(
+                    f"persisted scenes[{index}] fields are invalid"
+                )
+            number = _positive_int(
+                raw.get("sceneNumber"),
+                f"scenes[{index}].sceneNumber",
+                maximum=10_000,
+            )
+            if number != index + 1:
+                raise ScriptStudioError("scene numbers must be continuous")
+            scene_ref = _required_ref(
+                raw.get("scriptSceneRef"), f"scenes[{index}].scriptSceneRef"
+            )
+            if scene_ref in scene_refs:
+                raise ScriptStudioError("scriptSceneRef values must be unique")
+            scene_refs.add(scene_ref)
+            scenes.append(
+                {
+                    "scriptSceneRef": scene_ref,
+                    "sceneNumber": number,
+                    "heading": _required_text(
+                        raw.get("heading"), "heading", limit=300
+                    ),
+                    "location": _required_text(
+                        raw.get("location"), "location", limit=300
+                    ),
+                    "timeOfDay": _required_text(
+                        raw.get("timeOfDay"), "timeOfDay", limit=120
+                    ),
+                    "characters": _text_list(raw.get("characters"), "characters"),
+                    "action": _required_text(
+                        raw.get("action"), "action", limit=6000
+                    ),
+                    "dialogue": _dialogue(raw.get("dialogue"), "dialogue"),
+                    "narration": _text_list(raw.get("narration"), "narration"),
+                    "subtitleText": _text_list(
+                        raw.get("subtitleText"), "subtitleText"
+                    ),
+                    "estimatedDurationSec": _positive_number(
+                        raw.get("estimatedDurationSec"), "estimatedDurationSec"
+                    ),
+                    "scenePurpose": _required_text(
+                        raw.get("scenePurpose"), "scenePurpose", limit=1000
+                    ),
+                    "continuityNotes": _text_list(
+                        raw.get("continuityNotes"), "continuityNotes"
+                    ),
+                    "productionNotes": _text_list(
+                        raw.get("productionNotes"), "productionNotes"
+                    ),
+                }
+            )
+        total_duration = round(
+            sum(scene["estimatedDurationSec"] for scene in scenes), 3
+        )
+        if not target_duration * 0.8 <= total_duration <= target_duration * 1.2:
+            raise ScriptStudioError(
+                "scene duration total is inconsistent with the ScriptVersion target"
+            )
+        normalized = {
+            "title": _required_text(value.get("title"), "title", limit=300),
+            "logline": _required_text(value.get("logline"), "logline", limit=1000),
+            "synopsis": _required_text(
+                value.get("synopsis"), "synopsis", limit=6000
+            ),
+            "targetDurationSec": target_duration,
+            "scenes": scenes,
+        }
+    except ScriptStudioError as exc:
+        raise RepositoryWriteError("persisted ScriptVersion content is invalid") from exc
+
+    stored_content = {field: value[field] for field in _SCRIPT_CONTENT_FIELDS}
+    if normalized != stored_content:
+        raise RepositoryWriteError("persisted ScriptVersion content is not normalized")
+    if reviewed_import:
+        normalized["importProvenance"] = value["importProvenance"]
+    return normalized
 
 
 @dataclass(frozen=True)
@@ -739,23 +893,189 @@ class ScriptStudioService:
 
     @staticmethod
     def _version_mapping(record: ScriptVersionRecord) -> dict[str, Any]:
-        content = json.loads(record.contentJson)
-        return {
-            "schemaVersion": record.schemaVersion,
-            "workspaceRef": record.workspaceRef,
-            "seriesRef": record.seriesRef,
-            "episodeRef": record.episodeRef,
-            "scriptRef": record.scriptRef,
-            "scriptVersionRef": record.scriptVersionRef,
-            "sourcePlanRef": record.sourcePlanRef,
-            "sourcePlanSchemaVersion": record.sourcePlanSchemaVersion,
-            "sourcePlanVersion": record.sourcePlanVersion,
-            "versionNumber": record.versionNumber,
-            **content,
-            "changeKind": record.changeKind,
-            "parentScriptVersionRef": record.parentScriptVersionRef,
-            "createdAt": record.createdAt,
-        }
+        try:
+            if record.schemaVersion != SCRIPT_VERSION_SCHEMA_VERSION:
+                raise ScriptStudioError("ScriptVersion schemaVersion is invalid")
+            for field in (
+                "workspaceRef",
+                "seriesRef",
+                "episodeRef",
+                "scriptRef",
+                "scriptVersionRef",
+                "sourcePlanRef",
+                "sourcePlanSchemaVersion",
+            ):
+                _required_ref(getattr(record, field), field)
+            for field in ("sourcePlanVersion", "versionNumber"):
+                value = getattr(record, field)
+                if isinstance(value, bool) or not isinstance(value, int) or value < 1:
+                    raise ScriptStudioError(f"ScriptVersion {field} is invalid")
+            if record.changeKind not in _SCRIPT_CHANGE_KINDS:
+                raise ScriptStudioError("ScriptVersion changeKind is invalid")
+            if record.versionNumber == 1:
+                if (
+                    record.parentScriptVersionRef is not None
+                    or record.changeKind not in {"ai-generation", "reviewed-import"}
+                ):
+                    raise ScriptStudioError("initial ScriptVersion lineage is invalid")
+            elif (
+                record.changeKind in {"ai-generation", "reviewed-import"}
+                or _required_ref(
+                    record.parentScriptVersionRef, "parentScriptVersionRef"
+                )
+                == record.scriptVersionRef
+            ):
+                raise ScriptStudioError("derived ScriptVersion lineage is invalid")
+            _required_text(record.createdAt, "createdAt", limit=100)
+        except ScriptStudioError as exc:
+            raise RepositoryWriteError(
+                "persisted ScriptVersion envelope is invalid"
+            ) from exc
+        try:
+            stored_content = json.loads(record.contentJson)
+        except (TypeError, json.JSONDecodeError) as exc:
+            raise RepositoryWriteError(
+                "persisted ScriptVersion content is invalid"
+            ) from exc
+        content = _normalize_persisted_content(
+            stored_content,
+            reviewed_import=record.changeKind == "reviewed-import",
+        )
+        provenance = content.get("importProvenance")
+        if record.changeKind == "reviewed-import":
+            expected_provenance_fields = {
+                "uploadedSourceByteDigest",
+                "normalizedSourceDocumentDigest",
+                "reviewedDocumentDigest",
+                "importedByRef",
+                "digestAssertionState",
+                "reviewedDocumentToContentBindingState",
+                "canonicalScriptContentDigest",
+                "importProvenanceDigest",
+            }
+            if (
+                not isinstance(provenance, Mapping)
+                or set(provenance) != expected_provenance_fields
+            ):
+                raise RepositoryWriteError("reviewed import provenance is invalid")
+            for field in (
+                "uploadedSourceByteDigest",
+                "normalizedSourceDocumentDigest",
+                "reviewedDocumentDigest",
+                "canonicalScriptContentDigest",
+                "importProvenanceDigest",
+            ):
+                try:
+                    _sha256_digest(provenance.get(field), field)
+                except ScriptStudioError as exc:
+                    raise RepositoryWriteError(
+                        "reviewed import provenance is invalid"
+                    ) from exc
+            try:
+                _required_ref(provenance.get("importedByRef"), "importedByRef")
+            except ScriptStudioError as exc:
+                raise RepositoryWriteError(
+                    "reviewed import provenance is invalid"
+                ) from exc
+            canonical_content = {
+                key: content[key]
+                for key in (
+                    "title",
+                    "logline",
+                    "synopsis",
+                    "targetDurationSec",
+                    "scenes",
+                )
+            }
+            expected_digest = hashlib.sha256(
+                json.dumps(
+                    canonical_content,
+                    ensure_ascii=False,
+                    sort_keys=True,
+                    separators=(",", ":"),
+                    allow_nan=False,
+                ).encode("utf-8")
+            ).hexdigest()
+            provenance_payload = {
+                key: value
+                for key, value in provenance.items()
+                if key != "importProvenanceDigest"
+            }
+            expected_provenance_digest = hashlib.sha256(
+                json.dumps(
+                    provenance_payload,
+                    ensure_ascii=False,
+                    sort_keys=True,
+                    separators=(",", ":"),
+                    allow_nan=False,
+                ).encode("utf-8")
+            ).hexdigest()
+            if (
+                provenance.get("canonicalScriptContentDigest") != expected_digest
+                or provenance.get("importProvenanceDigest")
+                != expected_provenance_digest
+                or provenance.get("digestAssertionState")
+                != "AUTHENTICATED_SERVICE_CREDENTIAL_DECLARATION_UNVERIFIED"
+                or provenance.get("reviewedDocumentToContentBindingState")
+                != "NOT_VERIFIED"
+            ):
+                raise RepositoryWriteError(
+                    "reviewed import provenance verification failed"
+                )
+        elif "importProvenance" in content:
+            raise RepositoryWriteError(
+                "non-import ScriptVersion contains reviewed import provenance"
+            )
+        projection = {field: content[field] for field in _SCRIPT_CONTENT_FIELDS}
+        if record.changeKind == "reviewed-import":
+            projection["importProvenance"] = provenance
+        # Record-owned identity and scope are applied last and cannot be
+        # overridden by contentJson, even if storage is externally corrupted.
+        projection.update(
+            {
+                "schemaVersion": record.schemaVersion,
+                "workspaceRef": record.workspaceRef,
+                "seriesRef": record.seriesRef,
+                "episodeRef": record.episodeRef,
+                "scriptRef": record.scriptRef,
+                "scriptVersionRef": record.scriptVersionRef,
+                "sourcePlanRef": record.sourcePlanRef,
+                "sourcePlanSchemaVersion": record.sourcePlanSchemaVersion,
+                "sourcePlanVersion": record.sourcePlanVersion,
+                "versionNumber": record.versionNumber,
+                "changeKind": record.changeKind,
+                "parentScriptVersionRef": record.parentScriptVersionRef,
+                "createdAt": record.createdAt,
+            }
+        )
+        return projection
+
+    @classmethod
+    def _lineage_version_mapping(
+        cls,
+        record: ScriptVersionRecord,
+        *,
+        workspace_ref: str,
+        series_ref: str,
+        episode_ref: str,
+        script_ref: str,
+        bootstrap: Mapping[str, Any],
+    ) -> dict[str, Any]:
+        projection = cls._version_mapping(record)
+        if (
+            projection["workspaceRef"] != workspace_ref
+            or projection["seriesRef"] != series_ref
+            or projection["episodeRef"] != episode_ref
+            or projection["scriptRef"] != script_ref
+            or projection["sourcePlanRef"] != bootstrap.get("sourcePlanRef")
+            or projection["sourcePlanSchemaVersion"]
+            != bootstrap.get("sourcePlanSchemaVersion")
+            or projection["sourcePlanVersion"] != bootstrap.get("sourcePlanVersion")
+        ):
+            raise RepositoryWriteError(
+                "persisted ScriptVersion lineage does not match current Episode context"
+            )
+        return projection
 
     def _bootstrap(self, workspace: str, series: str, episode: str) -> Mapping[str, Any]:
         bootstrap = _validate_bootstrap(
@@ -781,7 +1101,14 @@ class ScriptStudioService:
             "bootstrap": bootstrap,
             "script": self._script_mapping(script),
             "versions": [
-                self._version_mapping(item)
+                self._lineage_version_mapping(
+                    item,
+                    workspace_ref=workspace,
+                    series_ref=series,
+                    episode_ref=episode,
+                    script_ref=script.scriptRef,
+                    bootstrap=bootstrap,
+                )
                 for item in self.repository.list_versions(workspace, script.scriptRef)
             ],
         }
@@ -793,14 +1120,37 @@ class ScriptStudioService:
         series = _required_ref(value.get("seriesRef"), "seriesRef")
         episode = _required_ref(value.get("episodeRef"), "episodeRef")
         change_kind = _required_text(value.get("changeKind"), "changeKind", limit=40)
-        if change_kind not in {"ai-generation", "manual-edit", "ai-scene-rewrite"}:
+        if change_kind not in _SCRIPT_CHANGE_KINDS:
             raise ScriptStudioError("changeKind is invalid")
         bootstrap = self._bootstrap(workspace, series, episode)
         existing = self.repository.get_script(workspace, series, episode)
         now = self._clock()
         if existing is None:
-            if change_kind != "ai-generation":
+            if change_kind not in {"ai-generation", "reviewed-import"}:
                 raise RecordNotFoundError("Script must be generated before editing")
+            import_provenance = None
+            if change_kind == "reviewed-import":
+                import_provenance = {
+                    "uploadedSourceByteDigest": _sha256_digest(
+                        value.get("uploadedSourceByteDigest"),
+                        "uploadedSourceByteDigest",
+                    ),
+                    "normalizedSourceDocumentDigest": _sha256_digest(
+                        value.get("normalizedSourceDocumentDigest"),
+                        "normalizedSourceDocumentDigest",
+                    ),
+                    "reviewedDocumentDigest": _sha256_digest(
+                        value.get("reviewedDocumentDigest"),
+                        "reviewedDocumentDigest",
+                    ),
+                    "importedByRef": _required_ref(
+                        value.get("importedByRef"), "importedByRef"
+                    ),
+                    "digestAssertionState": (
+                        "AUTHENTICATED_SERVICE_CREDENTIAL_DECLARATION_UNVERIFIED"
+                    ),
+                    "reviewedDocumentToContentBindingState": "NOT_VERIFIED",
+                }
             script_ref = self._ref_factory("script")
             version_ref = self._ref_factory("script-version")
             content = _normalize_content(
@@ -808,6 +1158,26 @@ class ScriptStudioService:
                 bootstrap=bootstrap,
                 ref_factory=self._ref_factory,
             )
+            if import_provenance is not None:
+                import_provenance["canonicalScriptContentDigest"] = hashlib.sha256(
+                    json.dumps(
+                        content,
+                        ensure_ascii=False,
+                        sort_keys=True,
+                        separators=(",", ":"),
+                        allow_nan=False,
+                    ).encode("utf-8")
+                ).hexdigest()
+                import_provenance["importProvenanceDigest"] = hashlib.sha256(
+                    json.dumps(
+                        import_provenance,
+                        ensure_ascii=False,
+                        sort_keys=True,
+                        separators=(",", ":"),
+                        allow_nan=False,
+                    ).encode("utf-8")
+                ).hexdigest()
+                content["importProvenance"] = import_provenance
             script = ScriptRecord(
                 SCRIPT_SCHEMA_VERSION,
                 workspace,
@@ -839,6 +1209,10 @@ class ScriptStudioService:
             )
             stored_script, stored_version = self.repository.create_script_with_version(script, version)
         else:
+            if change_kind == "reviewed-import":
+                raise DuplicateRecordError(
+                    "reviewed import is allowed only for the first ScriptVersion"
+                )
             supplied_script = _required_ref(value.get("scriptRef"), "scriptRef")
             if supplied_script != existing.scriptRef:
                 raise ScopeMismatchError("scriptRef does not belong to Episode")
@@ -846,17 +1220,57 @@ class ScriptStudioService:
             parent = self.repository.get_version(workspace, existing.scriptRef, parent_ref)
             if parent is None:
                 raise RecordNotFoundError("base ScriptVersion was not found")
-            refs = {scene["scriptSceneRef"] for scene in json.loads(parent.contentJson)["scenes"]}
+            parent_mapping = self._lineage_version_mapping(
+                parent,
+                workspace_ref=workspace,
+                series_ref=series,
+                episode_ref=episode,
+                script_ref=existing.scriptRef,
+                bootstrap=bootstrap,
+            )
+            version_records = self.repository.list_versions(
+                workspace, existing.scriptRef
+            )
+            version_mappings: dict[str, dict[str, Any]] = {}
+            version_numbers: list[int] = []
+            listed_parent: ScriptVersionRecord | None = None
+            for record in version_records:
+                mapping = self._lineage_version_mapping(
+                    record,
+                    workspace_ref=workspace,
+                    series_ref=series,
+                    episode_ref=episode,
+                    script_ref=existing.scriptRef,
+                    bootstrap=bootstrap,
+                )
+                version_ref = mapping["scriptVersionRef"]
+                if version_ref in version_mappings:
+                    raise RepositoryWriteError(
+                        "persisted ScriptVersion identity is ambiguous"
+                    )
+                version_mappings[version_ref] = mapping
+                version_numbers.append(mapping["versionNumber"])
+                if version_ref == parent_ref:
+                    listed_parent = record
+            if (
+                listed_parent != parent
+                or version_mappings.get(parent_ref) != parent_mapping
+                or sorted(version_numbers) != list(range(1, len(version_records) + 1))
+                or existing.currentScriptVersionRef not in version_mappings
+            ):
+                raise RepositoryWriteError(
+                    "persisted ScriptVersion lineage is incomplete"
+                )
+            refs = {
+                scene["scriptSceneRef"] for scene in parent_mapping["scenes"]
+            }
             content = _normalize_content(
                 value.get("content"),
                 bootstrap=bootstrap,
                 ref_factory=self._ref_factory,
                 existing_scene_refs=refs,
             )
-            next_number = max(
-                item.versionNumber
-                for item in self.repository.list_versions(workspace, existing.scriptRef)
-            ) + 1
+            next_number = max(version_numbers) + 1
             version_ref = self._ref_factory("script-version")
             version = ScriptVersionRecord(
                 SCRIPT_VERSION_SCHEMA_VERSION,
@@ -888,7 +1302,14 @@ class ScriptStudioService:
             )
         return {
             "script": self._script_mapping(stored_script),
-            "scriptVersion": self._version_mapping(stored_version),
+            "scriptVersion": self._lineage_version_mapping(
+                stored_version,
+                workspace_ref=workspace,
+                series_ref=series,
+                episode_ref=episode,
+                script_ref=stored_script.scriptRef,
+                bootstrap=bootstrap,
+            ),
         }
 
     def confirm_version(self, value: Mapping[str, Any]) -> dict[str, Any]:
@@ -905,6 +1326,11 @@ class ScriptStudioService:
         version = self.repository.get_version(workspace, script_ref, version_ref)
         if version is None or version.seriesRef != series or version.episodeRef != episode:
             raise RecordNotFoundError("ScriptVersion was not found")
+        versions = self.repository.list_versions(workspace, script_ref)
+        if versions and versions[0].changeKind == "reviewed-import":
+            raise TrustedApprovalRequiredError(
+                "reviewed-import lineage requires a trusted approval resolver"
+            )
         updated = replace(
             script,
             confirmedScriptVersionRef=version_ref,
@@ -938,7 +1364,7 @@ class ScriptStudioService:
         )
         if version is None:
             raise RecordNotFoundError("confirmed ScriptVersion was not found")
-        content = json.loads(version.contentJson)
+        content = self._version_mapping(version)
         return {
             "schemaVersion": STORYBOARD_BOOTSTRAP_SCHEMA_VERSION,
             "workspaceRef": workspace,

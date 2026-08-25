@@ -79,13 +79,55 @@ Delete Working Branch + Preserve Audit Trail
 1. 禁止直接推送、强制推送和删除；所有变更通过 Pull Request。
 2. Pull Request 必须关联任务，说明范围、排除项、验证、风险、架构/数据/安全影响和回退方式。
 3. 所有适用强制检查必须通过，`FAIL`、`BLOCKED` 或强制 `NOT RUN` 不得合并。
-4. 至少取得两名非作者评审者批准；架构、安全、全仓库治理或 Release 高影响变更还必须确保其中一名来自对应责任职能。
+4. 通用规则至少取得两名非作者评审者批准；Frontend 继续执行该规则。Core 当前单人运营期只适用第 4B 节零批准精确例外。架构、安全、全仓库治理或 Release 高影响变更仍须满足对应责任职能和专项治理要求。
 5. 所有阻塞意见和对话必须解决；实质性更新后重新执行检查并重新评审。
 6. 合并历史保持线性；仓库启用后默认使用 squash merge，并使最终提交符合 Commit Convention。
 7. 合并结果必须保留任务、Pull Request、验证证据和审批记录之间的追溯关系。
 8. 不允许用管理员绕过、紧急标签或临时关闭保护来替代正式例外流程。
 
 具体 GitHub 配置见 [分支保护规范](BRANCH_PROTECTION.md)。
+
+## 4A. Core 单人运营一批准例外（历史 / 已取代，2026-08-25）
+
+本节保留同日较早治理状态的审计轨迹：当时 Core `main` ruleset 被决定为
+`1 approval`，且批准必须来自合格非作者；PR #11 author=`lpjiayou`、
+reviews=`[]`，因此形成 `0/1` Reviewer capacity blocker。该配置及阻塞结论已由
+第 4B 节的后续 Owner 决定取代，不得再作为当前规则或当前 PR 状态引用。
+
+## 4B. Core 单人运营零批准精确例外（当前，2026-08-25）
+
+Project Lead / Repository Governance Owner `蔺鹏` 明确记录：项目当前只有一名
+运营者，Core `main` 的 GitHub ruleset 在该运营期采用 `0 approvals`。本决定取代
+同日较早记录的 `1 approval` 单人运营配置及其 Reviewer capacity blocker。它是
+Core 仓库级 Pull Request 入口的精确治理决定，不是作者自批，不把自动化或技术
+审查伪装成 GitHub approval，也不适用于 Frontend；Frontend 继续要求
+`2 approvals`。
+
+该精确例外的强制条件是：
+
+1. GitHub 平台批准计数明确为 `0`；approval-dependent 的 dismiss-stale、
+   latest-push 和 unattributed-Copilot extra-approval 选项关闭，不得虚构
+   `0/0`、作者自批或其他平台批准证据；
+2. 独立技术审查继续作为合并前强制治理证据，必须绑定精确候选 SHA/tree 并报告
+   blocker/high/medium；它不产生 GitHub approval，也不替代 Project Lead、架构、
+   安全、风险接受或 Release 等专项决定；
+3. Pull Request、conversation resolution、五项 strict required checks、linear
+   history、force/delete protection 全部继续生效；
+4. bypass actor 必须为空，不能为解决其他门禁阻塞而临时增加；
+5. 有效 Core `main` ruleset 只允许 squash；仓库 General settings 即使仍显示
+   merge/squash/rebase，也不能被描述为整个仓库 squash-only，或被用来绕过
+   `main` ruleset；以及
+6. Release、安全、风险接受、Phase Exit、Script/ShotPlan、媒体准入和发布仍使用
+   各自通用或专项规范；本例外不满足、替代或降低那些决定。
+
+当 Core 不再是单一运营账号，或 Repository Governance Owner 重新决定审批模型时，
+必须按第 13 节重新评估并显式取代本例外；不得静默恢复、提高或降低批准数。
+
+当前精确事实记录在 [Branch Protection](BRANCH_PROTECTION.md#6a-2026-08-25-远端配置历史与当前差异账本)。
+PR #11 author=`lpjiayou`、reviews=`[]`；在本例外下该事实不再构成 approval
+blocker。PR #11 仍只能在精确候选的独立技术审查、五项 required checks、
+conversation resolution、线性 squash 合并及合并后核验全部满足后进入 Core
+`main`。`0 approvals` 不等于无审查或自动可合并。
 
 ## 5. `develop` 规则
 

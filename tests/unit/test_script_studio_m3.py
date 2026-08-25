@@ -1,4 +1,6 @@
 from contextlib import redirect_stderr
+from dataclasses import replace
+import hashlib
 import io
 import json
 from pathlib import Path
@@ -31,6 +33,7 @@ from services.v5_core_os.script_studio.foundation import (
     ScriptStudioService,
 )
 from services.v5_core_os.script_studio.public import (
+    ScriptStudioPublicBoundary,
     ScriptStudioPublicError,
     create_local_development_boundary,
 )
@@ -41,6 +44,13 @@ from tests.unit.test_ai_director_phase1 import valid_brief, valid_plan
 
 WORKSPACE = "workspace-m3"
 PROFILE = "profile-m3"
+_SCRIPT_CONTENT_TEST_FIELDS = (
+    "title",
+    "logline",
+    "synopsis",
+    "targetDurationSec",
+    "scenes",
+)
 
 
 class Refs:
@@ -188,6 +198,348 @@ class ScriptStudioDomainTests(unittest.TestCase):
         self.assertIsNone(script["confirmedScriptVersionRef"])
         self.assertEqual([item["sceneNumber"] for item in version["scenes"]], [1, 2])
         self.assertEqual(len({item["scriptSceneRef"] for item in version["scenes"]}), 2)
+
+    def test_reviewed_import_records_digest_assertions_and_remains_unconfirmed(self):
+        result = self.service.create_version(
+            {
+                **self.scope,
+                "changeKind": "reviewed-import",
+                "uploadedSourceByteDigest": "A" * 64,
+                "normalizedSourceDocumentDigest": "B" * 64,
+                "reviewedDocumentDigest": "C" * 64,
+                "importedByRef": "creator-reviewer-credential",
+                "content": content_from_candidate(),
+            }
+        )
+        version = result["scriptVersion"]
+        self.assertEqual(version["changeKind"], "reviewed-import")
+        self.assertIsNone(result["script"]["confirmedScriptVersionRef"])
+        normalized_content = {
+            key: version[key]
+            for key in (
+                "title",
+                "logline",
+                "synopsis",
+                "targetDurationSec",
+                "scenes",
+            )
+        }
+        canonical_digest = hashlib.sha256(
+            json.dumps(
+                normalized_content,
+                ensure_ascii=False,
+                sort_keys=True,
+                separators=(",", ":"),
+                allow_nan=False,
+            ).encode("utf-8")
+        ).hexdigest()
+        expected_provenance = {
+                "uploadedSourceByteDigest": "a" * 64,
+                "normalizedSourceDocumentDigest": "b" * 64,
+                "reviewedDocumentDigest": "c" * 64,
+                "importedByRef": "creator-reviewer-credential",
+                "digestAssertionState": (
+                    "AUTHENTICATED_SERVICE_CREDENTIAL_DECLARATION_UNVERIFIED"
+                ),
+                "reviewedDocumentToContentBindingState": "NOT_VERIFIED",
+                "canonicalScriptContentDigest": canonical_digest,
+        }
+        expected_provenance["importProvenanceDigest"] = hashlib.sha256(
+            json.dumps(
+                expected_provenance,
+                ensure_ascii=False,
+                sort_keys=True,
+                separators=(",", ":"),
+                allow_nan=False,
+            ).encode("utf-8")
+        ).hexdigest()
+        self.assertEqual(version["importProvenance"], expected_provenance)
+
+    def test_reviewed_import_in_memory_content_tampering_fails_closed(self):
+        imported = self.service.create_version(
+            {
+                **self.scope,
+                "changeKind": "reviewed-import",
+                "uploadedSourceByteDigest": "a" * 64,
+                "normalizedSourceDocumentDigest": "b" * 64,
+                "reviewedDocumentDigest": "c" * 64,
+                "importedByRef": "creator-reviewer-credential",
+                "content": content_from_candidate(),
+            }
+        )
+        script_ref = imported["script"]["scriptRef"]
+        version_ref = imported["scriptVersion"]["scriptVersionRef"]
+        key = (WORKSPACE, script_ref, version_ref)
+        original = self.repository._versions[key]
+        public = ScriptStudioPublicBoundary(self.service)
+
+        def extra_workspace(content):
+            content["workspaceRef"] = "forged-workspace"
+
+        def publication_authority(content):
+            content["publicationAllowed"] = True
+
+        def canonical_authority(content):
+            content["canonicalExecutableScriptRef"] = "forged-canonical-script"
+
+        def scene_authority(content):
+            content["scenes"][0]["canonicalShotRef"] = "forged-canonical-shot"
+
+        for label, tamper in (
+            ("workspace_scope", extra_workspace),
+            ("publication_authority", publication_authority),
+            ("canonical_authority", canonical_authority),
+            ("scene_authority", scene_authority),
+        ):
+            with self.subTest(label=label):
+                content = json.loads(original.contentJson)
+                tamper(content)
+                self.repository._versions[key] = replace(
+                    original,
+                    contentJson=json.dumps(
+                        content,
+                        ensure_ascii=False,
+                        sort_keys=True,
+                        separators=(",", ":"),
+                    ),
+                )
+                with self.assertRaises(ScriptStudioPublicError) as caught:
+                    public.get_workspace(
+                        WORKSPACE,
+                        self.series["seriesRef"],
+                        self.episode["episodeRef"],
+                    )
+                self.assertEqual(
+                    (caught.exception.status, caught.exception.code),
+                    (500, "application_error"),
+                )
+        self.repository._versions[key] = original
+
+    def test_derived_version_validates_parent_before_any_in_memory_write(self):
+        imported = self.service.create_version(
+            {
+                **self.scope,
+                "changeKind": "reviewed-import",
+                "uploadedSourceByteDigest": "a" * 64,
+                "normalizedSourceDocumentDigest": "b" * 64,
+                "reviewedDocumentDigest": "c" * 64,
+                "importedByRef": "creator-reviewer-credential",
+                "content": content_from_candidate(),
+            }
+        )
+        script_ref = imported["script"]["scriptRef"]
+        version_ref = imported["scriptVersion"]["scriptVersionRef"]
+        key = (WORKSPACE, script_ref, version_ref)
+        original_record = self.repository._versions[key]
+        original_script = self.repository.get_script(
+            WORKSPACE, self.series["seriesRef"], self.episode["episodeRef"]
+        )
+        content = {
+            field: imported["scriptVersion"][field]
+            for field in _SCRIPT_CONTENT_TEST_FIELDS
+        }
+        content = json.loads(json.dumps(content, ensure_ascii=False))
+        content["title"] = "不得写入的派生版本"
+        public = ScriptStudioPublicBoundary(self.service)
+
+        stored_content = json.loads(original_record.contentJson)
+        stored_content["publicationAllowed"] = True
+        poisoned_content = replace(
+            original_record,
+            contentJson=json.dumps(
+                stored_content,
+                ensure_ascii=False,
+                sort_keys=True,
+                separators=(",", ":"),
+            ),
+        )
+        poisoned_source = replace(
+            original_record,
+            sourcePlanRef="forged-source-plan",
+        )
+        for label, poisoned in (
+            ("content", poisoned_content),
+            ("source_lineage", poisoned_source),
+        ):
+            with self.subTest(label=label):
+                self.repository._versions[key] = poisoned
+                with self.assertRaises(ScriptStudioPublicError) as caught:
+                    public.create_version(
+                        {
+                            **self.scope,
+                            "scriptRef": script_ref,
+                            "baseScriptVersionRef": version_ref,
+                            "changeKind": "manual-edit",
+                            "content": content,
+                        }
+                    )
+                self.assertEqual(
+                    (caught.exception.status, caught.exception.code),
+                    (500, "application_error"),
+                )
+                self.assertEqual(
+                    self.repository.get_script(
+                        WORKSPACE,
+                        self.series["seriesRef"],
+                        self.episode["episodeRef"],
+                    ),
+                    original_script,
+                )
+                self.assertEqual(
+                    len(self.repository.list_versions(WORKSPACE, script_ref)), 1
+                )
+        self.repository._versions[key] = original_record
+
+    def test_derived_version_validates_every_record_used_for_next_number(self):
+        first = self.create_initial()
+        first_content = {
+            field: first["scriptVersion"][field]
+            for field in _SCRIPT_CONTENT_TEST_FIELDS
+        }
+        first_content = json.loads(json.dumps(first_content, ensure_ascii=False))
+        first_content["title"] = "第二版"
+        second = self.service.create_version(
+            {
+                **self.scope,
+                "scriptRef": first["script"]["scriptRef"],
+                "baseScriptVersionRef": first["scriptVersion"]["scriptVersionRef"],
+                "changeKind": "manual-edit",
+                "content": first_content,
+            }
+        )
+        script_ref = first["script"]["scriptRef"]
+        first_key = (
+            WORKSPACE,
+            script_ref,
+            first["scriptVersion"]["scriptVersionRef"],
+        )
+        original_first = self.repository._versions[first_key]
+        self.repository._versions[first_key] = replace(
+            original_first,
+            sourcePlanVersion=original_first.sourcePlanVersion + 1,
+        )
+        before_script = self.repository.get_script(
+            WORKSPACE, self.series["seriesRef"], self.episode["episodeRef"]
+        )
+        next_content = {
+            field: second["scriptVersion"][field]
+            for field in _SCRIPT_CONTENT_TEST_FIELDS
+        }
+        next_content = json.loads(json.dumps(next_content, ensure_ascii=False))
+        next_content["title"] = "不得写入的第三版"
+        public = ScriptStudioPublicBoundary(self.service)
+        with self.assertRaises(ScriptStudioPublicError) as caught:
+            public.create_version(
+                {
+                    **self.scope,
+                    "scriptRef": script_ref,
+                    "baseScriptVersionRef": second["scriptVersion"][
+                        "scriptVersionRef"
+                    ],
+                    "changeKind": "manual-edit",
+                    "content": next_content,
+                }
+            )
+        self.assertEqual(
+            (caught.exception.status, caught.exception.code),
+            (500, "application_error"),
+        )
+        self.assertEqual(
+            self.repository.get_script(
+                WORKSPACE, self.series["seriesRef"], self.episode["episodeRef"]
+            ),
+            before_script,
+        )
+        self.assertEqual(len(self.repository.list_versions(WORKSPACE, script_ref)), 2)
+        self.repository._versions[first_key] = original_first
+
+    def test_reviewed_import_rejects_client_scene_refs_and_generic_confirmation(self):
+        content = content_from_candidate()
+        content["scenes"][0]["scriptSceneRef"] = "k2-001-reused-scene"
+        command = {
+            **self.scope,
+            "changeKind": "reviewed-import",
+            "uploadedSourceByteDigest": "a" * 64,
+            "normalizedSourceDocumentDigest": "b" * 64,
+            "reviewedDocumentDigest": "c" * 64,
+            "importedByRef": "creator-reviewer-credential",
+            "content": content,
+        }
+        with self.assertRaises(ScriptStudioError):
+            self.service.create_version(command)
+
+        command["content"] = content_from_candidate()
+        imported = self.service.create_version(command)
+        with self.assertRaises(ScriptStudioError):
+            self.service.confirm_version(
+                {
+                    **self.scope,
+                    "scriptRef": imported["script"]["scriptRef"],
+                    "scriptVersionRef": imported["scriptVersion"][
+                        "scriptVersionRef"
+                    ],
+                    "humanConfirmed": True,
+                }
+            )
+        self.assertIsNone(
+            self.repository.get_script(
+                WORKSPACE, self.series["seriesRef"], self.episode["episodeRef"]
+            ).confirmedScriptVersionRef
+        )
+
+    def test_reviewed_import_requires_all_source_digests_and_service_credential(self):
+        base = {
+            **self.scope,
+            "changeKind": "reviewed-import",
+            "uploadedSourceByteDigest": "a" * 64,
+            "normalizedSourceDocumentDigest": "b" * 64,
+            "reviewedDocumentDigest": "c" * 64,
+            "importedByRef": "creator-reviewer-credential",
+            "content": content_from_candidate(),
+        }
+        for field, value in (
+            ("uploadedSourceByteDigest", "bad"),
+            ("normalizedSourceDocumentDigest", "bad"),
+            ("reviewedDocumentDigest", "bad"),
+            ("importedByRef", ""),
+        ):
+            with self.subTest(field=field):
+                command = dict(base)
+                command[field] = value
+                with self.assertRaises(ScriptStudioError):
+                    self.service.create_version(command)
+        self.assertIsNone(
+            self.repository.get_script(
+                WORKSPACE, self.series["seriesRef"], self.episode["episodeRef"]
+            )
+        )
+
+    def test_reviewed_import_cannot_be_appended_to_existing_script(self):
+        first = self.create_initial()
+        with self.assertRaises(ScriptStudioError):
+            self.service.create_version(
+                {
+                    **self.scope,
+                    "scriptRef": first["script"]["scriptRef"],
+                    "baseScriptVersionRef": first["scriptVersion"][
+                        "scriptVersionRef"
+                    ],
+                    "changeKind": "reviewed-import",
+                    "uploadedSourceByteDigest": "a" * 64,
+                    "normalizedSourceDocumentDigest": "b" * 64,
+                    "reviewedDocumentDigest": "c" * 64,
+                    "importedByRef": "creator-reviewer-credential",
+                    "content": content_from_candidate(),
+                }
+            )
+        self.assertEqual(
+            len(
+                self.repository.list_versions(
+                    WORKSPACE, first["script"]["scriptRef"]
+                )
+            ),
+            1,
+        )
 
     def test_manual_edit_creates_immutable_second_version(self):
         first = self.create_initial()
