@@ -115,6 +115,11 @@ class SelectionAuthority:
 
 
 class K2RealVideoSelectionTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        image_selection._golden_media_fixture()
+
     def setUp(self):
         image_selection.K2RealImageSelectionTests.setUp(self)
         self.boundary.select_real_images(
