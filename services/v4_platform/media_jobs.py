@@ -34,6 +34,10 @@ M11_VIDEO_CAPABILITY = "self-hosted-wan22-image-to-video-v1"
 M11_VIDEO_PROVENANCE = "SELF_HOSTED_AI_GENERATED"
 
 
+_PROBE_MEDIA_CACHE: dict[tuple[str, int], dict[str, Any]] = {}
+_PROBE_MEDIA_CACHE_LOCK = RLock()
+
+
 class MediaJobError(RuntimeError):
     code = "worker_unavailable"
 
@@ -1516,7 +1520,25 @@ class SqliteMediaJobAdapter:
             connection.close()
 
 
+def _probe_media_cache_key(path: Path) -> tuple[str, int]:
+    digest = sha256()
+    size = 0
+    try:
+        with path.open("rb") as source:
+            while chunk := source.read(1024 * 1024):
+                digest.update(chunk)
+                size += len(chunk)
+    except OSError as exc:
+        raise ArtifactVerificationError("ffprobe verification failed") from exc
+    return digest.hexdigest(), size
+
+
 def probe_media(path: Path) -> dict[str, Any]:
+    cache_key = _probe_media_cache_key(path)
+    with _PROBE_MEDIA_CACHE_LOCK:
+        cached = _PROBE_MEDIA_CACHE.get(cache_key)
+    if cached is not None:
+        return deepcopy(cached)
     try:
         result = subprocess.run(
             [
@@ -1549,11 +1571,14 @@ def probe_media(path: Path) -> dict[str, Any]:
                 if stream.get(key) is not None
             }
         )
-    return {
+    probe = {
         "streams": normalized,
         "formatName": payload.get("format", {}).get("format_name"),
         "durationSeconds": payload.get("format", {}).get("duration"),
     }
+    with _PROBE_MEDIA_CACHE_LOCK:
+        cached = _PROBE_MEDIA_CACHE.setdefault(cache_key, deepcopy(probe))
+    return deepcopy(cached)
 
 
 def verify_media_against_request(path: Path, request: Mapping[str, Any]) -> dict[str, Any]:

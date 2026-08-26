@@ -64,8 +64,7 @@ jobs:
       - name: Install deterministic media runtime
         shell: bash
         run: |
-          sudo apt-get update
-          sudo apt-get install --yes ffmpeg
+          command -v ffmpeg || (sudo apt-get update && sudo apt-get install -y ffmpeg)
           ffmpeg -version
           ffprobe -version
 
@@ -89,7 +88,7 @@ jobs:
               raise SystemExit("No unit tests were discovered; validation cannot pass.")
 
           print(f"Discovered {count} unit tests.")
-          result = unittest.TextTestRunner(verbosity=2).run(suite)
+          result = unittest.TextTestRunner(verbosity=1).run(suite)
           raise SystemExit(0 if result.wasSuccessful() else 1)
           PY
 
@@ -125,7 +124,7 @@ jobs:
               raise SystemExit("No contract tests were discovered; validation cannot pass.")
 
           print(f"Discovered {count} contract tests.")
-          result = unittest.TextTestRunner(verbosity=2).run(suite)
+          result = unittest.TextTestRunner(verbosity=1).run(suite)
           raise SystemExit(0 if result.wasSuccessful() else 1)
           PY
 
@@ -144,8 +143,7 @@ jobs:
       - name: Install deterministic media runtime
         shell: bash
         run: |
-          sudo apt-get update
-          sudo apt-get install --yes ffmpeg
+          command -v ffmpeg || (sudo apt-get update && sudo apt-get install -y ffmpeg)
           ffmpeg -version
           ffprobe -version
 
@@ -169,6 +167,6 @@ jobs:
               raise SystemExit("No integration tests were discovered; validation cannot pass.")
 
           print(f"Discovered {count} integration tests.")
-          result = unittest.TextTestRunner(verbosity=2).run(suite)
+          result = unittest.TextTestRunner(verbosity=1).run(suite)
           raise SystemExit(0 if result.wasSuccessful() else 1)
           PY

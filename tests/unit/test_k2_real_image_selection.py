@@ -1,8 +1,9 @@
 import json
 from concurrent.futures import ThreadPoolExecutor
-from dataclasses import replace
+from dataclasses import dataclass, replace
 from hashlib import sha256
 from pathlib import Path
+import shutil
 import tempfile
 from threading import Barrier
 import unittest
@@ -38,6 +39,7 @@ from tests.unit.test_episode_production_k2 import (
     run_command,
     seed_k2_roots,
 )
+from tests.stub_ffmpeg_adapter import StubFfmpegAdapter
 
 
 def _digest(label: str) -> str:
@@ -127,9 +129,78 @@ class SelectionAuthority:
         return VerifiedMediaSelection.create(**values)
 
 
+@dataclass(frozen=True)
+class _GoldenMediaFixture:
+    directory: tempfile.TemporaryDirectory
+    artifact_root: Path
+    storage_key_by_request_digest: dict[str, str]
+    preview_storage_key: str
+
+
+_SHARED_GOLDEN_MEDIA_FIXTURE: _GoldenMediaFixture | None = None
+
+
+def _golden_media_fixture() -> _GoldenMediaFixture:
+    global _SHARED_GOLDEN_MEDIA_FIXTURE
+    if _SHARED_GOLDEN_MEDIA_FIXTURE is not None:
+        return _SHARED_GOLDEN_MEDIA_FIXTURE
+
+    directory = tempfile.TemporaryDirectory()
+    artifact_root = Path(directory.name) / "artifacts"
+    assembly, refs, project, series, episode, _ = seed_k2_roots(
+        with_m6_authority=True
+    )
+    activate_k2_m6_baseline(assembly, project, series)
+    execution = MediaJobCoordinator(
+        InMemoryMediaJobAdapter(),
+        DeterministicLocalFfmpegAdapter(),
+        artifact_root,
+        ref_factory=refs,
+        clock=lambda: "2026-08-23T08:00:00Z",
+    )
+    boundary = create_in_memory_boundary(
+        project_boundary=assembly.project_context,
+        series_episode_boundary=assembly.series_episode,
+        series_planning_boundary=assembly.series_planning,
+        script_studio_boundary=assembly.script_studio,
+        identity_reference_authority=k2_identity_authority(),
+        media_execution=execution,
+        composition_execution=V4CompositionExecutor.from_artifact_root(
+            artifact_root
+        ),
+        ref_factory=refs,
+        clock=lambda: "2026-08-23T08:00:00Z",
+    )
+    run = boundary.create_run(run_command(project, series, episode))
+    boundary.authorize_and_lock(g2_command(run))
+    boundary.compile_shot_graph(g3_command(run))
+    boundary.resolve_assets(g4_command(run))
+    media = boundary.execute_media(g5_command(run))
+    preview = boundary.compose_and_qc(g6_preview_command(run))
+    _SHARED_GOLDEN_MEDIA_FIXTURE = _GoldenMediaFixture(
+        directory=directory,
+        artifact_root=artifact_root,
+        storage_key_by_request_digest={
+            asset["generationRequestDigest"]: asset["storageKey"]
+            for asset in media["assetVersions"]
+        },
+        preview_storage_key=preview["previewCandidate"]["storageKey"],
+    )
+    return _SHARED_GOLDEN_MEDIA_FIXTURE
+
+
 class K2RealImageSelectionTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        _golden_media_fixture()
+
     def setUp(self):
         self.directory = tempfile.TemporaryDirectory()
+        golden = _golden_media_fixture()
+        test_root = Path(self.directory.name)
+        golden_copy_root = test_root / "golden-artifacts"
+        shutil.copytree(golden.artifact_root, golden_copy_root)
         (
             self.assembly,
             self.refs,
@@ -139,10 +210,13 @@ class K2RealImageSelectionTests(unittest.TestCase):
             _,
         ) = seed_k2_roots(with_m6_authority=True)
         activate_k2_m6_baseline(self.assembly, self.project, self.series)
-        artifact_root = Path(self.directory.name) / "artifacts"
+        artifact_root = test_root / "artifacts"
         execution = MediaJobCoordinator(
             InMemoryMediaJobAdapter(),
-            DeterministicLocalFfmpegAdapter(),
+            StubFfmpegAdapter(
+                golden_copy_root,
+                golden.storage_key_by_request_digest,
+            ),
             artifact_root,
             ref_factory=self.refs,
             clock=lambda: "2026-08-23T08:00:00Z",
@@ -172,6 +246,10 @@ class K2RealImageSelectionTests(unittest.TestCase):
         self.boundary.compile_shot_graph(g3_command(self.run))
         self.boundary.resolve_assets(g4_command(self.run))
         self.boundary.execute_media(g5_command(self.run))
+        preview_source = golden_copy_root / golden.preview_storage_key
+        preview_destination = artifact_root / golden.preview_storage_key
+        preview_destination.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(preview_source, preview_destination)
         self.boundary.compose_and_qc(g6_preview_command(self.run))
         self.plan = self.boundary.plan_real_images(
             {
