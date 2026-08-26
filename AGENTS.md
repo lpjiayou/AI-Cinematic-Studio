@@ -1416,6 +1416,41 @@ Test execution must follow the changed-file scope:
 - In every other case the complete suite is CI's responsibility.
   Running the full local suite before commit is prohibited.
 
+### Gate Applicability
+
+Gates apply according to the **state the output claims**, not according to the
+activity that produced it.
+
+Technical evidence runs — outputs marked
+`TECHNICAL_EVIDENCE_ONLY / publicationAllowed=false` that create no
+AssetVersion, no Admission, no Master and no Export, and advance no canonical
+state — are NOT subject to:
+
+- Rights / Provider / Budget Authority bundles
+- canonical target resolution or canonical registration receipts
+- M5 EpisodePlanItem binding
+- asset admission
+- ShotPlan freeze or Camera Contract readiness
+- ExecutableShotGraph compilation
+
+Precedent: the 2026-08-20 ComfyUI runtime attestation
+(`technical-k2-funhpc-a100-20260820T141317Z`) was obtained and accepted through
+exactly this path.
+
+The full gate chain applies only when an output is to become a canonical
+AssetVersion or is to be published. Until then, blocking a technical experiment
+on production gates is incorrect scoping, not caution.
+
+### Gate Design Constraint
+
+Before adding any gate, state who satisfies it. If the answer is a role that
+does not currently exist in the project, the gate must not be added.
+
+While the project has a single member with repository access, gates that require
+a second distinct identity — non-author approval, external authority signature,
+or multiple distinct approvers — must not be introduced. Hard gates are carried
+by CI required checks only, with no bypass.
+
 ---
 
 # 33. Browser / Live Gate
