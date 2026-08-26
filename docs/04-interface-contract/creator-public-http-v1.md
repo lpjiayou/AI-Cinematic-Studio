@@ -1,6 +1,6 @@
 # Creator Public HTTP/API v1
 
-Status: `XR1 FROZEN / AUTH-W1 SECURITY AMENDMENT / ADR-0013 CONTROL PLANE / ADR-0014 K2-002 PREFLIGHT AMENDMENT`
+Status: `XR1 FROZEN / AUTH-W1 SECURITY AMENDMENT / ADR-0013 CONTROL PLANE / ADR-0014 K2-002 PREFLIGHT + SCRIPT ACCEPTANCE AMENDMENT`
 
 This contract is the only browser-facing Core HTTP surface for the separate Commercial
 Frontend. Existing `/creator/internal/*` endpoints remain compatibility-only and must
@@ -19,8 +19,8 @@ Commercial Frontend → Frontend Experience Adapter → /creator/api/v1
 | --- | --- | --- |
 | M1 | `/ai-director/candidates`, `/creative-plans/confirm` | AI Director Application + Series/Episode boundary |
 | M2 | `/series`, `/episodes` | Series/Episode public boundary |
-| M3 | `/script-workspaces`, `/script-versions/*`, `/script-versions/reviewed-import` | Script Studio Application/public boundary |
-| M4 | `/projects`, `/project-contexts` | Project Context public boundary |
+| M3 | `/script-workspaces`, `/script-versions/*`, `/script-versions/reviewed-import`, `/script-versions/reviewed-import/accept` | Script Studio Application/public boundary |
+| M4 | `/projects`, `/project-contexts`, `/canonical-registrations`, `/canonical-registrations/preflight` | Project Context plus V5 canonical registration boundary |
 | M5 | `/series-planning-workspaces`, `/series-plan-*` | Series Planning + Series Director boundaries |
 | M6 | `/series-intelligence-workspaces`, `/series-intelligence/*` | accepted Series Intelligence public boundary |
 | M7–M8 | `/episode-production-runs/{runRef}/shot-graph` | bounded K2 V5 legacy executable-graph service plus v2 local-draft compatibility transport |
@@ -68,6 +68,84 @@ Generic confirmation of any reviewed-import lineage returns
 `trusted_approval_required` until a trusted Owner approval resolver verifies the exact
 subject. Existing generic generation/manual-edit paths do not carry reviewed-source
 provenance. The internal unauthenticated alias remains forbidden.
+
+### Trusted reviewed Script acceptance
+
+`POST /creator/api/v1/script-versions/reviewed-import/accept` accepts exactly
+`seriesRef`, `episodeRef`, `scriptRef`, `scriptVersionRef`, `idempotencyKey` and
+`approvalRef`. Authentication injects `workspaceRef`. Client-supplied workspace,
+actor, role, decision, authority, subject digest, document digest, publication or
+confirmation fields are rejected.
+
+The configured Script acceptance authority is external to request content. Core loads
+one closed-world JSON authority bundle only when both
+`CREATOR_SCRIPT_ACCEPTANCE_AUTHORITY_BUNDLE_PATH` and
+`CREATOR_SCRIPT_ACCEPTANCE_AUTHORITY_BUNDLE_SHA256` are present. The path must be an
+absolute non-symlink file and the separately configured SHA-256 must match its exact
+bytes. Duplicate JSON keys, unknown fields, duplicate approval/decision refs, a
+non-`PROJECT_LEAD` actor kind, a decision other than `ACCEPTED`, or any mismatch with
+the persisted reviewed-import subject fails closed. With no configured authority the
+route returns `trusted_approval_required`.
+
+The verified subject binds the exact Workspace, Series, Episode, Script and
+ScriptVersion together with the uploaded-source, normalized-document,
+reviewed-document, canonical Script-content and import-provenance SHA-256 values
+already stored on that first reviewed-import ScriptVersion. Core atomically appends
+one immutable `v5.script-acceptance.v1` record and updates the Script's confirmed
+version in the existing Lifecycle SQLite transaction. The additive
+`script_acceptance@1` component lives in that same database; it does not change the
+accepted global Lifecycle V2 marker and does not create another authority store.
+
+An exact replay returns the original sealed record with `idempotentReplay=true` and
+does not call the authority again. Reusing an idempotency key, approval ref or subject
+with changed scope, lineage or evidence conflicts. Every acceptance remains
+`publicationAllowed=false`; this route grants neither asset admission nor
+Provider/GPU execution.
+
+### Durable canonical registration
+
+`POST /creator/api/v1/canonical-registrations/preflight` and
+`POST /creator/api/v1/canonical-registrations` accept the same closed registration
+package. Its top-level fields are exactly `registrationKey`, `idempotencyKey`,
+`packageDigest`, `contentProfileRef`, `series`, `project`, `creativePlan`, `episode`,
+`reviewedScript` and `acceptance`. Authentication injects `workspaceRef` and
+`importedByRef`; client-supplied workspace or import actor fields are rejected. The
+server must also be configured with a non-client
+`CREATOR_CANONICAL_TARGET_REF`. An absent target fails closed with
+`canonical_registration_unavailable`.
+
+Preflight is deterministic and performs zero canonical writes. Core hashes the
+server-held storage identity into a secret-free `canonicalTargetDigest`, so reusing a
+target label on a different database cannot reproduce the same authority subject.
+From that target binding, workspace, stable `registrationKey` and normalized request
+digest, Core derives the exact planned Project,
+Series, Episode, creative-plan, Script, ScriptVersion and Script-scene refs and returns
+the exact `v5.script-acceptance-subject.v1` needed by the closed-world approval bundle.
+It reports `canonicalMutationCount=0` and `publicationAllowed=false`. The operator can
+therefore preflight, create and separately SHA-256-pin the exact authority bundle,
+restart against the same explicit target, and then apply without accepting wildcard
+or caller-authored authority.
+
+Apply is available only on the shared Lifecycle SQLite assembly. One
+`canonical-registration` lease and one `BEGIN IMMEDIATE` transaction create the
+Series, Project/Series relationship, confirmed creative plan, EP01, first
+`reviewed-import` ScriptVersion, exact trusted Script acceptance and immutable
+`v5.canonical-registration.v1` receipt. Any failure before receipt commit rolls back every domain row.
+The additive `canonical_registration@1` component and its foreign keys live in the
+same Lifecycle V2 database; there is no project-specific database or second Project,
+Script or acceptance owner.
+
+The receipt binds the explicit target and physical-store digest, stable registration key, idempotency key,
+package digest, normalized request digest, every root ref, exact accepted
+ScriptVersion/acceptance digests and `publicationAllowed=false`. `packageDigest` is an
+authenticated service-credential declaration that is sealed by the receipt; this
+route does not receive or independently re-hash an external archive. Exact or
+concurrent replay returns the original refs and receipt with
+`idempotentReplay=true` and does not call the acceptance authority again. Reusing the
+registration or idempotency key with changed target, package, scope, content,
+approval or lineage returns `idempotency_conflict`. M5 binding, assets, ShotPlan,
+Camera Contract, graph compilation and Provider/GPU authorization remain separate
+later gates.
 
 ## K2 provider experiment semantics
 

@@ -1401,6 +1401,14 @@ A working UI alone is insufficient.
 
 Unit tests alone are insufficient.
 
+Test execution must follow the changed-file scope:
+
+- when the working diff modifies only `.md` files, run only the Markdown and
+  documentation-links checks;
+- when the working diff modifies any `.py` file, run the affected module's focused
+  tests first and run the complete test suite exactly once on the final pre-commit
+  snapshot.
+
 ---
 
 # 33. Browser / Live Gate

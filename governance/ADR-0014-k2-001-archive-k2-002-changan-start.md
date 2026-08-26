@@ -16,6 +16,13 @@
 > repository-reviewed v1.4 rebase candidate plus versioned v2 EP01 ledger. Script
 > content acceptance, live registration, assets, Provider/GPU and publication remain
 > ungranted.
+>
+> Later exact-digest acceptance — `2026-08-26`:
+> [ACS-K2-002-SCRIPT-ACC3](ACS-K2-002-SCRIPT-V1-4-ACCEPTANCE-AND-EP01-IMPLEMENTATION.md)
+> records the Decision Owner's acceptance of the repository-reviewed v1.4 and authorizes
+> the ordered EP01 non-GPU implementation through final prerequisite audit. Missing
+> rights evidence remains fail-closed, and Provider/GPU execution still requires a
+> separate later decision.
 
 ## Context
 

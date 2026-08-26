@@ -19,6 +19,13 @@
 | ShotPlan / Camera / ExecutableShotGraph | `DRAFT ONLY / NOT_APPROVED / NOT_READY / NOT_COMPILED` |
 | Assets / Provider / GPU / Publication | `NONE_ADMITTED / NOT_AUTHORIZED / NOT_STARTED / false` |
 
+> Later decision overlay — `2026-08-26`:
+> [ACS-K2-002-SCRIPT-ACC3](ACS-K2-002-SCRIPT-V1-4-ACCEPTANCE-AND-EP01-IMPLEMENTATION.md)
+> accepts the exact repository-reviewed v1.4 digest and authorizes the ordered EP01
+> non-GPU implementation. This RB2 record remains immutable evidence of the earlier
+> repository-ingest checkpoint; its pending-acceptance statements are historical after
+> ACC3, not current execution authority.
+
 ## 1. Decision
 
 The Decision Owner directed the uploaded v1.4 to be written into Core. The uploaded

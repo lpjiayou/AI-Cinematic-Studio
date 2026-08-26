@@ -25,6 +25,7 @@ class AssemblyState(str, Enum):
 
 
 class LifecycleOperation(str, Enum):
+    CANONICAL_REGISTRATION = "canonical-registration"
     CREATE_SERIES = "create-series"
     CONFIRM_CREATIVE_PLAN = "confirm-creative-plan"
     CREATE_EPISODE = "create-episode"

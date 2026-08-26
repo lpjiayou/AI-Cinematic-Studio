@@ -45,6 +45,8 @@ from apps.creator_workspace_mvp.public_contract import (
     PUBLIC_API_PREFIX,
     PUBLIC_AI_DIRECTOR_ENDPOINT,
     PUBLIC_CONFIRM_PLAN_ENDPOINT,
+    PUBLIC_CANONICAL_REGISTRATIONS_ENDPOINT,
+    PUBLIC_CANONICAL_REGISTRATION_PREFLIGHT_ENDPOINT,
     PUBLIC_EPISODES_ENDPOINT,
     PUBLIC_EPISODE_PRODUCTION_RUNS_ENDPOINT,
     PUBLIC_M6_BASELINE_ACTIVATE_ENDPOINT,
@@ -59,6 +61,7 @@ from apps.creator_workspace_mvp.public_contract import (
     PUBLIC_SCRIPT_CONFIRM_ENDPOINT,
     PUBLIC_SCRIPT_GENERATE_ENDPOINT,
     PUBLIC_SCRIPT_REVIEWED_IMPORT_ENDPOINT,
+    PUBLIC_SCRIPT_REVIEWED_ACCEPT_ENDPOINT,
     PUBLIC_SCRIPT_MANUAL_VERSION_ENDPOINT,
     PUBLIC_SCRIPT_REWRITE_ENDPOINT,
     PUBLIC_SCRIPT_WORKSPACE_ENDPOINT,
@@ -72,6 +75,10 @@ from apps.creator_workspace_mvp.public_contract import (
     PUBLIC_SERIES_PLANNING_MANUAL_VERSION_ENDPOINT,
     PUBLIC_STORYBOARD_BOOTSTRAP_ENDPOINT,
     capability_payload,
+)
+from services.v5_core_os.canonical_registration import (
+    CanonicalRegistrationPublicBoundary,
+    CanonicalRegistrationPublicError,
 )
 from apps.creator_workspace_mvp.public_auth import (
     PublicApiAuthenticator,
@@ -112,6 +119,7 @@ EPISODES_ENDPOINT = "/creator/internal/episodes"
 SCRIPT_WORKSPACE_ENDPOINT = "/creator/internal/script-studio"
 SCRIPT_GENERATE_ENDPOINT = f"{SCRIPT_WORKSPACE_ENDPOINT}/generate"
 SCRIPT_REVIEWED_IMPORT_ENDPOINT = f"{SCRIPT_WORKSPACE_ENDPOINT}/reviewed-import"
+SCRIPT_REVIEWED_ACCEPT_ENDPOINT = f"{SCRIPT_WORKSPACE_ENDPOINT}/reviewed-import/accept"
 SCRIPT_MANUAL_VERSION_ENDPOINT = f"{SCRIPT_WORKSPACE_ENDPOINT}/manual-version"
 SCRIPT_REWRITE_ENDPOINT = f"{SCRIPT_WORKSPACE_ENDPOINT}/rewrite-scene"
 SCRIPT_CONFIRM_ENDPOINT = f"{SCRIPT_WORKSPACE_ENDPOINT}/confirm"
@@ -159,6 +167,7 @@ PUBLIC_EXACT_ALIASES = {
     PUBLIC_SCRIPT_WORKSPACE_ENDPOINT: SCRIPT_WORKSPACE_ENDPOINT,
     PUBLIC_SCRIPT_GENERATE_ENDPOINT: SCRIPT_GENERATE_ENDPOINT,
     PUBLIC_SCRIPT_REVIEWED_IMPORT_ENDPOINT: SCRIPT_REVIEWED_IMPORT_ENDPOINT,
+    PUBLIC_SCRIPT_REVIEWED_ACCEPT_ENDPOINT: SCRIPT_REVIEWED_ACCEPT_ENDPOINT,
     PUBLIC_SCRIPT_MANUAL_VERSION_ENDPOINT: SCRIPT_MANUAL_VERSION_ENDPOINT,
     PUBLIC_SCRIPT_REWRITE_ENDPOINT: SCRIPT_REWRITE_ENDPOINT,
     PUBLIC_SCRIPT_CONFIRM_ENDPOINT: SCRIPT_CONFIRM_ENDPOINT,
@@ -253,6 +262,7 @@ class CreatorRequestHandler(BaseHTTPRequestHandler):
         script_studio_service: ScriptStudioApplicationService,
         script_studio_boundary: ScriptStudioPublicBoundary,
         episode_production_boundary: EpisodeProductionPublicBoundary,
+        canonical_registration_boundary: CanonicalRegistrationPublicBoundary | None,
         public_authenticator: PublicApiAuthenticator | None,
         allow_internal_routes: bool,
         **kwargs: Any,
@@ -266,6 +276,7 @@ class CreatorRequestHandler(BaseHTTPRequestHandler):
         self.script_studio_service = script_studio_service
         self.script_studio_boundary = script_studio_boundary
         self.episode_production_boundary = episode_production_boundary
+        self.canonical_registration_boundary = canonical_registration_boundary
         self.public_authenticator = public_authenticator
         self.allow_internal_routes = allow_internal_routes
         self.authenticated_principal: PublicApiPrincipal | None = None
@@ -289,6 +300,7 @@ class CreatorRequestHandler(BaseHTTPRequestHandler):
             EPISODES_ENDPOINT,
             SCRIPT_GENERATE_ENDPOINT,
             SCRIPT_REVIEWED_IMPORT_ENDPOINT,
+            SCRIPT_REVIEWED_ACCEPT_ENDPOINT,
             SCRIPT_MANUAL_VERSION_ENDPOINT,
             SCRIPT_REWRITE_ENDPOINT,
             SCRIPT_CONFIRM_ENDPOINT,
@@ -297,6 +309,8 @@ class CreatorRequestHandler(BaseHTTPRequestHandler):
             SERIES_PLANNING_MANUAL_VERSION_ENDPOINT,
             SERIES_PLANNING_CONFIRM_VERSION_ENDPOINT,
             PUBLIC_EPISODE_PRODUCTION_RUNS_ENDPOINT,
+            PUBLIC_CANONICAL_REGISTRATIONS_ENDPOINT,
+            PUBLIC_CANONICAL_REGISTRATION_PREFLIGHT_ENDPOINT,
         } and requested_path not in PUBLIC_M6_COMMAND_ENDPOINTS and production_subresource is None:
             self._send_application_error(404, "not_found")
             return
@@ -332,6 +346,39 @@ class CreatorRequestHandler(BaseHTTPRequestHandler):
                     "normalizedSourceDocumentDigest",
                     "reviewedDocumentDigest",
                     "content",
+                }:
+                    self._send_application_error(400, "invalid_request")
+                    return
+                payload = {
+                    **payload,
+                    "importedByRef": self._authenticated_credential_ref(),
+                }
+            elif requested_path == PUBLIC_SCRIPT_REVIEWED_ACCEPT_ENDPOINT:
+                if set(payload) != {
+                    "seriesRef",
+                    "episodeRef",
+                    "scriptRef",
+                    "scriptVersionRef",
+                    "idempotencyKey",
+                    "approvalRef",
+                }:
+                    self._send_application_error(400, "invalid_request")
+                    return
+            elif requested_path in {
+                PUBLIC_CANONICAL_REGISTRATIONS_ENDPOINT,
+                PUBLIC_CANONICAL_REGISTRATION_PREFLIGHT_ENDPOINT,
+            }:
+                if set(payload) != {
+                    "registrationKey",
+                    "idempotencyKey",
+                    "packageDigest",
+                    "contentProfileRef",
+                    "series",
+                    "project",
+                    "creativePlan",
+                    "episode",
+                    "reviewedScript",
+                    "acceptance",
                 }:
                     self._send_application_error(400, "invalid_request")
                     return
@@ -380,6 +427,37 @@ class CreatorRequestHandler(BaseHTTPRequestHandler):
             }
         if requested_path in PUBLIC_M6_COMMAND_ENDPOINTS:
             self._handle_series_intelligence_post(requested_path, payload)
+            return
+        if requested_path in {
+            PUBLIC_CANONICAL_REGISTRATIONS_ENDPOINT,
+            PUBLIC_CANONICAL_REGISTRATION_PREFLIGHT_ENDPOINT,
+        }:
+            if self.canonical_registration_boundary is None:
+                self._send_application_error(
+                    503, "canonical_registration_unavailable"
+                )
+                return
+            try:
+                if (
+                    requested_path
+                    == PUBLIC_CANONICAL_REGISTRATION_PREFLIGHT_ENDPOINT
+                ):
+                    result = self.canonical_registration_boundary.preflight(
+                        payload
+                    )
+                    self._send_json(
+                        200, {"ok": True, "preflight": result}
+                    )
+                else:
+                    result = self.canonical_registration_boundary.register(
+                        payload
+                    )
+                    self._send_json(
+                        200 if result["idempotentReplay"] else 201,
+                        {"ok": True, **result},
+                    )
+            except CanonicalRegistrationPublicError as exc:
+                self._send_canonical_registration_error(exc)
             return
         if requested_path == PUBLIC_EPISODE_PRODUCTION_RUNS_ENDPOINT:
             try:
@@ -1032,6 +1110,16 @@ class CreatorRequestHandler(BaseHTTPRequestHandler):
                         "content": payload.get("content"),
                     }
                 )
+            elif path == SCRIPT_REVIEWED_ACCEPT_ENDPOINT:
+                result = self.script_studio_boundary.accept_reviewed_import(
+                    {
+                        **self._script_scope(payload),
+                        "scriptRef": payload.get("scriptRef"),
+                        "scriptVersionRef": payload.get("scriptVersionRef"),
+                        "idempotencyKey": payload.get("idempotencyKey"),
+                        "approvalRef": payload.get("approvalRef"),
+                    }
+                )
             elif path == SCRIPT_MANUAL_VERSION_ENDPOINT:
                 result = self.script_studio_boundary.create_version(
                     {
@@ -1172,6 +1260,11 @@ class CreatorRequestHandler(BaseHTTPRequestHandler):
     ) -> None:
         self._send_application_error(exc.status, exc.code)
 
+    def _send_canonical_registration_error(
+        self, exc: CanonicalRegistrationPublicError
+    ) -> None:
+        self._send_application_error(exc.status, exc.code)
+
     def _send_application_error(self, status: int, code: str) -> None:
         messages = {
             "invalid_request": "请检查输入后重试。",
@@ -1186,6 +1279,7 @@ class CreatorRequestHandler(BaseHTTPRequestHandler):
             "version_conflict": "剧本版本已更新，请刷新后重试。",
             "script_not_confirmed": "请先确认一个剧本版本。",
             "trusted_approval_required": "该导入剧本需要可信的项目负责人审批后才能确认。",
+            "canonical_registration_unavailable": "请先配置显式 canonical target。",
             "dependent_script_exists": "该内容已有剧本版本，为保护制作链路暂不能删除。",
             "invalid_series_plan_candidate": "系列规划候选未通过本地结构校验。",
             "series_plan_not_confirmed": "请先完成人工确认。",
@@ -1365,11 +1459,16 @@ def create_server(
     episode_production_boundary: EpisodeProductionPublicBoundary | None = None,
     public_authenticator: PublicApiAuthenticator | None = None,
     allow_internal_routes: bool = True,
+    canonical_registration_boundary: CanonicalRegistrationPublicBoundary | None = None,
 ) -> ThreadingHTTPServer:
     series_boundary = series_episode_boundary or create_in_memory_series_boundary()
     projects = project_boundary or create_in_memory_project_boundary(series_boundary)
     planning = series_planning_boundary or create_in_memory_series_planning_boundary(projects)
     scripts = script_studio_boundary or create_in_memory_script_boundary(series_boundary)
+    assembly = series_boundary._lifecycle_assembly_or_none()
+    registration = canonical_registration_boundary or (
+        assembly.canonical_registration if assembly is not None else None
+    )
     production = episode_production_boundary or create_in_memory_episode_production_boundary(
         project_boundary=projects,
         series_episode_boundary=series_boundary,
@@ -1390,6 +1489,7 @@ def create_server(
         or ScriptStudioApplicationService(default_text_generation),
         script_studio_boundary=scripts,
         episode_production_boundary=production,
+        canonical_registration_boundary=registration,
         public_authenticator=public_authenticator,
         allow_internal_routes=allow_internal_routes,
     )
@@ -1445,6 +1545,7 @@ def main() -> None:
         script_studio_service=script_service,
         script_studio_boundary=assembly.script_studio,
         episode_production_boundary=episode_production_boundary,
+        canonical_registration_boundary=assembly.canonical_registration,
         public_authenticator=public_authenticator,
         allow_internal_routes=allow_internal_routes,
     )
