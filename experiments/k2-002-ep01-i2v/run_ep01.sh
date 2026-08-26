@@ -13,7 +13,7 @@ usage() {
   printf '%s\n' \
     "Usage:" \
     "  run_ep01.sh preflight" \
-    "  run_ep01.sh shot EP01_SH04" \
+    "  run_ep01.sh shot EP01_SH06" \
     "  run_ep01.sh batch" \
     "" \
     "Execution requires:" \

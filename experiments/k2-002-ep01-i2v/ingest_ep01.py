@@ -33,7 +33,7 @@ WORKFLOW_PATH = EXPERIMENT_ROOT / "workflow.json"
 SHOTS_PATH = EXPERIMENT_ROOT / "shots.json"
 
 AUTHORITY_STATE = "TECHNICAL_EVIDENCE_ONLY"
-EXPERIMENT_ID = "K2-002-EP01-I2V-49F-1280X704-V1"
+EXPERIMENT_ID = "K2-002-EP01-I2V-49F-704X1280-V1"
 PACKAGE_SHA256 = "532765d91b56692e611cabb9fcbd3d8ecc916f169f5c4e2b3b9e82a56bbe99c6"
 PACKAGE_ROOT = "final-assets-v1.2"
 
@@ -238,14 +238,14 @@ def _validate_workflow(workflow: Mapping[str, Any]) -> None:
     if any(
         latent.get(field) != expected
         for field, expected in (
-            ("width", 1280),
-            ("height", 704),
+            ("width", 704),
+            ("height", 1280),
             ("length", 49),
             ("batch_size", 1),
             ("start_image", ["12", 0]),
         )
     ):
-        raise ExperimentError("workflow is not one native 1280x704 49-frame segment")
+        raise ExperimentError("workflow is not one native 704x1280 49-frame segment")
 
     sampler = _node_inputs(workflow, "8")
     for field, expected in (
@@ -302,8 +302,8 @@ def _validate_contract(contract: Mapping[str, Any], workflow: Mapping[str, Any])
     if not isinstance(profile, Mapping) or any(
         profile.get(field) != expected
         for field, expected in (
-            ("width", 1280),
-            ("height", 704),
+            ("width", 704),
+            ("height", 1280),
             ("nativeFrames", 49),
             ("frameRate", 24),
             ("segmentsPerShot", 1),
@@ -732,13 +732,13 @@ def _probe_video(path: Path) -> dict[str, Any]:
     except (KeyError, TypeError, ValueError, ZeroDivisionError) as exc:
         raise ExperimentError("generated MP4 probe is incomplete") from exc
     if (
-        width != 1280
-        or height != 704
+        width != 704
+        or height != 1280
         or frame_count != 49
         or frame_rate != Fraction(24, 1)
         or not (1.9 <= duration <= 2.2)
     ):
-        raise ExperimentError("generated MP4 does not match 1280x704/49f/24fps")
+        raise ExperimentError("generated MP4 does not match 704x1280/49f/24fps")
     return {
         "codec": str(stream.get("codec_name", "")),
         "pixelFormat": str(stream.get("pix_fmt", "")),
@@ -856,8 +856,8 @@ def _run_shot(
             "sha256": workflow_digest,
             "templateSha256": _file_sha256(WORKFLOW_PATH),
             "shotsContractSha256": _file_sha256(SHOTS_PATH),
-            "width": 1280,
-            "height": 704,
+            "width": 704,
+            "height": 1280,
             "nativeFrames": 49,
             "frameRate": 24,
             "segments": 1,
@@ -948,7 +948,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                 print("PUBLICATION_ALLOWED=false")
                 print(f"SOURCE_PACKAGE_MODE={package.source_kind}")
                 print("SHOT_COUNT=12")
-                print("OUTPUT_PROFILE=1280x704/49f/24fps/ONE_SEGMENT")
+                print("OUTPUT_PROFILE=704x1280/49f/24fps/ONE_SEGMENT")
                 print("GPU_OR_PROVIDER_CALLS=0")
                 print("CANONICAL_MUTATIONS=0")
                 return 0

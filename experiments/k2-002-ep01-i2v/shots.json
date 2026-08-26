@@ -1,6 +1,6 @@
 {
   "schemaVersion": "k2-002.ep01-i2v-technical-batch.v1",
-  "experimentId": "K2-002-EP01-I2V-49F-1280X704-V1",
+  "experimentId": "K2-002-EP01-I2V-49F-704X1280-V1",
   "projectId": "K2-002-CHANGAN",
   "episodeId": "EP01",
   "purpose": "Evaluate Wan2.2 I2V character and scene consistency from twelve candidate start anchors.",
@@ -35,8 +35,8 @@
       "relativePath": "vae/wan2.2_vae.safetensors",
       "sha256": "e40321bd36b9709991dae2530eb4ac303dd168276980d3e9bc4b6e2b75fed156"
     },
-    "width": 1280,
-    "height": 704,
+    "width": 704,
+    "height": 1280,
     "nativeFrames": 49,
     "frameRate": 24,
     "segmentsPerShot": 1,

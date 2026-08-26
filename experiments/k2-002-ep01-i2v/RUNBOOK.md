@@ -3,8 +3,8 @@
 ## 1. 边界
 
 本目录只准备一次自托管 A100 技术验证：用 `final-assets-v1.2.zip` 内 12 张
-`704×1280` EP01 候选关键帧作为起锚帧，逐镜生成一个原生 `1280×704 / 49 帧 /
-24 fps` Wan2.2 I2V 片段。
+`704×1280` EP01 候选关键帧作为起锚帧，逐镜生成一个原生
+`704×1280（竖屏 9:16） / 49 帧 / 24 fps` Wan2.2 I2V 片段。
 
 固定状态：
 
@@ -26,7 +26,7 @@ Creator API、V5、canonical database、Asset Registry 或发布接口。每镜�
 | UNET | `wan2.2_ti2v_5B_fp16.safetensors` |
 | Text encoder | `umt5_xxl_fp8_e4m3fn_scaled.safetensors` |
 | VAE | `wan2.2_vae.safetensors` |
-| 输出 | `1280×704` |
+| 输出 | `704×1280（竖屏 9:16）` |
 | 原生帧数 | `49` |
 | 帧率 | `24 fps` |
 | Steps / CFG | `20 / 5.0` |
@@ -82,7 +82,7 @@ experiments/k2-002-ep01-i2v/run_ep01.sh preflight
 ```text
 VALIDATION=PASS
 SHOT_COUNT=12
-OUTPUT_PROFILE=1280x704/49f/24fps/ONE_SEGMENT
+OUTPUT_PROFILE=704x1280/49f/24fps/ONE_SEGMENT
 GPU_OR_PROVIDER_CALLS=0
 CANONICAL_MUTATIONS=0
 ```
@@ -107,19 +107,20 @@ curl -fsS http://127.0.0.1:8188/object_info >/tmp/k2-002-object-info.json
 `scripts/k2_comfyui_runtime_attestation.py --require-start-image`；它仍只是技术证据，
 不是 Rights、Provider、Budget 或 canonical authority。
 
-### 4.4 先跑身份高风险 SH04，预计冷启动 8–15 分钟
+### 4.4 必须先跑单镜探针 SH06，预计冷启动 8–15 分钟
 
 ```bash
 export K2_EP01_I2V_ACK=TECHNICAL_EVIDENCE_ONLY
-experiments/k2-002-ep01-i2v/run_ep01.sh shot EP01_SH04
+experiments/k2-002-ep01-i2v/run_ep01.sh shot EP01_SH06
 ```
 
 脚本顺序执行：锚帧摘要复核 → 本机 input staging → `/prompt` 单次提交 → 单次 history
-等待 → MP4 下载 → `ffprobe`。只有输出同时满足 `1280×704 / 49 帧 / 24 fps / 无音轨`
-才写入技术证据记录。没有隐式重试。
+等待 → MP4 下载 → `ffprobe`。只有输出同时满足
+`704×1280（竖屏 9:16） / 49 帧 / 24 fps / 无音轨` 才写入技术证据记录。没有隐式重试。
 
-先人工查看 SH04 是否存在明显身份漂移、服装漂移、面部变形或大幅运镜。该查看不是
-Human Selection，也不产生 Admission。
+必须先由人工查看 SH06，确认画面方向、构图、主体一致性、形变与运镜符合技术验证预期；
+只有人工确认后，才可执行 `run_ep01.sh batch`。该查看不是 Human Selection，也不产生
+Admission。
 
 ### 4.5 顺序执行其余镜头，预计 45–90 分钟
 
@@ -127,7 +128,7 @@ Human Selection，也不产生 Admission。
 experiments/k2-002-ep01-i2v/run_ep01.sh batch
 ```
 
-`batch` 固定串行，自动跳过同一 `EVIDENCE_ROOT` 下已通过摘要验证的 SH04；不会并发占用
+`batch` 固定串行，自动跳过同一 `EVIDENCE_ROOT` 下已通过摘要验证的 SH06；不会并发占用
 显存，也不会拼接镜头。任一镜头失败即停止，修复原因后由操作员决定是否再次执行；脚本
 不会自动消费第二次 GPU 尝试。
 
@@ -143,15 +144,15 @@ sha256sum "$EVIDENCE_ROOT"/media/*.mp4
 - `media/EP01_SH01.mp4` 至 `media/EP01_SH12.mp4`；
 - `records/EP01_SH01.json` 至 `records/EP01_SH12.json`；
 - `session-manifest.json`；
-- 可选的单镜校准 `session-manifest-EP01_SH04.json`。
+- 可选的单镜校准 `session-manifest-EP01_SH06.json`。
 
 将整个 `EVIDENCE_ROOT` 保存在持久盘后关闭 GPU。不要把 MP4 或 runtime evidence 提交到
 Git，也不要调用任何 canonical、Admission、Master、Export 或 Publication 操作。
 
 ## 5. 时间与开机时长估算
 
-仓库没有 `1280×704 / 49 帧 / 20 steps` 在当前 A100 40GB 上的实测时延，因此以下是
-排期估算，不是已验证性能结论：
+仓库没有 `704×1280（竖屏 9:16） / 49 帧 / 20 steps` 在当前 A100 40GB 上的实测时延，
+因此以下是排期估算，不是已验证性能结论：
 
 | 阶段 | 估算 |
 | --- | ---: |
@@ -171,7 +172,7 @@ Git，也不要调用任何 canonical、Admission、Master、Export 或 Publicat
 出现以下任一情况立即停止，不继续消耗 GPU：
 
 - 资产包、锚帧或模型 SHA-256 不匹配；
-- 输出不是 `1280×704 / 49 帧 / 24 fps`；
+- 输出不是 `704×1280（竖屏 9:16） / 49 帧 / 24 fps`；
 - ComfyUI 缺少原生 I2V 节点或 `start_image`；
 - 运行设备不是唯一 A100 CUDA 设备；
 - 单镜超过 60 分钟超时；
