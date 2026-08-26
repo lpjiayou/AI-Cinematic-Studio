@@ -135,6 +135,119 @@ class SqliteMigrationTests(unittest.TestCase):
             after.close()
         self.assertEqual(created["title"], "Legacy")
 
+    def test_lifecycle_v2_adds_missing_script_acceptance_component(self):
+        self.assertEqual(
+            migrate_lifecycle_database(self.path, allow_upgrade=True), "fresh"
+        )
+        before = open_fk(self.path)
+        try:
+            before.execute("DROP INDEX ix_script_acceptance_episode_parent")
+            before.execute("DROP TABLE v5_script_acceptances")
+            before.execute("DROP TABLE v5_script_acceptance_schema")
+            existing = {
+                table: before.execute(f"SELECT COUNT(*) FROM {table}").fetchone()[0]
+                for table in (
+                    "v5_series",
+                    "v5_projects",
+                    "v5_scripts",
+                    "v5_script_versions",
+                    "v5_series_plans",
+                    "v5_series_plan_versions",
+                )
+            }
+        finally:
+            before.close()
+
+        self.assertEqual(
+            migrate_lifecycle_database(self.path, allow_upgrade=True), "upgrade"
+        )
+        after = open_fk(self.path)
+        try:
+            self.assertEqual(
+                after.execute(
+                    "SELECT COUNT(*) FROM v5_script_acceptances"
+                ).fetchone()[0],
+                0,
+            )
+            for table, count in existing.items():
+                self.assertEqual(
+                    after.execute(f"SELECT COUNT(*) FROM {table}").fetchone()[0],
+                    count,
+                )
+            self.assertEqual(
+                after.execute(
+                    "SELECT schema_version FROM v5_script_studio_schema"
+                ).fetchone()[0],
+                2,
+            )
+            self.assertEqual(
+                tuple(
+                    after.execute(
+                        "SELECT component,schema_version "
+                        "FROM v5_script_acceptance_schema"
+                    ).fetchone()
+                ),
+                ("script_acceptance", 1),
+            )
+            self.assertEqual(after.execute("PRAGMA foreign_key_check").fetchall(), [])
+        finally:
+            after.close()
+
+    def test_missing_script_acceptance_requires_explicit_upgrade_without_writes(self):
+        migrate_lifecycle_database(self.path, allow_upgrade=True)
+        connection = open_fk(self.path)
+        try:
+            connection.execute("DROP INDEX ix_script_acceptance_episode_parent")
+            connection.execute("DROP TABLE v5_script_acceptances")
+            connection.execute("DROP TABLE v5_script_acceptance_schema")
+        finally:
+            connection.close()
+        before = self.path.read_bytes()
+        with self.assertRaises(LifecycleMigrationError):
+            migrate_lifecycle_database(self.path, allow_upgrade=False)
+        self.assertEqual(self.path.read_bytes(), before)
+
+    def test_script_acceptance_additive_migration_rolls_back_atomically(self):
+        migrate_lifecycle_database(self.path, allow_upgrade=True)
+        connection = open_fk(self.path)
+        try:
+            connection.execute("DROP INDEX ix_script_acceptance_episode_parent")
+            connection.execute("DROP TABLE v5_script_acceptances")
+            connection.execute("DROP TABLE v5_script_acceptance_schema")
+        finally:
+            connection.close()
+
+        def fault(point):
+            if point == "before-marker-update":
+                raise RuntimeError("acceptance migration fault")
+
+        with self.assertRaisesRegex(RuntimeError, "acceptance migration fault"):
+            migrate_lifecycle_database(
+                self.path,
+                allow_upgrade=True,
+                fault=fault,
+            )
+        after_failure = open_fk(self.path)
+        try:
+            objects = {
+                row[0]
+                for row in after_failure.execute(
+                    "SELECT name FROM sqlite_master "
+                    "WHERE name LIKE '%script_acceptance%'"
+                )
+            }
+            self.assertEqual(objects, set())
+            self.assertEqual(
+                after_failure.execute("PRAGMA foreign_key_check").fetchall(),
+                [],
+            )
+        finally:
+            after_failure.close()
+        self.assertEqual(
+            migrate_lifecycle_database(self.path, allow_upgrade=True),
+            "upgrade",
+        )
+
     def test_partial_v1_marker_table_mismatch_fails_before_writes(self):
         cases = ("marker-only", "tables-without-marker")
         for case in cases:

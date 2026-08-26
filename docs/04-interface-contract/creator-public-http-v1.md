@@ -1,6 +1,6 @@
 # Creator Public HTTP/API v1
 
-Status: `XR1 FROZEN / AUTH-W1 SECURITY AMENDMENT / ADR-0013 CONTROL PLANE / ADR-0014 K2-002 PREFLIGHT AMENDMENT`
+Status: `XR1 FROZEN / AUTH-W1 SECURITY AMENDMENT / ADR-0013 CONTROL PLANE / ADR-0014 K2-002 PREFLIGHT + SCRIPT ACCEPTANCE AMENDMENT`
 
 This contract is the only browser-facing Core HTTP surface for the separate Commercial
 Frontend. Existing `/creator/internal/*` endpoints remain compatibility-only and must
@@ -19,7 +19,7 @@ Commercial Frontend → Frontend Experience Adapter → /creator/api/v1
 | --- | --- | --- |
 | M1 | `/ai-director/candidates`, `/creative-plans/confirm` | AI Director Application + Series/Episode boundary |
 | M2 | `/series`, `/episodes` | Series/Episode public boundary |
-| M3 | `/script-workspaces`, `/script-versions/*`, `/script-versions/reviewed-import` | Script Studio Application/public boundary |
+| M3 | `/script-workspaces`, `/script-versions/*`, `/script-versions/reviewed-import`, `/script-versions/reviewed-import/accept` | Script Studio Application/public boundary |
 | M4 | `/projects`, `/project-contexts` | Project Context public boundary |
 | M5 | `/series-planning-workspaces`, `/series-plan-*` | Series Planning + Series Director boundaries |
 | M6 | `/series-intelligence-workspaces`, `/series-intelligence/*` | accepted Series Intelligence public boundary |
@@ -68,6 +68,39 @@ Generic confirmation of any reviewed-import lineage returns
 `trusted_approval_required` until a trusted Owner approval resolver verifies the exact
 subject. Existing generic generation/manual-edit paths do not carry reviewed-source
 provenance. The internal unauthenticated alias remains forbidden.
+
+### Trusted reviewed Script acceptance
+
+`POST /creator/api/v1/script-versions/reviewed-import/accept` accepts exactly
+`seriesRef`, `episodeRef`, `scriptRef`, `scriptVersionRef`, `idempotencyKey` and
+`approvalRef`. Authentication injects `workspaceRef`. Client-supplied workspace,
+actor, role, decision, authority, subject digest, document digest, publication or
+confirmation fields are rejected.
+
+The configured Script acceptance authority is external to request content. Core loads
+one closed-world JSON authority bundle only when both
+`CREATOR_SCRIPT_ACCEPTANCE_AUTHORITY_BUNDLE_PATH` and
+`CREATOR_SCRIPT_ACCEPTANCE_AUTHORITY_BUNDLE_SHA256` are present. The path must be an
+absolute non-symlink file and the separately configured SHA-256 must match its exact
+bytes. Duplicate JSON keys, unknown fields, duplicate approval/decision refs, a
+non-`PROJECT_LEAD` actor kind, a decision other than `ACCEPTED`, or any mismatch with
+the persisted reviewed-import subject fails closed. With no configured authority the
+route returns `trusted_approval_required`.
+
+The verified subject binds the exact Workspace, Series, Episode, Script and
+ScriptVersion together with the uploaded-source, normalized-document,
+reviewed-document, canonical Script-content and import-provenance SHA-256 values
+already stored on that first reviewed-import ScriptVersion. Core atomically appends
+one immutable `v5.script-acceptance.v1` record and updates the Script's confirmed
+version in the existing Lifecycle SQLite transaction. The additive
+`script_acceptance@1` component lives in that same database; it does not change the
+accepted global Lifecycle V2 marker and does not create another authority store.
+
+An exact replay returns the original sealed record with `idempotentReplay=true` and
+does not call the authority again. Reusing an idempotency key, approval ref or subject
+with changed scope, lineage or evidence conflicts. Every acceptance remains
+`publicationAllowed=false`; this route grants neither asset admission nor
+Provider/GPU execution.
 
 ## K2 provider experiment semantics
 

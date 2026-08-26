@@ -19,6 +19,9 @@ PUBLIC_SCRIPT_GENERATE_ENDPOINT: Final = f"{PUBLIC_API_PREFIX}/script-versions/g
 PUBLIC_SCRIPT_REVIEWED_IMPORT_ENDPOINT: Final = (
     f"{PUBLIC_API_PREFIX}/script-versions/reviewed-import"
 )
+PUBLIC_SCRIPT_REVIEWED_ACCEPT_ENDPOINT: Final = (
+    f"{PUBLIC_API_PREFIX}/script-versions/reviewed-import/accept"
+)
 PUBLIC_SCRIPT_MANUAL_VERSION_ENDPOINT: Final = f"{PUBLIC_API_PREFIX}/script-versions/manual"
 PUBLIC_SCRIPT_REWRITE_ENDPOINT: Final = f"{PUBLIC_API_PREFIX}/script-versions/rewrite-scene"
 PUBLIC_SCRIPT_CONFIRM_ENDPOINT: Final = f"{PUBLIC_API_PREFIX}/script-versions/confirm"
@@ -71,6 +74,7 @@ CAPABILITY_PROJECTION: Final = (
             "script-workspaces",
             "script-versions",
             "script-versions/reviewed-import",
+            "script-versions/reviewed-import/accept",
         ],
         "requirements": [
             "confirmed_creative_plan",
@@ -79,6 +83,7 @@ CAPABILITY_PROJECTION: Final = (
             "authenticated_actor_document_digest_assertions_unverified",
             "server_generated_scene_refs_and_canonical_content_digest",
             "trusted_owner_approval_required_for_confirmation",
+            "digest_pinned_reviewed_import_acceptance_is_durable_and_idempotent",
         ],
     },
     {

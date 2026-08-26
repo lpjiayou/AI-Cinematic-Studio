@@ -10,7 +10,7 @@
 >
 > Current Task: `ACS-K2-002-CHANGAN-ONBOARDING-AND-EP01-CHAIN`
 >
-> Current Work Package: `ACS-K2-002-SCRIPT-ACC3 / K2-001 CLOSED HISTORICAL / K2-002 v1.4 OWNER ACCEPTED EXACT DIGEST / TRUSTED ACCEPTANCE IMPLEMENTATION IN PROGRESS / EP01 MEDIA NOT STARTED`
+> Current Work Package: `ACS-K2-002-SCRIPT-ACC3 / K2-001 CLOSED HISTORICAL / K2-002 v1.4 OWNER ACCEPTED EXACT DIGEST / TRUSTED ACCEPTANCE CAPABILITY LOCAL-TESTED / LIVE ACCEPTANCE NOT APPLIED / GITHUB SYNC HOLD / EP01 MEDIA NOT STARTED`
 >
 > M6 Authorization: `ACCEPTED SURFACES / K2-002 MUST CREATE DISTINCT SCOPE AND APPROVALS / NO K2-001 AUTHORITY INHERITANCE`
 >
@@ -61,7 +61,8 @@ EXACT_OWNER_REVISION_SOURCE=V1.4@33067592eb3c0c632d10f2fea3ef20b77ab319ee5aec999
 SOURCE_PACKAGE=V1.4_REPOSITORY_REVIEWED_REBASE_CANDIDATE
 REPOSITORY_INGEST_AUTHORIZATION=OWNER_AUTHORIZED
 SCRIPT_OWNER_ACCEPTANCE=OWNER_ACCEPTED_EXACT_REVIEWED_V1_4_DIGEST
-TRUSTED_V5_SCRIPT_ACCEPTANCE=NOT_YET_PERSISTED
+TRUSTED_V5_SCRIPT_ACCEPTANCE_CAPABILITY=LOCAL_TESTED_CANDIDATE / 907 PASS
+TRUSTED_V5_SCRIPT_ACCEPTANCE=NOT_YET_APPLIED_TO_CANONICAL_TARGET
 MACHINE_LEDGER=V2 / V1.4 EP01 MAPPED FAIL_CLOSED
 EDITORIAL_SHOT_PLAN=LOCAL_STRUCTURAL_REPRESENTATION_ONLY
 SHOT_PLAN_APPROVAL=NOT_VERIFIED
@@ -84,8 +85,20 @@ PUBLICATION_ALLOWED=false
 ```
 
 The current non-GPU repository candidate audits reviewed import and durable registration
-and maps the repository-reviewed v1.4 into the vertical output profile plus an explicit 12-shot local structural
-draft. For a v2 run in an isolated verification store, one atomic
+and now implements a generic, fail-closed `v5.script-acceptance.v1` path through the
+existing Creator Public API, V5 Script Studio, Lifecycle lease and same SQLite
+transaction. It binds exact reviewed-import provenance to a digest-pinned external
+Project Lead decision, atomically confirms the ScriptVersion, survives restart and
+returns the original immutable record on exact or concurrent replay. The additive
+`script_acceptance@1` marker does not change the global Lifecycle V2 contract or create
+a second authority store. Unit `657/657`, Contract `97/97` and Integration `153/153`
+pass locally. This is a repository capability candidate only: no explicit canonical
+target was available, no live K2-002 ScriptVersion/acceptance was written, and GitHub
+sync remains on hold.
+
+The repository candidate also maps the repository-reviewed v1.4 into the vertical
+output profile plus an explicit 12-shot local structural draft. For a v2 run in an
+isolated verification store, one atomic
 `G3_SCRIPT_VALIDATION` append records `ConsistencyValidation`, `StoryboardDraft`, twelve
 `CreativeShotDraft:*` facts and `ShotPlanDraft`, then stops at `SCRIPT_VALIDATED`. It
 does not append `G3_SHOT_GRAPH`, create or project `ExecutableShotGraph`, or advance to

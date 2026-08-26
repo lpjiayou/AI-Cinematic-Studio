@@ -13,6 +13,7 @@ from apps.creator_workspace_mvp.public_contract import (
     PUBLIC_M6_BIBLE_VERSION_ENDPOINT,
     PUBLIC_PROJECTS_ENDPOINT,
     PUBLIC_SCRIPT_CONFIRM_ENDPOINT,
+    PUBLIC_SCRIPT_REVIEWED_ACCEPT_ENDPOINT,
     PUBLIC_SCRIPT_REVIEWED_IMPORT_ENDPOINT,
     PUBLIC_SERIES_ENDPOINT,
     PUBLIC_SERIES_INTELLIGENCE_WORKSPACE_ENDPOINT,
@@ -344,6 +345,28 @@ class CreatorPublicHttpV1IntegrationTests(unittest.TestCase):
         blocked = json.loads(caught.exception.read().decode("utf-8"))
         self.assertEqual(blocked["error"]["code"], "trusted_approval_required")
 
+        accept_command = {
+            "seriesRef": series["seriesRef"],
+            "episodeRef": episode["episodeRef"],
+            "scriptRef": imported["script"]["scriptRef"],
+            "scriptVersionRef": imported["scriptVersion"][
+                "scriptVersionRef"
+            ],
+            "idempotencyKey": "accept-reviewed-import",
+            "approvalRef": "approval-reviewed-import",
+        }
+        with self.assertRaises(error.HTTPError) as caught:
+            self.post(
+                PUBLIC_SCRIPT_REVIEWED_ACCEPT_ENDPOINT,
+                {**accept_command, "actorRef": "forged-actor"},
+            )
+        self.assertEqual(caught.exception.code, 400)
+        with self.assertRaises(error.HTTPError) as caught:
+            self.post(PUBLIC_SCRIPT_REVIEWED_ACCEPT_ENDPOINT, accept_command)
+        self.assertEqual(caught.exception.code, 403)
+        blocked = json.loads(caught.exception.read().decode("utf-8"))
+        self.assertEqual(blocked["error"]["code"], "trusted_approval_required")
+
     def test_unknown_public_route_is_stable_404(self):
         with self.assertRaises(error.HTTPError) as caught:
             self.get("/creator/api/v1/not-a-resource")
@@ -365,7 +388,7 @@ class CreatorPublicHttpV1IntegrationTests(unittest.TestCase):
                 )
             }
         )
-        self.assertEqual(len(declared), 29)
+        self.assertEqual(len(declared), 30)
         for path in declared:
             with self.subTest(path=path), self.assertRaises(error.HTTPError) as caught:
                 request.urlopen(f"{self.base_url}{path}", timeout=5)

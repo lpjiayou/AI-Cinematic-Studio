@@ -59,6 +59,7 @@ from apps.creator_workspace_mvp.public_contract import (
     PUBLIC_SCRIPT_CONFIRM_ENDPOINT,
     PUBLIC_SCRIPT_GENERATE_ENDPOINT,
     PUBLIC_SCRIPT_REVIEWED_IMPORT_ENDPOINT,
+    PUBLIC_SCRIPT_REVIEWED_ACCEPT_ENDPOINT,
     PUBLIC_SCRIPT_MANUAL_VERSION_ENDPOINT,
     PUBLIC_SCRIPT_REWRITE_ENDPOINT,
     PUBLIC_SCRIPT_WORKSPACE_ENDPOINT,
@@ -112,6 +113,7 @@ EPISODES_ENDPOINT = "/creator/internal/episodes"
 SCRIPT_WORKSPACE_ENDPOINT = "/creator/internal/script-studio"
 SCRIPT_GENERATE_ENDPOINT = f"{SCRIPT_WORKSPACE_ENDPOINT}/generate"
 SCRIPT_REVIEWED_IMPORT_ENDPOINT = f"{SCRIPT_WORKSPACE_ENDPOINT}/reviewed-import"
+SCRIPT_REVIEWED_ACCEPT_ENDPOINT = f"{SCRIPT_WORKSPACE_ENDPOINT}/reviewed-import/accept"
 SCRIPT_MANUAL_VERSION_ENDPOINT = f"{SCRIPT_WORKSPACE_ENDPOINT}/manual-version"
 SCRIPT_REWRITE_ENDPOINT = f"{SCRIPT_WORKSPACE_ENDPOINT}/rewrite-scene"
 SCRIPT_CONFIRM_ENDPOINT = f"{SCRIPT_WORKSPACE_ENDPOINT}/confirm"
@@ -159,6 +161,7 @@ PUBLIC_EXACT_ALIASES = {
     PUBLIC_SCRIPT_WORKSPACE_ENDPOINT: SCRIPT_WORKSPACE_ENDPOINT,
     PUBLIC_SCRIPT_GENERATE_ENDPOINT: SCRIPT_GENERATE_ENDPOINT,
     PUBLIC_SCRIPT_REVIEWED_IMPORT_ENDPOINT: SCRIPT_REVIEWED_IMPORT_ENDPOINT,
+    PUBLIC_SCRIPT_REVIEWED_ACCEPT_ENDPOINT: SCRIPT_REVIEWED_ACCEPT_ENDPOINT,
     PUBLIC_SCRIPT_MANUAL_VERSION_ENDPOINT: SCRIPT_MANUAL_VERSION_ENDPOINT,
     PUBLIC_SCRIPT_REWRITE_ENDPOINT: SCRIPT_REWRITE_ENDPOINT,
     PUBLIC_SCRIPT_CONFIRM_ENDPOINT: SCRIPT_CONFIRM_ENDPOINT,
@@ -289,6 +292,7 @@ class CreatorRequestHandler(BaseHTTPRequestHandler):
             EPISODES_ENDPOINT,
             SCRIPT_GENERATE_ENDPOINT,
             SCRIPT_REVIEWED_IMPORT_ENDPOINT,
+            SCRIPT_REVIEWED_ACCEPT_ENDPOINT,
             SCRIPT_MANUAL_VERSION_ENDPOINT,
             SCRIPT_REWRITE_ENDPOINT,
             SCRIPT_CONFIRM_ENDPOINT,
@@ -339,6 +343,17 @@ class CreatorRequestHandler(BaseHTTPRequestHandler):
                     **payload,
                     "importedByRef": self._authenticated_credential_ref(),
                 }
+            elif requested_path == PUBLIC_SCRIPT_REVIEWED_ACCEPT_ENDPOINT:
+                if set(payload) != {
+                    "seriesRef",
+                    "episodeRef",
+                    "scriptRef",
+                    "scriptVersionRef",
+                    "idempotencyKey",
+                    "approvalRef",
+                }:
+                    self._send_application_error(400, "invalid_request")
+                    return
             if production_subresource is not None and "productionRunRef" in payload:
                 self._send_application_error(400, "invalid_request")
                 return
@@ -1030,6 +1045,16 @@ class CreatorRequestHandler(BaseHTTPRequestHandler):
                         ),
                         "importedByRef": payload.get("importedByRef"),
                         "content": payload.get("content"),
+                    }
+                )
+            elif path == SCRIPT_REVIEWED_ACCEPT_ENDPOINT:
+                result = self.script_studio_boundary.accept_reviewed_import(
+                    {
+                        **self._script_scope(payload),
+                        "scriptRef": payload.get("scriptRef"),
+                        "scriptVersionRef": payload.get("scriptVersionRef"),
+                        "idempotencyKey": payload.get("idempotencyKey"),
+                        "approvalRef": payload.get("approvalRef"),
                     }
                 )
             elif path == SCRIPT_MANUAL_VERSION_ENDPOINT:

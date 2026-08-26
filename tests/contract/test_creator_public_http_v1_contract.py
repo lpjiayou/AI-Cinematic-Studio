@@ -117,6 +117,11 @@ class CreatorPublicHttpV1ContractTests(unittest.TestCase):
             "approvalRef",
             "BREAKING",
             "client_workspace_scope_forbidden",
+            "script-versions/reviewed-import/accept",
+            "CREATOR_SCRIPT_ACCEPTANCE_AUTHORITY_BUNDLE_SHA256",
+            "v5.script-acceptance.v1",
+            "script_acceptance@1",
+            "idempotentReplay=true",
         ):
             with self.subTest(required_term=required_term):
                 self.assertIn(required_term, document)

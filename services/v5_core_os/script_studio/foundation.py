@@ -17,6 +17,8 @@ from uuid import uuid4
 
 SCRIPT_SCHEMA_VERSION = "v5.script.v1"
 SCRIPT_VERSION_SCHEMA_VERSION = "creator.script-studio.script-version.v1"
+SCRIPT_ACCEPTANCE_SCHEMA_VERSION = "v5.script-acceptance.v1"
+SCRIPT_ACCEPTANCE_SUBJECT_SCHEMA_VERSION = "v5.script-acceptance-subject.v1"
 STORYBOARD_BOOTSTRAP_SCHEMA_VERSION = "creator.storyboard.bootstrap-input.v1"
 SCRIPT_STUDIO_BOOTSTRAP_SCHEMA_VERSION = "creator.script-studio.bootstrap-input.v1"
 SQLITE_SCHEMA_VERSION = 1
@@ -118,6 +120,20 @@ def _sha256_digest(value: Any, field: str) -> str:
     if re.fullmatch(r"[0-9a-f]{64}", text) is None:
         raise ScriptStudioError(f"{field} must be a SHA-256 digest")
     return text
+
+
+def _canonical_digest(value: Any) -> str:
+    try:
+        encoded = json.dumps(
+            value,
+            ensure_ascii=False,
+            sort_keys=True,
+            separators=(",", ":"),
+            allow_nan=False,
+        ).encode("utf-8")
+    except (TypeError, ValueError) as exc:
+        raise ScriptStudioError("value cannot be canonicalized") from exc
+    return hashlib.sha256(encoded).hexdigest()
 
 
 def _positive_int(value: Any, field: str, *, maximum: int = 100_000) -> int:
@@ -438,6 +454,285 @@ class ScriptVersionRecord:
     createdAt: str
 
 
+@dataclass(frozen=True)
+class ScriptAcceptanceSubject:
+    workspaceRef: str
+    seriesRef: str
+    episodeRef: str
+    scriptRef: str
+    scriptVersionRef: str
+    uploadedSourceByteDigest: str
+    normalizedSourceDocumentDigest: str
+    reviewedDocumentDigest: str
+    canonicalScriptContentDigest: str
+    importProvenanceDigest: str
+
+    @classmethod
+    def create(cls, **value: Any) -> "ScriptAcceptanceSubject":
+        return cls(
+            *(
+                _required_ref(value.get(field), field)
+                for field in (
+                    "workspaceRef",
+                    "seriesRef",
+                    "episodeRef",
+                    "scriptRef",
+                    "scriptVersionRef",
+                )
+            ),
+            *(
+                _sha256_digest(value.get(field), field)
+                for field in (
+                    "uploadedSourceByteDigest",
+                    "normalizedSourceDocumentDigest",
+                    "reviewedDocumentDigest",
+                    "canonicalScriptContentDigest",
+                    "importProvenanceDigest",
+                )
+            ),
+        )
+
+    def as_mapping(self) -> dict[str, str]:
+        return {
+            "schemaVersion": SCRIPT_ACCEPTANCE_SUBJECT_SCHEMA_VERSION,
+            **{
+                field: getattr(self, field)
+                for field in (
+                    "workspaceRef",
+                    "seriesRef",
+                    "episodeRef",
+                    "scriptRef",
+                    "scriptVersionRef",
+                    "uploadedSourceByteDigest",
+                    "normalizedSourceDocumentDigest",
+                    "reviewedDocumentDigest",
+                    "canonicalScriptContentDigest",
+                    "importProvenanceDigest",
+                )
+            },
+        }
+
+    @property
+    def subject_digest(self) -> str:
+        return _canonical_digest(self.as_mapping())
+
+
+@dataclass(frozen=True)
+class VerifiedScriptAcceptance:
+    authorityRef: str
+    approvalRef: str
+    actorRef: str
+    actorKind: str
+    decision: str
+    authorityDecisionRef: str
+    authorityDecisionDigest: str
+    decidedAt: str
+    governanceRecordRef: str
+    subjectDigest: str
+
+    @classmethod
+    def create(cls, **value: Any) -> "VerifiedScriptAcceptance":
+        actor_kind = _required_text(value.get("actorKind"), "actorKind", limit=40)
+        decision = _required_text(value.get("decision"), "decision", limit=40)
+        if actor_kind != "PROJECT_LEAD" or decision != "ACCEPTED":
+            raise TrustedApprovalRequiredError(
+                "trusted Script acceptance decision is invalid"
+            )
+        return cls(
+            _required_ref(value.get("authorityRef"), "authorityRef"),
+            _required_ref(value.get("approvalRef"), "approvalRef"),
+            _required_ref(value.get("actorRef"), "actorRef"),
+            actor_kind,
+            decision,
+            _required_ref(
+                value.get("authorityDecisionRef"), "authorityDecisionRef"
+            ),
+            _sha256_digest(
+                value.get("authorityDecisionDigest"),
+                "authorityDecisionDigest",
+            ),
+            _required_text(value.get("decidedAt"), "decidedAt", limit=100),
+            _required_ref(
+                value.get("governanceRecordRef"), "governanceRecordRef"
+            ),
+            _sha256_digest(value.get("subjectDigest"), "subjectDigest"),
+        )
+
+    def matches(
+        self,
+        *,
+        subject: ScriptAcceptanceSubject,
+        approval_ref: str,
+    ) -> bool:
+        return (
+            self.approvalRef == approval_ref
+            and self.subjectDigest == subject.subject_digest
+            and self.decision == "ACCEPTED"
+            and self.actorKind == "PROJECT_LEAD"
+        )
+
+
+class ScriptAcceptanceAuthorityPort(Protocol):
+    def verify(
+        self,
+        *,
+        subject: ScriptAcceptanceSubject,
+        approval_ref: str,
+    ) -> VerifiedScriptAcceptance: ...
+
+
+class RejectingScriptAcceptanceAuthority:
+    def verify(self, **_: Any) -> VerifiedScriptAcceptance:
+        raise TrustedApprovalRequiredError(
+            "reviewed-import lineage requires a trusted approval resolver"
+        )
+
+
+@dataclass(frozen=True)
+class ScriptAcceptanceRecord:
+    schemaVersion: str
+    workspaceRef: str
+    seriesRef: str
+    episodeRef: str
+    scriptRef: str
+    scriptVersionRef: str
+    acceptanceRef: str
+    approvalRef: str
+    authorityDecisionRef: str
+    idempotencyKey: str
+    contentJson: str
+    payloadDigest: str
+    createdAt: str
+
+
+def _same_acceptance_request(
+    left: ScriptAcceptanceRecord,
+    right: ScriptAcceptanceRecord,
+) -> bool:
+    return all(
+        getattr(left, field) == getattr(right, field)
+        for field in (
+            "schemaVersion",
+            "workspaceRef",
+            "seriesRef",
+            "episodeRef",
+            "scriptRef",
+            "scriptVersionRef",
+            "approvalRef",
+            "authorityDecisionRef",
+            "idempotencyKey",
+            "contentJson",
+        )
+    )
+
+
+def _acceptance_mapping(record: ScriptAcceptanceRecord) -> dict[str, Any]:
+    try:
+        content = json.loads(record.contentJson)
+    except (TypeError, json.JSONDecodeError) as exc:
+        raise RepositoryWriteError("persisted Script acceptance is invalid") from exc
+    fields = {
+        "uploadedSourceByteDigest",
+        "normalizedSourceDocumentDigest",
+        "reviewedDocumentDigest",
+        "canonicalScriptContentDigest",
+        "importProvenanceDigest",
+        "subjectDigest",
+        "authorityRef",
+        "actorRef",
+        "actorKind",
+        "decision",
+        "authorityDecisionDigest",
+        "decidedAt",
+        "governanceRecordRef",
+        "publicationAllowed",
+    }
+    if record.schemaVersion != SCRIPT_ACCEPTANCE_SCHEMA_VERSION or not isinstance(
+        content, Mapping
+    ) or set(content) != fields:
+        raise RepositoryWriteError("persisted Script acceptance is invalid")
+    try:
+        canonical_content_json = json.dumps(
+            content,
+            ensure_ascii=False,
+            sort_keys=True,
+            separators=(",", ":"),
+            allow_nan=False,
+        )
+    except (TypeError, ValueError) as exc:
+        raise RepositoryWriteError(
+            "persisted Script acceptance content is invalid"
+        ) from exc
+    if record.contentJson != canonical_content_json:
+        raise RepositoryWriteError(
+            "persisted Script acceptance content is not canonical"
+        )
+    try:
+        subject = ScriptAcceptanceSubject.create(
+            workspaceRef=record.workspaceRef,
+            seriesRef=record.seriesRef,
+            episodeRef=record.episodeRef,
+            scriptRef=record.scriptRef,
+            scriptVersionRef=record.scriptVersionRef,
+            **{
+                field: content.get(field)
+                for field in (
+                    "uploadedSourceByteDigest",
+                    "normalizedSourceDocumentDigest",
+                    "reviewedDocumentDigest",
+                    "canonicalScriptContentDigest",
+                    "importProvenanceDigest",
+                )
+            },
+        )
+        verified = VerifiedScriptAcceptance.create(
+            authorityRef=content.get("authorityRef"),
+            approvalRef=record.approvalRef,
+            actorRef=content.get("actorRef"),
+            actorKind=content.get("actorKind"),
+            decision=content.get("decision"),
+            authorityDecisionRef=record.authorityDecisionRef,
+            authorityDecisionDigest=content.get("authorityDecisionDigest"),
+            decidedAt=content.get("decidedAt"),
+            governanceRecordRef=content.get("governanceRecordRef"),
+            subjectDigest=content.get("subjectDigest"),
+        )
+        for field in (
+            "acceptanceRef",
+            "approvalRef",
+            "authorityDecisionRef",
+            "idempotencyKey",
+        ):
+            _required_ref(getattr(record, field), field)
+        _required_text(record.createdAt, "createdAt", limit=100)
+        _sha256_digest(record.payloadDigest, "payloadDigest")
+    except ScriptStudioError as exc:
+        raise RepositoryWriteError("persisted Script acceptance is invalid") from exc
+    if (
+        content.get("subjectDigest") != subject.subject_digest
+        or not verified.matches(subject=subject, approval_ref=record.approvalRef)
+        or content.get("publicationAllowed") is not False
+    ):
+        raise RepositoryWriteError("persisted Script acceptance is invalid")
+    payload = {
+        "schemaVersion": record.schemaVersion,
+        "workspaceRef": record.workspaceRef,
+        "seriesRef": record.seriesRef,
+        "episodeRef": record.episodeRef,
+        "scriptRef": record.scriptRef,
+        "scriptVersionRef": record.scriptVersionRef,
+        "acceptanceRef": record.acceptanceRef,
+        "approvalRef": record.approvalRef,
+        "authorityDecisionRef": record.authorityDecisionRef,
+        "idempotencyKey": record.idempotencyKey,
+        **dict(content),
+        "createdAt": record.createdAt,
+    }
+    if _canonical_digest(payload) != record.payloadDigest:
+        raise RepositoryWriteError("persisted Script acceptance digest is invalid")
+    return {**payload, "payloadDigest": record.payloadDigest}
+
+
 class ScriptStudioRepository(Protocol):
     def create_script_with_version(
         self,
@@ -458,10 +753,23 @@ class ScriptStudioRepository(Protocol):
         expected_script_version: int,
     ) -> ScriptRecord: ...
 
+    def accept_reviewed_import(
+        self,
+        updated_script: ScriptRecord,
+        acceptance: ScriptAcceptanceRecord,
+        expected_script_version: int,
+    ) -> tuple[ScriptRecord, ScriptAcceptanceRecord, bool]: ...
+
     def get_script(self, workspace_ref: str, series_ref: str, episode_ref: str) -> ScriptRecord | None: ...
     def get_script_by_ref(self, workspace_ref: str, script_ref: str) -> ScriptRecord | None: ...
     def get_version(self, workspace_ref: str, script_ref: str, version_ref: str) -> ScriptVersionRecord | None: ...
     def list_versions(self, workspace_ref: str, script_ref: str) -> list[ScriptVersionRecord]: ...
+    def get_acceptance(
+        self, workspace_ref: str, script_ref: str, version_ref: str
+    ) -> ScriptAcceptanceRecord | None: ...
+    def get_acceptance_by_idempotency_key(
+        self, workspace_ref: str, idempotency_key: str
+    ) -> ScriptAcceptanceRecord | None: ...
 
 
 class InMemoryScriptStudioAdapter:
@@ -471,6 +779,15 @@ class InMemoryScriptStudioAdapter:
         self._scripts: dict[tuple[str, str], ScriptRecord] = {}
         self._episode_index: dict[tuple[str, str, str], str] = {}
         self._versions: dict[tuple[str, str, str], ScriptVersionRecord] = {}
+        self._acceptances: dict[
+            tuple[str, str, str], ScriptAcceptanceRecord
+        ] = {}
+        self._acceptance_idempotency: dict[
+            tuple[str, str], tuple[str, str, str]
+        ] = {}
+        self._acceptance_uniques: dict[
+            tuple[str, str, str], tuple[str, str, str]
+        ] = {}
         self._lock = RLock()
 
     def create_script_with_version(self, script, version):
@@ -518,6 +835,68 @@ class InMemoryScriptStudioAdapter:
             self._scripts[key] = updated_script
         return updated_script
 
+    def accept_reviewed_import(
+        self, updated_script, acceptance, expected_script_version
+    ):
+        script_key = (updated_script.workspaceRef, updated_script.scriptRef)
+        acceptance_key = (
+            acceptance.workspaceRef,
+            acceptance.scriptRef,
+            acceptance.scriptVersionRef,
+        )
+        idempotency_key = (
+            acceptance.workspaceRef,
+            acceptance.idempotencyKey,
+        )
+        with self._lock:
+            current = self._scripts.get(script_key)
+            if current is None:
+                raise RecordNotFoundError("Script was not found")
+            existing_key = self._acceptance_idempotency.get(idempotency_key)
+            existing = self._acceptances.get(acceptance_key)
+            if existing is not None or existing_key is not None:
+                replay = existing or self._acceptances.get(existing_key)
+                if (
+                    replay is None
+                    or not _same_acceptance_request(replay, acceptance)
+                    or current.confirmedScriptVersionRef
+                    != acceptance.scriptVersionRef
+                ):
+                    raise VersionConflictError(
+                        "Script acceptance idempotency content changed"
+                    )
+                return current, replay, True
+            if current.version != expected_script_version:
+                raise VersionConflictError("Script version changed")
+            version_key = (
+                acceptance.workspaceRef,
+                acceptance.scriptRef,
+                acceptance.scriptVersionRef,
+            )
+            if version_key not in self._versions:
+                raise RecordNotFoundError("ScriptVersion was not found")
+            unique_values = {
+                "acceptanceRef": acceptance.acceptanceRef,
+                "approvalRef": acceptance.approvalRef,
+                "authorityDecisionRef": acceptance.authorityDecisionRef,
+            }
+            if any(
+                (acceptance.workspaceRef, kind, value)
+                in self._acceptance_uniques
+                for kind, value in unique_values.items()
+            ):
+                raise VersionConflictError(
+                    "Script acceptance identity already exists"
+                )
+            self._acceptances[acceptance_key] = acceptance
+            self._acceptance_idempotency[idempotency_key] = acceptance_key
+            for kind, value in unique_values.items():
+                self._acceptance_uniques[
+                    (acceptance.workspaceRef, kind, value)
+                ] = acceptance_key
+            self._scripts[script_key] = updated_script
+        return updated_script, acceptance, False
+
     def get_script(self, workspace_ref, series_ref, episode_ref):
         script_ref = self._episode_index.get((workspace_ref, series_ref, episode_ref))
         return self._scripts.get((workspace_ref, script_ref)) if script_ref else None
@@ -535,6 +914,17 @@ class InMemoryScriptStudioAdapter:
             if workspace == workspace_ref and script == script_ref
         ]
         return sorted(records, key=lambda item: item.versionNumber)
+
+    def get_acceptance(self, workspace_ref, script_ref, version_ref):
+        return self._acceptances.get((workspace_ref, script_ref, version_ref))
+
+    def get_acceptance_by_idempotency_key(
+        self, workspace_ref, idempotency_key
+    ):
+        key = self._acceptance_idempotency.get(
+            (workspace_ref, idempotency_key)
+        )
+        return self._acceptances.get(key) if key is not None else None
 
     def lifecycle_has_episode_dependency(self, workspace_ref, series_ref, episode_ref):
         if (workspace_ref, series_ref, episode_ref) in self._episode_index:
@@ -685,6 +1075,24 @@ class SqliteScriptStudioAdapter:
         )
 
     @staticmethod
+    def _acceptance(row: sqlite3.Row) -> ScriptAcceptanceRecord:
+        return ScriptAcceptanceRecord(
+            row["schema_version"],
+            row["workspace_ref"],
+            row["series_ref"],
+            row["episode_ref"],
+            row["script_ref"],
+            row["script_version_ref"],
+            row["acceptance_ref"],
+            row["approval_ref"],
+            row["authority_decision_ref"],
+            row["idempotency_key"],
+            row["content_json"],
+            row["payload_digest"],
+            row["created_at"],
+        )
+
+    @staticmethod
     def _script_values(record: ScriptRecord) -> tuple[Any, ...]:
         return (
             record.workspaceRef, record.seriesRef, record.episodeRef, record.scriptRef,
@@ -701,6 +1109,24 @@ class SqliteScriptStudioAdapter:
             record.sourcePlanRef, record.sourcePlanSchemaVersion, record.sourcePlanVersion,
             record.versionNumber, record.contentJson, record.changeKind,
             record.parentScriptVersionRef, record.createdAt,
+        )
+
+    @staticmethod
+    def _acceptance_values(record: ScriptAcceptanceRecord) -> tuple[Any, ...]:
+        return (
+            record.workspaceRef,
+            record.scriptRef,
+            record.scriptVersionRef,
+            record.acceptanceRef,
+            record.schemaVersion,
+            record.seriesRef,
+            record.episodeRef,
+            record.approvalRef,
+            record.authorityDecisionRef,
+            record.idempotencyKey,
+            record.contentJson,
+            record.payloadDigest,
+            record.createdAt,
         )
 
     def create_script_with_version(self, script, version):
@@ -797,6 +1223,87 @@ class SqliteScriptStudioAdapter:
             raise RepositoryWriteError("Script confirmation failed") from exc
         return updated_script
 
+    def accept_reviewed_import(
+        self, updated_script, acceptance, expected_script_version
+    ):
+        try:
+            with self._lock, self._write_session() as connection:
+                row = connection.execute(
+                    "SELECT * FROM v5_scripts "
+                    "WHERE workspace_ref=? AND script_ref=?",
+                    (updated_script.workspaceRef, updated_script.scriptRef),
+                ).fetchone()
+                if row is None:
+                    raise RecordNotFoundError("Script was not found")
+                current = self._script(row)
+                existing_row = connection.execute(
+                    "SELECT * FROM v5_script_acceptances "
+                    "WHERE workspace_ref=? AND script_ref=? "
+                    "AND script_version_ref=?",
+                    (
+                        acceptance.workspaceRef,
+                        acceptance.scriptRef,
+                        acceptance.scriptVersionRef,
+                    ),
+                ).fetchone()
+                idempotent_row = connection.execute(
+                    "SELECT * FROM v5_script_acceptances "
+                    "WHERE workspace_ref=? AND idempotency_key=?",
+                    (acceptance.workspaceRef, acceptance.idempotencyKey),
+                ).fetchone()
+                if existing_row is not None or idempotent_row is not None:
+                    replay = self._acceptance(existing_row or idempotent_row)
+                    if (
+                        not _same_acceptance_request(replay, acceptance)
+                        or current.confirmedScriptVersionRef
+                        != acceptance.scriptVersionRef
+                    ):
+                        raise VersionConflictError(
+                            "Script acceptance idempotency content changed"
+                        )
+                    return current, replay, True
+                if current.version != expected_script_version:
+                    raise VersionConflictError("Script version changed")
+                version = connection.execute(
+                    "SELECT 1 FROM v5_script_versions "
+                    "WHERE workspace_ref=? AND script_ref=? "
+                    "AND script_version_ref=?",
+                    (
+                        acceptance.workspaceRef,
+                        acceptance.scriptRef,
+                        acceptance.scriptVersionRef,
+                    ),
+                ).fetchone()
+                if version is None:
+                    raise RecordNotFoundError("ScriptVersion was not found")
+                connection.execute(
+                    "INSERT INTO v5_script_acceptances VALUES "
+                    "(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                    self._acceptance_values(acceptance),
+                )
+                changed = connection.execute(
+                    "UPDATE v5_scripts SET confirmed_script_version_ref=?, "
+                    "updated_at=?, version=? WHERE workspace_ref=? "
+                    "AND script_ref=? AND version=?",
+                    (
+                        updated_script.confirmedScriptVersionRef,
+                        updated_script.updatedAt,
+                        updated_script.version,
+                        updated_script.workspaceRef,
+                        updated_script.scriptRef,
+                        expected_script_version,
+                    ),
+                )
+                if changed.rowcount != 1:
+                    raise VersionConflictError("Script version changed")
+        except sqlite3.IntegrityError as exc:
+            raise VersionConflictError(
+                "Script acceptance identity already exists"
+            ) from exc
+        except sqlite3.DatabaseError as exc:
+            raise RepositoryWriteError("Script acceptance write failed") from exc
+        return updated_script, acceptance, False
+
     def lifecycle_has_episode_dependency(self, workspace_ref, series_ref, episode_ref):
         with self._session() as connection:
             return connection.execute(
@@ -858,6 +1365,33 @@ class SqliteScriptStudioAdapter:
             ).fetchall()
         return [self._version(row) for row in rows]
 
+    def get_acceptance(self, workspace_ref, script_ref, version_ref):
+        try:
+            with self._session() as connection:
+                row = connection.execute(
+                    "SELECT * FROM v5_script_acceptances "
+                    "WHERE workspace_ref=? AND script_ref=? "
+                    "AND script_version_ref=?",
+                    (workspace_ref, script_ref, version_ref),
+                ).fetchone()
+        except sqlite3.DatabaseError as exc:
+            raise RepositoryWriteError("Script acceptance read failed") from exc
+        return self._acceptance(row) if row else None
+
+    def get_acceptance_by_idempotency_key(
+        self, workspace_ref, idempotency_key
+    ):
+        try:
+            with self._session() as connection:
+                row = connection.execute(
+                    "SELECT * FROM v5_script_acceptances "
+                    "WHERE workspace_ref=? AND idempotency_key=?",
+                    (workspace_ref, idempotency_key),
+                ).fetchone()
+        except sqlite3.DatabaseError as exc:
+            raise RepositoryWriteError("Script acceptance read failed") from exc
+        return self._acceptance(row) if row else None
+
 
 class ScriptStudioService:
     """V5 owner for Script identity, immutable versions, and confirmation refs."""
@@ -867,11 +1401,15 @@ class ScriptStudioService:
         repository: ScriptStudioRepository,
         upstream: UpstreamReader,
         *,
+        acceptance_authority: ScriptAcceptanceAuthorityPort | None = None,
         ref_factory: Callable[[str], str] | None = None,
         clock: Callable[[], str] = _utc_now,
     ) -> None:
         self.repository = repository
         self.upstream = upstream
+        self.acceptance_authority = (
+            acceptance_authority or RejectingScriptAcceptanceAuthority()
+        )
         self._ref_factory = ref_factory or (lambda prefix: f"{prefix}-{uuid4().hex}")
         self._clock = clock
 
@@ -1341,6 +1879,193 @@ class ScriptStudioService:
         return {
             "script": self._script_mapping(stored),
             "confirmedVersion": self._version_mapping(version),
+        }
+
+    def accept_reviewed_import(self, value: Mapping[str, Any]) -> dict[str, Any]:
+        fields = {
+            "workspaceRef",
+            "seriesRef",
+            "episodeRef",
+            "scriptRef",
+            "scriptVersionRef",
+            "idempotencyKey",
+            "approvalRef",
+        }
+        if not isinstance(value, Mapping) or set(value) != fields:
+            raise ScriptStudioError(
+                "reviewed Script acceptance fields are invalid"
+            )
+        workspace = _required_ref(value.get("workspaceRef"), "workspaceRef")
+        series = _required_ref(value.get("seriesRef"), "seriesRef")
+        episode = _required_ref(value.get("episodeRef"), "episodeRef")
+        script_ref = _required_ref(value.get("scriptRef"), "scriptRef")
+        version_ref = _required_ref(
+            value.get("scriptVersionRef"), "scriptVersionRef"
+        )
+        idempotency_key = _required_ref(
+            value.get("idempotencyKey"), "idempotencyKey"
+        )
+        approval_ref = _required_ref(value.get("approvalRef"), "approvalRef")
+        script = self.repository.get_script(workspace, series, episode)
+        if script is None or script.scriptRef != script_ref:
+            raise RecordNotFoundError("Script was not found")
+        version = self.repository.get_version(workspace, script_ref, version_ref)
+        if (
+            version is None
+            or version.seriesRef != series
+            or version.episodeRef != episode
+            or version.changeKind != "reviewed-import"
+            or version.versionNumber != 1
+            or version.parentScriptVersionRef is not None
+        ):
+            raise RecordNotFoundError(
+                "reviewed-import ScriptVersion was not found"
+            )
+        version_mapping = self._version_mapping(version)
+        provenance = version_mapping.get("importProvenance")
+        if not isinstance(provenance, Mapping):
+            raise RepositoryWriteError(
+                "reviewed import provenance is unavailable"
+            )
+        subject = ScriptAcceptanceSubject.create(
+            workspaceRef=workspace,
+            seriesRef=series,
+            episodeRef=episode,
+            scriptRef=script_ref,
+            scriptVersionRef=version_ref,
+            uploadedSourceByteDigest=provenance.get(
+                "uploadedSourceByteDigest"
+            ),
+            normalizedSourceDocumentDigest=provenance.get(
+                "normalizedSourceDocumentDigest"
+            ),
+            reviewedDocumentDigest=provenance.get("reviewedDocumentDigest"),
+            canonicalScriptContentDigest=provenance.get(
+                "canonicalScriptContentDigest"
+            ),
+            importProvenanceDigest=provenance.get("importProvenanceDigest"),
+        )
+        by_subject = self.repository.get_acceptance(
+            workspace, script_ref, version_ref
+        )
+        by_idempotency = self.repository.get_acceptance_by_idempotency_key(
+            workspace, idempotency_key
+        )
+        if by_subject is not None or by_idempotency is not None:
+            existing = by_subject or by_idempotency
+            if by_subject is not None and by_idempotency is not None and (
+                by_subject != by_idempotency
+            ):
+                raise VersionConflictError(
+                    "Script acceptance idempotency content changed"
+                )
+            acceptance = _acceptance_mapping(existing)
+            if (
+                existing.scriptRef != script_ref
+                or existing.scriptVersionRef != version_ref
+                or existing.idempotencyKey != idempotency_key
+                or existing.approvalRef != approval_ref
+                or acceptance.get("subjectDigest") != subject.subject_digest
+                or script.confirmedScriptVersionRef != version_ref
+            ):
+                raise VersionConflictError(
+                    "Script acceptance idempotency content changed"
+                )
+            return {
+                "script": self._script_mapping(script),
+                "confirmedVersion": version_mapping,
+                "scriptAcceptance": acceptance,
+                "idempotentReplay": True,
+            }
+        if script.confirmedScriptVersionRef is not None:
+            raise VersionConflictError("Script already has a confirmed version")
+        approval = self.acceptance_authority.verify(
+            subject=subject,
+            approval_ref=approval_ref,
+        )
+        if not isinstance(approval, VerifiedScriptAcceptance) or not approval.matches(
+            subject=subject,
+            approval_ref=approval_ref,
+        ):
+            raise TrustedApprovalRequiredError(
+                "reviewed Script acceptance was not resolved for the exact subject"
+            )
+        now = self._clock()
+        content = {
+            "uploadedSourceByteDigest": subject.uploadedSourceByteDigest,
+            "normalizedSourceDocumentDigest": (
+                subject.normalizedSourceDocumentDigest
+            ),
+            "reviewedDocumentDigest": subject.reviewedDocumentDigest,
+            "canonicalScriptContentDigest": (
+                subject.canonicalScriptContentDigest
+            ),
+            "importProvenanceDigest": subject.importProvenanceDigest,
+            "subjectDigest": subject.subject_digest,
+            "authorityRef": approval.authorityRef,
+            "actorRef": approval.actorRef,
+            "actorKind": approval.actorKind,
+            "decision": approval.decision,
+            "authorityDecisionDigest": approval.authorityDecisionDigest,
+            "decidedAt": approval.decidedAt,
+            "governanceRecordRef": approval.governanceRecordRef,
+            "publicationAllowed": False,
+        }
+        envelope = {
+            "schemaVersion": SCRIPT_ACCEPTANCE_SCHEMA_VERSION,
+            "workspaceRef": workspace,
+            "seriesRef": series,
+            "episodeRef": episode,
+            "scriptRef": script_ref,
+            "scriptVersionRef": version_ref,
+            "acceptanceRef": _required_ref(
+                self._ref_factory("script-acceptance"), "acceptanceRef"
+            ),
+            "approvalRef": approval.approvalRef,
+            "authorityDecisionRef": approval.authorityDecisionRef,
+            "idempotencyKey": idempotency_key,
+            **content,
+            "createdAt": now,
+        }
+        record = ScriptAcceptanceRecord(
+            SCRIPT_ACCEPTANCE_SCHEMA_VERSION,
+            workspace,
+            series,
+            episode,
+            script_ref,
+            version_ref,
+            envelope["acceptanceRef"],
+            approval.approvalRef,
+            approval.authorityDecisionRef,
+            idempotency_key,
+            json.dumps(
+                content,
+                ensure_ascii=False,
+                sort_keys=True,
+                separators=(",", ":"),
+            ),
+            _canonical_digest(envelope),
+            now,
+        )
+        _acceptance_mapping(record)
+        updated = replace(
+            script,
+            confirmedScriptVersionRef=version_ref,
+            updatedAt=now,
+            version=script.version + 1,
+        )
+        stored_script, stored_acceptance, replayed = (
+            self.repository.accept_reviewed_import(
+                updated,
+                record,
+                script.version,
+            )
+        )
+        return {
+            "script": self._script_mapping(stored_script),
+            "confirmedVersion": version_mapping,
+            "scriptAcceptance": _acceptance_mapping(stored_acceptance),
+            "idempotentReplay": replayed,
         }
 
     def build_storyboard_bootstrap(

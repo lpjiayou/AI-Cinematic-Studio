@@ -22,6 +22,9 @@ from services.v5_core_os.script_studio.foundation import (
     SqliteScriptStudioAdapter,
 )
 from services.v5_core_os.script_studio.public import ScriptStudioPublicBoundary
+from services.v5_core_os.script_studio.external_acceptance import (
+    script_acceptance_authority_from_environment,
+)
 from services.v5_core_os.series_episode.foundation import (
     DependentRecordError,
     InMemorySeriesEpisodeAdapter,
@@ -129,6 +132,7 @@ class LifecycleAssembly:
         m6_approval_authority=None,
         m6_identity_authority=None,
         m6_outbox_hook=None,
+        script_acceptance_authority=None,
     ) -> "LifecycleAssembly":
         identity = LifecycleAssemblyIdentity(
             f"assembly-{uuid4().hex}",
@@ -153,8 +157,28 @@ class LifecycleAssembly:
         )
         state.register_resource(
             "script-studio",
-            _capture(script_repository, ("_scripts", "_episode_index", "_versions")),
-            _restore(script_repository, ("_scripts", "_episode_index", "_versions")),
+            _capture(
+                script_repository,
+                (
+                    "_scripts",
+                    "_episode_index",
+                    "_versions",
+                    "_acceptances",
+                    "_acceptance_idempotency",
+                    "_acceptance_uniques",
+                ),
+            ),
+            _restore(
+                script_repository,
+                (
+                    "_scripts",
+                    "_episode_index",
+                    "_versions",
+                    "_acceptances",
+                    "_acceptance_idempotency",
+                    "_acceptance_uniques",
+                ),
+            ),
         )
         state.register_resource(
             "series-planning",
@@ -177,7 +201,12 @@ class LifecycleAssembly:
             **kwargs,
         )
         project_boundary = ProjectPublicBoundary(project_service, lifecycle_state=state)
-        script_service = ScriptStudioService(script_repository, series_boundary, **kwargs)
+        script_service = ScriptStudioService(
+            script_repository,
+            series_boundary,
+            acceptance_authority=script_acceptance_authority,
+            **kwargs,
+        )
         script_boundary = ScriptStudioPublicBoundary(script_service, lifecycle_state=state)
         planning_service = SeriesPlanningService(
             planning_repository,
@@ -270,6 +299,7 @@ class LifecycleAssembly:
         m6_approval_authority=None,
         m6_identity_authority=None,
         m6_fault_hook=None,
+        script_acceptance_authority=None,
     ) -> "LifecycleAssembly":
         if initialize_or_upgrade:
             migrate_lifecycle_database(database_path, allow_upgrade=True)
@@ -296,7 +326,12 @@ class LifecycleAssembly:
             **kwargs,
         )
         project_boundary = ProjectPublicBoundary(project_service, lifecycle_state=state)
-        script_service = ScriptStudioService(script_repository, series_boundary, **kwargs)
+        script_service = ScriptStudioService(
+            script_repository,
+            series_boundary,
+            acceptance_authority=script_acceptance_authority,
+            **kwargs,
+        )
         script_boundary = ScriptStudioPublicBoundary(script_service, lifecycle_state=state)
         planning_service = SeriesPlanningService(
             planning_repository,
@@ -376,6 +411,9 @@ class LifecycleAssembly:
         m6_scope_authority, m6_approval_authority = (
             m6_external_authorities_from_environment(values)
         )
+        script_acceptance_authority = (
+            script_acceptance_authority_from_environment(values)
+        )
         configured_path = str(values.get("CREATOR_DATA_PATH", "")).strip()
         if configured_path:
             database_path = Path(configured_path)
@@ -387,6 +425,7 @@ class LifecycleAssembly:
             database_path,
             m6_scope_authority=m6_scope_authority,
             m6_approval_authority=m6_approval_authority,
+            script_acceptance_authority=script_acceptance_authority,
         )
 
     def diagnostic_snapshot(self) -> dict[str, Any]:

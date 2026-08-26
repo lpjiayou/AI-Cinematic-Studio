@@ -14,6 +14,12 @@ from services.v5_core_os.lifecycle_integrity.sqlite_schema import (
     index_statements as lifecycle_index_statements,
     table_statements as lifecycle_table_statements,
 )
+from services.v5_core_os.script_studio.acceptance_sqlite import (
+    INDEX as SCRIPT_ACCEPTANCE_INDEX,
+    MARKER_TABLE as SCRIPT_ACCEPTANCE_MARKER_TABLE,
+    TABLE as SCRIPT_ACCEPTANCE_TABLE,
+    _validate_script_acceptance_connection,
+)
 
 from .sqlite_schema import (
     MARKER_COMPONENT,
@@ -100,12 +106,25 @@ def _exact_marker(
 def _validate_schema_allowlist(
     connection: sqlite3.Connection, *, allow_m6: bool
 ) -> None:
+    tables = _tables(connection)
     expected_tables = set(LIFECYCLE_TABLES) | set(LIFECYCLE_MARKERS)
     expected_indexes = {_index_name(item) for item in lifecycle_index_statements()}
     if allow_m6:
         expected_tables |= set(M6_TABLES) | {MARKER_TABLE}
         expected_indexes |= {_index_name(item) for item in index_statements()}
-    if _tables(connection) != expected_tables:
+    acceptance_tables = {
+        SCRIPT_ACCEPTANCE_TABLE,
+        SCRIPT_ACCEPTANCE_MARKER_TABLE,
+    }
+    acceptance_present = acceptance_tables & tables
+    if acceptance_present and acceptance_present != acceptance_tables:
+        raise SeriesIntelligenceMigrationError(
+            "partial Script acceptance schema"
+        )
+    if acceptance_present:
+        expected_tables |= acceptance_tables
+        expected_indexes.add(SCRIPT_ACCEPTANCE_INDEX)
+    if tables != expected_tables:
         raise SeriesIntelligenceMigrationError("undeclared SQLite table")
     forbidden = connection.execute(
         "SELECT 1 FROM sqlite_master WHERE type IN ('view','trigger') LIMIT 1"
@@ -121,6 +140,8 @@ def _validate_schema_allowlist(
     }
     if explicit_indexes != expected_indexes:
         raise SeriesIntelligenceMigrationError("undeclared SQLite index")
+    if acceptance_present:
+        _validate_script_acceptance_connection(connection)
 
 
 def _validate_lifecycle_v2_connection(

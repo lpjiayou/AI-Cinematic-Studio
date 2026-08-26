@@ -245,8 +245,12 @@ def validate_lifecycle_database(database_path: Path | str) -> None:
     from services.v5_core_os.series_intelligence.migration import (
         validate_series_intelligence_database,
     )
+    from services.v5_core_os.script_studio.acceptance_sqlite import (
+        validate_script_acceptance_database,
+    )
 
     validate_series_intelligence_database(path)
+    validate_script_acceptance_database(path)
 
 
 def migrate_lifecycle_database(
@@ -273,6 +277,12 @@ def migrate_lifecycle_database(
                 for table in MARKERS
             )
         ):
+            from services.v5_core_os.script_studio.acceptance_sqlite import (
+                INDEX as SCRIPT_ACCEPTANCE_INDEX,
+                MARKER_TABLE as SCRIPT_ACCEPTANCE_MARKER_TABLE,
+                TABLE as SCRIPT_ACCEPTANCE_TABLE,
+                _migrate_script_acceptance_connection,
+            )
             from services.v5_core_os.series_intelligence.migration import (
                 _migrate_series_intelligence_connection,
             )
@@ -285,12 +295,30 @@ def migrate_lifecycle_database(
             # not a validated no-op.  Honour the caller's explicit upgrade gate
             # before opening a write transaction or changing any schema object.
             required_m6_objects = set(M6_TABLES) | {M6_MARKER_TABLE}
-            if not required_m6_objects.issubset(tables) and not allow_upgrade:
-                raise LifecycleMigrationError("M6 lifecycle migration required")
+            required_acceptance_objects = {
+                SCRIPT_ACCEPTANCE_TABLE,
+                SCRIPT_ACCEPTANCE_MARKER_TABLE,
+            }
+            acceptance_index_present = connection.execute(
+                "SELECT 1 FROM sqlite_master WHERE type='index' AND name=?",
+                (SCRIPT_ACCEPTANCE_INDEX,),
+            ).fetchone() is not None
+            additive_upgrade_required = (
+                not required_m6_objects.issubset(tables)
+                or not required_acceptance_objects.issubset(tables)
+                or not acceptance_index_present
+            )
+            if additive_upgrade_required and not allow_upgrade:
+                raise LifecycleMigrationError(
+                    "additive lifecycle migration required"
+                )
 
             connection.execute("BEGIN IMMEDIATE")
             try:
                 m6_result = _migrate_series_intelligence_connection(
+                    connection, fault=fault
+                )
+                acceptance_result = _migrate_script_acceptance_connection(
                     connection, fault=fault
                 )
                 connection.commit()
@@ -298,7 +326,11 @@ def migrate_lifecycle_database(
                 connection.rollback()
                 raise
             validate_lifecycle_database(path)
-            return "no-op" if m6_result == "no-op" else "upgrade"
+            return (
+                "no-op"
+                if m6_result == acceptance_result == "no-op"
+                else "upgrade"
+            )
         is_empty = not tables
         if not is_empty and (not versions or set(versions.values()) != {1}):
             raise LifecycleMigrationError("unsupported or partial lifecycle schema")
@@ -368,8 +400,12 @@ def migrate_lifecycle_database(
             from services.v5_core_os.series_intelligence.migration import (
                 _migrate_series_intelligence_connection,
             )
+            from services.v5_core_os.script_studio.acceptance_sqlite import (
+                _migrate_script_acceptance_connection,
+            )
 
             _migrate_series_intelligence_connection(connection, fault=fault)
+            _migrate_script_acceptance_connection(connection, fault=fault)
             connection.commit()
         except BaseException:
             connection.rollback()

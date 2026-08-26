@@ -92,6 +92,21 @@ The M5 binding is a new v2 `SeriesPlanVersion` whose exact `EpisodePlanItem` bin
 to the accepted Script lineage. It must be confirmed through the existing M5 boundary
 before an `EpisodeProductionRun` can become canonical.
 
+### 4.1 Script acceptance capability checkpoint
+
+The implementation candidate adds one generic V5 Script Studio operation for exact
+reviewed-import acceptance. It uses the existing Creator Public API, Lifecycle lease,
+Script repository and transaction; no K2-specific endpoint or database is introduced.
+The immutable record schema is `v5.script-acceptance.v1`. SQLite persistence is an
+additive `script_acceptance@1` component in the accepted Lifecycle V2 database, with
+strict schema/row validation and atomic migration. The external resolver is a
+separately SHA-256-pinned, closed-world authority bundle and defaults to rejection.
+
+This repository capability is not itself the live K2-002 acceptance record. Completion
+of ordered step 1 still requires importing the exact reviewed v1.4 content into the
+explicit canonical target and applying `ACS-K2-002-SCRIPT-ACC3` through this operation.
+Temporary test stores and local fixture refs remain non-canonical evidence only.
+
 ## 5. Asset-package boundary
 
 The package digest above is authorized as candidate evidence for v1.4 remapping and

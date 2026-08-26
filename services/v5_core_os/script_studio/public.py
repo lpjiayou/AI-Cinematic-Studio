@@ -143,6 +143,27 @@ class ScriptStudioPublicBoundary:
                 lease, lambda: self._invoke(self.__service.confirm_version, command)
             )
 
+    def accept_reviewed_import(
+        self, command: Mapping[str, Any]
+    ) -> dict[str, Any]:
+        if self.__lifecycle_state is None:
+            return self._invoke(self.__service.accept_reviewed_import, command)
+        workspace_ref = (
+            str(command.get("workspaceRef") or "")
+            if isinstance(command, Mapping)
+            else ""
+        )
+        with self.__lifecycle_state.lease(
+            workspace_ref=workspace_ref,
+            operation=LifecycleOperation.CONFIRM_SCRIPT_VERSION,
+        ) as lease:
+            return self.__lifecycle_state.apply_mutation(
+                lease,
+                lambda: self._invoke(
+                    self.__service.accept_reviewed_import, command
+                ),
+            )
+
     def build_storyboard_bootstrap(
         self,
         workspace_ref: str,
