@@ -45,7 +45,7 @@ v1.4 只重放 Owner 指定的六项逻辑修正：
 | Gate | 正确入口 | 当前结论 | 阻断条件 |
 | --- | --- | --- | --- |
 | Source | 声明 reviewed-source provenance 的首次整稿只能走 unconfirmed `reviewed-import`；Core 生成 scene refs 与 canonical content digest | 上传 v1.4 exact source 与 repository-reviewed v1.4 rebase 均已入库；Owner 已接受 exact reviewed digest；可信 V5 acceptance 与 live apply 尚未发生 | 禁止把 repository ingest、客户端布尔值或普通 service credential 冒充可信 domain acceptance；正式确认须有 trusted Owner approval resolver |
-| Roots | 幂等创建独立 Project / Series / Episode | `NOT IMPLEMENTED FOR DURABLE APPLY` | durable receipt、可信审批、M5 v2 EpisodePlanItem binding 均缺失；禁止复用 K2-001 数据库或 refs |
+| Roots | 幂等创建独立 Project / Series / Episode | `GENERIC DURABLE CAPABILITY IMPLEMENTED / LIVE APPLY NOT PERFORMED` | 同库单事务、确定性零写 preflight、可信 Script acceptance、不可变 receipt、重启/并发 replay 与全回滚已形成仓库候选；当前没有显式 canonical target 现场证据，M5 v2 EpisodePlanItem binding 仍缺失；禁止复用 K2-001 数据库或 refs |
 | Output profiles | 生成 `704×1280`、剪辑 `720×1280`、发布 `1080×1920` | additive v2 合同候选与测试已形成；不是 live domain fact | 旧 16:9 v1 不能承载本项目 |
 | ShotPlan draft | EP01 12 个显式镜头及逐镜人物/对话约束 | additive v2 repository candidate 在一个 `G3_SCRIPT_VALIDATION` 原子 append 中写入 `StoryboardDraft`、12 个 `CreativeShotDraft:*` 与 `ShotPlanDraft`，并停在 `SCRIPT_VALIDATED`；未在 live canonical host 执行 | ShotPlan approval 与 camera contract 均未验证；禁止写 `G3_SHOT_GRAPH`、生成 `ExecutableShotGraph`、进入 `SHOTS_COMPILED`，或从 editorial size 发明 lens/angle/movement |
 | Image candidates (M10 preview only) | Public API → V5 current-authority read | authenticated public zero-write image-preflight implementation 已接入，server-side 绑定 current `ShotPlanDraft` / `CreativeShotDraft` refs+digests；camera 为 `NOT_READY` 且返回 `CAMERA_CONTRACT_NOT_READY` blocker；尚未在 K2-002 live canonical lineage 上执行 | canonical M10 append、V4 MediaJob/Attempt 与 dispatch 均未接入；M11/video preflight 未实现；禁止走 detached provider experiment |
@@ -60,7 +60,8 @@ implementation。草稿事实只通过 `G3_SCRIPT_VALIDATION` 进入隔离证据
 `SCRIPT_VALIDATED`；它们不是 `ExecutableShotGraph`，不会推进 `SHOTS_COMPILED`。
 该实现尚未对 K2-002 live canonical lineage 执行，不是 canonical 生成主链或生成成功。
 EP01 当前有 16 项硬阻断资产；EP02–03 另有 8 项延后需求。可信 V5 Script
-acceptance record、durable registration receipt、M5 binding、
+acceptance record 与 durable registration receipt 的 generic capability 已实现但未在
+显式 K2-002 canonical target 上 apply；M5 binding、
 ShotPlan/camera approval、canonical production refs、EP01 输入资产、后处理 manifest、
 rights/provider/budget/runtime authority 与 canonical M10 append 任一未就绪时都必须
 fail closed；即使这些条件成立，Provider/GPU dispatch 仍须单独授权。M11/video

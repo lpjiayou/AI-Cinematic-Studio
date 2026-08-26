@@ -107,6 +107,35 @@ of ordered step 1 still requires importing the exact reviewed v1.4 content into 
 explicit canonical target and applying `ACS-K2-002-SCRIPT-ACC3` through this operation.
 Temporary test stores and local fixture refs remain non-canonical evidence only.
 
+### 4.2 Durable canonical registration capability checkpoint
+
+The implementation candidate adds one generic V5 canonical-registration boundary and
+two authenticated Creator Public API resources: deterministic zero-write preflight and
+durable apply. A non-client `CREATOR_CANONICAL_TARGET_REF` is mandatory. Preflight
+derives stable server-owned refs and the exact Script acceptance subject without a
+canonical mutation, allowing the separately digest-pinned closed-world authority
+bundle to bind the eventual Script/ScriptVersion identities before apply.
+The target digest also binds the resolved physical SQLite storage identity. Once a
+receipt exists, copying that database to another path under the same target label is
+rejected during restart validation and cannot silently establish a second canonical
+authority.
+
+Apply uses one shared Lifecycle SQLite lease and transaction for Series, Project,
+confirmed creative plan, EP01, reviewed-import ScriptVersion, trusted Script
+acceptance and immutable `v5.canonical-registration.v1` receipt. The additive
+`canonical_registration@1` table is foreign-keyed to the existing V5 parents. Exact
+and concurrent replay returns the original receipt after restart; changed target,
+scope, package, content, approval or lineage conflicts; a fault at any intermediate
+point rolls every domain row back. Restart validation re-derives all server-owned refs
+from the complete request digest and verifies the immutable registered parent facts
+remain exact without blocking a later valid Project lifecycle transition. The receipt
+is secret-free and keeps `publicationAllowed=false`.
+
+This is still a repository capability candidate. No explicit K2-002 canonical target
+or matching live authority bundle was available in this workspace, so no live roots,
+Script acceptance or registration receipt were applied. M5 remains the next ordered
+implementation gate after an independently verified canonical apply.
+
 ## 5. Asset-package boundary
 
 The package digest above is authorized as candidate evidence for v1.4 remapping and

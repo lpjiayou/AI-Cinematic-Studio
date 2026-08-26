@@ -20,7 +20,7 @@ Commercial Frontend → Frontend Experience Adapter → /creator/api/v1
 | M1 | `/ai-director/candidates`, `/creative-plans/confirm` | AI Director Application + Series/Episode boundary |
 | M2 | `/series`, `/episodes` | Series/Episode public boundary |
 | M3 | `/script-workspaces`, `/script-versions/*`, `/script-versions/reviewed-import`, `/script-versions/reviewed-import/accept` | Script Studio Application/public boundary |
-| M4 | `/projects`, `/project-contexts` | Project Context public boundary |
+| M4 | `/projects`, `/project-contexts`, `/canonical-registrations`, `/canonical-registrations/preflight` | Project Context plus V5 canonical registration boundary |
 | M5 | `/series-planning-workspaces`, `/series-plan-*` | Series Planning + Series Director boundaries |
 | M6 | `/series-intelligence-workspaces`, `/series-intelligence/*` | accepted Series Intelligence public boundary |
 | M7–M8 | `/episode-production-runs/{runRef}/shot-graph` | bounded K2 V5 legacy executable-graph service plus v2 local-draft compatibility transport |
@@ -101,6 +101,51 @@ does not call the authority again. Reusing an idempotency key, approval ref or s
 with changed scope, lineage or evidence conflicts. Every acceptance remains
 `publicationAllowed=false`; this route grants neither asset admission nor
 Provider/GPU execution.
+
+### Durable canonical registration
+
+`POST /creator/api/v1/canonical-registrations/preflight` and
+`POST /creator/api/v1/canonical-registrations` accept the same closed registration
+package. Its top-level fields are exactly `registrationKey`, `idempotencyKey`,
+`packageDigest`, `contentProfileRef`, `series`, `project`, `creativePlan`, `episode`,
+`reviewedScript` and `acceptance`. Authentication injects `workspaceRef` and
+`importedByRef`; client-supplied workspace or import actor fields are rejected. The
+server must also be configured with a non-client
+`CREATOR_CANONICAL_TARGET_REF`. An absent target fails closed with
+`canonical_registration_unavailable`.
+
+Preflight is deterministic and performs zero canonical writes. Core hashes the
+server-held storage identity into a secret-free `canonicalTargetDigest`, so reusing a
+target label on a different database cannot reproduce the same authority subject.
+From that target binding, workspace, stable `registrationKey` and normalized request
+digest, Core derives the exact planned Project,
+Series, Episode, creative-plan, Script, ScriptVersion and Script-scene refs and returns
+the exact `v5.script-acceptance-subject.v1` needed by the closed-world approval bundle.
+It reports `canonicalMutationCount=0` and `publicationAllowed=false`. The operator can
+therefore preflight, create and separately SHA-256-pin the exact authority bundle,
+restart against the same explicit target, and then apply without accepting wildcard
+or caller-authored authority.
+
+Apply is available only on the shared Lifecycle SQLite assembly. One
+`canonical-registration` lease and one `BEGIN IMMEDIATE` transaction create the
+Series, Project/Series relationship, confirmed creative plan, EP01, first
+`reviewed-import` ScriptVersion, exact trusted Script acceptance and immutable
+`v5.canonical-registration.v1` receipt. Any failure before receipt commit rolls back every domain row.
+The additive `canonical_registration@1` component and its foreign keys live in the
+same Lifecycle V2 database; there is no project-specific database or second Project,
+Script or acceptance owner.
+
+The receipt binds the explicit target and physical-store digest, stable registration key, idempotency key,
+package digest, normalized request digest, every root ref, exact accepted
+ScriptVersion/acceptance digests and `publicationAllowed=false`. `packageDigest` is an
+authenticated service-credential declaration that is sealed by the receipt; this
+route does not receive or independently re-hash an external archive. Exact or
+concurrent replay returns the original refs and receipt with
+`idempotentReplay=true` and does not call the acceptance authority again. Reusing the
+registration or idempotency key with changed target, package, scope, content,
+approval or lineage returns `idempotency_conflict`. M5 binding, assets, ShotPlan,
+Camera Contract, graph compilation and Provider/GPU authorization remain separate
+later gates.
 
 ## K2 provider experiment semantics
 

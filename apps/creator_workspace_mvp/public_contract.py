@@ -14,6 +14,12 @@ PUBLIC_SERIES_ENDPOINT: Final = f"{PUBLIC_API_PREFIX}/series"
 PUBLIC_PROJECTS_ENDPOINT: Final = f"{PUBLIC_API_PREFIX}/projects"
 PUBLIC_PROJECT_CONTEXT_ENDPOINT: Final = f"{PUBLIC_API_PREFIX}/project-contexts"
 PUBLIC_EPISODES_ENDPOINT: Final = f"{PUBLIC_API_PREFIX}/episodes"
+PUBLIC_CANONICAL_REGISTRATIONS_ENDPOINT: Final = (
+    f"{PUBLIC_API_PREFIX}/canonical-registrations"
+)
+PUBLIC_CANONICAL_REGISTRATION_PREFLIGHT_ENDPOINT: Final = (
+    f"{PUBLIC_CANONICAL_REGISTRATIONS_ENDPOINT}/preflight"
+)
 PUBLIC_SCRIPT_WORKSPACE_ENDPOINT: Final = f"{PUBLIC_API_PREFIX}/script-workspaces"
 PUBLIC_SCRIPT_GENERATE_ENDPOINT: Final = f"{PUBLIC_API_PREFIX}/script-versions/generate"
 PUBLIC_SCRIPT_REVIEWED_IMPORT_ENDPOINT: Final = (
@@ -90,8 +96,16 @@ CAPABILITY_PROJECTION: Final = (
         "id": "M4",
         "name": "Project Context",
         "state": "available",
-        "publicResources": ["projects", "project-contexts"],
-        "requirements": ["series_for_series_project"],
+        "publicResources": [
+            "projects",
+            "project-contexts",
+            "canonical-registrations",
+            "canonical-registrations/preflight",
+        ],
+        "requirements": [
+            "series_for_series_project",
+            "explicit_canonical_target_and_trusted_script_acceptance",
+        ],
     },
     {
         "id": "M5",

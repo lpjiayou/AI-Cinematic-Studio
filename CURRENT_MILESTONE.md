@@ -10,7 +10,7 @@
 >
 > Current Task: `ACS-K2-002-CHANGAN-ONBOARDING-AND-EP01-CHAIN`
 >
-> Current Work Package: `ACS-K2-002-SCRIPT-ACC3 / K2-001 CLOSED HISTORICAL / K2-002 v1.4 OWNER ACCEPTED EXACT DIGEST / TRUSTED ACCEPTANCE CAPABILITY LOCAL-TESTED / LIVE ACCEPTANCE NOT APPLIED / GITHUB SYNC HOLD / EP01 MEDIA NOT STARTED`
+> Current Work Package: `ACS-K2-002-SCRIPT-ACC3 / K2-001 CLOSED HISTORICAL / K2-002 v1.4 OWNER ACCEPTED EXACT DIGEST / TRUSTED ACCEPTANCE + DURABLE REGISTRATION CAPABILITIES LOCAL-TESTED / LIVE APPLY NOT PERFORMED / M5 NEXT / EP01 MEDIA NOT STARTED`
 >
 > M6 Authorization: `ACCEPTED SURFACES / K2-002 MUST CREATE DISTINCT SCOPE AND APPROVALS / NO K2-001 AUTHORITY INHERITANCE`
 >
@@ -70,7 +70,7 @@ REPOSITORY_DRAFT_FACT_KINDS=StoryboardDraft/CreativeShotDraft:*/ShotPlanDraft
 REPOSITORY_DRAFT_TRANSITION=AUTHORITY_READY→SCRIPT_VALIDATED
 LIVE_CANONICAL_DRAFT_FACTS=NOT_APPLIED
 CANONICAL_PROJECT_REGISTRATION=NOT_APPLIED_TO_LIVE_HOST
-REGISTRATION_DURABILITY=NOT_IMPLEMENTED
+REGISTRATION_DURABILITY=GENERIC_CAPABILITY_IMPLEMENTED_LOCAL_TESTED / LIVE_RECEIPT_ABSENT
 M5_EPISODE_PLAN_ITEM_BINDING=NOT_CREATED
 EXECUTABLE_SHOT_GRAPH=NOT_COMPILED
 G3_SHOT_GRAPH=NOT_APPENDED
@@ -92,9 +92,21 @@ Project Lead decision, atomically confirms the ScriptVersion, survives restart a
 returns the original immutable record on exact or concurrent replay. The additive
 `script_acceptance@1` marker does not change the global Lifecycle V2 contract or create
 a second authority store. Unit `657/657`, Contract `97/97` and Integration `153/153`
-pass locally. This is a repository capability candidate only: no explicit canonical
-target was available, no live K2-002 ScriptVersion/acceptance was written, and GitHub
-sync remains on hold.
+passed for the preceding Script-acceptance checkpoint. The current exact candidate's
+final pre-commit gate is Unit `669/669`, Contract `100/100` and Integration `155/155`.
+This remains a repository capability only: no explicit canonical target was available
+and no live K2-002 ScriptVersion/acceptance was written. The current candidate also
+adds authenticated deterministic zero-write canonical-registration preflight plus an
+explicit-target-only SQLite apply.
+One Lifecycle transaction creates Series, Project, confirmed creative plan, EP01,
+reviewed-import ScriptVersion, trusted acceptance and an immutable
+`v5.canonical-registration.v1` receipt. Exact/concurrent replay, restart validation,
+changed-content conflict, parent-drift rejection, physical-store binding, tamper
+rejection and full rollback are covered. A registered database copied to a different
+path fails closed instead of becoming a second target with the same label. This is
+still not a live K2-002 registration: no explicit canonical target or matching live
+authority bundle was available in this workspace. Repository sync is accepted only
+after the exact commit and remote branch SHA are independently verified.
 
 The repository candidate also maps the repository-reviewed v1.4 into the vertical
 output profile plus an explicit 12-shot local structural draft. For a v2 run in an
@@ -111,8 +123,8 @@ candidate admission or dispatch. The external asset archive is evidence only: it
 v1.3-bound, failed current semantic/visual suitability review, and has no verified rights,
 exact requirement mapping or admitted AssetVersion. Client-supplied shot budgets still have no accepted
 ShotPlan ref/version/digest/approval lineage and do not establish owner-reviewed shot or
-camera facts. Durable registration, live canonical draft/media append and V4 dispatch
-remain blocked/not integrated. Any future continuation must preserve the single Creator
+camera facts. Live canonical registration apply, M5 binding, canonical draft/media
+append and V4 dispatch remain blocked/not integrated. Any future continuation must preserve the single Creator
 Public API → V5 → V4 → Compute spine and must not create a K2-002-specific database or
 AssetVersion authority.
 

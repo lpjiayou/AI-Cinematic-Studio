@@ -217,10 +217,10 @@ class SeriesIntelligenceSqliteContractTests(unittest.TestCase):
         finally:
             connection.close()
         schema_bytes = json.dumps(objects, separators=(",", ":")).encode("utf-8")
-        self.assertEqual(len(objects), 32)
+        self.assertEqual(len(objects), 35)
         self.assertEqual(
             hashlib.sha256(schema_bytes).hexdigest(),
-            "6180cfbc81f08ceb9b576a901d3deaedeecb679f62ec8c65b84a2d81a9357ae8",
+            "13eb56af5e0f5f2bb1cb187ff9d00ce3cd16136b2798a34ed11bfda76a4361d2",
         )
         self.assertIn("schema_version", columns)
         self.assertIn("content_json", columns)
@@ -234,6 +234,10 @@ class SeriesIntelligenceSqliteContractTests(unittest.TestCase):
             "v5_series_planning_schema": ("series_planning", 2),
             "v5_series_intelligence_schema": ("series_intelligence", 1),
             "v5_script_acceptance_schema": ("script_acceptance", 1),
+            "v5_canonical_registration_schema": (
+                "canonical_registration",
+                1,
+            ),
         }
         for marker, (component, version) in markers.items():
             with self.subTest(marker=marker):

@@ -16,6 +16,14 @@ from services.v5_core_os.project_engine.foundation import (
     SqliteProjectAdapter,
 )
 from services.v5_core_os.project_engine.public import ProjectPublicBoundary
+from services.v5_core_os.canonical_registration.foundation import (
+    CanonicalRegistrationService,
+    InMemoryCanonicalRegistrationRepository,
+    SqliteCanonicalRegistrationRepository,
+)
+from services.v5_core_os.canonical_registration.public import (
+    CanonicalRegistrationPublicBoundary,
+)
 from services.v5_core_os.script_studio.foundation import (
     InMemoryScriptStudioAdapter,
     ScriptStudioService,
@@ -119,6 +127,7 @@ class LifecycleAssembly:
     project_context: ProjectPublicBoundary
     script_studio: ScriptStudioPublicBoundary
     series_planning: SeriesPlanningPublicBoundary
+    canonical_registration: CanonicalRegistrationPublicBoundary
     series_intelligence: object | None = None
 
     @classmethod
@@ -133,6 +142,8 @@ class LifecycleAssembly:
         m6_identity_authority=None,
         m6_outbox_hook=None,
         script_acceptance_authority=None,
+        canonical_target_ref=None,
+        canonical_registration_fault_hook=None,
     ) -> "LifecycleAssembly":
         identity = LifecycleAssemblyIdentity(
             f"assembly-{uuid4().hex}",
@@ -144,6 +155,7 @@ class LifecycleAssembly:
         project_repository = InMemoryProjectAdapter()
         script_repository = InMemoryScriptStudioAdapter()
         planning_repository = InMemorySeriesPlanningAdapter()
+        registration_repository = InMemoryCanonicalRegistrationRepository()
 
         state.register_resource(
             "series-episode",
@@ -185,6 +197,17 @@ class LifecycleAssembly:
             _capture(planning_repository, ("_plans", "_scope_index", "_versions")),
             _restore(planning_repository, ("_plans", "_scope_index", "_versions")),
         )
+        state.register_resource(
+            "canonical-registration",
+            _capture(
+                registration_repository,
+                ("_records", "_registration_keys", "_idempotency_keys"),
+            ),
+            _restore(
+                registration_repository,
+                ("_records", "_registration_keys", "_idempotency_keys"),
+            ),
+        )
 
         kwargs: dict[str, Any] = {}
         if ref_factory is not None:
@@ -208,6 +231,21 @@ class LifecycleAssembly:
             **kwargs,
         )
         script_boundary = ScriptStudioPublicBoundary(script_service, lifecycle_state=state)
+        registration_service = CanonicalRegistrationService(
+            registration_repository,
+            series_repository=series_repository,
+            project_repository=project_repository,
+            script_repository=script_repository,
+            acceptance_authority=script_service.acceptance_authority,
+            backend_kind=identity.backend_kind,
+            storage_identity=identity.storage_identity,
+            canonical_target_ref=canonical_target_ref,
+            fault_hook=canonical_registration_fault_hook,
+            **({"clock": clock} if clock is not None else {}),
+        )
+        registration_boundary = CanonicalRegistrationPublicBoundary(
+            registration_service, lifecycle_state=state
+        )
         planning_service = SeriesPlanningService(
             planning_repository,
             project_boundary,
@@ -267,20 +305,22 @@ class LifecycleAssembly:
         project_boundary.bind_lifecycle(coordinator)
         script_boundary.bind_lifecycle(coordinator)
         assembly = cls(
-            identity,
-            state,
-            coordinator,
-            series_boundary,
-            project_boundary,
-            script_boundary,
-            planning_boundary,
-            intelligence_boundary,
+            identity=identity,
+            state=state,
+            coordinator=coordinator,
+            series_episode=series_boundary,
+            project_context=project_boundary,
+            script_studio=script_boundary,
+            series_planning=planning_boundary,
+            canonical_registration=registration_boundary,
+            series_intelligence=intelligence_boundary,
         )
         for boundary in (
             series_boundary,
             project_boundary,
             script_boundary,
             planning_boundary,
+            registration_boundary,
             intelligence_boundary,
         ):
             boundary._bind_lifecycle_assembly(assembly)
@@ -300,6 +340,8 @@ class LifecycleAssembly:
         m6_identity_authority=None,
         m6_fault_hook=None,
         script_acceptance_authority=None,
+        canonical_target_ref=None,
+        canonical_registration_fault_hook=None,
     ) -> "LifecycleAssembly":
         if initialize_or_upgrade:
             migrate_lifecycle_database(database_path, allow_upgrade=True)
@@ -311,6 +353,9 @@ class LifecycleAssembly:
         project_repository = SqliteProjectAdapter(database_path, lifecycle_state=state)
         script_repository = SqliteScriptStudioAdapter(database_path, lifecycle_state=state)
         planning_repository = SqliteSeriesPlanningAdapter(database_path, lifecycle_state=state)
+        registration_repository = SqliteCanonicalRegistrationRepository(
+            database_path, lifecycle_state=state
+        )
 
         kwargs: dict[str, Any] = {}
         if ref_factory is not None:
@@ -333,6 +378,21 @@ class LifecycleAssembly:
             **kwargs,
         )
         script_boundary = ScriptStudioPublicBoundary(script_service, lifecycle_state=state)
+        registration_service = CanonicalRegistrationService(
+            registration_repository,
+            series_repository=series_repository,
+            project_repository=project_repository,
+            script_repository=script_repository,
+            acceptance_authority=script_service.acceptance_authority,
+            backend_kind=identity.backend_kind,
+            storage_identity=identity.storage_identity,
+            canonical_target_ref=canonical_target_ref,
+            fault_hook=canonical_registration_fault_hook,
+            **({"clock": clock} if clock is not None else {}),
+        )
+        registration_boundary = CanonicalRegistrationPublicBoundary(
+            registration_service, lifecycle_state=state
+        )
         planning_service = SeriesPlanningService(
             planning_repository,
             project_boundary,
@@ -392,14 +452,22 @@ class LifecycleAssembly:
         project_boundary.bind_lifecycle(coordinator)
         script_boundary.bind_lifecycle(coordinator)
         assembly = cls(
-            identity, state, coordinator, series_boundary, project_boundary,
-            script_boundary, planning_boundary, intelligence_boundary,
+            identity=identity,
+            state=state,
+            coordinator=coordinator,
+            series_episode=series_boundary,
+            project_context=project_boundary,
+            script_studio=script_boundary,
+            series_planning=planning_boundary,
+            canonical_registration=registration_boundary,
+            series_intelligence=intelligence_boundary,
         )
         for boundary in (
             series_boundary,
             project_boundary,
             script_boundary,
             planning_boundary,
+            registration_boundary,
             intelligence_boundary,
         ):
             boundary._bind_lifecycle_assembly(assembly)
@@ -415,6 +483,9 @@ class LifecycleAssembly:
             script_acceptance_authority_from_environment(values)
         )
         configured_path = str(values.get("CREATOR_DATA_PATH", "")).strip()
+        canonical_target_ref = str(
+            values.get("CREATOR_CANONICAL_TARGET_REF", "")
+        ).strip() or None
         if configured_path:
             database_path = Path(configured_path)
         else:
@@ -426,6 +497,7 @@ class LifecycleAssembly:
             m6_scope_authority=m6_scope_authority,
             m6_approval_authority=m6_approval_authority,
             script_acceptance_authority=script_acceptance_authority,
+            canonical_target_ref=canonical_target_ref,
         )
 
     def diagnostic_snapshot(self) -> dict[str, Any]:

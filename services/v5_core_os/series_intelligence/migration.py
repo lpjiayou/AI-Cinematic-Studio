@@ -20,6 +20,14 @@ from services.v5_core_os.script_studio.acceptance_sqlite import (
     TABLE as SCRIPT_ACCEPTANCE_TABLE,
     _validate_script_acceptance_connection,
 )
+from services.v5_core_os.canonical_registration.migration import (
+    _validate_canonical_registration_connection,
+)
+from services.v5_core_os.canonical_registration.sqlite_schema import (
+    INDEX as CANONICAL_REGISTRATION_INDEX,
+    MARKER_TABLE as CANONICAL_REGISTRATION_MARKER_TABLE,
+    TABLE as CANONICAL_REGISTRATION_TABLE,
+)
 
 from .sqlite_schema import (
     MARKER_COMPONENT,
@@ -124,6 +132,18 @@ def _validate_schema_allowlist(
     if acceptance_present:
         expected_tables |= acceptance_tables
         expected_indexes.add(SCRIPT_ACCEPTANCE_INDEX)
+    registration_tables = {
+        CANONICAL_REGISTRATION_TABLE,
+        CANONICAL_REGISTRATION_MARKER_TABLE,
+    }
+    registration_present = registration_tables & tables
+    if registration_present and registration_present != registration_tables:
+        raise SeriesIntelligenceMigrationError(
+            "partial canonical registration schema"
+        )
+    if registration_present:
+        expected_tables |= registration_tables
+        expected_indexes.add(CANONICAL_REGISTRATION_INDEX)
     if tables != expected_tables:
         raise SeriesIntelligenceMigrationError("undeclared SQLite table")
     forbidden = connection.execute(
@@ -142,6 +162,8 @@ def _validate_schema_allowlist(
         raise SeriesIntelligenceMigrationError("undeclared SQLite index")
     if acceptance_present:
         _validate_script_acceptance_connection(connection)
+    if registration_present and acceptance_present:
+        _validate_canonical_registration_connection(connection)
 
 
 def _validate_lifecycle_v2_connection(

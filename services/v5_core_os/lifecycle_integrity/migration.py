@@ -248,9 +248,13 @@ def validate_lifecycle_database(database_path: Path | str) -> None:
     from services.v5_core_os.script_studio.acceptance_sqlite import (
         validate_script_acceptance_database,
     )
+    from services.v5_core_os.canonical_registration.migration import (
+        validate_canonical_registration_database,
+    )
 
     validate_series_intelligence_database(path)
     validate_script_acceptance_database(path)
+    validate_canonical_registration_database(path)
 
 
 def migrate_lifecycle_database(
@@ -283,6 +287,14 @@ def migrate_lifecycle_database(
                 TABLE as SCRIPT_ACCEPTANCE_TABLE,
                 _migrate_script_acceptance_connection,
             )
+            from services.v5_core_os.canonical_registration.migration import (
+                _migrate_canonical_registration_connection,
+            )
+            from services.v5_core_os.canonical_registration.sqlite_schema import (
+                INDEX as CANONICAL_REGISTRATION_INDEX,
+                MARKER_TABLE as CANONICAL_REGISTRATION_MARKER_TABLE,
+                TABLE as CANONICAL_REGISTRATION_TABLE,
+            )
             from services.v5_core_os.series_intelligence.migration import (
                 _migrate_series_intelligence_connection,
             )
@@ -299,14 +311,24 @@ def migrate_lifecycle_database(
                 SCRIPT_ACCEPTANCE_TABLE,
                 SCRIPT_ACCEPTANCE_MARKER_TABLE,
             }
+            required_registration_objects = {
+                CANONICAL_REGISTRATION_TABLE,
+                CANONICAL_REGISTRATION_MARKER_TABLE,
+            }
             acceptance_index_present = connection.execute(
                 "SELECT 1 FROM sqlite_master WHERE type='index' AND name=?",
                 (SCRIPT_ACCEPTANCE_INDEX,),
+            ).fetchone() is not None
+            registration_index_present = connection.execute(
+                "SELECT 1 FROM sqlite_master WHERE type='index' AND name=?",
+                (CANONICAL_REGISTRATION_INDEX,),
             ).fetchone() is not None
             additive_upgrade_required = (
                 not required_m6_objects.issubset(tables)
                 or not required_acceptance_objects.issubset(tables)
                 or not acceptance_index_present
+                or not required_registration_objects.issubset(tables)
+                or not registration_index_present
             )
             if additive_upgrade_required and not allow_upgrade:
                 raise LifecycleMigrationError(
@@ -321,6 +343,11 @@ def migrate_lifecycle_database(
                 acceptance_result = _migrate_script_acceptance_connection(
                     connection, fault=fault
                 )
+                registration_result = (
+                    _migrate_canonical_registration_connection(
+                        connection, fault=fault
+                    )
+                )
                 connection.commit()
             except BaseException:
                 connection.rollback()
@@ -328,7 +355,7 @@ def migrate_lifecycle_database(
             validate_lifecycle_database(path)
             return (
                 "no-op"
-                if m6_result == acceptance_result == "no-op"
+                if m6_result == acceptance_result == registration_result == "no-op"
                 else "upgrade"
             )
         is_empty = not tables
@@ -403,9 +430,15 @@ def migrate_lifecycle_database(
             from services.v5_core_os.script_studio.acceptance_sqlite import (
                 _migrate_script_acceptance_connection,
             )
+            from services.v5_core_os.canonical_registration.migration import (
+                _migrate_canonical_registration_connection,
+            )
 
             _migrate_series_intelligence_connection(connection, fault=fault)
             _migrate_script_acceptance_connection(connection, fault=fault)
+            _migrate_canonical_registration_connection(
+                connection, fault=fault
+            )
             connection.commit()
         except BaseException:
             connection.rollback()
