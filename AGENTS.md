@@ -1403,11 +1403,18 @@ Unit tests alone are insufficient.
 
 Test execution must follow the changed-file scope:
 
-- when the working diff modifies only `.md` files, run only the Markdown and
-  documentation-links checks;
-- when the working diff modifies any `.py` file, run the affected module's focused
-  tests first and run the complete test suite exactly once on the final pre-commit
-  snapshot.
+- Default: run only the affected module's focused tests
+  (`python -m unittest tests.unit.test_xxx -v`, typically under 10 seconds).
+- When the working diff modifies only `.md` files, run only
+  `python scripts/validate_markdown.py` and `python scripts/validate_doc_links.py`.
+- Local test scope is widened only when the diff touches shared infrastructure:
+  `services/v5_core_os/lifecycle_integrity/`,
+  `services/v5_core_os/episode_production/production_policy.py`,
+  any cross-layer contract (V5<->V4<->V3, Creator Public API), or a data migration.
+  In that case run the corresponding contract and integration subsets;
+  the full unit suite is still not run locally.
+- In every other case the complete suite is CI's responsibility.
+  Running the full local suite before commit is prohibited.
 
 ---
 
