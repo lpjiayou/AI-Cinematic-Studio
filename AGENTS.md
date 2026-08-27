@@ -1451,6 +1451,37 @@ a second distinct identity — non-author approval, external authority signature
 or multiple distinct approvers — must not be introduced. Hard gates are carried
 by CI required checks only, with no bypass.
 
+### Experiment Package Camera Schema Gate
+
+For every newly created experiment package beginning with EP02, run this exact
+path-scoped gate before file-manifest hashing or archive creation:
+
+```bash
+python scripts/validate_experiment_package_schema.py \
+  --new-package-root /absolute/path/to/new-package
+```
+
+The gate reads only the explicitly selected package's `shots.json` and
+`camera_contract.json`; it must never discover or scan historical packages.
+Camera data must use the domain-owned names derived from
+`services/v5_core_os/episode_production/shot_graph.py`:
+
+- `shotSize`
+- `movement`
+- `angle`
+- `lensMm`
+- `intent`
+
+Additive fields such as `heightMeters`, `focus` and `endCondition` are allowed.
+Aliases for existing concepts, including `framing`, `primaryMove` and
+`lensMmEquivalent`, are prohibited. The gate validates field alignment and types;
+it does not invent `angle` or `intent` values. Those values must come from the
+domain camera derivation or a separately verified production result.
+
+The frozen K2-002 EP01 `v2-promptfix-r1` package is grandfathered: do not scan,
+rewrite or repackage it for this gate. A separately created post-EP01 aligned
+successor is a new package and must pass the gate.
+
 ---
 
 # 33. Browser / Live Gate
