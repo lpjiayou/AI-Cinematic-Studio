@@ -8,8 +8,8 @@ HERE=Path(__file__).resolve().parent
 sys.path.insert(0,str(HERE))
 from r6_protocol import AiohttpAdapter, ComfyLifecycle, ProtocolError, canonical_sha256, dry_run_report
 
-ALLOW=("EP01_SH03","EP01_SH04","EP01_SH05","EP01_SH06","EP01_SH07","EP01_SH08","EP01_SH09","EP01_SH10","EP01_SH11","EP01_SH13","EP01_SH14","EP01_SH15","EP01_SH16","EP01_SH17","EP01_SH18")
-EXCLUDED={"EP01_SH01","EP01_SH02","EP01_SH12"}
+ALLOW=("EP01_SH04","EP01_SH05","EP01_SH06","EP01_SH07","EP01_SH08","EP01_SH09","EP01_SH10","EP01_SH11","EP01_SH13","EP01_SH14","EP01_SH15","EP01_SH16","EP01_SH17","EP01_SH18")
+EXCLUDED={"EP01_SH01","EP01_SH02","EP01_SH03","EP01_SH12"}
 STATES={"NOT_STARTED","RESERVED","PROMPT_ACCEPTED","QUEUED","RUNNING","COMPLETED","FAILED_EXECUTION","FAILED_TECHNICAL_VALIDATION","FAILED_CONTROL_BINDING","OUTPUT_RECOVERY_REQUIRED"}
 
 class BatchError(RuntimeError): pass
@@ -22,15 +22,15 @@ def load(p:Path)->Any: return json.loads(p.read_text(encoding='utf-8'))
 def put_exclusive(p:Path,v:Any)->None:
  p.parent.mkdir(parents=True,exist_ok=True); data=(json.dumps(v,ensure_ascii=False,sort_keys=True,indent=2)+'\n').encode(); fd=os.open(p,os.O_WRONLY|os.O_CREAT|os.O_EXCL,0o600); os.write(fd,data); os.fsync(fd); os.close(fd)
 def validate_manifest(m:Mapping[str,Any])->None:
- if tuple(m.get('exactShotIds',()))!=ALLOW: raise BatchError('exact 15-shot allowlist changed')
+ if tuple(m.get('exactShotIds',()))!=ALLOW: raise BatchError('exact 14-shot allowlist changed')
  if EXCLUDED & set(m['exactShotIds']): raise BatchError('excluded shot entered allowlist')
- checks={'maxTotalPromptPosts':15,'maxPromptPostsPerShot':1,'automaticRetryAllowed':False,'sequentialOnly':True,'authorityState':'TECHNICAL_EVIDENCE_ONLY','publicationAllowed':False,'canonicalMutations':0}
+ checks={'maxTotalPromptPosts':14,'maxPromptPostsPerShot':1,'automaticRetryAllowed':False,'sequentialOnly':True,'authorityState':'TECHNICAL_EVIDENCE_ONLY','publicationAllowed':False,'canonicalMutations':0}
  for k,v in checks.items():
   if m.get(k)!=v: raise BatchError(f'{k} changed')
  if m.get('sourceShotsJsonSha256')!='52e24c8c781f2c729239d6152246677c8eb633d43d17463550c22bb91c8fd9c9': raise BatchError('shots digest changed')
  if set(m.get('perShotSemanticDigests',{}))!=set(ALLOW): raise BatchError('semantic digest set changed')
 def materialize(shot:Mapping[str,Any],template:Mapping[str,Any])->dict[str,Any]:
- w=json.loads(json.dumps(template)); w['5']['inputs']['text']=shot['positivePrompt']; w['6']['inputs']['text']=shot['negativePrompt']; w['8']['inputs']['seed']=shot['seed']; w['11']['inputs']['filename_prefix']='k2-002-ep01-i2v-batch-r2/'+shot['outputPrefix']; w['12']['inputs']['image']='k2-002-ep01-i2v-batch-r2/'+shot['startAnchorSha256']+'.png'; return w
+ w=json.loads(json.dumps(template)); w['5']['inputs']['text']=shot['positivePrompt']; w['6']['inputs']['text']=shot['negativePrompt']; w['8']['inputs']['seed']=shot['seed']; w['10']['inputs']['fps']=24.0; w['11']['inputs']['filename_prefix']='k2-002-ep01-i2v-batch-r2/'+shot['outputPrefix']; w['12']['inputs']['image']='k2-002-ep01-i2v-batch-r2/'+shot['startAnchorSha256']+'.png'; return w
 def semantic(w:Mapping[str,Any])->str:return canonical_sha256(w)
 def validate_inputs(root:Path,m:Mapping[str,Any])->tuple[dict[str,Any],dict[str,dict[str,Any]]]:
  shots=load(root/'inputs/shots.json'); template=load(root/'inputs/workflow.json')
@@ -64,12 +64,12 @@ def queue(m:Mapping[str,Any],e:Path)->list[str]:
   elif s in {'RESERVED','PROMPT_ACCEPTED','QUEUED','RUNNING','FAILED_CONTROL_BINDING','OUTPUT_RECOVERY_REQUIRED'}: raise BatchError(f'recovery audit required {sid}: {s}')
  return result
 def dry(root:Path,m:Mapping[str,Any],workflows:Mapping[str,Any])->dict[str,Any]:
- return {'mode':'DRY_RUN','shotIds':list(ALLOW),'shotCount':15,'promptPostCount':0,'gpuOrProviderCalls':0,'reports':{k:dry_run_report(v) for k,v in workflows.items()},'snapshotSha256':m['executionSnapshotSha256']}
+ return {'mode':'DRY_RUN','shotIds':list(ALLOW),'shotCount':14,'promptPostCount':0,'gpuOrProviderCalls':0,'reports':{k:dry_run_report(v) for k,v in workflows.items()},'snapshotSha256':m['executionSnapshotSha256']}
 async def execute(root:Path,m:Mapping[str,Any],workflows:Mapping[str,Any])->dict[str,Any]:
  if os.environ.get('K2_EP01_I2V_ACK')!='TECHNICAL_EVIDENCE_ONLY': raise BatchError('missing technical evidence acknowledgement')
  evidence=Path(m['evidenceRoot']); evidence.mkdir(parents=True,exist_ok=True); completed=[]; failed=[]; posts=0
  for sid in queue(m,evidence):
-  if posts>=15: raise BatchError('batch POST budget exceeded')
+  if posts>=14: raise BatchError('batch POST budget exceeded')
   reserve(evidence,sid); attempt=evidence/'shots'/sid/'attempt'
   try:
    life=ComfyLifecycle(AiohttpAdapter(m['comfyuiBaseUrl']),timeout_seconds=m.get('timeoutSeconds',3600),poll_seconds=2,evidence_dir=attempt)
