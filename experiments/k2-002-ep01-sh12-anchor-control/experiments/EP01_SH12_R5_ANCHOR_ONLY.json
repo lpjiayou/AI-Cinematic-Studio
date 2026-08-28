@@ -1,0 +1,34 @@
+{
+    "schemaVersion": 1,
+    "experimentId": "K2-002-EP01-SH12-R5-ANCHOR-ONLY",
+    "authorityState": "TECHNICAL_EVIDENCE_ONLY",
+    "publicationAllowed": false,
+    "canonicalMutations": 0,
+    "shotId": "EP01_SH12",
+    "changedVariable": "START_ANCHOR_ONLY",
+    "maxRuns": 1,
+    "baseline": {
+      "shotsSha256": "52e24c8c781f2c729239d6152246677c8eb633d43d17463550c22bb91c8fd9c9",
+      "workflowFileSha256": "374533b301660ce77b645fc706c185efb9cc3cf070330c4bae44078d0d34bb65",
+      "workflowCanonicalSha256": "ead8128c3625e9ecea76fe18059ae0439136134aa1af1c4b44a2861f359122cd",
+      "anchorSha256": "21ef1ff9b874bf8be850702afd34acc1885bb22cd909b8587097b092eaea2827",
+      "seed": 596974677755723,
+      "positivePromptSha256": "c321d403fe740753a807033b490c181d431ccc03b22924ef7da44940dfbf3f85",
+      "negativePromptSha256": "02064208e66afa23a1290b1c2f79c71126267c93d2465081849e20f25265c75e",
+      "comfyuiCommit": "feca51a8544511dd73d43602f387def0cc601a9d",
+      "modelSha256": {
+        "UNET": "456f901338bd9eadbded3828b819109a9b68e8a525ca5cf8d0049a69fcfeca1e",
+        "TEXT_ENCODER": "c3355d30191f1f066b26d93fba017ae9809dce6c627dda5f6a66eaa651204f68",
+        "VAE": "e40321bd36b9709991dae2530eb4ac303dd168276980d3e9bc4b6e2b75fed156"
+      }
+    },
+    "variant": {
+      "anchorPath": "/data/k2-technical-evidence/k2-002-ep01-i2v-v2-sh12-r5-anchor-only/inputs/EP01_SH12_anchor_pre_step_r5.png",
+      "anchorSha256": "3ccfe06afa15a6fcf46450c0bc5edf2dc1a8e1b0be126a5f15e36b1e8f9d434d",
+      "seedPolicy": "FIXED_BASELINE_SEED",
+      "seed": 596974677755723
+    },
+    "allowedWorkflowDiffPointers": [
+      "/12/inputs/image"
+    ]
+  }

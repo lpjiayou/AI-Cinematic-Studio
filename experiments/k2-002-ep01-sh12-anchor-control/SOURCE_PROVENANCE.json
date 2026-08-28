@@ -1,0 +1,39 @@
+{
+  "schemaVersion": "k2-002.sh12-anchor-control-runner-source.v1",
+  "controlRunner": "K2-002-EP01-SH12-R5-ANCHOR-ONLY",
+  "authorityRepository": {
+    "pathAtImplementation": "/data/coding/AI-Cinematic-Studio-main-2701",
+    "remote": "https://github.com/lpjiayou/AI-Cinematic-Studio.git",
+    "baseBranch": "main",
+    "baseCommit": "2701cd39d77d100f72e783ca0bb095a73c31d244",
+    "sourceFile": "experiments/k2-002-ep01-i2v/ingest_ep01.py",
+    "sourceFileSha256": "21b8f7e11deb2d4614631a8fe8f2d80b23d09445d31d8dafe37a26a782896239"
+  },
+  "frozenPackageRunner": {
+    "pathAtImplementation": "/data/coding/k2-002-ep01-i2v-v2/ingest_ep01.py",
+    "sha256": "e7347c33c3175dd5bedbc5b103bb3b9b6aef8b060ec866e06b829a08dfde8238",
+    "wrapperPathAtImplementation": "/data/coding/k2-002-ep01-i2v-v2/run_ep01.sh",
+    "wrapperSha256": "fef765ab3ada3525d1bfa460a73dddff012c4d500004f5a0583fb07ed90a9292"
+  },
+  "defaultContractPreserved": {
+    "policy": "ANCHOR_DERIVED",
+    "rule": "seed=int(startAnchorSha256[:13],16)",
+    "existingRunnerModified": false
+  },
+  "isolatedChanges": [
+    "Add an experiment-manifest-only FIXED_BASELINE_SEED control path.",
+    "Restrict the path to TECHNICAL_EVIDENCE_ONLY, EP01_SH12, START_ANCHOR_ONLY and maxRuns=1.",
+    "Require dual explicit environment acknowledgements.",
+    "Read and hash the frozen R3 workflow and prompts instead of duplicating prompt text.",
+    "Deep-copy the frozen workflow and allow only /12/inputs/image to differ.",
+    "Hash actual model files and pin the ComfyUI commit.",
+    "Use an atomic single-attempt lock before one loopback /prompt submission.",
+    "Keep shots.json, the package materialized workflow, normal runner and batch path read-only."
+  ],
+  "governance": {
+    "authorityState": "TECHNICAL_EVIDENCE_ONLY",
+    "publicationAllowed": false,
+    "canonicalMutations": 0,
+    "batchAllowed": false
+  }
+}
