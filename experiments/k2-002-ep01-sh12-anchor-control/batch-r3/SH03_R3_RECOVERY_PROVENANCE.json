@@ -1,0 +1,50 @@
+{
+  "allExactMatches": [
+    {
+      "path": "/data/coding/apps/ComfyUI/output/k2-002-ep01-i2v-v2/EP01_SH03-v2-actionfix-r3-technical-evidence_00001_.mp4",
+      "sha256": "6b936a8bb59654888dabd4d8439fb5b6f182516c3687a53da139435a4cb8d179",
+      "size": 545098
+    }
+  ],
+  "canonicalAdmission": false,
+  "controlProvenance": "INCOMPLETE",
+  "createdAtUtc": "2026-08-28T12:49:13.519518+00:00",
+  "knownRunFeatures": {
+    "cfg": 6.0,
+    "formalEvidenceAtOriginalRun": false,
+    "frameDifference": 1.97,
+    "frozenFrames": "0/48",
+    "steps": 30
+  },
+  "mediaAttribution": "EXACT_HASH_MATCH",
+  "mediaValidity": "VALID",
+  "nearbyEvidence": [
+    {
+      "path": "/data/coding/apps/ComfyUI/output/k2-002-ep01-i2v-v2/EP01_SH03-v2-technical-evidence_00001_.mp4",
+      "sha256": "f0ea0058e561410aacd802cc293c52a7b4542653f070fb0ebd5a8f85dacccbc4",
+      "size": 449661
+    },
+    {
+      "path": "/data/coding/apps/ComfyUI/output/k2-002-ep01-i2v-v2/EP01_SH03-v2-actionfix-r1-technical-evidence_00001_.mp4",
+      "sha256": "a96466a7d31756de2dd9b3a2b7f2ffec74b51489659ef924f8bda5e7b5ed52bd",
+      "size": 454343
+    },
+    {
+      "path": "/data/coding/apps/ComfyUI/output/k2-002-ep01-i2v-v2/EP01_SH03-v2-actionfix-r2-technical-evidence_00001_.mp4",
+      "sha256": "978ad7d84dc42b99ad001be50850051018c167b91513e9f245ae6fe0e188ad91",
+      "size": 449148
+    },
+    {
+      "path": "/data/coding/apps/ComfyUI/output/k2-002-ep01-i2v-v2/EP01_SH03-v2-actionfix-r3-technical-evidence_00001_.mp4",
+      "sha256": "6b936a8bb59654888dabd4d8439fb5b6f182516c3687a53da139435a4cb8d179",
+      "size": 545098
+    }
+  ],
+  "recoveredPath": "/data/k2-technical-evidence/k2-002-ep01-sh03-r3-recovered/media/EP01_SH03_R3_RECOVERED.mp4",
+  "schema": "sh03-r3-recovery-v1",
+  "sourceCopyByteIdentical": true,
+  "sourcePath": "/data/coding/apps/ComfyUI/output/k2-002-ep01-i2v-v2/EP01_SH03-v2-actionfix-r3-technical-evidence_00001_.mp4",
+  "targetSha256": "6b936a8bb59654888dabd4d8439fb5b6f182516c3687a53da139435a4cb8d179",
+  "textReferenceHits": [],
+  "userPreference": "SELECTED_TECHNICAL_CANDIDATE"
+}

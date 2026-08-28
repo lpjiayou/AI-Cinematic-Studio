@@ -1,0 +1,42 @@
+{
+  "exactShotIds": [
+    "EP01_SH04",
+    "EP01_SH05",
+    "EP01_SH06",
+    "EP01_SH07",
+    "EP01_SH08",
+    "EP01_SH09",
+    "EP01_SH10",
+    "EP01_SH11",
+    "EP01_SH13",
+    "EP01_SH14",
+    "EP01_SH15",
+    "EP01_SH16",
+    "EP01_SH17",
+    "EP01_SH18"
+  ],
+  "excludedShotIds": [
+    "EP01_SH01",
+    "EP01_SH02",
+    "EP01_SH03",
+    "EP01_SH12"
+  ],
+  "ordering": [
+    "EP01_SH04",
+    "EP01_SH05",
+    "EP01_SH06",
+    "EP01_SH07",
+    "EP01_SH08",
+    "EP01_SH09",
+    "EP01_SH10",
+    "EP01_SH11",
+    "EP01_SH13",
+    "EP01_SH14",
+    "EP01_SH15",
+    "EP01_SH16",
+    "EP01_SH17",
+    "EP01_SH18"
+  ],
+  "schemaVersion": "k2.batch-r3.allowlist.v1",
+  "shotCount": 14
+}

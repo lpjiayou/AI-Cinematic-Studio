@@ -1,0 +1,61 @@
+{
+  "authorityState": "TECHNICAL_EVIDENCE_ONLY",
+  "automaticRetryAllowed": false,
+  "canonicalMutations": 0,
+  "comfyuiAtPreflight": {
+    "baseUrl": "http://127.0.0.1:8188",
+    "historyCount": 0,
+    "queuePendingCount": 0,
+    "queueRunningCount": 0,
+    "serviceState": "STOPPED"
+  },
+  "cpuIntegration": {
+    "gpuOrProviderCalls": 0,
+    "path": "/data/k2-technical-evidence/k2-002-ep01-batch-r3-fps-fix-cpu/CPU_INTEGRATION_RECEIPT.json",
+    "promptPostCount": 1,
+    "sha256": "bbd62667177517a76954835098bd92e7010c24942c5a012dbe3f2c843ddf6f9e",
+    "workflowCanonicalBinding": "PASS"
+  },
+  "createdAtUtc": "2026-08-28T13:22:39.692249+00:00",
+  "dryRun": {
+    "gpuOrProviderCalls": 0,
+    "mode": "DRY_RUN",
+    "path": "/data/coding/k2-002-ep01-i2v-batch-r3/audits/DRY_RUN_FINAL.json",
+    "promptPostCount": 0,
+    "sha256": "afe607564a54d4597976ce2e10b08583743e730ed9919f074e534b7e104130d0"
+  },
+  "exactShotIds": [
+    "EP01_SH04",
+    "EP01_SH05",
+    "EP01_SH06",
+    "EP01_SH07",
+    "EP01_SH08",
+    "EP01_SH09",
+    "EP01_SH10",
+    "EP01_SH11",
+    "EP01_SH13",
+    "EP01_SH14",
+    "EP01_SH15",
+    "EP01_SH16",
+    "EP01_SH17",
+    "EP01_SH18"
+  ],
+  "focusedTests": "48 PASS",
+  "fpsTypeOnlyDiff": {
+    "allowedPath": "/10/inputs/fps",
+    "path": "/data/coding/k2-002-ep01-i2v-batch-r3/audits/FPS_TYPE_ONLY_DIFF_AUDIT.json",
+    "result": "PASS",
+    "sha256": "7e80b44cb9421dfc4d7f15577215b80f894bc3863f1daeb095b5e2dad0c717ab"
+  },
+  "maxPromptPostsPerShot": 1,
+  "maxTotalPromptPosts": 14,
+  "publicationAllowed": false,
+  "remoteBinding": "PASS",
+  "result": "PASS",
+  "runnerCommit": "7a5d0dc3e8f80b167bb58861163bfc0faee12c17",
+  "runnerTree": "1a4a5ed5bc0c286bcb72cb0f2f2f735439726627",
+  "schemaVersion": "k2.batch-r3.zero-call-preflight.v1",
+  "sequentialOnly": true,
+  "shotCount": 14,
+  "snapshotSha256": "39b13db7522e0a6393627a3bf584067df9a578b118989e3e2cde02d87be250c3"
+}

@@ -1,0 +1,16 @@
+{
+  "a100RepoLineageRecorded": true,
+  "authorityRepository": "/data/coding/AI-Cinematic-Studio-main-2701",
+  "comfyUiCommit": "feca51a8544511dd73d43602f387def0cc601a9d",
+  "comfyUiTree": "7ce010c8d16dd29ad5e8094770e97ccbc66017dd",
+  "convergenceBranch": "feature/k2-002-ep01-batch-r3-convergence",
+  "developmentWorktree": "/data/coding/AI-Cinematic-Studio-k2-002-ep01-batch-r3-fps-fix",
+  "executionSnapshot": "/data/coding/k2-002-ep01-i2v-batch-r3",
+  "executionSnapshotSha256": "39b13db7522e0a6393627a3bf584067df9a578b118989e3e2cde02d87be250c3",
+  "fpsFixBranch": "feature/k2-002-ep01-batch-r3-fps-fix",
+  "fpsFixCommit": "7a5d0dc3e8f80b167bb58861163bfc0faee12c17",
+  "fpsFixTree": "1a4a5ed5bc0c286bcb72cb0f2f2f735439726627",
+  "generatedAtUtc": "2026-08-28T13:49:55.458941+00:00",
+  "schemaVersion": "1.0",
+  "shotsJsonSha256": "52e24c8c781f2c729239d6152246677c8eb633d43d17463550c22bb91c8fd9c9"
+}

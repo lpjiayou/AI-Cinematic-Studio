@@ -1,0 +1,77 @@
+{
+  "EP01_VISUAL_COMPLETION": "INCOMPLETE",
+  "authorityState": "TECHNICAL_EVIDENCE_ONLY",
+  "canonicalMutations": 0,
+  "episode": "EP01",
+  "evidenceMedia": {
+    "batchR3": "/data/k2-technical-evidence/k2-002-ep01-i2v-batch-r3",
+    "sh03R3Recovered": "/data/k2-technical-evidence/k2-002-ep01-sh03-r3-recovered",
+    "sh12CurrentEvidence": "R5"
+  },
+  "executionSnapshot": {
+    "exactShotAllowlist": [
+      "EP01_SH04",
+      "EP01_SH05",
+      "EP01_SH06",
+      "EP01_SH07",
+      "EP01_SH08",
+      "EP01_SH09",
+      "EP01_SH10",
+      "EP01_SH11",
+      "EP01_SH13",
+      "EP01_SH14",
+      "EP01_SH15",
+      "EP01_SH16",
+      "EP01_SH17",
+      "EP01_SH18"
+    ],
+    "path": "/data/coding/k2-002-ep01-i2v-batch-r3",
+    "sha256": "39b13db7522e0a6393627a3bf584067df9a578b118989e3e2cde02d87be250c3"
+  },
+  "generatedAtUtc": "2026-08-28T13:49:55.458941+00:00",
+  "project": "K2-002-CHANGAN",
+  "publicationAllowed": false,
+  "runtimeEnvironment": {
+    "comfyUiCommit": "feca51a8544511dd73d43602f387def0cc601a9d",
+    "models": {
+      "textEncoder": "c3355d30191f1f066b26d93fba017ae9809dce6c627dda5f6a66eaa651204f68",
+      "vae": "e40321bd36b9709991dae2530eb4ac303dd168276980d3e9bc4b6e2b75fed156",
+      "wan5B": "456f901338bd9eadbded3828b819109a9b68e8a525ca5cf8d0049a69fcfeca1e"
+    }
+  },
+  "schemaVersion": "1.0",
+  "selectedCandidate": {
+    "EP01_SH03": {
+      "path": "/data/k2-technical-evidence/k2-002-ep01-sh03-r3-recovered/media/EP01_SH03_R3_RECOVERED.mp4",
+      "sha256": "6b936a8bb59654888dabd4d8439fb5b6f182516c3687a53da139435a4cb8d179",
+      "status": "SELECTED_TECHNICAL_CANDIDATE_NOT_CANONICAL"
+    },
+    "EP01_SH12": "NONE"
+  },
+  "sourceAuthority": {
+    "convergenceBranch": "feature/k2-002-ep01-batch-r3-convergence",
+    "fpsFixCommit": "7a5d0dc3e8f80b167bb58861163bfc0faee12c17",
+    "repository": "/data/coding/AI-Cinematic-Studio-main-2701"
+  },
+  "status": "TECHNICAL_BASELINE_DRAFT",
+  "unknownFileCount": 0,
+  "unresolvedShots": [
+    "EP01_SH08",
+    "EP01_SH12",
+    "EP01_SH13",
+    "EP01_SH15",
+    "EP01_SH16",
+    "EP01_SH17",
+    "EP01_SH18"
+  ],
+  "unresolvedSourceConflictCount": 0,
+  "visualFailureShots": [
+    "EP01_SH08",
+    "EP01_SH12",
+    "EP01_SH13",
+    "EP01_SH15",
+    "EP01_SH16",
+    "EP01_SH17",
+    "EP01_SH18"
+  ]
+}

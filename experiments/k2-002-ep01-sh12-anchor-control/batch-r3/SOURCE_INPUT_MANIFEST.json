@@ -1,0 +1,133 @@
+{
+  "comfyui": {
+    "commit": "feca51a8544511dd73d43602f387def0cc601a9d",
+    "path": "/data/coding/apps/ComfyUI",
+    "tree": "7ce010c8d16dd29ad5e8094770e97ccbc66017dd"
+  },
+  "createdAtUtc": "2026-08-28T13:13:27.232419+00:00",
+  "files": {
+    "SHOT_ALLOWLIST.json": {
+      "bytes": 684,
+      "sha256": "3eae2abae57c2e207b44fb39decc50102c9c8714faed11e3829999c7a0af9345"
+    },
+    "SHOT_SEMANTIC_DIGESTS.json": {
+      "bytes": 1327,
+      "sha256": "a29d4dca4007f2cb9bd25d903553c450e23bbf2aafb7b47f900b38292b94196f"
+    },
+    "audits/FPS_TYPE_ONLY_DIFF_AUDIT.json": {
+      "bytes": 5350,
+      "sha256": "7e80b44cb9421dfc4d7f15577215b80f894bc3863f1daeb095b5e2dad0c717ab"
+    },
+    "authorizations/K2-002-EP01-BATCH-R3-AUTHORIZATION-REFERENCE.json": {
+      "bytes": 1071,
+      "sha256": "5c88be1ee50382e4a87aca078a8f6f8f75fba7b194d28fb3e12739a4201af807"
+    },
+    "inputs/anchors/EP01_SH04_anchor_v2.png": {
+      "bytes": 1130293,
+      "sha256": "b2f0232930719a248260c0d3f93b7b6244de80b61c061af0b1a3ae53951bf383"
+    },
+    "inputs/anchors/EP01_SH05_anchor_v2.png": {
+      "bytes": 1067751,
+      "sha256": "a31b3f98ebc3e5fcd3721d79eb5c12c83ae55b945df8a2329b72f9291e8c3e15"
+    },
+    "inputs/anchors/EP01_SH06_anchor_v2.png": {
+      "bytes": 974133,
+      "sha256": "08aa9140471538af4fb67aff2c73009a2f3c01c497f4b2945a42e1594f806e14"
+    },
+    "inputs/anchors/EP01_SH07_anchor_v2.png": {
+      "bytes": 978639,
+      "sha256": "38bfe7729792b0e73a7cac2890fc61af7486c43304f305a84395a3588855d4b5"
+    },
+    "inputs/anchors/EP01_SH08_anchor_v2.png": {
+      "bytes": 709482,
+      "sha256": "a1d9517fc644119e6920355a1402d262f7a9351fafb4c5a69ba06de53d77fe9a"
+    },
+    "inputs/anchors/EP01_SH09_anchor_v2.png": {
+      "bytes": 998335,
+      "sha256": "3b4f871ab59332625f0d343bde0ca1686477a135a3a2f9d6373f474f22e252ea"
+    },
+    "inputs/anchors/EP01_SH10_anchor_v2.png": {
+      "bytes": 998819,
+      "sha256": "e0fb7c1610e859be432a88c344b78be545bad003ec7429fd97ef334e0723ef8d"
+    },
+    "inputs/anchors/EP01_SH11_anchor_v2.png": {
+      "bytes": 896789,
+      "sha256": "ce0417c2022e0f48855fae0544d224582cfc38c217e5e78eefc568de1bfb113f"
+    },
+    "inputs/anchors/EP01_SH13_anchor_v2.png": {
+      "bytes": 904043,
+      "sha256": "6c668a2259b63d8bb39abdb9d51fafe431e4bf513e02d576df52b89d35e3d519"
+    },
+    "inputs/anchors/EP01_SH14_anchor_v2.png": {
+      "bytes": 913927,
+      "sha256": "251070c10f89961b95f38e5dcae8d72a45430fb46684c8c3a8c0f30782d9c935"
+    },
+    "inputs/anchors/EP01_SH15_anchor_v2.png": {
+      "bytes": 1274540,
+      "sha256": "8afaa2a4f0fd461bf1388502ff4ff37dedd4dc1e1bae446aaccd4736c98cedf7"
+    },
+    "inputs/anchors/EP01_SH16_anchor_v2.png": {
+      "bytes": 1193036,
+      "sha256": "3b6ec981d3ca8bb0f3cd2373a972b189563a9f5cd76576d903a8cc27f226484e"
+    },
+    "inputs/anchors/EP01_SH17_anchor_v2.png": {
+      "bytes": 729204,
+      "sha256": "fde73534465fca7e24afc431df9395fe0d7cd84956fb982cc7b35f65d138cad2"
+    },
+    "inputs/anchors/EP01_SH18_anchor_v2.png": {
+      "bytes": 717441,
+      "sha256": "da56f6c3b7d5615fbc0e4900628d65b9a84e84f0723fb8f45edc7ce1b2c27a0e"
+    },
+    "inputs/camera_contract.json": {
+      "bytes": 20922,
+      "sha256": "b83967cd56dc22681b6b0271cae03a5aae9f3f328a5dbb9ff209e15544104a3a"
+    },
+    "inputs/shots.json": {
+      "bytes": 35140,
+      "sha256": "52e24c8c781f2c729239d6152246677c8eb633d43d17463550c22bb91c8fd9c9"
+    },
+    "inputs/workflow.json": {
+      "bytes": 3548,
+      "sha256": "2f008050d10977b477ebe1d357ee6491109ab80b96545c578344385445ebe710"
+    },
+    "runner/batch_runner.py": {
+      "bytes": 8526,
+      "sha256": "963e0cbd667995f717043d284f45ce691784449ccf8f26af3ea95369575f6d1e"
+    },
+    "runner/r6_protocol.py": {
+      "bytes": 19848,
+      "sha256": "3a8d0c5be746f819db74bf354ab8958cb23acb9333b5cb6c0b4839a0202e129a"
+    }
+  },
+  "legacyRuntimePathCompatibility": {
+    "comfyInputSubdir": "k2-002-ep01-i2v-batch-r2",
+    "outputFilenamePrefix": "k2-002-ep01-i2v-batch-r2/{shot}-v2-batch-r2-technical-evidence",
+    "reason": "preserve strict workflow equivalence except fps JSON numeric type",
+    "semanticEffect": "none"
+  },
+  "models": [
+    {
+      "bytes": 9999658848,
+      "path": "/data/coding/apps/ComfyUI/models/diffusion_models/wan2.2_ti2v_5B_fp16.safetensors",
+      "sha256": "456f901338bd9eadbded3828b819109a9b68e8a525ca5cf8d0049a69fcfeca1e"
+    },
+    {
+      "bytes": 6735906897,
+      "path": "/data/coding/apps/ComfyUI/models/text_encoders/umt5_xxl_fp8_e4m3fn_scaled.safetensors",
+      "sha256": "c3355d30191f1f066b26d93fba017ae9809dce6c627dda5f6a66eaa651204f68"
+    },
+    {
+      "bytes": 1409400960,
+      "path": "/data/coding/apps/ComfyUI/models/vae/wan2.2_vae.safetensors",
+      "sha256": "e40321bd36b9709991dae2530eb4ac303dd168276980d3e9bc4b6e2b75fed156"
+    }
+  ],
+  "runner": {
+    "branch": "feature/k2-002-ep01-batch-r3-fps-fix",
+    "commit": "7a5d0dc3e8f80b167bb58861163bfc0faee12c17",
+    "tree": "1a4a5ed5bc0c286bcb72cb0f2f2f735439726627"
+  },
+  "schemaVersion": "k2.batch-r3.source-input-manifest.v1",
+  "sourcePackageRoot": "/data/coding/k2-002-ep01-i2v-v2",
+  "sourceShotsJsonSha256": "52e24c8c781f2c729239d6152246677c8eb633d43d17463550c22bb91c8fd9c9"
+}

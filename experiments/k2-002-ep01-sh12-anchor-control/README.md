@@ -97,3 +97,7 @@ python3 -m unittest discover -s tests -p 'test_*.py' -v
 ```
 
 These tests do not contact ComfyUI and do not use a GPU.
+
+## Batch-r3 convergence record
+
+See batch-r3/RUNBOOK_BATCH_R3.md for the authorized 14-shot execution snapshot, evidence index, visual status matrix, and non-canonical EP01 baseline draft.
