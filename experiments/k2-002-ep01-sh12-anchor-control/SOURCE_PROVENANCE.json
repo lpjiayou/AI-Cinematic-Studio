@@ -15,6 +15,43 @@
     "wrapperPathAtImplementation": "/data/coding/k2-002-ep01-i2v-v2/run_ep01.sh",
     "wrapperSha256": "fef765ab3ada3525d1bfa460a73dddff012c4d500004f5a0583fb07ed90a9292"
   },
+  "comfyuiWorktreeAttestation": {
+    "commit": "feca51a8544511dd73d43602f387def0cc601a9d",
+    "branch": "master",
+    "trackedWorktreeRequiredClean": true,
+    "untrackedPolicy": "EXACT_CODE_PINNED_ALLOWLIST",
+    "r3PreExistingEvidence": {
+      "allowedFilesObservedMtimeDate": "2026-07-24",
+      "r3VideoObservedMtimeDate": "2026-08-28"
+    },
+    "runtimeLoading": {
+      "directory": "api_workflows",
+      "isComfyuiCustomNodesAutoLoadPath": false,
+      "importedOrExecutedByControlRunner": false
+    },
+    "allowedUntracked": [
+      {
+        "path": "api_workflows/R5C-1-GPU-OpenPose-ControlNet-Closeout.md",
+        "sha256": "1371589bfc191274e467b53ba475cc8e15129f4961c5164bed9889f592e22dfc"
+      },
+      {
+        "path": "api_workflows/r5c1_openpose_runner.py",
+        "sha256": "df018bb287c1d1025eab9bcab79e084a2f498271dc3e0a9e1e82ce394652de33"
+      },
+      {
+        "path": "api_workflows/r5c1_sd15_openpose_api.json",
+        "sha256": "e76bd44d2818be1b8e57c4e856cdd41d3046a62f433001608d492e659757052b"
+      },
+      {
+        "path": "api_workflows/run_openpose_api.py",
+        "sha256": "4d20be5f720bd31bb3e87b314e033cba10399a886299afaf65e7bfc80bade6fc"
+      },
+      {
+        "path": "api_workflows/run_openpose_api_flexible.py",
+        "sha256": "df018bb287c1d1025eab9bcab79e084a2f498271dc3e0a9e1e82ce394652de33"
+      }
+    ]
+  },
   "defaultContractPreserved": {
     "policy": "ANCHOR_DERIVED",
     "rule": "seed=int(startAnchorSha256[:13],16)",
@@ -27,6 +64,7 @@
     "Read and hash the frozen R3 workflow and prompts instead of duplicating prompt text.",
     "Deep-copy the frozen workflow and allow only /12/inputs/image to differ.",
     "Hash actual model files and pin the ComfyUI commit.",
+    "Require a clean tracked ComfyUI tree and attest the exact five-file path-and-hash untracked allowlist before and after hashing.",
     "Use an atomic single-attempt lock before one loopback /prompt submission.",
     "Keep shots.json, the package materialized workflow, normal runner and batch path read-only."
   ],

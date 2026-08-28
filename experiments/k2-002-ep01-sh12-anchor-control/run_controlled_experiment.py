@@ -28,6 +28,7 @@ import subprocess
 import sys
 import time
 from typing import Any, Mapping, Sequence
+from types import MappingProxyType
 from urllib import error, parse, request
 import zlib
 
@@ -61,6 +62,23 @@ EXPECTED_BASE_URL = "http://127.0.0.1:8188"
 EXPECTED_MANIFEST_PATH = (
     EXPECTED_RUNNER_ROOT / "experiments" / "EP01_SH12_R5_ANCHOR_ONLY.json"
 )
+ALLOWED_COMFYUI_UNTRACKED_SHA256 = MappingProxyType({
+    "api_workflows/R5C-1-GPU-OpenPose-ControlNet-Closeout.md": (
+        "1371589bfc191274e467b53ba475cc8e15129f4961c5164bed9889f592e22dfc"
+    ),
+    "api_workflows/r5c1_openpose_runner.py": (
+        "df018bb287c1d1025eab9bcab79e084a2f498271dc3e0a9e1e82ce394652de33"
+    ),
+    "api_workflows/r5c1_sd15_openpose_api.json": (
+        "e76bd44d2818be1b8e57c4e856cdd41d3046a62f433001608d492e659757052b"
+    ),
+    "api_workflows/run_openpose_api.py": (
+        "4d20be5f720bd31bb3e87b314e033cba10399a886299afaf65e7bfc80bade6fc"
+    ),
+    "api_workflows/run_openpose_api_flexible.py": (
+        "df018bb287c1d1025eab9bcab79e084a2f498271dc3e0a9e1e82ce394652de33"
+    ),
+})
 
 
 @dataclass(frozen=True)
@@ -636,7 +654,21 @@ def _git_command(root: Path, *args: str) -> str:
         )
     except (OSError, subprocess.SubprocessError) as exc:
         raise ControlError("ComfyUI Git facts are unavailable") from exc
-    return completed.stdout.strip()
+    return completed.stdout.rstrip("\n")
+
+
+def _parse_comfyui_worktree_status(worktree_status: str) -> set[str]:
+    actual_untracked: set[str] = set()
+    for record in worktree_status.split("\0"):
+        if not record:
+            continue
+        if not record.startswith("?? "):
+            raise ControlError("ComfyUI tracked worktree is dirty")
+        relative = record[3:]
+        if not relative or relative in actual_untracked:
+            raise ControlError("ComfyUI untracked status is malformed")
+        actual_untracked.add(relative)
+    return actual_untracked
 
 
 def _git_facts(root: Path, policy: RunnerPolicy) -> dict[str, Any]:
@@ -645,14 +677,69 @@ def _git_facts(root: Path, policy: RunnerPolicy) -> dict[str, Any]:
         raise ControlError("ComfyUI root is unavailable")
     commit = _git_command(root, "rev-parse", "HEAD")
     branch = _git_command(root, "branch", "--show-current")
-    tracked_status = _git_command(root, "status", "--porcelain", "--untracked-files=no")
+    worktree_status = _git_command(
+        root,
+        "status",
+        "--porcelain=v1",
+        "-z",
+        "--untracked-files=all",
+    )
     if not re.fullmatch(r"[0-9a-f]{40}", commit) or commit != policy.comfyui_commit:
         raise ControlError("ComfyUI commit changed")
     if branch != policy.comfyui_branch:
         raise ControlError("ComfyUI branch changed")
-    if tracked_status:
-        raise ControlError("ComfyUI tracked worktree is dirty")
-    return {"commit": commit, "branch": branch, "trackedWorktreeClean": True}
+    actual_untracked = _parse_comfyui_worktree_status(worktree_status)
+
+    expected_untracked = set(ALLOWED_COMFYUI_UNTRACKED_SHA256)
+    if actual_untracked != expected_untracked:
+        raise ControlError(
+            "ComfyUI untracked path set changed; "
+            f"missing={sorted(expected_untracked-actual_untracked)}, "
+            f"extra={sorted(actual_untracked-expected_untracked)}"
+        )
+
+    attested_untracked: list[dict[str, str]] = []
+    for relative, expected_sha256 in sorted(ALLOWED_COMFYUI_UNTRACKED_SHA256.items()):
+        relative_path = PurePosixPath(relative)
+        if (
+            relative_path.is_absolute()
+            or ".." in relative_path.parts
+            or relative_path.as_posix() != relative
+            or re.fullmatch(r"[0-9a-f]{64}", expected_sha256) is None
+        ):
+            raise ControlError("compiled ComfyUI untracked allowlist is invalid")
+        path = _require_under(
+            root / Path(*relative_path.parts),
+            root,
+            "allowed ComfyUI untracked file",
+        )
+        _assert_regular_file(path, "allowed ComfyUI untracked file")
+        actual_sha256 = file_sha256(path)
+        if actual_sha256 != expected_sha256:
+            raise ControlError(f"allowed ComfyUI untracked SHA-256 changed: {relative}")
+        attested_untracked.append(
+            {"path": relative, "sha256": actual_sha256}
+        )
+
+    final_worktree_status = _git_command(
+        root,
+        "status",
+        "--porcelain=v1",
+        "-z",
+        "--untracked-files=all",
+    )
+    if _parse_comfyui_worktree_status(final_worktree_status) != expected_untracked:
+        raise ControlError("ComfyUI worktree changed during untracked attestation")
+
+    return {
+        "commit": commit,
+        "branch": branch,
+        "trackedWorktreeClean": True,
+        "untrackedPolicy": "EXACT_CODE_PINNED_ALLOWLIST",
+        "untrackedPathsExact": True,
+        "worktreeStatusRechecked": True,
+        "allowedUntracked": attested_untracked,
+    }
 
 
 def _model_facts(policy: RunnerPolicy) -> dict[str, dict[str, Any]]:

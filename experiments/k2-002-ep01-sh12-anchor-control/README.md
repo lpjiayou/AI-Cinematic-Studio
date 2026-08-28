@@ -63,6 +63,31 @@ or batch option.
 The experiment manifest contains prompt digests only. Prompt text is read from
 the frozen R3 materialized workflow and is never restated as a new authority.
 
+## ComfyUI worktree attestation
+
+The fixed ComfyUI checkout must remain at commit
+`feca51a8544511dd73d43602f387def0cc601a9d` on branch `master`, with no
+tracked changes. Five untracked `api_workflows` files were present before the
+R3 video: their observed file mtime was 2026-07-24, while the R3 video mtime
+was 2026-08-28. They are not under ComfyUI's automatically loaded
+`custom_nodes` path, and this runner never imports or executes them.
+
+They are admitted only as this exact code-pinned path-and-SHA-256 closed set:
+
+| Path | SHA-256 |
+|---|---|
+| `api_workflows/R5C-1-GPU-OpenPose-ControlNet-Closeout.md` | `1371589bfc191274e467b53ba475cc8e15129f4961c5164bed9889f592e22dfc` |
+| `api_workflows/r5c1_openpose_runner.py` | `df018bb287c1d1025eab9bcab79e084a2f498271dc3e0a9e1e82ce394652de33` |
+| `api_workflows/r5c1_sd15_openpose_api.json` | `e76bd44d2818be1b8e57c4e856cdd41d3046a62f433001608d492e659757052b` |
+| `api_workflows/run_openpose_api.py` | `4d20be5f720bd31bb3e87b314e033cba10399a886299afaf65e7bfc80bade6fc` |
+| `api_workflows/run_openpose_api_flexible.py` | `df018bb287c1d1025eab9bcab79e084a2f498271dc3e0a9e1e82ce394652de33` |
+
+Missing, additional, symlinked, non-regular or digest-changed files fail the
+run. The complete untracked set is checked before and after hashing, and the
+receipt records every attested path and digest. This is not a directory-level
+exception: any sixth untracked path, including another `api_workflows` file,
+is rejected.
+
 ## Tests
 
 Run only the focused CPU tests in this directory:

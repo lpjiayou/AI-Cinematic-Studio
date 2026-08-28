@@ -307,7 +307,20 @@ class WrapperTests(unittest.TestCase):
         self.git = mock.patch.object(
             wrapper,
             "_git_facts",
-            return_value={"commit": self.fx.policy.comfyui_commit, "branch": "master", "trackedWorktreeClean": True},
+            return_value={
+                "commit": self.fx.policy.comfyui_commit,
+                "branch": "master",
+                "trackedWorktreeClean": True,
+                "untrackedPolicy": "EXACT_CODE_PINNED_ALLOWLIST",
+                "untrackedPathsExact": True,
+                "worktreeStatusRechecked": True,
+                "allowedUntracked": [
+                    {"path": path, "sha256": digest}
+                    for path, digest in sorted(
+                        wrapper.ALLOWED_COMFYUI_UNTRACKED_SHA256.items()
+                    )
+                ],
+            },
         )
         self.git.start()
         self.processes = mock.patch.object(wrapper, "_find_conflicting_processes", return_value=[])
@@ -322,6 +335,25 @@ class WrapperTests(unittest.TestCase):
     def dry(self):
         with mock.patch.object(wrapper, "_list_tcp_listeners", return_value=[]), mock.patch.object(wrapper, "_gpu_compute_pids", return_value=[]):
             return wrapper.run_dry_run(self.fx.manifest_path, self.fx.policy)
+
+    def make_untracked_allowlist_tree(self, name):
+        root = self.fx.root / name
+        root.mkdir()
+        allowlist = {}
+        for index, relative in enumerate(
+            sorted(wrapper.ALLOWED_COMFYUI_UNTRACKED_SHA256)
+        ):
+            payload = f"allowlisted fixture {index}\n".encode()
+            path = root / relative
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_bytes(payload)
+            allowlist[relative] = sha256(payload).hexdigest()
+        return root, allowlist
+
+    @staticmethod
+    def porcelain_status(paths, *tracked_records):
+        records = [*tracked_records, *(f"?? {path}" for path in sorted(paths))]
+        return "\0".join(records) + ("\0" if records else "")
 
     def test_w01_valid_dry_run_is_zero_network_zero_lock_zero_stage_and_23_gates(self):
         with mock.patch.object(wrapper, "ComfyTransport", side_effect=AssertionError("network")):
@@ -378,6 +410,180 @@ class WrapperTests(unittest.TestCase):
                 wrapper._git_facts(self.fx.comfy, self.fx.policy)
             with mock.patch.object(wrapper, "_git_command", side_effect=[self.fx.policy.comfyui_commit, "master", " M main.py"]), self.assertRaisesRegex(ControlError, "dirty"):
                 wrapper._git_facts(self.fx.comfy, self.fx.policy)
+        finally:
+            self.git.start()
+
+    def test_w05c_exact_allowed_untracked_paths_and_hashes_pass(self):
+        self.assertEqual(
+            wrapper.ALLOWED_COMFYUI_UNTRACKED_SHA256,
+            {
+                "api_workflows/R5C-1-GPU-OpenPose-ControlNet-Closeout.md": "1371589bfc191274e467b53ba475cc8e15129f4961c5164bed9889f592e22dfc",
+                "api_workflows/r5c1_openpose_runner.py": "df018bb287c1d1025eab9bcab79e084a2f498271dc3e0a9e1e82ce394652de33",
+                "api_workflows/r5c1_sd15_openpose_api.json": "e76bd44d2818be1b8e57c4e856cdd41d3046a62f433001608d492e659757052b",
+                "api_workflows/run_openpose_api.py": "4d20be5f720bd31bb3e87b314e033cba10399a886299afaf65e7bfc80bade6fc",
+                "api_workflows/run_openpose_api_flexible.py": "df018bb287c1d1025eab9bcab79e084a2f498271dc3e0a9e1e82ce394652de33",
+            },
+        )
+        self.git.stop()
+        try:
+            root, allowlist = self.make_untracked_allowlist_tree("git-exact")
+            status = self.porcelain_status(allowlist)
+            with mock.patch.object(
+                wrapper, "ALLOWED_COMFYUI_UNTRACKED_SHA256", allowlist
+            ), mock.patch.object(
+                wrapper,
+                "_git_command",
+                side_effect=[
+                    self.fx.policy.comfyui_commit,
+                    "master",
+                    status,
+                    status,
+                ],
+            ):
+                facts = wrapper._git_facts(root, self.fx.policy)
+            self.assertTrue(facts["trackedWorktreeClean"])
+            self.assertTrue(facts["untrackedPathsExact"])
+            self.assertTrue(facts["worktreeStatusRechecked"])
+            self.assertEqual(
+                facts["allowedUntracked"],
+                [
+                    {"path": path, "sha256": digest}
+                    for path, digest in sorted(allowlist.items())
+                ],
+            )
+        finally:
+            self.git.start()
+
+    def test_w05d_missing_allowed_untracked_file_fails(self):
+        self.git.stop()
+        try:
+            root, allowlist = self.make_untracked_allowlist_tree("git-missing")
+            missing = root / next(iter(sorted(allowlist)))
+            missing.unlink()
+            status = self.porcelain_status(allowlist)
+            with mock.patch.object(
+                wrapper, "ALLOWED_COMFYUI_UNTRACKED_SHA256", allowlist
+            ), mock.patch.object(
+                wrapper,
+                "_git_command",
+                side_effect=[self.fx.policy.comfyui_commit, "master", status],
+            ), self.assertRaisesRegex(ControlError, "missing"):
+                wrapper._git_facts(root, self.fx.policy)
+        finally:
+            self.git.start()
+
+    def test_w05e_extra_untracked_path_fails(self):
+        self.git.stop()
+        try:
+            root, allowlist = self.make_untracked_allowlist_tree("git-extra")
+            extra = "api_workflows/not-allowed.py"
+            status = self.porcelain_status([*allowlist, extra])
+            with mock.patch.object(
+                wrapper, "ALLOWED_COMFYUI_UNTRACKED_SHA256", allowlist
+            ), mock.patch.object(
+                wrapper,
+                "_git_command",
+                side_effect=[self.fx.policy.comfyui_commit, "master", status],
+            ), self.assertRaisesRegex(ControlError, "extra"):
+                wrapper._git_facts(root, self.fx.policy)
+        finally:
+            self.git.start()
+
+    def test_w05f_allowed_untracked_hash_drift_fails(self):
+        self.git.stop()
+        try:
+            root, allowlist = self.make_untracked_allowlist_tree("git-hash")
+            changed = root / next(iter(sorted(allowlist)))
+            changed.write_bytes(b"changed\n")
+            status = self.porcelain_status(allowlist)
+            with mock.patch.object(
+                wrapper, "ALLOWED_COMFYUI_UNTRACKED_SHA256", allowlist
+            ), mock.patch.object(
+                wrapper,
+                "_git_command",
+                side_effect=[self.fx.policy.comfyui_commit, "master", status],
+            ), self.assertRaisesRegex(ControlError, "SHA-256"):
+                wrapper._git_facts(root, self.fx.policy)
+        finally:
+            self.git.start()
+
+    def test_w05g_allowed_untracked_symlink_fails(self):
+        self.git.stop()
+        try:
+            root, allowlist = self.make_untracked_allowlist_tree("git-symlink")
+            linked = root / next(iter(sorted(allowlist)))
+            target = root / "outside-target"
+            target.write_bytes(linked.read_bytes())
+            linked.unlink()
+            linked.symlink_to(target)
+            status = self.porcelain_status(allowlist)
+            with mock.patch.object(
+                wrapper, "ALLOWED_COMFYUI_UNTRACKED_SHA256", allowlist
+            ), mock.patch.object(
+                wrapper,
+                "_git_command",
+                side_effect=[self.fx.policy.comfyui_commit, "master", status],
+            ), self.assertRaisesRegex(ControlError, "symlink"):
+                wrapper._git_facts(root, self.fx.policy)
+        finally:
+            self.git.start()
+
+    def test_w05h_allowed_untracked_nonregular_file_fails(self):
+        self.git.stop()
+        try:
+            root, allowlist = self.make_untracked_allowlist_tree("git-nonregular")
+            nonregular = root / next(iter(sorted(allowlist)))
+            nonregular.unlink()
+            nonregular.mkdir()
+            status = self.porcelain_status(allowlist)
+            with mock.patch.object(
+                wrapper, "ALLOWED_COMFYUI_UNTRACKED_SHA256", allowlist
+            ), mock.patch.object(
+                wrapper,
+                "_git_command",
+                side_effect=[self.fx.policy.comfyui_commit, "master", status],
+            ), self.assertRaisesRegex(ControlError, "not a regular file"):
+                wrapper._git_facts(root, self.fx.policy)
+        finally:
+            self.git.start()
+
+    def test_w05i_tracked_change_fails_with_allowlist_present(self):
+        self.git.stop()
+        try:
+            root, allowlist = self.make_untracked_allowlist_tree("git-tracked")
+            status = self.porcelain_status(allowlist, " M main.py")
+            with mock.patch.object(
+                wrapper, "ALLOWED_COMFYUI_UNTRACKED_SHA256", allowlist
+            ), mock.patch.object(
+                wrapper,
+                "_git_command",
+                side_effect=[self.fx.policy.comfyui_commit, "master", status],
+            ), self.assertRaisesRegex(ControlError, "dirty"):
+                wrapper._git_facts(root, self.fx.policy)
+        finally:
+            self.git.start()
+
+    def test_w05j_untracked_membership_change_during_hashing_fails(self):
+        self.git.stop()
+        try:
+            root, allowlist = self.make_untracked_allowlist_tree("git-race")
+            initial_status = self.porcelain_status(allowlist)
+            final_status = self.porcelain_status(
+                [*allowlist, "api_workflows/appeared-during-attestation.py"]
+            )
+            with mock.patch.object(
+                wrapper, "ALLOWED_COMFYUI_UNTRACKED_SHA256", allowlist
+            ), mock.patch.object(
+                wrapper,
+                "_git_command",
+                side_effect=[
+                    self.fx.policy.comfyui_commit,
+                    "master",
+                    initial_status,
+                    final_status,
+                ],
+            ), self.assertRaisesRegex(ControlError, "changed during"):
+                wrapper._git_facts(root, self.fx.policy)
         finally:
             self.git.start()
 
