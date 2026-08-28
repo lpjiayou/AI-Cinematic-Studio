@@ -1,0 +1,67 @@
+{
+    "schemaVersion": 1,
+    "experimentId": "K2-002-EP01-SH12-R5-ANCHOR-ONLY",
+    "attemptState": "FAILED_AFTER_PROMPT_ACCEPTED",
+    "experimentValidity": "INVALID",
+    "failureDomain": "CONTROL_PLANE_HISTORY_BINDING",
+    "primaryFailureClassification": "HISTORY_SCHEMA_PARSE_ERROR",
+    "exactFailure": {
+      "oldRunnerRead": {
+        "promptId": "entry.prompt[unread]",
+        "apiPrompt": "entry.prompt[1]",
+        "extraData": "entry.prompt[2]"
+      },
+      "actualComfyUi028Schema": {
+        "promptId": "entry.prompt[1]",
+        "apiPrompt": "entry.prompt[2]",
+        "extraData": "entry.prompt[3]"
+      },
+      "consequence": "The old runner compared the UUID/string at index 1 to the submitted API prompt object, then treated the API prompt at index 2 as extra_data. A valid history entry therefore raised a binding error as soon as it appeared."
+    },
+    "r5Submission": {
+      "endpoint": "http://127.0.0.1:8188/prompt",
+      "apiPromptCanonicalSha256": "7910fd4a55c472e51f2a6a04befbf63bfa109c056576cce507d985471fb1f529",
+      "topLevelClientId": "k2-002-ep01-sh12-r5-anchor-only",
+      "topLevelPromptId": null,
+      "extraData": null,
+      "requestTime": null,
+      "requestTimeStatus": "NOT_PERSISTED_BY_R5_RUNNER"
+    },
+    "r5Response": {
+      "httpStatus": null,
+      "body": null,
+      "responsePromptId": null,
+      "number": null,
+      "nodeErrors": null,
+      "status": "NOT_PERSISTED_BY_R5_RUNNER; successful JSON with a non-empty prompt_id is implied by the frozen control-flow position but is not reconstructed as fact"
+    },
+    "r5ControlEvidence": {
+      "history": "NOT_PERSISTED_BY_R5_RUNNER",
+      "queue": "NOT_PERSISTED_BY_R5_RUNNER",
+      "webSocket": "NOT_USED_BY_R5_RUNNER",
+      "comfyLog": "got prompt; Prompt executed in 53.30 seconds"
+    },
+    "recoveredOutput": {
+      "sourcePath": "/data/coding/apps/ComfyUI/output/k2-002-ep01-i2v-v2/EP01_SH12-v2-technical-evidence_00005_.mp4",
+      "recoveredPath": "/data/k2-technical-evidence/k2-002-ep01-i2v-v2-sh12-r5-anchor-only/recovered_media/EP01_SH12_R5_RECOVERED.mp4",
+      "sha256": "1d115e2bf71e11a8b57d1e891bf8e1fe08f483e32ae78be5a675d969fa2bd5c1",
+      "width": 704,
+      "height": 1280,
+      "fps": "24/1",
+      "frames": 49,
+      "durationSeconds": "2.041667",
+      "audioStreamCount": 0
+    },
+    "governance": {
+      "runBudgetConsumed": true,
+      "promptPostCount": 1,
+      "gpuOrProviderCalls": 1,
+      "automaticRetryCount": 0,
+      "attemptLockPreserved": true,
+      "visualQc": "NOT_RUN",
+      "anchorHypothesis": "UNRESOLVED",
+      "canonicalMutations": 0,
+      "publicationAllowed": false,
+      "batchAdvanced": false
+    }
+  }

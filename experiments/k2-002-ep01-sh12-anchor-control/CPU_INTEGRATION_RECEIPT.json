@@ -1,0 +1,79 @@
+{
+  "automaticRetryCount": 0,
+  "baseUrl": "http://127.0.0.1:8190",
+  "checks": {
+    "automaticRetryCountIsZero": true,
+    "historyAttemptAndCorrelationBound": true,
+    "historyClientIdBound": true,
+    "historyPendingHandled": true,
+    "historyPromptIdBound": true,
+    "integrationServerHasNoGpuContext": true,
+    "matchingCompletionReceived": true,
+    "outputsLocated": true,
+    "promptIdUnique": true,
+    "promptPostCountIsOne": true,
+    "responsePromptIdMatched": true,
+    "topLevelClientIdSubmitted": true,
+    "topLevelPromptIdSubmitted": true,
+    "webSocketConnectedBeforePost": true,
+    "workflowCanonicalBound": true,
+    "wrongClientIdRejected": true
+  },
+  "cudaVisibleDevices": "",
+  "gpuOrProviderCalls": 0,
+  "gpuProcessesAfter": [
+    {
+      "pid": 52795,
+      "process": "/data/venvs/comfyui-k2/bin/python",
+      "usedMemoryMiB": 416
+    }
+  ],
+  "gpuProcessesBefore": [
+    {
+      "pid": 52795,
+      "process": "/data/venvs/comfyui-k2/bin/python",
+      "usedMemoryMiB": 416
+    }
+  ],
+  "gpuProcessesDuring": [
+    {
+      "pid": 52795,
+      "process": "/data/venvs/comfyui-k2/bin/python",
+      "usedMemoryMiB": 416
+    }
+  ],
+  "historyEntrySha256": "edfe618671c1ca0c08208c1a2b6de173c3769b8f12aab28b79aa7f612b423a74",
+  "historyPendingCount": 4,
+  "historyWorkflowCanonicalSha256": "ae3a25683b0ab10349729ccf8c56e811376d58146e00a269a3d9b5cd2220b97e",
+  "ids": {
+    "attemptId": "4d3646e0-4aa5-417a-aedf-3819b7de46d8",
+    "clientId": "ee1b3410-2e96-47bf-b1d1-19335b14d717",
+    "correlationId": "ee6316ea-98b5-4863-a5e3-82e5d3e018d5",
+    "promptId": "60c0e214-8cb7-464b-ad31-230567145d71"
+  },
+  "integrationTestComfyuiApiBinding": "PASS",
+  "negativeWrongClientId": {
+    "details": [
+      {
+        "actual": "ee1b3410-2e96-47bf-b1d1-19335b14d717",
+        "expected": "34658579-fdac-4e36-a44b-b74cb9d7bf0e",
+        "pointer": "/prompt/3/client_id"
+      }
+    ],
+    "errorCode": "HISTORY_MISMATCH"
+  },
+  "newGpuComputePids": [],
+  "outputs": [
+    {
+      "cleanedAfterHashing": true,
+      "path": "/data/coding/r6-cpu-integration.cAopTY/output/r6_protocol_cpu_only/tiny_00001_.png",
+      "sha256": "3bd417712fc550a5fba076b17b512060e3c5ee7b763f6ed7280074cb407bd55e",
+      "size": 399
+    }
+  ],
+  "promptPostCount": 1,
+  "schemaVersion": 1,
+  "serverPid": 11827,
+  "submittedWorkflowCanonicalSha256": "ae3a25683b0ab10349729ccf8c56e811376d58146e00a269a3d9b5cd2220b97e",
+  "test": "REAL_COMFYUI_CPU_PROTOCOL_BINDING"
+}
