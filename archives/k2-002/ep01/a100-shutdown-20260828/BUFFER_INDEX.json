@@ -1,0 +1,225 @@
+{
+  "schemaVersion": "1.0",
+  "codeServerBufferCount": 19,
+  "savedBufferCount": 19,
+  "discardedBufferCount": 0,
+  "unsavedBufferCount": 0,
+  "generatedAtUtc": "2026-08-28T14:45:22.933625+00:00",
+  "buffers": [
+    {
+      "bufferNumber": 1,
+      "codeServerTabTitle": "run_controlled_experiment.py",
+      "originalPath": "/data/coding/AI-Cinematic-Studio-main-2701/experiments/k2-002-ep01-sh12-anchor-control/run_controlled_experiment.py",
+      "capturedPath": "/data/coding/code-server-shutdown-capture-20260828/saved-buffers/data/coding/AI-Cinematic-Studio-main-2701/experiments/k2-002-ep01-sh12-anchor-control/run_controlled_experiment.py",
+      "fileSize": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "languageType": "py",
+      "savedAt": "2026-08-28T14:45:22.933625+00:00",
+      "classification": "SOURCE_CHANGE"
+    },
+    {
+      "bufferNumber": 2,
+      "codeServerTabTitle": "control_runner_core.py",
+      "originalPath": "/data/coding/AI-Cinematic-Studio-main-2701/experiments/k2-002-ep01-sh12-anchor-control/control_runner_core.py",
+      "capturedPath": "/data/coding/code-server-shutdown-capture-20260828/saved-buffers/data/coding/AI-Cinematic-Studio-main-2701/experiments/k2-002-ep01-sh12-anchor-control/control_runner_core.py",
+      "fileSize": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "languageType": "py",
+      "savedAt": "2026-08-28T14:45:22.933625+00:00",
+      "classification": "SOURCE_CHANGE"
+    },
+    {
+      "bufferNumber": 3,
+      "codeServerTabTitle": "EP01_SH12_R5_ANCHOR_ONLY.json",
+      "originalPath": "/data/coding/AI-Cinematic-Studio-main-2701/experiments/k2-002-ep01-sh12-anchor-control/experiments/EP01_SH12_R5_ANCHOR_ONLY.json",
+      "capturedPath": "/data/coding/code-server-shutdown-capture-20260828/saved-buffers/data/coding/AI-Cinematic-Studio-main-2701/experiments/k2-002-ep01-sh12-anchor-control/experiments/EP01_SH12_R5_ANCHOR_ONLY.json",
+      "fileSize": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "languageType": "json",
+      "savedAt": "2026-08-28T14:45:22.933625+00:00",
+      "classification": "CONFIG_CHANGE"
+    },
+    {
+      "bufferNumber": 4,
+      "codeServerTabTitle": "README.md",
+      "originalPath": "/data/coding/AI-Cinematic-Studio-main-2701/experiments/k2-002-ep01-sh12-anchor-control/README.md",
+      "capturedPath": "/data/coding/code-server-shutdown-capture-20260828/saved-buffers/data/coding/AI-Cinematic-Studio-main-2701/experiments/k2-002-ep01-sh12-anchor-control/README.md",
+      "fileSize": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "languageType": "md",
+      "savedAt": "2026-08-28T14:45:22.933625+00:00",
+      "classification": "DOCUMENTATION"
+    },
+    {
+      "bufferNumber": 5,
+      "codeServerTabTitle": "experiment.schema.json",
+      "originalPath": "/data/coding/AI-Cinematic-Studio-main-2701/experiments/k2-002-ep01-sh12-anchor-control/experiment.schema.json",
+      "capturedPath": "/data/coding/code-server-shutdown-capture-20260828/saved-buffers/data/coding/AI-Cinematic-Studio-main-2701/experiments/k2-002-ep01-sh12-anchor-control/experiment.schema.json",
+      "fileSize": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "languageType": "json",
+      "savedAt": "2026-08-28T14:45:22.933625+00:00",
+      "classification": "CONFIG_CHANGE"
+    },
+    {
+      "bufferNumber": 6,
+      "codeServerTabTitle": "SOURCE_PROVENANCE.json",
+      "originalPath": "/data/coding/AI-Cinematic-Studio-main-2701/experiments/k2-002-ep01-sh12-anchor-control/SOURCE_PROVENANCE.json",
+      "capturedPath": "/data/coding/code-server-shutdown-capture-20260828/saved-buffers/data/coding/AI-Cinematic-Studio-main-2701/experiments/k2-002-ep01-sh12-anchor-control/SOURCE_PROVENANCE.json",
+      "fileSize": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "languageType": "json",
+      "savedAt": "2026-08-28T14:45:22.933625+00:00",
+      "classification": "DOCUMENTATION"
+    },
+    {
+      "bufferNumber": 7,
+      "codeServerTabTitle": "test_control_runner.py",
+      "originalPath": "/data/coding/AI-Cinematic-Studio-main-2701/experiments/k2-002-ep01-sh12-anchor-control/tests/test_control_runner.py",
+      "capturedPath": "/data/coding/code-server-shutdown-capture-20260828/saved-buffers/data/coding/AI-Cinematic-Studio-main-2701/experiments/k2-002-ep01-sh12-anchor-control/tests/test_control_runner.py",
+      "fileSize": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "languageType": "py",
+      "savedAt": "2026-08-28T14:45:22.933625+00:00",
+      "classification": "TEST_CHANGE"
+    },
+    {
+      "bufferNumber": 8,
+      "codeServerTabTitle": "test_wrapper.py",
+      "originalPath": "/data/coding/AI-Cinematic-Studio-main-2701/experiments/k2-002-ep01-sh12-anchor-control/tests/test_wrapper.py",
+      "capturedPath": "/data/coding/code-server-shutdown-capture-20260828/saved-buffers/data/coding/AI-Cinematic-Studio-main-2701/experiments/k2-002-ep01-sh12-anchor-control/tests/test_wrapper.py",
+      "fileSize": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "languageType": "py",
+      "savedAt": "2026-08-28T14:45:22.933625+00:00",
+      "classification": "TEST_CHANGE"
+    },
+    {
+      "bufferNumber": 9,
+      "codeServerTabTitle": "collect_r5_forensics.py",
+      "originalPath": "/data/coding/AI-Cinematic-Studio-main-2701/experiments/k2-002-ep01-sh12-anchor-control/collect_r5_forensics.py",
+      "capturedPath": "/data/coding/code-server-shutdown-capture-20260828/saved-buffers/data/coding/AI-Cinematic-Studio-main-2701/experiments/k2-002-ep01-sh12-anchor-control/collect_r5_forensics.py",
+      "fileSize": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "languageType": "py",
+      "savedAt": "2026-08-28T14:45:22.933625+00:00",
+      "classification": "EVIDENCE_SCRIPT"
+    },
+    {
+      "bufferNumber": 10,
+      "codeServerTabTitle": "r6_protocol.py",
+      "originalPath": "/data/coding/AI-Cinematic-Studio-main-2701/experiments/k2-002-ep01-sh12-anchor-control/r6_protocol.py",
+      "capturedPath": "/data/coding/code-server-shutdown-capture-20260828/saved-buffers/data/coding/AI-Cinematic-Studio-main-2701/experiments/k2-002-ep01-sh12-anchor-control/r6_protocol.py",
+      "fileSize": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "languageType": "py",
+      "savedAt": "2026-08-28T14:45:22.933625+00:00",
+      "classification": "SOURCE_CHANGE"
+    },
+    {
+      "bufferNumber": 11,
+      "codeServerTabTitle": "test_r6_protocol.py",
+      "originalPath": "/data/coding/AI-Cinematic-Studio-main-2701/experiments/k2-002-ep01-sh12-anchor-control/tests/test_r6_protocol.py",
+      "capturedPath": "/data/coding/code-server-shutdown-capture-20260828/saved-buffers/data/coding/AI-Cinematic-Studio-main-2701/experiments/k2-002-ep01-sh12-anchor-control/tests/test_r6_protocol.py",
+      "fileSize": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "languageType": "py",
+      "savedAt": "2026-08-28T14:45:22.933625+00:00",
+      "classification": "TEST_CHANGE"
+    },
+    {
+      "bufferNumber": 12,
+      "codeServerTabTitle": "run_cpu_integration.py",
+      "originalPath": "/data/coding/AI-Cinematic-Studio-main-2701/experiments/k2-002-ep01-sh12-anchor-control/run_cpu_integration.py",
+      "capturedPath": "/data/coding/code-server-shutdown-capture-20260828/saved-buffers/data/coding/AI-Cinematic-Studio-main-2701/experiments/k2-002-ep01-sh12-anchor-control/run_cpu_integration.py",
+      "fileSize": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "languageType": "py",
+      "savedAt": "2026-08-28T14:45:22.933625+00:00",
+      "classification": "TEST_CHANGE"
+    },
+    {
+      "bufferNumber": 13,
+      "codeServerTabTitle": "R5_ROOT_CAUSE.json",
+      "originalPath": "/data/coding/AI-Cinematic-Studio-main-2701/experiments/k2-002-ep01-sh12-anchor-control/R5_ROOT_CAUSE.json",
+      "capturedPath": "/data/coding/code-server-shutdown-capture-20260828/saved-buffers/data/coding/AI-Cinematic-Studio-main-2701/experiments/k2-002-ep01-sh12-anchor-control/R5_ROOT_CAUSE.json",
+      "fileSize": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "languageType": "json",
+      "savedAt": "2026-08-28T14:45:22.933625+00:00",
+      "classification": "DOCUMENTATION"
+    },
+    {
+      "bufferNumber": 14,
+      "codeServerTabTitle": "R6_MANIFEST.json",
+      "originalPath": "/data/coding/AI-Cinematic-Studio-main-2701/experiments/k2-002-ep01-sh12-anchor-control/R6_MANIFEST.json",
+      "capturedPath": "/data/coding/code-server-shutdown-capture-20260828/saved-buffers/data/coding/AI-Cinematic-Studio-main-2701/experiments/k2-002-ep01-sh12-anchor-control/R6_MANIFEST.json",
+      "fileSize": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "languageType": "json",
+      "savedAt": "2026-08-28T14:45:22.933625+00:00",
+      "classification": "CONFIG_CHANGE"
+    },
+    {
+      "bufferNumber": 15,
+      "codeServerTabTitle": "build_r3_r5_evidence.py",
+      "originalPath": "/data/coding/AI-Cinematic-Studio-main-2701/experiments/k2-002-ep01-sh12-anchor-control/build_r3_r5_evidence.py",
+      "capturedPath": "/data/coding/code-server-shutdown-capture-20260828/saved-buffers/data/coding/AI-Cinematic-Studio-main-2701/experiments/k2-002-ep01-sh12-anchor-control/build_r3_r5_evidence.py",
+      "fileSize": 18985,
+      "sha256": "fbb065833a8a8893cd0a2a6ac58c9941894faa87f892c69021c782cd9a188b1e",
+      "languageType": "py",
+      "savedAt": "2026-08-28T14:45:22.933625+00:00",
+      "classification": "EVIDENCE_SCRIPT",
+      "saveAnomaly": {
+        "emptySaveResultSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "recoveredExactPreSaveVersion": true,
+        "recoverySource": "/data/.code-server/User/History/3029b4d3/y4ZZ.py",
+        "requiredFinalSha256": "fbb065833a8a8893cd0a2a6ac58c9941894faa87f892c69021c782cd9a188b1e"
+      }
+    },
+    {
+      "bufferNumber": 16,
+      "codeServerTabTitle": "R3_R5_REVIEW.html",
+      "originalPath": "/data/k2-technical-evidence/k2-002-ep01-i2v-v2-sh12-r5-anchor-only/visual_qc/R3_R5_REVIEW.html",
+      "capturedPath": "/data/coding/code-server-shutdown-capture-20260828/saved-buffers/data/k2-technical-evidence/k2-002-ep01-i2v-v2-sh12-r5-anchor-only/visual_qc/R3_R5_REVIEW.html",
+      "fileSize": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "languageType": "html",
+      "savedAt": "2026-08-28T14:45:22.933625+00:00",
+      "classification": "DOCUMENTATION"
+    },
+    {
+      "bufferNumber": 17,
+      "codeServerTabTitle": "R3_R5_VISUAL_QC.json",
+      "originalPath": "/data/k2-technical-evidence/k2-002-ep01-i2v-v2-sh12-r5-anchor-only/visual_qc/R3_R5_VISUAL_QC.json",
+      "capturedPath": "/data/coding/code-server-shutdown-capture-20260828/saved-buffers/data/k2-technical-evidence/k2-002-ep01-i2v-v2-sh12-r5-anchor-only/visual_qc/R3_R5_VISUAL_QC.json",
+      "fileSize": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "languageType": "json",
+      "savedAt": "2026-08-28T14:45:22.933625+00:00",
+      "classification": "DOCUMENTATION"
+    },
+    {
+      "bufferNumber": 18,
+      "codeServerTabTitle": "R3_R5_VISUAL_QC.txt",
+      "originalPath": "/data/k2-technical-evidence/k2-002-ep01-i2v-v2-sh12-r5-anchor-only/visual_qc/R3_R5_VISUAL_QC.txt",
+      "capturedPath": "/data/coding/code-server-shutdown-capture-20260828/saved-buffers/data/k2-technical-evidence/k2-002-ep01-i2v-v2-sh12-r5-anchor-only/visual_qc/R3_R5_VISUAL_QC.txt",
+      "fileSize": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "languageType": "txt",
+      "savedAt": "2026-08-28T14:45:22.933625+00:00",
+      "classification": "DOCUMENTATION"
+    },
+    {
+      "bufferNumber": 19,
+      "codeServerTabTitle": "EP01_SH12_anchor_pre_step_r5.provenance.json",
+      "originalPath": "/data/k2-technical-evidence/k2-002-ep01-i2v-v2-sh12-r5-anchor-only/inputs/EP01_SH12_anchor_pre_step_r5.provenance.json",
+      "capturedPath": "/data/coding/code-server-shutdown-capture-20260828/saved-buffers/data/k2-technical-evidence/k2-002-ep01-i2v-v2-sh12-r5-anchor-only/inputs/EP01_SH12_anchor_pre_step_r5.provenance.json",
+      "fileSize": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "languageType": "json",
+      "savedAt": "2026-08-28T14:45:22.933625+00:00",
+      "classification": "DOCUMENTATION"
+    }
+  ]
+}

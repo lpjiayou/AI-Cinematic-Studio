@@ -1,0 +1,15 @@
+ M experiments/k2-002-ep01-sh12-anchor-control/R5_ROOT_CAUSE.json
+ M experiments/k2-002-ep01-sh12-anchor-control/R6_MANIFEST.json
+ M experiments/k2-002-ep01-sh12-anchor-control/README.md
+ M experiments/k2-002-ep01-sh12-anchor-control/SOURCE_PROVENANCE.json
+ M experiments/k2-002-ep01-sh12-anchor-control/collect_r5_forensics.py
+ M experiments/k2-002-ep01-sh12-anchor-control/control_runner_core.py
+ M experiments/k2-002-ep01-sh12-anchor-control/experiment.schema.json
+ M experiments/k2-002-ep01-sh12-anchor-control/experiments/EP01_SH12_R5_ANCHOR_ONLY.json
+ M experiments/k2-002-ep01-sh12-anchor-control/r6_protocol.py
+ M experiments/k2-002-ep01-sh12-anchor-control/run_controlled_experiment.py
+ M experiments/k2-002-ep01-sh12-anchor-control/run_cpu_integration.py
+ M experiments/k2-002-ep01-sh12-anchor-control/tests/test_control_runner.py
+ M experiments/k2-002-ep01-sh12-anchor-control/tests/test_r6_protocol.py
+ M experiments/k2-002-ep01-sh12-anchor-control/tests/test_wrapper.py
+?? experiments/k2-002-ep01-sh12-anchor-control/build_r3_r5_evidence.py

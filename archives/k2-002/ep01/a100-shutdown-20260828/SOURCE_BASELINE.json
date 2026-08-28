@@ -1,0 +1,20 @@
+{
+  "projectId": "K2-002-CHANGAN",
+  "episodeId": "EP01",
+  "authorityBranch": "feature/k2-002-ep01-batch-r3-convergence",
+  "authorityCommit": "2a07118fbe962a6a073e62a05a8c70fac583cd66",
+  "authorityTree": "976657754417fcea0d5ad62ffcd1d83108836a6f",
+  "authorityPathFact": {
+    "requestedAuthorityPath": "/data/coding/AI-Cinematic-Studio-main-2701",
+    "actualAuthorityBranch": "feature/k2-002-sh12-r6-history-binding-fix",
+    "actualAuthorityCommit": "dcb45083ae4e71c740e05614acf0478686cbb7dd",
+    "actualAuthorityTree": "6be0d55ed33e4b9400f653534f375893eed7b41a",
+    "frozenConvergenceWorktree": "/data/coding/AI-Cinematic-Studio-k2-002-ep01-batch-r3-fps-fix"
+  },
+  "bufferCount": 19,
+  "technicalEvidenceRoot": "/data/k2-technical-evidence",
+  "archivePurpose": "A100_CODE_SERVER_SHUTDOWN_RECOVERY",
+  "publicationAllowed": false,
+  "canonicalMutations": 0,
+  "generatedAtUtc": "2026-08-28T14:45:22.933625+00:00"
+}
