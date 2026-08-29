@@ -18,6 +18,20 @@ from services.v5_core_os.episode_production.audio import (
     build_proposed_audio_asset_version,
     build_tts_execution_request,
 )
+from services.v5_core_os.episode_production.audio_authority import (
+    build_audio_provenance,
+    build_rights_binding,
+    build_sfx_asset_version,
+    validate_sfx_asset_version,
+)
+from services.v5_core_os.episode_production.audio_timing import (
+    build_audio_stem_member,
+    build_audio_stem_set,
+    build_audio_timing_provenance,
+    build_preliminary_mix_execution_request,
+    build_source_audio_timing_evidence,
+    validate_audio_stem_set,
+)
 from services.v5_core_os.episode_production.foundation import _digest
 from tests.contract.test_m12_audio_execution_contract import dialogue_context
 from tests.stub_tts_adapter import FIXED_WAV_BYTES, FixedWavTtsAdapter
@@ -25,6 +39,8 @@ from tests.stub_tts_adapter import FIXED_WAV_BYTES, FixedWavTtsAdapter
 
 SAMPLE_RATE = 48_000
 SHORT_SAMPLES = 4_800
+EPISODE_REF = "episode-m12"
+CREATED_AT = "2026-08-29T00:00:01Z"
 
 
 def _programmatic_request(effect_kind: str, *, ordinal: int) -> dict:
@@ -111,6 +127,258 @@ def _execute_programmatic(
         created_at="2026-08-29T00:00:01Z",
     )
     return request, artifact, proposed_asset
+
+
+def _sfx_rights_binding(
+    *, asset_requirement_ref: str, asset_requirement_digest: str
+) -> dict:
+    manifest_ref = "rights-manifest-m12-integration"
+    manifest_digest = _digest({"rightsManifest": "m12-integration"})
+    authority_ref = "rights-authority-m12-integration"
+    authority_digest = _digest({"rightsAuthority": "m12-integration"})
+    return build_rights_binding(
+        {
+            "rightsBindingRef": "audio-rights-binding-sfx-m12-integration-v1",
+            "rightsSource": "RIGHTS_MANIFEST_VERSION",
+            "license": "PROJECT_OWNED",
+            "ownership": "PROJECT_OWNER",
+            "usageScope": ["AUDIO_PRODUCTION", "SFX_GENERATION"],
+            "attributionRequirement": "",
+            "sourceRefs": [
+                {
+                    "sourceRef": manifest_ref,
+                    "sourceDigest": manifest_digest,
+                },
+                {
+                    "sourceRef": authority_ref,
+                    "sourceDigest": authority_digest,
+                },
+                {
+                    "sourceRef": asset_requirement_ref,
+                    "sourceDigest": asset_requirement_digest,
+                },
+            ],
+            "rightsManifestRef": manifest_ref,
+            "rightsManifestVersion": 1,
+            "rightsManifestDigest": manifest_digest,
+            "authorityEvidenceRef": authority_ref,
+            "authorityEvidenceDigest": authority_digest,
+        }
+    )
+
+
+def _typed_sfx_asset_version(
+    request: dict,
+    artifact_result: dict,
+    *,
+    project_ref: str,
+    series_ref: str,
+):
+    evidence = artifact_result["artifactEvidence"]
+    asset_ref = "audio-asset-sfx-" + evidence["sha256"][:24]
+    provenance = build_audio_provenance(
+        {
+            "originKind": "LOCAL_DETERMINISTIC_EXECUTION",
+            "adapterIdentity": evidence["adapterIdentity"],
+            "generationRecordRef": artifact_result["generationResultRef"],
+            "parametersDigest": evidence["parametersDigest"],
+            "artifactEvidenceRef": evidence["artifactEvidenceRef"],
+            "artifactEvidenceDigest": evidence["payloadDigest"],
+            "sourceRefs": [
+                {
+                    "sourceRef": request["generationRequestVersionRef"],
+                    "sourceDigest": request["payloadDigest"],
+                },
+                {
+                    "sourceRef": artifact_result["generationResultRef"],
+                    "sourceDigest": artifact_result["generationResultDigest"],
+                },
+            ],
+        }
+    )
+    asset = build_sfx_asset_version(
+        {
+            "workspaceRef": request["workspaceRef"],
+            "projectRef": project_ref,
+            "seriesRef": series_ref,
+            "episodeRef": EPISODE_REF,
+            "productionRunRef": request["productionRunRef"],
+            "assetRef": asset_ref,
+            "assetVersionRef": f"{asset_ref}-v1",
+            "version": 1,
+            "assetRequirementRef": request["assetRequirementRef"],
+            "assetRequirementDigest": request["assetRequirementDigest"],
+            "generationRequestRef": request["generationRequestRef"],
+            "generationRequestVersionRef": request[
+                "generationRequestVersionRef"
+            ],
+            "generationRequestDigest": request["payloadDigest"],
+            "generationResultRef": artifact_result["generationResultRef"],
+            "generationResultDigest": artifact_result[
+                "generationResultDigest"
+            ],
+            "artifact": {
+                "artifactKind": "PCM_AUDIO",
+                "artifactEvidenceRef": evidence["artifactEvidenceRef"],
+                "artifactEvidenceDigest": evidence["payloadDigest"],
+                "artifactRef": evidence["artifactRef"],
+                "storageKey": evidence["storageKey"],
+                "byteSize": evidence["byteSize"],
+                "fileDigest": evidence["sha256"],
+                "mediaType": "audio/wav",
+            },
+            "supersedesAssetVersionRef": None,
+            "supersedesAssetVersionDigest": None,
+            "provenance": provenance,
+            "rightsBinding": _sfx_rights_binding(
+                asset_requirement_ref=request["assetRequirementRef"],
+                asset_requirement_digest=request["assetRequirementDigest"],
+            ),
+            "sfxKind": request["parameters"]["effectKind"],
+            "synthesisSpecDigest": evidence["synthesisSpecDigest"],
+            "sourceAudioCueRefs": [],
+            "createdBy": "v5.m12.audio-execution.integration-test",
+            "createdAt": CREATED_AT,
+        }
+    )
+    return validate_sfx_asset_version(asset)
+
+
+def _single_sfx_stem_set(
+    request: dict,
+    artifact_result: dict,
+    *,
+    project_ref: str,
+    series_ref: str,
+):
+    evidence = artifact_result["artifactEvidence"]
+    asset = _typed_sfx_asset_version(
+        request,
+        artifact_result,
+        project_ref=project_ref,
+        series_ref=series_ref,
+    )
+    asset_value = asset.as_dict()
+    timing = build_source_audio_timing_evidence(
+        evidence,
+        source_asset_version=asset,
+    )
+    rights = asset_value["rightsBinding"]
+    duration_samples = timing["sampleCount"]
+    member_ref = "audio-stem-member-sfx-m12-integration"
+    member = build_audio_stem_member(
+        {
+            "stemMemberRef": member_ref,
+            "stemRole": "sfx",
+            "stemLaneRef": "audio-stem-lane-sfx-m12-integration",
+            "overlapPolicy": "NON_OVERLAPPING",
+            "sourceAssetVersionRef": asset_value["assetVersionRef"],
+            "sourceAssetVersionDigest": asset_value["payloadDigest"],
+            "sourceAssetVersionType": asset_value["assetVersionType"],
+            "sourceCueRef": None,
+            "sourceCueVersionRef": None,
+            "sourceCueDigest": None,
+            "sourceStartSample": 0,
+            "sourceEndSample": duration_samples,
+            "stemStartSample": 0,
+            "stemEndSample": duration_samples,
+            "rightsBindingRef": rights["rightsBindingRef"],
+            "rightsBindingDigest": rights["payloadDigest"],
+            "provenance": build_audio_timing_provenance(
+                {
+                    "originKind": "LOCAL_DETERMINISTIC_EXECUTION",
+                    "producerIdentity": "v5.m12.audio-stem.integration-test.v1",
+                    "recordRef": member_ref,
+                    "parametersDigest": _digest(
+                        {
+                            "sourceStartSample": 0,
+                            "sourceEndSample": duration_samples,
+                            "stemStartSample": 0,
+                            "stemEndSample": duration_samples,
+                        }
+                    ),
+                    "sourceRefs": [
+                        {
+                            "sourceRef": asset_value["assetVersionRef"],
+                            "sourceDigest": asset_value["payloadDigest"],
+                        },
+                        {
+                            "sourceRef": evidence["artifactEvidenceRef"],
+                            "sourceDigest": evidence["payloadDigest"],
+                        },
+                        {
+                            "sourceRef": rights["rightsBindingRef"],
+                            "sourceDigest": rights["payloadDigest"],
+                        },
+                    ],
+                }
+            ),
+            "createdBy": "v5.m12.audio-stem.integration-test",
+            "createdAt": CREATED_AT,
+        },
+        source_asset_version=asset,
+        source_artifact_evidence=evidence,
+        source_timing_evidence=timing,
+        expected_script_version_ref=request["scriptVersionRef"],
+        expected_script_version_digest=request["scriptVersionDigest"],
+    )
+    stem_set_ref = "audio-stem-set-m12-integration"
+    context = {
+        "source_asset_versions": {asset_value["assetVersionRef"]: asset},
+        "source_artifact_evidence": {
+            asset_value["assetVersionRef"]: evidence
+        },
+        "source_timing_evidence": {asset_value["assetVersionRef"]: timing},
+        "audio_cues": {},
+        "expected_script_version_ref": request["scriptVersionRef"],
+        "expected_script_version_digest": request["scriptVersionDigest"],
+    }
+    stem_set = build_audio_stem_set(
+        {
+            "workspaceRef": request["workspaceRef"],
+            "projectRef": project_ref,
+            "seriesRef": series_ref,
+            "episodeRef": EPISODE_REF,
+            "productionRunRef": request["productionRunRef"],
+            "stemSetRef": stem_set_ref,
+            "stemSetVersionRef": f"{stem_set_ref}-v1",
+            "version": 1,
+            "supersedesStemSetVersionRef": None,
+            "supersedesStemSetVersionDigest": None,
+            "scriptVersionRef": request["scriptVersionRef"],
+            "scriptVersionDigest": request["scriptVersionDigest"],
+            "sampleRate": timing["sampleRate"],
+            "preliminaryDurationSamples": duration_samples,
+            "members": [member],
+            "provenance": build_audio_timing_provenance(
+                {
+                    "originKind": "LOCAL_DETERMINISTIC_EXECUTION",
+                    "producerIdentity": "v5.m12.audio-stem-set.integration-test.v1",
+                    "recordRef": f"{stem_set_ref}-v1",
+                    "parametersDigest": _digest(
+                        {
+                            "sampleRate": timing["sampleRate"],
+                            "preliminaryDurationSamples": duration_samples,
+                        }
+                    ),
+                    "sourceRefs": [
+                        {
+                            "sourceRef": request["scriptVersionRef"],
+                            "sourceDigest": request["scriptVersionDigest"],
+                        },
+                        {
+                            "sourceRef": member["stemMemberRef"],
+                            "sourceDigest": member["payloadDigest"],
+                        },
+                    ],
+                }
+            ),
+            "createdBy": "v5.m12.audio-stem-set.integration-test",
+            "createdAt": CREATED_AT,
+        },
+        **context,
+    )
+    return validate_audio_stem_set(stem_set, **context), asset_value, timing
 
 
 class M12AudioExecutionIntegrationTests(unittest.TestCase):
@@ -328,6 +596,111 @@ class M12AudioExecutionIntegrationTests(unittest.TestCase):
                 first["artifactEvidence"]["state"], "TECHNICALLY_VERIFIED"
             )
             self.assertFalse(first["publicationAllowed"])
+
+    def test_stem_set_projection_executes_through_v4_preliminary_mix_adapter(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source_request = _programmatic_request("paper", ordinal=3)
+            source_result = audio_artifact_evidence(
+                source_request,
+                artifact_root=root,
+                storage_key="asset-versions/audio/shot-1/stem-source-paper.wav",
+                adapter=DeterministicProgrammaticAudioAdapter(),
+            )
+            _, voice_lock = dialogue_context()
+            scope = voice_lock["voiceLock"]
+            stem_set, source_asset, source_timing = _single_sfx_stem_set(
+                source_request,
+                source_result,
+                project_ref=scope["projectRef"],
+                series_ref=scope["seriesRef"],
+            )
+            mix_request = build_preliminary_mix_execution_request(
+                {
+                    "creativeShotRef": source_request["creativeShotRef"],
+                    "creativeShotVersionRef": source_request[
+                        "creativeShotVersionRef"
+                    ],
+                    "creativeShotDigest": source_request[
+                        "creativeShotDigest"
+                    ],
+                    "scriptRef": source_request["scriptRef"],
+                    "scriptSceneRef": source_request["scriptSceneRef"],
+                },
+                stem_set=stem_set,
+            )
+            mix_storage_key = (
+                "asset-versions/audio/shot-1/stem-set-preliminary-mix.wav"
+            )
+            mix_result = audio_artifact_evidence(
+                mix_request,
+                artifact_root=root,
+                storage_key=mix_storage_key,
+                adapter=DeterministicPreliminaryMixAdapter(root),
+            )
+
+            self.assertEqual(
+                mix_request["parameters"]["tracks"],
+                [
+                    {
+                        "audioRole": "sfx",
+                        "assetVersionRef": source_asset["assetVersionRef"],
+                        "assetVersionDigest": source_asset["payloadDigest"],
+                        "storageKey": source_timing["storageKey"],
+                        "sha256": source_timing["fileDigest"],
+                        "sampleRate": SAMPLE_RATE,
+                        "channels": 1,
+                        "durationSamples": SHORT_SAMPLES,
+                    }
+                ],
+            )
+            self.assertEqual(
+                mix_result["generationRequestDigest"],
+                mix_request["payloadDigest"],
+            )
+            self.assertEqual(
+                mix_result["executionRequestDigest"],
+                mix_request["payloadDigest"],
+            )
+            self.assertEqual(
+                mix_result["parametersDigest"],
+                _digest(mix_request["parameters"]),
+            )
+            self.assertEqual(
+                mix_result["artifactEvidenceDigest"],
+                mix_result["artifactEvidence"]["payloadDigest"],
+            )
+            self.assertEqual(
+                mix_result["generationResultDigest"],
+                mix_result["generationResult"]["payloadDigest"],
+            )
+            self.assertEqual(mix_result["audioRole"], "preliminary_mix")
+            self.assertEqual(
+                mix_result["adapterIdentity"], PRELIMINARY_MIX_ADAPTER_ID
+            )
+            self.assertEqual(mix_result["generationResult"]["state"], "SUCCEEDED")
+            self.assertEqual(
+                mix_result["artifactEvidence"]["state"],
+                "TECHNICALLY_VERIFIED",
+            )
+            self.assertEqual(
+                mix_result["probe"],
+                {
+                    "sampleRate": SAMPLE_RATE,
+                    "channels": 1,
+                    "durationSeconds": SHORT_SAMPLES / SAMPLE_RATE,
+                    "durationSamples": SHORT_SAMPLES,
+                    "codec": "pcm_s16le",
+                    "container": "wav",
+                },
+            )
+            self.assertNotEqual(
+                mix_result["sha256"], source_result["sha256"]
+            )
+            output = root.joinpath(*PurePosixPath(mix_storage_key).parts)
+            self.assertTrue(output.is_file())
+            self.assertGreater(output.stat().st_size, 44)
+            self.assertFalse(mix_result["publicationAllowed"])
 
 
 if __name__ == "__main__":
