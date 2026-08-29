@@ -14,6 +14,7 @@ from services.v4_platform import (
 )
 
 from .assets import K2AssetPipelineService
+from .audio import reject_speech_synthesis_in_legacy_media
 from .evidence import EpisodeProductionEvidenceRepository, EvidenceFact, GateAppend
 from .foundation import (
     EpisodeProductionError,
@@ -172,6 +173,7 @@ class K2MediaExecutionService:
         require_legacy_executable_graph(graph)
         asset_manifest = verified["assetResolutionManifest"]
         requests = verified["generationRequests"]
+        reject_speech_synthesis_in_legacy_media(requests)
         gate_key = _digest(
             {"clientIdempotencyKey": client_key, "stage": "media"}
         )

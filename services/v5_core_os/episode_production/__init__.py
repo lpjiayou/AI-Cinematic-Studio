@@ -92,6 +92,23 @@ from .dynamic_media_revision import (
     DYNAMIC_MEDIA_PREFLIGHT_SCHEMA_VERSION,
     K2DynamicMediaPreflightService,
 )
+from .audio import (
+    AUDIO_ASSET_VERSION_SCHEMA_VERSION,
+    AUDIO_ROLES,
+    K2AudioProductionService,
+    SPEECH_EMOTION_TAGS,
+    normalize_speech_parameters,
+    validate_audio_asset_version_contract,
+)
+from .voice import (
+    InMemoryVoiceLockAdapter,
+    K2VoiceLockService,
+    SqliteVoiceLockAdapter,
+    VoiceLockConflictError,
+    VoiceLockImmutableError,
+    VoiceLockNotConfirmedError,
+    validate_confirmed_voice_lock_bundle,
+)
 
 __all__ = [
     "EpisodeProductionPublicBoundary",
@@ -151,6 +168,19 @@ __all__ = [
     "K2ProductionStateProjectionService",
     "DYNAMIC_MEDIA_PREFLIGHT_SCHEMA_VERSION",
     "K2DynamicMediaPreflightService",
+    "AUDIO_ASSET_VERSION_SCHEMA_VERSION",
+    "AUDIO_ROLES",
+    "K2AudioProductionService",
+    "SPEECH_EMOTION_TAGS",
+    "normalize_speech_parameters",
+    "validate_audio_asset_version_contract",
+    "InMemoryVoiceLockAdapter",
+    "K2VoiceLockService",
+    "SqliteVoiceLockAdapter",
+    "VoiceLockConflictError",
+    "VoiceLockImmutableError",
+    "VoiceLockNotConfirmedError",
+    "validate_confirmed_voice_lock_bundle",
     "create_in_memory_boundary",
     "create_local_development_boundary",
     "create_local_development_boundary_from_environment",

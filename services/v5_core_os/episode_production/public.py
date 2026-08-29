@@ -25,6 +25,7 @@ from .authority import (
     RejectingIdentityReferenceAuthority,
 )
 from .assets import K2AssetPipelineService
+from .audio import K2AudioProductionService
 from .evidence import (
     InMemoryEpisodeProductionEvidenceAdapter,
     InvalidStateTransitionError,
@@ -91,6 +92,14 @@ from .media_candidate_review import (
     MediaSelectionApprovalRequiredError,
 )
 from .state_projection import K2ProductionStateProjectionService
+from .voice import (
+    InMemoryVoiceLockAdapter,
+    K2VoiceLockService,
+    SqliteVoiceLockAdapter,
+    VoiceLockConflictError,
+    VoiceLockImmutableError,
+    VoiceLockNotConfirmedError,
+)
 from .external_authority import (
     external_authorities_from_environment,
     identity_reference_authority_from_environment,
@@ -161,6 +170,8 @@ class EpisodeProductionPublicBoundary:
         provider_experiments: K2ProviderExperimentService,
         shot_graph: K2ShotGraphService,
         assets: K2AssetPipelineService,
+        voice_locks: K2VoiceLockService,
+        audio: K2AudioProductionService,
         media: K2MediaExecutionService,
         delivery: K2DeliveryService,
         real_media_revision: K2RealMediaRevisionService,
@@ -171,6 +182,8 @@ class EpisodeProductionPublicBoundary:
         self.__provider_experiments = provider_experiments
         self.__shot_graph = shot_graph
         self.__assets = assets
+        self.__voice_locks = voice_locks
+        self.__audio = audio
         self.__media = media
         self.__delivery = delivery
         self.__real_media_revision = real_media_revision
@@ -221,6 +234,9 @@ class EpisodeProductionPublicBoundary:
                 IdempotencyConflictError,
                 InvalidStateTransitionError,
                 StaleInputError,
+                VoiceLockConflictError,
+                VoiceLockImmutableError,
+                VoiceLockNotConfirmedError,
             ),
         ):
             return EpisodeProductionPublicError(exc.code, 409)
@@ -302,6 +318,39 @@ class EpisodeProductionPublicBoundary:
 
     def get_asset_plan(self, workspace_ref: str, run_ref: str) -> dict[str, Any]:
         return self._invoke(self.__assets.get_asset_plan, workspace_ref, run_ref)
+
+    def create_voice_lock(self, command: Mapping[str, Any]) -> dict[str, Any]:
+        return self._invoke(self.__voice_locks.create_voice_lock, command)
+
+    def create_voice_lock_version(
+        self, command: Mapping[str, Any]
+    ) -> dict[str, Any]:
+        return self._invoke(self.__voice_locks.create_voice_lock_version, command)
+
+    def confirm_voice_lock(self, command: Mapping[str, Any]) -> dict[str, Any]:
+        return self._invoke(self.__voice_locks.confirm_voice_lock, command)
+
+    def get_voice_lock(
+        self,
+        workspace_ref: str,
+        project_ref: str,
+        series_ref: str,
+        voice_ref: str,
+    ) -> dict[str, Any]:
+        return self._invoke(
+            self.__voice_locks.get_voice_lock,
+            workspace_ref,
+            project_ref,
+            series_ref,
+            voice_ref,
+        )
+
+    def plan_dialogue_audio(
+        self, workspace_ref: str, run_ref: str
+    ) -> dict[str, Any]:
+        return self._invoke(
+            self.__audio.plan_dialogue_requests, workspace_ref, run_ref
+        )
 
     def execute_media(self, command: Mapping[str, Any]) -> dict[str, Any]:
         return self._invoke(self.__media.execute_media, command)
@@ -463,6 +512,7 @@ def _services(
     evidence_repository,
     production_policy_repository,
     provider_experiment_repository,
+    voice_lock_repository,
     *,
     project_boundary,
     series_episode_boundary,
@@ -488,6 +538,8 @@ def _services(
     K2ProviderExperimentService,
     K2ShotGraphService,
     K2AssetPipelineService,
+    K2VoiceLockService,
+    K2AudioProductionService,
     K2MediaExecutionService,
     K2DeliveryService,
     K2RealMediaRevisionService,
@@ -538,6 +590,15 @@ def _services(
         evidence_repository,
         ref_factory=selected_ref_factory,
         clock=selected_clock,
+    )
+    voice_locks = K2VoiceLockService(
+        voice_lock_repository,
+        ref_factory=selected_ref_factory,
+        clock=selected_clock,
+    )
+    audio = K2AudioProductionService(
+        shot_graph,
+        voice_locks,
     )
     provider_experiments = K2ProviderExperimentService(
         assets,
@@ -591,6 +652,8 @@ def _services(
         provider_experiments,
         shot_graph,
         assets,
+        voice_locks,
+        audio,
         media,
         delivery,
         real_media_revision,
@@ -624,6 +687,8 @@ def create_in_memory_boundary(
         provider_experiments,
         shot_graph,
         assets,
+        voice_locks,
+        audio,
         media,
         delivery,
         real_media_revision,
@@ -632,6 +697,7 @@ def create_in_memory_boundary(
         InMemoryEpisodeProductionEvidenceAdapter(),
         InMemoryProductionPolicyAdapter(),
         InMemoryProviderExperimentAdapter(),
+        InMemoryVoiceLockAdapter(),
         project_boundary=project_boundary,
         series_episode_boundary=series_episode_boundary,
         series_planning_boundary=series_planning_boundary,
@@ -657,6 +723,8 @@ def create_in_memory_boundary(
         provider_experiments,
         shot_graph,
         assets,
+        voice_locks,
+        audio,
         media,
         delivery,
         real_media_revision,
@@ -673,6 +741,7 @@ def create_local_development_boundary(
     evidence_database_path: Path | str | None = None,
     production_policy_database_path: Path | str | None = None,
     provider_experiment_database_path: Path | str | None = None,
+    voice_lock_database_path: Path | str | None = None,
     identity_reference_authority=None,
     rights_evidence_authority=None,
     provider_policy_authority=None,
@@ -703,6 +772,11 @@ def create_local_development_boundary(
         if provider_experiment_database_path is not None
         else Path(f"{database_path}.provider-experiments.sqlite3")
     )
+    voice_lock_path = (
+        Path(voice_lock_database_path)
+        if voice_lock_database_path is not None
+        else Path(f"{database_path}.voice-locks.sqlite3")
+    )
     (
         service,
         authority_identity,
@@ -710,6 +784,8 @@ def create_local_development_boundary(
         provider_experiments,
         shot_graph,
         assets,
+        voice_locks,
+        audio,
         media,
         delivery,
         real_media_revision,
@@ -725,6 +801,10 @@ def create_local_development_boundary(
         ),
         SqliteProviderExperimentAdapter(
             provider_experiment_path,
+            initialize_if_missing=initialize_if_missing,
+        ),
+        SqliteVoiceLockAdapter(
+            voice_lock_path,
             initialize_if_missing=initialize_if_missing,
         ),
         project_boundary=project_boundary,
@@ -752,6 +832,8 @@ def create_local_development_boundary(
         provider_experiments,
         shot_graph,
         assets,
+        voice_locks,
+        audio,
         media,
         delivery,
         real_media_revision,
