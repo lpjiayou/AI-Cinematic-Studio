@@ -361,6 +361,21 @@ class SqliteVoiceLockContractTests(VoiceLockContractMixin, unittest.TestCase):
                 self.database, initialize_if_missing=False
             )
 
+    def test_runtime_trigger_drift_stops_before_write(self):
+        service = self.service()
+        with sqlite3.connect(self.database) as connection:
+            connection.execute(
+                "CREATE TRIGGER ignore_operation_insert BEFORE INSERT ON "
+                "v5_voice_lock_operations BEGIN SELECT RAISE(IGNORE); END"
+            )
+        with self.assertRaises(RepositoryUnavailableError):
+            service.create_voice_lock(command("runtime-trigger"))
+        with sqlite3.connect(self.database) as connection:
+            count = connection.execute(
+                "SELECT COUNT(*) FROM v5_voice_locks"
+            ).fetchone()[0]
+        self.assertEqual(count, 0)
+
     def test_confirmation_and_operation_sql_keys_are_digest_pinned(self):
         service = self.service()
         created = service.create_voice_lock(command("projection-create"))
@@ -431,6 +446,68 @@ class SqliteVoiceLockContractTests(VoiceLockContractMixin, unittest.TestCase):
                 SCOPE["projectRef"],
                 SCOPE["seriesRef"],
                 successor["voiceLock"]["voiceRef"],
+            )
+        tampered_confirmation = confirm_command(successor, "tampered-confirm")
+        tampered_confirmation["voiceLockDigest"] = tampered["payloadDigest"]
+        with self.assertRaises(RepositoryUnavailableError):
+            service.confirm_voice_lock(tampered_confirmation)
+
+    def test_general_read_validates_confirmed_character_lineage(self):
+        service = self.service()
+        created = service.create_voice_lock(command("character-create"))
+        confirmed = service.confirm_voice_lock(
+            confirm_command(created, "character-confirm")
+        )
+        successor = service.create_voice_lock_version(
+            successor_command(confirmed, "character-successor")
+        )
+        confirmation = deepcopy(confirmed["voiceLockConfirmation"])
+        confirmation["characterRef"] = "character-other"
+        confirmation.pop("payloadDigest")
+        confirmation["payloadDigest"] = _digest(confirmation)
+        payload = json.dumps(
+            confirmation, ensure_ascii=False, sort_keys=True, separators=(",", ":")
+        )
+        with sqlite3.connect(self.database) as connection:
+            connection.execute(
+                "UPDATE v5_voice_lock_confirmations SET payload_json=?, "
+                "payload_digest=?",
+                (payload, confirmation["payloadDigest"]),
+            )
+        with self.assertRaises(RepositoryUnavailableError):
+            service.get_voice_lock(
+                SCOPE["workspaceRef"],
+                SCOPE["projectRef"],
+                SCOPE["seriesRef"],
+                confirmed["voiceLock"]["voiceRef"],
+            )
+        with self.assertRaises(RepositoryUnavailableError):
+            service.confirm_voice_lock(
+                confirm_command(successor, "character-successor-confirm")
+            )
+
+    def test_successor_rejects_corrupt_confirmed_bundle(self):
+        service = self.service()
+        created = service.create_voice_lock(command("successor-create"))
+        confirmed = service.confirm_voice_lock(
+            confirm_command(created, "successor-confirm")
+        )
+        confirmation = deepcopy(confirmed["voiceLockConfirmation"])
+        confirmation["characterRef"] = "character-other"
+        confirmation.pop("payloadDigest")
+        confirmation["payloadDigest"] = _digest(confirmation)
+        payload = json.dumps(
+            confirmation, ensure_ascii=False, sort_keys=True, separators=(",", ":")
+        )
+        with sqlite3.connect(self.database) as connection:
+            connection.execute(
+                "UPDATE v5_voice_lock_confirmations SET payload_json=?, "
+                "payload_digest=?",
+                (payload, confirmation["payloadDigest"]),
+            )
+        with self.assertRaises(RepositoryUnavailableError):
+            service.create_voice_lock_version(
+                successor_command(confirmed, "corrupt-successor")
             )
 
 

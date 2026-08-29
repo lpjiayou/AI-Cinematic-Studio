@@ -1401,6 +1401,7 @@ class SqliteVoiceLockAdapter:
         connection = self._connect()
         try:
             connection.execute("BEGIN IMMEDIATE")
+            self._validate_schema(connection)
             result = action(connection)
             connection.commit()
             return result
@@ -1720,6 +1721,8 @@ class K2VoiceLockService:
         root = self.repository.get_root_by_ref(scope, voice_ref)
         if root is None:
             raise RecordNotFoundError("VoiceLock was not found")
+        versions = self.repository.list_versions(scope, voice_ref)
+        self._require_complete_version_lineage(root, versions)
         if root["revision"] != expected_revision:
             raise StaleInputError("VoiceLock revision changed")
         if (
@@ -1742,6 +1745,13 @@ class K2VoiceLockService:
             raise VoiceLockNotConfirmedError(
                 "confirmed VoiceLockVersion lineage is unavailable"
             )
+        validate_confirmed_voice_lock_bundle(
+            {
+                "voiceLock": root,
+                "voiceLockVersion": parent,
+                "voiceLockConfirmation": confirmation,
+            }
+        )
         version_ref = _required_ref(
             self._ref_factory("voice-lock-version"), "voiceLockVersionRef"
         )
@@ -1775,6 +1785,9 @@ class K2VoiceLockService:
                 "revision": expected_revision + 1,
                 "updatedAt": now,
             }
+        )
+        self._require_complete_version_lineage(
+            updated_root, [*versions, version]
         )
         response = {
             "voiceLock": updated_root,
@@ -1845,6 +1858,27 @@ class K2VoiceLockService:
         root = self.repository.get_root_by_ref(scope, voice_ref)
         if root is None:
             raise RecordNotFoundError("VoiceLock was not found")
+        versions = self.repository.list_versions(scope, voice_ref)
+        self._require_complete_version_lineage(root, versions)
+        confirmed_ref = root["confirmedVoiceLockVersionRef"]
+        if confirmed_ref is not None:
+            confirmed_version = self.repository.get_version(
+                scope, voice_ref, confirmed_ref
+            )
+            confirmed_fact = self.repository.get_confirmation(
+                scope, voice_ref, confirmed_ref
+            )
+            if confirmed_version is None or confirmed_fact is None:
+                raise RepositoryUnavailableError(
+                    "VoiceLock confirmed lineage is incomplete"
+                )
+            validate_confirmed_voice_lock_bundle(
+                {
+                    "voiceLock": root,
+                    "voiceLockVersion": confirmed_version,
+                    "voiceLockConfirmation": confirmed_fact,
+                }
+            )
         if root["revision"] != expected_revision:
             raise StaleInputError("VoiceLock revision changed")
         if root["currentVoiceLockVersionRef"] != version_ref:
@@ -1975,16 +2009,20 @@ class K2VoiceLockService:
             if (
                 version is None
                 or confirmation is None
-                or version["payloadDigest"] != root["confirmedVoiceLockDigest"]
-                or confirmation["voiceLockDigest"]
-                != root["confirmedVoiceLockDigest"]
             ):
                 raise RepositoryUnavailableError(
                     "VoiceLock confirmed lineage is incomplete"
                 )
+            bundle = validate_confirmed_voice_lock_bundle(
+                {
+                    "voiceLock": root,
+                    "voiceLockVersion": version,
+                    "voiceLockConfirmation": confirmation,
+                }
+            )
             confirmed = {
-                "voiceLockVersion": version,
-                "voiceLockConfirmation": confirmation,
+                "voiceLockVersion": bundle["voiceLockVersion"],
+                "voiceLockConfirmation": bundle["voiceLockConfirmation"],
             }
         return {
             "voiceLock": root,
