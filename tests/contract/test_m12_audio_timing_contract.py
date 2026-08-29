@@ -583,7 +583,13 @@ def preliminary_mix_execution_context() -> dict:
 
 
 def projected_mix_parameters(stem_set: dict) -> dict:
-    priority = {"dialogue": 3, "narration": 3, "sfx": 2, "ambience": 1}
+    priority = {
+        "dialogue": 3,
+        "narration": 3,
+        "sfx": 2,
+        "ambience": 1,
+        "music": 0,
+    }
     tracks = []
     for member in stem_set["members"]:
         evidence = member["sourceTimingEvidence"]
@@ -619,7 +625,7 @@ def v4_premix_artifact_result(
     parameters = execution_request["parameters"]
     duration = parameters["durationSamples"]
     mix_parameters_digest = parameters_digest or _digest(parameters)
-    adapter_identity = "v4.deterministic-preliminary-ffmpeg-mix.v1"
+    adapter_identity = "v4.deterministic-preliminary-ffmpeg-mix.v2"
     execution_digest = execution_request["payloadDigest"]
     synthesis_spec_digest = _digest(
         {
@@ -1100,7 +1106,7 @@ class M12AudioTimingContractTests(unittest.TestCase):
         )
         self.assertEqual(len(accepted["members"]), 2)
 
-    def test_preliminary_mix_candidate_pins_stem_set_and_music_is_pending(self):
+    def test_preliminary_mix_candidate_pins_stem_set_and_supports_music(self):
         bundle = explicit_source_assets()
         sources = bundle["sources"]
         executable_members = [
@@ -1184,14 +1190,18 @@ class M12AudioTimingContractTests(unittest.TestCase):
         music_stem_set = validate_stem_set_fixture(
             bundle, music_stem_set_mapping
         )
-        with self.assertRaisesRegex(
-            UpstreamNotReadyError,
-            "PRELIMINARY_MIX_MUSIC_PARAMETERS_PENDING",
-        ):
-            build_preliminary_mix_execution_request(
-                preliminary_mix_execution_context(),
-                stem_set=music_stem_set,
-            )
+        music_request = build_preliminary_mix_execution_request(
+            preliminary_mix_execution_context(),
+            stem_set=music_stem_set,
+        )
+        self.assertEqual(
+            music_request["parameters"],
+            projected_mix_parameters(music_stem_set.as_dict()),
+        )
+        self.assertEqual(
+            music_request["parameters"]["tracks"][0]["audioRole"],
+            "music",
+        )
 
     def test_final_timeline_fields_fail_closed_for_builders_and_validators(self):
         bundle = explicit_source_assets()

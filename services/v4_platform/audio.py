@@ -12,6 +12,7 @@ V5 ``AssetVersion`` records.
 from __future__ import annotations
 
 from copy import deepcopy
+from dataclasses import dataclass
 from hashlib import sha256
 import json
 import math
@@ -22,10 +23,18 @@ import stat
 import subprocess
 from typing import Any, Mapping, Protocol
 
+from .audio_validation import (
+    AudioTechnicalAnalysisEvidence,
+    analyze_audio_artifact,
+)
+
 
 AUDIO_ARTIFACT_EVIDENCE_SCHEMA_VERSION = "v4.audio-artifact-evidence.v1"
 AUDIO_GENERATION_RESULT_SCHEMA_VERSION = "v4.audio-generation-result.v1"
 AUDIO_ARTIFACT_RESULT_SCHEMA_VERSION = "v4.audio-artifact-result.v1"
+PIPER_TTS_EXECUTION_EVIDENCE_SCHEMA_VERSION = (
+    "v4.piper-tts-execution-evidence.v1"
+)
 AUDIO_STORAGE_PREFIX = "asset-versions/audio/"
 TTS_EXECUTION_REQUEST_SCHEMA_VERSION = "v4.local-tts-request.v1"
 PROGRAMMATIC_AUDIO_REQUEST_SCHEMA_VERSION = (
@@ -35,15 +44,19 @@ PRELIMINARY_AUDIO_MIX_REQUEST_SCHEMA_VERSION = (
     "v4.preliminary-audio-mix-request.v1"
 )
 PIPER_TTS_ADAPTER_ID = "v4.local-piper-tts.v1"
+PIPER_TTS_EXECUTION_STATE = "PIPER_TTS_TECHNICALLY_VERIFIED"
 PROGRAMMATIC_AUDIO_ADAPTER_ID = (
     "v4.deterministic-programmatic-ffmpeg-audio.v1"
 )
-PRELIMINARY_MIX_ADAPTER_ID = "v4.deterministic-preliminary-ffmpeg-mix.v1"
+PRELIMINARY_MIX_ADAPTER_ID = "v4.deterministic-preliminary-ffmpeg-mix.v2"
 
 SPEECH_AUDIO_ROLES = frozenset({"dialogue", "narration"})
 PROGRAMMATIC_AUDIO_ROLES = frozenset({"ambience", "sfx"})
-AUDIO_ROLES = SPEECH_AUDIO_ROLES | PROGRAMMATIC_AUDIO_ROLES
+AUDIO_ROLES = SPEECH_AUDIO_ROLES | PROGRAMMATIC_AUDIO_ROLES | frozenset({"music"})
 PROGRAMMATIC_EFFECTS = frozenset({"rain", "wind", "fire_crackle", "paper"})
+
+_DescriptorIdentity = tuple[int, int, int, int, int, int]
+_DescriptorDigest = tuple[str, int, _DescriptorIdentity]
 
 _COMMON_REQUEST_FIELDS = frozenset(
     {
@@ -492,6 +505,7 @@ def _run_ffmpeg(
     candidate_path: Path,
     *,
     pass_fds: tuple[int, ...] = (),
+    cleanup_on_failure: bool = True,
 ) -> None:
     command = [
         _executable("ffmpeg"),
@@ -505,6 +519,8 @@ def _run_ffmpeg(
         "1",
         "-filter_complex_threads",
         "1",
+        "-protocol_whitelist",
+        "file,pipe",
         *arguments,
     ]
     try:
@@ -517,12 +533,17 @@ def _run_ffmpeg(
             pass_fds=pass_fds,
         )
     except (OSError, subprocess.SubprocessError) as exc:
-        _remove_partial(candidate_path)
+        if cleanup_on_failure:
+            _remove_partial(candidate_path)
         raise AudioRuntimeUnavailableError("local FFmpeg audio execution failed") from exc
 
 
 def _wav_output_arguments(
-    *, sample_rate: int, channels: int, candidate_path: Path
+    *,
+    sample_rate: int,
+    channels: int,
+    candidate_path: Path | str,
+    overwrite_open_descriptor: bool = False,
 ) -> list[str]:
     return [
         "-vn",
@@ -548,7 +569,7 @@ def _wav_output_arguments(
         "never",
         "-f",
         "wav",
-        "-n",
+        "-y" if overwrite_open_descriptor else "-n",
         str(candidate_path),
     ]
 
@@ -571,12 +592,6 @@ def _seconds(samples: int) -> str:
 
 def _effect_parameters(request: Any) -> tuple[dict[str, Any], dict[str, Any]]:
     normalized, parameters = _programmatic_request(request)
-    if (
-        parameters.get("audioRole") == "bgm"
-        or parameters.get("effectKind") == "bgm"
-        or parameters.get("synthesisKind") == "bgm"
-    ):
-        raise NotImplementedError("BGM_NOT_IMPLEMENTED")
     fields = {
         "synthesisKind",
         "effectKind",
@@ -733,7 +748,18 @@ def _hash_regular_path(path: Path) -> tuple[str, int, tuple[int, int, int]]:
     return digest.hexdigest(), size, (opened.st_dev, opened.st_ino, opened.st_size)
 
 
-def _hash_descriptor(descriptor: int) -> tuple[str, int, tuple[int, int, int]]:
+def _descriptor_identity(metadata: os.stat_result) -> _DescriptorIdentity:
+    return (
+        metadata.st_dev,
+        metadata.st_ino,
+        metadata.st_size,
+        metadata.st_mtime_ns,
+        metadata.st_ctime_ns,
+        metadata.st_nlink,
+    )
+
+
+def _hash_descriptor(descriptor: int) -> _DescriptorDigest:
     digest = sha256()
     size = 0
     try:
@@ -753,14 +779,11 @@ def _hash_descriptor(descriptor: int) -> tuple[str, int, tuple[int, int, int]]:
         raise
     except OSError as exc:
         raise AudioArtifactVerificationError("audio input hashing failed") from exc
-    if (
-        opened.st_dev != closed_over.st_dev
-        or opened.st_ino != closed_over.st_ino
-        or opened.st_size != closed_over.st_size
-        or size != opened.st_size
-    ):
+    opened_identity = _descriptor_identity(opened)
+    closed_identity = _descriptor_identity(closed_over)
+    if opened_identity != closed_identity or size != opened.st_size:
         raise AudioArtifactVerificationError("audio input changed while hashing")
-    return digest.hexdigest(), size, (opened.st_dev, opened.st_ino, opened.st_size)
+    return digest.hexdigest(), size, opened_identity
 
 
 def _probe_wav(
@@ -772,6 +795,8 @@ def _probe_wav(
                 _executable("ffprobe"),
                 "-v",
                 "error",
+                "-protocol_whitelist",
+                "file,pipe",
                 "-show_streams",
                 "-show_format",
                 "-of",
@@ -849,6 +874,8 @@ def _verify_wav(
 
 class PiperTtsAdapter:
     """A-tier Piper boundary; production synthesis is deliberately unavailable."""
+
+    __slots__ = ()
 
     adapter_identity = PIPER_TTS_ADAPTER_ID
     provenance = "LOCAL_EVIDENCE"
@@ -996,8 +1023,6 @@ def _mix_parameters(request: Any) -> tuple[dict[str, Any], dict[str, Any]]:
         }:
             raise AudioRequestValidationError("preliminary mix track fields are invalid")
         role = track.get("audioRole")
-        if role == "bgm":
-            raise NotImplementedError("BGM_NOT_IMPLEMENTED")
         if role not in AUDIO_ROLES:
             raise AudioRequestValidationError("preliminary mix audioRole is invalid")
         asset_ref = _ref(track.get("assetVersionRef"), f"tracks[{index}].assetVersionRef")
@@ -1023,35 +1048,244 @@ def _canonical_mix_parameters(parameters: Mapping[str, Any]) -> dict[str, Any]:
     result["tracks"] = sorted(
         result["tracks"],
         key=lambda item: (
-            -({"dialogue": 3, "narration": 3, "sfx": 2, "ambience": 1}[item["audioRole"]]),
+            -(
+                {
+                    "dialogue": 3,
+                    "narration": 3,
+                    "sfx": 2,
+                    "ambience": 1,
+                    "music": 0,
+                }[item["audioRole"]]
+            ),
             item["assetVersionRef"],
         ),
     )
     return result
 
 
-def _open_internal_track(
-    artifact_root: Path, track: Mapping[str, Any]
-) -> tuple[int, tuple[str, int, tuple[int, int, int]]]:
-    storage_key = track["storageKey"]
-    parts = PurePosixPath(storage_key).parts
-    raw_path = artifact_root.joinpath(*parts)
-    cursor = artifact_root
+def _open_audio_root_descriptor(artifact_root: Path) -> tuple[int, tuple[int, int]]:
+    flags = (
+        os.O_RDONLY
+        | getattr(os, "O_DIRECTORY", 0)
+        | getattr(os, "O_NOFOLLOW", 0)
+        | getattr(os, "O_CLOEXEC", 0)
+    )
+    descriptor: int | None = None
+    try:
+        descriptor = os.open(artifact_root, flags)
+        info = os.fstat(descriptor)
+    except OSError as exc:
+        if descriptor is not None:
+            os.close(descriptor)
+        raise AudioArtifactVerificationError(
+            "artifact root cannot be pinned"
+        ) from exc
+    if not stat.S_ISDIR(info.st_mode):
+        os.close(descriptor)
+        raise AudioArtifactVerificationError("artifact root is not a directory")
+    return descriptor, (info.st_dev, info.st_ino)
+
+
+def _open_audio_parent_descriptor(
+    root_descriptor: int,
+    parts: tuple[str, ...],
+    *,
+    create: bool,
+) -> int:
+    flags = (
+        os.O_RDONLY
+        | getattr(os, "O_DIRECTORY", 0)
+        | getattr(os, "O_NOFOLLOW", 0)
+        | getattr(os, "O_CLOEXEC", 0)
+    )
+    try:
+        current = os.dup(root_descriptor)
+    except OSError as exc:
+        raise AudioArtifactVerificationError(
+            "artifact root descriptor is unavailable"
+        ) from exc
     try:
         for part in parts:
-            cursor = cursor / part
-            if cursor.is_symlink():
-                raise AudioArtifactVerificationError("internal audio path contains a symlink")
-        resolved = raw_path.resolve(strict=True)
-        resolved.relative_to(artifact_root)
+            next_descriptor: int | None = None
+            try:
+                next_descriptor = os.open(part, flags, dir_fd=current)
+            except FileNotFoundError:
+                if not create:
+                    raise
+                try:
+                    os.mkdir(part, mode=0o700, dir_fd=current)
+                except FileExistsError:
+                    pass
+                next_descriptor = os.open(part, flags, dir_fd=current)
+            try:
+                info = os.fstat(next_descriptor)
+            except OSError:
+                os.close(next_descriptor)
+                raise
+            if not stat.S_ISDIR(info.st_mode):
+                os.close(next_descriptor)
+                raise AudioArtifactVerificationError(
+                    "artifact parent is not a directory"
+                )
+            os.close(current)
+            current = next_descriptor
+        return current
+    except AudioArtifactVerificationError:
+        os.close(current)
+        raise
+    except OSError as exc:
+        os.close(current)
+        raise AudioArtifactVerificationError(
+            "artifact descendant cannot be pinned"
+        ) from exc
+
+
+def _mix_candidate_parts(artifact_root: Path, candidate_path: Any) -> tuple[Path, tuple[str, ...]]:
+    candidate = _validate_candidate_path(candidate_path)
+    absolute = Path(os.path.abspath(os.fspath(candidate)))
+    try:
+        relative = absolute.relative_to(artifact_root)
+    except ValueError as exc:
+        raise AudioRequestValidationError(
+            "preliminary mix candidate must be below artifact_root"
+        ) from exc
+    parts = relative.parts
+    if not parts or any(part in {"", ".", ".."} for part in parts):
+        raise AudioRequestValidationError("preliminary mix candidate is invalid")
+    return absolute, parts
+
+
+def _create_mix_output(
+    artifact_root: Path,
+    root_descriptor: int,
+    candidate_path: Any,
+) -> tuple[Path, int, int, str]:
+    candidate, parts = _mix_candidate_parts(artifact_root, candidate_path)
+    parent_descriptor = _open_audio_parent_descriptor(
+        root_descriptor, parts[:-1], create=True
+    )
+    leaf = parts[-1]
+    flags = (
+        os.O_RDWR
+        | os.O_CREAT
+        | os.O_EXCL
+        | getattr(os, "O_NOFOLLOW", 0)
+        | getattr(os, "O_CLOEXEC", 0)
+    )
+    output_descriptor: int | None = None
+    try:
+        output_descriptor = os.open(
+            leaf, flags, 0o600, dir_fd=parent_descriptor
+        )
+        info = os.fstat(output_descriptor)
+    except FileExistsError as exc:
+        os.close(parent_descriptor)
+        raise AudioRequestValidationError("candidate_path already exists") from exc
+    except OSError as exc:
+        if output_descriptor is not None:
+            os.close(output_descriptor)
+        os.close(parent_descriptor)
+        raise AudioRuntimeUnavailableError(
+            "preliminary mix output cannot be created"
+        ) from exc
+    if (
+        not stat.S_ISREG(info.st_mode)
+        or info.st_nlink != 1
+        or info.st_size != 0
+    ):
+        os.close(output_descriptor)
+        os.close(parent_descriptor)
+        raise AudioArtifactVerificationError(
+            "preliminary mix output is not a new regular file"
+        )
+    return candidate, parent_descriptor, output_descriptor, leaf
+
+
+def _verify_wav_descriptor(
+    descriptor: int,
+    *,
+    sample_rate: int,
+    channels: int,
+    duration_samples: int,
+) -> tuple[str, int, _DescriptorIdentity, dict[str, Any]]:
+    before = _hash_descriptor(descriptor)
+    probe = _probe_wav(
+        f"/proc/self/fd/{descriptor}", pass_fds=(descriptor,)
+    )
+    after = _hash_descriptor(descriptor)
+    if before != after:
+        raise AudioArtifactVerificationError(
+            "preliminary mix output changed during probe"
+        )
+    if (
+        probe["sampleRate"] != sample_rate
+        or probe["channels"] != channels
+        or abs(probe["durationSamples"] - duration_samples) > 1
+    ):
+        raise AudioArtifactVerificationError(
+            "preliminary mix output does not match request"
+        )
+    return (*before, probe)
+
+
+def _verify_mix_output_visible(
+    root_descriptor: int,
+    relative_parts: tuple[str, ...],
+    expected: _DescriptorDigest,
+) -> None:
+    parent_descriptor = _open_audio_parent_descriptor(
+        root_descriptor, relative_parts[:-1], create=False
+    )
+    flags = os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0)
+    try:
         descriptor = os.open(
-            resolved,
+            relative_parts[-1], flags, dir_fd=parent_descriptor
+        )
+        actual = _hash_descriptor(descriptor)
+    except OSError as exc:
+        raise AudioArtifactVerificationError(
+            "preliminary mix output is no longer visible"
+        ) from exc
+    finally:
+        if "descriptor" in locals():
+            os.close(descriptor)
+        os.close(parent_descriptor)
+    if actual != expected:
+        raise AudioArtifactVerificationError(
+            "preliminary mix output namespace binding changed"
+        )
+
+
+def _neutralize_audio_descriptor(descriptor: int) -> None:
+    try:
+        os.ftruncate(descriptor, 0)
+        os.fsync(descriptor)
+    except OSError:
+        pass
+
+
+def _open_internal_track(
+    root_descriptor: int, track: Mapping[str, Any]
+) -> tuple[int, _DescriptorDigest]:
+    storage_key = track["storageKey"]
+    parts = PurePosixPath(storage_key).parts
+    parent_descriptor: int | None = None
+    try:
+        parent_descriptor = _open_audio_parent_descriptor(
+            root_descriptor, parts[:-1], create=False
+        )
+        descriptor = os.open(
+            parts[-1],
             os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0),
+            dir_fd=parent_descriptor,
         )
     except AudioArtifactVerificationError:
         raise
-    except (OSError, ValueError) as exc:
+    except OSError as exc:
         raise AudioArtifactVerificationError("internal audio artifact is unavailable") from exc
+    finally:
+        if parent_descriptor is not None:
+            os.close(parent_descriptor)
     try:
         digest_value, size, identity = _hash_descriptor(descriptor)
         if digest_value != track["sha256"]:
@@ -1091,7 +1325,13 @@ def _mix_filtergraph(parameters: Mapping[str, Any]) -> str:
     channels = parameters["channels"]
     samples = parameters["durationSamples"]
     layout = "mono" if channels == 1 else "stereo"
-    gains = {"dialogue": "0", "narration": "0", "sfx": "-6", "ambience": "-12"}
+    gains = {
+        "dialogue": "0",
+        "narration": "0",
+        "sfx": "-6",
+        "ambience": "-12",
+        "music": "-18",
+    }
     graph: list[str] = []
     roles: dict[str, list[str]] = {role: [] for role in AUDIO_ROLES}
     for index, track in enumerate(parameters["tracks"]):
@@ -1106,7 +1346,8 @@ def _mix_filtergraph(parameters: Mapping[str, Any]) -> str:
     dialogue = _bus(graph, roles["dialogue"] + roles["narration"], "dialogue")
     sfx = _bus(graph, roles["sfx"], "sfx")
     ambience = _bus(graph, roles["ambience"], "ambience")
-    bed_labels = [label for label in (sfx, ambience) if label is not None]
+    music = _bus(graph, roles["music"], "music")
+    bed_labels = [label for label in (sfx, ambience, music) if label is not None]
     bed = _bus(graph, bed_labels, "bed")
     if dialogue is not None and bed is not None:
         graph.append(f"[{dialogue}]asplit=2[dialogue-final][dialogue-key]")
@@ -1137,8 +1378,15 @@ def _mix_filtergraph(parameters: Mapping[str, Any]) -> str:
 class DeterministicPreliminaryMixAdapter:
     """Deterministic role-level mix over verified internal audio artifacts only."""
 
+    __slots__ = ("_artifact_root", "_verified_output_claim")
+
     adapter_identity = PRELIMINARY_MIX_ADAPTER_ID
     provenance = "LOCAL_EVIDENCE"
+
+    def __setattr__(self, name: str, value: Any) -> None:
+        if name == "_artifact_root" and hasattr(self, "_artifact_root"):
+            raise AttributeError("artifact_root is immutable")
+        object.__setattr__(self, name, value)
 
     def __init__(self, artifact_root: Path | str) -> None:
         raw_root = Path(artifact_root)
@@ -1151,15 +1399,52 @@ class DeterministicPreliminaryMixAdapter:
         if not root.is_dir():
             raise AudioRequestValidationError("artifact_root is unavailable")
         self._artifact_root = root
+        self._verified_output_claim: (
+            tuple[str, Path, tuple[str, ...], _DescriptorDigest]
+            | None
+        ) = None
+
+    def _consume_verified_output_claim(
+        self, *, request_digest: str, candidate: Path
+    ) -> tuple[tuple[str, ...], _DescriptorDigest]:
+        claim = self._verified_output_claim
+        self._verified_output_claim = None
+        if (
+            claim is None
+            or claim[0] != request_digest
+            or claim[1] != candidate
+        ):
+            raise AudioArtifactVerificationError(
+                "preliminary mix verified-output claim is unavailable"
+            )
+        return claim[2], claim[3]
 
     def generate(self, request: Mapping[str, Any], candidate_path: Path) -> Path:
+        self._verified_output_claim = None
         _, parameters = _mix_parameters(request)
         execution_parameters = _canonical_mix_parameters(parameters)
-        candidate = _prepare_candidate(candidate_path)
-        opened: list[tuple[int, tuple[str, int, tuple[int, int, int]]]] = []
+        root_descriptor: int | None = None
+        parent_descriptor: int | None = None
+        output_descriptor: int | None = None
+        opened: list[tuple[int, _DescriptorDigest]] = []
+        succeeded = False
         try:
+            root_descriptor, root_identity = _open_audio_root_descriptor(
+                self._artifact_root
+            )
             for track in execution_parameters["tracks"]:
-                opened.append(_open_internal_track(self._artifact_root, track))
+                opened.append(_open_internal_track(root_descriptor, track))
+            candidate, relative_parts = _mix_candidate_parts(
+                self._artifact_root, candidate_path
+            )
+            (
+                candidate,
+                parent_descriptor,
+                output_descriptor,
+                _,
+            ) = _create_mix_output(
+                self._artifact_root, root_descriptor, candidate
+            )
             descriptors = tuple(item[0] for item in opened)
             input_arguments: list[str] = []
             for descriptor in descriptors:
@@ -1173,29 +1458,68 @@ class DeterministicPreliminaryMixAdapter:
                 *_wav_output_arguments(
                     sample_rate=execution_parameters["sampleRate"],
                     channels=execution_parameters["channels"],
-                    candidate_path=candidate,
+                    candidate_path=f"/proc/self/fd/{output_descriptor}",
+                    overwrite_open_descriptor=True,
                 ),
             ]
-            _run_ffmpeg(arguments, candidate, pass_fds=descriptors)
+            _run_ffmpeg(
+                arguments,
+                candidate,
+                pass_fds=(*descriptors, output_descriptor),
+                cleanup_on_failure=False,
+            )
             for descriptor, expected in opened:
                 if _hash_descriptor(descriptor) != expected:
-                    _remove_partial(candidate)
                     raise AudioArtifactVerificationError("internal audio changed during mix")
-            _verify_wav(
-                candidate,
+            try:
+                os.fsync(output_descriptor)
+            except OSError as exc:
+                raise AudioArtifactVerificationError(
+                    "preliminary mix output cannot be synchronized"
+                ) from exc
+            verified_output = _verify_wav_descriptor(
+                output_descriptor,
                 sample_rate=execution_parameters["sampleRate"],
                 channels=execution_parameters["channels"],
                 duration_samples=execution_parameters["durationSamples"],
             )
+            expected_output = verified_output[:3]
+            visible_root = os.stat(self._artifact_root, follow_symlinks=False)
+            if (visible_root.st_dev, visible_root.st_ino) != root_identity:
+                raise AudioArtifactVerificationError(
+                    "artifact root namespace binding changed"
+                )
+            _verify_mix_output_visible(
+                root_descriptor, relative_parts, expected_output
+            )
+            self._verified_output_claim = (
+                request["payloadDigest"],
+                candidate,
+                relative_parts,
+                expected_output,
+            )
+            succeeded = True
         except Exception:
-            _remove_partial(candidate)
+            if output_descriptor is not None:
+                _neutralize_audio_descriptor(output_descriptor)
             raise
         finally:
-            for descriptor, _ in opened:
+            for descriptor in (
+                *(item[0] for item in opened),
+                output_descriptor,
+                parent_descriptor,
+                root_descriptor,
+            ):
+                if descriptor is None:
+                    continue
                 try:
                     os.close(descriptor)
                 except OSError:
                     pass
+        if not succeeded:
+            raise AudioArtifactVerificationError(
+                "preliminary mix did not complete"
+            )
         return candidate
 
 
@@ -1240,6 +1564,131 @@ def _validated_execution_request(
     raise AudioRequestValidationError("audio request schema is unsupported")
 
 
+def _sealed_audio_artifact_result(
+    *,
+    normalized: Mapping[str, Any],
+    requested_parameters: Mapping[str, Any],
+    effective_parameters: Mapping[str, Any],
+    lineage: Mapping[str, str],
+    safe_storage_key: str,
+    artifact_sha: str,
+    byte_size: int,
+    probe: Mapping[str, Any],
+    sample_rate: int,
+    channels: int,
+    adapter_identity: str,
+    adapter_provenance: str,
+    role: str,
+) -> dict[str, Any]:
+    """Seal an already verified artifact without touching its namespace."""
+
+    execution_request_digest = normalized["payloadDigest"]
+    generation_request_digest = normalized.get(
+        "generationRequestDigest", execution_request_digest
+    )
+    _sha256(generation_request_digest, "generationRequestDigest")
+    parameters_digest = _digest(requested_parameters)
+    effective_parameters_digest = _digest(effective_parameters)
+    synthesis_spec_digest = _digest(
+        {
+            "adapterIdentity": adapter_identity,
+            "parameters": effective_parameters,
+        }
+    )
+    evidence_semantic = {
+        "generationRequestDigest": generation_request_digest,
+        "executionRequestDigest": execution_request_digest,
+        "storageKey": safe_storage_key,
+        "sha256": artifact_sha,
+    }
+    artifact_evidence_ref = "audio-artifact-evidence-" + _digest(evidence_semantic)[:32]
+    artifact_ref = "audio-artifact-" + artifact_sha[:32]
+    artifact_evidence = _sealed(
+        {
+            "schemaVersion": AUDIO_ARTIFACT_EVIDENCE_SCHEMA_VERSION,
+            **lineage,
+            "generationRequestDigest": generation_request_digest,
+            "executionRequestDigest": execution_request_digest,
+            "artifactEvidenceRef": artifact_evidence_ref,
+            "artifactRef": artifact_ref,
+            "storageKey": safe_storage_key,
+            "byteSize": byte_size,
+            "sha256": artifact_sha,
+            "sampleRate": sample_rate,
+            "channels": channels,
+            "probe": deepcopy(dict(probe)),
+            "parametersDigest": parameters_digest,
+            "effectiveParametersDigest": effective_parameters_digest,
+            "synthesisSpecDigest": synthesis_spec_digest,
+            "adapterIdentity": adapter_identity,
+            "audioRole": role,
+            "provenance": adapter_provenance,
+            "state": "TECHNICALLY_VERIFIED",
+            "publicationAllowed": False,
+        }
+    )
+    result_semantic = {
+        "generationRequestDigest": generation_request_digest,
+        "executionRequestDigest": execution_request_digest,
+        "artifactEvidenceDigest": artifact_evidence["payloadDigest"],
+    }
+    generation_result_ref = "audio-generation-result-" + _digest(result_semantic)[:32]
+    generation_result = _sealed(
+        {
+            "schemaVersion": AUDIO_GENERATION_RESULT_SCHEMA_VERSION,
+            **lineage,
+            "generationRequestDigest": generation_request_digest,
+            "executionRequestDigest": execution_request_digest,
+            "generationResultRef": generation_result_ref,
+            "adapterIdentity": adapter_identity,
+            "provenance": adapter_provenance,
+            "artifactEvidenceRef": artifact_evidence_ref,
+            "artifactEvidenceDigest": artifact_evidence["payloadDigest"],
+            "artifactRef": artifact_ref,
+            "storageKey": safe_storage_key,
+            "byteSize": byte_size,
+            "sha256": artifact_sha,
+            "sampleRate": sample_rate,
+            "channels": channels,
+            "probe": deepcopy(dict(probe)),
+            "parametersDigest": parameters_digest,
+            "effectiveParametersDigest": effective_parameters_digest,
+            "synthesisSpecDigest": synthesis_spec_digest,
+            "audioRole": role,
+            "state": "SUCCEEDED",
+            "publicationAllowed": False,
+        }
+    )
+    return _sealed(
+        {
+            "schemaVersion": AUDIO_ARTIFACT_RESULT_SCHEMA_VERSION,
+            **lineage,
+            "generationRequestDigest": generation_request_digest,
+            "executionRequestDigest": execution_request_digest,
+            "generationResultRef": generation_result_ref,
+            "generationResultDigest": generation_result["payloadDigest"],
+            "adapterIdentity": adapter_identity,
+            "provenance": adapter_provenance,
+            "artifactEvidenceRef": artifact_evidence_ref,
+            "artifactEvidenceDigest": artifact_evidence["payloadDigest"],
+            "artifactRef": artifact_ref,
+            "storageKey": safe_storage_key,
+            "byteSize": byte_size,
+            "sha256": artifact_sha,
+            "sampleRate": sample_rate,
+            "channels": channels,
+            "probe": deepcopy(dict(probe)),
+            "parametersDigest": parameters_digest,
+            "effectiveParametersDigest": effective_parameters_digest,
+            "synthesisSpecDigest": synthesis_spec_digest,
+            "audioRole": role,
+            "generationResult": generation_result,
+            "artifactEvidence": artifact_evidence,
+            "publicationAllowed": False,
+        }
+    )
+
+
 def audio_artifact_evidence(
     request: Mapping[str, Any],
     *,
@@ -1276,9 +1725,18 @@ def audio_artifact_evidence(
     if role is None and requested_parameters.get("mixKind") == "preliminary":
         role = "preliminary_mix"
     if role not in AUDIO_ROLES | {"preliminary_mix"}:
-        if role == "bgm":
-            raise NotImplementedError("BGM_NOT_IMPLEMENTED")
         raise AudioRequestValidationError("audioRole is invalid")
+    if role == "preliminary_mix" and type(adapter) is not DeterministicPreliminaryMixAdapter:
+        raise AudioRequestValidationError(
+            "preliminary mix requires the exact built-in adapter"
+        )
+    if role == "preliminary_mix" and {
+        "generate",
+        "_consume_verified_output_claim",
+    }.intersection(getattr(adapter, "__dict__", {})):
+        raise AudioRequestValidationError(
+            "preliminary mix adapter methods cannot be overridden"
+        )
     sample_rate = effective_parameters.get("sampleRate")
     channels = effective_parameters.get("channels")
     if sample_rate != _SAMPLE_RATE:
@@ -1294,129 +1752,337 @@ def audio_artifact_evidence(
         )
     safe_storage_key = _storage_key(storage_key)
     root = _pinned_artifact_root(artifact_root)
-    candidate = _pinned_artifact_candidate(
-        root, safe_storage_key, must_not_exist=True
-    )
-    try:
-        produced = adapter.generate(normalized, candidate)
-        if not isinstance(produced, Path) or produced != candidate:
-            raise AudioArtifactVerificationError(
-                "audio adapter returned an unexpected candidate"
-            )
-        _pinned_artifact_candidate(root, safe_storage_key, must_not_exist=False)
-        artifact_sha, byte_size, probe = _verify_wav(
-            candidate,
-            sample_rate=sample_rate,
-            channels=channels,
-            duration_samples=expected_samples,
+    if role == "preliminary_mix" and adapter._artifact_root != root:
+        raise AudioRequestValidationError(
+            "preliminary mix adapter artifact_root binding is stale"
         )
-    except Exception:
-        _remove_partial(candidate)
-        raise
-    execution_request_digest = normalized["payloadDigest"]
-    generation_request_digest = normalized.get(
-        "generationRequestDigest", execution_request_digest
+    storage_parts = PurePosixPath(safe_storage_key).parts
+    candidate = root.joinpath(*storage_parts)
+    if role == "preliminary_mix":
+        root_descriptor: int | None = None
+        parent_descriptor: int | None = None
+        artifact_descriptor: int | None = None
+        artifact_claim_verified = False
+        try:
+            root_descriptor, root_identity = _open_audio_root_descriptor(root)
+            execution_adapter = DeterministicPreliminaryMixAdapter(root)
+            produced = DeterministicPreliminaryMixAdapter.generate(
+                execution_adapter, normalized, candidate
+            )
+            if not isinstance(produced, Path) or produced != candidate:
+                raise AudioArtifactVerificationError(
+                    "audio adapter returned an unexpected candidate"
+                )
+            claim_parts, claim = (
+                DeterministicPreliminaryMixAdapter._consume_verified_output_claim(
+                    execution_adapter,
+                    request_digest=normalized["payloadDigest"],
+                    candidate=candidate,
+                )
+            )
+            if claim_parts != storage_parts:
+                raise AudioArtifactVerificationError(
+                    "preliminary mix storage claim is stale"
+                )
+            parent_descriptor = _open_audio_parent_descriptor(
+                root_descriptor, storage_parts[:-1], create=False
+            )
+            artifact_descriptor = os.open(
+                storage_parts[-1],
+                os.O_RDWR | getattr(os, "O_NOFOLLOW", 0),
+                dir_fd=parent_descriptor,
+            )
+            verified = _verify_wav_descriptor(
+                artifact_descriptor,
+                sample_rate=sample_rate,
+                channels=channels,
+                duration_samples=expected_samples,
+            )
+            artifact_sha, byte_size, identity, probe = verified
+            if (artifact_sha, byte_size, identity) != claim:
+                raise AudioArtifactVerificationError(
+                    "preliminary mix output claim changed before evidence"
+                )
+            artifact_claim_verified = True
+            visible_root = os.stat(root, follow_symlinks=False)
+            if (visible_root.st_dev, visible_root.st_ino) != root_identity:
+                raise AudioArtifactVerificationError(
+                    "artifact root namespace binding changed"
+                )
+            _verify_mix_output_visible(
+                root_descriptor, storage_parts, claim
+            )
+            result_bundle = _sealed_audio_artifact_result(
+                normalized=normalized,
+                requested_parameters=requested_parameters,
+                effective_parameters=effective_parameters,
+                lineage=lineage,
+                safe_storage_key=safe_storage_key,
+                artifact_sha=artifact_sha,
+                byte_size=byte_size,
+                probe=probe,
+                sample_rate=sample_rate,
+                channels=channels,
+                adapter_identity=adapter_identity,
+                adapter_provenance=adapter_provenance,
+                role=role,
+            )
+            _verify_mix_output_visible(
+                root_descriptor, storage_parts, claim
+            )
+            visible_root = os.stat(root, follow_symlinks=False)
+            if (visible_root.st_dev, visible_root.st_ino) != root_identity:
+                raise AudioArtifactVerificationError(
+                    "artifact root namespace binding changed before evidence mint"
+                )
+            return result_bundle
+        except AudioAdapterError:
+            if artifact_claim_verified and artifact_descriptor is not None:
+                _neutralize_audio_descriptor(artifact_descriptor)
+            raise
+        except OSError as exc:
+            if artifact_claim_verified and artifact_descriptor is not None:
+                _neutralize_audio_descriptor(artifact_descriptor)
+            raise AudioArtifactVerificationError(
+                "preliminary mix evidence cannot pin its output"
+            ) from exc
+        except Exception:
+            if artifact_claim_verified and artifact_descriptor is not None:
+                _neutralize_audio_descriptor(artifact_descriptor)
+            raise
+        finally:
+            for descriptor in (
+                artifact_descriptor,
+                parent_descriptor,
+                root_descriptor,
+            ):
+                if descriptor is not None:
+                    try:
+                        os.close(descriptor)
+                    except OSError:
+                        pass
+    else:
+        candidate = _pinned_artifact_candidate(
+            root, safe_storage_key, must_not_exist=True
+        )
+        try:
+            produced = adapter.generate(normalized, candidate)
+            if not isinstance(produced, Path) or produced != candidate:
+                raise AudioArtifactVerificationError(
+                    "audio adapter returned an unexpected candidate"
+                )
+            _pinned_artifact_candidate(root, safe_storage_key, must_not_exist=False)
+            artifact_sha, byte_size, probe = _verify_wav(
+                candidate,
+                sample_rate=sample_rate,
+                channels=channels,
+                duration_samples=expected_samples,
+            )
+        except Exception:
+            _remove_partial(candidate)
+            raise
+    return _sealed_audio_artifact_result(
+        normalized=normalized,
+        requested_parameters=requested_parameters,
+        effective_parameters=effective_parameters,
+        lineage=lineage,
+        safe_storage_key=safe_storage_key,
+        artifact_sha=artifact_sha,
+        byte_size=byte_size,
+        probe=probe,
+        sample_rate=sample_rate,
+        channels=channels,
+        adapter_identity=adapter_identity,
+        adapter_provenance=adapter_provenance,
+        role=role,
     )
-    _sha256(generation_request_digest, "generationRequestDigest")
-    parameters_digest = _digest(requested_parameters)
-    effective_parameters_digest = _digest(effective_parameters)
-    synthesis_spec_digest = _digest(
-        {
-            "adapterIdentity": adapter_identity,
-            "parameters": effective_parameters,
-        }
-    )
-    evidence_semantic = {
-        "generationRequestDigest": generation_request_digest,
-        "executionRequestDigest": execution_request_digest,
-        "storageKey": safe_storage_key,
-        "sha256": artifact_sha,
+
+
+_PIPER_TTS_EXECUTION_EVIDENCE_FIELDS = frozenset(
+    {
+        "schemaVersion",
+        "executionEvidenceRef",
+        "generationRequestDigest",
+        "executionRequestDigest",
+        "adapterIdentity",
+        "audioRole",
+        "generationResultRef",
+        "generationResultDigest",
+        "artifactResultDigest",
+        "artifactEvidenceRef",
+        "artifactEvidenceDigest",
+        "analysisEvidenceRef",
+        "analysisEvidenceDigest",
+        "artifactResult",
+        "technicalAnalysisEvidence",
+        "state",
+        "publicationAllowed",
+        "payloadDigest",
     }
-    artifact_evidence_ref = "audio-artifact-evidence-" + _digest(evidence_semantic)[:32]
-    artifact_ref = "audio-artifact-" + artifact_sha[:32]
-    artifact_evidence = _sealed(
-        {
-            "schemaVersion": AUDIO_ARTIFACT_EVIDENCE_SCHEMA_VERSION,
-            **lineage,
-            "generationRequestDigest": generation_request_digest,
-            "executionRequestDigest": execution_request_digest,
-            "artifactEvidenceRef": artifact_evidence_ref,
-            "artifactRef": artifact_ref,
-            "storageKey": safe_storage_key,
-            "byteSize": byte_size,
-            "sha256": artifact_sha,
-            "sampleRate": sample_rate,
-            "channels": channels,
-            "probe": probe,
-            "parametersDigest": parameters_digest,
-            "effectiveParametersDigest": effective_parameters_digest,
-            "synthesisSpecDigest": synthesis_spec_digest,
-            "adapterIdentity": adapter_identity,
-            "audioRole": role,
-            "provenance": adapter_provenance,
-            "state": "TECHNICALLY_VERIFIED",
+)
+_PIPER_TTS_EVIDENCE_MINT_TOKEN = object()
+
+
+def _piper_tts_execution_evidence_ref(value: Mapping[str, Any]) -> str:
+    semantic = deepcopy(dict(value))
+    semantic.pop("executionEvidenceRef", None)
+    semantic.pop("payloadDigest", None)
+    return "piper-tts-execution-evidence-" + _digest(semantic)[:32]
+
+
+@dataclass(frozen=True, slots=True, init=False)
+class PiperTtsExecutionEvidence:
+    """Mint-only proof of exact built-in Piper execution plus PR-5 analysis.
+
+    There is intentionally no mapping constructor.  The only supported mint is
+    :func:`execute_piper_tts_evidence`, which owns the exact adapter instance and
+    binds the resulting artifact to an exact technical-analysis capability.
+    """
+
+    _payload_json: str
+
+    @classmethod
+    def _from_executor(
+        cls,
+        artifact_result: Mapping[str, Any],
+        technical_analysis: AudioTechnicalAnalysisEvidence,
+        *,
+        _mint_token: object,
+    ) -> "PiperTtsExecutionEvidence":
+        if _mint_token is not _PIPER_TTS_EVIDENCE_MINT_TOKEN:
+            raise AudioArtifactVerificationError(
+                "Piper execution evidence mint authority is unavailable"
+            )
+        if type(technical_analysis) is not AudioTechnicalAnalysisEvidence:
+            raise AudioArtifactVerificationError(
+                "exact audio technical-analysis evidence is required"
+            )
+        bundle = _verify_sealed(artifact_result, "Piper artifact result")
+        analysis = technical_analysis.as_dict()
+        evidence = bundle.get("artifactEvidence")
+        result = bundle.get("generationResult")
+        if not isinstance(evidence, Mapping) or not isinstance(result, Mapping):
+            raise AudioArtifactVerificationError(
+                "Piper artifact result is incomplete"
+            )
+        evidence = _verify_sealed(evidence, "Piper artifact evidence")
+        result = _verify_sealed(result, "Piper generation result")
+        if (
+            bundle.get("schemaVersion") != AUDIO_ARTIFACT_RESULT_SCHEMA_VERSION
+            or bundle.get("adapterIdentity") != PIPER_TTS_ADAPTER_ID
+            or bundle.get("audioRole") not in SPEECH_AUDIO_ROLES
+            or bundle.get("provenance") != "LOCAL_EVIDENCE"
+            or bundle.get("publicationAllowed") is not False
+            or bundle.get("generationResult") != result
+            or bundle.get("artifactEvidence") != evidence
+            or bundle.get("generationResultRef")
+            != result.get("generationResultRef")
+            or bundle.get("generationResultDigest") != result.get("payloadDigest")
+            or bundle.get("artifactEvidenceRef")
+            != evidence.get("artifactEvidenceRef")
+            or bundle.get("artifactEvidenceDigest")
+            != evidence.get("payloadDigest")
+            or analysis.get("sourceArtifactEvidenceRef")
+            != evidence.get("artifactEvidenceRef")
+            or analysis.get("sourceArtifactEvidenceDigest")
+            != evidence.get("payloadDigest")
+            or analysis.get("artifactRef") != evidence.get("artifactRef")
+            or analysis.get("storageKey") != evidence.get("storageKey")
+            or analysis.get("byteSize") != evidence.get("byteSize")
+            or analysis.get("fileDigest") != evidence.get("sha256")
+            or analysis.get("validationState") != "PASSED"
+            or analysis.get("failureReasons") != []
+            or analysis.get("clippingDetected") is not False
+            or analysis.get("state") != "TECHNICAL_ANALYSIS_COMPLETE"
+            or analysis.get("publicationAllowed") is not False
+        ):
+            raise AudioArtifactVerificationError(
+                "Piper artifact and technical analysis are not exactly bound"
+            )
+        for field, value in (
+            ("generationRequestDigest", bundle.get("generationRequestDigest")),
+            ("executionRequestDigest", bundle.get("executionRequestDigest")),
+            ("generationResultDigest", result.get("payloadDigest")),
+            ("artifactResultDigest", bundle.get("payloadDigest")),
+            ("artifactEvidenceDigest", evidence.get("payloadDigest")),
+            ("analysisEvidenceDigest", analysis.get("payloadDigest")),
+            ("pcmContentDigest", analysis.get("pcmContentDigest")),
+        ):
+            _sha256(value, field)
+        for field, value in (
+            ("generationResultRef", result.get("generationResultRef")),
+            ("artifactEvidenceRef", evidence.get("artifactEvidenceRef")),
+            ("analysisEvidenceRef", analysis.get("analysisEvidenceRef")),
+        ):
+            _ref(value, field)
+        semantic: dict[str, Any] = {
+            "schemaVersion": PIPER_TTS_EXECUTION_EVIDENCE_SCHEMA_VERSION,
+            "generationRequestDigest": bundle["generationRequestDigest"],
+            "executionRequestDigest": bundle["executionRequestDigest"],
+            "adapterIdentity": PIPER_TTS_ADAPTER_ID,
+            "audioRole": bundle["audioRole"],
+            "generationResultRef": result["generationResultRef"],
+            "generationResultDigest": result["payloadDigest"],
+            "artifactResultDigest": bundle["payloadDigest"],
+            "artifactEvidenceRef": evidence["artifactEvidenceRef"],
+            "artifactEvidenceDigest": evidence["payloadDigest"],
+            "analysisEvidenceRef": analysis["analysisEvidenceRef"],
+            "analysisEvidenceDigest": analysis["payloadDigest"],
+            "artifactResult": bundle,
+            "technicalAnalysisEvidence": analysis,
+            "state": PIPER_TTS_EXECUTION_STATE,
             "publicationAllowed": False,
         }
+        semantic["executionEvidenceRef"] = _piper_tts_execution_evidence_ref(
+            semantic
+        )
+        sealed = _sealed(semantic)
+        if set(sealed) != _PIPER_TTS_EXECUTION_EVIDENCE_FIELDS:
+            raise AudioArtifactVerificationError(
+                "Piper execution evidence fields are invalid"
+            )
+        instance = object.__new__(cls)
+        object.__setattr__(
+            instance,
+            "_payload_json",
+            _canonical(sealed).decode("utf-8"),
+        )
+        return instance
+
+    def as_dict(self) -> dict[str, Any]:
+        return json.loads(self._payload_json)
+
+
+def execute_piper_tts_evidence(
+    request: Mapping[str, Any],
+    *,
+    artifact_root: Path | str,
+    storage_key: str,
+) -> PiperTtsExecutionEvidence:
+    """Execute only the built-in Piper boundary and mint production evidence.
+
+    The current A-tier adapter always raises
+    ``NotImplementedError("PIPER_RUNTIME_ABSENT")`` before creating an output.
+    No caller-selected adapter can enter this authority-bearing path.
+    """
+
+    normalized, _, _ = _validated_speech_request(request)
+    adapter = PiperTtsAdapter()
+    if type(adapter) is not PiperTtsAdapter:
+        raise AudioRuntimeUnavailableError("exact Piper adapter is unavailable")
+    artifact_result = audio_artifact_evidence(
+        normalized,
+        artifact_root=artifact_root,
+        storage_key=storage_key,
+        adapter=adapter,
     )
-    result_semantic = {
-        "generationRequestDigest": generation_request_digest,
-        "executionRequestDigest": execution_request_digest,
-        "artifactEvidenceDigest": artifact_evidence["payloadDigest"],
-    }
-    generation_result_ref = "audio-generation-result-" + _digest(result_semantic)[:32]
-    generation_result = _sealed(
-        {
-            "schemaVersion": AUDIO_GENERATION_RESULT_SCHEMA_VERSION,
-            **lineage,
-            "generationRequestDigest": generation_request_digest,
-            "executionRequestDigest": execution_request_digest,
-            "generationResultRef": generation_result_ref,
-            "adapterIdentity": adapter_identity,
-            "provenance": adapter_provenance,
-            "artifactEvidenceRef": artifact_evidence_ref,
-            "artifactEvidenceDigest": artifact_evidence["payloadDigest"],
-            "artifactRef": artifact_ref,
-            "storageKey": safe_storage_key,
-            "byteSize": byte_size,
-            "sha256": artifact_sha,
-            "sampleRate": sample_rate,
-            "channels": channels,
-            "probe": probe,
-            "parametersDigest": parameters_digest,
-            "effectiveParametersDigest": effective_parameters_digest,
-            "synthesisSpecDigest": synthesis_spec_digest,
-            "audioRole": role,
-            "state": "SUCCEEDED",
-            "publicationAllowed": False,
-        }
+    technical_analysis = analyze_audio_artifact(
+        artifact_result["artifactEvidence"], artifact_root=artifact_root
     )
-    return _sealed(
-        {
-            "schemaVersion": AUDIO_ARTIFACT_RESULT_SCHEMA_VERSION,
-            **lineage,
-            "generationRequestDigest": generation_request_digest,
-            "executionRequestDigest": execution_request_digest,
-            "generationResultRef": generation_result_ref,
-            "generationResultDigest": generation_result["payloadDigest"],
-            "adapterIdentity": adapter_identity,
-            "provenance": adapter_provenance,
-            "artifactEvidenceRef": artifact_evidence_ref,
-            "artifactEvidenceDigest": artifact_evidence["payloadDigest"],
-            "artifactRef": artifact_ref,
-            "storageKey": safe_storage_key,
-            "byteSize": byte_size,
-            "sha256": artifact_sha,
-            "sampleRate": sample_rate,
-            "channels": channels,
-            "probe": probe,
-            "parametersDigest": parameters_digest,
-            "effectiveParametersDigest": effective_parameters_digest,
-            "synthesisSpecDigest": synthesis_spec_digest,
-            "audioRole": role,
-            "generationResult": generation_result,
-            "artifactEvidence": artifact_evidence,
-            "publicationAllowed": False,
-        }
+    return PiperTtsExecutionEvidence._from_executor(
+        artifact_result,
+        technical_analysis,
+        _mint_token=_PIPER_TTS_EVIDENCE_MINT_TOKEN,
     )
 
 
@@ -1424,11 +2090,13 @@ __all__ = [
     "AUDIO_ARTIFACT_EVIDENCE_SCHEMA_VERSION",
     "AUDIO_GENERATION_RESULT_SCHEMA_VERSION",
     "AUDIO_ARTIFACT_RESULT_SCHEMA_VERSION",
+    "PIPER_TTS_EXECUTION_EVIDENCE_SCHEMA_VERSION",
     "AUDIO_STORAGE_PREFIX",
     "TTS_EXECUTION_REQUEST_SCHEMA_VERSION",
     "PROGRAMMATIC_AUDIO_REQUEST_SCHEMA_VERSION",
     "PRELIMINARY_AUDIO_MIX_REQUEST_SCHEMA_VERSION",
     "PIPER_TTS_ADAPTER_ID",
+    "PIPER_TTS_EXECUTION_STATE",
     "PROGRAMMATIC_AUDIO_ADAPTER_ID",
     "PRELIMINARY_MIX_ADAPTER_ID",
     "SPEECH_AUDIO_ROLES",
@@ -1441,8 +2109,10 @@ __all__ = [
     "AudioArtifactVerificationError",
     "AudioGenerationAdapter",
     "PiperTtsAdapter",
+    "PiperTtsExecutionEvidence",
     "DeterministicProgrammaticAudioAdapter",
     "DeterministicPreliminaryMixAdapter",
     "emotion_parameters",
     "audio_artifact_evidence",
+    "execute_piper_tts_evidence",
 ]

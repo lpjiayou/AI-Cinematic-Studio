@@ -440,7 +440,7 @@ class V4PreliminaryMixTests(unittest.TestCase):
         artifact_sha = _write_test_stem(root / storage_key)
         return storage_key, artifact_sha
 
-    def test_bgm_is_not_implemented_and_does_not_create_output(self):
+    def test_legacy_bgm_role_is_rejected_without_creating_output(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             storage_key, artifact_sha = self._one_internal_stem(root)
@@ -450,10 +450,9 @@ class V4PreliminaryMixTests(unittest.TestCase):
             )
             candidate = root / "not-created" / "mix.wav"
 
-            with self.assertRaises(NotImplementedError) as caught:
+            with self.assertRaises(AudioRequestValidationError):
                 adapter.generate(request, candidate)
 
-            self.assertEqual(caught.exception.args, ("BGM_NOT_IMPLEMENTED",))
             self.assertFalse(candidate.exists())
             self.assertFalse(candidate.parent.exists())
 
