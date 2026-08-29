@@ -72,6 +72,7 @@ DATABASE_FILENAMES = {
     "episodeEvidence": "episode-production.sqlite3.evidence.sqlite3",
     "productionPolicy": "episode-production.sqlite3.production-policy.sqlite3",
     "providerExperiments": "episode-production.sqlite3.provider-experiments.sqlite3",
+    "voiceLocks": "episode-production.sqlite3.voice-locks.sqlite3",
 }
 SHA256_PATTERN = re.compile(r"^[0-9a-f]{64}$")
 COMMIT_PATTERN = re.compile(r"^[0-9a-f]{40}$")
@@ -118,6 +119,7 @@ class BootstrapPaths:
     episode_evidence: Path
     production_policy: Path
     provider_experiments: Path
+    voice_locks: Path
 
 
 @dataclass(frozen=True)
@@ -594,6 +596,7 @@ def _paths(root: Path) -> BootstrapPaths:
         episode_evidence=root / DATABASE_FILENAMES["episodeEvidence"],
         production_policy=root / DATABASE_FILENAMES["productionPolicy"],
         provider_experiments=root / DATABASE_FILENAMES["providerExperiments"],
+        voice_locks=root / DATABASE_FILENAMES["voiceLocks"],
     )
 
 
@@ -612,6 +615,7 @@ def _episode_boundary(
         evidence_database_path=paths.episode_evidence,
         production_policy_database_path=paths.production_policy,
         provider_experiment_database_path=paths.provider_experiments,
+        voice_lock_database_path=paths.voice_locks,
         initialize_if_missing=initialize_if_missing,
     )
 
