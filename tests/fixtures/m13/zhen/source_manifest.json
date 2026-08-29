@@ -1,0 +1,57 @@
+{
+  "files": [
+    {
+      "bytes": 1097,
+      "fileDigest": "sha256:1eb50a3ee3fcac0adc60c0e90baa6d051c642f3a930330ac9aec9dd92996f3f7",
+      "path": "cumulative_masks/mask_01.png",
+      "pixelDigest": "sha256:4571a45562870efcbcbaacbe46976b780a3be00a4b3651d8a0a3329e6f38ac3b"
+    },
+    {
+      "bytes": 3438,
+      "fileDigest": "sha256:9b179c460644ebe22c4ad40eb3c541a224e8c07b653cbe409b92756e36f1a8f0",
+      "path": "cumulative_masks/mask_02.png",
+      "pixelDigest": "sha256:61da1a0af011eea749520186bdc2293b61a3cf89e4463da8ad2052d4ee59f0a5"
+    },
+    {
+      "bytes": 9554,
+      "fileDigest": "sha256:b30887021689156e787650154e90153cd2ad94aca01ed36d9645861de53ca29b",
+      "path": "cumulative_masks/mask_03.png",
+      "pixelDigest": "sha256:65f8d2cb4dbdcd34aaf2ff1724aa534473d3aab1467390bd7163a389d12252a3"
+    },
+    {
+      "bytes": 13032,
+      "fileDigest": "sha256:dfbadffc6e5bddf4f7704487994e272cf17da7aa19d01cf58f1354c45af67c80",
+      "path": "cumulative_masks/mask_04.png",
+      "pixelDigest": "sha256:cb0ef7b80d040aad9cbb929ece80e164d507dd00d5a09a2fa5ed4afb2c82dd2f"
+    },
+    {
+      "bytes": 12022,
+      "fileDigest": "sha256:461b592f86904494cb80f5334a6ee8feee2fedb28c1c311316684bebbbed47a9",
+      "path": "cumulative_masks/mask_05.png",
+      "pixelDigest": "sha256:9a3c48b45211a72f5c6102ada7b2269ef7c9ab34c361e0ec72d8eac1d5584290"
+    },
+    {
+      "bytes": 12023,
+      "fileDigest": "sha256:66a6c62fb8c8435e0e37cec002ea60d0024de5d0bb47847c64b86faf2462417d",
+      "path": "cumulative_masks/mask_06.png",
+      "pixelDigest": "sha256:fe4d048ee516f7469fa9b97de64f66a81421aee0b323ce54be28e9ca05652586"
+    }
+  ],
+  "glyphSlug": "zhen",
+  "glyphAssetSpec": {
+    "bytes": 683,
+    "fileDigest": "sha256:cb77c6c88d39c2593fc360b22fd30e5de1b59c6f2d623905208ce475939584f7",
+    "sourceMember": "final-assets-v1.2/05_deterministic_post/glyphs/zhen/asset.json"
+  },
+  "pixelDigestSpec": "RGBA8/exif-transposed/row-major/v1",
+  "revealFrameCount": 6,
+  "schemaVersion": "m13.glyph-reveal-technical-fixture.v1",
+  "sourceArchive": {
+    "bytes": 159608548,
+    "fileName": "final-assets-v1.2.zip",
+    "sha256": "532765d91b56692e611cabb9fcbd3d8ecc916f169f5c4e2b3b9e82a56bbe99c6"
+  },
+  "sourceMemberRoot": "final-assets-v1.2/05_deterministic_post/glyphs/zhen/cumulative_masks",
+  "status": "TECHNICAL_FIXTURE_ONLY_NOT_ASSET_VERSION_NOT_ADMITTED",
+  "visualSemantics": "no-ink pressure indentation; grazing-light relief only; zero pigment"
+}

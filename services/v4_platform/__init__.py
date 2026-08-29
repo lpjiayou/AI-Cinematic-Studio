@@ -45,7 +45,13 @@ from .comfyui import (
     build_comfyui_runtime_attestation,
     create_comfyui_wan22_adapter_from_environment,
 )
-from .composition import CompositionExecutionError, V4CompositionExecutor
+from .composition import (
+    GLYPH_REVEAL_ARTIFACT_EVIDENCE_SCHEMA_VERSION,
+    GLYPH_REVEAL_EXECUTION_REQUEST_SCHEMA_VERSION,
+    CompositionExecutionError,
+    CompositionRequestValidationError,
+    V4CompositionExecutor,
+)
 from .audio import (
     AUDIO_ARTIFACT_EVIDENCE_SCHEMA_VERSION,
     AUDIO_ARTIFACT_RESULT_SCHEMA_VERSION,
@@ -122,6 +128,9 @@ __all__ = [
     "build_comfyui_runtime_attestation",
     "create_comfyui_wan22_adapter_from_environment",
     "CompositionExecutionError",
+    "CompositionRequestValidationError",
+    "GLYPH_REVEAL_ARTIFACT_EVIDENCE_SCHEMA_VERSION",
+    "GLYPH_REVEAL_EXECUTION_REQUEST_SCHEMA_VERSION",
     "V4CompositionExecutor",
     "AUDIO_ARTIFACT_EVIDENCE_SCHEMA_VERSION",
     "AUDIO_ARTIFACT_RESULT_SCHEMA_VERSION",
