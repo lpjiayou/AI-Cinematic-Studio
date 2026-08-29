@@ -197,7 +197,9 @@ def normalize_speech_parameters(
     text = _text(parameters.get("text"), "text", maximum=2_000)
     voice_ref = _required_ref(parameters.get("voiceRef"), "voiceRef")
     emotion = parameters.get("emotionTag")
-    if emotion is not None and emotion not in SPEECH_EMOTION_TAGS:
+    if emotion is not None and (
+        not isinstance(emotion, str) or emotion not in SPEECH_EMOTION_TAGS
+    ):
         raise EpisodeProductionError("emotionTag is invalid")
     sample_rate = _integer(
         parameters.get("sampleRate", 48_000),
@@ -209,7 +211,7 @@ def normalize_speech_parameters(
         parameters.get("channels", 1), "channels", minimum=1, maximum=2
     )
     audio_role = parameters.get("audioRole")
-    if audio_role not in AUDIO_ROLES:
+    if not isinstance(audio_role, str) or audio_role not in AUDIO_ROLES:
         raise EpisodeProductionError("audioRole is invalid")
     if confirmed_voice_lock is None:
         raise UpstreamNotReadyError("confirmed VoiceLock is required")
@@ -309,12 +311,14 @@ def validate_audio_asset_version_contract(value: Any) -> dict[str, Any]:
         "sha256",
     ):
         _sha256(asset.get(field), field)
+    audio_role = asset.get("audioRole")
     if (
         asset.get("schemaVersion") != AUDIO_ASSET_VERSION_SCHEMA_VERSION
         or asset.get("assetKind") != "audio"
         or asset.get("mediaKind") != "audio"
         or asset.get("mediaType") != "audio/wav"
-        or asset.get("audioRole") not in AUDIO_ROLES
+        or not isinstance(audio_role, str)
+        or audio_role not in AUDIO_ROLES
         or asset.get("provenance") != "LOCAL_EVIDENCE"
         or asset.get("rightsState") != "LOCAL_EVIDENCE_ONLY"
         or asset.get("state") != "REGISTERED"
@@ -346,6 +350,10 @@ def validate_audio_asset_version_contract(value: Any) -> dict[str, Any]:
     else:
         _required_ref(predecessor_ref, "supersedesAssetVersionRef")
         _sha256(predecessor_digest, "supersedesAssetVersionDigest")
+        if predecessor_ref == asset.get("assetVersionRef"):
+            raise RepositoryUnavailableError(
+                "audio AssetVersion cannot supersede itself"
+            )
     probe = asset.get("probe")
     if not isinstance(probe, Mapping) or set(probe) != {
         "sampleRate",
@@ -593,6 +601,7 @@ class K2AudioProductionService:
         require_legacy_executable_graph(graph)
         requirements: list[dict[str, Any]] = []
         requests: list[dict[str, Any]] = []
+        voice_cache: dict[str, tuple[dict[str, Any], dict[str, Any]]] = {}
         global_ordinal = 0
         nodes = sorted(graph["shots"], key=lambda item: item["globalOrder"])
         for node in nodes:
@@ -613,16 +622,22 @@ class K2AudioProductionService:
                 if set(line) != {"speaker", "text", "emotion"}:
                     raise StaleInputError("Script dialogue contract is malformed")
                 speaker = line.get("speaker")
+                if not isinstance(speaker, str):
+                    raise StaleInputError(
+                        "dialogue speaker has no exact shot character"
+                    )
                 character_ref = character_by_name.get(speaker)
                 if not isinstance(character_ref, str):
                     raise StaleInputError("dialogue speaker has no exact shot character")
-                bundle, version = _voice_bundle(
-                    self.voice_locks,
-                    workspace_ref=workspace,
-                    project_ref=root["projectRef"],
-                    series_ref=root["seriesRef"],
-                    character_ref=character_ref,
-                )
+                if character_ref not in voice_cache:
+                    voice_cache[character_ref] = _voice_bundle(
+                        self.voice_locks,
+                        workspace_ref=workspace,
+                        project_ref=root["projectRef"],
+                        series_ref=root["seriesRef"],
+                        character_ref=character_ref,
+                    )
+                bundle, version = voice_cache[character_ref]
                 global_ordinal += 1
                 requirement = self._requirement(
                     root=root,

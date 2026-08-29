@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from copy import deepcopy
+import json
 from pathlib import Path
 import sqlite3
 import tempfile
@@ -10,6 +11,7 @@ from services.v5_core_os.episode_production.foundation import (
     EpisodeProductionError,
     IdempotencyConflictError,
     RepositoryUnavailableError,
+    _digest,
 )
 from services.v5_core_os.episode_production.voice import (
     InMemoryVoiceLockAdapter,
@@ -18,6 +20,7 @@ from services.v5_core_os.episode_production.voice import (
     VoiceLockConflictError,
     VoiceLockImmutableError,
     VoiceLockNotConfirmedError,
+    validate_confirmed_voice_lock_bundle,
 )
 
 
@@ -127,6 +130,11 @@ class VoiceLockContractMixin:
         with self.assertRaises(EpisodeProductionError):
             service.create_voice_lock(injected)
 
+        invalid_gender = command("invalid-gender")
+        invalid_gender["gender"] = []
+        with self.assertRaises(EpisodeProductionError):
+            service.create_voice_lock(invalid_gender)
+
     def test_unconfirmed_voice_lock_is_not_resolvable(self):
         service = self.service()
         service.create_voice_lock(command("unconfirmed"))
@@ -150,6 +158,16 @@ class VoiceLockContractMixin:
             candidate_before["payloadDigest"],
         )
         self.assertEqual(confirmed["voiceLockVersion"], candidate_before)
+        canonical_bundle = validate_confirmed_voice_lock_bundle(confirmed)
+        self.assertEqual(
+            set(canonical_bundle),
+            {"voiceLock", "voiceLockVersion", "voiceLockConfirmation"},
+        )
+
+        invalid_replay = deepcopy(confirmed)
+        invalid_replay["idempotentReplay"] = "false"
+        with self.assertRaises(RepositoryUnavailableError):
+            validate_confirmed_voice_lock_bundle(invalid_replay)
 
         replay = service.confirm_voice_lock(confirm_command(created, "confirm-v1"))
         self.assertTrue(replay["idempotentReplay"])
@@ -329,6 +347,90 @@ class SqliteVoiceLockContractTests(VoiceLockContractMixin, unittest.TestCase):
         with self.assertRaises(RepositoryUnavailableError):
             SqliteVoiceLockAdapter(
                 self.database, initialize_if_missing=False
+            )
+
+    def test_repository_trigger_drift_fails_closed(self):
+        self.service()
+        with sqlite3.connect(self.database) as connection:
+            connection.execute(
+                "CREATE TRIGGER ignore_voice_lock_insert BEFORE INSERT ON "
+                "v5_voice_locks BEGIN SELECT RAISE(IGNORE); END"
+            )
+        with self.assertRaises(RepositoryUnavailableError):
+            SqliteVoiceLockAdapter(
+                self.database, initialize_if_missing=False
+            )
+
+    def test_confirmation_and_operation_sql_keys_are_digest_pinned(self):
+        service = self.service()
+        created = service.create_voice_lock(command("projection-create"))
+        service.confirm_voice_lock(
+            confirm_command(created, "projection-confirm")
+        )
+        with sqlite3.connect(self.database) as connection:
+            connection.execute(
+                "UPDATE v5_voice_lock_confirmations SET "
+                "voice_lock_confirmation_ref='tampered-confirmation'"
+            )
+        with self.assertRaises(RepositoryUnavailableError):
+            service.get_confirmed_voice_lock(
+                SCOPE["workspaceRef"],
+                SCOPE["projectRef"],
+                SCOPE["seriesRef"],
+                "character-lin",
+            )
+
+        second_database = Path(self.directory.name) / "voice-lock-operation.sqlite3"
+        operation_service = K2VoiceLockService(
+            SqliteVoiceLockAdapter(second_database),
+            ref_factory=Refs(),
+            clock=lambda: "2026-08-29T12:00:00Z",
+        )
+        operation_service.create_voice_lock(command("original-key"))
+        with sqlite3.connect(second_database) as connection:
+            connection.execute(
+                "UPDATE v5_voice_lock_operations SET "
+                "idempotency_key='tampered-key'"
+            )
+        with self.assertRaises(RepositoryUnavailableError):
+            operation_service.create_voice_lock(command("tampered-key"))
+
+    def test_version_parent_chain_is_verified_on_read(self):
+        service = self.service()
+        created = service.create_voice_lock(command("chain-create"))
+        confirmed = service.confirm_voice_lock(
+            confirm_command(created, "chain-confirm")
+        )
+        successor = service.create_voice_lock_version(
+            successor_command(confirmed, "chain-successor")
+        )
+        tampered = deepcopy(successor["voiceLockVersion"])
+        tampered["parentVoiceLockVersionRef"] = "missing-version"
+        tampered["parentVoiceLockDigest"] = "f" * 64
+        tampered.pop("payloadDigest")
+        tampered["payloadDigest"] = _digest(tampered)
+        payload = json.dumps(
+            tampered, ensure_ascii=False, sort_keys=True, separators=(",", ":")
+        )
+        with sqlite3.connect(self.database) as connection:
+            connection.execute(
+                "UPDATE v5_voice_lock_versions SET parent_version_ref=?, "
+                "parent_version_digest=?, payload_json=?, payload_digest=? "
+                "WHERE voice_lock_version_ref=?",
+                (
+                    tampered["parentVoiceLockVersionRef"],
+                    tampered["parentVoiceLockDigest"],
+                    payload,
+                    tampered["payloadDigest"],
+                    tampered["voiceLockVersionRef"],
+                ),
+            )
+        with self.assertRaises(RepositoryUnavailableError):
+            service.get_voice_lock(
+                SCOPE["workspaceRef"],
+                SCOPE["projectRef"],
+                SCOPE["seriesRef"],
+                successor["voiceLock"]["voiceRef"],
             )
 
 

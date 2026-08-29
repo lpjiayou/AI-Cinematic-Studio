@@ -318,7 +318,9 @@ class M12AudioContractTests(unittest.TestCase):
         self.assertEqual(normalized["emotionTag"], "tense")
         for field, value in (
             ("emotionTag", "happy"),
+            ("emotionTag", []),
             ("audioRole", "bgm"),
+            ("audioRole", {}),
         ):
             invalid = deepcopy(normalized)
             invalid[field] = value
@@ -326,6 +328,13 @@ class M12AudioContractTests(unittest.TestCase):
                 normalize_speech_parameters(
                     invalid, confirmed_voice_lock=bundle
                 )
+
+    def test_dialogue_speaker_type_fails_closed(self):
+        dialogue = [{"speaker": [], "text": "不要动。", "emotion": "克制"}]
+        with patch(
+            "services.v5_core_os.episode_production.audio.require_legacy_executable_graph"
+        ), self.assertRaises(EpisodeProductionError):
+            self.service(dialogue).plan_dialogue_requests(WORKSPACE, RUN)
 
     def test_dialogue_plan_is_ordered_voice_bound_and_not_dispatchable(self):
         dialogue = [
@@ -403,6 +412,66 @@ class M12AudioContractTests(unittest.TestCase):
             validate_audio_asset_version_contract(successor),
             successor,
         )
+
+        non_string_role = sealed(
+            {
+                **{
+                    key: value
+                    for key, value in valid.items()
+                    if key != "payloadDigest"
+                },
+                "audioRole": [],
+            }
+        )
+        with self.assertRaises(EpisodeProductionError):
+            validate_audio_asset_version_contract(non_string_role)
+
+        self_cycle = sealed(
+            {
+                **{
+                    key: value
+                    for key, value in valid.items()
+                    if key != "payloadDigest"
+                },
+                "version": 2,
+                "supersedesAssetVersionRef": valid["assetVersionRef"],
+                "supersedesAssetVersionDigest": valid["payloadDigest"],
+            }
+        )
+        with self.assertRaises(EpisodeProductionError):
+            validate_audio_asset_version_contract(self_cycle)
+
+    def test_plan_reads_each_character_voice_once(self):
+        class OneReadVoiceReader(VoiceReader):
+            def __init__(self, values):
+                super().__init__(values)
+                self.reads = 0
+
+            def get_confirmed_voice_lock(
+                self, workspace_ref, project_ref, series_ref, character_ref
+            ):
+                self.reads += 1
+                if self.reads > 1:
+                    raise AssertionError("voice changed inside one plan")
+                return super().get_confirmed_voice_lock(
+                    workspace_ref, project_ref, series_ref, character_ref
+                )
+
+        reader = OneReadVoiceReader(
+            {"character-lin": voice_bundle("character-lin", "voice-lin")}
+        )
+        dialogue = [
+            {"speaker": "林澈", "text": "第一句。", "emotion": "克制"},
+            {"speaker": "林澈", "text": "第二句。", "emotion": "克制"},
+        ]
+        with patch(
+            "services.v5_core_os.episode_production.audio.require_legacy_executable_graph"
+        ):
+            plan = K2AudioProductionService(
+                ShotGraph(fixture(dialogue)), reader
+            ).plan_dialogue_requests(WORKSPACE, RUN)
+        self.assertEqual(len(plan["generationRequests"]), 2)
+        self.assertEqual(reader.reads, 1)
 
     def test_legacy_false_parameters_are_unchanged_and_true_is_rejected(self):
         legacy = {

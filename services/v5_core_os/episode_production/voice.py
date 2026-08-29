@@ -240,7 +240,8 @@ def _validate_version(value: Mapping[str, Any]) -> dict[str, Any]:
             raise RepositoryUnavailableError("VoiceLockVersion parent digest is invalid")
     if value.get("schemaVersion") != VOICE_LOCK_VERSION_SCHEMA_VERSION:
         raise RepositoryUnavailableError("VoiceLockVersion schema is unsupported")
-    if value.get("gender") not in VOICE_GENDERS:
+    gender = value.get("gender")
+    if not isinstance(gender, str) or gender not in VOICE_GENDERS:
         raise RepositoryUnavailableError("VoiceLockVersion gender is invalid")
     _required_ref(value.get("engineFamily"), "engineFamily")
     _required_ref(value.get("voiceId"), "voiceId")
@@ -282,13 +283,23 @@ def _validate_confirmation(value: Mapping[str, Any]) -> dict[str, Any]:
 def validate_confirmed_voice_lock_bundle(value: Any) -> dict[str, Any]:
     """Validate the exact public bundle consumed by downstream M12 services."""
 
-    if not isinstance(value, Mapping) or set(value) != {
+    required_fields = {
         "voiceLock",
         "voiceLockVersion",
         "voiceLockConfirmation",
-    }:
+    }
+    if not isinstance(value, Mapping) or set(value) not in (
+        required_fields,
+        required_fields | {"idempotentReplay"},
+    ):
         raise RepositoryUnavailableError(
             "confirmed VoiceLock bundle fields are invalid"
+        )
+    if "idempotentReplay" in value and not isinstance(
+        value["idempotentReplay"], bool
+    ):
+        raise RepositoryUnavailableError(
+            "confirmed VoiceLock replay metadata is invalid"
         )
     root = _validate_root(value["voiceLock"])
     version = _validate_version(value["voiceLockVersion"])
@@ -324,6 +335,8 @@ def validate_confirmed_voice_lock_bundle(value: Any) -> dict[str, Any]:
 
 
 def _validate_response(operation_kind: str, response: Mapping[str, Any]) -> None:
+    if not isinstance(operation_kind, str):
+        raise RepositoryUnavailableError("VoiceLock operation response is invalid")
     expected = {
         "create-voice-lock": {"voiceLock", "voiceLockVersion"},
         "create-voice-lock-version": {"voiceLock", "voiceLockVersion"},
@@ -417,7 +430,7 @@ def _validate_write_inputs(
 
 def _traits(command: Mapping[str, Any]) -> dict[str, Any]:
     gender = command.get("gender")
-    if gender not in VOICE_GENDERS:
+    if not isinstance(gender, str) or gender not in VOICE_GENDERS:
         raise EpisodeProductionError("gender is invalid")
     return {
         "engineFamily": _required_ref(command.get("engineFamily"), "engineFamily"),
@@ -954,6 +967,25 @@ class SqliteVoiceLockAdapter:
 
     @classmethod
     def _validate_schema(cls, connection: sqlite3.Connection) -> None:
+        def schema_objects(selected: sqlite3.Connection) -> tuple[tuple[Any, ...], ...]:
+            return tuple(
+                tuple(row)
+                for row in selected.execute(
+                    "SELECT type, name, tbl_name, sql FROM sqlite_master "
+                    "WHERE name NOT LIKE 'sqlite_%' ORDER BY type, name"
+                )
+            )
+
+        expected_connection = sqlite3.connect(":memory:")
+        try:
+            cls._create_schema(expected_connection)
+            expected_objects = schema_objects(expected_connection)
+        finally:
+            expected_connection.close()
+        if schema_objects(connection) != expected_objects:
+            raise RepositoryUnavailableError(
+                "VoiceLock repository schema objects changed"
+            )
         integrity = connection.execute("PRAGMA integrity_check").fetchall()
         if [tuple(row) for row in integrity] != [("ok",)]:
             raise RepositoryUnavailableError(
@@ -1115,10 +1147,26 @@ class SqliteVoiceLockAdapter:
             _json_load(row["payload_json"], "VoiceLockConfirmation")
         )
         if (
-            row["payload_digest"] != value["payloadDigest"]
-            or row["voice_lock_digest"] != value["voiceLockDigest"]
-            or row["voice_ref"] != value["voiceRef"]
-            or row["voice_lock_version_ref"] != value["voiceLockVersionRef"]
+            (
+                row["workspace_ref"],
+                row["project_ref"],
+                row["series_ref"],
+                row["voice_lock_confirmation_ref"],
+                row["voice_ref"],
+                row["voice_lock_version_ref"],
+                row["voice_lock_digest"],
+                row["payload_digest"],
+            )
+            != (
+                value["workspaceRef"],
+                value["projectRef"],
+                value["seriesRef"],
+                value["voiceLockConfirmationRef"],
+                value["voiceRef"],
+                value["voiceLockVersionRef"],
+                value["voiceLockDigest"],
+                value["payloadDigest"],
+            )
         ):
             raise RepositoryUnavailableError(
                 "VoiceLockConfirmation projection changed"
@@ -1131,9 +1179,24 @@ class SqliteVoiceLockAdapter:
             _json_load(row["payload_json"], "VoiceLock operation")
         )
         if (
-            row["payload_digest"] != value["payloadDigest"]
-            or row["operation_kind"] != value["operationKind"]
-            or row["request_digest"] != value["requestDigest"]
+            (
+                row["workspace_ref"],
+                row["project_ref"],
+                row["series_ref"],
+                row["idempotency_key"],
+                row["operation_kind"],
+                row["request_digest"],
+                row["payload_digest"],
+            )
+            != (
+                value["workspaceRef"],
+                value["projectRef"],
+                value["seriesRef"],
+                value["idempotencyKey"],
+                value["operationKind"],
+                value["requestDigest"],
+                value["payloadDigest"],
+            )
         ):
             raise RepositoryUnavailableError("VoiceLock operation projection changed")
         return value
@@ -1851,6 +1914,42 @@ class K2VoiceLockService:
         )
         return {**stored, "idempotentReplay": replayed}
 
+    @staticmethod
+    def _require_complete_version_lineage(
+        root: Mapping[str, Any], versions: list[Mapping[str, Any]]
+    ) -> None:
+        if not versions:
+            raise RepositoryUnavailableError("VoiceLock version lineage is incomplete")
+        root_scope = tuple(
+            root[field] for field in ("workspaceRef", "projectRef", "seriesRef")
+        )
+        previous: Mapping[str, Any] | None = None
+        for expected_number, version in enumerate(versions, start=1):
+            if (
+                version["versionNumber"] != expected_number
+                or tuple(
+                    version[field]
+                    for field in ("workspaceRef", "projectRef", "seriesRef")
+                )
+                != root_scope
+                or version["voiceRef"] != root["voiceRef"]
+                or version["characterRef"] != root["characterRef"]
+            ):
+                raise RepositoryUnavailableError(
+                    "VoiceLock version lineage is incomplete"
+                )
+            if previous is not None and (
+                version["parentVoiceLockVersionRef"]
+                != previous["voiceLockVersionRef"]
+                or version["parentVoiceLockDigest"] != previous["payloadDigest"]
+            ):
+                raise RepositoryUnavailableError(
+                    "VoiceLock version lineage is incomplete"
+                )
+            previous = version
+        if versions[-1]["voiceLockVersionRef"] != root["currentVoiceLockVersionRef"]:
+            raise RepositoryUnavailableError("VoiceLock version lineage is incomplete")
+
     def get_voice_lock(
         self,
         workspace_ref: str,
@@ -1864,12 +1963,7 @@ class K2VoiceLockService:
         if root is None:
             raise RecordNotFoundError("VoiceLock was not found")
         versions = self.repository.list_versions(scope, selected_voice_ref)
-        if (
-            not versions
-            or versions[-1]["voiceLockVersionRef"]
-            != root["currentVoiceLockVersionRef"]
-        ):
-            raise RepositoryUnavailableError("VoiceLock version lineage is incomplete")
+        self._require_complete_version_lineage(root, versions)
         confirmed = None
         if root["confirmedVoiceLockVersionRef"] is not None:
             version = self.repository.get_version(
@@ -1910,6 +2004,8 @@ class K2VoiceLockService:
         root = self.repository.get_root_by_character(scope, selected_character_ref)
         if root is None:
             raise RecordNotFoundError("VoiceLock was not found")
+        versions = self.repository.list_versions(scope, root["voiceRef"])
+        self._require_complete_version_lineage(root, versions)
         version_ref = root["confirmedVoiceLockVersionRef"]
         if version_ref is None:
             raise VoiceLockNotConfirmedError("VoiceLock is not confirmed")
