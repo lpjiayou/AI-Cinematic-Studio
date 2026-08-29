@@ -1618,6 +1618,14 @@ Do not rewrite correct code because of network connectivity.
 
 Never force push unless Project Lead explicitly authorizes it.
 
+### Core / Frontend pin strategy
+
+- Frontend normally references Core through immutable annotated tags named `core-baseline-vN`, not exact commit SHAs.
+- Core creates a new tag only for behavioral changes: public API changes, domain behavior changes, or capabilities required by Gate C.
+- Do not create a new tag or change Frontend for documentation, comments, formatting, test refactors, CI configuration, or governance files.
+- Bump flow: create the new Core tag → update the two Frontend pin variables → PR → merge.
+- If an annotated tag cannot be published because Git push credentials are unavailable, the explicitly authorized fallback is a centralized `CORE_PIN_SHA` plus `CORE_PIN_TREE`; record the reason and migrate to a tag when authenticated tag publication is available.
+
 ---
 
 # 37. Secret Policy
