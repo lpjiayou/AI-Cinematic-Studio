@@ -1,0 +1,19 @@
+{
+  "asset_version": "v2",
+  "character": "贞",
+  "slug": "zhen",
+  "font_family": "Noto Serif SC",
+  "font_file": "../../font/NotoSerifSC-VF.ttf",
+  "font_license": "SIL Open Font License 1.1",
+  "license_file": "../../font/OFL-1.1-LICENSE.txt",
+  "canvas": [
+    1024,
+    1024
+  ],
+  "reveal_frame_count": 6,
+  "mask_semantics": "deterministic progressive reveal masks for preproduction compositing; not isolated vector stroke paths",
+  "visual_semantics": "no-ink pressure indentation; grazing-light relief only; zero pigment",
+  "pigment_present": false,
+  "relief_light_direction": "upper-left highlight / lower-right shallow shadow",
+  "texture_seed": 101
+}
