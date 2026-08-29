@@ -1,0 +1,659 @@
+{
+  "schemaVersion": "k2-002.ep01-18shot-source-archive.v1",
+  "projectId": "K2-002-CHANGAN",
+  "episodeId": "EP01",
+  "archivePurpose": "PRESERVE_EXACT_18_SHOT_SEMANTIC_SOURCE_AND_EXTERNAL_MEDIA_METADATA",
+  "archivedAtDateUtc": "2026-08-29",
+  "authorityState": "TECHNICAL_EVIDENCE_ONLY",
+  "canonicalMutationCount": 0,
+  "publicationAllowed": false,
+  "assetVersionCreationAllowed": false,
+  "admissionAllowed": false,
+  "masterExportAllowed": false,
+  "rightsAdmissionState": "NOT_EVALUATED_BY_THIS_ARCHIVE",
+  "largeBinariesInGit": false,
+  "sourceHostRoot": "/data/coding/k2-002-ep01-i2v-v2",
+  "sourceEvidence": {
+    "nonAncestorConvergenceCommit": "2a07118fbe962a6a073e62a05a8c70fac583cd66",
+    "shutdownArchiveCommit": "46bc8f0fc71970c136996cc30282759d964437fd",
+    "shutdownArchiveBranch": "archive/k2-002-ep01-a100-shutdown-20260828",
+    "shutdownArchiveTag": "k2-002-ep01-a100-shutdown-20260828",
+    "shutdownArchiveGitBlob": "60f183cdee5163ccc9de903d244a3b0639686f07",
+    "shutdownArchiveSha256": "30fd28beb8c641672da2e07f63810c12e3e72d0624854a2fd9908d9d1794ea01",
+    "shutdownArchiveGeneratedAtUtc": "2026-08-28T14:45:22.933625+00:00",
+    "sourceInputManifest": {
+      "archiveMemberPath": "execution-snapshots/k2-002-ep01-i2v-batch-r3/SOURCE_INPUT_MANIFEST.json",
+      "repositoryPath": "experiments/k2-002-ep01-sh12-anchor-control/batch-r3/SOURCE_INPUT_MANIFEST.json",
+      "bytes": 5214,
+      "sha256": "b0f966d95c63a39ed88cbdd071248f5146854e8afb7605836093993121997392"
+    },
+    "batchR1ShotStatusMatrix": {
+      "archiveMemberPath": "execution-snapshots/k2-002-ep01-i2v-batch-r1/manifests/SHOT_STATUS_MATRIX.json",
+      "bytes": 28522,
+      "sha256": "cc3bb81cc533e7d1345ce00f04ad7a1f3ffe4972ed1f0f0d52343bddc55092e8"
+    },
+    "batchR3TechnicalStatusMatrix": {
+      "archiveMemberPath": "technical-evidence/k2-002-ep01-i2v-batch-r3/SHOT_TECHNICAL_STATUS_MATRIX.json",
+      "bytes": 15633,
+      "sha256": "2b1ad763f68394d062ddb922a8d811b3cb9df1e2b9b40254cb52a76ab6be860d"
+    },
+    "batchR3VisualStatusMatrix": {
+      "archiveMemberPath": "technical-evidence/k2-002-ep01-i2v-batch-r3/SHOT_VISUAL_STATUS_MATRIX.json",
+      "bytes": 17371,
+      "sha256": "9a540861d508b7b7d52280dd56da9ad954ba3d6edf8ad9ca41fd3ae88bc139c7"
+    },
+    "convergenceShotStatusMatrix": {
+      "commit": "2a07118fbe962a6a073e62a05a8c70fac583cd66",
+      "path": "experiments/k2-002-ep01-sh12-anchor-control/batch-r3/SHOT_STATUS_MATRIX.json",
+      "bytes": 5770,
+      "sha256": "cbbb0759357831676052f1ea1a55c6116a13192e9e9f430b0490cb66a19579a6"
+    },
+    "a100ReadOnlyExport": {
+      "dateUtc": "2026-08-29",
+      "scope": [
+        "EP01_SH01",
+        "EP01_SH02"
+      ],
+      "schemaVersion": "ep01-two-shot-video-metadata.v1",
+      "ffprobeVersion": "ffprobe version 6.1.1-3ubuntu5 Copyright (c) 2007-2023 the FFmpeg developers"
+    },
+    "shutdownArchiveByteReprobe": {
+      "dateUtc": "2026-08-29",
+      "scope": [
+        "EP01_SH03",
+        "EP01_SH04",
+        "EP01_SH05",
+        "EP01_SH06",
+        "EP01_SH07",
+        "EP01_SH08",
+        "EP01_SH09",
+        "EP01_SH10",
+        "EP01_SH11",
+        "EP01_SH12",
+        "EP01_SH13",
+        "EP01_SH14",
+        "EP01_SH15",
+        "EP01_SH16",
+        "EP01_SH17",
+        "EP01_SH18"
+      ],
+      "source": "BYTE_IDENTICAL_MEDIA_FROM_SHUTDOWN_ARCHIVE",
+      "ffprobeVersion": "ffprobe version 6.1.1-3ubuntu5 Copyright (c) 2007-2023 the FFmpeg developers"
+    }
+  },
+  "sourceFiles": [
+    {
+      "path": "shots.json",
+      "sourcePath": "/data/coding/k2-002-ep01-i2v-v2/shots.json",
+      "archiveMemberPath": "execution-snapshots/k2-002-ep01-i2v-batch-r1/inputs/shots.json",
+      "bytes": 35140,
+      "sha256": "52e24c8c781f2c729239d6152246677c8eb633d43d17463550c22bb91c8fd9c9",
+      "gitBlob": "77e341bed3ecaa90a3917d848c40158d80e99ead"
+    },
+    {
+      "path": "camera_contract.json",
+      "sourcePath": "/data/coding/k2-002-ep01-i2v-v2/camera_contract.json",
+      "archiveMemberPath": "execution-snapshots/k2-002-ep01-i2v-batch-r1/inputs/camera_contract.json",
+      "bytes": 20922,
+      "sha256": "b83967cd56dc22681b6b0271cae03a5aae9f3f328a5dbb9ff209e15544104a3a",
+      "gitBlob": "ad52f3a138c4152a012eb9803513365cdf3fa026"
+    },
+    {
+      "path": "anchor_manifest.json",
+      "sourcePath": "/data/coding/k2-002-ep01-i2v-v2/anchor_manifest.json",
+      "archiveMemberPath": "execution-snapshots/k2-002-ep01-i2v-batch-r1/inputs/anchor_manifest.json",
+      "bytes": 7424,
+      "sha256": "70bdc61408123381b448cc9732840197632ad5523283681a15c38ff85f47fbb3",
+      "gitBlob": "5dbf844fba940bb600c24fc58b9e352afc30553c"
+    }
+  ],
+  "anchors": {
+    "storageMode": "MANIFEST_ONLY",
+    "manifestPath": "anchor_manifest.json",
+    "binaryFilesInGit": false,
+    "fileCount": 18,
+    "shotIds": [
+      "EP01_SH01",
+      "EP01_SH02",
+      "EP01_SH03",
+      "EP01_SH04",
+      "EP01_SH05",
+      "EP01_SH06",
+      "EP01_SH07",
+      "EP01_SH08",
+      "EP01_SH09",
+      "EP01_SH10",
+      "EP01_SH11",
+      "EP01_SH12",
+      "EP01_SH13",
+      "EP01_SH14",
+      "EP01_SH15",
+      "EP01_SH16",
+      "EP01_SH17",
+      "EP01_SH18"
+    ]
+  },
+  "probeProfiles": {
+    "H264_HIGH_704X1280_49F_24FPS_NO_AUDIO": {
+      "container": "mov,mp4,m4a,3gp,3g2,mj2",
+      "codec": "h264",
+      "profile": "High",
+      "pixelFormat": "yuv420p",
+      "width": 704,
+      "height": 1280,
+      "realFrameRate": "24/1",
+      "averageFrameRate": "24/1",
+      "frameCount": 49,
+      "decodedFrameCount": 49,
+      "durationSeconds": "2.041667",
+      "videoStreamCount": 1,
+      "audioStreamCount": 0
+    }
+  },
+  "videos": {
+    "binaryFilesInGit": false,
+    "metadataCount": 18,
+    "selectedCount": 11,
+    "unresolvedSelectionShots": [
+      "EP01_SH08",
+      "EP01_SH12",
+      "EP01_SH13",
+      "EP01_SH15",
+      "EP01_SH16",
+      "EP01_SH17",
+      "EP01_SH18"
+    ],
+    "episodeVisualCompletion": "INCOMPLETE",
+    "items": [
+      {
+        "shotId": "EP01_SH01",
+        "selection": {
+          "status": "ACCEPTED_POSITIVE_CONTROL",
+          "selectedSourcePath": "/data/k2-technical-evidence/k2-002-ep01-i2v-v2-18shot/media/EP01_SH01.mp4"
+        },
+        "media": {
+          "role": "SELECTED_TECHNICAL_EVIDENCE",
+          "path": "/data/k2-technical-evidence/k2-002-ep01-i2v-v2-18shot/media/EP01_SH01.mp4",
+          "bytes": 1711664,
+          "sha256": "1f6567c64547693c0d7e43146f26b16121f8a9570677a3a2d2d3bc81af0bfe3e"
+        },
+        "probeResult": {
+          "profileRef": "H264_HIGH_704X1280_49F_24FPS_NO_AUDIO",
+          "source": "A100_READ_ONLY_EXPORT_2026-08-29",
+          "verified": true
+        },
+        "status": {
+          "technical": "EXISTING_VALID",
+          "visual": "PASS",
+          "provenance": "SOURCE_RECORD_REFERENCED_NOT_ARCHIVED"
+        },
+        "gaps": [
+          "RUN_AND_COPY_BINDING_RECORD_NOT_ARCHIVED"
+        ],
+        "canonicalAdmission": false,
+        "publicationAllowed": false
+      },
+      {
+        "shotId": "EP01_SH02",
+        "selection": {
+          "status": "ACCEPTED_POSITIVE_CONTROL",
+          "selectedSourcePath": "/data/k2-technical-evidence/k2-002-ep01-i2v-v2-18shot/media/EP01_SH02.mp4"
+        },
+        "media": {
+          "role": "SELECTED_TECHNICAL_EVIDENCE",
+          "path": "/data/k2-technical-evidence/k2-002-ep01-i2v-v2-18shot/media/EP01_SH02.mp4",
+          "bytes": 436084,
+          "sha256": "2f35b8d96ff8242843a1969171e3d7c8032b306d3ce7b16e96149c9489b7ccff"
+        },
+        "probeResult": {
+          "profileRef": "H264_HIGH_704X1280_49F_24FPS_NO_AUDIO",
+          "source": "A100_READ_ONLY_EXPORT_2026-08-29",
+          "verified": true
+        },
+        "status": {
+          "technical": "EXISTING_VALID",
+          "visual": "PASS",
+          "provenance": "SOURCE_RECORD_REFERENCED_NOT_ARCHIVED"
+        },
+        "gaps": [
+          "RUN_AND_COPY_BINDING_RECORD_NOT_ARCHIVED"
+        ],
+        "canonicalAdmission": false,
+        "publicationAllowed": false
+      },
+      {
+        "shotId": "EP01_SH03",
+        "selection": {
+          "status": "USER_SELECTED_TECHNICAL_CANDIDATE",
+          "selectedSourcePath": "/data/k2-technical-evidence/k2-002-ep01-sh03-r3-recovered/media/EP01_SH03_R3_RECOVERED.mp4"
+        },
+        "media": {
+          "role": "SELECTED_TECHNICAL_EVIDENCE",
+          "path": "/data/k2-technical-evidence/k2-002-ep01-sh03-r3-recovered/media/EP01_SH03_R3_RECOVERED.mp4",
+          "bytes": 545098,
+          "sha256": "6b936a8bb59654888dabd4d8439fb5b6f182516c3687a53da139435a4cb8d179"
+        },
+        "probeResult": {
+          "profileRef": "H264_HIGH_704X1280_49F_24FPS_NO_AUDIO",
+          "source": "SHUTDOWN_ARCHIVE_BYTE_REPROBE_2026-08-29",
+          "verified": true
+        },
+        "status": {
+          "technical": "RECOVERED_MEDIA_VALID",
+          "visual": "USER_SELECTED_TECHNICAL_CANDIDATE",
+          "provenance": "RECOVERED_MEDIA_CONTROL_PROVENANCE_INCOMPLETE"
+        },
+        "gaps": [
+          "CONTROL_PROVENANCE_INCOMPLETE"
+        ],
+        "canonicalAdmission": false,
+        "publicationAllowed": false
+      },
+      {
+        "shotId": "EP01_SH04",
+        "selection": {
+          "status": "TECHNICAL_CANDIDATE",
+          "selectedSourcePath": "/data/k2-technical-evidence/k2-002-ep01-i2v-batch-r3/media/EP01_SH04.mp4"
+        },
+        "media": {
+          "role": "SELECTED_TECHNICAL_EVIDENCE",
+          "path": "/data/k2-technical-evidence/k2-002-ep01-i2v-batch-r3/media/EP01_SH04.mp4",
+          "bytes": 576929,
+          "sha256": "c08f864bc9862ffa63aabb97c7c6f0c7d34c5200f55ef761126e61e28713ac14"
+        },
+        "probeResult": {
+          "profileRef": "H264_HIGH_704X1280_49F_24FPS_NO_AUDIO",
+          "source": "SHUTDOWN_ARCHIVE_BYTE_REPROBE_2026-08-29",
+          "verified": true
+        },
+        "status": {
+          "technical": "PASS",
+          "visual": "PASS",
+          "provenance": "BATCH_R3_HISTORY_WORKFLOW_SOURCE_COPY_BINDING_PASS"
+        },
+        "gaps": [],
+        "canonicalAdmission": false,
+        "publicationAllowed": false
+      },
+      {
+        "shotId": "EP01_SH05",
+        "selection": {
+          "status": "TECHNICAL_CANDIDATE",
+          "selectedSourcePath": "/data/k2-technical-evidence/k2-002-ep01-i2v-batch-r3/media/EP01_SH05.mp4"
+        },
+        "media": {
+          "role": "SELECTED_TECHNICAL_EVIDENCE",
+          "path": "/data/k2-technical-evidence/k2-002-ep01-i2v-batch-r3/media/EP01_SH05.mp4",
+          "bytes": 453689,
+          "sha256": "752eaf12d2fa42115da678e6d77d03e3cbd6ec44466e014bfa40da7aa2bdb67b"
+        },
+        "probeResult": {
+          "profileRef": "H264_HIGH_704X1280_49F_24FPS_NO_AUDIO",
+          "source": "SHUTDOWN_ARCHIVE_BYTE_REPROBE_2026-08-29",
+          "verified": true
+        },
+        "status": {
+          "technical": "PASS",
+          "visual": "PASS",
+          "provenance": "BATCH_R3_HISTORY_WORKFLOW_SOURCE_COPY_BINDING_PASS"
+        },
+        "gaps": [],
+        "canonicalAdmission": false,
+        "publicationAllowed": false
+      },
+      {
+        "shotId": "EP01_SH06",
+        "selection": {
+          "status": "TECHNICAL_CANDIDATE",
+          "selectedSourcePath": "/data/k2-technical-evidence/k2-002-ep01-i2v-batch-r3/media/EP01_SH06.mp4"
+        },
+        "media": {
+          "role": "SELECTED_TECHNICAL_EVIDENCE",
+          "path": "/data/k2-technical-evidence/k2-002-ep01-i2v-batch-r3/media/EP01_SH06.mp4",
+          "bytes": 165484,
+          "sha256": "eaf26654e9beead66d8aae53b3d42986c328d94ba2be04e4dfd5273486f275f2"
+        },
+        "probeResult": {
+          "profileRef": "H264_HIGH_704X1280_49F_24FPS_NO_AUDIO",
+          "source": "SHUTDOWN_ARCHIVE_BYTE_REPROBE_2026-08-29",
+          "verified": true
+        },
+        "status": {
+          "technical": "PASS",
+          "visual": "PASS_WITH_MINOR_DEFECT",
+          "provenance": "BATCH_R3_HISTORY_WORKFLOW_SOURCE_COPY_BINDING_PASS"
+        },
+        "gaps": [],
+        "canonicalAdmission": false,
+        "publicationAllowed": false
+      },
+      {
+        "shotId": "EP01_SH07",
+        "selection": {
+          "status": "TECHNICAL_CANDIDATE",
+          "selectedSourcePath": "/data/k2-technical-evidence/k2-002-ep01-i2v-batch-r3/media/EP01_SH07.mp4"
+        },
+        "media": {
+          "role": "SELECTED_TECHNICAL_EVIDENCE",
+          "path": "/data/k2-technical-evidence/k2-002-ep01-i2v-batch-r3/media/EP01_SH07.mp4",
+          "bytes": 529657,
+          "sha256": "4b1a6b975934b9616f738471b42f6771268d650539062f03fce50a8a88f814e1"
+        },
+        "probeResult": {
+          "profileRef": "H264_HIGH_704X1280_49F_24FPS_NO_AUDIO",
+          "source": "SHUTDOWN_ARCHIVE_BYTE_REPROBE_2026-08-29",
+          "verified": true
+        },
+        "status": {
+          "technical": "PASS",
+          "visual": "PASS_WITH_MINOR_DEFECT",
+          "provenance": "BATCH_R3_HISTORY_WORKFLOW_SOURCE_COPY_BINDING_PASS"
+        },
+        "gaps": [],
+        "canonicalAdmission": false,
+        "publicationAllowed": false
+      },
+      {
+        "shotId": "EP01_SH08",
+        "selection": {
+          "status": "NONE",
+          "selectedSourcePath": null
+        },
+        "media": {
+          "role": "EVIDENCE_ONLY",
+          "path": "/data/k2-technical-evidence/k2-002-ep01-i2v-batch-r3/media/EP01_SH08.mp4",
+          "bytes": 169789,
+          "sha256": "84701c4e1b8ed5f9a0493e311380fabe5aa52d11218a2690a4d19e0061ba3310"
+        },
+        "probeResult": {
+          "profileRef": "H264_HIGH_704X1280_49F_24FPS_NO_AUDIO",
+          "source": "SHUTDOWN_ARCHIVE_BYTE_REPROBE_2026-08-29",
+          "verified": true
+        },
+        "status": {
+          "technical": "PASS",
+          "visual": "FAIL_VISUAL",
+          "provenance": "BATCH_R3_HISTORY_WORKFLOW_SOURCE_COPY_BINDING_PASS"
+        },
+        "gaps": [
+          "NO_SELECTED_MEDIA"
+        ],
+        "canonicalAdmission": false,
+        "publicationAllowed": false
+      },
+      {
+        "shotId": "EP01_SH09",
+        "selection": {
+          "status": "TECHNICAL_CANDIDATE",
+          "selectedSourcePath": "/data/k2-technical-evidence/k2-002-ep01-i2v-batch-r3/media/EP01_SH09.mp4"
+        },
+        "media": {
+          "role": "SELECTED_TECHNICAL_EVIDENCE",
+          "path": "/data/k2-technical-evidence/k2-002-ep01-i2v-batch-r3/media/EP01_SH09.mp4",
+          "bytes": 233086,
+          "sha256": "eef43c6653716a0d9ac647ff4b3645312e80ec4961d5b5308a2396eb1db5a99b"
+        },
+        "probeResult": {
+          "profileRef": "H264_HIGH_704X1280_49F_24FPS_NO_AUDIO",
+          "source": "SHUTDOWN_ARCHIVE_BYTE_REPROBE_2026-08-29",
+          "verified": true
+        },
+        "status": {
+          "technical": "PASS",
+          "visual": "PASS",
+          "provenance": "BATCH_R3_HISTORY_WORKFLOW_SOURCE_COPY_BINDING_PASS"
+        },
+        "gaps": [],
+        "canonicalAdmission": false,
+        "publicationAllowed": false
+      },
+      {
+        "shotId": "EP01_SH10",
+        "selection": {
+          "status": "TECHNICAL_CANDIDATE",
+          "selectedSourcePath": "/data/k2-technical-evidence/k2-002-ep01-i2v-batch-r3/media/EP01_SH10.mp4"
+        },
+        "media": {
+          "role": "SELECTED_TECHNICAL_EVIDENCE",
+          "path": "/data/k2-technical-evidence/k2-002-ep01-i2v-batch-r3/media/EP01_SH10.mp4",
+          "bytes": 282991,
+          "sha256": "f820b44ae14949c1bc3e5d86c7cf8470eeae2f2b8ae9c91a0897ef95cb56a014"
+        },
+        "probeResult": {
+          "profileRef": "H264_HIGH_704X1280_49F_24FPS_NO_AUDIO",
+          "source": "SHUTDOWN_ARCHIVE_BYTE_REPROBE_2026-08-29",
+          "verified": true
+        },
+        "status": {
+          "technical": "PASS",
+          "visual": "PASS_WITH_MINOR_DEFECT",
+          "provenance": "BATCH_R3_HISTORY_WORKFLOW_SOURCE_COPY_BINDING_PASS"
+        },
+        "gaps": [],
+        "canonicalAdmission": false,
+        "publicationAllowed": false
+      },
+      {
+        "shotId": "EP01_SH11",
+        "selection": {
+          "status": "TECHNICAL_CANDIDATE",
+          "selectedSourcePath": "/data/k2-technical-evidence/k2-002-ep01-i2v-batch-r3/media/EP01_SH11.mp4"
+        },
+        "media": {
+          "role": "SELECTED_TECHNICAL_EVIDENCE",
+          "path": "/data/k2-technical-evidence/k2-002-ep01-i2v-batch-r3/media/EP01_SH11.mp4",
+          "bytes": 260474,
+          "sha256": "d5b73cd3e955707418b6e65e3870036c2f9ab6b8e984775ae052b69efea11905"
+        },
+        "probeResult": {
+          "profileRef": "H264_HIGH_704X1280_49F_24FPS_NO_AUDIO",
+          "source": "SHUTDOWN_ARCHIVE_BYTE_REPROBE_2026-08-29",
+          "verified": true
+        },
+        "status": {
+          "technical": "PASS",
+          "visual": "PASS",
+          "provenance": "BATCH_R3_HISTORY_WORKFLOW_SOURCE_COPY_BINDING_PASS"
+        },
+        "gaps": [],
+        "canonicalAdmission": false,
+        "publicationAllowed": false
+      },
+      {
+        "shotId": "EP01_SH12",
+        "selection": {
+          "status": "NONE",
+          "selectedSourcePath": null
+        },
+        "media": {
+          "role": "RECOVERED_EVIDENCE_ONLY",
+          "path": "/data/k2-technical-evidence/k2-002-ep01-i2v-v2-sh12-r5-anchor-only/recovered_media/EP01_SH12_R5_RECOVERED.mp4",
+          "bytes": 688063,
+          "sha256": "1d115e2bf71e11a8b57d1e891bf8e1fe08f483e32ae78be5a675d969fa2bd5c1"
+        },
+        "probeResult": {
+          "profileRef": "H264_HIGH_704X1280_49F_24FPS_NO_AUDIO",
+          "source": "SHUTDOWN_ARCHIVE_BYTE_REPROBE_2026-08-29",
+          "verified": true
+        },
+        "status": {
+          "technical": "R5_MEDIA_VALID_CONTROL_PROVENANCE_INCOMPLETE",
+          "visual": "FAIL",
+          "provenance": "RECOVERED_MEDIA_ATTRIBUTION_STRONG_CONTROL_PROVENANCE_INCOMPLETE"
+        },
+        "gaps": [
+          "NO_SELECTED_MEDIA",
+          "CONTROL_PROVENANCE_INCOMPLETE"
+        ],
+        "canonicalAdmission": false,
+        "publicationAllowed": false
+      },
+      {
+        "shotId": "EP01_SH13",
+        "selection": {
+          "status": "NONE",
+          "selectedSourcePath": null
+        },
+        "media": {
+          "role": "EVIDENCE_ONLY",
+          "path": "/data/k2-technical-evidence/k2-002-ep01-i2v-batch-r3/media/EP01_SH13.mp4",
+          "bytes": 226239,
+          "sha256": "e6580faae4079900de324f267c47c5b7fc520fc88360bf67495a1d53c3d3307a"
+        },
+        "probeResult": {
+          "profileRef": "H264_HIGH_704X1280_49F_24FPS_NO_AUDIO",
+          "source": "SHUTDOWN_ARCHIVE_BYTE_REPROBE_2026-08-29",
+          "verified": true
+        },
+        "status": {
+          "technical": "PASS",
+          "visual": "FAIL_VISUAL",
+          "provenance": "BATCH_R3_HISTORY_WORKFLOW_SOURCE_COPY_BINDING_PASS"
+        },
+        "gaps": [
+          "NO_SELECTED_MEDIA"
+        ],
+        "canonicalAdmission": false,
+        "publicationAllowed": false
+      },
+      {
+        "shotId": "EP01_SH14",
+        "selection": {
+          "status": "TECHNICAL_CANDIDATE",
+          "selectedSourcePath": "/data/k2-technical-evidence/k2-002-ep01-i2v-batch-r3/media/EP01_SH14.mp4"
+        },
+        "media": {
+          "role": "SELECTED_TECHNICAL_EVIDENCE",
+          "path": "/data/k2-technical-evidence/k2-002-ep01-i2v-batch-r3/media/EP01_SH14.mp4",
+          "bytes": 284759,
+          "sha256": "3aa14a83fc243210f15aaadadb3b4dec5f7df69e0d4891b416901e0e42228b06"
+        },
+        "probeResult": {
+          "profileRef": "H264_HIGH_704X1280_49F_24FPS_NO_AUDIO",
+          "source": "SHUTDOWN_ARCHIVE_BYTE_REPROBE_2026-08-29",
+          "verified": true
+        },
+        "status": {
+          "technical": "PASS",
+          "visual": "PASS_WITH_MINOR_DEFECT",
+          "provenance": "BATCH_R3_HISTORY_WORKFLOW_SOURCE_COPY_BINDING_PASS"
+        },
+        "gaps": [],
+        "canonicalAdmission": false,
+        "publicationAllowed": false
+      },
+      {
+        "shotId": "EP01_SH15",
+        "selection": {
+          "status": "NONE",
+          "selectedSourcePath": null
+        },
+        "media": {
+          "role": "EVIDENCE_ONLY",
+          "path": "/data/k2-technical-evidence/k2-002-ep01-i2v-batch-r3/media/EP01_SH15.mp4",
+          "bytes": 965499,
+          "sha256": "545aa16905c22581d63ff001a71d900ed83e790818b46eb677730a76d3535fd2"
+        },
+        "probeResult": {
+          "profileRef": "H264_HIGH_704X1280_49F_24FPS_NO_AUDIO",
+          "source": "SHUTDOWN_ARCHIVE_BYTE_REPROBE_2026-08-29",
+          "verified": true
+        },
+        "status": {
+          "technical": "PASS",
+          "visual": "FAIL_VISUAL",
+          "provenance": "BATCH_R3_HISTORY_WORKFLOW_SOURCE_COPY_BINDING_PASS"
+        },
+        "gaps": [
+          "NO_SELECTED_MEDIA"
+        ],
+        "canonicalAdmission": false,
+        "publicationAllowed": false
+      },
+      {
+        "shotId": "EP01_SH16",
+        "selection": {
+          "status": "NONE",
+          "selectedSourcePath": null
+        },
+        "media": {
+          "role": "EVIDENCE_ONLY",
+          "path": "/data/k2-technical-evidence/k2-002-ep01-i2v-batch-r3/media/EP01_SH16.mp4",
+          "bytes": 654360,
+          "sha256": "0a09e09821eaf69e4831dc5d1cb9587118f86d5b80cc6a6c04cf09b1d15e2856"
+        },
+        "probeResult": {
+          "profileRef": "H264_HIGH_704X1280_49F_24FPS_NO_AUDIO",
+          "source": "SHUTDOWN_ARCHIVE_BYTE_REPROBE_2026-08-29",
+          "verified": true
+        },
+        "status": {
+          "technical": "PASS",
+          "visual": "FAIL_VISUAL",
+          "provenance": "BATCH_R3_HISTORY_WORKFLOW_SOURCE_COPY_BINDING_PASS"
+        },
+        "gaps": [
+          "NO_SELECTED_MEDIA"
+        ],
+        "canonicalAdmission": false,
+        "publicationAllowed": false
+      },
+      {
+        "shotId": "EP01_SH17",
+        "selection": {
+          "status": "NONE",
+          "selectedSourcePath": null
+        },
+        "media": {
+          "role": "EVIDENCE_ONLY",
+          "path": "/data/k2-technical-evidence/k2-002-ep01-i2v-batch-r3/media/EP01_SH17.mp4",
+          "bytes": 113786,
+          "sha256": "a522cf11c5c825953f825476ecd7b30d0934b380969bd717f4f663d78ccba11d"
+        },
+        "probeResult": {
+          "profileRef": "H264_HIGH_704X1280_49F_24FPS_NO_AUDIO",
+          "source": "SHUTDOWN_ARCHIVE_BYTE_REPROBE_2026-08-29",
+          "verified": true
+        },
+        "status": {
+          "technical": "PASS",
+          "visual": "FAIL_VISUAL",
+          "provenance": "BATCH_R3_HISTORY_WORKFLOW_SOURCE_COPY_BINDING_PASS"
+        },
+        "gaps": [
+          "NO_SELECTED_MEDIA"
+        ],
+        "canonicalAdmission": false,
+        "publicationAllowed": false
+      },
+      {
+        "shotId": "EP01_SH18",
+        "selection": {
+          "status": "NONE",
+          "selectedSourcePath": null
+        },
+        "media": {
+          "role": "EVIDENCE_ONLY",
+          "path": "/data/k2-technical-evidence/k2-002-ep01-i2v-batch-r3/media/EP01_SH18.mp4",
+          "bytes": 144472,
+          "sha256": "7b994411cd5930e7eaf21baab3fc5ab74bcc1be564a9d66204d2cf80b5575258"
+        },
+        "probeResult": {
+          "profileRef": "H264_HIGH_704X1280_49F_24FPS_NO_AUDIO",
+          "source": "SHUTDOWN_ARCHIVE_BYTE_REPROBE_2026-08-29",
+          "verified": true
+        },
+        "status": {
+          "technical": "PASS",
+          "visual": "FAIL_VISUAL",
+          "provenance": "BATCH_R3_HISTORY_WORKFLOW_SOURCE_COPY_BINDING_PASS"
+        },
+        "gaps": [
+          "NO_SELECTED_MEDIA"
+        ],
+        "canonicalAdmission": false,
+        "publicationAllowed": false
+      }
+    ]
+  }
+}

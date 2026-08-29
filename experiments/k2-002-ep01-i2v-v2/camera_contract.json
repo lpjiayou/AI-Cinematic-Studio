@@ -1,0 +1,449 @@
+{
+  "schemaVersion": "k2.camera-contract.v2",
+  "contractId": "K2-002-EP01-CAMERA-CONTRACT-18SHOT-V2",
+  "projectId": "K2-002-CHANGAN",
+  "episodeId": "EP01",
+  "title": "长安刮痕 EP01 18-shot motion redesign",
+  "status": "TECHNICAL_DESIGN_READY",
+  "claim": {
+    "authorityState": "TECHNICAL_EVIDENCE_ONLY",
+    "publicationAllowed": false,
+    "canonicalMutations": 0,
+    "createsAssetVersion": false,
+    "createsAdmission": false,
+    "createsMaster": false,
+    "createsExport": false
+  },
+  "raster": {
+    "width": 704,
+    "height": 1280,
+    "orientation": "portrait 9:16",
+    "generationFramesPerShot": 49,
+    "generationFps": 24,
+    "nativeSegmentSeconds": 2.041667,
+    "editTimelineSeconds": 30.0,
+    "chainSegments": false
+  },
+  "cameraRules": {
+    "onePrimarySpatialMovePerShot": true,
+    "oneOptionalFocusMovePerShot": true,
+    "actorActionRequiredWhenActorVisible": true,
+    "cameraCannotSubstituteForActorAction": true,
+    "visibleParallaxRequiredForSpatialMoves": true,
+    "pushRangePercent": [5, 10],
+    "maximumArcDegrees": 15,
+    "genericUniformSlowPushProhibited": true,
+    "intentionalStops": ["EP01_SH13", "EP01_SH16", "EP01_SH18"]
+  },
+  "continuity": {
+    "rain": {
+      "source": "deterministic exterior rain plate",
+      "direction": "upper-left to lower-right",
+      "intensity": "steady medium-heavy night rain",
+      "applies": "continuous whenever L1 straight-lattice windows, west doorway, or L2 exterior are visible",
+      "prohibited": "random direction or intensity changes between shots"
+    },
+    "coldWind": {
+      "source": "Pei Yun opening L1 west door",
+      "direction": "west-to-east",
+      "timeline": {
+        "EP01_SH08": "first off-screen door crack; short leading gust reaches hero flame",
+        "EP01_SH09": "gust continues at reduced strength as Shen reacts",
+        "EP01_SH10": "door movement is revealed; pressure front enters room",
+        "EP01_SH11": "threshold opening strengthens gust",
+        "EP01_SH12": "peak gust during Pei's step",
+        "EP01_SH13": "decay and paper oscillation",
+        "EP01_SH14": "final settling",
+        "EP01_SH15-EP01_SH18": "no new gust"
+      }
+    },
+    "windLinkedObjects": {
+      "paperA": "near loose sheet: lift in SH11, one page-turn in SH12, oscillate in SH13, settle in SH14",
+      "paperB": "secondary corner: brief lift only, never leaves desk",
+      "scrollEdge": "small ripple only",
+      "heroFlame": "leans east with the same gust; no independent direction change",
+      "wardrobe": "Pei robe hem and Shen sleeve respond to the same west-to-east force"
+    },
+    "characterLocks": {
+      "ShenZhiwei": "young Chinese woman; exact lock-v3 face; black futou; teal-blue official robe; black belt and boots",
+      "PeiYun": "elderly Chinese man; exact lock-v2 face and gray beard; black futou; deep-crimson official robe; black belt and boots"
+    },
+    "propLocks": {
+      "heroLamp": "bronze proofreading oil lamp; never substitute a paper lantern",
+      "openingLamp": "the same bronze proofreading lamp carried by Shen; not the EP02 lantern-bearer's paper lantern",
+      "residualScroll": "warm fibrous paper with pressure relief; no model-generated readable glyph"
+    }
+  },
+  "globalGenerationConstraints": {
+    "required": [
+      "continuous natural actor motion",
+      "environment motion remains causally linked",
+      "stable facial identity and wardrobe",
+      "stable architecture and prop geometry",
+      "single native 49-frame segment"
+    ],
+    "prohibited": [
+      "frozen pose with breathing only",
+      "camera-only motion when an actor is visible",
+      "large unmotivated camera move",
+      "identity drift",
+      "face morph",
+      "age change",
+      "wardrobe change",
+      "geometry warp",
+      "scene cut",
+      "transition",
+      "object appearing",
+      "duplicate limbs",
+      "random paper storm",
+      "model-generated Chinese glyph"
+    ]
+  },
+  "shots": [
+    {
+      "shotId": "EP01_SH01",
+      "editDurationSeconds": 1.5,
+      "anchor": "anchors/EP01_SH01_anchor_v2.png",
+      "purpose": "Open on spatial movement and establish the dynamic baseline.",
+      "startState": "Shen enters the near end of L2 as a back/three-quarter silhouette, bronze proofreading lamp in hand, before her first visible step.",
+      "performance": "Walk two measured steps down the rain corridor; lamp hand swings slightly; robe hem trails.",
+      "camera": {
+        "framing": "full-body silhouette with deep corridor vanishing point",
+        "lensMmEquivalent": 28,
+        "heightMeters": 0.85,
+        "primaryMove": "side-track 0.8 m parallel to Shen, maintaining foreground-pillar parallax",
+        "focus": "hold Shen silhouette and near rain edge; no rack",
+        "endCondition": "Shen clears the first pillar; do not reveal an identifiable face"
+      },
+      "environment": "Diagonal rain, eave runoff, puddle ripples and wet reflections move continuously; compact lamp flame and robe respond to walking air.",
+      "identityRisk": "LOW_SILHOUETTE"
+    },
+    {
+      "shotId": "EP01_SH02",
+      "editDurationSeconds": 1.8,
+      "anchor": "anchors/EP01_SH02_anchor_v2.png",
+      "purpose": "Turn the residual scroll into an active discovery surface.",
+      "startState": "Pressure field is almost dark; bright side-light is just outside frame right.",
+      "performance": "No actor visible; light sweeps across fibers and faint pressure traces emerge.",
+      "camera": {
+        "framing": "extreme oblique macro",
+        "lensMmEquivalent": 90,
+        "heightMeters": 0.12,
+        "primaryMove": "12 cm slider right-to-left along the paper ridge",
+        "focus": "4 cm rack from near fiber ridge to pressure field",
+        "endCondition": "traces are visible but remain unreadable"
+      },
+      "environment": "Dust motes cross the light cone; no wind-driven paper motion yet.",
+      "identityRisk": "NONE"
+    },
+    {
+      "shotId": "EP01_SH03",
+      "editDurationSeconds": 2.0,
+      "anchor": "anchors/EP01_SH03_anchor_v2.png",
+      "purpose": "Motivate the changing side-light through a physical action.",
+      "startState": "Shen's hand hovers beside the lamp pedestal before contact; side-light is fixed.",
+      "performance": "Fingers contact and rotate the bronze base a small amount; the light pool sweeps onto pressure traces.",
+      "camera": {
+        "framing": "low desk-level hand-and-lamp close-up",
+        "lensMmEquivalent": 65,
+        "heightMeters": 0.18,
+        "primaryMove": "10-degree clockwise arc at 0.7 m radius",
+        "focus": "rack fingertips to newly lit paper texture",
+        "endCondition": "lamp rotation stops cleanly; traces remain unreadable"
+      },
+      "environment": "Flame bends briefly with lamp rotation then stabilizes; paper remains still.",
+      "identityRisk": "LOW_HAND_ONLY"
+    },
+    {
+      "shotId": "EP01_SH04",
+      "editDurationSeconds": 1.7,
+      "anchor": "anchors/EP01_SH04_anchor_v2.png",
+      "purpose": "Add a precise forensic action beat.",
+      "startState": "Tweezers hover 2 cm above one fiber and have not touched the scroll.",
+      "performance": "Tweezers lower once and stop immediately above the selected fiber; no pluck.",
+      "camera": {
+        "framing": "extreme macro of tweezers tip and pressure field",
+        "lensMmEquivalent": 100,
+        "heightMeters": 0.16,
+        "primaryMove": "4 cm micro push-in",
+        "focus": "tip-to-fiber rack ending on the selected fiber",
+        "endCondition": "tool and camera both settle without contact"
+      },
+      "environment": "Only dust and flame-light shimmer; no paper displacement.",
+      "identityRisk": "LOW_HAND_ONLY"
+    },
+    {
+      "shotId": "EP01_SH05",
+      "editDurationSeconds": 2.0,
+      "anchor": "anchors/EP01_SH05_anchor_v2.png",
+      "purpose": "Replace a static portrait with active inspection.",
+      "startState": "Shen sits upright with both hands near the scroll before leaning.",
+      "performance": "She leans forward decisively by 8-10 cm, shoulders and gaze arriving together over the trace.",
+      "camera": {
+        "framing": "three-quarter medium-wide at the primary desk",
+        "lensMmEquivalent": 40,
+        "heightMeters": 1.15,
+        "primaryMove": "7% dolly push with foreground lamp and shelf parallax",
+        "focus": "hold Shen's face through the lean",
+        "endCondition": "lean completes; no frozen breathing-only beat"
+      },
+      "environment": "Rain runs continuously beyond the lattice windows; lamp reflections tremble subtly on paper.",
+      "identityRisk": "MEDIUM_FACE_VISIBLE"
+    },
+    {
+      "shotId": "EP01_SH06",
+      "editDurationSeconds": 1.7,
+      "anchor": "anchors/EP01_SH06_anchor_v2.png",
+      "purpose": "Make the deduction readable through eye and brow motion.",
+      "startState": "Brow neutral, gaze at the near edge of the scroll.",
+      "performance": "Eyes track once across the pressure field; brow tightens and chin settles 1-2 cm.",
+      "camera": {
+        "framing": "tight three-quarter close-up",
+        "lensMmEquivalent": 75,
+        "heightMeters": 1.28,
+        "primaryMove": "8 cm lateral slide left-to-right",
+        "focus": "rack from near paper edge to Shen's eyes",
+        "endCondition": "eyes stop on the inferred mark"
+      },
+      "environment": "Rain-window bokeh travels behind her; wardrobe remains calm.",
+      "identityRisk": "HIGH_FACE_HERO"
+    },
+    {
+      "shotId": "EP01_SH07",
+      "editDurationSeconds": 1.8,
+      "anchor": "anchors/EP01_SH07_anchor_v2.png",
+      "purpose": "Give the lamp adjustment a second, wider spatial beat.",
+      "startState": "Left hand is open beside the lamp base; upper body remains behind it.",
+      "performance": "Hand grips and finishes a short base rotation, then releases; sleeve follows through.",
+      "camera": {
+        "framing": "low three-quarter hand, lamp and soft face layer",
+        "lensMmEquivalent": 50,
+        "heightMeters": 0.32,
+        "primaryMove": "14 cm lateral slide left-to-right",
+        "focus": "hold the hand/lamp plane; face remains softly readable",
+        "endCondition": "hand releases and light angle locks"
+      },
+      "environment": "Light pool crosses paper; rain remains visible at far window; no independent wind.",
+      "identityRisk": "MEDIUM_FACE_SECONDARY"
+    },
+    {
+      "shotId": "EP01_SH08",
+      "editDurationSeconds": 1.2,
+      "anchor": "anchors/EP01_SH08_anchor_v2.png",
+      "purpose": "Introduce the west-door pressure event before revealing its source.",
+      "startState": "Hero flame is upright and compact immediately before the off-screen door cracks.",
+      "performance": "Flame stretches and leans east once, then shivers at reduced height.",
+      "camera": {
+        "framing": "extreme flame-height macro",
+        "lensMmEquivalent": 100,
+        "heightMeters": 0.28,
+        "primaryMove": "locked camera",
+        "focus": "short rack from wick to flame tip",
+        "endCondition": "flame remains lit and points east"
+      },
+      "environment": "First west-to-east cold gust is caused only by Pei opening the off-screen west door; rain continues outside.",
+      "identityRisk": "NONE"
+    },
+    {
+      "shotId": "EP01_SH09",
+      "editDurationSeconds": 2.0,
+      "anchor": "anchors/EP01_SH09_anchor_v2.png",
+      "purpose": "Convert the gust into Shen's motivated reaction.",
+      "startState": "Shen still looks down; head and eyes have not turned.",
+      "performance": "She lifts her head, turns toward the west door and lets her gaze arrive after the head turn; sleeve edge reacts to the gust.",
+      "camera": {
+        "framing": "medium close three-quarter",
+        "lensMmEquivalent": 65,
+        "heightMeters": 1.25,
+        "primaryMove": "12-degree counter-arc around Shen",
+        "focus": "hold eyes through the turn",
+        "endCondition": "head and gaze lock toward west"
+      },
+      "environment": "Rain stays active; flame and sleeve retain the same west-to-east force direction.",
+      "identityRisk": "HIGH_FACE_HERO"
+    },
+    {
+      "shotId": "EP01_SH10",
+      "editDurationSeconds": 2.0,
+      "anchor": "anchors/EP01_SH10_anchor_v2.png",
+      "purpose": "Reveal the room geography and west-door source.",
+      "startState": "Wide L1 axis with west door closed, Shen small at desk and foreground lamp dominant.",
+      "performance": "West door begins opening into the room while Shen remains turned toward it; no entrant visible yet.",
+      "camera": {
+        "framing": "wide room axis from foreground lamp to west door",
+        "lensMmEquivalent": 28,
+        "heightMeters": 1.05,
+        "primaryMove": "0.5 m dolly pullback revealing the north blank rack area and west door",
+        "focus": "deep focus; no rack",
+        "endCondition": "door gap established, Pei not yet revealed"
+      },
+      "environment": "Rain crosses every visible lattice bay; a pressure wave travels from west doorway toward papers and lamps.",
+      "identityRisk": "LOW_WIDE"
+    },
+    {
+      "shotId": "EP01_SH11",
+      "editDurationSeconds": 1.4,
+      "anchor": "anchors/EP01_SH11_anchor_v2.png",
+      "purpose": "Break the entrance into a forceful threshold action.",
+      "startState": "Pei's leading boot hovers outside the sill; robe hem remains behind it.",
+      "performance": "Boot crosses and plants once; crimson robe hem follows through the doorway.",
+      "camera": {
+        "framing": "very low threshold insert",
+        "lensMmEquivalent": 35,
+        "heightMeters": 0.22,
+        "primaryMove": "camera backs 0.3 m as the boot advances",
+        "focus": "hold boot and sill plane",
+        "endCondition": "one foot planted inside; no second step"
+      },
+      "environment": "West-to-east gust strengthens: paperA lifts, paperB corner lifts, scroll edge ripples, flame leans east.",
+      "identityRisk": "LOW_COSTUME_ONLY"
+    },
+    {
+      "shotId": "EP01_SH12",
+      "editDurationSeconds": 1.4,
+      "anchor": "anchors/EP01_SH12_anchor_v2.png",
+      "purpose": "Complete Pei's entrance with body and environment motion.",
+      "startState": "Pei is framed in the doorway before his full step and robe swing.",
+      "performance": "He takes one deliberate step into L1 and stops; robe swings with the step and head turns to scan the hall.",
+      "camera": {
+        "framing": "three-quarter full-to-medium entrance",
+        "lensMmEquivalent": 40,
+        "heightMeters": 1.0,
+        "primaryMove": "0.45 m lateral follow across the threshold",
+        "focus": "hold Pei's face and torso",
+        "endCondition": "body stops inside; head finishes its scan"
+      },
+      "environment": "Peak gust turns paperA exactly one page, paperB flexes without leaving desk, flame and robe swing east.",
+      "identityRisk": "HIGH_FACE_HERO"
+    },
+    {
+      "shotId": "EP01_SH13",
+      "editDurationSeconds": 2.0,
+      "anchor": "anchors/EP01_SH13_anchor_v2.png",
+      "purpose": "Hold tension without static posing or dialogue.",
+      "startState": "Pei has stopped; right hand is modestly raised at lower chest, mouth closed.",
+      "performance": "Right hand lowers out of frame, chest takes one restrained inhale and eyes scan once; no dialogue.",
+      "camera": {
+        "framing": "medium close three-quarter just inside doorway",
+        "lensMmEquivalent": 65,
+        "heightMeters": 1.3,
+        "primaryMove": "7% push-in",
+        "focus": "hold eyes",
+        "endCondition": "camera and Pei stop for final 8 frames"
+      },
+      "environment": "Gust decays; paperA oscillates once, paperB drops, rain continues.",
+      "identityRisk": "HIGH_FACE_HERO"
+    },
+    {
+      "shotId": "EP01_SH14",
+      "editDurationSeconds": 1.0,
+      "anchor": "anchors/EP01_SH14_anchor_v2.png",
+      "purpose": "Deliver Shen's silent counter-reaction.",
+      "startState": "Over Pei's shoulder, Shen holds a neutral gaze before a tiny tightening reaction.",
+      "performance": "Shen's eyes narrow slightly and chin rises 1 cm; hands remain controlled; no dialogue.",
+      "camera": {
+        "framing": "Pei-shoulder foreground to Shen medium reaction",
+        "lensMmEquivalent": 75,
+        "heightMeters": 1.3,
+        "primaryMove": "quick 6% push toward Shen",
+        "focus": "hold Shen; Pei shoulder remains soft foreground",
+        "endCondition": "reaction lands without a head turn"
+      },
+      "environment": "PaperA finishes settling, flame recovers toward vertical, rain never stops.",
+      "identityRisk": "HIGH_FACE_HERO"
+    },
+    {
+      "shotId": "EP01_SH15",
+      "editDurationSeconds": 1.7,
+      "anchor": "anchors/EP01_SH15_anchor_v2.png",
+      "purpose": "Begin the deterministic reveal of 贞 without asking the video model to draw text.",
+      "startState": "Clean pressure field with no readable glyph in the I2V base plate.",
+      "performance": "Underlying fibers and raking light move subtly; deterministic overlay reveals the first strokes along the camera path.",
+      "camera": {
+        "framing": "near-overhead macro",
+        "lensMmEquivalent": 90,
+        "heightMeters": 0.3,
+        "primaryMove": "10 cm overhead slide following the stroke direction",
+        "focus": "hold paper plane",
+        "endCondition": "first deterministic strokes visible; base plate itself remains text-free"
+      },
+      "environment": "No new wind; tiny fibers and light shimmer only.",
+      "identityRisk": "NONE",
+      "deterministicPost": {
+        "required": true,
+        "glyph": "贞",
+        "phase": "first strokes",
+        "modelGeneratedGlyphProhibited": true
+      }
+    },
+    {
+      "shotId": "EP01_SH16",
+      "editDurationSeconds": 1.3,
+      "anchor": "anchors/EP01_SH16_anchor_v2.png",
+      "purpose": "Complete the glyph and let the camera settle on the evidence.",
+      "startState": "Clean stable base plate; editorial composite carries forward SH15's partial deterministic overlay.",
+      "performance": "Exact deterministic glyph completes and neighboring scratches darken slightly; no modeled writing.",
+      "camera": {
+        "framing": "tighter near-overhead macro",
+        "lensMmEquivalent": 100,
+        "heightMeters": 0.26,
+        "primaryMove": "2% residual drift, then lock",
+        "focus": "fixed on paper relief",
+        "endCondition": "camera locked for final 10 frames on completed deterministic glyph"
+      },
+      "environment": "No wind; only stable raking light.",
+      "identityRisk": "NONE",
+      "deterministicPost": {
+        "required": true,
+        "glyph": "贞",
+        "phase": "completion and scratch darkening",
+        "modelGeneratedGlyphProhibited": true
+      }
+    },
+    {
+      "shotId": "EP01_SH17",
+      "editDurationSeconds": 1.5,
+      "anchor": "anchors/EP01_SH17_anchor_v2.png",
+      "purpose": "Convert the lamp-out beat into an observable action.",
+      "startState": "Distant central lamp is small, lit and steady; foreground lamps are soft bokeh.",
+      "performance": "Central flame sputters twice, shrinks and extinguishes completely.",
+      "camera": {
+        "framing": "long-lens lamp row through blurred foreground lamps",
+        "lensMmEquivalent": 100,
+        "heightMeters": 0.65,
+        "primaryMove": "locked camera",
+        "focus": "pull foreground glow to central distant flame before it dies",
+        "endCondition": "central wick fully dark; no smoke plume yet"
+      },
+      "environment": "Rain continues beyond the lattice windows; no gust causes the extinction.",
+      "identityRisk": "NONE"
+    },
+    {
+      "shotId": "EP01_SH18",
+      "editDurationSeconds": 2.0,
+      "anchor": "anchors/EP01_SH18_anchor_v2.png",
+      "purpose": "End on residual motion rather than a frozen extinguished lamp.",
+      "startState": "Central wick is dark with the first thin smoke curl; foreground lamps remain blurred and lit.",
+      "performance": "Smoke rises, coils once and thins while the distant rain continues; voice-over may begin in edit.",
+      "camera": {
+        "framing": "same lamp-row axis as SH17, slightly closer start",
+        "lensMmEquivalent": 85,
+        "heightMeters": 0.65,
+        "primaryMove": "extremely slow 5% pullback",
+        "focus": "hold the first smoke curl, then allow it to soften",
+        "endCondition": "camera locks for final 8 frames; smoke remains visible but thin"
+      },
+      "environment": "Rain remains the final continuous movement source; no new wind or paper motion.",
+      "identityRisk": "NONE"
+    }
+  ],
+  "reviewGates": {
+    "beforeTechnicalGpuRun": [
+      "Project Lead reviews the 18-anchor contact sheet",
+      "Camera Contract shot order and durations are accepted",
+      "SH01 confirms bronze proofreading lamp, not paper lantern",
+      "SH15-SH16 deterministic glyph post path is preserved"
+    ],
+    "canonicalStatus": "OUT_OF_SCOPE"
+  }
+}

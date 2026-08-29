@@ -1,0 +1,212 @@
+{
+  "schemaVersion": "k2.anchor-manifest.v2",
+  "packageId": "k2-002-ep01-anchors-v2",
+  "projectId": "K2-002-CHANGAN",
+  "episodeId": "EP01",
+  "createdDate": "2026-08-27",
+  "claim": {
+    "authorityState": "TECHNICAL_EVIDENCE_ONLY",
+    "publicationAllowed": false,
+    "canonicalMutations": 0
+  },
+  "generation": {
+    "mode": "OpenAI built-in imagegen with local identity, location, prop and repaired-anchor references",
+    "intent": "pre-action I2V start anchors for the accepted 18-shot motion redesign",
+    "normalization": "center-crop and resize to 704x1280 sRGB PNG",
+    "modelGeneratedReadableText": false,
+    "deterministicGlyphBasePlates": ["EP01_SH15", "EP01_SH16"]
+  },
+  "sourceArchives": [
+    {
+      "name": "final-assets-v1.2.zip",
+      "sha256": "532765d91b56692e611cabb9fcbd3d8ecc916f169f5c4e2b3b9e82a56bbe99c6"
+    },
+    {
+      "name": "k2-002-ep01-i2v-repaired-v1.zip",
+      "sha256": "4d962c77815f1b627176832b59bf2474c0b4e6ddd90612c7c1df06b7a7c5f06c"
+    }
+  ],
+  "referenceLocks": {
+    "ShenZhiwei": "shen-zhiwei-lock-v3 plus front, three-quarter and back views",
+    "PeiYun": "pei-yun-lock-v2 plus front, three-quarter and back views",
+    "L1": "L1-proofreading-room-master-v2",
+    "L2": "L2-rain-corridor-master-v1",
+    "heroLamp": "bronze-oil-lamp-master-v1",
+    "residualScroll": "residual-scroll-master-v2",
+    "repairedAnchors": "verified 12-anchor repaired-v1 package"
+  },
+  "files": [
+    {
+      "shotId": "EP01_SH01",
+      "path": "anchors/EP01_SH01_anchor_v2.png",
+      "width": 704,
+      "height": 1280,
+      "bytes": 1329840,
+      "sha256": "ca3a93bc686a7f5eb7a9a88334be15c9101dab19b20ceadf02c6d8192e207b6d",
+      "preActionState": "Shen silhouette at L2 corridor entry with bronze lamp before first step"
+    },
+    {
+      "shotId": "EP01_SH02",
+      "path": "anchors/EP01_SH02_anchor_v2.png",
+      "width": 704,
+      "height": 1280,
+      "bytes": 916645,
+      "sha256": "bedc7d4783ad2cedb08d189a3930e1c77bdc91eb1f1431c31ac98ac723e9a400",
+      "preActionState": "dark pressure field before side-light sweep"
+    },
+    {
+      "shotId": "EP01_SH03",
+      "path": "anchors/EP01_SH03_anchor_v2.png",
+      "width": 704,
+      "height": 1280,
+      "bytes": 1037751,
+      "sha256": "030f997d3eef8cb7d890084390a54d514e3bcdcaf6b28649a79debdf89fb1e89",
+      "preActionState": "hand hovering beside lamp base before rotation"
+    },
+    {
+      "shotId": "EP01_SH04",
+      "path": "anchors/EP01_SH04_anchor_v2.png",
+      "width": 704,
+      "height": 1280,
+      "bytes": 1130293,
+      "sha256": "b2f0232930719a248260c0d3f93b7b6244de80b61c061af0b1a3ae53951bf383",
+      "preActionState": "tweezers hovering above a paper fiber before lowering"
+    },
+    {
+      "shotId": "EP01_SH05",
+      "path": "anchors/EP01_SH05_anchor_v2.png",
+      "width": 704,
+      "height": 1280,
+      "bytes": 1067751,
+      "sha256": "a31b3f98ebc3e5fcd3721d79eb5c12c83ae55b945df8a2329b72f9291e8c3e15",
+      "preActionState": "Shen upright at desk before active forward lean"
+    },
+    {
+      "shotId": "EP01_SH06",
+      "path": "anchors/EP01_SH06_anchor_v2.png",
+      "width": 704,
+      "height": 1280,
+      "bytes": 974133,
+      "sha256": "08aa9140471538af4fb67aff2c73009a2f3c01c497f4b2945a42e1594f806e14",
+      "preActionState": "neutral attentive brow before gaze track"
+    },
+    {
+      "shotId": "EP01_SH07",
+      "path": "anchors/EP01_SH07_anchor_v2.png",
+      "width": 704,
+      "height": 1280,
+      "bytes": 978639,
+      "sha256": "38bfe7729792b0e73a7cac2890fc61af7486c43304f305a84395a3588855d4b5",
+      "preActionState": "open hand beside lamp before grip and release"
+    },
+    {
+      "shotId": "EP01_SH08",
+      "path": "anchors/EP01_SH08_anchor_v2.png",
+      "width": 704,
+      "height": 1280,
+      "bytes": 709482,
+      "sha256": "a1d9517fc644119e6920355a1402d262f7a9351fafb4c5a69ba06de53d77fe9a",
+      "preActionState": "upright compact flame before west-door gust"
+    },
+    {
+      "shotId": "EP01_SH09",
+      "path": "anchors/EP01_SH09_anchor_v2.png",
+      "width": 704,
+      "height": 1280,
+      "bytes": 998335,
+      "sha256": "3b4f871ab59332625f0d343bde0ca1686477a135a3a2f9d6373f474f22e252ea",
+      "preActionState": "Shen still looking down before head turn"
+    },
+    {
+      "shotId": "EP01_SH10",
+      "path": "anchors/EP01_SH10_anchor_v2.png",
+      "width": 704,
+      "height": 1280,
+      "bytes": 998819,
+      "sha256": "e0fb7c1610e859be432a88c344b78be545bad003ec7429fd97ef334e0723ef8d",
+      "preActionState": "L1 wide axis before west door opens"
+    },
+    {
+      "shotId": "EP01_SH11",
+      "path": "anchors/EP01_SH11_anchor_v2.png",
+      "width": 704,
+      "height": 1280,
+      "bytes": 896789,
+      "sha256": "ce0417c2022e0f48855fae0544d224582cfc38c217e5e78eefc568de1bfb113f",
+      "preActionState": "Pei's boot outside sill before crossing"
+    },
+    {
+      "shotId": "EP01_SH12",
+      "path": "anchors/EP01_SH12_anchor_v2.png",
+      "width": 704,
+      "height": 1280,
+      "bytes": 1091252,
+      "sha256": "21ef1ff9b874bf8be850702afd34acc1885bb22cd909b8587097b092eaea2827",
+      "preActionState": "Pei framed at doorway before deliberate step"
+    },
+    {
+      "shotId": "EP01_SH13",
+      "path": "anchors/EP01_SH13_anchor_v2.png",
+      "width": 704,
+      "height": 1280,
+      "bytes": 904043,
+      "sha256": "6c668a2259b63d8bb39abdb9d51fafe431e4bf513e02d576df52b89d35e3d519",
+      "preActionState": "Pei stopped with right hand raised before lowering"
+    },
+    {
+      "shotId": "EP01_SH14",
+      "path": "anchors/EP01_SH14_anchor_v2.png",
+      "width": 704,
+      "height": 1280,
+      "bytes": 913927,
+      "sha256": "251070c10f89961b95f38e5dcae8d72a45430fb46684c8c3a8c0f30782d9c935",
+      "preActionState": "Shen neutral over Pei's shoulder before silent reaction"
+    },
+    {
+      "shotId": "EP01_SH15",
+      "path": "anchors/EP01_SH15_anchor_v2.png",
+      "width": 704,
+      "height": 1280,
+      "bytes": 1274540,
+      "sha256": "8afaa2a4f0fd461bf1388502ff4ff37dedd4dc1e1bae446aaccd4736c98cedf7",
+      "preActionState": "clean no-glyph paper base before first deterministic strokes"
+    },
+    {
+      "shotId": "EP01_SH16",
+      "path": "anchors/EP01_SH16_anchor_v2.png",
+      "width": 704,
+      "height": 1280,
+      "bytes": 1193036,
+      "sha256": "3b6ec981d3ca8bb0f3cd2373a972b189563a9f5cd76576d903a8cc27f226484e",
+      "preActionState": "clean stable paper base for carried partial overlay and completion"
+    },
+    {
+      "shotId": "EP01_SH17",
+      "path": "anchors/EP01_SH17_anchor_v2.png",
+      "width": 704,
+      "height": 1280,
+      "bytes": 729204,
+      "sha256": "fde73534465fca7e24afc431df9395fe0d7cd84956fb982cc7b35f65d138cad2",
+      "preActionState": "distant central lamp lit before sputter and extinction"
+    },
+    {
+      "shotId": "EP01_SH18",
+      "path": "anchors/EP01_SH18_anchor_v2.png",
+      "width": 704,
+      "height": 1280,
+      "bytes": 717441,
+      "sha256": "da56f6c3b7d5615fbc0e4900628d65b9a84e84f0723fb8f45edc7ce1b2c27a0e",
+      "preActionState": "central wick dark with first thin smoke curl"
+    }
+  ],
+  "companionFiles": [
+    {
+      "path": "camera_contract.json",
+      "sha256": "b83967cd56dc22681b6b0271cae03a5aae9f3f328a5dbb9ff209e15544104a3a"
+    },
+    {
+      "path": "contact_sheet_v2.jpg",
+      "sha256": "314839be3a0d18236692218335e89e2e835cf8b9a252941bc18c12d3fec1b9be"
+    }
+  ]
+}
