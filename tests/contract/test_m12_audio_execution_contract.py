@@ -236,7 +236,8 @@ def artifact_bundle(request, *, storage_key, adapter_identity):
 class M12AudioExecutionContractTests(unittest.TestCase):
     def test_audio_roles_extend_without_enabling_bgm_for_speech(self):
         self.assertEqual(
-            AUDIO_ROLES, {"dialogue", "narration", "ambience", "sfx"}
+            AUDIO_ROLES,
+            {"dialogue", "narration", "ambience", "sfx", "music"},
         )
         request, voice = dialogue_context()
         parameters = deepcopy(request["parameters"])
@@ -333,7 +334,7 @@ class M12AudioExecutionContractTests(unittest.TestCase):
             adapter.generate(execution, second)
             self.assertEqual(candidate.read_bytes(), second.read_bytes())
 
-    def test_programmatic_parameters_reject_external_audio_and_bgm(self):
+    def test_legacy_programmatic_parameters_reject_external_audio_and_bgm(self):
         base = programmatic_request()["parameters"]
         for field, value in (
             ("inputPath", "/tmp/external.wav"),
@@ -345,7 +346,7 @@ class M12AudioExecutionContractTests(unittest.TestCase):
                 EpisodeProductionError
             ):
                 normalize_programmatic_audio_parameters(invalid)
-        with self.assertRaisesRegex(NotImplementedError, "^BGM_NOT_IMPLEMENTED$"):
+        with self.assertRaises(EpisodeProductionError):
             normalize_programmatic_audio_parameters(
                 {
                     **base,
@@ -355,7 +356,7 @@ class M12AudioExecutionContractTests(unittest.TestCase):
                 }
             )
 
-    def test_bgm_mix_track_is_not_implemented_before_any_write(self):
+    def test_legacy_bgm_mix_role_is_rejected_before_any_write(self):
         request = sealed(
             {
                 "schemaVersion": PRELIMINARY_AUDIO_MIX_REQUEST_SCHEMA_VERSION,
@@ -402,9 +403,7 @@ class M12AudioExecutionContractTests(unittest.TestCase):
             root = Path(directory)
             candidate = root / "not-created" / "mix.wav"
             adapter = DeterministicPreliminaryMixAdapter(root)
-            with self.assertRaisesRegex(
-                NotImplementedError, "^BGM_NOT_IMPLEMENTED$"
-            ):
+            with self.assertRaises(AudioRequestValidationError):
                 adapter.generate(request, candidate)
             self.assertFalse(candidate.exists())
             self.assertFalse(candidate.parent.exists())

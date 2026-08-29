@@ -41,7 +41,7 @@ _SPEECH_EMOTION_PARAMETERS: dict[str, tuple[float, float, float]] = {
 }
 SPEECH_AUDIO_ROLES = frozenset({"dialogue", "narration"})
 PROGRAMMATIC_AUDIO_ROLES = frozenset({"ambience", "sfx"})
-AUDIO_ROLES = SPEECH_AUDIO_ROLES | PROGRAMMATIC_AUDIO_ROLES
+AUDIO_ROLES = SPEECH_AUDIO_ROLES | PROGRAMMATIC_AUDIO_ROLES | frozenset({"music"})
 PROGRAMMATIC_AUDIO_KINDS = frozenset({"rain", "wind", "fire_crackle", "paper"})
 PROGRAMMATIC_AUDIO_REQUEST_SCHEMA_VERSION = (
     "v5.k2-programmatic-audio-generation-request.v1"
@@ -58,7 +58,7 @@ V4_AUDIO_ARTIFACT_RESULT_SCHEMA_VERSION = "v4.audio-artifact-result.v1"
 PRELIMINARY_AUDIO_MIX_REQUEST_SCHEMA_VERSION = (
     "v4.preliminary-audio-mix-request.v1"
 )
-PRELIMINARY_MIX_ADAPTER_ID = "v4.deterministic-preliminary-ffmpeg-mix.v1"
+PRELIMINARY_MIX_ADAPTER_ID = "v4.deterministic-preliminary-ffmpeg-mix.v2"
 _DIALOGUE_AUDIO_GENERATION_REQUEST_FIELDS = frozenset(
     {
         "schemaVersion",
@@ -618,12 +618,6 @@ def normalize_programmatic_audio_parameters(value: Any) -> dict[str, Any]:
     if not isinstance(value, Mapping):
         raise EpisodeProductionError("programmatic audio parameters must be an object")
     parameters = deepcopy(dict(value))
-    if (
-        parameters.get("audioRole") == "bgm"
-        or parameters.get("synthesisKind") == "bgm"
-        or parameters.get("effectKind") == "bgm"
-    ):
-        raise NotImplementedError("BGM_NOT_IMPLEMENTED")
     expected = {
         "audioRole",
         "synthesisKind",
@@ -851,7 +845,13 @@ def build_preliminary_mix_request(value: Any) -> dict[str, Any]:
                 "durationSamples": duration_samples,
             }
         )
-    priority = {"dialogue": 3, "narration": 3, "sfx": 2, "ambience": 1}
+    priority = {
+        "dialogue": 3,
+        "narration": 3,
+        "sfx": 2,
+        "ambience": 1,
+        "music": 0,
+    }
     tracks.sort(key=lambda item: (-priority[item["audioRole"]], item["assetVersionRef"]))
     requirement_semantic = {
         "kind": "preliminaryAudioMix",
@@ -1157,7 +1157,7 @@ def validate_audio_asset_version_v2_contract(value: Any) -> dict[str, Any]:
         ):
             _required_ref(voice.get(field), f"voiceBinding.{field}")
         _sha256(voice.get("voiceLockDigest"), "voiceBinding.voiceLockDigest")
-    else:
+    elif role in PROGRAMMATIC_AUDIO_ROLES:
         if source.get("kind") != "audioCue" or voice is not None:
             raise RepositoryUnavailableError("programmatic audio lineage is invalid")
         _required_ref(source.get("sourceRef"), "sourceBinding.sourceRef")
@@ -1199,6 +1199,10 @@ def validate_audio_asset_version_v2_contract(value: Any) -> dict[str, Any]:
             raise RepositoryUnavailableError(
                 "programmatic synthesis adapter is invalid"
             )
+    else:
+        raise RepositoryUnavailableError(
+            "audio AssetVersion v2 role requires its authoritative typed contract"
+        )
 
     _text(asset.get("createdAt"), "createdAt", maximum=64)
     version = _integer(asset.get("version"), "version", minimum=1, maximum=10_000)
@@ -1403,6 +1407,10 @@ def _validated_v4_audio_artifact_bundle(
             )
         ):
             raise StaleInputError("programmatic synthesis evidence is stale")
+    else:
+        raise EpisodeProductionError(
+            "audioRole is unsupported by the legacy v1 artifact bundle"
+        )
 
     for field, item in (
         ("generationResultRef", result),
@@ -1507,10 +1515,10 @@ def build_proposed_audio_asset_version(
             "synthesisSpecDigest": None,
             "adapterIdentity": expected_adapter_identity,
         }
-    elif role == "bgm":
-        raise NotImplementedError("BGM_NOT_IMPLEMENTED")
     else:
-        raise EpisodeProductionError("audioRole is invalid")
+        raise EpisodeProductionError(
+            "audioRole is invalid for the legacy audio proposal path"
+        )
 
     _, result, evidence = _validated_v4_audio_artifact_bundle(
         artifact_bundle,

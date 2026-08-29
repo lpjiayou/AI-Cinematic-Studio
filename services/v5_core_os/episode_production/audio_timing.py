@@ -66,7 +66,7 @@ PRELIMINARY_MIX_ADMISSION_STATE = "NOT_ADMITTED"
 AUDIO_TIMELINE_BINDING_STATE = "UNASSIGNED"
 PRELIMINARY_MIX_KIND = "PRELIMINARY"
 PRELIMINARY_MIX_ADAPTER_ID = (
-    "v4.deterministic-preliminary-ffmpeg-mix.v1"
+    "v4.deterministic-preliminary-ffmpeg-mix.v2"
 )
 PRELIMINARY_MIX_REQUEST_SCHEMA_VERSION = (
     "v4.preliminary-audio-mix-request.v1"
@@ -2343,10 +2343,6 @@ def _expected_v4_mix_parameters(stem_set: Mapping[str, Any]) -> dict[str, Any]:
     seen_assets: set[str] = set()
     channel_count: int | None = None
     for member in stem_set["members"]:
-        if member["stemRole"] == "music":
-            raise UpstreamNotReadyError(
-                "PRELIMINARY_MIX_MUSIC_PARAMETERS_PENDING"
-            )
         evidence = member["sourceTimingEvidence"]
         asset_ref = member["sourceAssetVersionRef"]
         if asset_ref in seen_assets:
@@ -2387,7 +2383,13 @@ def _expected_v4_mix_parameters(stem_set: Mapping[str, Any]) -> dict[str, Any]:
                 "durationSamples": duration,
             }
         )
-    priority = {"dialogue": 3, "narration": 3, "sfx": 2, "ambience": 1}
+    priority = {
+        "dialogue": 3,
+        "narration": 3,
+        "sfx": 2,
+        "ambience": 1,
+        "music": 0,
+    }
     tracks.sort(
         key=lambda item: (-priority[item["audioRole"]], item["assetVersionRef"])
     )
