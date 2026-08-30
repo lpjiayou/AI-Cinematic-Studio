@@ -10,9 +10,9 @@
 | --- | --- | --- |
 | Series intelligence and external authority decision | M6 / accepted V5 boundary | Identity Lock, GPU execution, final approval |
 | Identity Lock and authoritative asset/character refs | V5 Identity/Asset authority | Provider scheduling |
-| Episode production state and lineage | V5 Episode Production | Worker implementation or UI state |
+| Episode production state, TimelineVersion and candidate lineage | V5 Episode Production / K2DeliveryService | Worker implementation, V3 persistence or a second Timeline/Preview authority |
 | Queue, lease, retry, cancel and adapter invocation | V4 Platform | Domain acceptance or human approval |
-| Deterministic composition/render | V3 Render Core | Project authority or provider policy |
+| Deterministic Timeline execution, composition and render | V3 Render Core | Project/Timeline authority, provider policy, EpisodeMaster or ExportArtifact |
 | User interaction and workflow presentation | Existing Frontend Creator UI | Domain facts, SQL, V4/V3/worker/provider access |
 
 ## 2. Authoritative object graph
@@ -31,8 +31,10 @@ EpisodeProductionRun
 │       └── GenerationResult[*]
 │           └── AssetVersion[*]
 ├── TimelineVersion
-├── PreviewCandidate
-├── QCReport
+│   ├── PreviewCandidate[*]
+│   └── RenderCandidate[*]
+│       └── RenderManifest
+├── QCReport[*]
 ├── ApprovalDecision[*]
 └── EpisodeMaster
     └── ExportArtifact[*]
@@ -69,6 +71,11 @@ A state transition is append-only and requires its gate evidence. A downstream o
 becomes `STALE` when any locked upstream version changes. A blocked or stale run may
 be resumed only after a new valid version is explicitly selected; the previous lineage
 is retained.
+
+`PREVIEW_READY` means that an exact non-stale review candidate exists. A
+`RenderCandidate` may satisfy only this candidate-ready boundary; it cannot skip
+`QC_READY` or `APPROVAL_READY`, cannot directly cause `MASTER_READY`, and cannot
+create an export.
 
 ## 4. V4 job state machine
 
@@ -116,20 +123,36 @@ and production-readiness claims.
 
 ## 7. Composition, QC and decisions
 
-`TimelineVersion` deterministically maps selected media and audio to Shot Graph time.
-`PreviewCandidate` is a playable render candidate. `QCReport` is a machine-verifiable
-assessment and does not approve the candidate.
+`TimelineVersion` deterministically maps selected media, audio and effect clips to
+Shot Graph time.
 
-The following approval kinds are distinct append-only decisions:
+`PreviewCandidate` is a playable preview. `RenderCandidate` is a non-publishing
+technical render candidate that binds one exact `TimelineVersion` and records its
+render profile, resolution, codec, subtitle mode and `RenderManifest`.
+
+Every RenderCandidate is required to carry:
+
+```text
+publicationAllowed=false
+masterState=NOT_CREATED
+exportState=NOT_CREATED
+```
+
+Neither candidate is a Master, Export or approval. `ExportCandidate` does not exist
+and must not be introduced in this contract.
+
+`QCReport` is a machine-verifiable assessment of an exact candidate and does not
+approve it. The following approval kinds remain distinct append-only decisions:
 
 - `CREATIVE_DIRECTION`
 - `IDENTITY_CONTINUITY`
 - `TECHNICAL_QC`
 - `FINAL_MASTER`
 
-`EpisodeMaster` may be created only when required decisions explicitly accept the
-exact non-stale preview/timeline/asset versions. Rejection or upstream change prevents
-finalization.
+Only M15 may create `EpisodeMaster` and `ExportArtifact`. It may do so only when the
+required decisions explicitly accept the exact non-stale PreviewCandidate or
+RenderCandidate, TimelineVersion and AssetVersions. Rejection or any upstream change
+prevents finalization.
 
 ## 8. Public boundary and errors
 
@@ -160,11 +183,11 @@ resolve roots
 → resolve asset requirements
 → dispatch and execute media jobs
 → register verified immutable assets
-→ compose timeline and preview
-→ run technical/continuity QC
+→ compose timeline and produce a preview and/or non-publishing render candidate
+→ run technical/continuity QC on the exact candidate
 → record explicit decisions
-→ finalize immutable master
-→ expose playable/downloadable export in the existing Creator UI
+→ M15 finalizes the immutable master
+→ M15 creates the ExportArtifact exposed by the existing Creator UI
 ```
 
 Each arrow is a gate, not an optimistic UI transition. The next action remains blocked
