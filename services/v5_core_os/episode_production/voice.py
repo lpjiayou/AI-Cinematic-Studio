@@ -9,6 +9,7 @@ is a separate digest-pinned fact, so confirming a candidate never rewrites it.
 from __future__ import annotations
 
 from copy import deepcopy
+from datetime import datetime, timezone
 import json
 import math
 from pathlib import Path
@@ -31,11 +32,19 @@ from .foundation import (
 
 VOICE_LOCK_SCHEMA_VERSION = "v5.voice-lock.v1"
 VOICE_LOCK_VERSION_SCHEMA_VERSION = "v5.voice-lock-version.v1"
+VOICE_LOCK_VERSION_V2_SCHEMA_VERSION = "v5.m12-voice-lock-version.v2"
 VOICE_LOCK_CONFIRMATION_SCHEMA_VERSION = "v5.voice-lock-confirmation.v1"
 VOICE_LOCK_OPERATION_SCHEMA_VERSION = "v5.voice-lock-operation.v1"
 VOICE_LOCK_STORE_SCHEMA_VERSION = 1
 VOICE_GENDERS = frozenset({"female", "male"})
 DEFAULT_LANGUAGE_CODE = "zh-CN"
+CLONE_VOICE_ENGINE_FAMILY = (
+    "QwenAudio/CosyVoice:CosyVoice3.ZERO_SHOT_LOCAL"
+)
+CLONE_VOICE_MODEL_ID = (
+    "FunAudioLLM/Fun-CosyVoice3-0.5B-2512@"
+    "29e01c4e8d000f4bcd70751be16fa94bf3d85a18"
+)
 
 
 class VoiceLockConflictError(EpisodeProductionError):
@@ -81,6 +90,28 @@ def _positive_int(value: Any, field: str) -> int:
     if isinstance(value, bool) or not isinstance(value, int) or value < 1:
         raise EpisodeProductionError(f"{field} is invalid")
     return value
+
+
+def _sha256(value: Any, field: str) -> str:
+    if (
+        not isinstance(value, str)
+        or len(value) != 64
+        or any(character not in "0123456789abcdef" for character in value)
+    ):
+        raise EpisodeProductionError(f"{field} is invalid")
+    return value
+
+
+def _utc_instant(value: Any, field: str) -> str:
+    text = _text(value, field)
+    normalized = text[:-1] + "+00:00" if text.endswith("Z") else text
+    try:
+        parsed = datetime.fromisoformat(normalized)
+    except ValueError as exc:
+        raise EpisodeProductionError(f"{field} is invalid") from exc
+    if parsed.tzinfo is None or parsed.utcoffset() != timezone.utc.utcoffset(parsed):
+        raise EpisodeProductionError(f"{field} must be an explicit UTC instant")
+    return text
 
 
 def _closed_command(
@@ -158,6 +189,33 @@ _VERSION_FIELDS = frozenset(
         "payloadDigest",
     }
 )
+_CLONE_VERSION_LINEAGE_FIELDS = frozenset(
+    {
+        "sourceRecordingBindingRef",
+        "sourceRecordingBindingDigest",
+        "consentGrantVersionRef",
+        "consentGrantVersionDigest",
+        "rightsBindingRef",
+        "rightsBindingDigest",
+        "voiceIdentityRef",
+        "voiceIdentityVersionRef",
+        "voiceIdentityDigest",
+        "subjectRef",
+    }
+)
+_VERSION_V2_FIELDS = _VERSION_FIELDS | _CLONE_VERSION_LINEAGE_FIELDS
+_TRAIT_COMMAND_FIELDS = frozenset(
+    {
+        "engineFamily",
+        "voiceId",
+        "gender",
+        "apparentAge",
+        "pitchSemitones",
+        "rateScale",
+        "timbreDescriptor",
+    }
+)
+_SCOPE_COMMAND_FIELDS = frozenset({"workspaceRef", "projectRef", "seriesRef"})
 _CONFIRMATION_FIELDS = frozenset(
     {
         "schemaVersion",
@@ -191,7 +249,11 @@ _OPERATION_FIELDS = frozenset(
 
 
 def _validate_root(value: Mapping[str, Any]) -> dict[str, Any]:
-    if not isinstance(value, Mapping) or set(value) != _ROOT_FIELDS:
+    if (
+        not isinstance(value, Mapping)
+        or set(value) != _ROOT_FIELDS
+        or value.get("schemaVersion") != VOICE_LOCK_SCHEMA_VERSION
+    ):
         raise RepositoryUnavailableError("VoiceLock root fields are invalid")
     _validate_sealed(value, "VoiceLock root")
     scope = _scope(
@@ -211,8 +273,6 @@ def _validate_root(value: Mapping[str, Any]) -> dict[str, Any]:
         if not isinstance(confirmed_digest, str) or len(confirmed_digest) != 64:
             raise RepositoryUnavailableError("VoiceLock confirmation digest is invalid")
     _positive_int(value.get("revision"), "revision")
-    if value.get("schemaVersion") != VOICE_LOCK_SCHEMA_VERSION:
-        raise RepositoryUnavailableError("VoiceLock root schema is unsupported")
     _text(value.get("createdAt"), "createdAt")
     _text(value.get("updatedAt"), "updatedAt")
     result = deepcopy(dict(value))
@@ -222,7 +282,14 @@ def _validate_root(value: Mapping[str, Any]) -> dict[str, Any]:
 
 
 def _validate_version(value: Mapping[str, Any]) -> dict[str, Any]:
-    if not isinstance(value, Mapping) or set(value) != _VERSION_FIELDS:
+    if not isinstance(value, Mapping):
+        raise RepositoryUnavailableError("VoiceLockVersion fields are invalid")
+    schema_version = value.get("schemaVersion")
+    expected_fields = {
+        VOICE_LOCK_VERSION_SCHEMA_VERSION: _VERSION_FIELDS,
+        VOICE_LOCK_VERSION_V2_SCHEMA_VERSION: _VERSION_V2_FIELDS,
+    }.get(schema_version)
+    if expected_fields is None or set(value) != expected_fields:
         raise RepositoryUnavailableError("VoiceLockVersion fields are invalid")
     _validate_sealed(value, "VoiceLockVersion")
     _scope(value.get("workspaceRef"), value.get("projectRef"), value.get("seriesRef"))
@@ -238,13 +305,61 @@ def _validate_version(value: Mapping[str, Any]) -> dict[str, Any]:
         _required_ref(parent_ref, "parentVoiceLockVersionRef")
         if not isinstance(parent_digest, str) or len(parent_digest) != 64:
             raise RepositoryUnavailableError("VoiceLockVersion parent digest is invalid")
-    if value.get("schemaVersion") != VOICE_LOCK_VERSION_SCHEMA_VERSION:
-        raise RepositoryUnavailableError("VoiceLockVersion schema is unsupported")
+        if (
+            schema_version == VOICE_LOCK_VERSION_V2_SCHEMA_VERSION
+            and any(
+                character not in "0123456789abcdef"
+                for character in parent_digest
+            )
+        ):
+            raise RepositoryUnavailableError(
+                "VoiceLockVersion parent digest is invalid"
+            )
+    if schema_version == VOICE_LOCK_VERSION_V2_SCHEMA_VERSION:
+        if version_number < 2:
+            raise RepositoryUnavailableError(
+                "clone VoiceLockVersion v2 must be an existing-root successor"
+            )
+        for field in (
+            "sourceRecordingBindingRef",
+            "consentGrantVersionRef",
+            "rightsBindingRef",
+            "voiceIdentityRef",
+            "voiceIdentityVersionRef",
+            "subjectRef",
+        ):
+            _required_ref(value.get(field), field)
+        for field in (
+            "sourceRecordingBindingDigest",
+            "consentGrantVersionDigest",
+            "rightsBindingDigest",
+            "voiceIdentityDigest",
+        ):
+            digest = value.get(field)
+            if (
+                not isinstance(digest, str)
+                or len(digest) != 64
+                or any(character not in "0123456789abcdef" for character in digest)
+            ):
+                raise RepositoryUnavailableError(f"{field} is invalid")
+        _utc_instant(value.get("createdAt"), "createdAt")
     gender = value.get("gender")
     if not isinstance(gender, str) or gender not in VOICE_GENDERS:
         raise RepositoryUnavailableError("VoiceLockVersion gender is invalid")
-    _required_ref(value.get("engineFamily"), "engineFamily")
-    _required_ref(value.get("voiceId"), "voiceId")
+    if schema_version == VOICE_LOCK_VERSION_V2_SCHEMA_VERSION:
+        _text(value.get("engineFamily"), "engineFamily")
+        _text(value.get("voiceId"), "voiceId")
+        if (
+            value.get("engineFamily") != CLONE_VOICE_ENGINE_FAMILY
+            or value.get("voiceId") != CLONE_VOICE_MODEL_ID
+        ):
+            raise RepositoryUnavailableError(
+                "clone VoiceLockVersion runtime identity is not the frozen "
+                "zero-shot clone runtime"
+            )
+    else:
+        _required_ref(value.get("engineFamily"), "engineFamily")
+        _required_ref(value.get("voiceId"), "voiceId")
     _positive_int(value.get("apparentAge"), "apparentAge")
     _number(value.get("pitchSemitones"), "pitchSemitones")
     _number(value.get("rateScale"), "rateScale", positive=True)
@@ -280,8 +395,10 @@ def _validate_confirmation(value: Mapping[str, Any]) -> dict[str, Any]:
     return deepcopy(dict(value))
 
 
-def validate_confirmed_voice_lock_bundle(value: Any) -> dict[str, Any]:
-    """Validate the exact public bundle consumed by downstream M12 services."""
+def _validate_confirmed_authoritative_voice_lock_bundle(
+    value: Any,
+) -> dict[str, Any]:
+    """Validate a confirmed v1-root bundle without choosing its consumer."""
 
     required_fields = {
         "voiceLock",
@@ -317,12 +434,16 @@ def validate_confirmed_voice_lock_bundle(value: Any) -> dict[str, Any]:
         or confirmation["voiceRef"] != root["voiceRef"]
         or version["characterRef"] != root["characterRef"]
         or confirmation["characterRef"] != root["characterRef"]
-        or root["confirmedVoiceLockVersionRef"]
-        != version["voiceLockVersionRef"]
-        or root["confirmedVoiceLockDigest"] != version["payloadDigest"]
         or confirmation["voiceLockVersionRef"]
         != version["voiceLockVersionRef"]
         or confirmation["voiceLockDigest"] != version["payloadDigest"]
+    ):
+        raise RepositoryUnavailableError(
+            "confirmed VoiceLock bundle lineage is inconsistent"
+        )
+    if (
+        root["confirmedVoiceLockVersionRef"] != version["voiceLockVersionRef"]
+        or root["confirmedVoiceLockDigest"] != version["payloadDigest"]
     ):
         raise RepositoryUnavailableError(
             "confirmed VoiceLock bundle lineage is inconsistent"
@@ -334,13 +455,286 @@ def validate_confirmed_voice_lock_bundle(value: Any) -> dict[str, Any]:
     }
 
 
+def validate_confirmed_voice_lock_bundle(value: Any) -> dict[str, Any]:
+    """Validate the exact fixed-voice v1 bundle consumed by fixed TTS."""
+
+    bundle = _validate_confirmed_authoritative_voice_lock_bundle(value)
+    if bundle["voiceLockVersion"]["schemaVersion"] != VOICE_LOCK_VERSION_SCHEMA_VERSION:
+        raise VoiceLockNotConfirmedError(
+            "confirmed fixed VoiceLockVersion v1 is required"
+        )
+    return bundle
+
+
+def validate_confirmed_clone_voice_lock_bundle(value: Any) -> dict[str, Any]:
+    """Validate a confirmed clone v2 successor on the single v1 root."""
+
+    bundle = _validate_confirmed_authoritative_voice_lock_bundle(value)
+    version = bundle["voiceLockVersion"]
+    if version["schemaVersion"] != VOICE_LOCK_VERSION_V2_SCHEMA_VERSION:
+        raise VoiceLockNotConfirmedError(
+            "confirmed clone VoiceLockVersion v2 is required"
+        )
+    if version["voiceIdentityRef"] != bundle["voiceLock"]["voiceRef"]:
+        raise RepositoryUnavailableError(
+            "clone VoiceLockVersion voice identity root is inconsistent"
+        )
+    _utc_instant(version["createdAt"], "createdAt")
+    _utc_instant(
+        bundle["voiceLockConfirmation"]["createdAt"], "createdAt"
+    )
+    _sha256(
+        bundle["voiceLockConfirmation"]["voiceLockDigest"],
+        "voiceLockDigest",
+    )
+    return bundle
+
+
+def validate_clone_voice_lock_version_v2(value: Any) -> dict[str, Any]:
+    """Validate one immutable clone VoiceLockVersion v2 fact."""
+
+    result = _validate_version(value)
+    if result["schemaVersion"] != VOICE_LOCK_VERSION_V2_SCHEMA_VERSION:
+        raise RepositoryUnavailableError("clone VoiceLockVersion v2 is required")
+    return result
+
+
+def validate_clone_voice_lock(value: Any) -> dict[str, Any]:
+    """Validate the single existing root used by a clone v2 successor."""
+
+    result = _validate_root(value)
+    return result
+
+
+def validate_voice_lock_confirmation(value: Any) -> dict[str, Any]:
+    """Validate one immutable VoiceLockConfirmation fact."""
+
+    return _validate_confirmation(value)
+
+
+def build_clone_voice_lock(
+    command: Mapping[str, Any],
+    *,
+    voice_lock: Mapping[str, Any],
+    parent_voice_lock_version: Mapping[str, Any],
+) -> dict[str, Any]:
+    """Build a clone v2 successor on an existing authoritative v1 root."""
+
+    required = (
+        _SCOPE_COMMAND_FIELDS
+        | _TRAIT_COMMAND_FIELDS
+        | _CLONE_VERSION_LINEAGE_FIELDS
+        | frozenset(
+            {
+                "voiceRef",
+                "voiceLockVersionRef",
+                "baseVoiceLockVersionRef",
+                "baseVoiceLockDigest",
+                "expectedRevision",
+                "createdAt",
+            }
+        )
+    )
+    _closed_command(
+        command,
+        required=required,
+        optional=frozenset({"languageCode"}),
+        operation="build clone VoiceLock",
+    )
+    scope = _scope(
+        command.get("workspaceRef"),
+        command.get("projectRef"),
+        command.get("seriesRef"),
+    )
+    voice_ref = _required_ref(command.get("voiceRef"), "voiceRef")
+    root = _validate_root(voice_lock)
+    parent = _validate_version(parent_voice_lock_version)
+    version_ref = _required_ref(
+        command.get("voiceLockVersionRef"), "voiceLockVersionRef"
+    )
+    base_ref = _required_ref(
+        command.get("baseVoiceLockVersionRef"), "baseVoiceLockVersionRef"
+    )
+    base_digest = _sha256(
+        command.get("baseVoiceLockDigest"), "baseVoiceLockDigest"
+    )
+    expected_revision = _positive_int(
+        command.get("expectedRevision"), "expectedRevision"
+    )
+    created_at = _utc_instant(command.get("createdAt"), "createdAt")
+    traits = _traits(command, clone=True)
+    lineage: dict[str, Any] = {}
+    for field in (
+        "sourceRecordingBindingRef",
+        "consentGrantVersionRef",
+        "rightsBindingRef",
+        "voiceIdentityRef",
+        "voiceIdentityVersionRef",
+        "subjectRef",
+    ):
+        lineage[field] = _required_ref(command.get(field), field)
+    for field in (
+        "sourceRecordingBindingDigest",
+        "consentGrantVersionDigest",
+        "rightsBindingDigest",
+        "voiceIdentityDigest",
+    ):
+        lineage[field] = _sha256(command.get(field), field)
+    if (
+        tuple(root[field] for field in ("workspaceRef", "projectRef", "seriesRef"))
+        != scope
+        or tuple(
+            parent[field]
+            for field in ("workspaceRef", "projectRef", "seriesRef")
+        )
+        != scope
+        or root["voiceRef"] != voice_ref
+        or parent["voiceRef"] != voice_ref
+        or parent["characterRef"] != root["characterRef"]
+        or root["revision"] != expected_revision
+        or root["currentVoiceLockVersionRef"] != base_ref
+        or root["confirmedVoiceLockVersionRef"] != base_ref
+        or root["confirmedVoiceLockDigest"] != base_digest
+        or parent["voiceLockVersionRef"] != base_ref
+        or parent["payloadDigest"] != base_digest
+    ):
+        raise StaleInputError(
+            "clone VoiceLockVersion requires the current confirmed parent"
+        )
+    expected_identity_version_ref = (
+        parent["voiceIdentityVersionRef"]
+        if parent["schemaVersion"] == VOICE_LOCK_VERSION_V2_SCHEMA_VERSION
+        else parent["voiceLockVersionRef"]
+    )
+    expected_identity_digest = (
+        parent["voiceIdentityDigest"]
+        if parent["schemaVersion"] == VOICE_LOCK_VERSION_V2_SCHEMA_VERSION
+        else parent["payloadDigest"]
+    )
+    if (
+        lineage["voiceIdentityRef"] != root["voiceRef"]
+        or lineage["voiceIdentityVersionRef"] != expected_identity_version_ref
+        or lineage["voiceIdentityDigest"] != expected_identity_digest
+    ):
+        raise EpisodeProductionError(
+            "clone VoiceLock voice identity pin is not authoritative"
+        )
+    if (
+        parent["schemaVersion"] == VOICE_LOCK_VERSION_V2_SCHEMA_VERSION
+        and lineage["subjectRef"] != parent["subjectRef"]
+    ):
+        raise EpisodeProductionError(
+            "clone VoiceLock subject cannot change across v2 successors"
+        )
+    version = _sealed(
+        {
+            "schemaVersion": VOICE_LOCK_VERSION_V2_SCHEMA_VERSION,
+            "workspaceRef": scope[0],
+            "projectRef": scope[1],
+            "seriesRef": scope[2],
+            "voiceRef": voice_ref,
+            "voiceLockVersionRef": version_ref,
+            "versionNumber": parent["versionNumber"] + 1,
+            "parentVoiceLockVersionRef": parent["voiceLockVersionRef"],
+            "parentVoiceLockDigest": parent["payloadDigest"],
+            "characterRef": root["characterRef"],
+            **traits,
+            **lineage,
+            "state": "CANDIDATE",
+            "immutable": True,
+            "createdAt": created_at,
+        }
+    )
+    updated_root = _sealed(
+        {
+            key: value
+            for key, value in root.items()
+            if key != "payloadDigest"
+        }
+        | {
+            "currentVoiceLockVersionRef": version_ref,
+            "revision": expected_revision + 1,
+            "updatedAt": created_at,
+        }
+    )
+    return {
+        "voiceLock": _validate_root(updated_root),
+        "voiceLockVersion": _validate_version(version),
+    }
+
+
+def build_clone_voice_lock_confirmation(
+    command: Mapping[str, Any],
+    *,
+    clone_voice_lock_bundle: Mapping[str, Any],
+) -> dict[str, Any]:
+    """Confirm one exact clone VoiceLock v2 candidate without repository writes."""
+
+    _closed_command(
+        command,
+        required=frozenset({"voiceLockConfirmationRef", "createdAt"}),
+        operation="confirm clone VoiceLock",
+    )
+    if (
+        not isinstance(clone_voice_lock_bundle, Mapping)
+        or set(clone_voice_lock_bundle) != {"voiceLock", "voiceLockVersion"}
+    ):
+        raise EpisodeProductionError("clone VoiceLock candidate bundle is invalid")
+    root = _validate_root(clone_voice_lock_bundle["voiceLock"])
+    version = _validate_version(clone_voice_lock_bundle["voiceLockVersion"])
+    if (
+        version["schemaVersion"] != VOICE_LOCK_VERSION_V2_SCHEMA_VERSION
+        or root["voiceRef"] != version["voiceRef"]
+        or root["characterRef"] != version["characterRef"]
+        or root["currentVoiceLockVersionRef"] != version["voiceLockVersionRef"]
+        or root["confirmedVoiceLockVersionRef"]
+        != version["voiceLockVersionRef"]
+        or root["confirmedVoiceLockDigest"] != version["payloadDigest"]
+    ):
+        raise VoiceLockNotConfirmedError(
+            "an unconfirmed clone VoiceLockVersion v2 candidate is required"
+        )
+    created_at = _utc_instant(command.get("createdAt"), "createdAt")
+    confirmation = _sealed(
+        {
+            "schemaVersion": VOICE_LOCK_CONFIRMATION_SCHEMA_VERSION,
+            "workspaceRef": root["workspaceRef"],
+            "projectRef": root["projectRef"],
+            "seriesRef": root["seriesRef"],
+            "voiceLockConfirmationRef": _required_ref(
+                command.get("voiceLockConfirmationRef"),
+                "voiceLockConfirmationRef",
+            ),
+            "voiceRef": root["voiceRef"],
+            "voiceLockVersionRef": version["voiceLockVersionRef"],
+            "voiceLockDigest": version["payloadDigest"],
+            "characterRef": root["characterRef"],
+            "state": "CONFIRMED",
+            "createdAt": created_at,
+        }
+    )
+    return validate_confirmed_clone_voice_lock_bundle(
+        {
+            "voiceLock": root,
+            "voiceLockVersion": version,
+            "voiceLockConfirmation": confirmation,
+        }
+    )
+
+
 def _validate_response(operation_kind: str, response: Mapping[str, Any]) -> None:
     if not isinstance(operation_kind, str):
         raise RepositoryUnavailableError("VoiceLock operation response is invalid")
     expected = {
         "create-voice-lock": {"voiceLock", "voiceLockVersion"},
         "create-voice-lock-version": {"voiceLock", "voiceLockVersion"},
+        "create-clone-voice-lock-version": {"voiceLock", "voiceLockVersion"},
         "confirm-voice-lock": {
+            "voiceLock",
+            "voiceLockVersion",
+            "voiceLockConfirmation",
+        },
+        "confirm-clone-voice-lock": {
             "voiceLock",
             "voiceLockVersion",
             "voiceLockConfirmation",
@@ -365,13 +759,23 @@ def _validate_response(operation_kind: str, response: Mapping[str, Any]) -> None
     ):
         raise RepositoryUnavailableError("VoiceLock operation lineage is invalid")
     if operation_kind == "create-voice-lock" and (
-        version["versionNumber"] != 1
+        version["schemaVersion"] != VOICE_LOCK_VERSION_SCHEMA_VERSION
+        or version["versionNumber"] != 1
         or root["confirmedVoiceLockVersionRef"] is not None
         or root["confirmedVoiceLockDigest"] is not None
     ):
         raise RepositoryUnavailableError("initial VoiceLock lineage is invalid")
-    if operation_kind == "create-voice-lock-version" and (
-        version["versionNumber"] <= 1
+    if operation_kind in {
+        "create-voice-lock-version",
+        "create-clone-voice-lock-version",
+    } and (
+        version["schemaVersion"]
+        != (
+            VOICE_LOCK_VERSION_SCHEMA_VERSION
+            if operation_kind == "create-voice-lock-version"
+            else VOICE_LOCK_VERSION_V2_SCHEMA_VERSION
+        )
+        or version["versionNumber"] <= 1
         or version["parentVoiceLockVersionRef"]
         != root["confirmedVoiceLockVersionRef"]
         or version["parentVoiceLockDigest"]
@@ -380,6 +784,8 @@ def _validate_response(operation_kind: str, response: Mapping[str, Any]) -> None
         raise RepositoryUnavailableError("successor VoiceLock lineage is invalid")
     if operation_kind == "confirm-voice-lock":
         validate_confirmed_voice_lock_bundle(response)
+    if operation_kind == "confirm-clone-voice-lock":
+        validate_confirmed_clone_voice_lock_bundle(response)
 
 
 def _validate_operation(value: Mapping[str, Any]) -> dict[str, Any]:
@@ -428,13 +834,23 @@ def _validate_write_inputs(
         )
 
 
-def _traits(command: Mapping[str, Any]) -> dict[str, Any]:
+def _traits(
+    command: Mapping[str, Any], *, clone: bool = False
+) -> dict[str, Any]:
     gender = command.get("gender")
     if not isinstance(gender, str) or gender not in VOICE_GENDERS:
         raise EpisodeProductionError("gender is invalid")
-    return {
-        "engineFamily": _required_ref(command.get("engineFamily"), "engineFamily"),
-        "voiceId": _required_ref(command.get("voiceId"), "voiceId"),
+    result = {
+        "engineFamily": (
+            _text(command.get("engineFamily"), "engineFamily")
+            if clone
+            else _required_ref(command.get("engineFamily"), "engineFamily")
+        ),
+        "voiceId": (
+            _text(command.get("voiceId"), "voiceId")
+            if clone
+            else _required_ref(command.get("voiceId"), "voiceId")
+        ),
         "gender": gender,
         "apparentAge": _positive_int(command.get("apparentAge"), "apparentAge"),
         "pitchSemitones": _number(
@@ -448,6 +864,14 @@ def _traits(command: Mapping[str, Any]) -> dict[str, Any]:
             command.get("languageCode", DEFAULT_LANGUAGE_CODE), "languageCode"
         ),
     }
+    if clone and (
+        result["engineFamily"] != CLONE_VOICE_ENGINE_FAMILY
+        or result["voiceId"] != CLONE_VOICE_MODEL_ID
+    ):
+        raise EpisodeProductionError(
+            "clone VoiceLock requires the frozen zero-shot clone runtime"
+        )
+    return result
 
 
 class VoiceLockRepository(Protocol):
@@ -465,6 +889,10 @@ class VoiceLockRepository(Protocol):
 
     def list_versions(
         self, scope: tuple[str, str, str], voice_ref: str
+    ) -> list[dict[str, Any]]: ...
+
+    def list_versions_by_scope(
+        self, scope: tuple[str, str, str]
     ) -> list[dict[str, Any]]: ...
 
     def get_confirmation(
@@ -560,6 +988,18 @@ class InMemoryVoiceLockAdapter:
                 if key[:4] == (*scope, voice_ref)
             ]
             return sorted(values, key=lambda item: item["versionNumber"])
+
+    def list_versions_by_scope(self, scope):
+        with self._lock:
+            values = [
+                _validate_version(value)
+                for key, value in self._versions.items()
+                if key[:3] == scope
+            ]
+            return sorted(
+                values,
+                key=lambda item: (item["voiceRef"], item["versionNumber"]),
+            )
 
     def get_confirmation(self, scope, voice_ref, version_ref):
         with self._lock:
@@ -1267,6 +1707,25 @@ class SqliteVoiceLockAdapter:
         finally:
             connection.close()
 
+    def list_versions_by_scope(self, scope):
+        connection = self._connect()
+        try:
+            rows = connection.execute(
+                "SELECT * FROM v5_voice_lock_versions WHERE workspace_ref=? "
+                "AND project_ref=? AND series_ref=? "
+                "ORDER BY voice_ref, version_number",
+                scope,
+            ).fetchall()
+            return [self._version_from_row(row) for row in rows]
+        except EpisodeProductionError:
+            raise
+        except sqlite3.DatabaseError as exc:
+            raise RepositoryUnavailableError(
+                "VoiceLockVersion scope read failed"
+            ) from exc
+        finally:
+            connection.close()
+
     def get_confirmation(self, scope, voice_ref, version_ref):
         connection = self._connect()
         try:
@@ -1458,8 +1917,8 @@ class SqliteVoiceLockAdapter:
                 return _operation_replay(
                     self._operation_from_row(replay), selected_operation
                 )
-            self._insert_version(connection, selected_version)
             self._update_root(connection, selected_root, expected_revision)
+            self._insert_version(connection, selected_version)
             self._insert_operation(connection, selected_operation)
             return deepcopy(dict(selected_operation["response"])), False
 
@@ -1483,6 +1942,7 @@ class SqliteVoiceLockAdapter:
                 return _operation_replay(
                     self._operation_from_row(replay), selected_operation
                 )
+            self._update_root(connection, selected_root, expected_revision)
             connection.execute(
                 "INSERT INTO v5_voice_lock_confirmations VALUES "
                 "(?,?,?,?,?,?,?,?,?)",
@@ -1498,7 +1958,6 @@ class SqliteVoiceLockAdapter:
                     selected_confirmation["payloadDigest"],
                 ),
             )
-            self._update_root(connection, selected_root, expected_revision)
             self._insert_operation(connection, selected_operation)
             return deepcopy(dict(selected_operation["response"])), False
 
@@ -1506,18 +1965,8 @@ class SqliteVoiceLockAdapter:
 
 
 class K2VoiceLockService:
-    _TRAIT_FIELDS = frozenset(
-        {
-            "engineFamily",
-            "voiceId",
-            "gender",
-            "apparentAge",
-            "pitchSemitones",
-            "rateScale",
-            "timbreDescriptor",
-        }
-    )
-    _SCOPE_FIELDS = frozenset({"workspaceRef", "projectRef", "seriesRef"})
+    _TRAIT_FIELDS = _TRAIT_COMMAND_FIELDS
+    _SCOPE_FIELDS = _SCOPE_COMMAND_FIELDS
 
     def __init__(
         self,
@@ -1809,7 +2258,170 @@ class K2VoiceLockService:
         )
         return {**stored, "idempotentReplay": replayed}
 
-    def confirm_voice_lock(self, command: Mapping[str, Any]) -> dict[str, Any]:
+    def create_clone_voice_lock_version(
+        self, command: Mapping[str, Any]
+    ) -> dict[str, Any]:
+        """Append a clone v2 version through the single VoiceLock authority."""
+
+        required = (
+            self._SCOPE_FIELDS
+            | self._TRAIT_FIELDS
+            | _CLONE_VERSION_LINEAGE_FIELDS
+            | frozenset(
+                {
+                    "voiceRef",
+                    "baseVoiceLockVersionRef",
+                    "baseVoiceLockDigest",
+                    "expectedRevision",
+                    "idempotencyKey",
+                }
+            )
+        )
+        _closed_command(
+            command,
+            required=required,
+            optional=frozenset({"languageCode"}),
+            operation="create clone VoiceLockVersion",
+        )
+        scope = _scope(
+            command.get("workspaceRef"),
+            command.get("projectRef"),
+            command.get("seriesRef"),
+        )
+        voice_ref = _required_ref(command.get("voiceRef"), "voiceRef")
+        base_ref = _required_ref(
+            command.get("baseVoiceLockVersionRef"), "baseVoiceLockVersionRef"
+        )
+        base_digest = _sha256(
+            command.get("baseVoiceLockDigest"), "baseVoiceLockDigest"
+        )
+        expected_revision = _positive_int(
+            command.get("expectedRevision"), "expectedRevision"
+        )
+        key = _idempotency_key(command.get("idempotencyKey"))
+        traits = _traits(command, clone=True)
+        lineage: dict[str, Any] = {}
+        for field in (
+            "sourceRecordingBindingRef",
+            "consentGrantVersionRef",
+            "rightsBindingRef",
+            "voiceIdentityRef",
+            "voiceIdentityVersionRef",
+            "subjectRef",
+        ):
+            lineage[field] = _required_ref(command.get(field), field)
+        for field in (
+            "sourceRecordingBindingDigest",
+            "consentGrantVersionDigest",
+            "rightsBindingDigest",
+            "voiceIdentityDigest",
+        ):
+            lineage[field] = _sha256(command.get(field), field)
+        request_digest = _digest(
+            {
+                "operationKind": "create-clone-voice-lock-version",
+                "scope": list(scope),
+                "voiceRef": voice_ref,
+                "baseVoiceLockVersionRef": base_ref,
+                "baseVoiceLockDigest": base_digest,
+                "expectedRevision": expected_revision,
+                "voice": traits,
+                "lineage": lineage,
+            }
+        )
+        replay = self._replay(
+            scope,
+            key,
+            "create-clone-voice-lock-version",
+            request_digest,
+        )
+        if replay is not None:
+            return replay
+        root = self.repository.get_root_by_ref(scope, voice_ref)
+        if root is None:
+            raise RecordNotFoundError("VoiceLock was not found")
+        versions = self.repository.list_versions(scope, voice_ref)
+        self._require_complete_version_lineage(root, versions)
+        if root["revision"] != expected_revision:
+            raise StaleInputError("VoiceLock revision changed")
+        if (
+            root["currentVoiceLockVersionRef"]
+            != root["confirmedVoiceLockVersionRef"]
+            or root["confirmedVoiceLockVersionRef"] != base_ref
+            or root["confirmedVoiceLockDigest"] != base_digest
+        ):
+            raise VoiceLockNotConfirmedError(
+                "clone successor requires the current confirmed VoiceLockVersion"
+            )
+        parent = self.repository.get_version(scope, voice_ref, base_ref)
+        confirmation = self.repository.get_confirmation(scope, voice_ref, base_ref)
+        if (
+            parent is None
+            or confirmation is None
+            or parent["payloadDigest"] != base_digest
+            or confirmation["voiceLockDigest"] != base_digest
+        ):
+            raise VoiceLockNotConfirmedError(
+                "confirmed VoiceLockVersion lineage is unavailable"
+            )
+        parent_bundle = {
+            "voiceLock": root,
+            "voiceLockVersion": parent,
+            "voiceLockConfirmation": confirmation,
+        }
+        if parent["schemaVersion"] == VOICE_LOCK_VERSION_SCHEMA_VERSION:
+            validate_confirmed_voice_lock_bundle(parent_bundle)
+        else:
+            validate_confirmed_clone_voice_lock_bundle(parent_bundle)
+        version_ref = _required_ref(
+            self._ref_factory("voice-lock-version"), "voiceLockVersionRef"
+        )
+        now = _utc_instant(self._clock(), "createdAt")
+        built = build_clone_voice_lock(
+            {
+                "workspaceRef": scope[0],
+                "projectRef": scope[1],
+                "seriesRef": scope[2],
+                "voiceRef": voice_ref,
+                "voiceLockVersionRef": version_ref,
+                "baseVoiceLockVersionRef": base_ref,
+                "baseVoiceLockDigest": base_digest,
+                "expectedRevision": expected_revision,
+                **traits,
+                **lineage,
+                "createdAt": now,
+            },
+            voice_lock=root,
+            parent_voice_lock_version=parent,
+        )
+        updated_root = built["voiceLock"]
+        version = built["voiceLockVersion"]
+        self._require_complete_version_lineage(
+            updated_root, [*versions, version]
+        )
+        response = {
+            "voiceLock": updated_root,
+            "voiceLockVersion": version,
+        }
+        operation = self._operation(
+            scope=scope,
+            key=key,
+            operation_kind="create-clone-voice-lock-version",
+            request_digest=request_digest,
+            response=response,
+            created_at=now,
+        )
+        stored, replayed = self.repository.create_voice_lock_version(
+            updated_root,
+            version,
+            operation,
+            expected_revision=expected_revision,
+        )
+        return {**stored, "idempotentReplay": replayed}
+
+    def _confirm_voice_lock_version(
+        self, command: Mapping[str, Any], *, clone: bool
+    ) -> dict[str, Any]:
         required = self._SCOPE_FIELDS | frozenset(
             {
                 "voiceRef",
@@ -1822,7 +2434,11 @@ class K2VoiceLockService:
         _closed_command(
             command,
             required=required,
-            operation="confirm VoiceLock",
+            operation=(
+                "confirm clone VoiceLockVersion"
+                if clone
+                else "confirm VoiceLock"
+            ),
         )
         scope = _scope(
             command.get("workspaceRef"),
@@ -1840,9 +2456,12 @@ class K2VoiceLockService:
             command.get("expectedRevision"), "expectedRevision"
         )
         key = _idempotency_key(command.get("idempotencyKey"))
+        operation_kind = (
+            "confirm-clone-voice-lock" if clone else "confirm-voice-lock"
+        )
         request_digest = _digest(
             {
-                "operationKind": "confirm-voice-lock",
+                "operationKind": operation_kind,
                 "scope": list(scope),
                 "voiceRef": voice_ref,
                 "voiceLockVersionRef": version_ref,
@@ -1851,7 +2470,7 @@ class K2VoiceLockService:
             }
         )
         replay = self._replay(
-            scope, key, "confirm-voice-lock", request_digest
+            scope, key, operation_kind, request_digest
         )
         if replay is not None:
             return replay
@@ -1872,13 +2491,18 @@ class K2VoiceLockService:
                 raise RepositoryUnavailableError(
                     "VoiceLock confirmed lineage is incomplete"
                 )
-            validate_confirmed_voice_lock_bundle(
-                {
-                    "voiceLock": root,
-                    "voiceLockVersion": confirmed_version,
-                    "voiceLockConfirmation": confirmed_fact,
-                }
-            )
+            confirmed_bundle = {
+                "voiceLock": root,
+                "voiceLockVersion": confirmed_version,
+                "voiceLockConfirmation": confirmed_fact,
+            }
+            if (
+                confirmed_version["schemaVersion"]
+                == VOICE_LOCK_VERSION_SCHEMA_VERSION
+            ):
+                validate_confirmed_voice_lock_bundle(confirmed_bundle)
+            else:
+                validate_confirmed_clone_voice_lock_bundle(confirmed_bundle)
         if root["revision"] != expected_revision:
             raise StaleInputError("VoiceLock revision changed")
         if root["currentVoiceLockVersionRef"] != version_ref:
@@ -1890,12 +2514,25 @@ class K2VoiceLockService:
         version = self.repository.get_version(scope, voice_ref, version_ref)
         if version is None:
             raise RecordNotFoundError("VoiceLockVersion was not found")
+        expected_schema = (
+            VOICE_LOCK_VERSION_V2_SCHEMA_VERSION
+            if clone
+            else VOICE_LOCK_VERSION_SCHEMA_VERSION
+        )
+        if version["schemaVersion"] != expected_schema:
+            raise VoiceLockNotConfirmedError(
+                "VoiceLockVersion schema does not match the confirmation path"
+            )
         if (
             version["payloadDigest"] != voice_digest
             or version["characterRef"] != root["characterRef"]
         ):
             raise StaleInputError("VoiceLockVersion digest changed")
-        now = _text(self._clock(), "createdAt")
+        now = (
+            _utc_instant(self._clock(), "createdAt")
+            if clone
+            else _text(self._clock(), "createdAt")
+        )
         confirmation = _sealed(
             {
                 "schemaVersion": VOICE_LOCK_CONFIRMATION_SCHEMA_VERSION,
@@ -1935,7 +2572,7 @@ class K2VoiceLockService:
         operation = self._operation(
             scope=scope,
             key=key,
-            operation_kind="confirm-voice-lock",
+            operation_kind=operation_kind,
             request_digest=request_digest,
             response=response,
             created_at=now,
@@ -1948,10 +2585,23 @@ class K2VoiceLockService:
         )
         return {**stored, "idempotentReplay": replayed}
 
+    def confirm_voice_lock(self, command: Mapping[str, Any]) -> dict[str, Any]:
+        """Confirm only a fixed-voice v1 candidate."""
+
+        return self._confirm_voice_lock_version(command, clone=False)
+
+    def confirm_clone_voice_lock(
+        self, command: Mapping[str, Any]
+    ) -> dict[str, Any]:
+        """Confirm only a clone v2 candidate through the same root CAS."""
+
+        return self._confirm_voice_lock_version(command, clone=True)
+
     @staticmethod
     def _require_complete_version_lineage(
         root: Mapping[str, Any], versions: list[Mapping[str, Any]]
     ) -> None:
+        root = _validate_root(root)
         if not versions:
             raise RepositoryUnavailableError("VoiceLock version lineage is incomplete")
         root_scope = tuple(
@@ -1959,6 +2609,7 @@ class K2VoiceLockService:
         )
         previous: Mapping[str, Any] | None = None
         for expected_number, version in enumerate(versions, start=1):
+            version = _validate_version(version)
             if (
                 version["versionNumber"] != expected_number
                 or tuple(
@@ -1972,6 +2623,13 @@ class K2VoiceLockService:
                 raise RepositoryUnavailableError(
                     "VoiceLock version lineage is incomplete"
                 )
+            if (
+                expected_number == 1
+                and version["schemaVersion"] != VOICE_LOCK_VERSION_SCHEMA_VERSION
+            ):
+                raise RepositoryUnavailableError(
+                    "VoiceLock lineage must begin with fixed v1"
+                )
             if previous is not None and (
                 version["parentVoiceLockVersionRef"]
                 != previous["voiceLockVersionRef"]
@@ -1980,6 +2638,47 @@ class K2VoiceLockService:
                 raise RepositoryUnavailableError(
                     "VoiceLock version lineage is incomplete"
                 )
+            if (
+                previous is not None
+                and previous["schemaVersion"]
+                == VOICE_LOCK_VERSION_V2_SCHEMA_VERSION
+                and version["schemaVersion"] == VOICE_LOCK_VERSION_SCHEMA_VERSION
+            ):
+                raise RepositoryUnavailableError(
+                    "VoiceLockVersion cannot downgrade from clone v2 to fixed v1"
+                )
+            if version["schemaVersion"] == VOICE_LOCK_VERSION_V2_SCHEMA_VERSION:
+                if previous is None:
+                    raise RepositoryUnavailableError(
+                        "clone VoiceLockVersion v2 has no authority parent"
+                    )
+                expected_identity_ref = (
+                    previous["voiceIdentityVersionRef"]
+                    if previous["schemaVersion"]
+                    == VOICE_LOCK_VERSION_V2_SCHEMA_VERSION
+                    else previous["voiceLockVersionRef"]
+                )
+                expected_identity_digest = (
+                    previous["voiceIdentityDigest"]
+                    if previous["schemaVersion"]
+                    == VOICE_LOCK_VERSION_V2_SCHEMA_VERSION
+                    else previous["payloadDigest"]
+                )
+                if (
+                    version["voiceIdentityRef"] != root["voiceRef"]
+                    or version["voiceIdentityVersionRef"]
+                    != expected_identity_ref
+                    or version["voiceIdentityDigest"]
+                    != expected_identity_digest
+                    or (
+                        previous["schemaVersion"]
+                        == VOICE_LOCK_VERSION_V2_SCHEMA_VERSION
+                        and version["subjectRef"] != previous["subjectRef"]
+                    )
+                ):
+                    raise RepositoryUnavailableError(
+                        "clone VoiceLockVersion identity lineage is incomplete"
+                    )
             previous = version
         if versions[-1]["voiceLockVersionRef"] != root["currentVoiceLockVersionRef"]:
             raise RepositoryUnavailableError("VoiceLock version lineage is incomplete")
@@ -2013,12 +2712,15 @@ class K2VoiceLockService:
                 raise RepositoryUnavailableError(
                     "VoiceLock confirmed lineage is incomplete"
                 )
-            bundle = validate_confirmed_voice_lock_bundle(
-                {
-                    "voiceLock": root,
-                    "voiceLockVersion": version,
-                    "voiceLockConfirmation": confirmation,
-                }
+            candidate_bundle = {
+                "voiceLock": root,
+                "voiceLockVersion": version,
+                "voiceLockConfirmation": confirmation,
+            }
+            bundle = (
+                validate_confirmed_voice_lock_bundle(candidate_bundle)
+                if version["schemaVersion"] == VOICE_LOCK_VERSION_SCHEMA_VERSION
+                else validate_confirmed_clone_voice_lock_bundle(candidate_bundle)
             )
             confirmed = {
                 "voiceLockVersion": bundle["voiceLockVersion"],
@@ -2069,8 +2771,61 @@ class K2VoiceLockService:
             "voiceLockConfirmation": confirmation,
         })
 
+    def get_confirmed_clone_voice_lock(
+        self,
+        workspace_ref: str,
+        project_ref: str,
+        series_ref: str,
+        voice_ref: str,
+    ) -> dict[str, Any]:
+        """Read the current confirmed clone v2 from the single root store."""
+
+        scope = _scope(workspace_ref, project_ref, series_ref)
+        selected_voice_ref = _required_ref(voice_ref, "voiceRef")
+        root = self.repository.get_root_by_ref(scope, selected_voice_ref)
+        if root is None:
+            raise RecordNotFoundError("VoiceLock was not found")
+        versions = self.repository.list_versions(scope, selected_voice_ref)
+        self._require_complete_version_lineage(root, versions)
+        version_ref = root["confirmedVoiceLockVersionRef"]
+        if version_ref is None:
+            raise VoiceLockNotConfirmedError("clone VoiceLock is not confirmed")
+        version = self.repository.get_version(scope, selected_voice_ref, version_ref)
+        confirmation = self.repository.get_confirmation(
+            scope, selected_voice_ref, version_ref
+        )
+        if version is None or confirmation is None:
+            raise RepositoryUnavailableError(
+                "confirmed clone VoiceLock lineage is incomplete"
+            )
+        return validate_confirmed_clone_voice_lock_bundle(
+            {
+                "voiceLock": root,
+                "voiceLockVersion": version,
+                "voiceLockConfirmation": confirmation,
+            }
+        )
+
+    def list_clone_voice_lock_versions(
+        self,
+        workspace_ref: str,
+        project_ref: str,
+        series_ref: str,
+    ) -> list[dict[str, Any]]:
+        """Read authoritative v2 descendants for downstream consent checks."""
+
+        scope = _scope(workspace_ref, project_ref, series_ref)
+        return [
+            validate_clone_voice_lock_version_v2(version)
+            for version in self.repository.list_versions_by_scope(scope)
+            if version.get("schemaVersion")
+            == VOICE_LOCK_VERSION_V2_SCHEMA_VERSION
+        ]
+
 
 __all__ = [
+    "CLONE_VOICE_ENGINE_FAMILY",
+    "CLONE_VOICE_MODEL_ID",
     "DEFAULT_LANGUAGE_CODE",
     "InMemoryVoiceLockAdapter",
     "K2VoiceLockService",
@@ -2079,9 +2834,16 @@ __all__ = [
     "VOICE_LOCK_CONFIRMATION_SCHEMA_VERSION",
     "VOICE_LOCK_SCHEMA_VERSION",
     "VOICE_LOCK_VERSION_SCHEMA_VERSION",
+    "VOICE_LOCK_VERSION_V2_SCHEMA_VERSION",
     "VoiceLockConflictError",
     "VoiceLockImmutableError",
     "VoiceLockNotConfirmedError",
     "VoiceLockRepository",
+    "build_clone_voice_lock",
+    "build_clone_voice_lock_confirmation",
+    "validate_clone_voice_lock_version_v2",
+    "validate_clone_voice_lock",
+    "validate_confirmed_clone_voice_lock_bundle",
     "validate_confirmed_voice_lock_bundle",
+    "validate_voice_lock_confirmation",
 ]

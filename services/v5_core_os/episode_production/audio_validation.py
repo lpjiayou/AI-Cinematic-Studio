@@ -39,6 +39,7 @@ from .audio_authority import (
     validate_sfx_asset_version,
 )
 from .audio_timing import (
+    AUDIO_SOURCE_TIMING_EVIDENCE_SCHEMA_VERSION,
     AudioCue,
     build_source_audio_timing_evidence,
     validate_audio_cue,
@@ -55,6 +56,9 @@ from .foundation import (
 
 AUDIO_TECHNICAL_VALIDATION_SCHEMA_VERSION = (
     "v5.audio-technical-validation.v1"
+)
+AUDIO_TECHNICAL_VALIDATION_V2_SCHEMA_VERSION = (
+    "v5.m12-audio-technical-validation.v2"
 )
 V4_AUDIO_TECHNICAL_ANALYSIS_SCHEMA_VERSION = (
     "v4.audio-technical-analysis-evidence.v1"
@@ -87,6 +91,25 @@ _COMMAND_FIELDS = frozenset(
 _DURATION_FIELDS = frozenset({"numerator", "denominator", "unit"})
 _SILENCE_RANGE_FIELDS = frozenset(
     {"startSample", "endSampleExclusive"}
+)
+_SOURCE_TIMING_PROJECTION_FIELDS = frozenset(
+    {
+        "schemaVersion",
+        "sourceAssetVersionRef",
+        "sourceAssetVersionDigest",
+        "artifactEvidenceRef",
+        "artifactEvidenceDigest",
+        "storageKey",
+        "fileDigest",
+        "sampleRate",
+        "channelCount",
+        "sampleCount",
+        "authorityState",
+        "payloadDigest",
+    }
+)
+_CUE_BINDING_FIELDS = frozenset(
+    {"cueRef", "cueVersionRef", "cueDigest"}
 )
 _PCM_DIGEST_SPEC = deepcopy(PCM_CONTENT_DIGEST_SPEC)
 _PCM_DIGEST_SPEC_FIELDS = frozenset(_PCM_DIGEST_SPEC)
@@ -153,6 +176,62 @@ _VALIDATION_FIELDS = frozenset(
         "analysisEvidenceDigest",
         "sourceTimingEvidence",
         "audioCueBindings",
+        "codec",
+        "container",
+        "sampleRate",
+        "channelCount",
+        "channelLayout",
+        "sampleCount",
+        "duration",
+        "integratedLufs",
+        "loudnessRangeLra",
+        "truePeakDbtp",
+        "maxSamplePeak",
+        "silenceRanges",
+        "clippedSampleCount",
+        "clippingThreshold",
+        "clippingDetected",
+        "dcOffset",
+        "fileDigest",
+        "pcmContentDigest",
+        "pcmDigestSpec",
+        "analysisParametersDigest",
+        "validationState",
+        "failureReasons",
+        "validatorIdentity",
+        "validatorVersion",
+        "state",
+        "authorityState",
+        "immutable",
+        "publicationAllowed",
+        "createdBy",
+        "createdAt",
+        "payloadDigest",
+    }
+)
+_PRE_ASSET_VALIDATION_FIELDS = frozenset(
+    {
+        "schemaVersion",
+        "validationKind",
+        "workspaceRef",
+        "productionRunRef",
+        "validationRef",
+        "validationVersionRef",
+        "version",
+        "supersedesValidationVersionRef",
+        "supersedesValidationVersionDigest",
+        "generationRequestRef",
+        "generationRequestVersionRef",
+        "generationRequestDigest",
+        "generationResultRef",
+        "generationResultDigest",
+        "artifactEvidenceRef",
+        "artifactEvidenceDigest",
+        "artifactRef",
+        "storageKey",
+        "byteSize",
+        "analysisEvidenceRef",
+        "analysisEvidenceDigest",
         "codec",
         "container",
         "sampleRate",
@@ -969,6 +1048,225 @@ def _validate_command_identity(value: Mapping[str, Any]) -> None:
     _timestamp(value["createdAt"], "createdAt")
 
 
+def validate_persisted_audio_technical_validation_evidence(
+    value: Any,
+    *,
+    expected_scope: tuple[str, str, str, str, str],
+    expected_source_ref: str,
+    expected_source_digest: str,
+) -> dict[str, Any]:
+    """Read a persisted v1 technical fact without recreating its V4 inputs.
+
+    This is a read-only evidence validator for repository resolvers.  It does
+    not build a second authority and cannot be used to mint a validation: the
+    complete, exact v1 payload must already be sealed in the evidence journal.
+    """
+
+    result = _verify_sealed(
+        value,
+        _VALIDATION_FIELDS,
+        "persisted AudioTechnicalValidation",
+    )
+    if (
+        not isinstance(expected_scope, tuple)
+        or len(expected_scope) != len(_COMMON_SCOPE_FIELDS)
+    ):
+        raise AudioTechnicalValidationError(
+            "expected_scope must contain the five audio scope refs"
+        )
+    scope = tuple(
+        _ref(selected, field)
+        for field, selected in zip(_COMMON_SCOPE_FIELDS, expected_scope)
+    )
+    selected_source_ref = _ref(expected_source_ref, "expected_source_ref")
+    selected_source_digest = _sha256(
+        expected_source_digest,
+        "expected_source_digest",
+    )
+    _validate_command_identity(result)
+    if (
+        result["schemaVersion"] != AUDIO_TECHNICAL_VALIDATION_SCHEMA_VERSION
+        or tuple(result[field] for field in _COMMON_SCOPE_FIELDS) != scope
+        or result["sourceAssetVersionRef"] != selected_source_ref
+        or result["sourceAssetVersionDigest"] != selected_source_digest
+        or result["sourceAssetVersionType"]
+        not in {
+            "DialogueAssetVersion",
+            "MusicAssetVersion",
+            "SfxAssetVersion",
+            "AmbienceAssetVersion",
+            # Read-only M12-C1 support for a pre-existing canonical human
+            # source recording.  This discriminator binds the underlying
+            # canonical AssetVersion ref/digest; it is not the derived
+            # SourceVoiceRecordingAssetVersion projection and is intentionally
+            # absent from the builder's audible wrapper types.
+            "SourceRecordingCanonicalAssetVersion",
+        }
+        or result["state"] != AUDIO_TECHNICAL_VALIDATION_STATE
+        or result["authorityState"]
+        != AUDIO_TECHNICAL_VALIDATION_AUTHORITY_STATE
+        or result["immutable"] is not True
+        or result["publicationAllowed"] is not False
+    ):
+        raise AudioTechnicalEvidenceBindingError(
+            "persisted AudioTechnicalValidation authority binding is stale"
+        )
+
+    for field in (
+        "sourceArtifactEvidenceRef",
+        "artifactRef",
+        "analysisEvidenceRef",
+    ):
+        _ref(result[field], field)
+    for field in (
+        "sourceAssetVersionDigest",
+        "sourceArtifactEvidenceDigest",
+        "analysisEvidenceDigest",
+        "fileDigest",
+        "pcmContentDigest",
+        "analysisParametersDigest",
+    ):
+        _sha256(result[field], field)
+    _storage_key(result["storageKey"])
+    _integer(result["byteSize"], "byteSize", minimum=1)
+
+    sample_rate = _integer(
+        result["sampleRate"], "sampleRate", minimum=8_000, maximum=384_000
+    )
+    channel_count = _integer(
+        result["channelCount"], "channelCount", minimum=1, maximum=32
+    )
+    sample_count = _integer(result["sampleCount"], "sampleCount", minimum=1)
+    expected_layout = {1: "mono", 2: "stereo"}.get(channel_count)
+    if expected_layout is None or result["channelLayout"] != expected_layout:
+        raise AudioTechnicalValidationError(
+            "persisted AudioTechnicalValidation channel layout is invalid"
+        )
+    if result["codec"] != "pcm_s16le" or result["container"] != "wav":
+        raise AudioTechnicalValidationError(
+            "persisted AudioTechnicalValidation format is unsupported"
+        )
+    _validate_duration(
+        result["duration"],
+        sample_count=sample_count,
+        sample_rate=sample_rate,
+        label="persisted AudioTechnicalValidation duration",
+    )
+
+    timing = _verify_sealed(
+        result["sourceTimingEvidence"],
+        _SOURCE_TIMING_PROJECTION_FIELDS,
+        "persisted SourceAudioTimingEvidence",
+    )
+    if (
+        timing["schemaVersion"]
+        != AUDIO_SOURCE_TIMING_EVIDENCE_SCHEMA_VERSION
+        or timing["authorityState"] != "TECHNICAL_EVIDENCE_ONLY"
+        or timing["sourceAssetVersionRef"] != selected_source_ref
+        or timing["sourceAssetVersionDigest"] != selected_source_digest
+        or timing["artifactEvidenceRef"]
+        != result["sourceArtifactEvidenceRef"]
+        or timing["artifactEvidenceDigest"]
+        != result["sourceArtifactEvidenceDigest"]
+        or timing["storageKey"] != result["storageKey"]
+        or timing["fileDigest"] != result["fileDigest"]
+        or timing["sampleRate"] != sample_rate
+        or timing["channelCount"] != channel_count
+        or timing["sampleCount"] != sample_count
+    ):
+        raise AudioTechnicalEvidenceBindingError(
+            "persisted source timing projection is stale"
+        )
+
+    bindings = result["audioCueBindings"]
+    if not isinstance(bindings, list):
+        raise AudioTechnicalCueBindingError(
+            "persisted AudioTechnicalValidation Cue bindings are invalid"
+        )
+    normalized_bindings: list[dict[str, str]] = []
+    seen_cue_versions: set[str] = set()
+    for index, raw in enumerate(bindings):
+        item = _exact(
+            raw,
+            _CUE_BINDING_FIELDS,
+            f"audioCueBindings[{index}]",
+        )
+        _ref(item["cueRef"], f"audioCueBindings[{index}].cueRef")
+        version_ref = _ref(
+            item["cueVersionRef"],
+            f"audioCueBindings[{index}].cueVersionRef",
+        )
+        _sha256(item["cueDigest"], f"audioCueBindings[{index}].cueDigest")
+        if version_ref in seen_cue_versions:
+            raise AudioTechnicalCueBindingError(
+                "persisted AudioTechnicalValidation has duplicate Cue bindings"
+            )
+        seen_cue_versions.add(version_ref)
+        normalized_bindings.append(item)
+    if bindings != sorted(
+        normalized_bindings, key=lambda item: item["cueVersionRef"]
+    ):
+        raise AudioTechnicalCueBindingError(
+            "persisted AudioTechnicalValidation Cue bindings are not canonical"
+        )
+
+    for field, places, minimum, maximum in (
+        ("integratedLufs", 3, Decimal("-200"), Decimal("100")),
+        ("loudnessRangeLra", 3, Decimal("0"), Decimal("200")),
+        ("truePeakDbtp", 3, Decimal("-200"), Decimal("100")),
+    ):
+        _fixed_decimal(
+            result[field],
+            field,
+            places=places,
+            minimum=minimum,
+            maximum=maximum,
+        )
+    if result["dcOffset"] is not None:
+        _fixed_decimal(
+            result["dcOffset"],
+            "dcOffset",
+            places=9,
+            minimum=Decimal("-1"),
+            maximum=Decimal("1"),
+        )
+    peak = _integer(
+        result["maxSamplePeak"],
+        "maxSamplePeak",
+        maximum=32_768,
+    )
+    clipped_count = _integer(
+        result["clippedSampleCount"],
+        "clippedSampleCount",
+        maximum=sample_count * channel_count,
+    )
+    if (
+        result["validationState"] != "PASSED"
+        or result["failureReasons"] != []
+        or result["clippingDetected"] is not False
+        or clipped_count != 0
+        or peak >= CLIPPING_THRESHOLD_ABS
+    ):
+        raise AudioTechnicalValidationError(
+            "persisted AudioTechnicalValidation did not pass"
+        )
+    _validate_silence_ranges(
+        result["silenceRanges"], sample_count=sample_count
+    )
+    _validate_clipping_threshold(result["clippingThreshold"])
+    _validate_pcm_digest_spec(result["pcmDigestSpec"])
+    if (
+        result["analysisParametersDigest"]
+        != AUDIO_TECHNICAL_ANALYSIS_PARAMETERS_DIGEST
+        or result["validatorIdentity"] != AUDIO_TECHNICAL_VALIDATOR_IDENTITY
+        or result["validatorVersion"] != AUDIO_TECHNICAL_VALIDATOR_VERSION
+    ):
+        raise AudioTechnicalValidationError(
+            "persisted AudioTechnicalValidation analysis identity is unsupported"
+        )
+    return result
+
+
 def _validated_inputs(
     *,
     source_asset_version: Any,
@@ -1001,6 +1299,276 @@ def _validated_inputs(
         source_timing=source_timing,
     )
     return asset, source_timing, analysis, cue_bindings
+
+
+def _validated_pre_asset_inputs(
+    *,
+    generation_result: Any,
+    artifact_evidence: Any,
+    v4_analysis_evidence: Any,
+) -> tuple[dict[str, Any], dict[str, Any], dict[str, Any]]:
+    """Validate generation evidence before any Audio AssetVersion exists."""
+
+    from .audio_authority import _validated_v4_generation_evidence
+
+    result, evidence = _validated_v4_generation_evidence(
+        generation_result,
+        artifact_evidence,
+    )
+    probe = evidence.get("probe")
+    if not isinstance(probe, Mapping):
+        raise AudioTechnicalValidationError(
+            "pre-asset ArtifactEvidence probe is unavailable"
+        )
+    source_timing = {
+        "sampleRate": evidence.get("sampleRate"),
+        "channelCount": evidence.get("channels"),
+        "sampleCount": probe.get("durationSamples"),
+    }
+    synthetic_asset = {
+        "artifact": {
+            "artifactEvidenceRef": evidence.get("artifactEvidenceRef"),
+            "artifactEvidenceDigest": evidence.get("payloadDigest"),
+            "artifactRef": evidence.get("artifactRef"),
+            "storageKey": evidence.get("storageKey"),
+            "byteSize": evidence.get("byteSize"),
+            "fileDigest": evidence.get("sha256"),
+        }
+    }
+    analysis = _validate_v4_analysis_evidence(
+        v4_analysis_evidence,
+        asset=synthetic_asset,
+        source_artifact_evidence=evidence,
+        source_timing=source_timing,
+    )
+    if (
+        result["workspaceRef"] != evidence["workspaceRef"]
+        or result["productionRunRef"] != evidence["productionRunRef"]
+    ):
+        raise AudioTechnicalEvidenceBindingError(
+            "pre-asset generation scope is stale"
+        )
+    return result, evidence, analysis
+
+
+def _pre_asset_projection(
+    *,
+    generation_result: Mapping[str, Any],
+    artifact_evidence: Mapping[str, Any],
+    analysis: Mapping[str, Any],
+) -> dict[str, Any]:
+    return {
+        "validationKind": "PRE_ASSET_GENERATION_EVIDENCE",
+        "workspaceRef": generation_result["workspaceRef"],
+        "productionRunRef": generation_result["productionRunRef"],
+        "generationRequestRef": generation_result["generationRequestRef"],
+        "generationRequestVersionRef": generation_result[
+            "generationRequestVersionRef"
+        ],
+        "generationRequestDigest": generation_result["generationRequestDigest"],
+        "generationResultRef": generation_result["generationResultRef"],
+        "generationResultDigest": generation_result["payloadDigest"],
+        "artifactEvidenceRef": artifact_evidence["artifactEvidenceRef"],
+        "artifactEvidenceDigest": artifact_evidence["payloadDigest"],
+        "artifactRef": analysis["artifactRef"],
+        "storageKey": analysis["storageKey"],
+        "byteSize": analysis["byteSize"],
+        "analysisEvidenceRef": analysis["analysisEvidenceRef"],
+        "analysisEvidenceDigest": analysis["payloadDigest"],
+        "codec": analysis["codec"],
+        "container": analysis["container"],
+        "sampleRate": analysis["sampleRate"],
+        "channelCount": analysis["channelCount"],
+        "channelLayout": analysis["channelLayout"],
+        "sampleCount": analysis["sampleCount"],
+        "duration": deepcopy(analysis["duration"]),
+        "integratedLufs": analysis["integratedLufs"],
+        "loudnessRangeLra": analysis["loudnessRangeLra"],
+        "truePeakDbtp": analysis["truePeakDbtp"],
+        "maxSamplePeak": analysis["maxSamplePeak"],
+        "silenceRanges": deepcopy(analysis["silenceRanges"]),
+        "clippedSampleCount": analysis["clippedSampleCount"],
+        "clippingThreshold": deepcopy(analysis["clippingThreshold"]),
+        "clippingDetected": analysis["clippingDetected"],
+        "dcOffset": analysis["dcOffset"],
+        "fileDigest": analysis["fileDigest"],
+        "pcmContentDigest": analysis["pcmContentDigest"],
+        "pcmDigestSpec": deepcopy(analysis["pcmDigestSpec"]),
+        "analysisParametersDigest": analysis["analysisParametersDigest"],
+        "validationState": analysis["validationState"],
+        "failureReasons": deepcopy(analysis["failureReasons"]),
+        "validatorIdentity": analysis["validatorIdentity"],
+        "validatorVersion": analysis["validatorVersion"],
+    }
+
+
+def _validate_pre_asset_predecessor(
+    value: Mapping[str, Any],
+    *,
+    predecessor_validation: Any,
+    projection: Mapping[str, Any],
+) -> None:
+    version = _version_lineage_fields(value)
+    if version == 1:
+        if predecessor_validation is not None:
+            raise AudioTechnicalValidationError(
+                "initial pre-asset validation cannot receive a predecessor"
+            )
+        return
+    if type(predecessor_validation) is not AudioTechnicalValidation:
+        raise UpstreamNotReadyError(
+            "pre-asset validation successor requires its exact predecessor wrapper"
+        )
+    predecessor = _verify_sealed(
+        predecessor_validation.as_dict(),
+        _PRE_ASSET_VALIDATION_FIELDS,
+        "predecessor pre-asset AudioTechnicalValidation",
+    )
+    stable_fields = (
+        "workspaceRef",
+        "productionRunRef",
+        "generationRequestRef",
+        "generationRequestVersionRef",
+        "generationRequestDigest",
+        "generationResultRef",
+        "generationResultDigest",
+        "artifactEvidenceRef",
+        "artifactEvidenceDigest",
+    )
+    if (
+        predecessor["schemaVersion"]
+        != AUDIO_TECHNICAL_VALIDATION_V2_SCHEMA_VERSION
+        or predecessor["validationKind"] != "PRE_ASSET_GENERATION_EVIDENCE"
+        or value["validationRef"] != predecessor["validationRef"]
+        or version != predecessor["version"] + 1
+        or value["supersedesValidationVersionRef"]
+        != predecessor["validationVersionRef"]
+        or value["supersedesValidationVersionDigest"]
+        != predecessor["payloadDigest"]
+        or any(predecessor[field] != projection[field] for field in stable_fields)
+    ):
+        raise AudioTechnicalEvidenceBindingError(
+            "pre-asset AudioTechnicalValidation predecessor binding is stale"
+        )
+
+
+def _validate_pre_asset_audio_technical_validation(
+    value: Any,
+    *,
+    generation_result: Any,
+    artifact_evidence: Any,
+    v4_analysis_evidence: Any,
+    predecessor_validation: Any = None,
+) -> dict[str, Any]:
+    selected = _verify_sealed(
+        value,
+        _PRE_ASSET_VALIDATION_FIELDS,
+        "pre-asset AudioTechnicalValidation",
+    )
+    if selected["schemaVersion"] != AUDIO_TECHNICAL_VALIDATION_V2_SCHEMA_VERSION:
+        raise AudioTechnicalValidationError(
+            "pre-asset AudioTechnicalValidation schema is unsupported"
+        )
+    _validate_command_identity(selected)
+    generation, evidence, analysis = _validated_pre_asset_inputs(
+        generation_result=generation_result,
+        artifact_evidence=artifact_evidence,
+        v4_analysis_evidence=v4_analysis_evidence,
+    )
+    projection = _pre_asset_projection(
+        generation_result=generation,
+        artifact_evidence=evidence,
+        analysis=analysis,
+    )
+    _validate_pre_asset_predecessor(
+        selected,
+        predecessor_validation=predecessor_validation,
+        projection=projection,
+    )
+    for field, expected in projection.items():
+        if selected[field] != expected:
+            raise AudioTechnicalEvidenceBindingError(
+                f"pre-asset AudioTechnicalValidation {field} binding is stale"
+            )
+    if (
+        selected["state"] != AUDIO_TECHNICAL_VALIDATION_STATE
+        or selected["authorityState"]
+        != AUDIO_TECHNICAL_VALIDATION_AUTHORITY_STATE
+        or selected["immutable"] is not True
+        or selected["publicationAllowed"] is not False
+    ):
+        raise AudioTechnicalValidationError(
+            "pre-asset AudioTechnicalValidation lifecycle is invalid"
+        )
+    return selected
+
+
+def build_pre_asset_audio_technical_validation(
+    command: Mapping[str, Any],
+    *,
+    generation_result: Any,
+    artifact_evidence: Any,
+    v4_analysis_evidence: Any,
+    predecessor_validation: Any = None,
+) -> dict[str, Any]:
+    """Build the acyclic technical fact consumed by a new audio AssetVersion."""
+
+    selected = _exact(
+        command,
+        _COMMAND_FIELDS,
+        "pre-asset AudioTechnicalValidation command",
+    )
+    _validate_command_identity(selected)
+    generation, evidence, analysis = _validated_pre_asset_inputs(
+        generation_result=generation_result,
+        artifact_evidence=artifact_evidence,
+        v4_analysis_evidence=v4_analysis_evidence,
+    )
+    projection = _pre_asset_projection(
+        generation_result=generation,
+        artifact_evidence=evidence,
+        analysis=analysis,
+    )
+    _validate_pre_asset_predecessor(
+        selected,
+        predecessor_validation=predecessor_validation,
+        projection=projection,
+    )
+    result = _seal(
+        {
+            "schemaVersion": AUDIO_TECHNICAL_VALIDATION_V2_SCHEMA_VERSION,
+            **selected,
+            **projection,
+            "state": AUDIO_TECHNICAL_VALIDATION_STATE,
+            "authorityState": AUDIO_TECHNICAL_VALIDATION_AUTHORITY_STATE,
+            "immutable": True,
+            "publicationAllowed": False,
+        }
+    )
+    return _validate_pre_asset_audio_technical_validation(
+        result,
+        generation_result=generation_result,
+        artifact_evidence=artifact_evidence,
+        v4_analysis_evidence=v4_analysis_evidence,
+        predecessor_validation=predecessor_validation,
+    )
+
+
+def validate_pre_asset_audio_technical_validation(
+    value: Any,
+    *,
+    generation_result: Any,
+    artifact_evidence: Any,
+    v4_analysis_evidence: Any,
+    predecessor_validation: Any = None,
+) -> "AudioTechnicalValidation":
+    return AudioTechnicalValidation.from_mapping(
+        value,
+        generation_result=generation_result,
+        artifact_evidence=artifact_evidence,
+        v4_analysis_evidence=v4_analysis_evidence,
+        predecessor_validation=predecessor_validation,
+    )
 
 
 def _validate_audio_technical_validation(
@@ -1146,20 +1714,35 @@ class AudioTechnicalValidation:
         cls,
         value: Any,
         *,
-        source_asset_version: Any,
-        source_artifact_evidence: Any,
+        source_asset_version: Any = None,
+        source_artifact_evidence: Any = None,
         v4_analysis_evidence: Any,
         audio_cues: Sequence[Any] = (),
         predecessor_validation: Any = None,
+        generation_result: Any = None,
+        artifact_evidence: Any = None,
     ) -> "AudioTechnicalValidation":
-        normalized = _validate_audio_technical_validation(
-            value,
-            source_asset_version=source_asset_version,
-            source_artifact_evidence=source_artifact_evidence,
-            v4_analysis_evidence=v4_analysis_evidence,
-            audio_cues=audio_cues,
-            predecessor_validation=predecessor_validation,
-        )
+        if (
+            isinstance(value, Mapping)
+            and value.get("schemaVersion")
+            == AUDIO_TECHNICAL_VALIDATION_V2_SCHEMA_VERSION
+        ):
+            normalized = _validate_pre_asset_audio_technical_validation(
+                value,
+                generation_result=generation_result,
+                artifact_evidence=artifact_evidence,
+                v4_analysis_evidence=v4_analysis_evidence,
+                predecessor_validation=predecessor_validation,
+            )
+        else:
+            normalized = _validate_audio_technical_validation(
+                value,
+                source_asset_version=source_asset_version,
+                source_artifact_evidence=source_artifact_evidence,
+                v4_analysis_evidence=v4_analysis_evidence,
+                audio_cues=audio_cues,
+                predecessor_validation=predecessor_validation,
+            )
         instance = object.__new__(cls)
         object.__setattr__(instance, "_payload_json", _canonical_json(normalized))
         return instance
@@ -1172,6 +1755,7 @@ __all__ = [
     "AUDIO_TECHNICAL_FAILURE_REASON",
     "AUDIO_TECHNICAL_VALIDATION_AUTHORITY_STATE",
     "AUDIO_TECHNICAL_VALIDATION_SCHEMA_VERSION",
+    "AUDIO_TECHNICAL_VALIDATION_V2_SCHEMA_VERSION",
     "AUDIO_TECHNICAL_VALIDATION_STATE",
     "V4_AUDIO_TECHNICAL_ANALYSIS_SCHEMA_VERSION",
     "AudioTechnicalCueBindingError",
@@ -1179,5 +1763,8 @@ __all__ = [
     "AudioTechnicalValidation",
     "AudioTechnicalValidationError",
     "build_audio_technical_validation",
+    "build_pre_asset_audio_technical_validation",
     "validate_audio_technical_validation",
+    "validate_persisted_audio_technical_validation_evidence",
+    "validate_pre_asset_audio_technical_validation",
 ]

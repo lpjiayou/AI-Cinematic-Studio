@@ -332,18 +332,28 @@ def cloned_voice_asset(
     rights: dict | None = None,
     subject_ref: str = "character-lin",
 ) -> dict:
+    """Build a sealed historical v1 read fixture without reopening v1 writes."""
+
     effective_rights = clone_rights(consent) if rights is None else rights
-    return build_voice_asset_version(
-        voice_asset_command(
-            confirmed_voice_lock,
-            rights=effective_rights,
-            source_kind="CLONED_WITH_CONSENT",
-            consent=consent,
-            subject_ref=subject_ref,
-        ),
-        confirmed_voice_lock=confirmed_voice_lock,
-        consent_grant=consent,
-        evaluated_at=AS_OF,
+    command = voice_asset_command(
+        confirmed_voice_lock,
+        rights=effective_rights,
+        source_kind="CLONED_WITH_CONSENT",
+        consent=consent,
+        subject_ref=subject_ref,
+    )
+    return resealed(
+        {
+            "schemaVersion": "v5.voice-asset-version.v1",
+            "assetVersionType": "VoiceAssetVersion",
+            **command,
+            "assetKind": "audio",
+            "audioKind": "voice",
+            "state": "PROPOSED",
+            "authorityState": "CONTRACT_ONLY_NOT_ADMITTED",
+            "immutable": True,
+            "publicationAllowed": False,
+        }
     )
 
 
@@ -768,39 +778,54 @@ class M12AudioAuthorityContractTests(unittest.TestCase):
             ).as_dict(),
             clone,
         )
+        with self.assertRaises(AudioDomainTypeMismatchError):
+            build_voice_asset_version(
+                command,
+                confirmed_voice_lock=confirmed,
+                consent_grant=consent,
+                evaluated_at=AS_OF,
+            )
 
         request_command = cloned_voice_request_command(
             confirmed,
             consent,
             rights,
         )
-        request = build_audio_generation_request(
-            request_command,
-            confirmed_voice_lock=confirmed,
-            consent_grant=consent,
-            evaluated_at=AS_OF,
+        request = resealed(
+            {
+                "schemaVersion": "v5.audio-generation-request.v1",
+                **request_command,
+                "state": "CONTRACT_ONLY_ADAPTER_REQUIRED",
+                "immutable": True,
+                "publicationAllowed": False,
+            }
         )
-        self.assertEqual(request["requestKind"], "VOICE_PROFILE_CREATION")
         self.assertEqual(
-            request["requestSpec"]["consentGrantVersionRef"],
-            consent["consentGrantVersionRef"],
+            validate_audio_generation_request(
+                request,
+                confirmed_voice_lock=confirmed,
+                consent_grant=consent,
+                evaluated_at=AS_OF,
+            ).as_dict(),
+            request,
         )
-        with self.assertRaises(AudioConsentRequiredError):
+        with self.assertRaises(AudioDomainTypeMismatchError):
             build_audio_generation_request(
                 request_command,
                 confirmed_voice_lock=confirmed,
+                consent_grant=consent,
                 evaluated_at=AS_OF,
             )
 
         with self.assertRaises(AudioConsentRequiredError):
-            build_voice_asset_version(
-                command,
+            validate_voice_asset_version(
+                clone,
                 confirmed_voice_lock=confirmed,
                 evaluated_at=AS_OF,
             )
         with self.assertRaises(VoiceLockNotConfirmedError):
-            build_voice_asset_version(
-                command,
+            validate_voice_asset_version(
+                clone,
                 confirmed_voice_lock=None,
                 consent_grant=consent,
                 evaluated_at=AS_OF,
@@ -812,34 +837,34 @@ class M12AudioAuthorityContractTests(unittest.TestCase):
         confirmation["state"] = "CANDIDATE"
         unconfirmed["voiceLockConfirmation"] = sealed(confirmation)
         with self.assertRaises(EpisodeProductionError):
-            build_voice_asset_version(
-                command,
+            validate_voice_asset_version(
+                clone,
                 confirmed_voice_lock=unconfirmed,
                 consent_grant=consent,
                 evaluated_at=AS_OF,
             )
 
-        mismatched_subject = deepcopy(command)
+        mismatched_subject = deepcopy(clone)
         mismatched_subject["voiceSourceSubjectRef"] = "character-other"
+        mismatched_subject = resealed(mismatched_subject)
         with self.assertRaises(StaleInputError):
-            build_voice_asset_version(
+            validate_voice_asset_version(
                 mismatched_subject,
                 confirmed_voice_lock=confirmed,
                 consent_grant=consent,
                 evaluated_at=AS_OF,
             )
 
-        stale_rights = voice_asset_command(
+        stale_rights = cloned_voice_asset(
             confirmed,
+            consent,
             rights=rights_binding(
                 asset_requirement_ref="asset-requirement-voice",
                 asset_requirement_digest="6" * 64,
             ),
-            source_kind="CLONED_WITH_CONSENT",
-            consent=consent,
         )
         with self.assertRaises(StaleInputError):
-            build_voice_asset_version(
+            validate_voice_asset_version(
                 stale_rights,
                 confirmed_voice_lock=confirmed,
                 consent_grant=consent,
@@ -859,10 +884,24 @@ class M12AudioAuthorityContractTests(unittest.TestCase):
                 consent=consent,
             )
             with self.subTest(name=name), self.assertRaises(
-                AudioConsentNotEffectiveError
+                AudioDomainTypeMismatchError
             ):
                 build_voice_asset_version(
                     command,
+                    confirmed_voice_lock=confirmed,
+                    consent_grant=consent,
+                    evaluated_at=AS_OF,
+                )
+            historical = cloned_voice_asset(
+                confirmed,
+                consent,
+                rights=clone_rights(consent),
+            )
+            with self.subTest(name=f"{name}-historical-read"), self.assertRaises(
+                AudioConsentNotEffectiveError
+            ):
+                validate_voice_asset_version(
+                    historical,
                     confirmed_voice_lock=confirmed,
                     consent_grant=consent,
                     evaluated_at=AS_OF,

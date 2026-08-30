@@ -101,6 +101,10 @@ from .voice import (
     VoiceLockImmutableError,
     VoiceLockNotConfirmedError,
 )
+from .voice_profile import (
+    CurrentConfirmedVoiceProfileAuthority,
+    K2VoiceProfileLineageService,
+)
 from .external_authority import (
     external_authorities_from_environment,
     identity_reference_authority_from_environment,
@@ -227,6 +231,7 @@ class EpisodeProductionPublicBoundary:
         media: K2MediaExecutionService,
         delivery: K2DeliveryService,
         real_media_revision: K2RealMediaRevisionService,
+        voice_profile_lineage: K2VoiceProfileLineageService | None = None,
     ) -> None:
         self.__service = service
         self.__authority_identity = authority_identity
@@ -239,6 +244,7 @@ class EpisodeProductionPublicBoundary:
         self.__media = media
         self.__delivery = delivery
         self.__real_media_revision = real_media_revision
+        self.__voice_profile_lineage = voice_profile_lineage
         self.__dynamic_media_preflight = K2DynamicMediaPreflightService(shot_graph)
         self.__candidate_review = real_media_revision.candidate_review
         self.__state_projection = real_media_revision.state_projection
@@ -400,6 +406,136 @@ class EpisodeProductionPublicBoundary:
             project_ref,
             series_ref,
             voice_ref,
+        )
+
+    def _voice_profile_lineage_service(self) -> K2VoiceProfileLineageService:
+        if self.__voice_profile_lineage is None:
+            raise self._error(
+                RepositoryUnavailableError(
+                    "VoiceProfile lineage service is not configured"
+                )
+            )
+        return self.__voice_profile_lineage
+
+    def create_source_recording_binding(
+        self, command: Mapping[str, Any]
+    ) -> dict[str, Any]:
+        return self._invoke(
+            self._voice_profile_lineage_service().create_source_recording_binding,
+            command,
+        )
+
+    def create_consent_grant(self, command: Mapping[str, Any]) -> dict[str, Any]:
+        return self._invoke(
+            self._voice_profile_lineage_service().create_consent_grant,
+            command,
+        )
+
+    def create_consent_grant_successor(
+        self, command: Mapping[str, Any]
+    ) -> dict[str, Any]:
+        return self._invoke(
+            self._voice_profile_lineage_service().create_consent_grant_successor,
+            command,
+        )
+
+    def create_clone_voice_lock(
+        self, command: Mapping[str, Any]
+    ) -> dict[str, Any]:
+        return self._invoke(
+            self._voice_profile_lineage_service().create_clone_voice_lock,
+            command,
+        )
+
+    def confirm_clone_voice_lock(
+        self, command: Mapping[str, Any]
+    ) -> dict[str, Any]:
+        return self._invoke(
+            self._voice_profile_lineage_service().confirm_clone_voice_lock,
+            command,
+        )
+
+    def create_voice_profile(
+        self, command: Mapping[str, Any]
+    ) -> dict[str, Any]:
+        return self._invoke(
+            self._voice_profile_lineage_service().create_voice_profile,
+            command,
+        )
+
+    def create_voice_profile_successor(
+        self, command: Mapping[str, Any]
+    ) -> dict[str, Any]:
+        return self._invoke(
+            self._voice_profile_lineage_service().create_voice_profile_successor,
+            command,
+        )
+
+    def get_source_recording_binding(
+        self, workspace_ref: str, run_ref: str, binding_ref: str
+    ) -> dict[str, Any]:
+        return self._invoke(
+            self._voice_profile_lineage_service().get_source_recording_binding,
+            workspace_ref,
+            run_ref,
+            binding_ref,
+        )
+
+    def get_consent_grant_version(
+        self, workspace_ref: str, run_ref: str, version_ref: str
+    ) -> dict[str, Any]:
+        return self._invoke(
+            self._voice_profile_lineage_service().get_consent_grant_version,
+            workspace_ref,
+            run_ref,
+            version_ref,
+        )
+
+    def get_confirmed_clone_voice_lock(
+        self, workspace_ref: str, run_ref: str, voice_ref: str
+    ) -> dict[str, Any]:
+        return self._invoke(
+            self._voice_profile_lineage_service().get_confirmed_clone_voice_lock,
+            workspace_ref,
+            run_ref,
+            voice_ref,
+        )
+
+    def get_voice_profile_version(
+        self, workspace_ref: str, run_ref: str, version_ref: str
+    ) -> dict[str, Any]:
+        return self._invoke(
+            self._voice_profile_lineage_service().get_voice_profile_version,
+            workspace_ref,
+            run_ref,
+            version_ref,
+        )
+
+    def resolve_current_confirmed_voice_profile(
+        self,
+        workspace_ref: str,
+        run_ref: str,
+        version_ref: str,
+        version_digest: str,
+        *,
+        evaluated_at: str | None = None,
+    ) -> CurrentConfirmedVoiceProfileAuthority:
+        return self._invoke(
+            self._voice_profile_lineage_service().resolve_current_confirmed_voice_profile,
+            workspace_ref,
+            run_ref,
+            version_ref,
+            version_digest,
+            evaluated_at=evaluated_at,
+        )
+
+    def get_voice_profile_lineage(
+        self, workspace_ref: str, run_ref: str
+    ) -> dict[str, Any]:
+        return self._invoke(
+            self._voice_profile_lineage_service().get_voice_profile_lineage,
+            workspace_ref,
+            run_ref,
         )
 
     def plan_dialogue_audio(
@@ -650,6 +786,7 @@ def _services(
     K2MediaExecutionService,
     K2DeliveryService,
     K2RealMediaRevisionService,
+    K2VoiceProfileLineageService,
 ]:
     selected_ref_factory = ref_factory or (
         lambda prefix: f"{prefix}-{uuid4().hex}"
@@ -700,6 +837,13 @@ def _services(
     )
     voice_locks = K2VoiceLockService(
         voice_lock_repository,
+        ref_factory=selected_ref_factory,
+        clock=selected_clock,
+    )
+    voice_profile_lineage = K2VoiceProfileLineageService(
+        service,
+        evidence_repository,
+        voice_locks=voice_locks,
         ref_factory=selected_ref_factory,
         clock=selected_clock,
     )
@@ -765,6 +909,7 @@ def _services(
         media,
         delivery,
         real_media_revision,
+        voice_profile_lineage,
     )
 
 
@@ -801,6 +946,7 @@ def create_in_memory_boundary(
         media,
         delivery,
         real_media_revision,
+        voice_profile_lineage,
     ) = _services(
         InMemoryEpisodeProductionAdapter(),
         InMemoryEpisodeProductionEvidenceAdapter(),
@@ -838,6 +984,7 @@ def create_in_memory_boundary(
         media,
         delivery,
         real_media_revision,
+        voice_profile_lineage,
     )
 
 
@@ -900,6 +1047,7 @@ def create_local_development_boundary(
         media,
         delivery,
         real_media_revision,
+        voice_profile_lineage,
     ) = _services(
         SqliteEpisodeProductionAdapter(
             database_path, initialize_if_missing=initialize_if_missing
@@ -949,6 +1097,7 @@ def create_local_development_boundary(
         media,
         delivery,
         real_media_revision,
+        voice_profile_lineage,
     )
 
 

@@ -24,7 +24,10 @@ from .foundation import (
     _required_ref,
 )
 from .shot_graph import K2ShotGraphService, require_legacy_executable_graph
-from .voice import validate_confirmed_voice_lock_bundle
+from .voice import (
+    validate_confirmed_clone_voice_lock_bundle,
+    validate_confirmed_voice_lock_bundle,
+)
 
 
 AUDIO_ASSET_VERSION_SCHEMA_VERSION = "v5.k2-audio-asset-version.v1"
@@ -403,23 +406,26 @@ def _verify_sealed(value: Any, field: str) -> dict[str, Any]:
 
 
 def _confirmed_voice_version(value: Mapping[str, Any]) -> dict[str, Any]:
-    """Normalize the VoiceLock public bundle without trusting caller aliases."""
+    """Normalize the fixed VoiceLock public bundle without caller aliases."""
 
     if value is None:
         raise UpstreamNotReadyError("confirmed VoiceLock is required")
     return validate_confirmed_voice_lock_bundle(value)["voiceLockVersion"]
 
 
-def normalize_speech_parameters(
+def _normalize_speech_parameters_for_voice_mode(
     value: Any,
     *,
     confirmed_voice_lock: Mapping[str, Any] | None = None,
+    voice_mode: str,
 ) -> dict[str, Any]:
-    """Validate one audio parameter object while preserving the legacy false branch.
+    """Normalize speech parameters against one explicit VoiceLock generation.
 
     Existing ``speechSynthesis=false`` requests are returned byte-for-byte (as a
-    detached copy).  The new true branch is closed-world and fills only the two
-    documented defaults.
+    detached copy).  The true branch is closed-world and fills only the two
+    documented defaults.  Fixed and clone bundles intentionally use different
+    validators so a confirmed v1 bundle can never authorize clone speech and a
+    confirmed v2 successor can never enter the fixed-voice TTS path.
     """
 
     if not isinstance(value, Mapping):
@@ -460,7 +466,15 @@ def normalize_speech_parameters(
         raise EpisodeProductionError("audioRole is invalid")
     if confirmed_voice_lock is None:
         raise UpstreamNotReadyError("confirmed VoiceLock is required")
-    version = _confirmed_voice_version(confirmed_voice_lock)
+    if voice_mode == "FIXED_V1":
+        bundle = validate_confirmed_voice_lock_bundle(confirmed_voice_lock)
+    elif voice_mode == "CLONE_V2":
+        bundle = validate_confirmed_clone_voice_lock_bundle(
+            confirmed_voice_lock
+        )
+    else:
+        raise EpisodeProductionError("speech voice mode is invalid")
+    version = bundle["voiceLockVersion"]
     if version.get("voiceRef") != voice_ref:
         raise UpstreamNotReadyError("voiceRef is not the confirmed VoiceLock")
     normalized: dict[str, Any] = {
@@ -474,6 +488,34 @@ def normalize_speech_parameters(
     if emotion is not None:
         normalized["emotionTag"] = emotion
     return normalized
+
+
+def normalize_speech_parameters(
+    value: Any,
+    *,
+    confirmed_voice_lock: Mapping[str, Any] | None = None,
+) -> dict[str, Any]:
+    """Normalize fixed-voice speech using only a confirmed VoiceLock v1."""
+
+    return _normalize_speech_parameters_for_voice_mode(
+        value,
+        confirmed_voice_lock=confirmed_voice_lock,
+        voice_mode="FIXED_V1",
+    )
+
+
+def normalize_clone_speech_parameters(
+    value: Any,
+    *,
+    confirmed_voice_lock: Mapping[str, Any] | None = None,
+) -> dict[str, Any]:
+    """Normalize clone speech using only a confirmed VoiceLock v2 successor."""
+
+    return _normalize_speech_parameters_for_voice_mode(
+        value,
+        confirmed_voice_lock=confirmed_voice_lock,
+        voice_mode="CLONE_V2",
+    )
 
 
 def _effective_speech_parameters(value: Mapping[str, Any]) -> dict[str, Any]:
