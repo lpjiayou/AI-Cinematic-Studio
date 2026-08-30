@@ -1,0 +1,149 @@
+{
+  "compositionResult": {
+    "adapterIdentity": "v4.local-composition-executor.v1",
+    "artifactEvidenceDigest": "71b92020154ae83cf329865bd9e78aada0c8ee9236b6decef394530c5f54e471",
+    "artifactRef": "m13-glyph-reveal-artifact-11111111111111111111111111111111",
+    "basePlateAssetRef": "asset-version-ep01-sh15-base-plate",
+    "byteSize": 8192,
+    "composerIdentity": "v3.deterministic-glyph-reveal-ffmpeg.v1",
+    "compositionResultRef": "m13-glyph-reveal-result-4a6bec4bc4fdfd48172cec35974f3122",
+    "executionRequestDigest": "258b0b6cb204171917cfb32b18f08ef1fdf5edc9b755b2b3ea4e9cf9a20eab3a",
+    "ffmpegVersion": "ffmpeg version m13-contract-fixture",
+    "ffprobeVersion": "ffprobe version m13-contract-fixture",
+    "glyphSlug": "zhen",
+    "inputBindingsDigest": "6437ff7933b9cee21f12d204c35a3318b6b9cbdd904b0b9c8747d8436d4d154b",
+    "inspectionDigest": "d259e1976419be8bf5813128d24f3544d0503b4364810fd216f522200d8cde81",
+    "maskAssetRefs": [
+      "asset-version-zhen-cumulative-mask-01",
+      "asset-version-zhen-cumulative-mask-02",
+      "asset-version-zhen-cumulative-mask-03",
+      "asset-version-zhen-cumulative-mask-04",
+      "asset-version-zhen-cumulative-mask-05",
+      "asset-version-zhen-cumulative-mask-06"
+    ],
+    "outputDigest": {
+      "fileDigest": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+      "fileDigestAlgorithm": "sha256",
+      "frameCount": 49,
+      "height": 64,
+      "pixelDigest": "sha256:2222222222222222222222222222222222222222222222222222222222222222",
+      "pixelDigestSpec": "RGBA8/display-transposed/frame-major/row-major/v1",
+      "pixelMode": "RGBA",
+      "width": 64
+    },
+    "payloadDigest": "e4b45f8acec582678957ba1d983821d38e947ea3a52d8cb517b0ec1203bf0ef2",
+    "productionRunRef": "production-run-ep01-m13",
+    "provenance": "LOCAL_EVIDENCE",
+    "publicationAllowed": false,
+    "requirementDigest": "6b1514ba0a0c25035b803a029e96905ca167e3e842545ddc34cee6744299813f",
+    "requirementRef": "m13-glyph-reveal-ep01-sh15-zhen",
+    "runtimeIdentity": "sha256:e11ed2bf819e7f4038d9660e226a92144ad718773bda9266b3f7791b3c8eb88b",
+    "schemaVersion": "v5.m13-glyph-reveal-composition-result.v1",
+    "sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+    "state": "COMPOSED_CANDIDATE",
+    "storageKey": "renders/m13/glyph-reveal-258b0b6cb204171917cfb32b18f08ef1fdf5edc9b755b2b3ea4e9cf9a20eab3a.mp4",
+    "targetShotRef": "EP01_SH15",
+    "workspaceRef": "workspace-m13-glyph-reveal"
+  },
+  "requirement": {
+    "basePlateAssetRef": "asset-version-ep01-sh15-base-plate",
+    "compositeParams": {
+      "blendMode": "GRAZING_LIGHT_RELIEF",
+      "perspective": {
+        "bottomLeft": [
+          0,
+          31
+        ],
+        "bottomRight": [
+          31,
+          31
+        ],
+        "topLeft": [
+          0,
+          0
+        ],
+        "topRight": [
+          31,
+          0
+        ]
+      },
+      "position": {
+        "xPixels": 16,
+        "yPixels": 16
+      },
+      "scale": {
+        "heightPixels": 32,
+        "widthPixels": 32
+      }
+    },
+    "frameRangeEnd": 30,
+    "frameRangeStart": 12,
+    "glyphSlug": "zhen",
+    "inputBindings": {
+      "basePlate": {
+        "assetVersionDigest": "a7753be76e05dc3ad5aedceab30b9f5b1b05b20909bdeb2527c2257a89e130b9",
+        "assetVersionRef": "asset-version-ep01-sh15-base-plate",
+        "fileDigest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      },
+      "masks": [
+        {
+          "assetVersionDigest": "828db6544b1056c924421e3ba7ecb1fb8f5ec472a733608c1ad008b03976106c",
+          "assetVersionRef": "asset-version-zhen-cumulative-mask-01",
+          "fileDigest": "sha256:1eb50a3ee3fcac0adc60c0e90baa6d051c642f3a930330ac9aec9dd92996f3f7",
+          "pixelDigest": "sha256:4571a45562870efcbcbaacbe46976b780a3be00a4b3651d8a0a3329e6f38ac3b"
+        },
+        {
+          "assetVersionDigest": "a29275af6e1006f7901e905f747014ba51d77785e612dde103c19d4105b278d7",
+          "assetVersionRef": "asset-version-zhen-cumulative-mask-02",
+          "fileDigest": "sha256:9b179c460644ebe22c4ad40eb3c541a224e8c07b653cbe409b92756e36f1a8f0",
+          "pixelDigest": "sha256:61da1a0af011eea749520186bdc2293b61a3cf89e4463da8ad2052d4ee59f0a5"
+        },
+        {
+          "assetVersionDigest": "fd535f240e828cc25ee97b4b718a63fe8f2aca152d6842e7eac26f8a73636dd0",
+          "assetVersionRef": "asset-version-zhen-cumulative-mask-03",
+          "fileDigest": "sha256:b30887021689156e787650154e90153cd2ad94aca01ed36d9645861de53ca29b",
+          "pixelDigest": "sha256:65f8d2cb4dbdcd34aaf2ff1724aa534473d3aab1467390bd7163a389d12252a3"
+        },
+        {
+          "assetVersionDigest": "60b059652b7c6f04d4b1e8b203cd4f85b45fc3156d9a2127e070004f6e51e119",
+          "assetVersionRef": "asset-version-zhen-cumulative-mask-04",
+          "fileDigest": "sha256:dfbadffc6e5bddf4f7704487994e272cf17da7aa19d01cf58f1354c45af67c80",
+          "pixelDigest": "sha256:cb0ef7b80d040aad9cbb929ece80e164d507dd00d5a09a2fa5ed4afb2c82dd2f"
+        },
+        {
+          "assetVersionDigest": "5d2a6397597baf677e1fd61ebcece466c65ef4814f8290b5968fc9f1fe7547ff",
+          "assetVersionRef": "asset-version-zhen-cumulative-mask-05",
+          "fileDigest": "sha256:461b592f86904494cb80f5334a6ee8feee2fedb28c1c311316684bebbbed47a9",
+          "pixelDigest": "sha256:9a3c48b45211a72f5c6102ada7b2269ef7c9ab34c361e0ec72d8eac1d5584290"
+        },
+        {
+          "assetVersionDigest": "1911b6a55234fb4f31d84af7f0d39170dd59165f3d4960336135540ffec0ae0e",
+          "assetVersionRef": "asset-version-zhen-cumulative-mask-06",
+          "fileDigest": "sha256:66a6c62fb8c8435e0e37cec002ea60d0024de5d0bb47847c64b86faf2462417d",
+          "pixelDigest": "sha256:fe4d048ee516f7469fa9b97de64f66a81421aee0b323ce54be28e9ca05652586"
+        }
+      ]
+    },
+    "inputBindingsDigest": "6437ff7933b9cee21f12d204c35a3318b6b9cbdd904b0b9c8747d8436d4d154b",
+    "inspectionDigest": "d259e1976419be8bf5813128d24f3544d0503b4364810fd216f522200d8cde81",
+    "maskAssetRefs": [
+      "asset-version-zhen-cumulative-mask-01",
+      "asset-version-zhen-cumulative-mask-02",
+      "asset-version-zhen-cumulative-mask-03",
+      "asset-version-zhen-cumulative-mask-04",
+      "asset-version-zhen-cumulative-mask-05",
+      "asset-version-zhen-cumulative-mask-06"
+    ],
+    "outputDigest": null,
+    "payloadDigest": "6b1514ba0a0c25035b803a029e96905ca167e3e842545ddc34cee6744299813f",
+    "productionRunRef": "production-run-ep01-m13",
+    "publicationAllowed": false,
+    "requirementRef": "m13-glyph-reveal-ep01-sh15-zhen",
+    "revealFrameCount": 6,
+    "schemaVersion": "v5.m13-glyph-reveal-requirement.v1",
+    "targetShotRef": "EP01_SH15",
+    "workspaceRef": "workspace-m13-glyph-reveal"
+  },
+  "schemaVersion": "m13.glyph-reveal-v1-history-fixture.v1",
+  "sourceCommit": "e9e79fc303f61193cf57c7c363565ed87ebd8210"
+}
