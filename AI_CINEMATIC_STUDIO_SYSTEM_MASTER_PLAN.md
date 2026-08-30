@@ -2,17 +2,17 @@
 
 > Document: `AI_CINEMATIC_STUDIO_SYSTEM_MASTER_PLAN.md`
 >
-> Status: `SYSTEM MASTER GOVERNANCE BASELINE / K2-002 EXACT NON-GPU PREPRODUCTION GOVERNANCE REBASELINED / LIVE PRODUCTION AND PUBLICATION CLOSED`
+> Status: `SYSTEM MASTER GOVERNANCE BASELINE / M12-M13 ARCHITECTURE CORRECTION ACCEPTED / LIVE PRODUCTION AND PUBLICATION CLOSED`
 >
-> Version: `v1.3`
+> Version: `v1.4`
 >
-> Date: `2026-08-25`
+> Date: `2026-08-30`
 >
-> Revision: `ACS-K2-002-GOV-RB1`
+> Revision: `ACS-M12-M13-ARCHITECTURE-CORRECTION-20260830`
 >
-> Architecture Decisions: `ADR-0001 / Accepted`; `ADR-0005 — M6 Consumer Boundary / Accepted as architecture only`; `ADR-0006 — V5 Text Generation Capability Boundary / Accepted for bounded G1`; `ADR-0014 — K2-001 archived and K2-002 non-GPU preproduction active / Accepted`
+> Architecture Decisions: `ADR-0001 / Accepted`; `ADR-0005 — M6 Consumer Boundary / Accepted as architecture only`; `ADR-0006 — V5 Text Generation Capability Boundary / Accepted for bounded G1`; `ADR-0014 — K2-001 archived and K2-002 non-GPU preproduction active / Accepted`; `ADR-0015 — M12 Isolated Audio Runtime and Acyclic Voice-Clone Lineage / Accepted`; `ADR-0016 — M13 Timeline, Render Candidate and Deterministic Post Boundary / Accepted`
 >
-> Current Exact-Scope Governance: [ACS-K2-002-GOV-RB1](governance/ACS-K2-002-NON-GPU-PREPRODUCTION-REBASELINE.md)
+> Current Exact-Scope Governance: [Current Milestone](CURRENT_MILESTONE.md); [ADR-0015](governance/ADR-0015-m12-isolated-audio-runtime-and-acyclic-voice-clone-lineage.md); [ADR-0016](governance/ADR-0016-m13-timeline-render-candidate-and-deterministic-post-boundary.md)
 >
 > Scope: AI Cinematic Studio 全系统产品、Domain、生产链、技术分层、研发顺序与验收基线
 >
@@ -1263,10 +1263,23 @@ Video 输出：
 
 Audio 与 Video 平行。
 
+M12 将普通固定声音 TTS 与声音克隆冻结为两个独立本地运行时：
+
+- `hexgrad/kokoro:LOCAL_FIXED_VOICE`：普通固定声音 TTS；
+- `QwenAudio/CosyVoice:CosyVoice3.ZERO_SHOT_LOCAL`：声音克隆。
+
+固定声音 TTS 不得冒充声音克隆。两个运行时分别使用独立 Python 环境、
+dependency lock、wheelhouse、模型目录和 runtime executable；不得安装进 Core
+或 ComfyUI。Core / V4 不得直接 import ML 包，只能通过关闭式独立进程协议执行。
+精确 engine commit、model bundle digest 与离线安装边界由
+[ADR-0015](governance/ADR-0015-m12-isolated-audio-runtime-and-acyclic-voice-clone-lineage.md)
+冻结。
+
 包括：
 
 - Voice Identity；
 - TTS；
+- voice cloning；
 - emotion acting；
 - narration；
 - ambience；
@@ -1275,19 +1288,43 @@ Audio 与 Video 平行。
 - BGM；
 - mixing preparation。
 
-Audio 必须引用：
+声音克隆的唯一权威血缘严格单向：
 
-Script / Scene / Shot。
+```text
+Admitted AUDIO AssetVersion
+↓
+SourceVoiceRecordingAssetVersionBinding
+↓
+ConsentGrantVersion
+↓
+confirmed VoiceLockVersion
+↓
+immutable VoiceProfileVersion
+↓
+VoiceAssetVersion
+↓
+DialogueAssetVersion
+```
+
+创建任一对象前，其全部上游对象和 digest 必须已经存在并可重新读取验证。
+任何对象不得引用后代对象或后代 digest；
+`SourceVoiceRecordingAssetVersionBinding` 不得引用 `ConsentGrantVersion`。
+
+Audio 还必须引用适用的 Script / Scene / Shot。
 
 ---
 
 # 17. Timeline 与 V3 Render
 
-用户看到的是：
+用户看到的是 Creator Timeline。
 
-Creator Timeline。
+`K2DeliveryService` 与 V5 Episode Production lineage / persistence 继续拥有唯一
+Production Timeline / TimelineVersion 权威。V3 只负责 Timeline execution、
+composition 和 deterministic render；V4 只负责 sealed request、job 和 runtime
+orchestration。
 
-权威 Production Timeline 应具有稳定 Version。
+禁止创建第二 Timeline authority、第二 AssetVersion authority、第二 Preview
+authority、M13 sidecar database 或 K2 专用 Timeline model。
 
 V3 负责：
 
@@ -1298,53 +1335,61 @@ V3 负责：
 - virtual camera；
 - color；
 - audio tracks；
+- deterministic post；
 - render；
 - encode。
 
-禁止：
-
-Creator Application 自己发展第二套最终 Render Engine。
+Creator Application 不得发展第二套最终 Render Engine。完整边界由
+[ADR-0016](governance/ADR-0016-m13-timeline-render-candidate-and-deterministic-post-boundary.md)
+冻结。
 
 ---
 
-# 18. Preview Candidate
+# 18. PreviewCandidate 与 RenderCandidate
 
-Preview 是候选输出。
-
-不是 Final Master。
-
-结构：
+`PreviewCandidate` 和 `RenderCandidate` 都是候选输出，不是 Final Master 或
+Export。
 
 ```text
 TimelineVersion
-↓
-Render
-↓
-PreviewCandidate
+├── PreviewCandidate
+└── RenderCandidate
+    └── RenderManifest
 ```
 
-Preview 可以：
+`RenderCandidate` 必须精确绑定 `TimelineVersion`，可以表达技术 render
+profile、分辨率、codec 和字幕模式，并可供 M14 QC 使用。所有
+`RenderCandidate` 必须满足：
 
-播放、审查、批注、返工。
+```text
+publicationAllowed=false
+masterState=NOT_CREATED
+exportState=NOT_CREATED
+```
+
+M13 不创建 `ExportCandidate`。PreviewCandidate 或 RenderCandidate 均不得直接
+进入发布、下载交付或 Master 权威。
 
 ---
 
 # 19. Episode Master
 
-经过：
-
-- technical QC；
-- creative confirmation；
-- applicable Rights；
-- required Approval；
-
-后形成：
+唯一正式链是：
 
 ```text
-EpisodeMaster
+TimelineVersion
+→ PreviewCandidate and/or RenderCandidate
+→ M14 QCReport
+→ explicit ApprovalDecision
+→ M15 EpisodeMaster
+→ M15 ExportArtifact
 ```
 
-Master 是正式可交付作品版本。
+只有 M15 可以创建 `EpisodeMaster` 和 `ExportArtifact`。M13 的任何 Candidate
+都不得绕过 M14 QC / Approval 或直接进入 `MASTER_READY`。
+
+Master 是经过 technical QC、creative confirmation、applicable Rights 和
+required Approval 后形成的正式可交付作品版本。
 
 ---
 
@@ -2502,7 +2547,10 @@ Status:
 完成：
 
 - Voice Identity；
-- TTS；
+- 普通固定声音 TTS；
+- 声音克隆；
+- 两套隔离运行时；
+- 单向 Source Recording / Consent / VoiceLock / VoiceProfile 血缘；
 - emotional voice；
 - narration；
 - BGM；
@@ -2511,7 +2559,7 @@ Status:
 - preliminary mix；
 - Shot / Script linkage。
 
-Audio 与 Video 并行。
+Audio 与 Video 并行。普通固定声音 TTS 不得冒充声音克隆。
 
 ---
 
@@ -2525,14 +2573,19 @@ Status:
 
 - Production Timeline；
 - TimelineVersion；
-- Video / Audio clips；
+- Video / Audio / Effect Clips；
 - Subtitle；
 - transition；
 - color；
 - audio tracks；
 - V3 composition；
-- preview render；
+- 八项 CPU / FFmpeg 确定性后期；
+- PreviewCandidate；
+- non-publishing RenderCandidate；
+- RenderManifest；
 - deterministic render。
+
+M13 不创建 `ExportCandidate`、`EpisodeMaster` 或 `ExportArtifact`。
 
 ---
 
@@ -2566,10 +2619,14 @@ Status:
 
 - EpisodeMaster；
 - master version；
+- ExportArtifact；
 - Works；
 - archive；
 - final metadata；
 - final traceability。
+
+`EpisodeMaster` 与 `ExportArtifact` 只能由 M15 创建，并且必须以前置 M14
+QCReport 和显式 ApprovalDecision 为依据。
 
 ---
 
@@ -3006,7 +3063,49 @@ STOP。
 
 # 62. Current System State
 
-## 62.1 Current exact-scope overlay — 2026-08-26
+## 62.1 Current architecture overlay — 2026-08-30
+
+The Project Lead, Architecture Owner and the respective M12/M13 Domain Owners accepted
+[ADR-0015](governance/ADR-0015-m12-isolated-audio-runtime-and-acyclic-voice-clone-lineage.md)
+and
+[ADR-0016](governance/ADR-0016-m13-timeline-render-candidate-and-deterministic-post-boundary.md)
+under decision `ACS-M12-M13-ARCHITECTURE-CORRECTION-20260830`.
+
+This records accepted architecture and bounded implementation authority, not
+implementation completion, runtime installation, A100 authority, Asset Admission or
+publication approval.
+
+```text
+M12_RUNTIME_G0_UNBLOCK=AUTHORIZED_NON_GPU
+M12_PERSISTENT_CPU_BUILD_ENVIRONMENT=REQUIRED
+M12_A100_EXECUTION=NOT_AUTHORIZED
+
+M13_FULL_BACKEND_IMPLEMENTATION=AUTHORIZED_CPU_ONLY
+M13_RENDER_CANDIDATE=AUTHORIZED_NON_PUBLISHING
+M13_EXPORT_CANDIDATE=PROHIBITED
+M13_EPISODE_MASTER=OUT_OF_SCOPE
+M13_EXPORT_ARTIFACT=OUT_OF_SCOPE
+
+M14_M15_IMPLEMENTATION=NOT_AUTHORIZED
+A100_START_AUTHORIZED=false
+GPU_CALLS_ALLOWED=false
+PROVIDER_CALLS_ALLOWED=false
+ASSET_ADMISSION_ALLOWED=false
+ASSET_ADMISSION=0
+PUBLICATION_ALLOWED=false
+CANONICAL_MUTATIONS=0
+LEGACY_MEDIA_WRITES=0
+```
+
+The Architecture Checkpoint must merge before any implementation PR begins. M12 uses
+two isolated runtimes and an acyclic source-recording lineage. M13 ends at
+PreviewCandidate / RenderCandidate / RenderManifest. M15 remains the exclusive owner
+of EpisodeMaster and ExportArtifact.
+
+## 62.2 Historical snapshot — 2026-08-26 K2 exact-scope overlay
+
+The following text preserves the exact decision-time state. It does not override
+section 62.1.
 
 The Project Lead / Architecture Owner / Repository Governance Owner accepted
 [ADR-0014](governance/ADR-0014-k2-001-archive-k2-002-changan-start.md) and the
@@ -3088,7 +3187,7 @@ applicable decision and evidence.
 overlay. If a lower-order execution statement exceeds ADR-0014 or
 ACS-K2-002-GOV-RB1 or ACS-K2-002-SCRIPT-RB2, the higher-order fail-closed limits apply.
 
-## 62.2 Historical snapshot — PRE-M6-RB1.3-CLOSEOUT-G1
+## 62.3 Historical snapshot — PRE-M6-RB1.3-CLOSEOUT-G1
 
 以下代码块严格保留 `PRE-M6-RB1.3-CLOSEOUT-G1` 决策时点的历史快照；后续
 执行状态不得回写或覆盖该快照。
@@ -3193,7 +3292,7 @@ M6 Series Intelligence baseline for the already authorized P1 implementation.
 `e38c75aa4ff26bdea80c82d8a24096f799dad860`. ADR-0004 accepts the bounded M6-P2
 local-development durable SQLite boundary.
 
-## 62.3 Historical snapshot — 2026-08-14 CCV/M6 overlay
+## 62.4 Historical snapshot — 2026-08-14 CCV/M6 overlay
 
 下列代码块保留 `2026-08-14` 时点曾被标作“当前执行状态”的 CCV/M6 快照。
 其 `Current`、`NOT AUTHORIZED`、Frontend 和 Production Ready 语句只描述该

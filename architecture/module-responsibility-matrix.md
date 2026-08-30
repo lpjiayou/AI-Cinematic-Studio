@@ -10,9 +10,9 @@ Accepted ADR、获批任务和明确公开契约后才可加入；目录存在�
 | 责任域 | 位置 | 主要责任 | 可公开的资产 | 不承担的责任 | 当前状态 |
 | --- | --- | --- | --- | --- | --- |
 | Creator Application | `apps/creator_workspace_mvp/` | Creator Server、公开 HTTP/API、Application orchestration 与 composition entry | Public HTTP/API、Application command/query/DTO/error contract | V5 authoritative facts、V4 Provider execution、对 V4/V3/Compute 的直接生产依赖 | 运行中；直接 V4 依赖由 `R-CORE-ARCH-001` 管理并获批在 G1 迁移 |
-| V5 Core OS | `services/v5_core_os/` | authoritative production facts、公开 capability boundary、版本/血缘及适用治理语义 | V5 public contracts；包括 ADR-0006 接受的 Text Generation Capability | Provider adapter、V4 execution ownership、Application presentation/HTTP | 运行中；Text Generation Capability 的 G1 实施以 G0 remote verification 为前提 |
-| V4 Platform | `services/v4_platform/` | AI/Provider execution boundary 与公开 `TextGenerationPort` | provider-neutral V4 execution contracts | V5 Domain Fact、Application workflow、HTTP/UI | 运行中；仅由获批的相邻 V5 capability 消费 |
-| V3 Render Core | `services/v3_render_core/` | deterministic audiovisual composition/render boundary | V3 public render contracts | V5 creative fact ownership、Application workflow | 运行中，按已接受范围使用 |
+| V5 Core OS | `services/v5_core_os/` | authoritative production facts、公开 capability boundary、版本/血缘及适用治理语义；拥有 ADR-0015 单向声音克隆血缘与 ADR-0016 唯一 Timeline/TimelineVersion 权威及持久化 | V5 public contracts；包括 ADR-0006 Text Generation、ADR-0015 M12 lineage 与 ADR-0016 M13 Timeline/RenderCandidate domain contracts | Provider adapter、V4 execution ownership、V3 render execution、Application presentation/HTTP | 运行中；ADR-0015/0016 的新增设计已接受，后续实现仍须逐项独立授权与验证 |
+| V4 Platform | `services/v4_platform/` | AI/Provider execution boundary、公开 `TextGenerationPort`、隔离音频运行时的 closed-process execution boundary 与 M13 sealed deterministic-post orchestration | provider-neutral V4 execution contracts、封闭执行请求与结果证据 | V5 Domain Fact、Timeline/RenderCandidate authority、Application workflow、HTTP/UI、ML 包直接导入或运行时内部实现 | 运行中；ADR-0015/0016 边界已接受，新增协议与编排实现待后续单一职责 PR |
+| V3 Render Core | `services/v3_render_core/` | deterministic audiovisual composition/render，以及 M13 CPU/FFmpeg deterministic-post execution | V3 public render contracts、确定性执行结果与 artifact evidence | V5 creative/Timeline facts、RenderCandidate persistence、Application workflow、EpisodeMaster、ExportArtifact 或 publication authority | 运行中；ADR-0016 边界已接受，其余确定性后期与 RenderCandidate 集成待后续单一职责 PR |
 | 共享能力 | `packages/` | 经验证、稳定且不承载产品工作流的复用能力 | 版本化包接口、类型与工具 | 应用专属流程、服务私有逻辑 | 按获批任务启用 |
 | 平台基础设施 | `infrastructure/` | 构建、部署和运行环境声明 | 环境契约、资源声明、策略 | 业务规则、领域模型 | 基线已建立 |
 | 工程自动化 | `scripts/` | 可重复的仓库操作 | 命令入口及其使用说明 | 业务逻辑、常驻运行时 | 基线已建立 |
@@ -28,6 +28,10 @@ Accepted ADR、获批任务和明确公开契约后才可加入；目录存在�
 ADR-0006 接受的 Text Generation 目标路径为：
 
 `Creator Application → V5 Text Generation Capability → V4 TextGenerationPort → Provider Adapter`
+
+ADR-0015 与 ADR-0016 保持同一相邻依赖方向：V5 持有事实与血缘，V4 只接收
+closed/sealed execution request 并编排独立进程，V3 只执行确定性合成与渲染。
+这两份 Accepted ADR 是后续实现边界，不表示未交付能力已经存在。
 
 G1 完成前，现存 `apps/` 直接依赖 V4 的事实只能视为已登记、待迁移的架构偏差，
 不得作为新实现先例。

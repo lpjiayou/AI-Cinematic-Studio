@@ -48,7 +48,7 @@ OS、V4 Platform、V3 Render Core、持久化与后端测试；客户 Commercial
 
 下表保留各原始里程碑的历史措辞用于审计。其 `Current`、`AUTHORIZED` 或
 `NOT STARTED` 只描述当时检查点，不覆盖 `CURRENT_MILESTONE.md` 第 0 节与
-ADR-0014 的当前权威。
+适用的 Accepted ADR；当前包括 ADR-0014、ADR-0015 与 ADR-0016。
 
 | 历史项目 | 当时状态 |
 | --- | --- |
@@ -260,6 +260,8 @@ PYTHONDONTWRITEBYTECODE=1 python -m unittest discover -s tests -p 'test_*.py' -q
 - [System Master Plan](AI_CINEMATIC_STUDIO_SYSTEM_MASTER_PLAN.md)
 - [UI Master Plan](AI_CINEMATIC_STUDIO_UI_MASTER_PLAN.md)
 - [Current Milestone](CURRENT_MILESTONE.md)
+- [ADR-0015 — M12 Isolated Audio Runtime and Acyclic Voice-Clone Lineage](governance/ADR-0015-m12-isolated-audio-runtime-and-acyclic-voice-clone-lineage.md)
+- [ADR-0016 — M13 Timeline, Render Candidate and Deterministic Post Boundary](governance/ADR-0016-m13-timeline-render-candidate-and-deterministic-post-boundary.md)
 - [K2-002 Non-GPU Preproduction Governance Rebaseline](governance/ACS-K2-002-NON-GPU-PREPRODUCTION-REBASELINE.md)
 - [K2-002 Script v1.4 Exact-Digest Repository Rebaseline](governance/ACS-K2-002-SCRIPT-V1-4-EXACT-DIGEST-REBASELINE.md)
 - [K2-002《长安刮痕》预生产包](docs/16-k2-production/k2-002-changan/README.md)

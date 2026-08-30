@@ -4,25 +4,25 @@
 >
 > Execution Mode: `AUTO-SEQUENTIAL / CONTRACT-FIRST / FAIL-CLOSED`
 >
-> Project Lead Authorization: `ACS-M12-M13-AUTHORITY-ALIGNMENT-AND-MINIMAL-VERTICAL-SLICE / NON-GPU TECHNICAL EVIDENCE ONLY / M12 PR-7 BLOCKED`
+> Project Lead Authorization: `ACS-M12-M13-ARCHITECTURE-CORRECTION-20260830`
 >
-> Authorized Wave: `PR-A AUTHORITY ALIGNMENT → PR-B M13 GLYPH CORRECTIVE V2 → PR-C M12→M13 MINIMAL PREVIEW VERTICAL SLICE → FRONTEND PIN-ONLY / NON-GPU ONLY`
+> Authorized Wave: `ARCHITECTURE CHECKPOINT → M12-C1 → M12-C2 → M12-C3/C4 WHEN PERSISTENT CPU ROOT EXISTS; M13-T1 → M13-E1 → M13-E2 → M13-E3 → M13-E4 → M13-R1 → M13-R2 / NON-GPU ONLY`
 >
-> Current Task: `ACS-M12-M13-AUTHORITY-ALIGNMENT-AND-MINIMAL-VERTICAL-SLICE`
+> Current Task: `ACS-M12-M13-ARCHITECTURE-CORRECTION-20260830`
 >
-> Current Work Package: `PR-A CURRENT_MILESTONE AUTHORITY ALIGNMENT / M12 PR-7 EXCLUDED / NO LIVE K2-002 WRITES / PR-B AND PR-C WAIT FOR PREDECESSOR MERGE`
+> Current Work Package: `ACCEPTED ADR + AUTHORITY CHECKPOINT ONLY / IMPLEMENTATION WAITS FOR CHECKPOINT MERGE`
 >
-> Authorized Source Base: `CORE c561800ab1f99813b286d86722181b24c5e2ccaa / TREE ff6ef8206a7d85bb1c1ea9e63cdeb8e79f7cf8bb / OR A VERIFIED DESCENDANT`
+> Authorized Source Base: `CORE 68cad32f60397c969b36257d8a894e0b52d2e162 / TREE 62084f092d4f42c5037d9c9f19e54bef266c2b1e / OR A VERIFIED NON-CONFLICTING DESCENDANT`
 >
 > M6 Authorization: `ACCEPTED SURFACES / K2-002 MUST CREATE DISTINCT SCOPE AND APPROVALS / NO K2-001 AUTHORITY INHERITANCE`
 >
-> M7–M11 Authorization: `EXISTING AUTHORITY UNCHANGED / CONTRACT + READ-ONLY PREFLIGHT ONLY / PROVIDER OR GPU DISPATCH REQUIRES A SEPARATE PROJECT LEAD GATE`
+> M7–M11 Authorization: `EXISTING AUTHORITY UNCHANGED / NO PROVIDER OR GPU DISPATCH`
 >
-> M12 Authorization: `PR-1 THROUGH PR-6 MERGED / PR-7 VOICE CLONING BLOCKED / ONLY EXISTING TYPED AUDIO TO M13 NON-GPU WIRING AUTHORIZED`
+> M12 Authorization: `RUNTIME G0 UNBLOCK AUTHORIZED NON-GPU / TWO ISOLATED RUNTIMES + ACYCLIC VOICE-CLONE LINEAGE / A100 NOT AUTHORIZED`
 >
-> M13 Authorization: `PR-1 GLYPH REVEAL MERGED / GLYPH CORRECTIVE V2 + MINIMAL TIMELINE/PREVIEW VERTICAL SLICE AUTHORIZED / OTHER SEVEN DETERMINISTIC EFFECTS AND FULL TIMELINE STUDIO NOT AUTHORIZED`
+> M13 Authorization: `FULL BACKEND AUTHORIZED CPU-ONLY / EIGHT DETERMINISTIC EFFECTS + TIMELINE + PREVIEW/RENDER CANDIDATES`
 >
-> M14–M15 Authorization: `IMPLEMENTATION NOT AUTHORIZED / MASTER, ADMISSION AND PUBLICATION CLOSED`
+> M14–M15 Authorization: `IMPLEMENTATION NOT AUTHORIZED / EPISODEMASTER AND EXPORTARTIFACT REMAIN M15-EXCLUSIVE`
 >
 > M16 Authorization: `BOUNDED 1 → 3 → 10 → 30 ONLY AFTER P9 + GATE A/B/C`
 >
@@ -30,68 +30,98 @@
 >
 > Historical ADR-0013 Acceptance Baseline: `CORE main 6d28a53f / TREE 369c3b14 / 851 PASS — FRONTEND main 5b36aac0 / TREE fd20b7d7 / 174 PASS + TYPECHECK + LINT + BUILD + TWO CHROMIUM GATES`
 >
-> Production Ready: `NO — M12 AND M13 REMAIN INCOMPLETE / TECHNICAL_EVIDENCE_ONLY / NO PROVIDER, GPU, ADMISSION, PUBLICATION OR LIVE CANONICAL WRITE`
+> Production Ready: `NO — ARCHITECTURE ACCEPTED BUT M12 RUNTIME G0 AND M13 FULL BACKEND ARE NOT COMPLETE / NO PROVIDER, GPU, ADMISSION, PUBLICATION OR LIVE CANONICAL WRITE`
 
 ---
 
 ## 0. 2026-08-30 current authority and transition
 
-The Project Lead directly authorizes the bounded
-`ACS-M12-M13-AUTHORITY-ALIGNMENT-AND-MINIMAL-VERTICAL-SLICE` wave. This authority
-supersedes the prior uniform M7–M15 read-only statement only for the exact M12/M13
-non-GPU work listed below. It does not widen K2 production authority, permit external
-providers, install a new TTS or voice-cloning runtime, or authorize GPU execution.
+The Project Lead, Architecture Owner and the respective M12/M13 Domain Owners authorize
+`ACS-M12-M13-ARCHITECTURE-CORRECTION-20260830`. This decision replaces the conflicting
+original `ACS-M12-RUNTIME-G0-UNBLOCK-AND-M13-BACKEND-COMPLETION` implementation
+authority and supersedes the earlier minimal M12/M13 vertical-slice overlay for future
+work. Already merged M12 PR-1 through PR-6 audio capabilities, M13 glyph work and the
+minimal Timeline/Preview slice remain immutable implementation history.
 
-The authorized source is Core
-`c561800ab1f99813b286d86722181b24c5e2ccaa` / tree
-`ff6ef8206a7d85bb1c1ea9e63cdeb8e79f7cf8bb`, or a verified descendant that preserves
-the same M12/M13 contracts and authority boundary. The ordered implementation is:
+The first mandatory work package is governance and architecture only:
 
-1. update this current execution authority;
-2. correct the existing M13 Glyph Reveal contract with additive v2 schemas while
-   preserving v1 history;
-3. connect existing typed M12 audio through a minimal immutable M13 TimelineVersion,
-   V4/V3 deterministic composition and a non-publishing PreviewCandidate;
-4. update only the Frontend Core pin if the merged Core behavior requires it.
+1. accept ADR-0015 and ADR-0016;
+2. synchronize the System Master Plan, Golden Contract, Current Milestone and Risk
+   Register;
+3. validate, merge and remotely verify the Architecture Checkpoint;
+4. only then start independent single-responsibility implementation PRs.
 
-The current M12/M13 capability and authority state is:
+The accepted M12 architecture freezes two distinct isolated runtimes:
 
 ```text
-M12_PR1_TO_PR6=MERGED
-M12_PR7=BLOCKED_EXTERNAL_RUNTIME_AND_LINEAGE_DECISION
-M13_PR1=MERGED
-M13_GLYPH_CORRECTIVE=AUTHORIZED_NON_GPU
-M12_M13_MINIMAL_VERTICAL_SLICE=AUTHORIZED_NON_GPU
-AUTHORITY_STATE=TECHNICAL_EVIDENCE_ONLY
-PROVIDER_EXECUTION=NOT_AUTHORIZED
-GPU_EXECUTION=NOT_AUTHORIZED
-ASSET_ADMISSION=NOT_AUTHORIZED
-PROVIDER_CALLS_ALLOWED=false
-GPU_CALLS_ALLOWED=false
-ASSET_ADMISSION_ALLOWED=false
-PUBLICATION_ALLOWED=false
-CANONICAL_MUTATIONS=0
+TTS_ENGINE_ID=hexgrad/kokoro:LOCAL_FIXED_VOICE
+VOICE_CLONE_ENGINE_ID=QwenAudio/CosyVoice:CosyVoice3.ZERO_SHOT_LOCAL
 ```
 
-M12 PR-1 through PR-6 provide the non-cloning local audio domain, execution,
-AudioCue, Stem, technical-validation and programmatic-audio capabilities consumed by
-this wave. M12 PR-7 remains blocked because no approved local cloning runtime, model,
-source-recording lineage or license decision exists. Neither M12 nor M13 is complete.
-The M13 authority is limited to Glyph Reveal corrective v2 and the minimal
-M12-to-M13 Timeline/Preview vertical slice; the other seven deterministic post effects,
-full Timeline Studio, M14, M15, Master, Admission and Publication remain outside scope.
+The fixed-voice TTS runtime is not voice cloning. Each runtime has a separate Python
+environment, dependency lock, wheelhouse, model root and executable; neither may be
+installed into Core or ComfyUI, and Core/V4 may not directly import its ML packages.
 
-K2 historical media, archived experiment videos, A100 work packages and their paths are
-not input authority for this wave. All execution remains
-`TECHNICAL_EVIDENCE_ONLY`, uses repository-owned deterministic fixtures, performs no
-live canonical or K2 mutation and keeps publication disabled. TimelineVersion and
-PreviewCandidate objects created by bounded tests are isolated technical evidence, not
-live K2 production facts.
+The sole voice-clone lineage is:
 
-The retained K2-001/K2-002 authority context below remains factual background for live
-K2 production only. Its references to current candidates, missing production gates or
-future dispatch do not supply input authority for this isolated M12/M13 wave and do not
-block its explicitly authorized non-GPU fixture composition.
+```text
+Admitted AUDIO AssetVersion
+→ SourceVoiceRecordingAssetVersionBinding
+→ ConsentGrantVersion
+→ confirmed VoiceLockVersion
+→ immutable VoiceProfileVersion
+→ VoiceAssetVersion
+→ DialogueAssetVersion
+```
+
+No object may reference a descendant digest. Every upstream digest must exist and be
+re-readable before the dependent object is created.
+
+The accepted M13 boundary retains V5 Episode Production / K2DeliveryService as the sole
+Timeline authority, V3 as deterministic execution and V4 as sealed runtime
+orchestration. M13 ends at PreviewCandidate, non-publishing RenderCandidate and
+RenderManifest. It creates no ExportCandidate, EpisodeMaster or ExportArtifact.
+
+The current authority state is:
+
+```text
+ARCHITECTURE_CHECKPOINT=AUTHORIZED_REQUIRED_PREDECESSOR
+
+M12_RUNTIME_G0_UNBLOCK=AUTHORIZED_NON_GPU
+M12_PERSISTENT_CPU_BUILD_ENVIRONMENT=REQUIRED
+M12_A100_EXECUTION=NOT_AUTHORIZED
+PERSISTENT_CPU_BUILD_ROOT=/data/k2-runtime-artifacts/m12/g0
+PERSISTENT_CPU_BUILD_ROOT_PRESENT=false
+M12_G0_3_STATE=ENVIRONMENT_HOLD
+BLOCK_REASON=PERSISTENT_CPU_BUILD_ARTIFACT_ROOT_UNAVAILABLE
+
+M13_FULL_BACKEND_IMPLEMENTATION=AUTHORIZED_CPU_ONLY
+M13_RENDER_CANDIDATE=AUTHORIZED_NON_PUBLISHING
+M13_EXPORT_CANDIDATE=PROHIBITED
+M13_EPISODE_MASTER=OUT_OF_SCOPE
+M13_EXPORT_ARTIFACT=OUT_OF_SCOPE
+
+M14_M15_IMPLEMENTATION=NOT_AUTHORIZED
+A100_START_AUTHORIZED=false
+GPU_CALLS_ALLOWED=false
+PROVIDER_CALLS_ALLOWED=false
+ASSET_ADMISSION_ALLOWED=false
+ASSET_ADMISSION=0
+PUBLICATION_ALLOWED=false
+CANONICAL_MUTATIONS=0
+LEGACY_MEDIA_WRITES=0
+```
+
+The missing persistent `/data` root places only M12-C3/C4 in `ENVIRONMENT_HOLD`. It
+does not block M12-C1/C2 or the independent M13 CPU track. A100 remains separately
+gated and may not be used for dependency resolution or exploratory installation.
+
+K2 historical media, archived experiments, A100 work packages and caller-supplied
+absolute paths do not provide authority for this work. Implementation remains
+non-publishing and creates no live K2 mutation, Asset Admission, Master or Export.
+
+The retained K2-001/K2-002 prose below is factual live-production background only. It
+does not provide input authority for this isolated M12/M13 work package.
 
 The Project Lead explicitly accepted the repository-reviewed K2-002 v1.4 at SHA-256
 `a954cc970c71f73028ecf5a6f5fe5d2603776cf49d21fb33da676bedf4093faf` and
@@ -193,13 +223,14 @@ append and V4 dispatch remain blocked/not integrated. Any future continuation mu
 Public API → V5 → V4 → Compute spine and must not create a K2-002-specific database or
 AssetVersion authority.
 
-Within section 0, only the 2026-08-30 M12/M13 authority overlay governs this bounded
-wave; the retained K2 prose is factual live-production background and grants no input or
-execution authority here. Sections 0A–16 below are dated historical snapshots or
-inherited specifications. Their “current”, “next action”, “pending”, “authorized” and
-“not merged” sentences describe their original checkpoints and are not current execution
-authority. Accepted ADRs and the master plans retain their higher source-of-truth
-priority.
+Within section 0, only the
+`ACS-M12-M13-ARCHITECTURE-CORRECTION-20260830` overlay governs current execution.
+The retained K2 prose is factual live-production background and grants no input or
+execution authority for this work package. Sections 0A–16 below are dated historical
+snapshots or inherited specifications. Their “current”, “next action”, “pending”,
+“authorized” and “not merged” sentences describe their original checkpoints and are
+not current execution authority. Accepted ADRs and the master plans retain their
+higher source-of-truth priority.
 
 ## 0A. Historical snapshot — 2026-08-23 assisted visual-quality audit
 
