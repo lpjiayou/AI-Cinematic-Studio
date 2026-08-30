@@ -146,6 +146,8 @@ _PRIVATE_PREVIEW_DETAIL_FIELDS = frozenset(
         "privatediagnostics",
         "privateruntimediagnostics",
         "runtimediagnostics",
+        "sql",
+        "sqlstatement",
         "stderr",
         "stdout",
         "token",
@@ -191,6 +193,7 @@ def _is_private_preview_detail(field: Any) -> bool:
         or normalized.endswith("argv")
         or normalized.endswith("filterexpression")
         or normalized.endswith("privatediagnostics")
+        or normalized.startswith("sql")
     )
 
 
@@ -208,6 +211,17 @@ def _strip_private_preview_details(value: Any) -> Any:
     if isinstance(value, tuple):
         return tuple(_strip_private_preview_details(item) for item in value)
     return value
+
+
+def _require_timeline_run_cas(command: Any) -> Mapping[str, Any]:
+    expected = command.get("expectedRunVersion") if isinstance(command, Mapping) else None
+    if (
+        isinstance(expected, bool)
+        or not isinstance(expected, int)
+        or expected < 1
+    ):
+        raise EpisodeProductionPublicError("invalid_request", 400)
+    return command
 
 
 class EpisodeProductionPublicError(RuntimeError):
@@ -561,6 +575,36 @@ class EpisodeProductionPublicBoundary:
         ):
             return _strip_private_preview_details(result)
         return result
+
+    def create_timeline(self, command: Mapping[str, Any]) -> dict[str, Any]:
+        return self._invoke_public_preview(
+            self.__delivery.create_timeline,
+            _require_timeline_run_cas(command),
+        )
+
+    def edit_timeline(self, command: Mapping[str, Any]) -> dict[str, Any]:
+        return self._invoke_public_preview(
+            self.__delivery.edit_timeline,
+            _require_timeline_run_cas(command),
+        )
+
+    def get_timeline(
+        self, workspace_ref: str, run_ref: str
+    ) -> dict[str, Any]:
+        return self._invoke_public_preview(
+            self.__delivery.get_timeline,
+            workspace_ref,
+            run_ref,
+        )
+
+    def get_timeline_versions(
+        self, workspace_ref: str, run_ref: str
+    ) -> dict[str, Any]:
+        return self._invoke_public_preview(
+            self.__delivery.get_timeline_versions,
+            workspace_ref,
+            run_ref,
+        )
 
     def record_m12_m13_inputs(
         self,

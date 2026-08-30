@@ -177,7 +177,13 @@ CAPABILITY_PROJECTION: Final = (
     },
     {
         "id": "M13", "name": "Timeline + Composition + Render", "state": "local_evidence_only",
-        "publicResources": ["episode-production-runs/preview"], "requirements": ["M11", "M12"],
+        "publicResources": [
+            "episode-production-runs/timeline",
+            "episode-production-runs/timeline-versions",
+            "episode-production-runs/timeline-edits",
+            "episode-production-runs/preview",
+        ],
+        "requirements": ["M11", "M12"],
     },
     {
         "id": "M14", "name": "Preview + QC + Approval + Local Regeneration", "state": "local_evidence_only",

@@ -7,7 +7,7 @@ from hashlib import sha256
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import json
 import sys
-from typing import Any
+from typing import Any, Mapping
 from pathlib import Path
 from urllib.parse import parse_qs, unquote, urlsplit
 from uuid import uuid4
@@ -140,6 +140,9 @@ EPISODE_PRODUCTION_SUBRESOURCES = {
     "shot-graph",
     "assets",
     "media",
+    "timeline",
+    "timeline-versions",
+    "timeline-edits",
     "preview",
     "finalize",
     "delivery",
@@ -156,6 +159,65 @@ EPISODE_PRODUCTION_SUBRESOURCES = {
     "real-video-admission",
     "state-projection",
 }
+
+_TIMELINE_WRITE_RESOURCES = frozenset({"timeline", "timeline-edits"})
+_TIMELINE_FORBIDDEN_CLIENT_FIELDS = frozenset(
+    {
+        "absolutepath",
+        "actorref",
+        "approvalref",
+        "assetversion",
+        "audiocue",
+        "canonicalmutations",
+        "ffmpegargv",
+        "ffmpegfilter",
+        "filter",
+        "filterexpression",
+        "jsonpointer",
+        "patch",
+        "path",
+        "publicationallowed",
+        "productionrunref",
+        "rawassetversion",
+        "rawaudiocue",
+        "rawrequirement",
+        "requirement",
+        "shellcommand",
+        "sql",
+        "storagekey",
+        "workspaceref",
+    }
+)
+
+
+def _contains_forbidden_timeline_client_claim(value: Any) -> bool:
+    if isinstance(value, Mapping):
+        for field, item in value.items():
+            normalized = str(field).replace("_", "").replace("-", "").lower()
+            if normalized in _TIMELINE_FORBIDDEN_CLIENT_FIELDS or any(
+                marker in normalized
+                for marker in (
+                    "absolutepath",
+                    "canonicalmutations",
+                    "expression",
+                    "ffmpeg",
+                    "filter",
+                    "inputpath",
+                    "internalpath",
+                    "outputpath",
+                    "python",
+                    "shell",
+                    "sql",
+                    "storagekey",
+                )
+            ):
+                return True
+            if _contains_forbidden_timeline_client_claim(item):
+                return True
+        return False
+    if isinstance(value, (list, tuple)):
+        return any(_contains_forbidden_timeline_client_claim(item) for item in value)
+    return False
 
 
 PUBLIC_EXACT_ALIASES = {
@@ -392,6 +454,37 @@ class CreatorRequestHandler(BaseHTTPRequestHandler):
                 return
             if (
                 production_subresource is not None
+                and production_subresource[1] in _TIMELINE_WRITE_RESOURCES
+            ):
+                resource = production_subresource[1]
+                allowed = (
+                    {
+                        "operationRef",
+                        "idempotencyKey",
+                        "expectedRunVersion",
+                    }
+                    if resource == "timeline"
+                    else {
+                        "operationRef",
+                        "idempotencyKey",
+                        "expectedRunVersion",
+                        "parentTimelineVersionRef",
+                        "parentTimelineVersionDigest",
+                        "editCommand",
+                    }
+                )
+                expected_run_version = payload.get("expectedRunVersion")
+                if (
+                    set(payload) != allowed
+                    or isinstance(expected_run_version, bool)
+                    or not isinstance(expected_run_version, int)
+                    or expected_run_version < 1
+                    or _contains_forbidden_timeline_client_claim(payload)
+                ):
+                    self._send_application_error(400, "invalid_request")
+                    return
+            if (
+                production_subresource is not None
                 and production_subresource[1]
                 in {
                     "production-readiness",
@@ -495,6 +588,10 @@ class CreatorRequestHandler(BaseHTTPRequestHandler):
                     result = self.episode_production_boundary.resolve_assets(command)
                 elif resource == "media":
                     result = self.episode_production_boundary.execute_media(command)
+                elif resource == "timeline":
+                    result = self.episode_production_boundary.create_timeline(command)
+                elif resource == "timeline-edits":
+                    result = self.episode_production_boundary.edit_timeline(command)
                 elif resource == "preview":
                     result = self.episode_production_boundary.compose_and_qc(command)
                 elif resource == "real-media-revision":
@@ -748,6 +845,14 @@ class CreatorRequestHandler(BaseHTTPRequestHandler):
                         )
                     elif resource == "media":
                         result = self.episode_production_boundary.get_media_bundle(
+                            workspace_ref, run_ref
+                        )
+                    elif resource == "timeline":
+                        result = self.episode_production_boundary.get_timeline(
+                            workspace_ref, run_ref
+                        )
+                    elif resource == "timeline-versions":
+                        result = self.episode_production_boundary.get_timeline_versions(
                             workspace_ref, run_ref
                         )
                     elif resource == "real-media-revision":
