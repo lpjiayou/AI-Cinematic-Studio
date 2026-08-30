@@ -118,6 +118,7 @@ def _probe_video_stream(
     path: Path,
     *,
     ffprobe_path: Path | str = "ffprobe",
+    pass_fds: tuple[int, ...] = (),
 ) -> dict[str, Any]:
     executable = _executable(ffprobe_path)
     command = [
@@ -141,6 +142,7 @@ def _probe_video_stream(
             text=True,
             timeout=120,
             env=_fixed_environment(),
+            pass_fds=pass_fds,
         )
         payload = json.loads(completed.stdout)
     except (OSError, subprocess.SubprocessError, json.JSONDecodeError) as exc:
@@ -351,6 +353,7 @@ def _decoded_rgba_sha256(
     *,
     frame_count: int,
     ffmpeg_path: Path | str = "ffmpeg",
+    pass_fds: tuple[int, ...] = (),
 ) -> tuple[str, int]:
     executable = _executable(ffmpeg_path)
     command = [
@@ -394,6 +397,7 @@ def _decoded_rgba_sha256(
                         check=False,
                         timeout=180,
                         env=_fixed_environment(),
+                        pass_fds=pass_fds,
                     )
                 except subprocess.SubprocessError as exc:
                     raise DigestError("pixel digest decode failed") from exc
@@ -599,13 +603,18 @@ def image_digest_metadata(
     *,
     ffmpeg_path: Path | str = "ffmpeg",
     ffprobe_path: Path | str = "ffprobe",
+    pass_fds: tuple[int, ...] = (),
 ) -> dict[str, object]:
     """Measure one single-frame PNG under the frozen RGBA8 pixel contract."""
 
     candidate = _require_file(path)
     if candidate.suffix.lower() != ".png":
         raise DigestError("image pixel digest input must be a PNG file")
-    probe = _probe_video_stream(candidate, ffprobe_path=ffprobe_path)
+    probe = _probe_video_stream(
+        candidate,
+        ffprobe_path=ffprobe_path,
+        pass_fds=pass_fds,
+    )
     if (
         probe["codecName"] != "png"
         or probe["formatName"] != "png_pipe"
@@ -616,6 +625,7 @@ def image_digest_metadata(
         candidate,
         frame_count=1,
         ffmpeg_path=ffmpeg_path,
+        pass_fds=pass_fds,
     )
     expected_bytes = probe["width"] * probe["height"] * 4
     if byte_count != expected_bytes:
