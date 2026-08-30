@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from functools import partial
+from hashlib import sha256
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import json
 import sys
@@ -779,7 +780,11 @@ class CreatorRequestHandler(BaseHTTPRequestHandler):
                         result = self.episode_production_boundary.get_state_projection(
                             workspace_ref, run_ref
                         )
-                    elif resource in {"preview", "finalize", "delivery"}:
+                    elif resource == "preview":
+                        result = self.episode_production_boundary.get_preview_bundle(
+                            workspace_ref, run_ref
+                        )
+                    elif resource in {"finalize", "delivery"}:
                         result = self.episode_production_boundary.get_delivery_bundle(
                             workspace_ref, run_ref
                         )
@@ -1418,7 +1423,10 @@ class CreatorRequestHandler(BaseHTTPRequestHandler):
             self._send_application_error(404, "resource_not_found")
             return
         body = path.read_bytes()
-        if len(body) != artifact.get("byteSize"):
+        if (
+            len(body) != artifact.get("byteSize")
+            or sha256(body).hexdigest() != artifact.get("sha256")
+        ):
             self._send_application_error(422, "artifact_verification_failed")
             return
         file_name = str(artifact.get("fileName", "episode.mp4")).replace('"', "")

@@ -31,6 +31,17 @@ ALLOWED_EVIDENCE_RECORD_KINDS = frozenset(
         "HumanSelectionDecision",
         "AssetAdmission",
         "AssetVersion",
+        "AudioInputBinding",
+        "AudioCue",
+        "AudioStemSet",
+        "GlyphRevealRequirement",
+        "MaskAssetVersion",
+        "Timeline",
+        "TimelineVersion",
+        "SubtitleManifest",
+        "TimelineMixRequest",
+        "CompositionResult",
+        "PreviewCandidate",
     }
 )
 K2_STATES = (

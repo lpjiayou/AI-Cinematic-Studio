@@ -9,11 +9,14 @@ hashing display-oriented frames in presentation order.
 
 from __future__ import annotations
 
+from fractions import Fraction
 from hashlib import sha256
 import json
 import os
 from pathlib import Path
+import re
 import shutil
+import stat
 import subprocess
 import tempfile
 from typing import Any, BinaryIO, Mapping
@@ -26,6 +29,31 @@ DECODED_FRAME_PIXEL_DIGEST_SPEC_V2 = (
     "RGBA8/display-identity/frame-major/row-major/"
     "width-height-frame-count-bound/v2"
 )
+CANONICAL_PCM_SAMPLE_RATE = 48_000
+CANONICAL_PCM_CHANNEL_COUNT = 2
+MAX_CANONICAL_PCM_SAMPLE_COUNT = 28_800_000
+_AAC_FRAME_SAMPLE_COUNT = 1024
+_PCM_CONTENT_DIGEST_SPEC_TEMPLATE = {
+    "schemaVersion": "v4.pcm-content-digest-spec.v1",
+    "algorithm": "SHA-256",
+    "decoder": "FFMPEG",
+    "sampleFormat": "s16le",
+    "sampleRate": CANONICAL_PCM_SAMPLE_RATE,
+    "channelLayout": "stereo",
+    "channelOrder": ["FL", "FR"],
+    "interleaving": "INTERLEAVED",
+    "sampleOrder": "FRAME_MAJOR_CHANNEL_ORDER",
+    "endianness": "LITTLE_ENDIAN",
+    "containerMetadataIncluded": False,
+    "monoExpansion": "DUPLICATE_TO_FL_FR",
+}
+
+# Keep the public contract inspectable without letting an in-process caller
+# mutate the template used to measure artifacts.
+PCM_CONTENT_DIGEST_SPEC = {
+    **_PCM_CONTENT_DIGEST_SPEC_TEMPLATE,
+    "channelOrder": list(_PCM_CONTENT_DIGEST_SPEC_TEMPLATE["channelOrder"]),
+}
 PIXEL_DIGEST_SPEC = IMAGE_PIXEL_DIGEST_SPEC
 
 
@@ -41,6 +69,11 @@ def _fixed_environment() -> dict[str, str]:
 
 def _executable(name_or_path: Path | str) -> Path:
     value = str(name_or_path)
+    if re.fullmatch(r"/proc/self/fd/[0-9]+", value) is not None:
+        candidate = Path(value)
+        if not candidate.is_file():
+            raise DigestError(f"{candidate.name} runtime is unavailable")
+        return candidate
     candidate = shutil.which(value)
     if candidate is None:
         raise DigestError(f"{Path(value).name} runtime is unavailable")
@@ -148,6 +181,7 @@ def _probe_identity_video_stream(
     path: Path,
     *,
     ffprobe_path: Path | str = "ffprobe",
+    pass_fds: tuple[int, ...] = (),
 ) -> dict[str, Any]:
     """Probe one video while rejecting every non-identity display transform."""
 
@@ -174,6 +208,7 @@ def _probe_identity_video_stream(
             text=True,
             timeout=120,
             env=_fixed_environment(),
+            pass_fds=pass_fds,
         )
         payload = json.loads(completed.stdout)
     except (OSError, subprocess.SubprocessError, json.JSONDecodeError) as exc:
@@ -240,6 +275,74 @@ def _probe_identity_video_stream(
         "frameCount": frame_count,
         "codecName": stream.get("codec_name"),
         "formatName": format_value.get("format_name"),
+    }
+
+
+def _probe_audio_stream(
+    path: Path,
+    *,
+    ffprobe_path: Path | str = "ffprobe",
+    pass_fds: tuple[int, ...] = (),
+) -> dict[str, Any]:
+    """Probe exactly one audible stream for the canonical PCM projection."""
+
+    executable = _executable(ffprobe_path)
+    command = [
+        str(executable),
+        "-v", "error",
+        "-select_streams", "a",
+        "-show_entries",
+        (
+            "stream=index,codec_type,codec_name,sample_rate,channels,"
+            "channel_layout,duration_ts,time_base"
+        ),
+        "-of", "json",
+        str(path),
+    ]
+    try:
+        completed = subprocess.run(
+            command,
+            check=True,
+            capture_output=True,
+            text=True,
+            timeout=120,
+            env=_fixed_environment(),
+            pass_fds=pass_fds,
+        )
+        payload = json.loads(completed.stdout)
+    except (OSError, subprocess.SubprocessError, json.JSONDecodeError) as exc:
+        raise DigestError("PCM content digest probe failed") from exc
+    streams = payload.get("streams")
+    if not isinstance(streams, list) or len(streams) != 1:
+        raise DigestError(
+            "PCM content digest input must contain exactly one audio stream"
+        )
+    stream = streams[0]
+    if not isinstance(stream, Mapping) or stream.get("codec_type") != "audio":
+        raise DigestError("PCM content digest stream metadata is invalid")
+    try:
+        sample_rate = int(stream["sample_rate"])
+        source_channel_count = int(stream["channels"])
+    except (KeyError, TypeError, ValueError) as exc:
+        raise DigestError("PCM content digest stream metadata is invalid") from exc
+    if (
+        sample_rate != CANONICAL_PCM_SAMPLE_RATE
+        or source_channel_count not in {1, 2}
+    ):
+        raise DigestError("PCM content digest source format is unsupported")
+    try:
+        duration_ticks = int(stream["duration_ts"])
+        time_base = Fraction(str(stream["time_base"]))
+    except (KeyError, TypeError, ValueError, ZeroDivisionError) as exc:
+        raise DigestError("PCM content digest duration is unavailable") from exc
+    if duration_ticks <= 0 or time_base != Fraction(1, sample_rate):
+        raise DigestError("PCM content digest duration is invalid")
+    return {
+        "codecName": stream.get("codec_name"),
+        "sampleRate": sample_rate,
+        "sourceChannelCount": source_channel_count,
+        "sourceChannelLayout": stream.get("channel_layout"),
+        "durationSamples": duration_ticks,
     }
 
 
@@ -318,6 +421,7 @@ def _decoded_rgba_sha256_v2(
     height: int,
     frame_count: int,
     ffmpeg_path: Path | str = "ffmpeg",
+    pass_fds: tuple[int, ...] = (),
 ) -> tuple[str, int]:
     """Hash identity-oriented RGBA8 frames with a dimension/count-bound header."""
 
@@ -375,6 +479,7 @@ def _decoded_rgba_sha256_v2(
                         check=False,
                         timeout=180,
                         env=_fixed_environment(),
+                        pass_fds=pass_fds,
                     )
                 except subprocess.SubprocessError as exc:
                     raise DigestError(
@@ -398,6 +503,95 @@ def _decoded_rgba_sha256_v2(
     except OSError as exc:
         raise DigestError("decoded-frame pixel digest decode failed") from exc
     return digest.hexdigest(), byte_count
+
+
+def _decoded_canonical_pcm_sha256(
+    path: Path,
+    *,
+    source_channel_count: int,
+    expected_sample_count: int,
+    ffmpeg_path: Path | str = "ffmpeg",
+    pass_fds: tuple[int, ...] = (),
+) -> tuple[str, int]:
+    """Hash headerless 48 kHz stereo s16le under the frozen M12 profile."""
+
+    if (
+        isinstance(expected_sample_count, bool)
+        or not isinstance(expected_sample_count, int)
+        or not 1 <= expected_sample_count <= MAX_CANONICAL_PCM_SAMPLE_COUNT
+    ):
+        raise DigestError("PCM content digest sample count is invalid")
+    if source_channel_count not in {1, 2}:
+        raise DigestError("PCM content digest channel count is invalid")
+    executable = _executable(ffmpeg_path)
+    canonical_filter = (
+        "pan=stereo|c0=c0|c1=c0,"
+        "aformat=sample_fmts=s16:sample_rates=48000:channel_layouts=stereo"
+        if source_channel_count == 1
+        else "aformat=sample_fmts=s16:sample_rates=48000:channel_layouts=stereo"
+    )
+    canonical_filter += f",atrim=end_sample={expected_sample_count}"
+    expected_bytes = (
+        expected_sample_count * CANONICAL_PCM_CHANNEL_COUNT * 2
+    )
+    command = [
+        str(executable),
+        "-nostdin",
+        "-hide_banner",
+        "-loglevel", "error",
+        "-xerror",
+        "-threads", "1",
+        "-filter_threads", "1",
+        "-filter_complex_threads", "1",
+        "-i", str(path),
+        "-map", "0:a:0",
+        "-vn",
+        "-sn",
+        "-dn",
+        "-af", canonical_filter,
+        "-ar", str(CANONICAL_PCM_SAMPLE_RATE),
+        "-ac", str(CANONICAL_PCM_CHANNEL_COUNT),
+        "-c:a", "pcm_s16le",
+        "-fflags", "+bitexact",
+        "-flags:a", "+bitexact",
+        "-map_metadata", "-1",
+        "-fs", str(expected_bytes + CANONICAL_PCM_CHANNEL_COUNT * 2),
+        "-f", "s16le",
+        "pipe:1",
+    ]
+    try:
+        with tempfile.TemporaryFile(mode="w+b") as raw_output:
+            with tempfile.TemporaryFile(mode="w+b") as error_output:
+                try:
+                    completed = subprocess.run(
+                        command,
+                        stdout=raw_output,
+                        stderr=error_output,
+                        check=False,
+                        timeout=180,
+                        env=_fixed_environment(),
+                        pass_fds=pass_fds,
+                    )
+                except subprocess.SubprocessError as exc:
+                    raise DigestError("PCM content digest decode failed") from exc
+                if completed.returncode != 0:
+                    error_output.seek(0)
+                    message = error_output.read(8192).decode(
+                        "utf-8", "replace"
+                    ).strip()
+                    raise DigestError(
+                        "PCM content digest decode failed"
+                        + (f": {message}" if message else "")
+                    )
+                raw_output.seek(0)
+                digest_hex, byte_count = _hash_stream(raw_output)
+    except DigestError:
+        raise
+    except OSError as exc:
+        raise DigestError("PCM content digest decode failed") from exc
+    if byte_count != expected_bytes:
+        raise DigestError("PCM content digest decoded byte count is invalid")
+    return digest_hex, byte_count
 
 
 def image_digest_metadata(
@@ -520,6 +714,7 @@ def decoded_frame_pixel_digest_metadata(
     *,
     ffmpeg_path: Path | str = "ffmpeg",
     ffprobe_path: Path | str = "ffprobe",
+    pass_fds: tuple[int, ...] = (),
 ) -> dict[str, object]:
     """Return v2 file and decoded-frame identity for one transform-free video."""
 
@@ -527,6 +722,7 @@ def decoded_frame_pixel_digest_metadata(
     probe = _probe_identity_video_stream(
         candidate,
         ffprobe_path=ffprobe_path,
+        pass_fds=pass_fds,
     )
     pixel_hex, byte_count = _decoded_rgba_sha256_v2(
         candidate,
@@ -534,6 +730,7 @@ def decoded_frame_pixel_digest_metadata(
         height=probe["height"],
         frame_count=probe["frameCount"],
         ffmpeg_path=ffmpeg_path,
+        pass_fds=pass_fds,
     )
     expected_bytes = (
         probe["width"] * probe["height"] * 4 * probe["frameCount"]
@@ -551,4 +748,134 @@ def decoded_frame_pixel_digest_metadata(
         "width": probe["width"],
         "height": probe["height"],
         "frameCount": probe["frameCount"],
+    }
+
+
+def canonical_pcm_digest_metadata(
+    path: Path | str,
+    *,
+    expected_sample_count: int,
+    allow_aac_frame_padding: bool = False,
+    ffmpeg_path: Path | str = "ffmpeg",
+    ffprobe_path: Path | str = "ffprobe",
+    pass_fds: tuple[int, ...] = (),
+    _input_descriptor: int | None = None,
+) -> dict[str, object]:
+    """Return frozen M12-compatible PCM identity for one audible stream.
+
+    The digest is intentionally the unprefixed hexadecimal form already owned
+    by ``pcmContentDigest``.  The accompanying closed spec removes any
+    ambiguity about rate, layout, sample order, or container metadata.  The
+    explicit AAC opt-in tolerates at most one codec frame of container-level
+    duration padding; the decoded projection is still trimmed and byte-counted
+    to exactly ``expected_sample_count`` samples.
+    """
+
+    if (
+        isinstance(expected_sample_count, bool)
+        or not isinstance(expected_sample_count, int)
+        or not 1 <= expected_sample_count <= MAX_CANONICAL_PCM_SAMPLE_COUNT
+        or type(allow_aac_frame_padding) is not bool
+        or (
+            _input_descriptor is not None
+            and (
+                isinstance(_input_descriptor, bool)
+                or not isinstance(_input_descriptor, int)
+                or _input_descriptor < 0
+            )
+        )
+    ):
+        raise DigestError("PCM content digest request is invalid")
+    candidate = Path(path)
+    no_follow = getattr(os, "O_NOFOLLOW", None)
+    if no_follow is None:
+        raise DigestError("PCM content digest no-follow support is unavailable")
+    flags = os.O_RDONLY | no_follow
+    if hasattr(os, "O_CLOEXEC"):
+        flags |= os.O_CLOEXEC
+    if hasattr(os, "O_NONBLOCK"):
+        flags |= os.O_NONBLOCK
+    descriptor: int | None = None
+    identity_fields = (
+        "st_dev",
+        "st_ino",
+        "st_mode",
+        "st_nlink",
+        "st_size",
+        "st_mtime_ns",
+        "st_ctime_ns",
+    )
+    try:
+        descriptor = (
+            os.dup(_input_descriptor)
+            if _input_descriptor is not None
+            else os.open(candidate, flags)
+        )
+        before = os.fstat(descriptor)
+        entry_before = os.stat(candidate, follow_symlinks=False)
+        if (
+            not stat.S_ISREG(before.st_mode)
+            or before.st_size <= 0
+            or any(
+                getattr(before, field) != getattr(entry_before, field)
+                for field in identity_fields
+            )
+        ):
+            raise DigestError("PCM content digest input is not a stable regular file")
+        descriptor_path = Path(f"/proc/self/fd/{descriptor}")
+        if not descriptor_path.exists():
+            raise DigestError(
+                "PCM content digest descriptor projection is unavailable"
+            )
+        inherited = tuple(dict.fromkeys((descriptor, *pass_fds)))
+        probe = _probe_audio_stream(
+            descriptor_path,
+            ffprobe_path=ffprobe_path,
+            pass_fds=inherited,
+        )
+        duration_delta = abs(probe["durationSamples"] - expected_sample_count)
+        if duration_delta != 0 and not (
+            allow_aac_frame_padding
+            and probe["codecName"] == "aac"
+            and duration_delta <= _AAC_FRAME_SAMPLE_COUNT
+        ):
+            raise DigestError("PCM content digest duration does not match request")
+        digest_hex, byte_count = _decoded_canonical_pcm_sha256(
+            descriptor_path,
+            source_channel_count=probe["sourceChannelCount"],
+            expected_sample_count=expected_sample_count,
+            ffmpeg_path=ffmpeg_path,
+            pass_fds=inherited,
+        )
+        after = os.fstat(descriptor)
+        entry_after = os.stat(candidate, follow_symlinks=False)
+        if any(
+            getattr(before, field) != getattr(after, field)
+            or getattr(before, field) != getattr(entry_after, field)
+            for field in identity_fields
+        ):
+            raise DigestError("PCM content digest input changed while measuring")
+    except DigestError:
+        raise
+    except OSError as exc:
+        raise DigestError("PCM content digest input is unavailable") from exc
+    finally:
+        if descriptor is not None:
+            os.close(descriptor)
+    return {
+        "pcmContentDigest": digest_hex,
+        "pcmDigestSpec": json.loads(
+            json.dumps(
+                _PCM_CONTENT_DIGEST_SPEC_TEMPLATE,
+                ensure_ascii=True,
+                sort_keys=True,
+                separators=(",", ":"),
+            )
+        ),
+        "sampleRate": CANONICAL_PCM_SAMPLE_RATE,
+        "channelCount": CANONICAL_PCM_CHANNEL_COUNT,
+        "sampleCount": expected_sample_count,
+        "decodedByteCount": byte_count,
+        "sourceCodecName": probe["codecName"],
+        "sourceChannelCount": probe["sourceChannelCount"],
     }

@@ -11,9 +11,14 @@ import re
 from typing import Any, Mapping
 
 from services.v3_render_core import (
+    CANONICAL_PCM_CHANNEL_COUNT,
+    CANONICAL_PCM_SAMPLE_RATE,
     DECODED_FRAME_PIXEL_DIGEST_SPEC_V2,
     DeterministicFfmpegComposer,
+    DigestError,
+    PCM_CONTENT_DIGEST_SPEC,
     RenderArtifactError,
+    file_digest,
 )
 
 
@@ -33,6 +38,16 @@ GLYPH_REVEAL_RENDERER_IDENTITY_V2 = (
     "v3.deterministic-glyph-reveal-ffmpeg"
 )
 GLYPH_REVEAL_RENDERER_VERSION_V2 = "2"
+TIMELINE_PREVIEW_EXECUTION_REQUEST_SCHEMA_VERSION_V1 = (
+    "v4.m13-composition-execution-request.v1"
+)
+TIMELINE_PREVIEW_COMPOSITION_RESULT_SCHEMA_VERSION_V1 = (
+    "v4.m13-composition-result.v1"
+)
+TIMELINE_PREVIEW_RENDERER_IDENTITY_V1 = (
+    "v3.deterministic-timeline-preview-ffmpeg"
+)
+TIMELINE_PREVIEW_RENDERER_VERSION_V1 = "1"
 GLYPH_REVEAL_MASK_PIXEL_DIGEST_SPEC = (
     "RGBA8/exif-transposed/row-major/v1"
 )
@@ -172,6 +187,232 @@ _V3_GLYPH_REVEAL_RESULT_FIELDS_V2 = frozenset(
         "publicationAllowed",
     }
 )
+_TIMELINE_PREVIEW_COMMAND_FIELDS_V1 = frozenset(
+    {
+        "workspaceRef",
+        "productionRunRef",
+        "timelineVersionRef",
+        "timelineVersionDigest",
+        "videoInput",
+        "audioMix",
+        "subtitleManifest",
+        "output",
+    }
+)
+_TIMELINE_PREVIEW_EXECUTION_REQUEST_FIELDS_V1 = frozenset(
+    {
+        "schemaVersion",
+        "executionRequestRef",
+        "workspaceRef",
+        "productionRunRef",
+        "timelineVersionRef",
+        "timelineVersionDigest",
+        "inputBindingsDigest",
+        "videoInput",
+        "audioMix",
+        "subtitleManifest",
+        "output",
+        "publicationAllowed",
+        "payloadDigest",
+    }
+)
+_TIMELINE_PREVIEW_VIDEO_INPUT_FIELDS_V1 = frozenset(
+    {
+        "glyphRevealRequirementRef",
+        "glyphRevealRequirementDigest",
+        "glyphRevealExecutionRequestRef",
+        "glyphRevealExecutionRequestDigest",
+        "glyphRevealArtifactEvidenceRef",
+        "glyphRevealArtifactEvidenceDigest",
+        "storageKey",
+        "fileDigest",
+        "decodedFramePixelDigest",
+        "decodedFramePixelDigestSpec",
+        "codec",
+        "pixelFormat",
+        "width",
+        "height",
+        "frameCount",
+        "frameRate",
+    }
+)
+_TIMELINE_PREVIEW_AUDIO_MIX_FIELDS_V1 = frozenset(
+    {
+        "mixRequestRef",
+        "mixRequestDigest",
+        "timelineVersionRef",
+        "timelineVersionDigest",
+        "stemSetVersionRef",
+        "stemSetDigest",
+        "sampleRate",
+        "channelCount",
+        "durationSamples",
+        "roundingRule",
+        "mixParameters",
+        "mixParametersDigest",
+        "clips",
+    }
+)
+_TIMELINE_PREVIEW_AUDIO_CLIP_FIELDS_V1 = frozenset(
+    {
+        "clipRef",
+        "clipDigest",
+        "stemMemberRef",
+        "stemMemberDigest",
+        "audioRole",
+        "assetVersionRef",
+        "assetVersionType",
+        "assetVersionDigest",
+        "technicalValidationRef",
+        "technicalValidationDigest",
+        "storageKey",
+        "fileDigest",
+        "pcmContentDigest",
+        "sampleRate",
+        "sourceChannelCount",
+        "sourceSampleCount",
+        "sourceStartSample",
+        "sourceEndSampleExclusive",
+        "timelineStartFrame",
+        "timelineEndFrameExclusive",
+        "timelineStartSample",
+        "timelineEndSampleExclusive",
+        "gainDb",
+        "fadeInSamples",
+        "fadeOutSamples",
+    }
+)
+_TIMELINE_PREVIEW_OUTPUT_FIELDS_V1 = frozenset(
+    {
+        "width",
+        "height",
+        "frameRate",
+        "totalFrames",
+        "sampleRate",
+        "channelCount",
+        "durationSamples",
+        "container",
+        "videoCodec",
+        "pixelFormat",
+        "audioCodec",
+        "audioBitRate",
+    }
+)
+_TIMELINE_PREVIEW_OUTPUT_DIGEST_FIELDS_V1 = frozenset(
+    {
+        "fileDigest",
+        "fileDigestAlgorithm",
+        "decodedFramePixelDigest",
+        "decodedFramePixelDigestSpec",
+        "pixelMode",
+        "width",
+        "height",
+        "frameCount",
+        "frameRate",
+        "pcmContentDigest",
+        "pcmDigestSpec",
+        "sampleRate",
+        "channelCount",
+        "sampleCount",
+    }
+)
+_TIMELINE_PREVIEW_OUTPUT_MEDIA_PROBE_FIELDS_V1 = frozenset(
+    {
+        "container",
+        "videoCodec",
+        "pixelFormat",
+        "width",
+        "height",
+        "frameRate",
+        "frameCount",
+        "audioCodec",
+        "sampleRate",
+        "channelCount",
+        "sampleCount",
+    }
+)
+_V3_TIMELINE_PREVIEW_RESULT_FIELDS_V1 = frozenset(
+    {
+        "internalPath",
+        "outputStorageKey",
+        "outputByteSize",
+        "outputMediaProbe",
+        "outputDigest",
+        "rendererIdentity",
+        "rendererVersion",
+        "ffmpegIdentity",
+        "runtimeEvidenceDigest",
+        "executionRequestRef",
+        "executionRequestDigest",
+        "timelineVersionRef",
+        "timelineVersionDigest",
+        "inputBindingsDigest",
+        "subtitleManifestRef",
+        "subtitleManifestDigest",
+        "publicationAllowed",
+    }
+)
+_TIMELINE_PREVIEW_RESULT_FIELDS_V1 = frozenset(
+    {
+        "schemaVersion",
+        "compositionResultRef",
+        "artifactRef",
+        "executionRequestRef",
+        "executionRequestDigest",
+        "timelineVersionRef",
+        "timelineVersionDigest",
+        "inputBindingsDigest",
+        "outputStorageKey",
+        "outputByteSize",
+        "outputMediaProbe",
+        "outputDigest",
+        "subtitleManifestRef",
+        "subtitleManifestDigest",
+        "rendererIdentity",
+        "rendererVersion",
+        "ffmpegIdentity",
+        "runtimeEvidenceDigest",
+        "adapterIdentity",
+        "provenance",
+        "providerUsed",
+        "gpuUsed",
+        "publicationAllowed",
+        "payloadDigest",
+    }
+)
+_TIMELINE_PREVIEW_ROLE_PRIORITY = {
+    "dialogue": 3,
+    "narration": 3,
+    "sfx": 2,
+    "ambience": 1,
+    "music": 0,
+}
+_TIMELINE_PREVIEW_ROLE_GAIN_DB = {
+    "dialogue": 0,
+    "narration": 0,
+    "sfx": -6,
+    "ambience": -12,
+    "music": -18,
+}
+_TIMELINE_PREVIEW_DUCKING = {
+    "threshold": "0.125",
+    "ratio": "8",
+    "attackMilliseconds": 5,
+    "releaseMilliseconds": 180,
+    "makeup": "1",
+    "knee": "2",
+    "link": "maximum",
+    "detection": "rms",
+    "levelSc": "1",
+    "mix": "1",
+}
+_TIMELINE_PREVIEW_LIMITER = {
+    "limit": "0.95",
+    "attackMilliseconds": 5,
+    "releaseMilliseconds": 50,
+    "level": False,
+    "latency": True,
+}
 
 
 class CompositionExecutionError(RuntimeError):
@@ -1092,6 +1333,624 @@ def _validate_v3_glyph_reveal_result_v2(
     return result
 
 
+def _timeline_preview_frame_rate_v1(value: Any, field: str) -> tuple[int, int]:
+    record = _closed_mapping(value, {"numerator", "denominator"}, field)
+    numerator = _integer(
+        record["numerator"], f"{field}.numerator", minimum=1, maximum=1_000_000
+    )
+    denominator = _integer(
+        record["denominator"],
+        f"{field}.denominator",
+        minimum=1,
+        maximum=1_000_000,
+    )
+    from fractions import Fraction
+
+    reduced = Fraction(numerator, denominator)
+    if reduced.numerator != numerator or reduced.denominator != denominator:
+        raise CompositionRequestValidationError(f"{field} must be reduced")
+    return numerator, denominator
+
+
+def _timeline_preview_frame_to_sample_v1(
+    frame: int, frame_rate: tuple[int, int]
+) -> int:
+    numerator, denominator = frame_rate
+    return frame * CANONICAL_PCM_SAMPLE_RATE * denominator // numerator
+
+
+def _timeline_preview_mix_parameters_v1() -> dict[str, Any]:
+    return {
+        "rolePriority": deepcopy(_TIMELINE_PREVIEW_ROLE_PRIORITY),
+        "roleGainDb": deepcopy(_TIMELINE_PREVIEW_ROLE_GAIN_DB),
+        "ducking": deepcopy(_TIMELINE_PREVIEW_DUCKING),
+        "limiter": deepcopy(_TIMELINE_PREVIEW_LIMITER),
+    }
+
+
+def _seal_timeline_preview_v1(value: Mapping[str, Any]) -> dict[str, Any]:
+    result = deepcopy(dict(value))
+    if "payloadDigest" in result:
+        raise CompositionRequestValidationError(
+            "timeline preview record cannot predeclare payloadDigest"
+        )
+    result["payloadDigest"] = sha256(_canonical_json(result)).hexdigest()
+    return result
+
+
+def _build_timeline_preview_execution_request_v1(
+    value: Any,
+) -> dict[str, Any]:
+    command = _closed_mapping(
+        value,
+        set(_TIMELINE_PREVIEW_COMMAND_FIELDS_V1),
+        "timeline preview command",
+    )
+    for field in (
+        "workspaceRef",
+        "productionRunRef",
+        "timelineVersionRef",
+    ):
+        _ref(command[field], field)
+    _raw_digest(command["timelineVersionDigest"], "timelineVersionDigest")
+
+    video = _closed_mapping(
+        command["videoInput"],
+        set(_TIMELINE_PREVIEW_VIDEO_INPUT_FIELDS_V1),
+        "videoInput",
+    )
+    for field in (
+        "glyphRevealRequirementRef",
+        "glyphRevealExecutionRequestRef",
+        "glyphRevealArtifactEvidenceRef",
+    ):
+        _ref(video[field], f"videoInput.{field}")
+    for field in (
+        "glyphRevealRequirementDigest",
+        "glyphRevealExecutionRequestDigest",
+        "glyphRevealArtifactEvidenceDigest",
+    ):
+        _raw_digest(video[field], f"videoInput.{field}")
+    _storage_key_v2(video["storageKey"], "videoInput.storageKey")
+    _prefixed_digest(video["fileDigest"], "videoInput.fileDigest")
+    _prefixed_digest(
+        video["decodedFramePixelDigest"],
+        "videoInput.decodedFramePixelDigest",
+    )
+    if (
+        video["decodedFramePixelDigestSpec"]
+        != DECODED_FRAME_PIXEL_DIGEST_SPEC_V2
+        or video["codec"] != "h264"
+        or video["pixelFormat"] not in {"yuv420p", "yuv422p", "yuv444p"}
+    ):
+        raise CompositionRequestValidationError("videoInput content is invalid")
+    video_width = _integer(
+        video["width"], "videoInput.width", minimum=1, maximum=131_072
+    )
+    video_height = _integer(
+        video["height"], "videoInput.height", minimum=1, maximum=131_072
+    )
+    video_frames = _integer(
+        video["frameCount"],
+        "videoInput.frameCount",
+        minimum=1,
+        maximum=10_000_000,
+    )
+    video_rate = _timeline_preview_frame_rate_v1(
+        video["frameRate"], "videoInput.frameRate"
+    )
+    if video_rate[1] != 1:
+        raise CompositionRequestValidationError(
+            "timeline preview vertical slice requires integral frameRate"
+        )
+
+    output = _closed_mapping(
+        command["output"],
+        set(_TIMELINE_PREVIEW_OUTPUT_FIELDS_V1),
+        "output",
+    )
+    output_rate = _timeline_preview_frame_rate_v1(
+        output["frameRate"], "output.frameRate"
+    )
+    output_width = _integer(
+        output["width"], "output.width", minimum=1, maximum=131_072
+    )
+    output_height = _integer(
+        output["height"], "output.height", minimum=1, maximum=131_072
+    )
+    total_frames = _integer(
+        output["totalFrames"],
+        "output.totalFrames",
+        minimum=1,
+        maximum=10_000_000,
+    )
+    duration_samples = _integer(
+        output["durationSamples"],
+        "output.durationSamples",
+        minimum=1,
+        maximum=28_800_000,
+    )
+    output_sample_rate = _integer(
+        output["sampleRate"],
+        "output.sampleRate",
+        minimum=1,
+        maximum=384_000,
+    )
+    output_channel_count = _integer(
+        output["channelCount"],
+        "output.channelCount",
+        minimum=1,
+        maximum=8,
+    )
+    output_audio_bit_rate = _integer(
+        output["audioBitRate"],
+        "output.audioBitRate",
+        minimum=1,
+        maximum=10_000_000,
+    )
+    if (
+        output_width != video_width
+        or output_height != video_height
+        or output["totalFrames"] != video_frames
+        or output_rate != video_rate
+        or output_sample_rate != CANONICAL_PCM_SAMPLE_RATE
+        or output_channel_count != CANONICAL_PCM_CHANNEL_COUNT
+        or duration_samples
+        != _timeline_preview_frame_to_sample_v1(total_frames, output_rate)
+        or output["container"] != "mp4"
+        or output["videoCodec"] != "h264"
+        or output["pixelFormat"] != video["pixelFormat"]
+        or output["audioCodec"] != "aac"
+        or output_audio_bit_rate != 128_000
+    ):
+        raise CompositionRequestValidationError("output contract is invalid")
+
+    subtitle = _closed_mapping(
+        command["subtitleManifest"],
+        {"subtitleManifestRef", "subtitleManifestDigest"},
+        "subtitleManifest",
+    )
+    _ref(subtitle["subtitleManifestRef"], "subtitleManifestRef")
+    _raw_digest(subtitle["subtitleManifestDigest"], "subtitleManifestDigest")
+
+    audio_mix = _closed_mapping(
+        command["audioMix"],
+        set(_TIMELINE_PREVIEW_AUDIO_MIX_FIELDS_V1),
+        "audioMix",
+    )
+    for field in ("mixRequestRef", "timelineVersionRef", "stemSetVersionRef"):
+        _ref(audio_mix[field], f"audioMix.{field}")
+    for field in (
+        "mixRequestDigest",
+        "timelineVersionDigest",
+        "stemSetDigest",
+        "mixParametersDigest",
+    ):
+        _raw_digest(audio_mix[field], f"audioMix.{field}")
+    mix_parameters = _timeline_preview_mix_parameters_v1()
+    mix_sample_rate = _integer(
+        audio_mix["sampleRate"],
+        "audioMix.sampleRate",
+        minimum=1,
+        maximum=384_000,
+    )
+    mix_channel_count = _integer(
+        audio_mix["channelCount"],
+        "audioMix.channelCount",
+        minimum=1,
+        maximum=8,
+    )
+    mix_duration_samples = _integer(
+        audio_mix["durationSamples"],
+        "audioMix.durationSamples",
+        minimum=1,
+        maximum=28_800_000,
+    )
+    if (
+        audio_mix["timelineVersionRef"] != command["timelineVersionRef"]
+        or audio_mix["timelineVersionDigest"] != command["timelineVersionDigest"]
+        or mix_sample_rate != CANONICAL_PCM_SAMPLE_RATE
+        or mix_channel_count != CANONICAL_PCM_CHANNEL_COUNT
+        or mix_duration_samples != duration_samples
+        or audio_mix["roundingRule"] != "FLOOR_EACH_BOUNDARY"
+        or audio_mix["mixParameters"] != mix_parameters
+        or audio_mix["mixParametersDigest"]
+        != sha256(_canonical_json(mix_parameters)).hexdigest()
+    ):
+        raise CompositionRequestValidationError("audioMix contract is invalid")
+    clips = audio_mix["clips"]
+    if not isinstance(clips, list) or not clips or len(clips) > 64:
+        raise CompositionRequestValidationError("audioMix.clips is invalid")
+    role_types = {
+        "dialogue": "DialogueAssetVersion",
+        "narration": "DialogueAssetVersion",
+        "sfx": "SfxAssetVersion",
+        "ambience": "AmbienceAssetVersion",
+        "music": "MusicAssetVersion",
+    }
+    seen_clip_refs: set[str] = set()
+    seen_stem_refs: set[str] = set()
+    normalized_clips: list[dict[str, Any]] = []
+    for index, raw_clip in enumerate(clips):
+        clip = _closed_mapping(
+            raw_clip,
+            set(_TIMELINE_PREVIEW_AUDIO_CLIP_FIELDS_V1),
+            f"audioMix.clips[{index}]",
+        )
+        clip_ref = _ref(clip["clipRef"], f"audioMix.clips[{index}].clipRef")
+        stem_ref = _ref(
+            clip["stemMemberRef"], f"audioMix.clips[{index}].stemMemberRef"
+        )
+        if clip_ref in seen_clip_refs or stem_ref in seen_stem_refs:
+            raise CompositionRequestValidationError("audioMix clip is duplicated")
+        seen_clip_refs.add(clip_ref)
+        seen_stem_refs.add(stem_ref)
+        for field in ("assetVersionRef", "technicalValidationRef"):
+            _ref(clip[field], f"audioMix.clips[{index}].{field}")
+        for field in (
+            "clipDigest",
+            "stemMemberDigest",
+            "assetVersionDigest",
+            "technicalValidationDigest",
+            "fileDigest",
+            "pcmContentDigest",
+        ):
+            _raw_digest(clip[field], f"audioMix.clips[{index}].{field}")
+        _storage_key_v2(
+            clip["storageKey"], f"audioMix.clips[{index}].storageKey"
+        )
+        role = clip["audioRole"]
+        clip_sample_rate = _integer(
+            clip["sampleRate"],
+            f"audioMix.clips[{index}].sampleRate",
+            minimum=1,
+            maximum=384_000,
+        )
+        source_channel_count = _integer(
+            clip["sourceChannelCount"],
+            f"audioMix.clips[{index}].sourceChannelCount",
+            minimum=1,
+            maximum=8,
+        )
+        if (
+            role not in role_types
+            or clip["assetVersionType"] != role_types[role]
+            or clip_sample_rate != CANONICAL_PCM_SAMPLE_RATE
+            or source_channel_count not in {1, 2}
+        ):
+            raise CompositionRequestValidationError(
+                "audioMix clip role or source format is invalid"
+            )
+        source_count = _integer(
+            clip["sourceSampleCount"],
+            f"audioMix.clips[{index}].sourceSampleCount",
+            minimum=1,
+            maximum=28_800_000,
+        )
+        source_start = _integer(
+            clip["sourceStartSample"],
+            f"audioMix.clips[{index}].sourceStartSample",
+            minimum=0,
+            maximum=28_799_999,
+        )
+        source_end = _integer(
+            clip["sourceEndSampleExclusive"],
+            f"audioMix.clips[{index}].sourceEndSampleExclusive",
+            minimum=1,
+            maximum=28_800_000,
+        )
+        timeline_start_frame = _integer(
+            clip["timelineStartFrame"],
+            f"audioMix.clips[{index}].timelineStartFrame",
+            minimum=0,
+            maximum=total_frames - 1,
+        )
+        timeline_end_frame = _integer(
+            clip["timelineEndFrameExclusive"],
+            f"audioMix.clips[{index}].timelineEndFrameExclusive",
+            minimum=1,
+            maximum=total_frames,
+        )
+        timeline_start_sample = _integer(
+            clip["timelineStartSample"],
+            f"audioMix.clips[{index}].timelineStartSample",
+            minimum=0,
+            maximum=duration_samples - 1,
+        )
+        timeline_end_sample = _integer(
+            clip["timelineEndSampleExclusive"],
+            f"audioMix.clips[{index}].timelineEndSampleExclusive",
+            minimum=1,
+            maximum=duration_samples,
+        )
+        gain = clip["gainDb"]
+        if isinstance(gain, bool) or not isinstance(gain, int) or not -96 <= gain <= 24:
+            raise CompositionRequestValidationError(
+                f"audioMix.clips[{index}].gainDb is invalid"
+            )
+        fade_in = _integer(
+            clip["fadeInSamples"],
+            f"audioMix.clips[{index}].fadeInSamples",
+            minimum=0,
+            maximum=28_800_000,
+        )
+        fade_out = _integer(
+            clip["fadeOutSamples"],
+            f"audioMix.clips[{index}].fadeOutSamples",
+            minimum=0,
+            maximum=28_800_000,
+        )
+        source_span = source_end - source_start
+        timeline_span = timeline_end_sample - timeline_start_sample
+        if (
+            source_start >= source_end
+            or source_end > source_count
+            or timeline_start_frame >= timeline_end_frame
+            or timeline_start_sample
+            != _timeline_preview_frame_to_sample_v1(
+                timeline_start_frame, output_rate
+            )
+            or timeline_end_sample
+            != _timeline_preview_frame_to_sample_v1(
+                timeline_end_frame, output_rate
+            )
+            or source_span != timeline_span
+            or fade_in + fade_out > source_span
+        ):
+            raise CompositionRequestValidationError(
+                "audioMix clip timing is invalid"
+            )
+        normalized_clips.append(clip)
+    if clips != sorted(
+        normalized_clips,
+        key=lambda item: (
+            -_TIMELINE_PREVIEW_ROLE_PRIORITY[item["audioRole"]],
+            item["clipRef"],
+        ),
+    ):
+        raise CompositionRequestValidationError("audioMix.clips is not canonical")
+
+    input_bindings_digest = sha256(
+        _canonical_json(
+            {
+                "videoInput": video,
+                "audioMix": audio_mix,
+                "subtitleManifest": subtitle,
+            }
+        )
+    ).hexdigest()
+    output_contract_digest = sha256(_canonical_json(output)).hexdigest()
+    execution_request_ref = "m13-composition-execution-" + sha256(
+        _canonical_json(
+            {
+                "timelineVersionRef": command["timelineVersionRef"],
+                "timelineVersionDigest": command["timelineVersionDigest"],
+                "inputBindingsDigest": input_bindings_digest,
+                "outputContractDigest": output_contract_digest,
+            }
+        )
+    ).hexdigest()[:32]
+    request = _seal_timeline_preview_v1(
+        {
+            "schemaVersion": TIMELINE_PREVIEW_EXECUTION_REQUEST_SCHEMA_VERSION_V1,
+            "executionRequestRef": execution_request_ref,
+            "workspaceRef": command["workspaceRef"],
+            "productionRunRef": command["productionRunRef"],
+            "timelineVersionRef": command["timelineVersionRef"],
+            "timelineVersionDigest": command["timelineVersionDigest"],
+            "inputBindingsDigest": input_bindings_digest,
+            "videoInput": video,
+            "audioMix": audio_mix,
+            "subtitleManifest": subtitle,
+            "output": output,
+            "publicationAllowed": False,
+        }
+    )
+    if set(request) != _TIMELINE_PREVIEW_EXECUTION_REQUEST_FIELDS_V1:
+        raise CompositionRequestValidationError(
+            "timeline preview execution request fields are invalid"
+        )
+    return request
+
+
+def _expected_timeline_preview_storage_key_v1(
+    request: Mapping[str, Any],
+) -> str:
+    workspace_hash = sha256(
+        str(request["workspaceRef"]).encode("utf-8")
+    ).hexdigest()[:20]
+    run_hash = sha256(
+        str(request["productionRunRef"]).encode("utf-8")
+    ).hexdigest()[:20]
+    return (
+        f"{workspace_hash}/{run_hash}/composition/"
+        f"preview-{request['payloadDigest']}.mp4"
+    )
+
+
+def _validate_v3_timeline_preview_result_v1(
+    value: Any,
+    *,
+    request: Mapping[str, Any],
+    artifact_root: Path,
+) -> dict[str, Any]:
+    result = _closed_mapping(
+        value,
+        set(_V3_TIMELINE_PREVIEW_RESULT_FIELDS_V1),
+        "V3 timeline preview result",
+    )
+    expected_storage_key = _expected_timeline_preview_storage_key_v1(request)
+    if (
+        _storage_key_v2(result["outputStorageKey"], "outputStorageKey")
+        != expected_storage_key
+        or result["executionRequestRef"] != request["executionRequestRef"]
+        or result["executionRequestDigest"] != request["payloadDigest"]
+        or result["timelineVersionRef"] != request["timelineVersionRef"]
+        or result["timelineVersionDigest"] != request["timelineVersionDigest"]
+        or result["inputBindingsDigest"] != request["inputBindingsDigest"]
+        or result["subtitleManifestRef"]
+        != request["subtitleManifest"]["subtitleManifestRef"]
+        or result["subtitleManifestDigest"]
+        != request["subtitleManifest"]["subtitleManifestDigest"]
+        or result["publicationAllowed"] is not False
+    ):
+        raise RenderArtifactError("V3 timeline preview lineage is invalid")
+    _integer(
+        result["outputByteSize"],
+        "outputByteSize",
+        minimum=1,
+        maximum=10**12,
+    )
+    internal_path = result.get("internalPath")
+    if not isinstance(internal_path, str) or not internal_path:
+        raise RenderArtifactError("V3 timeline preview internal path is invalid")
+    try:
+        actual_path = Path(internal_path).resolve(strict=True)
+        expected_path = (artifact_root / expected_storage_key).resolve(strict=True)
+    except (OSError, RuntimeError) as exc:
+        raise RenderArtifactError(
+            "V3 timeline preview artifact is unavailable"
+        ) from exc
+    if actual_path != expected_path or artifact_root not in actual_path.parents:
+        raise RenderArtifactError("V3 timeline preview path lineage is invalid")
+    try:
+        before_hash = actual_path.stat()
+        actual_file_digest = file_digest(actual_path)
+        after_hash = actual_path.stat()
+        identity_fields = (
+            "st_dev",
+            "st_ino",
+            "st_mode",
+            "st_nlink",
+            "st_size",
+            "st_mtime_ns",
+            "st_ctime_ns",
+        )
+        if (
+            before_hash.st_size != result["outputByteSize"]
+            or any(
+                getattr(before_hash, field) != getattr(after_hash, field)
+                for field in identity_fields
+            )
+        ):
+            raise RenderArtifactError("V3 timeline preview byte size is invalid")
+    except (OSError, DigestError) as exc:
+        raise RenderArtifactError(
+            "V3 timeline preview artifact is unavailable"
+        ) from exc
+
+    output = request["output"]
+    expected_probe = {
+        "container": output["container"],
+        "videoCodec": output["videoCodec"],
+        "pixelFormat": output["pixelFormat"],
+        "width": output["width"],
+        "height": output["height"],
+        "frameRate": deepcopy(output["frameRate"]),
+        "frameCount": output["totalFrames"],
+        "audioCodec": output["audioCodec"],
+        "sampleRate": output["sampleRate"],
+        "channelCount": output["channelCount"],
+        "sampleCount": output["durationSamples"],
+    }
+    output_probe = _closed_mapping(
+        result["outputMediaProbe"],
+        set(_TIMELINE_PREVIEW_OUTPUT_MEDIA_PROBE_FIELDS_V1),
+        "outputMediaProbe",
+    )
+    if output_probe != expected_probe:
+        raise RenderArtifactError(
+            "V3 timeline preview output media contract is invalid"
+        )
+    output_digest = _closed_mapping(
+        result["outputDigest"],
+        set(_TIMELINE_PREVIEW_OUTPUT_DIGEST_FIELDS_V1),
+        "outputDigest",
+    )
+    _prefixed_digest(output_digest["fileDigest"], "outputDigest.fileDigest")
+    _prefixed_digest(
+        output_digest["decodedFramePixelDigest"],
+        "outputDigest.decodedFramePixelDigest",
+    )
+    _raw_digest(
+        output_digest["pcmContentDigest"],
+        "outputDigest.pcmContentDigest",
+    )
+    if (
+        output_digest["fileDigest"] != actual_file_digest
+        or
+        output_digest["fileDigestAlgorithm"] != "sha256"
+        or output_digest["decodedFramePixelDigestSpec"]
+        != DECODED_FRAME_PIXEL_DIGEST_SPEC_V2
+        or output_digest["pixelMode"] != "RGBA"
+        or output_digest["decodedFramePixelDigest"]
+        != request["videoInput"]["decodedFramePixelDigest"]
+        or output_digest["width"] != output["width"]
+        or output_digest["height"] != output["height"]
+        or output_digest["frameCount"] != output["totalFrames"]
+        or output_digest["frameRate"] != output["frameRate"]
+        or output_digest["pcmDigestSpec"] != PCM_CONTENT_DIGEST_SPEC
+        or output_digest["sampleRate"] != output["sampleRate"]
+        or output_digest["channelCount"] != output["channelCount"]
+        or output_digest["sampleCount"] != output["durationSamples"]
+    ):
+        raise RenderArtifactError("V3 timeline preview output digest is invalid")
+    renderer_identity = result.get("rendererIdentity")
+    renderer_version = result.get("rendererVersion")
+    ffmpeg_identity = result.get("ffmpegIdentity")
+    if (
+        renderer_identity != TIMELINE_PREVIEW_RENDERER_IDENTITY_V1
+        or renderer_version != TIMELINE_PREVIEW_RENDERER_VERSION_V1
+        or not isinstance(ffmpeg_identity, str)
+        or ffmpeg_identity != ffmpeg_identity.strip()
+        or not 1 <= len(ffmpeg_identity) <= 500
+        or any(
+            ord(character) < 32 or ord(character) == 127
+            for character in ffmpeg_identity
+        )
+    ):
+        raise RenderArtifactError("V3 timeline preview runtime identity is invalid")
+    expected_runtime_digest = _runtime_evidence_digest_v2(
+        ffmpeg_identity=ffmpeg_identity,
+        renderer_identity=renderer_identity,
+        renderer_version=renderer_version,
+    )
+    if result["runtimeEvidenceDigest"] != expected_runtime_digest:
+        raise RenderArtifactError("V3 timeline preview runtime evidence is invalid")
+    return result
+
+
+def _timeline_preview_artifact_ref_v1(
+    *,
+    execution_request_digest: str,
+    file_digest: str,
+    pixel_digest: str,
+    pcm_digest: str,
+) -> str:
+    semantic = {
+        "executionRequestDigest": execution_request_digest,
+        "fileDigest": file_digest,
+        "decodedFramePixelDigest": pixel_digest,
+        "pcmContentDigest": pcm_digest,
+    }
+    return "m13-preview-artifact-" + sha256(
+        _canonical_json(semantic)
+    ).hexdigest()[:32]
+
+
+def _timeline_preview_result_ref_v1(
+    *, execution_request_digest: str, artifact_ref: str
+) -> str:
+    return "m13-composition-result-" + sha256(
+        _canonical_json(
+            {
+                "executionRequestDigest": execution_request_digest,
+                "artifactRef": artifact_ref,
+            }
+        )
+    ).hexdigest()[:32]
+
+
 class V4CompositionExecutor:
     adapter_identity = "v4.local-composition-executor.v1"
     provenance = "LOCAL_EVIDENCE"
@@ -1293,6 +2152,77 @@ class V4CompositionExecutor:
         ) as exc:
             raise CompositionExecutionError(
                 "V3 glyph reveal v2 composition failed"
+            ) from exc
+
+    def compose_timeline_preview_v1(
+        self, command: Mapping[str, Any]
+    ) -> dict[str, Any]:
+        """Seal and execute one non-GPU M12-to-M13 preview projection."""
+
+        request = _build_timeline_preview_execution_request_v1(command)
+        try:
+            raw_result = self.composer.compose_timeline_preview_v1(request)
+            result = _validate_v3_timeline_preview_result_v1(
+                raw_result,
+                request=request,
+                artifact_root=self.artifact_root,
+            )
+            output_digest = deepcopy(result["outputDigest"])
+            artifact_ref = _timeline_preview_artifact_ref_v1(
+                execution_request_digest=request["payloadDigest"],
+                file_digest=output_digest["fileDigest"],
+                pixel_digest=output_digest["decodedFramePixelDigest"],
+                pcm_digest=output_digest["pcmContentDigest"],
+            )
+            composition_result_ref = _timeline_preview_result_ref_v1(
+                execution_request_digest=request["payloadDigest"],
+                artifact_ref=artifact_ref,
+            )
+            sealed = _seal_timeline_preview_v1(
+                {
+                    "schemaVersion": (
+                        TIMELINE_PREVIEW_COMPOSITION_RESULT_SCHEMA_VERSION_V1
+                    ),
+                    "compositionResultRef": composition_result_ref,
+                    "artifactRef": artifact_ref,
+                    "executionRequestRef": request["executionRequestRef"],
+                    "executionRequestDigest": request["payloadDigest"],
+                    "timelineVersionRef": request["timelineVersionRef"],
+                    "timelineVersionDigest": request["timelineVersionDigest"],
+                    "inputBindingsDigest": request["inputBindingsDigest"],
+                    "outputStorageKey": result["outputStorageKey"],
+                    "outputByteSize": result["outputByteSize"],
+                    "outputMediaProbe": deepcopy(result["outputMediaProbe"]),
+                    "outputDigest": output_digest,
+                    "subtitleManifestRef": result["subtitleManifestRef"],
+                    "subtitleManifestDigest": result[
+                        "subtitleManifestDigest"
+                    ],
+                    "rendererIdentity": result["rendererIdentity"],
+                    "rendererVersion": result["rendererVersion"],
+                    "ffmpegIdentity": result["ffmpegIdentity"],
+                    "runtimeEvidenceDigest": result["runtimeEvidenceDigest"],
+                    "adapterIdentity": self.adapter_identity,
+                    "provenance": self.provenance,
+                    "providerUsed": False,
+                    "gpuUsed": False,
+                    "publicationAllowed": False,
+                }
+            )
+            if set(sealed) != _TIMELINE_PREVIEW_RESULT_FIELDS_V1:
+                raise RenderArtifactError(
+                    "V4 timeline preview result fields are invalid"
+                )
+            return sealed
+        except (
+            AttributeError,
+            KeyError,
+            TypeError,
+            RenderArtifactError,
+            CompositionRequestValidationError,
+        ) as exc:
+            raise CompositionExecutionError(
+                "V3 timeline preview composition failed"
             ) from exc
 
     def finalize(self, command: Mapping[str, Any]) -> dict[str, Any]:
