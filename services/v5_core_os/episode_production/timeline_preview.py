@@ -83,6 +83,16 @@ SUBTITLE_MANIFEST_SCHEMA_VERSION = "v5.subtitle-manifest.v1"
 TIMELINE_MIX_REQUEST_SCHEMA_VERSION = "v5.timeline-mix-request.v1"
 COMPOSITION_RESULT_SCHEMA_VERSION = "v5.m13-composition-result.v1"
 PREVIEW_CANDIDATE_SCHEMA_VERSION_V2 = "v5.preview-candidate.v2"
+EFFECT_PREVIEW_BINDINGS_SCHEMA_VERSION = (
+    "v5.m13-effect-preview-bindings.v1"
+)
+EFFECT_PREVIEW_COMPOSITION_RESULT_SCHEMA_VERSION = (
+    "v5.m13-composition-result.v2"
+)
+PREVIEW_CANDIDATE_SCHEMA_VERSION_V3 = "v5.preview-candidate.v3"
+V4_EFFECT_PREVIEW_COMPOSITION_RESULT_SCHEMA_VERSION = (
+    "v4.m13-composition-result.v2"
+)
 
 TIMELINE_ROUNDING_RULE = "FLOOR_EACH_BOUNDARY"
 TIMELINE_INTERVAL_SEMANTICS = "HALF_OPEN"
@@ -3859,11 +3869,692 @@ class PreviewCandidate(_ImmutableWireContract):
     pass
 
 
+_EFFECT_PREVIEW_RESULT_BINDING_FIELDS = frozenset(
+    {
+        "clipRef",
+        "clipDigest",
+        "effectMode",
+        "requirementRef",
+        "requirementDigest",
+        "resultRef",
+        "resultDigest",
+        "executionRequestRef",
+        "executionRequestDigest",
+        "artifactEvidenceRef",
+        "artifactEvidenceDigest",
+        "runtimeEvidenceRef",
+        "runtimeEvidenceDigest",
+        "frameRangeStartInclusive",
+        "frameRangeEndExclusive",
+    }
+)
+_EFFECT_PREVIEW_GLYPH_BINDING_FIELDS = frozenset(
+    {"clipRef", "clipDigest", "requirementRef", "requirementDigest"}
+)
+_V4_EFFECT_PREVIEW_RESULT_FIELDS = frozenset(
+    {
+        "schemaVersion",
+        "compositionResultRef",
+        "artifactRef",
+        "executionRequestRef",
+        "executionRequestDigest",
+        "timelineVersionRef",
+        "timelineVersionDigest",
+        "inputBindingsDigest",
+        "effectResultBindings",
+        "glyphRequirementBinding",
+        "effectBindingsDigest",
+        "mixRequestRef",
+        "mixRequestDigest",
+        "subtitleManifestRef",
+        "subtitleManifestDigest",
+        "outputStorageKey",
+        "outputByteSize",
+        "outputMediaProbe",
+        "outputDigest",
+        "rendererIdentity",
+        "rendererVersion",
+        "ffmpegIdentity",
+        "runtimeEvidenceDigest",
+        "adapterIdentity",
+        "provenance",
+        "providerUsed",
+        "gpuUsed",
+        "publicationAllowed",
+        "payloadDigest",
+    }
+)
+_EFFECT_PREVIEW_COMPOSITION_RESULT_FIELDS = frozenset(
+    {
+        "schemaVersion",
+        "workspaceRef",
+        "productionRunRef",
+        "compositionResultRef",
+        "artifactRef",
+        "timelineVersionRef",
+        "timelineVersionDigest",
+        "effectResultBindings",
+        "glyphRequirementBinding",
+        "effectBindingsDigest",
+        "mixRequestRef",
+        "mixRequestDigest",
+        "subtitleManifestRef",
+        "subtitleManifestDigest",
+        "executionRequestRef",
+        "executionRequestDigest",
+        "inputBindingsDigest",
+        "outputStorageKey",
+        "outputByteSize",
+        "outputMediaProbe",
+        "outputDigest",
+        "mixOutputPcmContentDigest",
+        "rendererIdentity",
+        "rendererVersion",
+        "ffmpegIdentity",
+        "runtimeEvidenceDigest",
+        "adapterIdentity",
+        "provenance",
+        "providerUsed",
+        "gpuUsed",
+        "executionResult",
+        "state",
+        "authorityState",
+        "immutable",
+        "publicationAllowed",
+        "createdBy",
+        "createdAt",
+        "payloadDigest",
+    }
+)
+_EFFECT_PREVIEW_CANDIDATE_FIELDS = _PREVIEW_CANDIDATE_FIELDS | frozenset(
+    {
+        "effectResultBindings",
+        "glyphRequirementBinding",
+        "effectBindingsDigest",
+    }
+)
+
+
+def _editing_timeline_version_wrapper(value: Any) -> dict[str, Any]:
+    # Import locally so the legacy M12/M13 Timeline v2 contracts retain their
+    # original import graph and exact wrapper checks.
+    from .timeline_editing import TimelineVersion as EditingTimelineVersion
+
+    if type(value) is not EditingTimelineVersion:
+        raise TimelineAuthorityError(
+            "exact editing TimelineVersion wrapper is required"
+        )
+    result = value.as_dict()
+    if result.get("schemaVersion") != "v5.timeline-version.v3":
+        raise TimelineAuthorityError("editing TimelineVersion schema is invalid")
+    return result
+
+
+def _effect_preview_bindings(
+    effect_result_bindings: Any,
+    glyph_requirement_binding: Any,
+) -> tuple[list[dict[str, Any]], dict[str, Any], str]:
+    if not isinstance(effect_result_bindings, list) or len(
+        effect_result_bindings
+    ) != 2:
+        raise TimelinePreviewContractError(
+            "effectResultBindings must contain Scratch/Light and Local Exposure"
+        )
+    bindings: list[dict[str, Any]] = []
+    seen_clips: set[str] = set()
+    seen_results: set[str] = set()
+    rank = {"SCRATCH_REVEAL": 0, "LIGHT_SWEEP": 0, "LOCAL_EXPOSURE": 1}
+    for index, raw in enumerate(effect_result_bindings):
+        item = _closed(
+            raw,
+            _EFFECT_PREVIEW_RESULT_BINDING_FIELDS,
+            f"effectResultBindings[{index}]",
+        )
+        for field in (
+            "clipRef",
+            "requirementRef",
+            "resultRef",
+            "executionRequestRef",
+            "artifactEvidenceRef",
+            "runtimeEvidenceRef",
+        ):
+            _ref(item[field], f"effectResultBindings[{index}].{field}")
+        for field in (
+            "clipDigest",
+            "requirementDigest",
+            "resultDigest",
+            "executionRequestDigest",
+            "artifactEvidenceDigest",
+            "runtimeEvidenceDigest",
+        ):
+            _sha256(item[field], f"effectResultBindings[{index}].{field}")
+        mode = item["effectMode"]
+        if mode not in rank:
+            raise TimelinePreviewContractError("effectMode is unsupported")
+        start = _integer(
+            item["frameRangeStartInclusive"],
+            f"effectResultBindings[{index}].frameRangeStartInclusive",
+        )
+        end = _integer(
+            item["frameRangeEndExclusive"],
+            f"effectResultBindings[{index}].frameRangeEndExclusive",
+            minimum=1,
+        )
+        if start >= end:
+            raise TimelineRangeError("effect Result frame range is invalid")
+        if item["clipRef"] in seen_clips or item["resultRef"] in seen_results:
+            raise TimelineSourceBindingError("effect Result binding is duplicated")
+        seen_clips.add(item["clipRef"])
+        seen_results.add(item["resultRef"])
+        bindings.append(item)
+    if [rank[item["effectMode"]] for item in bindings] != [0, 1]:
+        raise TimelineSourceBindingError(
+            "effect Result bindings are not in fixed stage order"
+        )
+
+    glyph = _closed(
+        glyph_requirement_binding,
+        _EFFECT_PREVIEW_GLYPH_BINDING_FIELDS,
+        "glyphRequirementBinding",
+    )
+    for field in ("clipRef", "requirementRef"):
+        _ref(glyph[field], f"glyphRequirementBinding.{field}")
+    for field in ("clipDigest", "requirementDigest"):
+        _sha256(glyph[field], f"glyphRequirementBinding.{field}")
+    if glyph["clipRef"] in seen_clips:
+        raise TimelineSourceBindingError("Glyph binding reuses an effect Clip")
+    binding_digest = _digest(
+        {
+            "schemaVersion": EFFECT_PREVIEW_BINDINGS_SCHEMA_VERSION,
+            "effectResultBindings": bindings,
+            "glyphRequirementBinding": glyph,
+        }
+    )
+    return bindings, glyph, binding_digest
+
+
+def _v4_effect_preview_result(value: Any) -> dict[str, Any]:
+    result = _verify_sealed(
+        value, _V4_EFFECT_PREVIEW_RESULT_FIELDS, "V4 effect preview result"
+    )
+    if (
+        result["schemaVersion"]
+        != V4_EFFECT_PREVIEW_COMPOSITION_RESULT_SCHEMA_VERSION
+    ):
+        raise PreviewArtifactError("V4 effect preview result schema is unsupported")
+    for field in (
+        "compositionResultRef",
+        "artifactRef",
+        "executionRequestRef",
+        "timelineVersionRef",
+        "mixRequestRef",
+        "subtitleManifestRef",
+    ):
+        _ref(result[field], field)
+    for field in (
+        "executionRequestDigest",
+        "timelineVersionDigest",
+        "inputBindingsDigest",
+        "effectBindingsDigest",
+        "mixRequestDigest",
+        "subtitleManifestDigest",
+    ):
+        _sha256(result[field], field)
+    bindings, glyph, binding_digest = _effect_preview_bindings(
+        result["effectResultBindings"], result["glyphRequirementBinding"]
+    )
+    if (
+        result["effectResultBindings"] != bindings
+        or result["glyphRequirementBinding"] != glyph
+        or result["effectBindingsDigest"] != binding_digest
+    ):
+        raise TimelineSourceBindingError("V4 effect bindings are stale")
+    _storage_key(result["outputStorageKey"], "outputStorageKey")
+    _integer(result["outputByteSize"], "outputByteSize", minimum=1)
+    _closed(
+        result["outputMediaProbe"],
+        _COMPOSITION_OUTPUT_PROBE_FIELDS,
+        "effect preview outputMediaProbe",
+    )
+    output_digest = _closed(
+        result["outputDigest"],
+        _COMPOSITION_OUTPUT_DIGEST_FIELDS,
+        "effect preview outputDigest",
+    )
+    _prefixed_sha256(output_digest["fileDigest"], "output fileDigest")
+    _prefixed_sha256(
+        output_digest["decodedFramePixelDigest"],
+        "decodedFramePixelDigest",
+    )
+    _sha256(output_digest["pcmContentDigest"], "output pcmContentDigest")
+    _prefixed_sha256(result["runtimeEvidenceDigest"], "runtimeEvidenceDigest")
+    if (
+        output_digest["fileDigestAlgorithm"] != "sha256"
+        or output_digest["decodedFramePixelDigestSpec"]
+        != DECODED_FRAME_PIXEL_DIGEST_SPEC
+        or output_digest["pixelMode"] != "RGBA"
+        or output_digest["pcmDigestSpec"] != PCM_CONTENT_DIGEST_SPEC
+        or result["rendererIdentity"]
+        != "v3.deterministic-timeline-preview-ffmpeg"
+        or result["rendererVersion"] != "2"
+        or result["adapterIdentity"] != "v4.local-composition-executor.v1"
+        or result["provenance"] != TIMELINE_PROVENANCE
+        or result["providerUsed"] is not False
+        or result["gpuUsed"] is not False
+        or result["publicationAllowed"] is not False
+    ):
+        raise PreviewArtifactError("V4 effect preview authority is invalid")
+    _text(result["ffmpegIdentity"], "ffmpegIdentity")
+    return result
+
+
+def _validate_effect_preview_composition_result_mapping(
+    value: Any,
+    *,
+    timeline_version: Any,
+) -> dict[str, Any]:
+    result = _verify_sealed(
+        value,
+        _EFFECT_PREVIEW_COMPOSITION_RESULT_FIELDS,
+        "effect Preview CompositionResult",
+    )
+    if (
+        result["schemaVersion"]
+        != EFFECT_PREVIEW_COMPOSITION_RESULT_SCHEMA_VERSION
+    ):
+        raise TimelinePreviewContractError(
+            "effect Preview CompositionResult schema is unsupported"
+        )
+    version = _editing_timeline_version_wrapper(timeline_version)
+    execution = _v4_effect_preview_result(result["executionResult"])
+    expected = {
+        "workspaceRef": version["workspaceRef"],
+        "productionRunRef": version["productionRunRef"],
+        "compositionResultRef": execution["compositionResultRef"],
+        "artifactRef": execution["artifactRef"],
+        "timelineVersionRef": version["timelineVersionRef"],
+        "timelineVersionDigest": version["payloadDigest"],
+        "effectResultBindings": execution["effectResultBindings"],
+        "glyphRequirementBinding": execution["glyphRequirementBinding"],
+        "effectBindingsDigest": execution["effectBindingsDigest"],
+        "mixRequestRef": execution["mixRequestRef"],
+        "mixRequestDigest": execution["mixRequestDigest"],
+        "subtitleManifestRef": execution["subtitleManifestRef"],
+        "subtitleManifestDigest": execution["subtitleManifestDigest"],
+        "executionRequestRef": execution["executionRequestRef"],
+        "executionRequestDigest": execution["executionRequestDigest"],
+        "inputBindingsDigest": execution["inputBindingsDigest"],
+        "outputStorageKey": execution["outputStorageKey"],
+        "outputByteSize": execution["outputByteSize"],
+        "outputMediaProbe": execution["outputMediaProbe"],
+        "outputDigest": execution["outputDigest"],
+        "mixOutputPcmContentDigest": execution["outputDigest"][
+            "pcmContentDigest"
+        ],
+        "rendererIdentity": execution["rendererIdentity"],
+        "rendererVersion": execution["rendererVersion"],
+        "ffmpegIdentity": execution["ffmpegIdentity"],
+        "runtimeEvidenceDigest": execution["runtimeEvidenceDigest"],
+        "adapterIdentity": execution["adapterIdentity"],
+        "provenance": execution["provenance"],
+        "providerUsed": execution["providerUsed"],
+        "gpuUsed": execution["gpuUsed"],
+    }
+    if any(result[field] != expected_value for field, expected_value in expected.items()):
+        raise TimelineSourceBindingError(
+            "effect Preview CompositionResult projection is stale"
+        )
+    if (
+        execution["timelineVersionRef"] != version["timelineVersionRef"]
+        or execution["timelineVersionDigest"] != version["payloadDigest"]
+    ):
+        raise TimelineSourceBindingError(
+            "effect Preview execution Timeline lineage is stale"
+        )
+    probe = result["outputMediaProbe"]
+    digest = result["outputDigest"]
+    rate = version["frameRate"]
+    expected_samples = map_frame_boundary_to_sample(
+        version["durationFrames"],
+        sample_rate=48_000,
+        frame_rate_numerator=rate["numerator"],
+        frame_rate_denominator=rate["denominator"],
+    )
+    if (
+        probe["container"] != "mp4"
+        or probe["videoCodec"] != "h264"
+        or probe["pixelFormat"] not in {"yuv420p", "yuv422p", "yuv444p"}
+        or probe["width"] != version["canvasWidth"]
+        or probe["height"] != version["canvasHeight"]
+        or probe["frameRate"] != rate
+        or probe["frameCount"] != version["durationFrames"]
+        or probe["audioCodec"] != "aac"
+        or probe["sampleRate"] != 48_000
+        or probe["channelCount"] != 2
+        or probe["sampleCount"] != expected_samples
+        or any(
+            digest[field] != probe[probe_field]
+            for field, probe_field in (
+                ("width", "width"),
+                ("height", "height"),
+                ("frameCount", "frameCount"),
+                ("frameRate", "frameRate"),
+                ("sampleRate", "sampleRate"),
+                ("channelCount", "channelCount"),
+                ("sampleCount", "sampleCount"),
+            )
+        )
+    ):
+        raise PreviewArtifactError("effect Preview output facts are stale")
+    if (
+        result["state"] != "COMPOSED"
+        or result["authorityState"] != TIMELINE_AUTHORITY_STATE
+        or result["immutable"] is not True
+        or result["publicationAllowed"] is not False
+    ):
+        raise TimelineAuthorityError(
+            "effect Preview CompositionResult lifecycle is invalid"
+        )
+    _ref(result["createdBy"], "createdBy")
+    _timestamp(result["createdAt"], "createdAt")
+    return result
+
+
+def build_effect_preview_composition_result(
+    command: Mapping[str, Any],
+    *,
+    timeline_version: Any,
+    execution_result: Mapping[str, Any],
+) -> dict[str, Any]:
+    value = _closed(
+        command,
+        _COMPOSITION_RESULT_COMMAND_FIELDS,
+        "effect Preview CompositionResult command",
+    )
+    version = _editing_timeline_version_wrapper(timeline_version)
+    execution = _v4_effect_preview_result(execution_result)
+    _ref(value["createdBy"], "createdBy")
+    _timestamp(value["createdAt"], "createdAt")
+    result = _seal(
+        {
+            "schemaVersion": EFFECT_PREVIEW_COMPOSITION_RESULT_SCHEMA_VERSION,
+            "workspaceRef": version["workspaceRef"],
+            "productionRunRef": version["productionRunRef"],
+            "compositionResultRef": execution["compositionResultRef"],
+            "artifactRef": execution["artifactRef"],
+            "timelineVersionRef": version["timelineVersionRef"],
+            "timelineVersionDigest": version["payloadDigest"],
+            "effectResultBindings": deepcopy(
+                execution["effectResultBindings"]
+            ),
+            "glyphRequirementBinding": deepcopy(
+                execution["glyphRequirementBinding"]
+            ),
+            "effectBindingsDigest": execution["effectBindingsDigest"],
+            "mixRequestRef": execution["mixRequestRef"],
+            "mixRequestDigest": execution["mixRequestDigest"],
+            "subtitleManifestRef": execution["subtitleManifestRef"],
+            "subtitleManifestDigest": execution["subtitleManifestDigest"],
+            "executionRequestRef": execution["executionRequestRef"],
+            "executionRequestDigest": execution["executionRequestDigest"],
+            "inputBindingsDigest": execution["inputBindingsDigest"],
+            "outputStorageKey": execution["outputStorageKey"],
+            "outputByteSize": execution["outputByteSize"],
+            "outputMediaProbe": deepcopy(execution["outputMediaProbe"]),
+            "outputDigest": deepcopy(execution["outputDigest"]),
+            "mixOutputPcmContentDigest": execution["outputDigest"][
+                "pcmContentDigest"
+            ],
+            "rendererIdentity": execution["rendererIdentity"],
+            "rendererVersion": execution["rendererVersion"],
+            "ffmpegIdentity": execution["ffmpegIdentity"],
+            "runtimeEvidenceDigest": execution["runtimeEvidenceDigest"],
+            "adapterIdentity": execution["adapterIdentity"],
+            "provenance": execution["provenance"],
+            "providerUsed": execution["providerUsed"],
+            "gpuUsed": execution["gpuUsed"],
+            "executionResult": execution,
+            "state": "COMPOSED",
+            "authorityState": TIMELINE_AUTHORITY_STATE,
+            "immutable": True,
+            "publicationAllowed": False,
+            "createdBy": value["createdBy"],
+            "createdAt": value["createdAt"],
+        }
+    )
+    return _validate_effect_preview_composition_result_mapping(
+        result, timeline_version=timeline_version
+    )
+
+
+def validate_effect_preview_composition_result(
+    value: Any,
+    *,
+    timeline_version: Any,
+) -> "CompositionResult":
+    return CompositionResult._from_validated(
+        _validate_effect_preview_composition_result_mapping(
+            value, timeline_version=timeline_version
+        )
+    )
+
+
+def _effect_preview_composition_wrapper(value: Any) -> dict[str, Any]:
+    if type(value) is not CompositionResult:
+        raise TimelineAuthorityError("exact CompositionResult wrapper is required")
+    result = value.as_dict()
+    if (
+        result.get("schemaVersion")
+        != EFFECT_PREVIEW_COMPOSITION_RESULT_SCHEMA_VERSION
+    ):
+        raise TimelineAuthorityError(
+            "effect Preview CompositionResult schema is invalid"
+        )
+    return result
+
+
+def _validate_effect_preview_candidate_mapping(
+    value: Any,
+    *,
+    timeline_version: Any,
+    composition_result: Any,
+    predecessor_preview_candidate: Any = None,
+) -> dict[str, Any]:
+    result = _verify_sealed(
+        value, _EFFECT_PREVIEW_CANDIDATE_FIELDS, "effect PreviewCandidate"
+    )
+    if result["schemaVersion"] != PREVIEW_CANDIDATE_SCHEMA_VERSION_V3:
+        raise TimelinePreviewContractError(
+            "effect PreviewCandidate schema is unsupported"
+        )
+    version = _editing_timeline_version_wrapper(timeline_version)
+    composition = _effect_preview_composition_wrapper(composition_result)
+    digest = composition["outputDigest"]
+    expected = {
+        "workspaceRef": version["workspaceRef"],
+        "productionRunRef": version["productionRunRef"],
+        "timelineRef": version["timelineRef"],
+        "timelineVersionRef": version["timelineVersionRef"],
+        "timelineVersionDigest": version["payloadDigest"],
+        "effectResultBindings": composition["effectResultBindings"],
+        "glyphRequirementBinding": composition["glyphRequirementBinding"],
+        "effectBindingsDigest": composition["effectBindingsDigest"],
+        "mixRequestRef": composition["mixRequestRef"],
+        "mixRequestDigest": composition["mixRequestDigest"],
+        "subtitleManifestRef": composition["subtitleManifestRef"],
+        "subtitleManifestDigest": composition["subtitleManifestDigest"],
+        "compositionResultRef": composition["compositionResultRef"],
+        "compositionResultDigest": composition["payloadDigest"],
+        "compositionRequestDigest": composition["executionRequestDigest"],
+        "artifactRef": composition["artifactRef"],
+        "fileDigest": digest["fileDigest"],
+        "decodedFramePixelDigest": digest["decodedFramePixelDigest"],
+        "pcmContentDigest": digest["pcmContentDigest"],
+        "outputByteSize": composition["outputByteSize"],
+        "mediaProbe": composition["outputMediaProbe"],
+        "outputMediaProbe": composition["outputMediaProbe"],
+        "runtimeIdentity": composition["runtimeEvidenceDigest"],
+        "provenance": composition["provenance"],
+        "providerUsed": composition["providerUsed"],
+        "gpuUsed": composition["gpuUsed"],
+    }
+    if any(result[field] != expected_value for field, expected_value in expected.items()):
+        raise TimelineSourceBindingError(
+            "effect PreviewCandidate projection is stale"
+        )
+    _sha256(result["effectBindingsDigest"], "effectBindingsDigest")
+    _sha256(result["compositionRequestDigest"], "compositionRequestDigest")
+    _prefixed_sha256(result["runtimeIdentity"], "runtimeIdentity")
+    _ref(result["previewCandidateRef"], "previewCandidateRef")
+    _ref(result["previewCandidateVersionRef"], "previewCandidateVersionRef")
+    candidate_version = _integer(result["version"], "version", minimum=1)
+    predecessor_fields = (
+        result["supersedesPreviewCandidateVersionRef"],
+        result["supersedesPreviewCandidateVersionDigest"],
+    )
+    if candidate_version == 1:
+        if (
+            any(item is not None for item in predecessor_fields)
+            or predecessor_preview_candidate is not None
+        ):
+            raise TimelineAuthorityError("PreviewCandidate v1 cannot supersede")
+    else:
+        predecessor = _preview_wrapper(predecessor_preview_candidate)
+        if (
+            predecessor.get("schemaVersion")
+            != PREVIEW_CANDIDATE_SCHEMA_VERSION_V3
+            or predecessor["previewCandidateRef"]
+            != result["previewCandidateRef"]
+            or predecessor["version"] != candidate_version - 1
+            or result["supersedesPreviewCandidateVersionRef"]
+            != predecessor["previewCandidateVersionRef"]
+            or result["supersedesPreviewCandidateVersionDigest"]
+            != predecessor["payloadDigest"]
+        ):
+            raise TimelineSourceBindingError(
+                "effect PreviewCandidate predecessor is stale"
+            )
+    if (
+        result["state"] != "CANDIDATE"
+        or result["approvalStatus"] != "UNAPPROVED"
+        or result["rightsState"]
+        != "SOURCE_BINDINGS_VERIFIED_LOCAL_EVIDENCE"
+        or result["providerUsed"] is not False
+        or result["gpuUsed"] is not False
+        or result["immutable"] is not True
+        or result["publicationAllowed"] is not False
+    ):
+        raise TimelineAuthorityError("effect PreviewCandidate authority is invalid")
+    _ref(result["createdBy"], "createdBy")
+    _timestamp(result["createdAt"], "createdAt")
+    return result
+
+
+def build_effect_preview_candidate(
+    command: Mapping[str, Any],
+    *,
+    timeline_version: Any,
+    composition_result: CompositionResult,
+    predecessor_preview_candidate: "PreviewCandidate | None" = None,
+) -> dict[str, Any]:
+    value = _closed(
+        command,
+        _PREVIEW_CANDIDATE_COMMAND_FIELDS,
+        "effect PreviewCandidate command",
+    )
+    version = _editing_timeline_version_wrapper(timeline_version)
+    composition = _effect_preview_composition_wrapper(composition_result)
+    output = composition["outputDigest"]
+    result = _seal(
+        {
+            "schemaVersion": PREVIEW_CANDIDATE_SCHEMA_VERSION_V3,
+            "workspaceRef": version["workspaceRef"],
+            "productionRunRef": version["productionRunRef"],
+            "previewCandidateRef": value["previewCandidateRef"],
+            "previewCandidateVersionRef": value[
+                "previewCandidateVersionRef"
+            ],
+            "version": value["version"],
+            "supersedesPreviewCandidateVersionRef": value[
+                "supersedesPreviewCandidateVersionRef"
+            ],
+            "supersedesPreviewCandidateVersionDigest": value[
+                "supersedesPreviewCandidateVersionDigest"
+            ],
+            "timelineRef": version["timelineRef"],
+            "timelineVersionRef": version["timelineVersionRef"],
+            "timelineVersionDigest": version["payloadDigest"],
+            "effectResultBindings": deepcopy(
+                composition["effectResultBindings"]
+            ),
+            "glyphRequirementBinding": deepcopy(
+                composition["glyphRequirementBinding"]
+            ),
+            "effectBindingsDigest": composition["effectBindingsDigest"],
+            "mixRequestRef": composition["mixRequestRef"],
+            "mixRequestDigest": composition["mixRequestDigest"],
+            "subtitleManifestRef": composition["subtitleManifestRef"],
+            "subtitleManifestDigest": composition["subtitleManifestDigest"],
+            "compositionResultRef": composition["compositionResultRef"],
+            "compositionResultDigest": composition["payloadDigest"],
+            "compositionRequestDigest": composition[
+                "executionRequestDigest"
+            ],
+            "artifactRef": composition["artifactRef"],
+            "fileDigest": output["fileDigest"],
+            "decodedFramePixelDigest": output[
+                "decodedFramePixelDigest"
+            ],
+            "pcmContentDigest": output["pcmContentDigest"],
+            "outputByteSize": composition["outputByteSize"],
+            "mediaProbe": deepcopy(composition["outputMediaProbe"]),
+            "outputMediaProbe": deepcopy(composition["outputMediaProbe"]),
+            "runtimeIdentity": composition["runtimeEvidenceDigest"],
+            "state": "CANDIDATE",
+            "approvalStatus": "UNAPPROVED",
+            "provenance": composition["provenance"],
+            "rightsState": "SOURCE_BINDINGS_VERIFIED_LOCAL_EVIDENCE",
+            "providerUsed": composition["providerUsed"],
+            "gpuUsed": composition["gpuUsed"],
+            "immutable": True,
+            "publicationAllowed": False,
+            "createdBy": value["createdBy"],
+            "createdAt": value["createdAt"],
+        }
+    )
+    return _validate_effect_preview_candidate_mapping(
+        result,
+        timeline_version=timeline_version,
+        composition_result=composition_result,
+        predecessor_preview_candidate=predecessor_preview_candidate,
+    )
+
+
+def validate_effect_preview_candidate(
+    value: Any,
+    *,
+    timeline_version: Any,
+    composition_result: CompositionResult,
+    predecessor_preview_candidate: "PreviewCandidate | None" = None,
+) -> "PreviewCandidate":
+    return PreviewCandidate._from_validated(
+        _validate_effect_preview_candidate_mapping(
+            value,
+            timeline_version=timeline_version,
+            composition_result=composition_result,
+            predecessor_preview_candidate=predecessor_preview_candidate,
+        )
+    )
+
+
 __all__ = [
     "AUDIO_INPUT_BINDING_SCHEMA_VERSION",
     "COMPOSITION_RESULT_SCHEMA_VERSION",
+    "EFFECT_PREVIEW_BINDINGS_SCHEMA_VERSION",
+    "EFFECT_PREVIEW_COMPOSITION_RESULT_SCHEMA_VERSION",
     "MASK_ASSET_VERSION_BINDING_SCHEMA_VERSION",
     "PREVIEW_CANDIDATE_SCHEMA_VERSION_V2",
+    "PREVIEW_CANDIDATE_SCHEMA_VERSION_V3",
     "SUBTITLE_MANIFEST_SCHEMA_VERSION",
     "TECHNICAL_FIXTURE_LABELS",
     "TIMELINE_AUTHORITY_STATE",
@@ -3877,6 +4568,7 @@ __all__ = [
     "TIMELINE_TRACK_KINDS",
     "TIMELINE_TRACK_SCHEMA_VERSION",
     "TIMELINE_VERSION_SCHEMA_VERSION_V2",
+    "V4_EFFECT_PREVIEW_COMPOSITION_RESULT_SCHEMA_VERSION",
     "AudioInputBinding",
     "CompositionResult",
     "MaskAssetVersionBinding",
@@ -3896,6 +4588,8 @@ __all__ = [
     "TimelineVersion",
     "build_audio_input_binding",
     "build_composition_result",
+    "build_effect_preview_candidate",
+    "build_effect_preview_composition_result",
     "build_mask_asset_version_binding",
     "build_preview_candidate",
     "build_subtitle_manifest",
@@ -3910,6 +4604,8 @@ __all__ = [
     "project_timeline_mix_request",
     "validate_audio_input_binding",
     "validate_composition_result",
+    "validate_effect_preview_candidate",
+    "validate_effect_preview_composition_result",
     "validate_mask_asset_version_binding",
     "validate_preview_candidate",
     "validate_subtitle_manifest",

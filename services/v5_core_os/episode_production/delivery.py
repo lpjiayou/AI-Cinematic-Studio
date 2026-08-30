@@ -35,6 +35,17 @@ from .evidence import (
     GateAppend,
     validated_evidence_snapshot,
 )
+from .deterministic_effects import (
+    LOCAL_EXPOSURE,
+    LOCAL_EXPOSURE_REQUIREMENT_RECORD_KIND,
+    LOCAL_EXPOSURE_RESULT_RECORD_KIND,
+    MASKED_SURFACE_ARTIFACT_EVIDENCE_RECORD_KIND,
+    MASKED_SURFACE_EXECUTION_REQUEST_RECORD_KIND,
+    MASKED_SURFACE_RUNTIME_EVIDENCE_RECORD_KIND,
+    SCRATCH_LIGHT_REQUIREMENT_RECORD_KIND,
+    SCRATCH_LIGHT_RESULT_RECORD_KIND,
+    resolve_deterministic_effect_result_chain,
+)
 from .foundation import (
     EpisodeProductionError,
     IdempotencyConflictError,
@@ -65,7 +76,11 @@ from .shot_graph import ValidationFailedError
 from .timeline_preview import (
     AudioInputBinding,
     COMPOSITION_RESULT_SCHEMA_VERSION,
+    EFFECT_PREVIEW_COMPOSITION_RESULT_SCHEMA_VERSION,
     PREVIEW_CANDIDATE_SCHEMA_VERSION_V2,
+    PREVIEW_CANDIDATE_SCHEMA_VERSION_V3,
+    DECODED_FRAME_PIXEL_DIGEST_SPEC,
+    TIMELINE_MIX_PARAMETERS,
     TIMELINE_CLIP_SCHEMA_VERSION as LEGACY_TIMELINE_CLIP_SCHEMA_VERSION,
     TIMELINE_TRACK_SCHEMA_VERSION as LEGACY_TIMELINE_TRACK_SCHEMA_VERSION,
     TIMELINE_VERSION_SCHEMA_VERSION_V2,
@@ -73,6 +88,8 @@ from .timeline_preview import (
     build_timeline,
     build_timeline_clip,
     build_composition_result,
+    build_effect_preview_candidate,
+    build_effect_preview_composition_result,
     build_mask_asset_version_binding,
     build_preview_candidate,
     build_subtitle_manifest,
@@ -80,10 +97,13 @@ from .timeline_preview import (
     build_timeline_mix_request,
     build_timeline_track,
     build_timeline_version,
+    map_frame_boundary_to_sample,
     map_sample_boundary_to_frame,
     project_timeline_mix_request,
     validate_audio_input_binding,
     validate_composition_result,
+    validate_effect_preview_candidate,
+    validate_effect_preview_composition_result,
     validate_mask_asset_version_binding,
     validate_preview_candidate,
     validate_subtitle_manifest,
@@ -96,7 +116,9 @@ from .timeline_preview import (
 )
 from .timeline_editing import (
     TIMELINE_CLIP_SCHEMA_VERSION as EDITING_TIMELINE_CLIP_SCHEMA_VERSION,
+    TIMELINE_CLIP_SCHEMA_VERSION_V3 as EDITING_TIMELINE_CLIP_SCHEMA_VERSION_V3,
     TIMELINE_EDIT_COMMAND_SCHEMA_VERSION as EDITING_TIMELINE_EDIT_COMMAND_SCHEMA_VERSION,
+    TIMELINE_EDIT_COMMAND_SCHEMA_VERSION_V2 as EDITING_TIMELINE_EDIT_COMMAND_SCHEMA_VERSION_V2,
     TIMELINE_SCHEMA_VERSION as EDITING_TIMELINE_SCHEMA_VERSION,
     TIMELINE_TRACK_KINDS as EDITING_TIMELINE_TRACK_KINDS,
     TIMELINE_TRACK_SCHEMA_VERSION as EDITING_TIMELINE_TRACK_SCHEMA_VERSION,
@@ -120,6 +142,7 @@ from .timeline_editing import (
 
 
 COMPOSITION_GATE = "G6_COMPOSITION"
+M13_EFFECT_COMPOSITION_GATE = "M13_EFFECT_COMPOSITION"
 QC_GATE = "G6_QC"
 APPROVAL_GATE = "G6_APPROVALS"
 MASTER_GATE = "G6_MASTER"
@@ -140,6 +163,10 @@ TIMELINE_EDIT_CREATE_REQUEST_SCHEMA_VERSION = (
 TIMELINE_EDIT_SUCCESSOR_REQUEST_SCHEMA_VERSION = (
     "v5.k2.timeline-edit-successor-request.v1"
 )
+M13_PREVIEW_STATE_TRANSITIONS = {
+    "MEDIA_READY": "PREVIEW_READY",
+    "REAL_VIDEO_READY": "REAL_PREVIEW_READY",
+}
 APPROVAL_KINDS = (
     "CREATIVE_DIRECTION",
     "IDENTITY_CONTINUITY",
@@ -166,7 +193,25 @@ class CompositionExecutionPort(Protocol):
     def compose_timeline_preview_v1(
         self, command: Mapping[str, Any]
     ) -> dict[str, Any]: ...
+    def compose_timeline_preview_v2(
+        self,
+        command: Mapping[str, Any],
+        *,
+        resolved_artifacts: Mapping[str, Any],
+    ) -> dict[str, Any]: ...
     def finalize(self, command: Mapping[str, Any]) -> dict[str, Any]: ...
+
+
+class RealVideoAuthorityPort(Protocol):
+    """Existing V5 owner projection for current immutable M11 videos."""
+
+    def get_revision_bundle(
+        self,
+        workspace_ref: str,
+        production_run_ref: str,
+        *,
+        evidence_snapshot: Any | None = None,
+    ) -> dict[str, Any]: ...
 
 
 def _is_sha256(value: Any) -> bool:
@@ -643,6 +688,7 @@ class K2DeliveryService:
         *,
         ref_factory: Callable[[str], str],
         clock: Callable[[], str],
+        real_video_authority: RealVideoAuthorityPort | None = None,
         glyph_inspection_adapter: (
             DigestPinnedBasePlateGlyphInspectionAdapter | None
         ) = None,
@@ -651,9 +697,67 @@ class K2DeliveryService:
         self.evidence = evidence
         self.composition = composition
         self.approval_authority = approval_authority
+        self.real_video_authority = real_video_authority
         self.glyph_inspection_adapter = glyph_inspection_adapter
         self._ref_factory = ref_factory
         self._clock = clock
+
+    def _current_glyph_video_assets(
+        self,
+        workspace: str,
+        run_ref: str,
+        *,
+        evidence_snapshot: Any | None = None,
+    ) -> list[dict[str, Any]]:
+        """Resolve only the existing current M11 video authority.
+
+        Direct service fixtures created before the M11 authority was injected
+        retain their historical current-media port as a compatibility reader.
+        Production assembly always supplies ``real_video_authority``.
+        """
+
+        if self.real_video_authority is not None:
+            bundle = self.real_video_authority.get_revision_bundle(
+                workspace,
+                run_ref,
+                evidence_snapshot=evidence_snapshot,
+            )
+            assets = bundle.get("videoAssetVersions")
+            lineage = bundle.get("videoLineageState")
+            if (
+                not isinstance(assets, list)
+                or not assets
+                or any(not isinstance(item, Mapping) for item in assets)
+                or not isinstance(lineage, Mapping)
+                or lineage.get("state") != "CURRENT"
+                or bundle.get("publicationAllowed") is not False
+            ):
+                raise UpstreamNotReadyError(
+                    "current immutable real-video authority is not ready"
+                )
+            return [
+                deepcopy(dict(item))
+                for item in assets
+                if isinstance(item, Mapping)
+            ]
+
+        verify_media_current = getattr(self.media, "verify_media_current", None)
+        if not callable(verify_media_current):
+            raise RepositoryUnavailableError(
+                "current media validator is unavailable"
+            )
+        current = verify_media_current(workspace, run_ref)
+        assets = current.get("assetVersions") if isinstance(current, Mapping) else None
+        if (
+            not isinstance(assets, list)
+            or any(not isinstance(item, Mapping) for item in assets)
+        ):
+            raise RepositoryUnavailableError("current media authority is invalid")
+        return [
+            deepcopy(dict(item))
+            for item in assets
+            if isinstance(item, Mapping)
+        ]
 
     @staticmethod
     def _input_record(
@@ -1839,22 +1943,7 @@ class K2DeliveryService:
                 raise RepositoryUnavailableError(
                     "GlyphRevealRequirement authority scope is stale"
                 )
-            base = validated_videos.get(requirement.base_plate_asset_version_ref)
-            if (
-                base is None
-                or base.get("payloadDigest")
-                != requirement.base_plate_asset_version_digest
-                or f"sha256:{base.get('sha256')}"
-                != requirement.base_plate_file_digest
-                or requirement.target_shot_ref
-                not in {
-                    base.get("creativeShotRef"),
-                    base.get("creativeShotVersionRef"),
-                }
-            ):
-                raise RepositoryUnavailableError(
-                    "GlyphRevealRequirement base plate authority is stale"
-                )
+            canonical_masks: list[dict[str, Any]] = []
             for ordinal, expected_mask in enumerate(
                 requirement.mask_asset_version_bindings, start=1
             ):
@@ -1895,8 +1984,240 @@ class K2DeliveryService:
                     raise RepositoryUnavailableError(
                         "GlyphRevealRequirement mask authority is stale"
                     )
+                canonical_masks.append(raw)
                 add("MASK_ASSET_VERSION", raw["assetVersionRef"], raw)
+
+            base = validated_videos.get(requirement.base_plate_asset_version_ref)
+            if base is None:
+                # A Glyph v2 requirement is intentionally bound to the
+                # immutable M11 real-video AssetVersion, not to the historical
+                # G5 generated-video schema above.  Admit only that one exact
+                # current producer projection, and only after the registered
+                # requirement and every registered mask have been revalidated.
+                current_assets = self._current_glyph_video_assets(
+                    workspace,
+                    run_ref,
+                    evidence_snapshot=snapshot,
+                )
+                matches = [
+                    deepcopy(dict(item))
+                    for item in current_assets
+                    if isinstance(item, Mapping)
+                    and item.get("assetVersionRef")
+                    == requirement.base_plate_asset_version_ref
+                ]
+                if (
+                    len(matches) != 1
+                    or self.glyph_inspection_adapter is None
+                ):
+                    raise RepositoryUnavailableError(
+                        "GlyphRevealRequirement current base authority is stale"
+                    )
+                current_base = matches[0]
+                shot = graph_shots_by_version.get(
+                    current_base.get("creativeShotVersionRef")
+                )
+                if (
+                    not isinstance(shot, Mapping)
+                    or shot.get("creativeShotRef")
+                    != requirement.target_shot_ref
+                    or current_base.get("creativeShotRef")
+                    != requirement.target_shot_ref
+                    or current_base.get("creativeShotDigest")
+                    != shot.get("payloadDigest")
+                ):
+                    raise RepositoryUnavailableError(
+                        "GlyphRevealRequirement current Shot authority is stale"
+                    )
+                execution = build_glyph_reveal_execution_request_v2(
+                    requirement,
+                    base_plate_asset=current_base,
+                    mask_assets=canonical_masks,
+                    inspection_adapter=self.glyph_inspection_adapter,
+                )
+                output = execution.get("output")
+                if not isinstance(output, Mapping):
+                    raise RepositoryUnavailableError(
+                        "GlyphRevealRequirement current base probe is invalid"
+                    )
+                base = {
+                    **current_base,
+                    "frameCount": output.get("totalFrames"),
+                    "frameRate": self._editing_frame_rate(
+                        output.get("frameRate")
+                    ),
+                }
+                validated_videos[requirement.base_plate_asset_version_ref] = base
+                add(
+                    "ASSET_VERSION",
+                    requirement.base_plate_asset_version_ref,
+                    base,
+                )
+            if (
+                base.get("payloadDigest")
+                != requirement.base_plate_asset_version_digest
+                or f"sha256:{base.get('sha256')}"
+                != requirement.base_plate_file_digest
+                or requirement.target_shot_ref
+                not in {
+                    base.get("creativeShotRef"),
+                    base.get("creativeShotVersionRef"),
+                }
+            ):
+                raise RepositoryUnavailableError(
+                    "GlyphRevealRequirement base plate authority is stale"
+                )
             add("EFFECT_REQUIREMENT", requirement.requirement_ref, payload)
+
+        # M13-E1 stores one closed five-record Result chain in the existing
+        # evidence journal.  Resolve through the production validator, then
+        # prove that every member came from this exact snapshot before
+        # projecting it into Timeline source authority.
+        effect_record_specs = (
+            (SCRATCH_LIGHT_REQUIREMENT_RECORD_KIND, "requirementRef"),
+            (LOCAL_EXPOSURE_REQUIREMENT_RECORD_KIND, "requirementRef"),
+            (
+                MASKED_SURFACE_EXECUTION_REQUEST_RECORD_KIND,
+                "executionRequestRef",
+            ),
+            (
+                MASKED_SURFACE_ARTIFACT_EVIDENCE_RECORD_KIND,
+                "artifactEvidenceRef",
+            ),
+            (
+                MASKED_SURFACE_RUNTIME_EVIDENCE_RECORD_KIND,
+                "runtimeEvidenceRef",
+            ),
+            (SCRATCH_LIGHT_RESULT_RECORD_KIND, "resultRef"),
+            (LOCAL_EXPOSURE_RESULT_RECORD_KIND, "resultRef"),
+        )
+        effect_records: dict[tuple[str, str], dict[str, Any]] = {}
+        for record_kind, identity_field in effect_record_specs:
+            for payload in records(record_kind, identity_field):
+                key = (record_kind, payload[identity_field])
+                if key in effect_records:
+                    raise RepositoryUnavailableError(
+                        "deterministic Effect evidence is ambiguous"
+                    )
+                effect_records[key] = payload
+        result_records = [
+            (record_kind, payload)
+            for (record_kind, _), payload in effect_records.items()
+            if record_kind
+            in {
+                SCRATCH_LIGHT_RESULT_RECORD_KIND,
+                LOCAL_EXPOSURE_RESULT_RECORD_KIND,
+            }
+        ]
+        used_effect_records: set[tuple[str, str]] = set()
+        for result_record_kind, stored_result in result_records:
+            try:
+                chain = resolve_deterministic_effect_result_chain(
+                    self.evidence,
+                    workspace_ref=workspace,
+                    production_run_ref=run_ref,
+                    result_ref=stored_result["resultRef"],
+                    result_digest=stored_result["payloadDigest"],
+                )
+            except EpisodeProductionError as exc:
+                raise RepositoryUnavailableError(
+                    "deterministic Effect Result chain is invalid"
+                ) from exc
+            resolved = chain.as_dict()
+            requirement = resolved["requirement"]
+            result = resolved["result"]
+            requirement_record_kind = (
+                LOCAL_EXPOSURE_REQUIREMENT_RECORD_KIND
+                if requirement["effectMode"] == LOCAL_EXPOSURE
+                else SCRATCH_LIGHT_REQUIREMENT_RECORD_KIND
+            )
+            expected_result_kind = (
+                LOCAL_EXPOSURE_RESULT_RECORD_KIND
+                if result["effectMode"] == LOCAL_EXPOSURE
+                else SCRATCH_LIGHT_RESULT_RECORD_KIND
+            )
+            members = (
+                (
+                    requirement_record_kind,
+                    requirement["requirementRef"],
+                    requirement,
+                ),
+                (
+                    MASKED_SURFACE_EXECUTION_REQUEST_RECORD_KIND,
+                    resolved["executionRequest"]["executionRequestRef"],
+                    resolved["executionRequest"],
+                ),
+                (
+                    MASKED_SURFACE_ARTIFACT_EVIDENCE_RECORD_KIND,
+                    resolved["artifactEvidence"]["artifactEvidenceRef"],
+                    resolved["artifactEvidence"],
+                ),
+                (
+                    MASKED_SURFACE_RUNTIME_EVIDENCE_RECORD_KIND,
+                    resolved["runtimeEvidence"]["runtimeEvidenceRef"],
+                    resolved["runtimeEvidence"],
+                ),
+                (expected_result_kind, result["resultRef"], result),
+            )
+            if (
+                result_record_kind != expected_result_kind
+                or requirement.get("workspaceRef") != workspace
+                or requirement.get("productionRunRef") != run_ref
+                or any(
+                    effect_records.get((kind, reference)) != payload
+                    for kind, reference, payload in members
+                )
+            ):
+                raise RepositoryUnavailableError(
+                    "deterministic Effect snapshot closure is stale"
+                )
+            used_effect_records.update(
+                (kind, reference) for kind, reference, _ in members
+            )
+            base = validated_videos.get(
+                requirement["basePlateAssetVersionRef"]
+            )
+            if (
+                base is None
+                or base.get("payloadDigest")
+                != requirement["basePlateAssetVersionDigest"]
+                or f"sha256:{base.get('sha256')}"
+                != requirement["basePlateFileDigest"]
+                or base.get("creativeShotRef")
+                != requirement["targetShotRef"]
+                or base.get("creativeShotVersionRef")
+                != requirement["targetShotVersionRef"]
+                or base.get("creativeShotDigest")
+                != requirement["targetShotVersionDigest"]
+                or requirement["frameRangeEndExclusive"]
+                > base.get("frameCount", -1)
+            ):
+                raise RepositoryUnavailableError(
+                    "deterministic Effect Requirement base/shot is stale"
+                )
+            add(
+                "EFFECT_REQUIREMENT",
+                requirement["requirementRef"],
+                requirement,
+            )
+            add(
+                "EFFECT_RESULT",
+                result["resultRef"],
+                {
+                    **result,
+                    "targetShotRef": requirement["targetShotRef"],
+                    "frameRangeStartInclusive": requirement[
+                        "frameRangeStartInclusive"
+                    ],
+                    "frameRangeEndExclusive": requirement[
+                        "frameRangeEndExclusive"
+                    ],
+                },
+            )
+        if used_effect_records != set(effect_records):
+            raise RepositoryUnavailableError(
+                "deterministic Effect evidence chain is incomplete"
+            )
 
         def resolve(source_type: str, source_ref: str) -> Mapping[str, Any] | None:
             matches = candidates.get((source_type, source_ref), [])
@@ -1913,8 +2234,13 @@ class K2DeliveryService:
         snapshot: Any,
         *,
         record_kind: str,
-        schema_version: str,
+        schema_version: str | frozenset[str],
     ) -> list[tuple[dict[str, Any], dict[str, Any]]]:
+        schema_versions = (
+            frozenset({schema_version})
+            if isinstance(schema_version, str)
+            else schema_version
+        )
         result: list[tuple[dict[str, Any], dict[str, Any]]] = []
         for record in snapshot.records:
             if record.get("recordKind") != record_kind:
@@ -1922,7 +2248,7 @@ class K2DeliveryService:
             payload = record.get("payload")
             if not isinstance(payload, Mapping) or payload.get(
                 "schemaVersion"
-            ) != schema_version:
+            ) not in schema_versions:
                 continue
             canonical = _immutable_payload(payload, record_kind)
             if canonical["payloadDigest"] != record.get("payloadDigest"):
@@ -1957,10 +2283,12 @@ class K2DeliveryService:
             },
             "TimelineClip": {
                 EDITING_TIMELINE_CLIP_SCHEMA_VERSION: "editing",
+                EDITING_TIMELINE_CLIP_SCHEMA_VERSION_V3: "editing",
                 LEGACY_TIMELINE_CLIP_SCHEMA_VERSION: "legacy",
             },
             "TimelineEditOperation": {
                 EDITING_TIMELINE_EDIT_COMMAND_SCHEMA_VERSION: "editing",
+                EDITING_TIMELINE_EDIT_COMMAND_SCHEMA_VERSION_V2: "editing",
             },
         }
         identity_by_kind = {
@@ -2061,7 +2389,9 @@ class K2DeliveryService:
             EDITING_TIMELINE_VERSION_SCHEMA_VERSION,
             EDITING_TIMELINE_TRACK_SCHEMA_VERSION,
             EDITING_TIMELINE_CLIP_SCHEMA_VERSION,
+            EDITING_TIMELINE_CLIP_SCHEMA_VERSION_V3,
             EDITING_TIMELINE_EDIT_COMMAND_SCHEMA_VERSION,
+            EDITING_TIMELINE_EDIT_COMMAND_SCHEMA_VERSION_V2,
         }
         return any(
             isinstance(item.get("payload"), Mapping)
@@ -2091,7 +2421,9 @@ class K2DeliveryService:
             EDITING_TIMELINE_VERSION_SCHEMA_VERSION,
             EDITING_TIMELINE_TRACK_SCHEMA_VERSION,
             EDITING_TIMELINE_CLIP_SCHEMA_VERSION,
+            EDITING_TIMELINE_CLIP_SCHEMA_VERSION_V3,
             EDITING_TIMELINE_EDIT_COMMAND_SCHEMA_VERSION,
+            EDITING_TIMELINE_EDIT_COMMAND_SCHEMA_VERSION_V2,
         }
         if any(
             item["payload"].get("schemaVersion") not in editing_schemas
@@ -2196,7 +2528,12 @@ class K2DeliveryService:
         all_clip_records = self._editing_payload_records(
             snapshot,
             record_kind="TimelineClip",
-            schema_version=EDITING_TIMELINE_CLIP_SCHEMA_VERSION,
+            schema_version=frozenset(
+                {
+                    EDITING_TIMELINE_CLIP_SCHEMA_VERSION,
+                    EDITING_TIMELINE_CLIP_SCHEMA_VERSION_V3,
+                }
+            ),
         )
         if any(
             payload.get("timelineVersionRef") not in refs
@@ -3776,7 +4113,16 @@ class K2DeliveryService:
                 "server-held glyph inspection evidence is not configured"
             )
 
-        verified = self.media.verify_media_current(workspace, run_ref)
+        source_snapshot = validated_evidence_snapshot(
+            self.evidence.read_snapshot(workspace, run_ref),
+            workspace_ref=workspace,
+            run_ref=run_ref,
+        )
+        current_video_assets = self._current_glyph_video_assets(
+            workspace,
+            run_ref,
+            evidence_snapshot=source_snapshot,
+        )
         requirement = GlyphRevealRequirementV2.from_mapping(
             glyph_reveal_requirement.as_dict()
         )
@@ -3787,14 +4133,14 @@ class K2DeliveryService:
             raise StaleInputError("GlyphRevealRequirementV2 scope is stale")
         base_matches = [
             item
-            for item in verified["assetVersions"]
+            for item in current_video_assets
             if isinstance(item, Mapping)
             and item.get("assetVersionRef")
             == requirement.base_plate_asset_version_ref
         ]
         if len(base_matches) != 1:
             raise StaleInputError(
-                "GlyphRevealRequirementV2 base plate is not current G5 media"
+                "GlyphRevealRequirementV2 base plate is not current immutable real-video media"
             )
         base_plate = deepcopy(dict(base_matches[0]))
         canonical_masks = [deepcopy(dict(item)) for item in mask_assets]
@@ -4011,9 +4357,19 @@ class K2DeliveryService:
             )
             for item in records
         ]
-        if snapshot.currentState != "MEDIA_READY" and not all(existing):
+        if (
+            snapshot.currentState not in M13_PREVIEW_STATE_TRANSITIONS
+            and not all(existing)
+        ):
             raise UpstreamNotReadyError(
-                "M12/M13 inputs can only be registered from MEDIA_READY"
+                "M12/M13 inputs require current video media"
+            )
+        if (
+            snapshot.revisionToken != source_snapshot.revisionToken
+            and not all(existing)
+        ):
+            raise StaleInputError(
+                "current real-video authority changed during input validation"
             )
         journal_head = self._stable_record_head(
             workspace, run_ref, snapshot.revisionToken
@@ -4112,6 +4468,734 @@ class K2DeliveryService:
             normalized["timelineInputRefs"][field] = canonical
         return normalized
 
+    @staticmethod
+    def _editing_timeline_preview_command(
+        command: Mapping[str, Any],
+    ) -> dict[str, Any]:
+        fields = {
+            "workspaceRef",
+            "productionRunRef",
+            "operationRef",
+            "idempotencyKey",
+            "expectedRunVersion",
+            "expectedEvidenceRevision",
+            "timelineVersionRef",
+            "timelineVersionDigest",
+        }
+        if not isinstance(command, Mapping) or set(command) != fields:
+            raise EpisodeProductionError(
+                "command fields do not match the M13 effect Preview contract"
+            )
+        result = {
+            "workspaceRef": _required_ref(
+                command.get("workspaceRef"), "workspaceRef"
+            ),
+            "productionRunRef": _required_ref(
+                command.get("productionRunRef"), "productionRunRef"
+            ),
+            "operationRef": _required_ref(
+                command.get("operationRef"), "operationRef"
+            ),
+            "idempotencyKey": _idempotency_key(command.get("idempotencyKey")),
+            "expectedRunVersion": _positive_version(
+                command.get("expectedRunVersion"), "expectedRunVersion"
+            ),
+            "expectedEvidenceRevision": command.get("expectedEvidenceRevision"),
+            "timelineVersionRef": _required_ref(
+                command.get("timelineVersionRef"), "timelineVersionRef"
+            ),
+            "timelineVersionDigest": command.get("timelineVersionDigest"),
+        }
+        if not _is_sha256(result["expectedEvidenceRevision"]):
+            raise EpisodeProductionError("expectedEvidenceRevision is invalid")
+        if not _is_sha256(result["timelineVersionDigest"]):
+            raise EpisodeProductionError("timelineVersionDigest is invalid")
+        return result
+
+    @staticmethod
+    def _editing_preview_layout(
+        restored: Mapping[str, Any],
+    ) -> dict[str, Any]:
+        version = restored["timelineVersion"].as_dict()
+        tracks = {
+            item.as_dict()["trackRef"]: item.as_dict()
+            for item in restored["tracks"]
+        }
+        if len(tracks) != len(restored["tracks"]):
+            raise RepositoryUnavailableError("Timeline Track refs are ambiguous")
+        active: dict[str, list[dict[str, Any]]] = {
+            "VIDEO": [],
+            "AUDIO": [],
+            "SUBTITLE": [],
+            "EFFECT": [],
+        }
+        for wrapper in restored["clips"]:
+            clip = wrapper.as_dict()
+            track = tracks.get(clip.get("trackRef"))
+            if track is None or track.get("trackKind") != clip.get("clipKind"):
+                raise RepositoryUnavailableError(
+                    "Timeline Clip track lineage is invalid"
+                )
+            if clip.get("enabled") is True and track.get("enabled") is True:
+                active[clip["clipKind"]].append(clip)
+        for values in active.values():
+            values.sort(
+                key=lambda item: (
+                    item["timelineStartFrameInclusive"],
+                    item["layer"],
+                    item["zOrder"],
+                    item["clipRef"],
+                )
+            )
+        identity_transform = {
+            "positionXPixels": 0,
+            "positionYPixels": 0,
+            "scaleX": {"numerator": 1, "denominator": 1},
+            "scaleY": {"numerator": 1, "denominator": 1},
+            "rotationMilliDegrees": 0,
+            "anchorXPixels": 0,
+            "anchorYPixels": 0,
+            "opacity": 1000,
+            "perspectiveMode": "NONE",
+            "perspectiveMatrix": None,
+            "perspectiveCorners": None,
+        }
+        for clip_kind, clips in active.items():
+            for clip in clips:
+                transform = clip["transform"]
+                if (
+                    clip["transitionIn"] is not None
+                    or clip["transitionOut"] is not None
+                    or clip["speed"]["numerator"] != 1
+                    or clip["speed"]["denominator"] != 1
+                    or clip["maskBindings"]
+                    or clip["opacity"] != 1000
+                    or any(
+                        transform[field] != expected
+                        for field, expected in identity_transform.items()
+                    )
+                    or (
+                        clip_kind != "EFFECT"
+                        and clip["blendMode"] != "NORMAL"
+                    )
+                ):
+                    raise UpstreamNotReadyError(
+                        "editing Timeline modifiers cannot be projected losslessly"
+                    )
+        effects = active["EFFECT"]
+        deterministic = [
+            item
+            for item in effects
+            if item["sourceBinding"].get("effectKind")
+            in {"SCRATCH_REVEAL", "LIGHT_SWEEP", "LOCAL_EXPOSURE"}
+        ]
+        glyphs = [
+            item
+            for item in effects
+            if item["sourceBinding"].get("effectKind") == "GLYPH_REVEAL"
+        ]
+        if (
+            len(active["VIDEO"]) != 1
+            or not active["AUDIO"]
+            or not active["SUBTITLE"]
+            or len(effects) != 3
+            or len(deterministic) != 2
+            or len(glyphs) != 1
+        ):
+            raise UpstreamNotReadyError(
+                "editing Timeline does not have exact Preview source coverage"
+            )
+        ranks = {
+            "SCRATCH_REVEAL": 0,
+            "LIGHT_SWEEP": 0,
+            "LOCAL_EXPOSURE": 1,
+        }
+        deterministic.sort(
+            key=lambda item: (
+                ranks[item["sourceBinding"]["effectKind"]],
+                item["clipRef"],
+            )
+        )
+        if [ranks[item["sourceBinding"]["effectKind"]] for item in deterministic] != [
+            0,
+            1,
+        ]:
+            raise UpstreamNotReadyError(
+                "editing Timeline effect stages are incomplete"
+            )
+        return {
+            "timelineVersion": version,
+            "video": active["VIDEO"][0],
+            "audio": active["AUDIO"],
+            "subtitles": active["SUBTITLE"],
+            "deterministicEffects": deterministic,
+            "glyph": glyphs[0],
+        }
+
+    def _editing_preview_input_refs(
+        self,
+        *,
+        snapshot: Any,
+        layout: Mapping[str, Any],
+    ) -> dict[str, Any]:
+        audio_assets = {
+            item["sourceBinding"]["audioAssetVersionRef"]
+            for item in layout["audio"]
+        }
+        stem_members = {
+            item["sourceBinding"]["stemMemberRef"]
+            for item in layout["audio"]
+        }
+        bindings_by_asset: dict[str, list[dict[str, Any]]] = {}
+        for record in snapshot.records:
+            if record.get("recordKind") != "AudioInputBinding":
+                continue
+            payload = _immutable_payload(
+                record.get("payload"), "AudioInputBinding"
+            )
+            binding = validate_audio_input_binding(payload).as_dict()
+            if (
+                record.get("recordRef") != binding["audioInputBindingRef"]
+                or record.get("payloadDigest") != binding["payloadDigest"]
+            ):
+                raise RepositoryUnavailableError(
+                    "AudioInputBinding evidence envelope is invalid"
+                )
+            if binding["assetVersionRef"] in audio_assets:
+                bindings_by_asset.setdefault(
+                    binding["assetVersionRef"], []
+                ).append(binding)
+        if set(bindings_by_asset) != audio_assets or any(
+            len(items) != 1 for items in bindings_by_asset.values()
+        ):
+            raise RepositoryUnavailableError(
+                "editing Timeline audio input authority is ambiguous"
+            )
+
+        stem_candidates: list[dict[str, Any]] = []
+        for record in snapshot.records:
+            if record.get("recordKind") != "AudioStemSet":
+                continue
+            payload = _immutable_payload(record.get("payload"), "AudioStemSet")
+            members = payload.get("members")
+            if not isinstance(members, list):
+                raise RepositoryUnavailableError("AudioStemSet members are invalid")
+            if {
+                item.get("stemMemberRef")
+                for item in members
+                if isinstance(item, Mapping)
+            } == stem_members:
+                stem_candidates.append(payload)
+        if len(stem_candidates) != 1:
+            raise RepositoryUnavailableError(
+                "editing Timeline AudioStemSet authority is ambiguous"
+            )
+        stem_set = stem_candidates[0]
+        members = stem_set["members"]
+        if {
+            item.get("sourceAssetVersionRef")
+            for item in members
+            if isinstance(item, Mapping)
+        } != audio_assets:
+            raise StaleInputError("Timeline AudioStemSet asset closure is stale")
+        cue_refs = sorted(
+            {
+                _required_ref(
+                    item.get("sourceCueVersionRef"), "audioCueVersionRef"
+                )
+                for item in members
+                if isinstance(item, Mapping)
+                and item.get("sourceCueVersionRef") is not None
+            }
+        )
+        subtitle_refs = {
+            item["sourceBinding"]["audioCueRef"]
+            for item in layout["subtitles"]
+        }
+        if not cue_refs or not subtitle_refs.issubset(set(cue_refs)):
+            raise StaleInputError("Timeline subtitle Cue closure is stale")
+        glyph_source = layout["glyph"]["sourceBinding"]
+        return {
+            "videoAssetVersionRef": layout["video"]["sourceBinding"][
+                "assetVersionRef"
+            ],
+            "audioInputBindingRefs": sorted(
+                items[0]["audioInputBindingRef"]
+                for items in bindings_by_asset.values()
+            ),
+            "audioCueVersionRefs": cue_refs,
+            "audioStemSetVersionRef": stem_set["stemSetVersionRef"],
+            "glyphRevealRequirementRef": glyph_source[
+                "effectRequirementRef"
+            ],
+        }
+
+    @staticmethod
+    def _editing_preview_audio_mix(
+        *,
+        layout: Mapping[str, Any],
+        inputs: Mapping[str, Any],
+    ) -> dict[str, Any]:
+        version = layout["timelineVersion"]
+        rate = version["frameRate"]
+        duration_samples = map_frame_boundary_to_sample(
+            version["durationFrames"],
+            sample_rate=48_000,
+            frame_rate_numerator=rate["numerator"],
+            frame_rate_denominator=rate["denominator"],
+        )
+        bindings = {
+            item["assetVersionRef"]: item
+            for item in inputs["audioInputBindings"]
+        }
+        members = {
+            item["stemMemberRef"]: item
+            for item in inputs["audioStemMembers"]
+        }
+        if len(bindings) != len(inputs["audioInputBindings"]) or len(
+            members
+        ) != len(inputs["audioStemMembers"]):
+            raise RepositoryUnavailableError(
+                "editing Timeline audio authority is ambiguous"
+            )
+        clips: list[dict[str, Any]] = []
+        for clip in layout["audio"]:
+            source = clip["sourceBinding"]
+            binding = bindings.get(source["audioAssetVersionRef"])
+            member = members.get(source["stemMemberRef"])
+            if binding is None or member is None:
+                raise StaleInputError("Timeline audio source closure is stale")
+            validation = binding.get("technicalValidation")
+            if not isinstance(validation, Mapping):
+                raise RepositoryUnavailableError(
+                    "audio technical validation is invalid"
+                )
+            start_frame = clip["timelineStartFrameInclusive"]
+            end_frame = clip["timelineEndFrameExclusive"]
+            timeline_start_sample = map_frame_boundary_to_sample(
+                start_frame,
+                sample_rate=48_000,
+                frame_rate_numerator=rate["numerator"],
+                frame_rate_denominator=rate["denominator"],
+            )
+            timeline_end_sample = map_frame_boundary_to_sample(
+                end_frame,
+                sample_rate=48_000,
+                frame_rate_numerator=rate["numerator"],
+                frame_rate_denominator=rate["denominator"],
+            )
+            if (
+                source["audioAssetVersionDigest"]
+                != binding["assetVersionDigest"]
+                or member.get("sourceAssetVersionRef")
+                != binding["assetVersionRef"]
+                or source["sampleRate"] != 48_000
+                or source["pan"] != 0
+                or source["sourceEndSampleExclusive"]
+                - source["sourceStartSampleInclusive"]
+                != timeline_end_sample - timeline_start_sample
+            ):
+                raise UpstreamNotReadyError(
+                    "editing Timeline audio cannot be projected losslessly"
+                )
+            clips.append(
+                {
+                    "clipRef": clip["clipRef"],
+                    "clipDigest": clip["payloadDigest"],
+                    "stemMemberRef": member["stemMemberRef"],
+                    "stemMemberDigest": member["payloadDigest"],
+                    "audioRole": _audio_role_from_binding(binding),
+                    "assetVersionRef": binding["assetVersionRef"],
+                    "assetVersionType": binding["assetVersionType"],
+                    "assetVersionDigest": binding["assetVersionDigest"],
+                    "technicalValidationRef": validation[
+                        "validationVersionRef"
+                    ],
+                    "technicalValidationDigest": validation["payloadDigest"],
+                    "storageKey": validation["storageKey"],
+                    "fileDigest": binding["fileDigest"],
+                    "pcmContentDigest": binding["pcmContentDigest"],
+                    "sampleRate": binding["sampleRate"],
+                    "sourceChannelCount": binding["channelCount"],
+                    "sourceSampleCount": binding["sampleCount"],
+                    "sourceStartSample": source[
+                        "sourceStartSampleInclusive"
+                    ],
+                    "sourceEndSampleExclusive": source[
+                        "sourceEndSampleExclusive"
+                    ],
+                    "timelineStartFrame": start_frame,
+                    "timelineEndFrameExclusive": end_frame,
+                    "timelineStartSample": timeline_start_sample,
+                    "timelineEndSampleExclusive": timeline_end_sample,
+                    "gainDb": source["gainDb"],
+                    "fadeInSamples": source["fadeInSamples"],
+                    "fadeOutSamples": source["fadeOutSamples"],
+                }
+            )
+        clips.sort(
+            key=lambda item: (
+                -TIMELINE_MIX_PARAMETERS["rolePriority"][item["audioRole"]],
+                item["clipRef"],
+            )
+        )
+        stem_set = inputs["audioStemSet"]
+        mix_ref = "m13-editing-timeline-mix-" + _digest(
+            {
+                "timelineVersionRef": version["timelineVersionRef"],
+                "timelineVersionDigest": version["payloadDigest"],
+                "stemSetVersionRef": stem_set["stemSetVersionRef"],
+                "stemSetDigest": stem_set["payloadDigest"],
+            }
+        )[:32]
+        projection = {
+            "mixRequestRef": mix_ref,
+            "timelineVersionRef": version["timelineVersionRef"],
+            "timelineVersionDigest": version["payloadDigest"],
+            "stemSetVersionRef": stem_set["stemSetVersionRef"],
+            "stemSetDigest": stem_set["payloadDigest"],
+            "sampleRate": 48_000,
+            "channelCount": 2,
+            "durationSamples": duration_samples,
+            "roundingRule": "FLOOR_EACH_BOUNDARY",
+            "mixParameters": deepcopy(TIMELINE_MIX_PARAMETERS),
+            "mixParametersDigest": _digest(TIMELINE_MIX_PARAMETERS),
+            "clips": clips,
+        }
+        return {
+            "mixRequestDigest": _digest(
+                {
+                    "schemaVersion": "v5.m13-editing-timeline-mix.v1",
+                    **projection,
+                }
+            ),
+            **projection,
+        }
+
+    @staticmethod
+    def _editing_preview_subtitle_manifest(
+        *, layout: Mapping[str, Any]
+    ) -> dict[str, str]:
+        version = layout["timelineVersion"]
+        clips = [
+            {
+                "clipRef": item["clipRef"],
+                "clipDigest": item["payloadDigest"],
+                "timelineStartFrameInclusive": item[
+                    "timelineStartFrameInclusive"
+                ],
+                "timelineEndFrameExclusive": item[
+                    "timelineEndFrameExclusive"
+                ],
+                "sourceBinding": deepcopy(item["sourceBinding"]),
+            }
+            for item in layout["subtitles"]
+        ]
+        digest = _digest(
+            {
+                "schemaVersion": "v5.m13-editing-subtitle-manifest.v1",
+                "workspaceRef": version["workspaceRef"],
+                "productionRunRef": version["productionRunRef"],
+                "timelineVersionRef": version["timelineVersionRef"],
+                "timelineVersionDigest": version["payloadDigest"],
+                "clips": clips,
+            }
+        )
+        return {
+            "subtitleManifestRef": "m13-editing-subtitle-manifest-"
+            + digest[:32],
+            "subtitleManifestDigest": digest,
+        }
+
+    def _editing_effect_preview_projection(
+        self,
+        *,
+        context: Mapping[str, Any],
+        restored: Mapping[str, Any],
+    ) -> dict[str, Any]:
+        workspace = context["run"]["workspaceRef"]
+        run_ref = context["run"]["productionRunRef"]
+        snapshot = context["snapshot"]
+        layout = self._editing_preview_layout(restored)
+        version = layout["timelineVersion"]
+        references = self._editing_preview_input_refs(
+            snapshot=snapshot, layout=layout
+        )
+        inputs = self._resolve_registered_timeline_inputs(
+            workspace=workspace,
+            run_ref=run_ref,
+            references=references,
+            snapshot=snapshot,
+        )
+        base_asset = inputs["basePlateAssetVersion"]
+        video_facts = deepcopy(inputs["baseVideoFacts"])
+        video_source = layout["video"]["sourceBinding"]
+        if (
+            video_source["assetVersionRef"] != base_asset["assetVersionRef"]
+            or video_source["assetVersionDigest"] != base_asset["payloadDigest"]
+            or video_source["sourceInFrameInclusive"] != 0
+            or video_source["sourceOutFrameExclusive"]
+            != video_facts["frameCount"]
+            or layout["video"]["timelineStartFrameInclusive"] != 0
+            or layout["video"]["timelineEndFrameExclusive"]
+            != version["durationFrames"]
+            or version["durationFrames"] != video_facts["frameCount"]
+            or version["canvasWidth"] != video_facts["width"]
+            or version["canvasHeight"] != video_facts["height"]
+            or version["frameRate"] != video_facts["frameRate"]
+            or video_facts["frameRate"]["denominator"] != 1
+            or video_facts["pixelFormat"] != "yuv420p"
+        ):
+            raise UpstreamNotReadyError(
+                "editing Timeline base video cannot be projected losslessly"
+            )
+
+        effect_bindings: list[dict[str, Any]] = []
+        effect_executions: dict[str, dict[str, Any]] = {}
+        chains: list[dict[str, Any]] = []
+        for clip in layout["deterministicEffects"]:
+            source = clip["sourceBinding"]
+            result_ref = source.get("effectResultRef")
+            result_digest = source.get("effectResultDigest")
+            if not isinstance(result_ref, str) or not _is_sha256(result_digest):
+                raise UpstreamNotReadyError(
+                    "editing Timeline effect Result is not bound"
+                )
+            chain = resolve_deterministic_effect_result_chain(
+                self.evidence,
+                workspace_ref=workspace,
+                production_run_ref=run_ref,
+                result_ref=result_ref,
+                result_digest=result_digest,
+            ).as_dict()
+            requirement = chain["requirement"]
+            request = chain["executionRequest"]
+            artifact = chain["artifactEvidence"]
+            runtime = chain["runtimeEvidence"]
+            result = chain["result"]
+            if (
+                source["effectKind"] != requirement["effectMode"]
+                or source["effectRequirementRef"]
+                != requirement["requirementRef"]
+                or source["effectRequirementDigest"]
+                != requirement["payloadDigest"]
+                or source["effectResultRef"] != result["resultRef"]
+                or source["effectResultDigest"] != result["payloadDigest"]
+                or clip["timelineStartFrameInclusive"]
+                != requirement["frameRangeStartInclusive"]
+                or clip["timelineEndFrameExclusive"]
+                != requirement["frameRangeEndExclusive"]
+                or requirement["basePlateAssetVersionRef"]
+                != base_asset["assetVersionRef"]
+                or requirement["basePlateAssetVersionDigest"]
+                != base_asset["payloadDigest"]
+                or requirement["basePlateFileDigest"]
+                != f"sha256:{base_asset['sha256']}"
+            ):
+                raise StaleInputError(
+                    "editing Timeline effect Result binding is stale"
+                )
+            binding = {
+                "clipRef": clip["clipRef"],
+                "clipDigest": clip["payloadDigest"],
+                "effectMode": requirement["effectMode"],
+                "requirementRef": requirement["requirementRef"],
+                "requirementDigest": requirement["payloadDigest"],
+                "resultRef": result["resultRef"],
+                "resultDigest": result["payloadDigest"],
+                "executionRequestRef": request["executionRequestRef"],
+                "executionRequestDigest": request["payloadDigest"],
+                "artifactEvidenceRef": artifact["artifactEvidenceRef"],
+                "artifactEvidenceDigest": artifact["payloadDigest"],
+                "runtimeEvidenceRef": runtime["runtimeEvidenceRef"],
+                "runtimeEvidenceDigest": runtime["payloadDigest"],
+                "frameRangeStartInclusive": requirement[
+                    "frameRangeStartInclusive"
+                ],
+                "frameRangeEndExclusive": requirement[
+                    "frameRangeEndExclusive"
+                ],
+            }
+            effect_bindings.append(binding)
+            chains.append(chain)
+
+        pixel_digests = {
+            chain["requirement"]["basePlatePixelDigest"] for chain in chains
+        }
+        if len(pixel_digests) != 1:
+            raise StaleInputError("effect base pixel authority is ambiguous")
+        base_pixel_digest = next(iter(pixel_digests))
+        resolved_base = {
+            "assetVersionRef": base_asset["assetVersionRef"],
+            "assetVersionDigest": base_asset["payloadDigest"],
+            "storageKey": base_asset["storageKey"],
+            "fileDigest": f"sha256:{base_asset['sha256']}",
+            "pixelDigest": base_pixel_digest,
+            "pixelDigestSpec": DECODED_FRAME_PIXEL_DIGEST_SPEC,
+            "width": video_facts["width"],
+            "height": video_facts["height"],
+            "frameCount": video_facts["frameCount"],
+            "frameRate": video_facts["frameRate"]["numerator"],
+            "pixelFormat": video_facts["pixelFormat"],
+        }
+
+        for binding, chain in zip(effect_bindings, chains, strict=True):
+            requirement = chain["requirement"]
+            artifact = chain["artifactEvidence"]
+            mask_asset = self._snapshot_record_payload(
+                snapshot,
+                record_kind="MaskAssetVersion",
+                record_ref=requirement["maskAssetVersionRef"],
+            )
+            if (
+                mask_asset.get("payloadDigest")
+                != requirement["maskAssetVersionDigest"]
+                or f"sha256:{mask_asset.get('sha256')}"
+                != requirement["maskFileDigest"]
+                or mask_asset.get("pixelDigest")
+                != requirement["maskPixelDigest"]
+                or _contains_path_authority(mask_asset)
+            ):
+                raise StaleInputError("effect mask AssetVersion is stale")
+            resolved_mask = {
+                "assetVersionRef": mask_asset["assetVersionRef"],
+                "assetVersionDigest": mask_asset["payloadDigest"],
+                "storageKey": mask_asset["storageKey"],
+                "fileDigest": f"sha256:{mask_asset['sha256']}",
+                "pixelDigest": mask_asset["pixelDigest"],
+                "pixelDigestSpec": mask_asset["pixelDigestSpec"],
+                "pixelMode": mask_asset["pixelMode"],
+                "width": mask_asset["width"],
+                "height": mask_asset["height"],
+            }
+            v3_digest = artifact["v3ExecutionRequestDigest"]
+            workspace_hash = sha256(workspace.encode("utf-8")).hexdigest()[:20]
+            run_hash = sha256(run_ref.encode("utf-8")).hexdigest()[:20]
+            output = artifact["outputDigest"]
+            probe = artifact["outputMediaProbe"]
+            effect_executions[binding["resultRef"]] = {
+                **deepcopy(chain),
+                "assetVersions": {
+                    resolved_base["assetVersionRef"]: deepcopy(resolved_base),
+                    resolved_mask["assetVersionRef"]: resolved_mask,
+                },
+                "artifactStorage": {
+                    "artifactEvidenceRef": artifact["artifactEvidenceRef"],
+                    "artifactEvidenceDigest": artifact["payloadDigest"],
+                    "storageKey": (
+                        f"{workspace_hash}/{run_hash}/masked-surface/"
+                        f"masked-surface-{v3_digest}.mp4"
+                    ),
+                    "fileDigest": output["fileDigest"],
+                    "pixelDigest": output["decodedFramePixelDigest"],
+                    "pixelDigestSpec": output[
+                        "decodedFramePixelDigestSpec"
+                    ],
+                    "width": output["width"],
+                    "height": output["height"],
+                    "frameCount": output["frameCount"],
+                    "frameRate": output["frameRate"],
+                    "pixelFormat": probe["pixelFormat"],
+                },
+            }
+
+        glyph_requirement = inputs["glyphRevealRequirement"]
+        glyph_source = layout["glyph"]["sourceBinding"]
+        if (
+            glyph_source["effectRequirementRef"]
+            != glyph_requirement.requirement_ref
+            or glyph_source["effectRequirementDigest"]
+            != glyph_requirement.payload_digest
+            or glyph_source.get("effectResultRef") is not None
+            or layout["glyph"]["timelineStartFrameInclusive"]
+            != glyph_requirement.frame_range_start_inclusive
+            or layout["glyph"]["timelineEndFrameExclusive"]
+            != glyph_requirement.frame_range_end_exclusive
+        ):
+            raise StaleInputError("Glyph Requirement Timeline binding is stale")
+        glyph_request = deepcopy(inputs["glyphRevealExecutionRequest"])
+        glyph_binding = {
+            "clipRef": layout["glyph"]["clipRef"],
+            "clipDigest": layout["glyph"]["payloadDigest"],
+            "requirementRef": glyph_requirement.requirement_ref,
+            "requirementDigest": glyph_requirement.payload_digest,
+        }
+        glyph_assets: dict[str, dict[str, Any]] = {
+            glyph_request["basePlate"]["assetVersionRef"]: deepcopy(
+                glyph_request["basePlate"]
+            )
+        }
+        glyph_assets.update(
+            {
+                item["assetVersionRef"]: deepcopy(item)
+                for item in glyph_request["masks"]
+            }
+        )
+        audio_mix = self._editing_preview_audio_mix(
+            layout=layout, inputs=inputs
+        )
+        subtitle_manifest = self._editing_preview_subtitle_manifest(
+            layout=layout
+        )
+        duration_samples = audio_mix["durationSamples"]
+        command = {
+            "workspaceRef": workspace,
+            "productionRunRef": run_ref,
+            "timelineVersionRef": version["timelineVersionRef"],
+            "timelineVersionDigest": version["payloadDigest"],
+            "baseVideo": {
+                **{
+                    field: deepcopy(resolved_base[field])
+                    for field in (
+                        "assetVersionRef",
+                        "assetVersionDigest",
+                        "fileDigest",
+                        "pixelDigest",
+                        "width",
+                        "height",
+                        "frameCount",
+                    )
+                },
+                "frameRate": deepcopy(version["frameRate"]),
+            },
+            "effectResultBindings": effect_bindings,
+            "glyphRequirementBinding": glyph_binding,
+            "audioMix": audio_mix,
+            "subtitleManifest": subtitle_manifest,
+            "output": {
+                "width": version["canvasWidth"],
+                "height": version["canvasHeight"],
+                "frameRate": deepcopy(version["frameRate"]),
+                "totalFrames": version["durationFrames"],
+                "sampleRate": 48_000,
+                "channelCount": 2,
+                "durationSamples": duration_samples,
+                "container": "mp4",
+                "videoCodec": "h264",
+                "pixelFormat": "yuv420p",
+                "audioCodec": "aac",
+                "audioBitRate": 128_000,
+            },
+        }
+        return {
+            "layout": layout,
+            "inputs": inputs,
+            "audioMix": audio_mix,
+            "subtitleManifest": subtitle_manifest,
+            "effectResultBindings": effect_bindings,
+            "glyphRequirementBinding": glyph_binding,
+            "compositionCommand": command,
+            "resolvedArtifacts": {
+                "baseVideo": resolved_base,
+                "effectExecutions": effect_executions,
+                "glyphExecution": {
+                    "requirement": glyph_requirement.as_dict(),
+                    "executionRequest": glyph_request,
+                    "assetVersions": glyph_assets,
+                },
+            },
+        }
+
     def _resolve_registered_timeline_inputs(
         self,
         *,
@@ -4119,7 +5203,6 @@ class K2DeliveryService:
         run_ref: str,
         references: Mapping[str, Any],
         snapshot: Any,
-        verified_media: Mapping[str, Any],
     ) -> dict[str, Any]:
         binding_payloads = [
             self._snapshot_record_payload(
@@ -4156,9 +5239,14 @@ class K2DeliveryService:
             != requirement.base_plate_asset_version_ref
         ):
             raise StaleInputError("Timeline video and glyph base plate differ")
+        current_video_assets = self._current_glyph_video_assets(
+            workspace,
+            run_ref,
+            evidence_snapshot=snapshot,
+        )
         base_matches = [
             item
-            for item in verified_media["assetVersions"]
+            for item in current_video_assets
             if isinstance(item, Mapping)
             and item.get("assetVersionRef")
             == references["videoAssetVersionRef"]
@@ -4189,6 +5277,28 @@ class K2DeliveryService:
             for ordinal, asset in enumerate(mask_assets, start=1)
         ]
         mask_payloads = [item.as_dict() for item in mask_wrappers]
+        if self.glyph_inspection_adapter is None:
+            raise UpstreamNotReadyError(
+                "server-held glyph inspection evidence is not configured"
+            )
+        glyph_execution_request = build_glyph_reveal_execution_request_v2(
+            requirement,
+            base_plate_asset=base_plate,
+            mask_assets=mask_assets,
+            inspection_adapter=self.glyph_inspection_adapter,
+        )
+        glyph_output = glyph_execution_request["output"]
+        base_video_facts = {
+            "width": glyph_output["width"],
+            "height": glyph_output["height"],
+            "frameCount": glyph_output["totalFrames"],
+            "frameRate": self._editing_frame_rate(
+                glyph_output["frameRate"]
+            ),
+            # This is the closed Preview input contract.  V3 re-probes the
+            # staged digest-pinned file and rejects any non-yuv420p source.
+            "pixelFormat": "yuv420p",
+        }
         bundle_ref = self._timeline_input_bundle_ref(
             workspace=workspace,
             run_ref=run_ref,
@@ -4239,7 +5349,9 @@ class K2DeliveryService:
             "audioStemSet": deepcopy(bundle["audioStemSet"]),
             "audioStemMembers": deepcopy(bundle["audioStemMembers"]),
             "glyphRevealRequirement": requirement,
+            "glyphRevealExecutionRequest": glyph_execution_request,
             "basePlateAssetVersion": base_plate,
+            "baseVideoFacts": base_video_facts,
             "maskAssetVersions": mask_assets,
             "maskAssetVersionBindings": mask_payloads,
         }
@@ -4257,7 +5369,7 @@ class K2DeliveryService:
         base = inputs["basePlateAssetVersion"]
         bundle = validate_timeline_input_bundle(inputs["bundle"])
         bundle_payload = bundle.as_dict()
-        video_facts = self._base_video_facts(base)
+        video_facts = deepcopy(inputs["baseVideoFacts"])
         identity = {
             "schemaVersion": "v5.m13-timeline-identity.v1",
             "workspaceRef": workspace,
@@ -4616,13 +5728,105 @@ class K2DeliveryService:
             "videoFacts": video_facts,
         }
 
+    def _validated_stored_effect_timeline_preview(
+        self,
+        *,
+        context: Mapping[str, Any],
+        composition_gate: Mapping[str, Any],
+    ) -> dict[str, Any]:
+        """Restore one v3 Preview without creating a second Timeline fact."""
+
+        snapshot = context["snapshot"]
+        preview_fact = _immutable_payload(
+            _fact(composition_gate, "PreviewCandidate"), "PreviewCandidate"
+        )
+        if preview_fact.get("schemaVersion") != PREVIEW_CANDIDATE_SCHEMA_VERSION_V3:
+            raise StaleInputError("stored Preview does not use the M13-E1 contract")
+        preview_payload = self._snapshot_record_payload(
+            snapshot,
+            record_kind="PreviewCandidate",
+            record_ref=_required_ref(
+                preview_fact.get("previewCandidateVersionRef"),
+                "previewCandidateVersionRef",
+            ),
+        )
+        composition_payload = self._snapshot_record_payload(
+            snapshot,
+            record_kind="CompositionResult",
+            record_ref=_required_ref(
+                preview_fact.get("compositionResultRef"),
+                "compositionResultRef",
+            ),
+        )
+        if (
+            preview_payload != preview_fact
+            or composition_payload.get("schemaVersion")
+            != EFFECT_PREVIEW_COMPOSITION_RESULT_SCHEMA_VERSION
+        ):
+            raise RepositoryUnavailableError(
+                "G6 v3 Preview fact and append-only records differ"
+            )
+        restored = self._restore_editing_timeline(
+            context,
+            timeline_version_ref=_required_ref(
+                preview_payload.get("timelineVersionRef"),
+                "timelineVersionRef",
+            ),
+        )
+        timeline_version = restored["timelineVersion"]
+        version_payload = timeline_version.as_dict()
+        if (
+            preview_payload.get("timelineVersionDigest")
+            != version_payload["payloadDigest"]
+        ):
+            raise StaleInputError("Preview TimelineVersion lineage is stale")
+        composition_result = validate_effect_preview_composition_result(
+            composition_payload,
+            timeline_version=timeline_version,
+        )
+        preview_candidate = validate_effect_preview_candidate(
+            preview_payload,
+            timeline_version=timeline_version,
+            composition_result=composition_result,
+        )
+        projection = self._editing_effect_preview_projection(
+            context=context,
+            restored=restored,
+        )
+        composition_mapping = composition_result.as_dict()
+        if (
+            composition_mapping["effectResultBindings"]
+            != projection["effectResultBindings"]
+            or composition_mapping["glyphRequirementBinding"]
+            != projection["glyphRequirementBinding"]
+            or composition_mapping["mixRequestRef"]
+            != projection["audioMix"]["mixRequestRef"]
+            or composition_mapping["mixRequestDigest"]
+            != projection["audioMix"]["mixRequestDigest"]
+            or composition_mapping["subtitleManifestRef"]
+            != projection["subtitleManifest"]["subtitleManifestRef"]
+            or composition_mapping["subtitleManifestDigest"]
+            != projection["subtitleManifest"]["subtitleManifestDigest"]
+        ):
+            raise StaleInputError("stored Preview input projection is stale")
+        artifact_path = self._verify_timeline_composition_artifact(
+            composition_mapping
+        )
+        return {
+            "restoredTimeline": restored,
+            "timelineVersion": timeline_version,
+            "compositionResult": composition_result,
+            "previewCandidate": preview_candidate,
+            "projection": projection,
+            "artifactPath": artifact_path,
+        }
+
     def _validated_stored_timeline_preview(
         self,
         *,
         command: Mapping[str, Any],
         composition_gate: Mapping[str, Any],
         snapshot: Any,
-        verified_media: Mapping[str, Any],
     ) -> dict[str, Any]:
         """Rebuild authority wrappers from append-only evidence, then pin bytes."""
 
@@ -4633,7 +5837,6 @@ class K2DeliveryService:
             run_ref=run_ref,
             references=command["timelineInputRefs"],
             snapshot=snapshot,
-            verified_media=verified_media,
         )
         timeline_fact = _immutable_payload(
             _fact(composition_gate, "TimelineVersion"), "TimelineVersion"
@@ -5010,6 +6213,227 @@ class K2DeliveryService:
             raise StaleInputError("M12/M13 preview QC evidence is stale")
         return qc
 
+    def compose_editing_timeline_preview(
+        self, command: Mapping[str, Any]
+    ) -> dict[str, Any]:
+        """Compose the exact editing Timeline v3 through the additive V4 port."""
+
+        normalized = self._editing_timeline_preview_command(command)
+        workspace = normalized["workspaceRef"]
+        run_ref = normalized["productionRunRef"]
+        context = self._timeline_authority_context(
+            workspace,
+            run_ref,
+            expected_run_version=normalized["expectedRunVersion"],
+        )
+        restored = self._restore_editing_timeline(
+            context,
+            timeline_version_ref=normalized["timelineVersionRef"],
+        )
+        version_payload = restored["timelineVersion"].as_dict()
+        latest_payload = restored["versionHistory"][-1].as_dict()
+        if (
+            version_payload["payloadDigest"]
+            != normalized["timelineVersionDigest"]
+            or latest_payload["timelineVersionRef"]
+            != normalized["timelineVersionRef"]
+            or latest_payload["payloadDigest"]
+            != normalized["timelineVersionDigest"]
+        ):
+            raise StaleInputError("editing Timeline Preview input is stale")
+        if self.composition is None or not callable(
+            getattr(self.composition, "compose_timeline_preview_v2", None)
+        ):
+            raise WorkerUnavailableError(
+                "M13 effect Preview composition is not configured"
+            )
+
+        client_key = normalized["idempotencyKey"]
+        operation_ref = normalized["operationRef"]
+        composition_key = _digest(
+            {
+                "clientIdempotencyKey": client_key,
+                "operationRef": operation_ref,
+                "stage": "m13-e1-editing-timeline-composition",
+            }
+        )
+        composition_request_digest = _digest(
+            {
+                "schemaVersion": "v5.m13-effect-preview-command.v1",
+                "command": normalized,
+                "deliveryId": TIMELINE_PREVIEW_DELIVERY_ID,
+            }
+        )
+        composition_gate = self._existing(
+            workspace,
+            run_ref,
+            M13_EFFECT_COMPOSITION_GATE,
+            composition_key,
+            composition_request_digest,
+        )
+        composition_replay = composition_gate is not None
+
+        if composition_gate is None:
+            if context["snapshot"].revisionToken != normalized[
+                "expectedEvidenceRevision"
+            ]:
+                raise StaleInputError("episode evidence revision changed")
+            source_state = context["snapshot"].currentState
+            if source_state not in M13_PREVIEW_STATE_TRANSITIONS:
+                raise UpstreamNotReadyError(
+                    "M13 effect Preview requires current video media"
+                )
+            preview_state = M13_PREVIEW_STATE_TRANSITIONS[source_state]
+            projection = self._editing_effect_preview_projection(
+                context=context,
+                restored=restored,
+            )
+            now = self._clock()
+            try:
+                execution_result = self.composition.compose_timeline_preview_v2(
+                    projection["compositionCommand"],
+                    resolved_artifacts=projection["resolvedArtifacts"],
+                )
+            except CompositionExecutionError as exc:
+                raise WorkerUnavailableError(
+                    "M13 deterministic effect Preview composition failed"
+                ) from exc
+            composition_result = validate_effect_preview_composition_result(
+                build_effect_preview_composition_result(
+                    {
+                        "createdBy": TIMELINE_PREVIEW_DELIVERY_ID,
+                        "createdAt": now,
+                    },
+                    timeline_version=restored["timelineVersion"],
+                    execution_result=execution_result,
+                ),
+                timeline_version=restored["timelineVersion"],
+            )
+            composition_payload = composition_result.as_dict()
+            preview_ref = "m13-effect-preview-candidate-" + _digest(
+                {
+                    "timelineVersionRef": version_payload[
+                        "timelineVersionRef"
+                    ],
+                    "timelineVersionDigest": version_payload["payloadDigest"],
+                    "compositionResultRef": composition_payload[
+                        "compositionResultRef"
+                    ],
+                    "compositionResultDigest": composition_payload[
+                        "payloadDigest"
+                    ],
+                }
+            )[:32]
+            preview_candidate = validate_effect_preview_candidate(
+                build_effect_preview_candidate(
+                    {
+                        "previewCandidateRef": preview_ref,
+                        "previewCandidateVersionRef": f"{preview_ref}-version-1",
+                        "version": 1,
+                        "supersedesPreviewCandidateVersionRef": None,
+                        "supersedesPreviewCandidateVersionDigest": None,
+                        "createdBy": TIMELINE_PREVIEW_DELIVERY_ID,
+                        "createdAt": now,
+                    },
+                    timeline_version=restored["timelineVersion"],
+                    composition_result=composition_result,
+                ),
+                timeline_version=restored["timelineVersion"],
+                composition_result=composition_result,
+            )
+            preview_payload = preview_candidate.as_dict()
+            self._verify_timeline_composition_artifact(composition_payload)
+            records = (
+                self._composition_record(
+                    workspace=workspace,
+                    run_ref=run_ref,
+                    record_kind="CompositionResult",
+                    record_ref=composition_payload["compositionResultRef"],
+                    record_version=1,
+                    client_key=client_key,
+                    operation_ref=operation_ref,
+                    composition_request_digest=composition_request_digest,
+                    slot="effect-composition-result",
+                    created_at=now,
+                    payload=composition_payload,
+                ),
+                self._composition_record(
+                    workspace=workspace,
+                    run_ref=run_ref,
+                    record_kind="PreviewCandidate",
+                    record_ref=preview_payload[
+                        "previewCandidateVersionRef"
+                    ],
+                    record_version=preview_payload["version"],
+                    client_key=client_key,
+                    operation_ref=operation_ref,
+                    composition_request_digest=composition_request_digest,
+                    slot="effect-preview-candidate",
+                    created_at=now,
+                    payload=preview_payload,
+                ),
+            )
+            journal_head = self._stable_record_head(
+                workspace, run_ref, context["snapshot"].revisionToken
+            )
+            _, composition_gate, atomic_replay = (
+                self.evidence.append_records_and_gate(
+                    records,
+                    GateAppend(
+                        workspace,
+                        run_ref,
+                        M13_EFFECT_COMPOSITION_GATE,
+                        composition_key,
+                        context["run"]["payloadDigest"],
+                        composition_request_digest,
+                        source_state,
+                        preview_state,
+                        now,
+                        (
+                            EvidenceFact(
+                                "PreviewCandidate",
+                                preview_payload[
+                                    "previewCandidateVersionRef"
+                                ],
+                                preview_payload["version"],
+                                preview_payload,
+                                preview_payload["payloadDigest"],
+                            ),
+                        ),
+                    ),
+                    expected_record_journal_head=journal_head,
+                )
+            )
+            composition_replay = atomic_replay
+            stored = {
+                "timelineVersion": restored["timelineVersion"],
+                "compositionResult": composition_result,
+                "previewCandidate": preview_candidate,
+                "projection": projection,
+            }
+        else:
+            stored = self._validated_stored_effect_timeline_preview(
+                context=context,
+                composition_gate=composition_gate,
+            )
+
+        version_payload = stored["timelineVersion"].as_dict()
+        composition_payload = stored["compositionResult"].as_dict()
+        preview_payload = stored["previewCandidate"].as_dict()
+        result_snapshot = validated_evidence_snapshot(
+            self.evidence.read_snapshot(workspace, run_ref),
+            workspace_ref=workspace,
+            run_ref=run_ref,
+        )
+        return {
+            "state": composition_gate["toState"],
+            "timelineVersion": version_payload,
+            "compositionResult": composition_payload,
+            "previewCandidate": preview_payload,
+            "evidenceRevision": result_snapshot.revisionToken,
+            "idempotentReplay": composition_replay,
+        }
+
     def compose_timeline_preview(
         self, command: Mapping[str, Any]
     ) -> dict[str, Any]:
@@ -5070,7 +6494,6 @@ class K2DeliveryService:
                 command=normalized,
                 composition_gate=composition_gate,
                 snapshot=snapshot,
-                verified_media=verified_media,
             )
             timeline = stored["timeline"]
             timeline_version = stored["timelineVersion"]
@@ -5111,7 +6534,6 @@ class K2DeliveryService:
                 run_ref=run_ref,
                 references=normalized["timelineInputRefs"],
                 snapshot=snapshot,
-                verified_media=verified_media,
             )
             now = self._clock()
             projection = self._build_timeline_projection(
@@ -5587,6 +7009,17 @@ class K2DeliveryService:
         )
 
     def compose_and_qc(self, command: Mapping[str, Any]) -> dict[str, Any]:
+        if isinstance(command, Mapping) and set(command) == {
+            "workspaceRef",
+            "productionRunRef",
+            "operationRef",
+            "idempotencyKey",
+            "expectedRunVersion",
+            "expectedEvidenceRevision",
+            "timelineVersionRef",
+            "timelineVersionDigest",
+        }:
+            return self.compose_editing_timeline_preview(command)
         if isinstance(command, Mapping) and set(command) == {
             "workspaceRef",
             "productionRunRef",
@@ -6225,18 +7658,44 @@ class K2DeliveryService:
             "state": self.evidence.current_state(workspace_ref, run_ref),
             "productionRunRef": run_ref,
         }
-        composition = self.evidence.get_gate(workspace_ref, run_ref, COMPOSITION_GATE)
+        selected_preview_is_v3 = False
+        composition = self.evidence.get_gate(
+            workspace_ref, run_ref, M13_EFFECT_COMPOSITION_GATE
+        ) or self.evidence.get_gate(workspace_ref, run_ref, COMPOSITION_GATE)
         qc = self.evidence.get_gate(workspace_ref, run_ref, QC_GATE)
         approvals = self.evidence.get_gate(workspace_ref, run_ref, APPROVAL_GATE)
         master = self.evidence.get_gate(workspace_ref, run_ref, MASTER_GATE)
         if composition is not None:
-            result.update(
-                {
-                    "timelineVersion": _fact(composition, "TimelineVersion"),
-                    "previewCandidate": _fact(composition, "PreviewCandidate"),
-                }
-            )
-        if qc is not None:
+            preview = _fact(composition, "PreviewCandidate")
+            if preview.get("schemaVersion") == PREVIEW_CANDIDATE_SCHEMA_VERSION_V3:
+                selected_preview_is_v3 = True
+                context = self._timeline_authority_context(
+                    workspace_ref, run_ref, expected_run_version=None
+                )
+                stored = self._validated_stored_effect_timeline_preview(
+                    context=context,
+                    composition_gate=composition,
+                )
+                result.update(
+                    {
+                        "timelineVersion": stored[
+                            "timelineVersion"
+                        ].as_dict(),
+                        "previewCandidate": stored[
+                            "previewCandidate"
+                        ].as_dict(),
+                    }
+                )
+            else:
+                result.update(
+                    {
+                        "timelineVersion": _fact(
+                            composition, "TimelineVersion"
+                        ),
+                        "previewCandidate": preview,
+                    }
+                )
+        if qc is not None and not selected_preview_is_v3:
             result["qcReport"] = _fact(qc, "QCReport")
         if approvals is not None:
             result["approvalDecisions"] = _approval_facts(approvals)
@@ -6257,20 +7716,154 @@ class K2DeliveryService:
         workspace = _required_ref(workspace_ref, "workspaceRef")
         production_run_ref = _required_ref(run_ref, "productionRunRef")
         composition_gate = self.evidence.get_gate(
+            workspace, production_run_ref, M13_EFFECT_COMPOSITION_GATE
+        ) or self.evidence.get_gate(
             workspace, production_run_ref, COMPOSITION_GATE
         )
         qc_gate = self.evidence.get_gate(
             workspace, production_run_ref, QC_GATE
         )
-        if composition_gate is None or qc_gate is None:
-            raise UpstreamNotReadyError("G6 preview and QC are not ready")
-        timeline_fact = _immutable_payload(
-            _fact(composition_gate, "TimelineVersion"), "TimelineVersion"
-        )
+        if composition_gate is None:
+            raise UpstreamNotReadyError("G6 preview is not ready")
         preview_fact = _immutable_payload(
             _fact(composition_gate, "PreviewCandidate"), "PreviewCandidate"
         )
+
+        if preview_fact.get("schemaVersion") == PREVIEW_CANDIDATE_SCHEMA_VERSION_V3:
+            context = self._timeline_authority_context(
+                workspace,
+                production_run_ref,
+                expected_run_version=None,
+            )
+            stored = self._validated_stored_effect_timeline_preview(
+                context=context,
+                composition_gate=composition_gate,
+            )
+            timeline = stored["timelineVersion"].as_dict()
+            preview = stored["previewCandidate"].as_dict()
+            projection = stored["projection"]
+            preview_fields = (
+                "previewCandidateRef",
+                "previewCandidateVersionRef",
+                "version",
+                "timelineRef",
+                "timelineVersionRef",
+                "timelineVersionDigest",
+                "effectResultBindings",
+                "glyphRequirementBinding",
+                "effectBindingsDigest",
+                "mixRequestRef",
+                "mixRequestDigest",
+                "subtitleManifestRef",
+                "subtitleManifestDigest",
+                "compositionResultRef",
+                "compositionResultDigest",
+                "compositionRequestDigest",
+                "artifactRef",
+                "fileDigest",
+                "decodedFramePixelDigest",
+                "pcmContentDigest",
+                "outputByteSize",
+                "mediaProbe",
+                "outputMediaProbe",
+                "runtimeIdentity",
+                "state",
+                "approvalStatus",
+                "provenance",
+                "rightsState",
+                "providerUsed",
+                "gpuUsed",
+                "immutable",
+                "publicationAllowed",
+                "payloadDigest",
+            )
+            return {
+                "state": composition_gate["toState"],
+                "productionRunRef": production_run_ref,
+                "timeline": {
+                    key: deepcopy(timeline[key])
+                    for key in (
+                        "timelineRef",
+                        "timelineVersionRef",
+                        "versionNumber",
+                        "parentTimelineVersionRef",
+                        "parentTimelineVersionDigest",
+                        "frameRate",
+                        "canvasWidth",
+                        "canvasHeight",
+                        "durationFrames",
+                        "trackRefs",
+                        "outputProfileBindings",
+                        "payloadDigest",
+                    )
+                },
+                "preview": {
+                    key: deepcopy(preview[key]) for key in preview_fields
+                },
+                "audio": {
+                    "stemSetVersionRef": projection["audioMix"][
+                        "stemSetVersionRef"
+                    ],
+                    "stemSetDigest": projection["audioMix"]["stemSetDigest"],
+                    "mixRequestRef": projection["audioMix"]["mixRequestRef"],
+                    "mixRequestDigest": projection["audioMix"][
+                        "mixRequestDigest"
+                    ],
+                    "assetVersionRefs": sorted(
+                        {
+                            item["sourceBinding"]["audioAssetVersionRef"]
+                            for item in projection["layout"]["audio"]
+                        }
+                    ),
+                },
+                "cues": [
+                    {
+                        "clipRef": item["clipRef"],
+                        "clipDigest": item["payloadDigest"],
+                        "timelineStartFrameInclusive": item[
+                            "timelineStartFrameInclusive"
+                        ],
+                        "timelineEndFrameExclusive": item[
+                            "timelineEndFrameExclusive"
+                        ],
+                        "audioCueRef": item["sourceBinding"]["audioCueRef"],
+                        "audioCueDigest": item["sourceBinding"][
+                            "audioCueDigest"
+                        ],
+                        "language": item["sourceBinding"]["language"],
+                        "wordTiming": deepcopy(
+                            item["sourceBinding"]["wordTiming"]
+                        ),
+                    }
+                    for item in projection["layout"]["subtitles"]
+                ],
+                "effect": {
+                    "executionOrder": [
+                        *(
+                            item["effectMode"]
+                            for item in preview["effectResultBindings"]
+                        ),
+                        "GLYPH_REVEAL",
+                    ],
+                    "effectResultBindings": deepcopy(
+                        preview["effectResultBindings"]
+                    ),
+                    "glyphRequirementBinding": deepcopy(
+                        preview["glyphRequirementBinding"]
+                    ),
+                    "effectBindingsDigest": preview[
+                        "effectBindingsDigest"
+                    ],
+                },
+            }
+
+        if qc_gate is None:
+            raise UpstreamNotReadyError("G6 preview and QC are not ready")
         qc = _immutable_payload(_fact(qc_gate, "QCReport"), "QCReport")
+
+        timeline_fact = _immutable_payload(
+            _fact(composition_gate, "TimelineVersion"), "TimelineVersion"
+        )
 
         if preview_fact.get("schemaVersion") != PREVIEW_CANDIDATE_SCHEMA_VERSION_V2:
             _, timeline, preview, _ = self._verified_preview_qc(
@@ -6350,9 +7943,6 @@ class K2DeliveryService:
         references = self._timeline_input_refs_from_version(
             snapshot, timeline_fact, mix_record
         )
-        verified_media = self.media.verify_media_current(
-            workspace, production_run_ref
-        )
         stored = self._validated_stored_timeline_preview(
             command={
                 "workspaceRef": workspace,
@@ -6361,7 +7951,6 @@ class K2DeliveryService:
             },
             composition_gate=composition_gate,
             snapshot=snapshot,
-            verified_media=verified_media,
         )
         timeline = stored["timelineVersion"].as_dict()
         preview = stored["previewCandidate"].as_dict()
@@ -6518,12 +8107,37 @@ class K2DeliveryService:
         workspace = _required_ref(workspace_ref, "workspaceRef")
         production_run_ref = _required_ref(run_ref, "productionRunRef")
         composition_gate = self.evidence.get_gate(
+            workspace, production_run_ref, M13_EFFECT_COMPOSITION_GATE
+        ) or self.evidence.get_gate(
             workspace, production_run_ref, COMPOSITION_GATE
         )
         qc_gate = self.evidence.get_gate(workspace, production_run_ref, QC_GATE)
-        if composition_gate is None or qc_gate is None:
-            raise UpstreamNotReadyError("G6 preview and QC are not ready")
+        if composition_gate is None:
+            raise UpstreamNotReadyError("G6 preview is not ready")
         preview = _fact(composition_gate, "PreviewCandidate")
+        if preview.get("schemaVersion") == PREVIEW_CANDIDATE_SCHEMA_VERSION_V3:
+            context = self._timeline_authority_context(
+                workspace,
+                production_run_ref,
+                expected_run_version=None,
+            )
+            stored = self._validated_stored_effect_timeline_preview(
+                context=context,
+                composition_gate=composition_gate,
+            )
+            composition = stored["compositionResult"].as_dict()
+            return {
+                "path": stored["artifactPath"],
+                "fileName": f"preview-{production_run_ref}.mp4",
+                "mediaType": "video/mp4",
+                "byteSize": composition["outputByteSize"],
+                "sha256": composition["outputDigest"][
+                    "fileDigest"
+                ].removeprefix("sha256:"),
+                "contentDisposition": "inline",
+            }
+        if qc_gate is None:
+            raise UpstreamNotReadyError("G6 preview and QC are not ready")
         if preview.get("schemaVersion") == PREVIEW_CANDIDATE_SCHEMA_VERSION_V2:
             preview = _immutable_payload(preview, "PreviewCandidate")
             timeline_fact = _immutable_payload(
@@ -6557,9 +8171,6 @@ class K2DeliveryService:
             references = self._timeline_input_refs_from_version(
                 snapshot, timeline_fact, mix_record
             )
-            verified_media = self.media.verify_media_current(
-                workspace, production_run_ref
-            )
             stored = self._validated_stored_timeline_preview(
                 command={
                     "workspaceRef": workspace,
@@ -6568,7 +8179,6 @@ class K2DeliveryService:
                 },
                 composition_gate=composition_gate,
                 snapshot=snapshot,
-                verified_media=verified_media,
             )
             timeline = stored["timelineVersion"].as_dict()
             preview = stored["previewCandidate"].as_dict()

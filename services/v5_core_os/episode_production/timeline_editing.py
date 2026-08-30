@@ -35,6 +35,7 @@ TIMELINE_SCHEMA_VERSION = "v5.timeline.v3"
 TIMELINE_VERSION_SCHEMA_VERSION = "v5.timeline-version.v3"
 TIMELINE_TRACK_SCHEMA_VERSION = "v5.timeline-track.v2"
 TIMELINE_CLIP_SCHEMA_VERSION = "v5.timeline-clip.v2"
+TIMELINE_CLIP_SCHEMA_VERSION_V3 = "v5.timeline-clip.v3"
 TRANSITION_SPEC_SCHEMA_VERSION = "v5.timeline-transition-spec.v1"
 SPEED_SPEC_SCHEMA_VERSION = "v5.timeline-speed-spec.v1"
 TRANSFORM_SPEC_SCHEMA_VERSION = "v5.timeline-transform-spec.v1"
@@ -43,6 +44,7 @@ OUTPUT_PROFILE_BINDING_SCHEMA_VERSION = (
     "v5.timeline-output-profile-binding.v1"
 )
 TIMELINE_EDIT_COMMAND_SCHEMA_VERSION = "v5.timeline-edit-command.v1"
+TIMELINE_EDIT_COMMAND_SCHEMA_VERSION_V2 = "v5.timeline-edit-command.v2"
 TIMELINE_TRACK_SNAPSHOT_SCHEMA_VERSION = "v5.timeline-track-snapshot.v1"
 TIMELINE_CLIP_SNAPSHOT_SCHEMA_VERSION = "v5.timeline-clip-snapshot.v1"
 TIMELINE_SNAPSHOT_SCHEMA_VERSION = "v5.timeline-snapshot.v1"
@@ -99,6 +101,12 @@ EDIT_OPERATIONS = (
     "SET_MASKS",
     "SET_SAFE_AREA",
     "SET_OUTPUT_PROFILES",
+)
+TIMELINE_EDIT_OPERATIONS_V2 = ("BIND_EFFECT_RESULT",)
+DETERMINISTIC_EFFECT_KINDS = (
+    "SCRATCH_REVEAL",
+    "LIGHT_SWEEP",
+    "LOCAL_EXPOSURE",
 )
 
 TIMELINE_PROVENANCE = "V5_K2_DELIVERY_SERVICE"
@@ -781,6 +789,9 @@ _EFFECT_SOURCE_FIELDS = frozenset(
         "blendMode",
     }
 )
+_EFFECT_SOURCE_FIELDS_V3 = _EFFECT_SOURCE_FIELDS | frozenset(
+    {"effectResultDigest"}
+)
 _WORD_TIMING_FIELDS = frozenset(
     {
         "wordRef",
@@ -846,6 +857,7 @@ def _validate_source_binding(
     value: Any,
     clip_kind: str,
     *,
+    clip_schema_version: str = TIMELINE_CLIP_SCHEMA_VERSION,
     source_resolver: SourceAuthorityResolver | None = None,
     scope: Mapping[str, str] | None = None,
     timeline_start_frame_inclusive: int | None = None,
@@ -932,18 +944,36 @@ def _validate_source_binding(
         ):
             raise TimelineEditingRangeError("wordTiming exceeds subtitle text range")
     elif clip_kind == "EFFECT":
-        result = _closed(value, _EFFECT_SOURCE_FIELDS, "EFFECT sourceBinding")
+        effect_source_fields = (
+            _EFFECT_SOURCE_FIELDS_V3
+            if clip_schema_version == TIMELINE_CLIP_SCHEMA_VERSION_V3
+            else _EFFECT_SOURCE_FIELDS
+        )
+        result = _closed(value, effect_source_fields, "EFFECT sourceBinding")
         ref_field, digest_field, source_type = (
             "effectRequirementRef",
             "effectRequirementDigest",
             "EFFECT_REQUIREMENT",
         )
-        if result["effectKind"] != "GLYPH_REVEAL":
-            raise TimelineEditingContractError("effectKind is invalid")
-        if result["effectResultRef"] is not None:
-            raise TimelineEditingAuthorityError(
-                "M13-T1 EFFECT clips cannot bind an effect result"
-            )
+        if clip_schema_version == TIMELINE_CLIP_SCHEMA_VERSION:
+            if result["effectKind"] != "GLYPH_REVEAL":
+                raise TimelineEditingContractError("effectKind is invalid")
+            if result["effectResultRef"] is not None:
+                raise TimelineEditingAuthorityError(
+                    "M13-T1 EFFECT clips cannot bind an effect result"
+                )
+        else:
+            if result["effectKind"] not in DETERMINISTIC_EFFECT_KINDS:
+                raise TimelineEditingContractError("effectKind is invalid")
+            result_ref = result["effectResultRef"]
+            result_digest = result["effectResultDigest"]
+            if (result_ref is None) != (result_digest is None):
+                raise TimelineEditingStaleInputError(
+                    "EFFECT result binding is incomplete"
+                )
+            if result_ref is not None:
+                _ref(result_ref, "effectResultRef")
+                _digest_value(result_digest, "effectResultDigest")
         _integer(result["layer"], "effect layer", maximum=1024)
         if result["blendMode"] not in BLEND_MODES:
             raise TimelineEditingContractError("effect blendMode is invalid")
@@ -1096,22 +1126,105 @@ def _validate_source_binding(
                     "AudioCue subtitle semantic binding is stale"
                 )
         if clip_kind == "EFFECT":
-            composite = authority.get("compositeParams")
-            if (
-                authority.get("requirementRef") != result["effectRequirementRef"]
-                or not isinstance(composite, Mapping)
-                or composite.get("blendMode") != result["blendMode"]
-                or result["layer"] != 1
-                or timeline_start_frame_inclusive is None
-                or timeline_end_frame_exclusive is None
-                or timeline_end_frame_exclusive
-                - timeline_start_frame_inclusive
-                != authority.get("frameRangeEndExclusive", -1)
-                - authority.get("frameRangeStartInclusive", 0)
-            ):
-                raise TimelineEditingStaleInputError(
-                    "GlyphRevealRequirement semantic binding is stale"
-                )
+            if clip_schema_version == TIMELINE_CLIP_SCHEMA_VERSION:
+                composite = authority.get("compositeParams")
+                if (
+                    authority.get("requirementRef")
+                    != result["effectRequirementRef"]
+                    or not isinstance(composite, Mapping)
+                    or composite.get("blendMode") != result["blendMode"]
+                    or result["layer"] != 1
+                    or timeline_start_frame_inclusive is None
+                    or timeline_end_frame_exclusive is None
+                    or timeline_end_frame_exclusive
+                    - timeline_start_frame_inclusive
+                    != authority.get("frameRangeEndExclusive", -1)
+                    - authority.get("frameRangeStartInclusive", 0)
+                ):
+                    raise TimelineEditingStaleInputError(
+                        "GlyphRevealRequirement semantic binding is stale"
+                    )
+            else:
+                range_start = authority.get("frameRangeStartInclusive")
+                range_end = authority.get("frameRangeEndExclusive")
+                base_ref = authority.get("basePlateAssetVersionRef")
+                base_digest = authority.get("basePlateAssetVersionDigest")
+                if (
+                    authority.get("requirementRef")
+                    != result["effectRequirementRef"]
+                    or authority.get("effectMode") != result["effectKind"]
+                    or authority.get("blendMode") != result["blendMode"]
+                    or authority.get("layer") != result["layer"]
+                    or isinstance(range_start, bool)
+                    or not isinstance(range_start, int)
+                    or isinstance(range_end, bool)
+                    or not isinstance(range_end, int)
+                    or range_start < 0
+                    or range_end <= range_start
+                    or timeline_start_frame_inclusive is None
+                    or timeline_end_frame_exclusive is None
+                    or timeline_end_frame_exclusive
+                    - timeline_start_frame_inclusive
+                    != range_end - range_start
+                    or not isinstance(base_ref, str)
+                    or not isinstance(base_digest, str)
+                ):
+                    raise TimelineEditingStaleInputError(
+                        "deterministic Effect Requirement binding is stale"
+                    )
+                base = source_resolver("ASSET_VERSION", base_ref)
+                if not isinstance(base, Mapping):
+                    raise TimelineEditingAuthorityError(
+                        "effect base AssetVersion authority is not resolvable"
+                    )
+                if (
+                    base.get("assetVersionRef") != base_ref
+                    or base.get("payloadDigest") != base_digest
+                    or base.get("creativeShotRef")
+                    != authority.get("targetShotRef")
+                    or base.get("creativeShotVersionRef")
+                    != authority.get("targetShotVersionRef")
+                    or base.get("creativeShotDigest")
+                    != authority.get("targetShotVersionDigest")
+                ):
+                    raise TimelineEditingStaleInputError(
+                        "effect Requirement shot/base binding is stale"
+                    )
+                if result["effectResultRef"] is not None:
+                    effect_result = source_resolver(
+                        "EFFECT_RESULT", result["effectResultRef"]
+                    )
+                    if not isinstance(effect_result, Mapping):
+                        raise TimelineEditingAuthorityError(
+                            "Effect Result authority is not resolvable"
+                        )
+                    if (
+                        effect_result.get("resultRef")
+                        != result["effectResultRef"]
+                        or effect_result.get("payloadDigest")
+                        != result["effectResultDigest"]
+                        or effect_result.get("requirementRef")
+                        != result["effectRequirementRef"]
+                        or effect_result.get("requirementDigest")
+                        != result["effectRequirementDigest"]
+                        or effect_result.get("effectMode")
+                        != result["effectKind"]
+                        or effect_result.get("workspaceRef")
+                        != authority.get("workspaceRef")
+                        or effect_result.get("productionRunRef")
+                        != authority.get("productionRunRef")
+                        or effect_result.get("targetShotRef")
+                        != authority.get("targetShotRef")
+                        or effect_result.get("frameRangeStartInclusive")
+                        != range_start
+                        or effect_result.get("frameRangeEndExclusive")
+                        != range_end
+                        or effect_result.get("state") != "SUCCEEDED"
+                        or effect_result.get("publicationAllowed") is not False
+                    ):
+                        raise TimelineEditingStaleInputError(
+                            "Effect Result binding is stale"
+                        )
     return result
 
 
@@ -1124,7 +1237,11 @@ def _validate_timeline_clip_mapping(
     scope: Mapping[str, str] | None = None,
 ) -> dict[str, Any]:
     result = _verify_sealed(value, _CLIP_FIELDS, "TimelineClip")
-    if result["schemaVersion"] != TIMELINE_CLIP_SCHEMA_VERSION:
+    clip_schema_version = result["schemaVersion"]
+    if clip_schema_version not in {
+        TIMELINE_CLIP_SCHEMA_VERSION,
+        TIMELINE_CLIP_SCHEMA_VERSION_V3,
+    }:
         raise TimelineEditingContractError("TimelineClip schema is unsupported")
     _ref(result["clipRef"], "clipRef")
     _ref(result["timelineVersionRef"], "timelineVersionRef")
@@ -1132,6 +1249,13 @@ def _validate_timeline_clip_mapping(
     clip_kind = result["clipKind"]
     if clip_kind not in set().union(*CLIP_KIND_BY_TRACK.values()):
         raise TimelineEditingContractError("clipKind is invalid")
+    if (
+        clip_schema_version == TIMELINE_CLIP_SCHEMA_VERSION_V3
+        and clip_kind != "EFFECT"
+    ):
+        raise TimelineEditingContractError(
+            "TimelineClip v3 is reserved for deterministic EFFECT clips"
+        )
     start = _integer(
         result["timelineStartFrameInclusive"],
         "timelineStartFrameInclusive",
@@ -1155,6 +1279,7 @@ def _validate_timeline_clip_mapping(
     source = _validate_source_binding(
         result["sourceBinding"],
         clip_kind,
+        clip_schema_version=clip_schema_version,
         source_resolver=source_resolver,
         scope=scope,
         timeline_start_frame_inclusive=start,
@@ -1278,9 +1403,23 @@ def _wire(value: Any, expected_type: type[_ImmutableWireContract]) -> Any:
     return value.as_dict() if type(value) is expected_type else deepcopy(value)
 
 
+def _timeline_clip_schema_for_command(value: Mapping[str, Any]) -> str:
+    source = value.get("sourceBinding")
+    if (
+        value.get("clipKind") == "EFFECT"
+        and isinstance(source, Mapping)
+        and (
+            source.get("effectKind") in DETERMINISTIC_EFFECT_KINDS
+            or "effectResultDigest" in source
+        )
+    ):
+        return TIMELINE_CLIP_SCHEMA_VERSION_V3
+    return TIMELINE_CLIP_SCHEMA_VERSION
+
+
 def build_timeline_clip(command: Mapping[str, Any]) -> dict[str, Any]:
     value = _closed(command, _CLIP_COMMAND_FIELDS, "TimelineClip command")
-    result = {"schemaVersion": TIMELINE_CLIP_SCHEMA_VERSION}
+    result = {"schemaVersion": _timeline_clip_schema_for_command(value)}
     for field in _CLIP_COMMAND_FIELDS:
         item = value[field]
         if field in {"transitionIn", "transitionOut"} and item is not None:
@@ -2090,6 +2229,11 @@ _EDIT_ARGUMENT_FIELDS = {
     "SET_SAFE_AREA": frozenset({"safeArea"}),
     "SET_OUTPUT_PROFILES": frozenset({"outputProfileBindings"}),
 }
+_EDIT_ARGUMENT_FIELDS_V2 = {
+    "BIND_EFFECT_RESULT": frozenset(
+        {"clipRef", "effectResultRef", "effectResultDigest"}
+    ),
+}
 _INSERT_CLIP_FIELDS = _CLIP_COMMAND_FIELDS - frozenset({"timelineVersionRef"})
 
 
@@ -2098,8 +2242,13 @@ def _validate_edit_arguments(
     value: Any,
     *,
     new_timeline_version_ref: str,
+    schema_version: str = TIMELINE_EDIT_COMMAND_SCHEMA_VERSION,
 ) -> dict[str, Any]:
-    fields = _EDIT_ARGUMENT_FIELDS[operation]
+    fields = (
+        _EDIT_ARGUMENT_FIELDS_V2
+        if schema_version == TIMELINE_EDIT_COMMAND_SCHEMA_VERSION_V2
+        else _EDIT_ARGUMENT_FIELDS
+    )[operation]
     result = _closed(value, fields, f"{operation} arguments")
     _reject_forbidden_keys(result)
     if "clipRef" in result:
@@ -2109,12 +2258,15 @@ def _validate_edit_arguments(
         _validate_timeline_clip_mapping(
             _seal(
                 {
-                    "schemaVersion": TIMELINE_CLIP_SCHEMA_VERSION,
+                    "schemaVersion": _timeline_clip_schema_for_command(clip),
                     **clip,
                     "timelineVersionRef": new_timeline_version_ref,
                 }
             )
         )
+    elif operation == "BIND_EFFECT_RESULT":
+        _ref(result["effectResultRef"], "effectResultRef")
+        _digest_value(result["effectResultDigest"], "effectResultDigest")
     elif operation == "MOVE_CLIP":
         _ref(result["trackRef"], "trackRef")
         start = _integer(
@@ -2199,7 +2351,11 @@ def _validate_edit_arguments(
 
 def _validate_timeline_edit_command_mapping(value: Any) -> dict[str, Any]:
     result = _verify_sealed(value, _EDIT_COMMAND_FIELDS, "TimelineEditCommand")
-    if result["schemaVersion"] != TIMELINE_EDIT_COMMAND_SCHEMA_VERSION:
+    schema_version = result["schemaVersion"]
+    if schema_version not in {
+        TIMELINE_EDIT_COMMAND_SCHEMA_VERSION,
+        TIMELINE_EDIT_COMMAND_SCHEMA_VERSION_V2,
+    }:
         raise TimelineEditingContractError("TimelineEditCommand schema is unsupported")
     _ref(result["operationRef"], "operationRef")
     _ref(result["idempotencyKey"], "idempotencyKey")
@@ -2209,12 +2365,18 @@ def _validate_timeline_edit_command_mapping(value: Any) -> dict[str, Any]:
     )
     _ref(result["newTimelineVersionRef"], "newTimelineVersionRef")
     operation = result["operation"]
-    if operation not in EDIT_OPERATIONS:
+    allowed_operations = (
+        TIMELINE_EDIT_OPERATIONS_V2
+        if schema_version == TIMELINE_EDIT_COMMAND_SCHEMA_VERSION_V2
+        else EDIT_OPERATIONS
+    )
+    if operation not in allowed_operations:
         raise TimelineEditingContractError("edit operation is invalid")
     _validate_edit_arguments(
         operation,
         result["arguments"],
         new_timeline_version_ref=result["newTimelineVersionRef"],
+        schema_version=schema_version,
     )
     _timestamp(result["createdAt"])
     return result
@@ -2225,7 +2387,12 @@ def build_timeline_edit_command(command: Mapping[str, Any]) -> dict[str, Any]:
         command, _EDIT_COMMAND_INPUT_FIELDS, "TimelineEditCommand command"
     )
     _reject_forbidden_keys(value["arguments"])
-    result = {"schemaVersion": TIMELINE_EDIT_COMMAND_SCHEMA_VERSION, **value}
+    schema_version = (
+        TIMELINE_EDIT_COMMAND_SCHEMA_VERSION_V2
+        if value["operation"] in TIMELINE_EDIT_OPERATIONS_V2
+        else TIMELINE_EDIT_COMMAND_SCHEMA_VERSION
+    )
+    result = {"schemaVersion": schema_version, **value}
     for field, expected in (
         ("transition", TransitionSpec),
         ("speed", SpeedSpec),
@@ -2266,7 +2433,11 @@ def assert_timeline_edit_replay(
         mapping = command.as_dict()
     elif (
         isinstance(command, Mapping)
-        and command.get("schemaVersion") == TIMELINE_EDIT_COMMAND_SCHEMA_VERSION
+        and command.get("schemaVersion")
+        in {
+            TIMELINE_EDIT_COMMAND_SCHEMA_VERSION,
+            TIMELINE_EDIT_COMMAND_SCHEMA_VERSION_V2,
+        }
         and "payloadDigest" in command
     ):
         mapping = _validate_timeline_edit_command_mapping(command)
@@ -2472,7 +2643,11 @@ def apply_timeline_edit(
         edit_mapping = command.as_dict()
     elif (
         isinstance(command, Mapping)
-        and command.get("schemaVersion") == TIMELINE_EDIT_COMMAND_SCHEMA_VERSION
+        and command.get("schemaVersion")
+        in {
+            TIMELINE_EDIT_COMMAND_SCHEMA_VERSION,
+            TIMELINE_EDIT_COMMAND_SCHEMA_VERSION_V2,
+        }
         and "payloadDigest" in command
     ):
         edit_mapping = _validate_timeline_edit_command_mapping(command)
@@ -2541,6 +2716,71 @@ def apply_timeline_edit(
             "timelineVersionRef": edit_mapping["newTimelineVersionRef"],
         }
         clips.append(build_timeline_clip(clip_command))
+    elif operation == "BIND_EFFECT_RESULT":
+        target = _find_clip(clips, arguments["clipRef"])
+        source = target["sourceBinding"]
+        if (
+            target["schemaVersion"] != TIMELINE_CLIP_SCHEMA_VERSION_V3
+            or target["clipKind"] != "EFFECT"
+            or source.get("effectResultRef") is not None
+            or source.get("effectResultDigest") is not None
+        ):
+            raise TimelineEditingAuthorityError(
+                "BIND_EFFECT_RESULT requires one unbound v3 EFFECT clip"
+            )
+        if source_resolver is None:
+            raise TimelineEditingAuthorityError(
+                "BIND_EFFECT_RESULT requires exact Effect authority"
+            )
+        requirement = source_resolver(
+            "EFFECT_REQUIREMENT", source["effectRequirementRef"]
+        )
+        effect_result = source_resolver(
+            "EFFECT_RESULT", arguments["effectResultRef"]
+        )
+        if not isinstance(requirement, Mapping) or not isinstance(
+            effect_result, Mapping
+        ):
+            raise TimelineEditingAuthorityError(
+                "BIND_EFFECT_RESULT authority is not resolvable"
+            )
+        if (
+            effect_result.get("resultRef") != arguments["effectResultRef"]
+            or effect_result.get("payloadDigest")
+            != arguments["effectResultDigest"]
+            or effect_result.get("requirementRef")
+            != source["effectRequirementRef"]
+            or effect_result.get("requirementDigest")
+            != source["effectRequirementDigest"]
+            or effect_result.get("effectMode") != source["effectKind"]
+            or effect_result.get("workspaceRef") != version["workspaceRef"]
+            or effect_result.get("productionRunRef")
+            != version["productionRunRef"]
+            or requirement.get("payloadDigest")
+            != source["effectRequirementDigest"]
+            or requirement.get("workspaceRef") != version["workspaceRef"]
+            or requirement.get("productionRunRef")
+            != version["productionRunRef"]
+            or effect_result.get("targetShotRef")
+            != requirement.get("targetShotRef")
+            or effect_result.get("frameRangeStartInclusive")
+            != requirement.get("frameRangeStartInclusive")
+            or effect_result.get("frameRangeEndExclusive")
+            != requirement.get("frameRangeEndExclusive")
+        ):
+            raise TimelineEditingStaleInputError(
+                "BIND_EFFECT_RESULT authority is stale"
+            )
+        bound_source = {
+            **deepcopy(source),
+            "effectResultRef": arguments["effectResultRef"],
+            "effectResultDigest": arguments["effectResultDigest"],
+        }
+        _replace_clip(
+            clips,
+            target,
+            _reseal_clip(target, sourceBinding=bound_source),
+        )
     elif operation == "REMOVE_CLIP":
         target = _find_clip(clips, arguments["clipRef"])
         clips.remove(target)
@@ -2846,6 +3086,7 @@ def apply_timeline_edit(
 __all__ = [
     "BLEND_MODES",
     "CLIP_KIND_BY_TRACK",
+    "DETERMINISTIC_EFFECT_KINDS",
     "EDIT_OPERATIONS",
     "FIXED_OPACITY_SCALE",
     "LANE_POLICIES",
@@ -2862,8 +3103,11 @@ __all__ = [
     "SpeedSpec",
     "TIMELINE_CLIP_SCHEMA_VERSION",
     "TIMELINE_CLIP_SCHEMA_VERSION_V2",
+    "TIMELINE_CLIP_SCHEMA_VERSION_V3",
     "TIMELINE_CLIP_SNAPSHOT_SCHEMA_VERSION",
     "TIMELINE_EDIT_COMMAND_SCHEMA_VERSION",
+    "TIMELINE_EDIT_COMMAND_SCHEMA_VERSION_V2",
+    "TIMELINE_EDIT_OPERATIONS_V2",
     "TIMELINE_PROVENANCE",
     "TIMELINE_SCHEMA_VERSION",
     "TIMELINE_SCHEMA_VERSION_V3",

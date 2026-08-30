@@ -10,9 +10,9 @@
 >
 > Current Task: `ACS-M12-M13-ARCHITECTURE-CORRECTION-20260830`
 >
-> Current Work Package: `ACCEPTED ADR + AUTHORITY CHECKPOINT ONLY / IMPLEMENTATION WAITS FOR CHECKPOINT MERGE`
+> Current Work Package: `M12-C2 MERGED / M13-E1 DETERMINISTIC MASKED-SURFACE IMPLEMENTATION / M12-C3/C4 ENVIRONMENT_HOLD`
 >
-> Authorized Source Base: `CORE 68cad32f60397c969b36257d8a894e0b52d2e162 / TREE 62084f092d4f42c5037d9c9f19e54bef266c2b1e / OR A VERIFIED NON-CONFLICTING DESCENDANT`
+> Authorized Source Base: `CORE 0386cd6da5fd434a0d525c7ec004ceb98d824b3e / TREE 9b19ea488844dd6ba4280246251cbc14dada69fc / VERIFIED M12-C2 MERGE`
 >
 > M6 Authorization: `ACCEPTED SURFACES / K2-002 MUST CREATE DISTINCT SCOPE AND APPROVALS / NO K2-001 AUTHORITY INHERITANCE`
 >
@@ -43,13 +43,18 @@ authority and supersedes the earlier minimal M12/M13 vertical-slice overlay for 
 work. Already merged M12 PR-1 through PR-6 audio capabilities, M13 glyph work and the
 minimal Timeline/Preview slice remain immutable implementation history.
 
-The first mandatory work package is governance and architecture only:
+The architecture checkpoint, M12-C1, M13-T1 and M12-C2 predecessors are merged and
+remotely verified. M12-C2 added only the closed isolated Kokoro/CosyVoice runtime
+protocol and V4 adapter boundary; it installed no runtime or ML dependency and added no
+Creator HTTP route. M12-C3/C4 remain on `ENVIRONMENT_HOLD` because the persistent CPU
+build root is absent.
 
-1. accept ADR-0015 and ADR-0016;
-2. synchronize the System Master Plan, Golden Contract, Current Milestone and Risk
-   Register;
-3. validate, merge and remotely verify the Architecture Checkpoint;
-4. only then start independent single-responsibility implementation PRs.
+M13-E1 is the current CPU-only implementation work package. It adds one shared,
+deterministic masked-surface primitive for `SCRATCH_REVEAL`, `LIGHT_SWEEP` and
+`LOCAL_EXPOSURE`, persists its closed evidence chain in the existing Episode Production
+journal, binds immutable Results one-way into successor TimelineVersions, and reuses the
+existing PreviewCandidate/API boundary. The next M13 work package after an independently
+verified M13-E1 merge is M13-E2. A100 remains unauthorized.
 
 The accepted M12 architecture freezes two distinct isolated runtimes:
 
@@ -85,7 +90,14 @@ RenderManifest. It creates no ExportCandidate, EpisodeMaster or ExportArtifact.
 The current authority state is:
 
 ```text
-ARCHITECTURE_CHECKPOINT=AUTHORIZED_REQUIRED_PREDECESSOR
+ARCHITECTURE_CHECKPOINT=MERGED
+
+M12_C1=MERGED
+M13_T1=MERGED
+M12_C2=MERGED
+M12_RUNTIME_INSTALLED=false
+M12_C2_CREATOR_HTTP_ROUTES_ADDED=0
+M12_RUNTIME_G0=NOT_COMPLETE
 
 M12_RUNTIME_G0_UNBLOCK=AUTHORIZED_NON_GPU
 M12_PERSISTENT_CPU_BUILD_ENVIRONMENT=REQUIRED
@@ -96,6 +108,11 @@ M12_G0_3_STATE=ENVIRONMENT_HOLD
 BLOCK_REASON=PERSISTENT_CPU_BUILD_ARTIFACT_ROOT_UNAVAILABLE
 
 M13_FULL_BACKEND_IMPLEMENTATION=AUTHORIZED_CPU_ONLY
+M13_E1=IMPLEMENTED_CPU_ONLY
+M13_DETERMINISTIC_POST_PRODUCTION_WIRED=3/8
+M13_E2=NEXT_AFTER_M13_E1_MERGE
+M13_BACKEND_CAPABILITY_COMPLETE=false
+M13_RENDER_CANDIDATE_STATE=NOT_IMPLEMENTED
 M13_RENDER_CANDIDATE=AUTHORIZED_NON_PUBLISHING
 M13_EXPORT_CANDIDATE=PROHIBITED
 M13_EPISODE_MASTER=OUT_OF_SCOPE

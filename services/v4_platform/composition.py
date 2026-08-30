@@ -2225,6 +2225,36 @@ class V4CompositionExecutor:
                 "V3 timeline preview composition failed"
             ) from exc
 
+    def compose_timeline_preview_v2(
+        self,
+        command: Mapping[str, Any],
+        *,
+        resolved_artifacts: Mapping[str, Any],
+    ) -> dict[str, Any]:
+        """Delegate the additive effect Preview through the same V4 owner."""
+
+        from services.v3_render_core.masked_surface import (
+            DeterministicMaskedSurfaceExecutor,
+        )
+        from .masked_surface_effects import (
+            MaskedSurfaceExecutionError,
+            V4MaskedSurfaceEffectExecutor,
+        )
+
+        try:
+            executor = V4MaskedSurfaceEffectExecutor(
+                self.artifact_root,
+                DeterministicMaskedSurfaceExecutor(self.artifact_root),
+            )
+            return executor.compose_timeline_preview_v2(
+                command,
+                resolved_artifacts=resolved_artifacts,
+            )
+        except MaskedSurfaceExecutionError as exc:
+            raise CompositionExecutionError(
+                "V3 effect timeline preview composition failed"
+            ) from exc
+
     def finalize(self, command: Mapping[str, Any]) -> dict[str, Any]:
         try:
             result = self.composer.finalize(

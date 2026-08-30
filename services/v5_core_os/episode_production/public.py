@@ -61,6 +61,9 @@ from .delivery import (
     RejectingApprovalAuthority,
 )
 from .timeline_preview import TIMELINE_VERSION_SCHEMA_VERSION_V2
+from .timeline_editing import (
+    TIMELINE_VERSION_SCHEMA_VERSION as EDITING_TIMELINE_VERSION_SCHEMA_VERSION,
+)
 from .production_policy import (
     InMemoryProductionPolicyAdapter,
     K2ProductionPolicyService,
@@ -210,6 +213,27 @@ def _strip_private_preview_details(value: Any) -> Any:
         return [_strip_private_preview_details(item) for item in value]
     if isinstance(value, tuple):
         return tuple(_strip_private_preview_details(item) for item in value)
+    return value
+
+
+def _strip_effect_preview_details(value: Any) -> Any:
+    """Redact v3 execution envelopes in addition to locator-like fields."""
+
+    if isinstance(value, Mapping):
+        return {
+            key: _strip_effect_preview_details(item)
+            for key, item in value.items()
+            if not _is_private_preview_detail(key)
+            and (
+                not isinstance(key, str)
+                or key.replace("_", "").replace("-", "").lower()
+                != "executionresult"
+            )
+        }
+    if isinstance(value, list):
+        return [_strip_effect_preview_details(item) for item in value]
+    if isinstance(value, tuple):
+        return tuple(_strip_effect_preview_details(item) for item in value)
     return value
 
 
@@ -574,6 +598,12 @@ class EpisodeProductionPublicBoundary:
             == TIMELINE_VERSION_SCHEMA_VERSION_V2
         ):
             return _strip_private_preview_details(result)
+        if (
+            isinstance(timeline_version, Mapping)
+            and timeline_version.get("schemaVersion")
+            == EDITING_TIMELINE_VERSION_SCHEMA_VERSION
+        ):
+            return _strip_effect_preview_details(result)
         return result
 
     def create_timeline(self, command: Mapping[str, Any]) -> dict[str, Any]:
@@ -648,6 +678,12 @@ class EpisodeProductionPublicBoundary:
             == TIMELINE_VERSION_SCHEMA_VERSION_V2
         ):
             return _strip_private_preview_details(result)
+        if (
+            isinstance(timeline_version, Mapping)
+            and timeline_version.get("schemaVersion")
+            == EDITING_TIMELINE_VERSION_SCHEMA_VERSION
+        ):
+            return _strip_effect_preview_details(result)
         return result
 
     def get_preview_bundle(
@@ -911,15 +947,6 @@ def _services(
         ref_factory=selected_ref_factory,
         clock=selected_clock,
     )
-    delivery = K2DeliveryService(
-        media,
-        evidence_repository,
-        composition_execution,
-        approval_authority or RejectingApprovalAuthority(),
-        ref_factory=selected_ref_factory,
-        clock=selected_clock,
-        glyph_inspection_adapter=glyph_inspection_adapter,
-    )
     real_media_revision = K2RealMediaRevisionService(
         shot_graph,
         evidence_repository,
@@ -933,6 +960,16 @@ def _services(
         ),
         ref_factory=selected_ref_factory,
         clock=selected_clock,
+    )
+    delivery = K2DeliveryService(
+        media,
+        evidence_repository,
+        composition_execution,
+        approval_authority or RejectingApprovalAuthority(),
+        ref_factory=selected_ref_factory,
+        clock=selected_clock,
+        real_video_authority=real_media_revision,
+        glyph_inspection_adapter=glyph_inspection_adapter,
     )
     real_media_revision.state_projection = K2ProductionStateProjectionService(
         service,
