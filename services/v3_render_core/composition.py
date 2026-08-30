@@ -2,11 +2,13 @@
 
 from __future__ import annotations
 
+import ctypes
+import errno
 from fractions import Fraction
 from hashlib import sha256
 import json
 import os
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 import re
 import shutil
 import stat
@@ -15,8 +17,13 @@ import tempfile
 from typing import Any, Mapping
 
 from .digests import (
+    CANONICAL_PCM_CHANNEL_COUNT,
+    CANONICAL_PCM_SAMPLE_RATE,
+    DECODED_FRAME_PIXEL_DIGEST_SPEC_V2,
     DigestError,
     IMAGE_PIXEL_DIGEST_SPEC,
+    PCM_CONTENT_DIGEST_SPEC,
+    canonical_pcm_digest_metadata,
     decoded_frame_pixel_digest_metadata,
     file_digest,
     image_digest_metadata,
@@ -35,6 +42,54 @@ _GLYPH_RENDERER_IDENTITY_V2 = "v3.deterministic-glyph-reveal-ffmpeg"
 _GLYPH_RENDERER_VERSION_V2 = "2"
 _GLYPH_BLEND_MODE = "GRAZING_LIGHT_RELIEF"
 _SUPPORTED_GLYPH_BASE_PIXEL_FORMATS = {"yuv420p", "yuv422p", "yuv444p"}
+_TIMELINE_PREVIEW_RENDERER_IDENTITY = "v3.deterministic-timeline-preview-ffmpeg"
+_TIMELINE_PREVIEW_RENDERER_VERSION = "1"
+_TIMELINE_PREVIEW_REQUEST_SCHEMA_VERSION = (
+    "v4.m13-composition-execution-request.v1"
+)
+_TIMELINE_PREVIEW_ROLE_PRIORITY = {
+    "dialogue": 3,
+    "narration": 3,
+    "sfx": 2,
+    "ambience": 1,
+    "music": 0,
+}
+_TIMELINE_PREVIEW_ROLE_GAIN_DB = {
+    "dialogue": 0,
+    "narration": 0,
+    "sfx": -6,
+    "ambience": -12,
+    "music": -18,
+}
+_TIMELINE_PREVIEW_DUCKING = {
+    "threshold": "0.125",
+    "ratio": "8",
+    "attackMilliseconds": 5,
+    "releaseMilliseconds": 180,
+    "makeup": "1",
+    "knee": "2",
+    "link": "maximum",
+    "detection": "rms",
+    "levelSc": "1",
+    "mix": "1",
+}
+_TIMELINE_PREVIEW_LIMITER = {
+    "limit": "0.95",
+    "attackMilliseconds": 5,
+    "releaseMilliseconds": 50,
+    "level": False,
+    "latency": True,
+}
+_MAX_TIMELINE_PREVIEW_INPUT_BYTES = 4_000_000_000
+_STABLE_FILE_IDENTITY_FIELDS = (
+    "st_dev",
+    "st_ino",
+    "st_mode",
+    "st_nlink",
+    "st_size",
+    "st_mtime_ns",
+    "st_ctime_ns",
+)
 
 
 def _scope_path(root: Path, workspace_ref: str, run_ref: str) -> Path:
@@ -124,6 +179,313 @@ def _runtime_path(name: str) -> Path:
     if not resolved.is_file():
         raise RenderArtifactError(f"{name} runtime is unavailable")
     return resolved
+
+
+def _runtime_binary_identity(path: Path, *, label: str) -> tuple[Any, ...]:
+    """Measure one no-follow executable and reject an unstable path entry."""
+
+    no_follow = getattr(os, "O_NOFOLLOW", None)
+    if no_follow is None:
+        raise RenderArtifactError(
+            f"{label} runtime no-follow support is unavailable"
+        )
+    flags = os.O_RDONLY | no_follow
+    if hasattr(os, "O_CLOEXEC"):
+        flags |= os.O_CLOEXEC
+    if hasattr(os, "O_NONBLOCK"):
+        flags |= os.O_NONBLOCK
+    descriptor: int | None = None
+    identity_fields = (
+        "st_dev",
+        "st_ino",
+        "st_mode",
+        "st_nlink",
+        "st_size",
+        "st_mtime_ns",
+        "st_ctime_ns",
+    )
+    try:
+        descriptor = os.open(path, flags)
+        before = os.fstat(descriptor)
+        entry_before = os.stat(path, follow_symlinks=False)
+        if (
+            not stat.S_ISREG(before.st_mode)
+            or before.st_size <= 0
+            or before.st_mode & 0o111 == 0
+            or any(
+                getattr(before, field) != getattr(entry_before, field)
+                for field in identity_fields
+            )
+        ):
+            raise RenderArtifactError(f"{label} runtime is not a stable executable")
+        digest = sha256()
+        with os.fdopen(os.dup(descriptor), "rb") as stream:
+            for block in iter(lambda: stream.read(1024 * 1024), b""):
+                digest.update(block)
+        after = os.fstat(descriptor)
+        entry_after = os.stat(path, follow_symlinks=False)
+        if any(
+            getattr(before, field) != getattr(after, field)
+            or getattr(before, field) != getattr(entry_after, field)
+            for field in identity_fields
+        ):
+            raise RenderArtifactError(f"{label} runtime changed while measuring")
+        return (
+            str(path),
+            *(getattr(after, field) for field in identity_fields),
+            digest.hexdigest(),
+        )
+    except RenderArtifactError:
+        raise
+    except OSError as exc:
+        raise RenderArtifactError(f"{label} runtime is unavailable") from exc
+    finally:
+        if descriptor is not None:
+            os.close(descriptor)
+
+
+def _require_stable_runtime_binary(
+    path: Path,
+    expected_identity: tuple[Any, ...],
+    *,
+    label: str,
+) -> None:
+    if _runtime_binary_identity(path, label=label) != expected_identity:
+        raise RenderArtifactError(f"{label} runtime changed during composition")
+
+
+def _stable_file_identity(value: os.stat_result) -> tuple[int, ...]:
+    return tuple(
+        getattr(value, field) for field in _STABLE_FILE_IDENTITY_FIELDS
+    )
+
+
+def _descriptor_sha256(
+    descriptor: int,
+    *,
+    label: str,
+    require_executable: bool = False,
+) -> tuple[str, int, tuple[int, ...]]:
+    if not hasattr(os, "pread"):
+        raise RenderArtifactError(f"{label} descriptor hashing is unavailable")
+    try:
+        before = os.fstat(descriptor)
+        if (
+            not stat.S_ISREG(before.st_mode)
+            or before.st_size <= 0
+            or (require_executable and before.st_mode & 0o111 == 0)
+        ):
+            raise RenderArtifactError(f"{label} is not a regular file")
+        digest = sha256()
+        byte_count = 0
+        offset = 0
+        while True:
+            block = os.pread(descriptor, 1024 * 1024, offset)
+            if not block:
+                break
+            digest.update(block)
+            byte_count += len(block)
+            offset += len(block)
+        after = os.fstat(descriptor)
+    except RenderArtifactError:
+        raise
+    except OSError as exc:
+        raise RenderArtifactError(f"{label} could not be hashed") from exc
+    if (
+        _stable_file_identity(before) != _stable_file_identity(after)
+        or byte_count != before.st_size
+    ):
+        raise RenderArtifactError(f"{label} changed while hashing")
+    return digest.hexdigest(), byte_count, _stable_file_identity(after)
+
+
+class _PinnedRuntimeBinary:
+    """Execute one measured runtime through its held descriptor only."""
+
+    def __init__(self, path: Path, *, label: str) -> None:
+        self.source_path = path
+        self.label = label
+        self.descriptor: int | None = None
+        self.binary_digest = ""
+        self.identity: tuple[int, ...] = ()
+
+    def __enter__(self) -> "_PinnedRuntimeBinary":
+        no_follow = getattr(os, "O_NOFOLLOW", None)
+        if no_follow is None:
+            raise RenderArtifactError(
+                f"{self.label} runtime no-follow support is unavailable"
+            )
+        flags = os.O_RDONLY | no_follow
+        if hasattr(os, "O_CLOEXEC"):
+            flags |= os.O_CLOEXEC
+        if hasattr(os, "O_NONBLOCK"):
+            flags |= os.O_NONBLOCK
+        try:
+            self.descriptor = os.open(self.source_path, flags)
+            entry = os.stat(self.source_path, follow_symlinks=False)
+            self.binary_digest, _, self.identity = _descriptor_sha256(
+                self.descriptor,
+                label=f"{self.label} runtime",
+                require_executable=True,
+            )
+            if _stable_file_identity(entry) != self.identity:
+                raise RenderArtifactError(
+                    f"{self.label} runtime path is not stable"
+                )
+            return self
+        except Exception:
+            self.close()
+            raise
+
+    def __exit__(self, *_: object) -> None:
+        self.close()
+
+    def close(self) -> None:
+        if self.descriptor is not None:
+            os.close(self.descriptor)
+            self.descriptor = None
+
+    @property
+    def executable_path(self) -> Path:
+        if self.descriptor is None:
+            raise RenderArtifactError(f"{self.label} runtime is not pinned")
+        return Path(f"/proc/self/fd/{self.descriptor}")
+
+    @property
+    def pass_fds(self) -> tuple[int, ...]:
+        if self.descriptor is None:
+            raise RenderArtifactError(f"{self.label} runtime is not pinned")
+        return (self.descriptor,)
+
+    def version_identity(self) -> str:
+        try:
+            result = subprocess.run(
+                [str(self.executable_path), "-version"],
+                check=True,
+                capture_output=True,
+                text=True,
+                encoding="utf-8",
+                errors="strict",
+                timeout=30,
+                env=_fixed_environment(),
+                pass_fds=self.pass_fds,
+            )
+        except (OSError, subprocess.SubprocessError, UnicodeError) as exc:
+            raise RenderArtifactError(
+                f"{self.label} runtime identity is unavailable"
+            ) from exc
+        lines = result.stdout.splitlines()
+        first_line = lines[0].strip() if lines else ""
+        if (
+            not first_line
+            or len(first_line) > 400
+            or any(
+                ord(character) < 32 or ord(character) == 127
+                for character in first_line
+            )
+        ):
+            raise RenderArtifactError(
+                f"{self.label} runtime identity is invalid"
+            )
+        return f"{first_line} | sha256:{self.binary_digest}"
+
+    def require_stable(self) -> None:
+        if self.descriptor is None:
+            raise RenderArtifactError(f"{self.label} runtime is not pinned")
+        digest, _, identity = _descriptor_sha256(
+            self.descriptor,
+            label=f"{self.label} runtime",
+            require_executable=True,
+        )
+        try:
+            entry = os.stat(self.source_path, follow_symlinks=False)
+        except OSError as exc:
+            raise RenderArtifactError(
+                f"{self.label} runtime path changed during composition"
+            ) from exc
+        if (
+            identity != self.identity
+            or digest != self.binary_digest
+            or _stable_file_identity(entry) != self.identity
+        ):
+            raise RenderArtifactError(
+                f"{self.label} runtime changed during composition"
+            )
+
+
+class _PinnedRegularFile:
+    """Retain one rendered candidate from digest through publication."""
+
+    def __init__(self, path: Path, *, label: str) -> None:
+        self.source_path = path
+        self.label = label
+        self.descriptor: int | None = None
+        self.identity: tuple[int, ...] = ()
+
+    def __enter__(self) -> "_PinnedRegularFile":
+        no_follow = getattr(os, "O_NOFOLLOW", None)
+        if no_follow is None:
+            raise RenderArtifactError(
+                f"{self.label} no-follow support is unavailable"
+            )
+        flags = os.O_RDONLY | no_follow
+        if hasattr(os, "O_CLOEXEC"):
+            flags |= os.O_CLOEXEC
+        if hasattr(os, "O_NONBLOCK"):
+            flags |= os.O_NONBLOCK
+        try:
+            self.descriptor = os.open(self.source_path, flags)
+            before = os.fstat(self.descriptor)
+            entry = os.stat(self.source_path, follow_symlinks=False)
+            if (
+                not stat.S_ISREG(before.st_mode)
+                or before.st_size <= 0
+                or _stable_file_identity(before)
+                != _stable_file_identity(entry)
+            ):
+                raise RenderArtifactError(f"{self.label} is not stable")
+            self.identity = _stable_file_identity(before)
+            return self
+        except Exception:
+            self.close()
+            raise
+
+    def __exit__(self, *_: object) -> None:
+        self.close()
+
+    def close(self) -> None:
+        if self.descriptor is not None:
+            os.close(self.descriptor)
+            self.descriptor = None
+
+    @property
+    def descriptor_path(self) -> Path:
+        if self.descriptor is None:
+            raise RenderArtifactError(f"{self.label} is not pinned")
+        return Path(f"/proc/self/fd/{self.descriptor}")
+
+    @property
+    def pass_fds(self) -> tuple[int, ...]:
+        if self.descriptor is None:
+            raise RenderArtifactError(f"{self.label} is not pinned")
+        return (self.descriptor,)
+
+    def require_stable(self) -> None:
+        if self.descriptor is None:
+            raise RenderArtifactError(f"{self.label} is not pinned")
+        try:
+            descriptor_identity = _stable_file_identity(
+                os.fstat(self.descriptor)
+            )
+            entry_identity = _stable_file_identity(
+                os.stat(self.source_path, follow_symlinks=False)
+            )
+        except OSError as exc:
+            raise RenderArtifactError(
+                f"{self.label} changed while pinned"
+            ) from exc
+        if descriptor_identity != self.identity or entry_identity != self.identity:
+            raise RenderArtifactError(f"{self.label} changed while pinned")
 
 
 def _runtime_version(executable: Path) -> str:
@@ -324,6 +686,106 @@ def _secure_output_directory(root: Path, directory: Path) -> Path:
     return resolved
 
 
+def _reuse_identical_published_output(
+    *,
+    directory_descriptor: int,
+    source: Path,
+    output_name: str,
+    no_follow: int,
+) -> None:
+    """Reuse one stable regular output only when its bytes are identical."""
+
+    file_flags = os.O_RDONLY | no_follow
+    if hasattr(os, "O_CLOEXEC"):
+        file_flags |= os.O_CLOEXEC
+    if hasattr(os, "O_NONBLOCK"):
+        file_flags |= os.O_NONBLOCK
+    source_descriptor: int | None = None
+    output_descriptor: int | None = None
+    try:
+        source_descriptor = os.open(source, file_flags)
+        output_descriptor = os.open(
+            output_name,
+            file_flags,
+            dir_fd=directory_descriptor,
+        )
+        source_before = os.fstat(source_descriptor)
+        output_before = os.fstat(output_descriptor)
+        if (
+            not stat.S_ISREG(source_before.st_mode)
+            or not stat.S_ISREG(output_before.st_mode)
+            or source_before.st_size <= 0
+            or output_before.st_size <= 0
+        ):
+            raise RenderArtifactError(
+                "existing deterministic output is not a regular file"
+            )
+
+        source_digest = sha256()
+        output_digest = sha256()
+        byte_identical = True
+        with os.fdopen(os.dup(source_descriptor), "rb") as source_stream:
+            with os.fdopen(os.dup(output_descriptor), "rb") as output_stream:
+                while True:
+                    source_block = source_stream.read(1024 * 1024)
+                    output_block = output_stream.read(1024 * 1024)
+                    source_digest.update(source_block)
+                    output_digest.update(output_block)
+                    if source_block != output_block:
+                        byte_identical = False
+                    if not source_block and not output_block:
+                        break
+
+        source_after = os.fstat(source_descriptor)
+        output_after = os.fstat(output_descriptor)
+        identity_fields = (
+            "st_dev",
+            "st_ino",
+            "st_mode",
+            "st_nlink",
+            "st_size",
+            "st_mtime_ns",
+            "st_ctime_ns",
+        )
+        if any(
+            getattr(source_before, field) != getattr(source_after, field)
+            or getattr(output_before, field) != getattr(output_after, field)
+            for field in identity_fields
+        ):
+            raise RenderArtifactError(
+                "deterministic output changed while checking exact replay"
+            )
+        directory_entry = os.stat(
+            output_name,
+            dir_fd=directory_descriptor,
+            follow_symlinks=False,
+        )
+        if (
+            not stat.S_ISREG(directory_entry.st_mode)
+            or any(
+                getattr(directory_entry, field) != getattr(output_after, field)
+                for field in identity_fields
+            )
+            or not byte_identical
+            or source_before.st_size != output_before.st_size
+            or source_digest.digest() != output_digest.digest()
+        ):
+            raise RenderArtifactError(
+                "deterministic output already exists with different content"
+            )
+    except RenderArtifactError:
+        raise
+    except OSError as exc:
+        raise RenderArtifactError(
+            "existing deterministic output could not be verified"
+        ) from exc
+    finally:
+        if output_descriptor is not None:
+            os.close(output_descriptor)
+        if source_descriptor is not None:
+            os.close(source_descriptor)
+
+
 def _publish_glyph_output_v2(
     *,
     root: Path,
@@ -377,8 +839,13 @@ def _publish_glyph_output_v2(
                 dst_dir_fd=current_descriptor,
                 follow_symlinks=False,
             )
-        except FileExistsError as exc:
-            raise RenderArtifactError("glyph output already exists") from exc
+        except FileExistsError:
+            _reuse_identical_published_output(
+                directory_descriptor=current_descriptor,
+                source=source,
+                output_name=output_name,
+                no_follow=no_follow,
+            )
     except RenderArtifactError:
         raise
     except (OSError, TypeError, NotImplementedError) as exc:
@@ -386,6 +853,261 @@ def _publish_glyph_output_v2(
             "glyph output could not be published atomically"
         ) from exc
     finally:
+        for descriptor in reversed(descriptors):
+            try:
+                os.close(descriptor)
+            except OSError:
+                pass
+    return directory / output_name
+
+
+def _reuse_identical_published_descriptor_output(
+    *,
+    directory_descriptor: int,
+    source: _PinnedRegularFile,
+    expected_file_digest: str,
+    output_name: str,
+    no_follow: int,
+) -> None:
+    """Verify an exact replay against the already pinned rendered bytes."""
+
+    if _PREFIXED_DIGEST.fullmatch(expected_file_digest) is None:
+        raise RenderArtifactError("deterministic output digest is invalid")
+    source.require_stable()
+    if source.descriptor is None:
+        raise RenderArtifactError("deterministic output source is not pinned")
+    file_flags = os.O_RDONLY | no_follow
+    if hasattr(os, "O_CLOEXEC"):
+        file_flags |= os.O_CLOEXEC
+    if hasattr(os, "O_NONBLOCK"):
+        file_flags |= os.O_NONBLOCK
+    output_descriptor: int | None = None
+    try:
+        output_descriptor = os.open(
+            output_name,
+            file_flags,
+            dir_fd=directory_descriptor,
+        )
+        output_before = os.fstat(output_descriptor)
+        if not stat.S_ISREG(output_before.st_mode) or output_before.st_size <= 0:
+            raise RenderArtifactError(
+                "existing deterministic output is not a regular file"
+            )
+        source_hex, source_size, source_identity = _descriptor_sha256(
+            source.descriptor,
+            label="deterministic output source",
+        )
+        output_hex, output_size, output_identity = _descriptor_sha256(
+            output_descriptor,
+            label="existing deterministic output",
+        )
+        byte_identical = True
+        offset = 0
+        while True:
+            source_block = os.pread(
+                source.descriptor,
+                1024 * 1024,
+                offset,
+            )
+            output_block = os.pread(
+                output_descriptor,
+                1024 * 1024,
+                offset,
+            )
+            if source_block != output_block:
+                byte_identical = False
+            if not source_block and not output_block:
+                break
+            offset += max(len(source_block), len(output_block))
+        directory_entry = os.stat(
+            output_name,
+            dir_fd=directory_descriptor,
+            follow_symlinks=False,
+        )
+        source.require_stable()
+        if (
+            source_identity != source.identity
+            or _stable_file_identity(directory_entry) != output_identity
+            or source_size != output_size
+            or source_hex != output_hex
+            or not byte_identical
+            or f"sha256:{source_hex}" != expected_file_digest
+        ):
+            raise RenderArtifactError(
+                "deterministic output already exists with different content"
+            )
+    except RenderArtifactError:
+        raise
+    except OSError as exc:
+        raise RenderArtifactError(
+            "existing deterministic output could not be verified"
+        ) from exc
+    finally:
+        if output_descriptor is not None:
+            os.close(output_descriptor)
+
+
+def _link_anonymous_descriptor_no_replace(
+    *,
+    source_descriptor: int,
+    directory_descriptor: int,
+    output_name: str,
+) -> None:
+    """Atomically link one O_TMPFILE inode without reopening a source name."""
+
+    at_empty_path = 0x1000
+    try:
+        linkat = ctypes.CDLL(None, use_errno=True).linkat
+        linkat.argtypes = (
+            ctypes.c_int,
+            ctypes.c_char_p,
+            ctypes.c_int,
+            ctypes.c_char_p,
+            ctypes.c_int,
+        )
+        linkat.restype = ctypes.c_int
+        ctypes.set_errno(0)
+        result = linkat(
+            source_descriptor,
+            b"",
+            directory_descriptor,
+            os.fsencode(output_name),
+            at_empty_path,
+        )
+    except (AttributeError, OSError, TypeError) as exc:
+        raise RenderArtifactError(
+            "timeline output descriptor linking is unavailable"
+        ) from exc
+    if result == 0:
+        return
+    error_number = ctypes.get_errno()
+    if error_number == errno.EEXIST:
+        raise FileExistsError(error_number, os.strerror(error_number), output_name)
+    raise OSError(error_number, os.strerror(error_number), output_name)
+
+
+def _publish_timeline_output_v1(
+    *,
+    root: Path,
+    directory: Path,
+    source: _PinnedRegularFile,
+    expected_file_digest: str,
+    output_name: str,
+) -> Path:
+    """Copy one held candidate, then atomically link or exact-reuse it."""
+
+    try:
+        relative = directory.relative_to(root)
+    except ValueError as exc:
+        raise RenderArtifactError("timeline output escaped artifact root") from exc
+    if (
+        not relative.parts
+        or any(part in {"", ".", ".."} for part in relative.parts)
+        or not output_name
+        or Path(output_name).name != output_name
+        or output_name in {".", ".."}
+        or _PREFIXED_DIGEST.fullmatch(expected_file_digest) is None
+    ):
+        raise RenderArtifactError("timeline output path is invalid")
+    no_follow = getattr(os, "O_NOFOLLOW", None)
+    directory_flag = getattr(os, "O_DIRECTORY", None)
+    temporary_flag = getattr(os, "O_TMPFILE", None)
+    if no_follow is None or directory_flag is None or temporary_flag is None:
+        raise RenderArtifactError(
+            "timeline output no-follow directory support is unavailable"
+        )
+    if source.descriptor is None:
+        raise RenderArtifactError("timeline output source is not pinned")
+    directory_flags = os.O_RDONLY | no_follow | directory_flag
+    output_flags = os.O_RDWR | temporary_flag | no_follow
+    if hasattr(os, "O_CLOEXEC"):
+        directory_flags |= os.O_CLOEXEC
+        output_flags |= os.O_CLOEXEC
+    descriptors: list[int] = []
+    temporary_descriptor: int | None = None
+    try:
+        current_descriptor = os.open(root, directory_flags)
+        descriptors.append(current_descriptor)
+        for part in relative.parts:
+            try:
+                os.mkdir(part, mode=0o700, dir_fd=current_descriptor)
+            except FileExistsError:
+                pass
+            next_descriptor = os.open(
+                part,
+                directory_flags,
+                dir_fd=current_descriptor,
+            )
+            descriptors.append(next_descriptor)
+            current_descriptor = next_descriptor
+
+        source.require_stable()
+        source_before = os.fstat(source.descriptor)
+        temporary_descriptor = os.open(
+            ".",
+            output_flags,
+            0o600,
+            dir_fd=current_descriptor,
+        )
+
+        digest = sha256()
+        byte_count = 0
+        offset = 0
+        while True:
+            block = os.pread(source.descriptor, 1024 * 1024, offset)
+            if not block:
+                break
+            digest.update(block)
+            byte_count += len(block)
+            offset += len(block)
+            view = memoryview(block)
+            while view:
+                written = os.write(temporary_descriptor, view)
+                if written <= 0:
+                    raise RenderArtifactError(
+                        "timeline output staging write failed"
+                    )
+                view = view[written:]
+        os.fsync(temporary_descriptor)
+        staged = os.fstat(temporary_descriptor)
+        source_after = os.fstat(source.descriptor)
+        source.require_stable()
+        if (
+            _stable_file_identity(source_before)
+            != _stable_file_identity(source_after)
+            or not stat.S_ISREG(staged.st_mode)
+            or byte_count != source_before.st_size
+            or staged.st_size != byte_count
+            or f"sha256:{digest.hexdigest()}" != expected_file_digest
+        ):
+            raise RenderArtifactError(
+                "timeline output source changed before publication"
+            )
+
+        try:
+            _link_anonymous_descriptor_no_replace(
+                source_descriptor=temporary_descriptor,
+                directory_descriptor=current_descriptor,
+                output_name=output_name,
+            )
+        except FileExistsError:
+            _reuse_identical_published_descriptor_output(
+                directory_descriptor=current_descriptor,
+                source=source,
+                expected_file_digest=expected_file_digest,
+                output_name=output_name,
+                no_follow=no_follow,
+            )
+        os.fsync(current_descriptor)
+    except RenderArtifactError:
+        raise
+    except (OSError, TypeError, NotImplementedError) as exc:
+        raise RenderArtifactError(
+            "timeline output could not be published atomically"
+        ) from exc
+    finally:
+        if temporary_descriptor is not None:
+            os.close(temporary_descriptor)
         for descriptor in reversed(descriptors):
             try:
                 os.close(descriptor)
@@ -485,7 +1207,12 @@ def _validate_cumulative_gray_stage(
         raise RenderArtifactError("glyph cumulative mask stage did not advance")
 
 
-def _glyph_probe(path: Path, ffprobe_path: Path) -> dict[str, Any]:
+def _glyph_probe(
+    path: Path,
+    ffprobe_path: Path,
+    *,
+    pass_fds: tuple[int, ...] = (),
+) -> dict[str, Any]:
     try:
         result = subprocess.run(
             [
@@ -502,6 +1229,7 @@ def _glyph_probe(path: Path, ffprobe_path: Path) -> dict[str, Any]:
             text=True,
             timeout=120,
             env=_fixed_environment(),
+            pass_fds=pass_fds,
         )
         payload = json.loads(result.stdout)
     except (OSError, subprocess.SubprocessError, json.JSONDecodeError) as exc:
@@ -790,6 +1518,793 @@ def _validate_glyph_output(
         or stream.get("pix_fmt") != pixel_format
     ):
         raise RenderArtifactError("glyph output media contract is invalid")
+
+
+def _timeline_preview_canonical_json(value: Mapping[str, Any]) -> bytes:
+    try:
+        return json.dumps(
+            value,
+            ensure_ascii=False,
+            sort_keys=True,
+            separators=(",", ":"),
+            allow_nan=False,
+        ).encode("utf-8")
+    except (TypeError, ValueError) as exc:
+        raise RenderArtifactError(
+            "timeline preview request is not canonical JSON"
+        ) from exc
+
+
+def _timeline_preview_ref(value: object, *, label: str) -> str:
+    if (
+        not isinstance(value, str)
+        or not value
+        or value != value.strip()
+        or len(value) > 200
+        or re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._:-]*", value) is None
+    ):
+        raise RenderArtifactError(f"{label} is invalid")
+    return value
+
+
+def _timeline_preview_raw_digest(value: object, *, label: str) -> str:
+    if not isinstance(value, str) or _HEX_DIGEST.fullmatch(value) is None:
+        raise RenderArtifactError(f"{label} is invalid")
+    return value
+
+
+def _timeline_preview_prefixed_digest(value: object, *, label: str) -> str:
+    if not isinstance(value, str) or _PREFIXED_DIGEST.fullmatch(value) is None:
+        raise RenderArtifactError(f"{label} is invalid")
+    return value
+
+
+def _timeline_preview_storage_key(value: object, *, label: str) -> str:
+    if (
+        not isinstance(value, str)
+        or not value
+        or value != value.strip()
+        or "\\" in value
+        or "//" in value
+        or any(ord(character) < 32 or ord(character) == 127 for character in value)
+    ):
+        raise RenderArtifactError(f"{label} is invalid")
+    path = PurePosixPath(value)
+    if (
+        path.is_absolute()
+        or path.as_posix() != value
+        or any(part in {"", ".", ".."} for part in path.parts)
+    ):
+        raise RenderArtifactError(f"{label} is invalid")
+    return value
+
+
+def _timeline_preview_signed_integer(
+    value: object,
+    *,
+    label: str,
+    minimum: int,
+    maximum: int,
+) -> int:
+    if (
+        isinstance(value, bool)
+        or not isinstance(value, int)
+        or value < minimum
+        or value > maximum
+    ):
+        raise RenderArtifactError(f"{label} is invalid")
+    return value
+
+
+def _timeline_preview_frame_rate(
+    value: object,
+    *,
+    label: str,
+) -> Fraction:
+    record = _closed_mapping(
+        value,
+        {"numerator", "denominator"},
+        label=label,
+    )
+    numerator = _integer(
+        record["numerator"], label=f"{label} numerator", minimum=1
+    )
+    denominator = _integer(
+        record["denominator"], label=f"{label} denominator", minimum=1
+    )
+    result = Fraction(numerator, denominator)
+    if result.numerator != numerator or result.denominator != denominator:
+        raise RenderArtifactError(f"{label} must be reduced")
+    return result
+
+
+def _timeline_preview_frame_to_sample(frame: int, frame_rate: Fraction) -> int:
+    return (
+        frame
+        * CANONICAL_PCM_SAMPLE_RATE
+        * frame_rate.denominator
+        // frame_rate.numerator
+    )
+
+
+def _stage_timeline_preview_input(
+    *,
+    root: Path,
+    storage_key: object,
+    expected_digest: object,
+    destination: Path,
+    prefixed_digest: bool,
+) -> None:
+    """Stage one server-resolved input through a no-follow descriptor walk."""
+
+    safe_key = _timeline_preview_storage_key(
+        storage_key, label="timeline preview input storage key"
+    )
+    expected = (
+        _timeline_preview_prefixed_digest(
+            expected_digest, label="timeline preview input file digest"
+        )
+        if prefixed_digest
+        else _timeline_preview_raw_digest(
+            expected_digest, label="timeline preview input file digest"
+        )
+    )
+    no_follow = getattr(os, "O_NOFOLLOW", None)
+    directory_flag = getattr(os, "O_DIRECTORY", None)
+    if no_follow is None or directory_flag is None:
+        raise RenderArtifactError(
+            "timeline preview no-follow input support is unavailable"
+        )
+    directory_flags = os.O_RDONLY | no_follow | directory_flag
+    file_flags = os.O_RDONLY | no_follow
+    if hasattr(os, "O_CLOEXEC"):
+        directory_flags |= os.O_CLOEXEC
+        file_flags |= os.O_CLOEXEC
+    if hasattr(os, "O_NONBLOCK"):
+        file_flags |= os.O_NONBLOCK
+    descriptors: list[int] = []
+    source_descriptor: int | None = None
+    destination_descriptor: int | None = None
+    try:
+        current = os.open(root, directory_flags)
+        descriptors.append(current)
+        parts = PurePosixPath(safe_key).parts
+        for part in parts[:-1]:
+            current = os.open(part, directory_flags, dir_fd=current)
+            descriptors.append(current)
+        source_descriptor = os.open(parts[-1], file_flags, dir_fd=current)
+        before = os.fstat(source_descriptor)
+        if (
+            not stat.S_ISREG(before.st_mode)
+            or before.st_size <= 0
+            or before.st_size > _MAX_TIMELINE_PREVIEW_INPUT_BYTES
+        ):
+            raise RenderArtifactError(
+                "timeline preview input is not an allowed regular file"
+            )
+        destination_descriptor = os.open(
+            destination,
+            os.O_WRONLY | os.O_CREAT | os.O_EXCL | no_follow,
+            0o600,
+        )
+        digest = sha256()
+        byte_count = 0
+        with os.fdopen(os.dup(source_descriptor), "rb") as source_stream:
+            with os.fdopen(
+                os.dup(destination_descriptor), "wb"
+            ) as destination_stream:
+                for block in iter(lambda: source_stream.read(1024 * 1024), b""):
+                    digest.update(block)
+                    byte_count += len(block)
+                    destination_stream.write(block)
+                destination_stream.flush()
+                os.fsync(destination_stream.fileno())
+        after = os.fstat(source_descriptor)
+        identity_fields = (
+            "st_dev",
+            "st_ino",
+            "st_mode",
+            "st_nlink",
+            "st_size",
+            "st_mtime_ns",
+            "st_ctime_ns",
+        )
+        if (
+            any(getattr(before, field) != getattr(after, field) for field in identity_fields)
+            or byte_count != before.st_size
+        ):
+            raise RenderArtifactError("timeline preview input changed while staging")
+        actual = f"sha256:{digest.hexdigest()}" if prefixed_digest else digest.hexdigest()
+        if actual != expected:
+            raise RenderArtifactError("timeline preview input file digest changed")
+    except RenderArtifactError:
+        raise
+    except OSError as exc:
+        raise RenderArtifactError("timeline preview input staging failed") from exc
+    finally:
+        if destination_descriptor is not None:
+            os.close(destination_descriptor)
+        if source_descriptor is not None:
+            os.close(source_descriptor)
+        for descriptor in reversed(descriptors):
+            try:
+                os.close(descriptor)
+            except OSError:
+                pass
+
+
+def _timeline_preview_bus(
+    graph: list[str], labels: list[str], bus_name: str
+) -> str | None:
+    if not labels:
+        return None
+    if len(labels) == 1:
+        return labels[0]
+    output = f"{bus_name}-bus"
+    weights = " ".join("1" for _ in labels)
+    graph.append(
+        "".join(f"[{label}]" for label in labels)
+        + f"amix=inputs={len(labels)}:weights='{weights}':normalize=false:"
+        f"duration=longest:dropout_transition=0[{output}]"
+    )
+    return output
+
+
+def _timeline_preview_mix_filter_graph(audio_mix: Mapping[str, Any]) -> str:
+    duration_samples = audio_mix["durationSamples"]
+    graph: list[str] = []
+    roles: dict[str, list[str]] = {
+        role: [] for role in _TIMELINE_PREVIEW_ROLE_PRIORITY
+    }
+    for index, clip in enumerate(audio_mix["clips"]):
+        role = clip["audioRole"]
+        label = f"timeline-track-{index}"
+        roles[role].append(label)
+        source_length = (
+            clip["sourceEndSampleExclusive"] - clip["sourceStartSample"]
+        )
+        filters = [
+            (
+                f"[{index + 1}:a:0]atrim=start_sample="
+                f"{clip['sourceStartSample']}:end_sample="
+                f"{clip['sourceEndSampleExclusive']}"
+            ),
+            "asetpts=N/SR/TB",
+            "aformat=sample_fmts=fltp:sample_rates=48000:channel_layouts=stereo",
+        ]
+        if clip["fadeInSamples"]:
+            filters.append(
+                f"afade=t=in:ss=0:ns={clip['fadeInSamples']}"
+            )
+        if clip["fadeOutSamples"]:
+            filters.append(
+                "afade=t=out:ss="
+                f"{source_length - clip['fadeOutSamples']}:"
+                f"ns={clip['fadeOutSamples']}"
+            )
+        gain = _TIMELINE_PREVIEW_ROLE_GAIN_DB[role] + clip["gainDb"]
+        filters.extend(
+            [
+                f"volume={gain}dB",
+                f"adelay=delays={clip['timelineStartSample']}S:all=1",
+                f"apad=whole_len={duration_samples}",
+                f"atrim=end_sample={duration_samples}",
+                "asetpts=N/SR/TB",
+            ]
+        )
+        graph.append(",".join(filters) + f"[{label}]")
+    dialogue = _timeline_preview_bus(
+        graph, roles["dialogue"] + roles["narration"], "dialogue"
+    )
+    sfx = _timeline_preview_bus(graph, roles["sfx"], "sfx")
+    ambience = _timeline_preview_bus(graph, roles["ambience"], "ambience")
+    music = _timeline_preview_bus(graph, roles["music"], "music")
+    bed = _timeline_preview_bus(
+        graph,
+        [label for label in (sfx, ambience, music) if label is not None],
+        "bed",
+    )
+    if dialogue is not None and bed is not None:
+        ducking = _TIMELINE_PREVIEW_DUCKING
+        graph.append(f"[{dialogue}]asplit=2[dialogue-final][dialogue-key]")
+        graph.append(
+            f"[{bed}][dialogue-key]sidechaincompress="
+            f"threshold={ducking['threshold']}:ratio={ducking['ratio']}:"
+            f"attack={ducking['attackMilliseconds']}:"
+            f"release={ducking['releaseMilliseconds']}:"
+            f"makeup={ducking['makeup']}:knee={ducking['knee']}:"
+            f"link={ducking['link']}:detection={ducking['detection']}:"
+            f"level_sc={ducking['levelSc']}:mix={ducking['mix']}[ducked-bed]"
+        )
+        graph.append(
+            "[dialogue-final][ducked-bed]amix=inputs=2:weights='1 1':"
+            "normalize=false:duration=longest:dropout_transition=0[timeline-mix]"
+        )
+        source = "timeline-mix"
+    elif dialogue is not None:
+        source = dialogue
+    elif bed is not None:
+        source = bed
+    else:
+        raise RenderArtifactError("timeline preview mix has no usable clips")
+    limiter = _TIMELINE_PREVIEW_LIMITER
+    graph.append(
+        f"[{source}]alimiter=limit={limiter['limit']}:"
+        f"attack={limiter['attackMilliseconds']}:"
+        f"release={limiter['releaseMilliseconds']}:"
+        f"level={'true' if limiter['level'] else 'false'}:"
+        f"latency={'true' if limiter['latency'] else 'false'},"
+        f"atrim=end_sample={duration_samples},asetpts=N/SR/TB,"
+        "aformat=sample_fmts=s16:sample_rates=48000:channel_layouts=stereo[aout]"
+    )
+    return ";".join(graph)
+
+
+def _validate_timeline_preview_execution_request(
+    value: object,
+) -> dict[str, Any]:
+    request = _closed_mapping(
+        value,
+        {
+            "schemaVersion",
+            "executionRequestRef",
+            "workspaceRef",
+            "productionRunRef",
+            "timelineVersionRef",
+            "timelineVersionDigest",
+            "inputBindingsDigest",
+            "videoInput",
+            "audioMix",
+            "subtitleManifest",
+            "output",
+            "publicationAllowed",
+            "payloadDigest",
+        },
+        label="timeline preview execution request",
+    )
+    # Snapshot the sealed request into JSON primitives before inspecting any
+    # nested binding.  A shallow copy would leave caller-owned lists and maps
+    # mutable after payload verification.
+    try:
+        result = json.loads(_timeline_preview_canonical_json(request))
+    except json.JSONDecodeError as exc:
+        raise RenderArtifactError(
+            "timeline preview request snapshot is invalid"
+        ) from exc
+    if not isinstance(result, dict):
+        raise RenderArtifactError("timeline preview request snapshot is invalid")
+    claimed_digest = result.pop("payloadDigest")
+    _timeline_preview_raw_digest(
+        claimed_digest, label="timeline preview execution request digest"
+    )
+    actual_digest = sha256(_timeline_preview_canonical_json(result)).hexdigest()
+    if claimed_digest != actual_digest:
+        raise RenderArtifactError(
+            "timeline preview execution request digest is invalid"
+        )
+    result["payloadDigest"] = claimed_digest
+    if (
+        result.get("schemaVersion") != _TIMELINE_PREVIEW_REQUEST_SCHEMA_VERSION
+        or result.get("publicationAllowed") is not False
+    ):
+        raise RenderArtifactError("timeline preview execution boundary is invalid")
+    for field in (
+        "executionRequestRef",
+        "workspaceRef",
+        "productionRunRef",
+        "timelineVersionRef",
+    ):
+        _timeline_preview_ref(result.get(field), label=field)
+    _timeline_preview_raw_digest(
+        result.get("timelineVersionDigest"), label="timelineVersionDigest"
+    )
+    _timeline_preview_raw_digest(
+        result.get("inputBindingsDigest"), label="inputBindingsDigest"
+    )
+
+    video = _closed_mapping(
+        result.get("videoInput"),
+        {
+            "glyphRevealRequirementRef",
+            "glyphRevealRequirementDigest",
+            "glyphRevealExecutionRequestRef",
+            "glyphRevealExecutionRequestDigest",
+            "glyphRevealArtifactEvidenceRef",
+            "glyphRevealArtifactEvidenceDigest",
+            "storageKey",
+            "fileDigest",
+            "decodedFramePixelDigest",
+            "decodedFramePixelDigestSpec",
+            "codec",
+            "pixelFormat",
+            "width",
+            "height",
+            "frameCount",
+            "frameRate",
+        },
+        label="timeline preview video input",
+    )
+    for field in (
+        "glyphRevealRequirementRef",
+        "glyphRevealExecutionRequestRef",
+        "glyphRevealArtifactEvidenceRef",
+    ):
+        _timeline_preview_ref(video[field], label=f"videoInput.{field}")
+    for field in (
+        "glyphRevealRequirementDigest",
+        "glyphRevealExecutionRequestDigest",
+        "glyphRevealArtifactEvidenceDigest",
+    ):
+        _timeline_preview_raw_digest(video[field], label=f"videoInput.{field}")
+    _timeline_preview_storage_key(
+        video["storageKey"], label="videoInput.storageKey"
+    )
+    _timeline_preview_prefixed_digest(
+        video["fileDigest"], label="videoInput.fileDigest"
+    )
+    _timeline_preview_prefixed_digest(
+        video["decodedFramePixelDigest"],
+        label="videoInput.decodedFramePixelDigest",
+    )
+    if (
+        video["decodedFramePixelDigestSpec"]
+        != DECODED_FRAME_PIXEL_DIGEST_SPEC_V2
+        or video["codec"] != "h264"
+        or video["pixelFormat"] not in _SUPPORTED_GLYPH_BASE_PIXEL_FORMATS
+    ):
+        raise RenderArtifactError("timeline preview video content contract is invalid")
+    video_width = _integer(
+        video["width"], label="timeline preview video width", minimum=1
+    )
+    video_height = _integer(
+        video["height"], label="timeline preview video height", minimum=1
+    )
+    video_frames = _integer(
+        video["frameCount"], label="timeline preview video frame count", minimum=1
+    )
+    video_rate = _timeline_preview_frame_rate(
+        video["frameRate"], label="timeline preview video frame rate"
+    )
+    if video_rate.denominator != 1:
+        raise RenderArtifactError(
+            "timeline preview vertical slice requires an integral frame rate"
+        )
+
+    output = _closed_mapping(
+        result.get("output"),
+        {
+            "width",
+            "height",
+            "frameRate",
+            "totalFrames",
+            "sampleRate",
+            "channelCount",
+            "durationSamples",
+            "container",
+            "videoCodec",
+            "pixelFormat",
+            "audioCodec",
+            "audioBitRate",
+        },
+        label="timeline preview output",
+    )
+    output_rate = _timeline_preview_frame_rate(
+        output["frameRate"], label="timeline preview output frame rate"
+    )
+    total_frames = _integer(
+        output["totalFrames"], label="timeline preview total frames", minimum=1
+    )
+    duration_samples = _integer(
+        output["durationSamples"],
+        label="timeline preview duration samples",
+        minimum=1,
+    )
+    output_sample_rate = _integer(
+        output["sampleRate"], label="timeline preview output sample rate", minimum=1
+    )
+    output_channel_count = _integer(
+        output["channelCount"],
+        label="timeline preview output channel count",
+        minimum=1,
+    )
+    output_audio_bit_rate = _integer(
+        output["audioBitRate"],
+        label="timeline preview output audio bit rate",
+        minimum=1,
+    )
+    if (
+        _integer(output["width"], label="timeline preview output width", minimum=1)
+        != video_width
+        or _integer(
+            output["height"], label="timeline preview output height", minimum=1
+        )
+        != video_height
+        or total_frames != video_frames
+        or output_rate != video_rate
+        or output_sample_rate != CANONICAL_PCM_SAMPLE_RATE
+        or output_channel_count != CANONICAL_PCM_CHANNEL_COUNT
+        or duration_samples
+        != _timeline_preview_frame_to_sample(total_frames, output_rate)
+        or output.get("container") != "mp4"
+        or output.get("videoCodec") != "h264"
+        or output.get("pixelFormat") != video["pixelFormat"]
+        or output.get("audioCodec") != "aac"
+        or output_audio_bit_rate != 128_000
+    ):
+        raise RenderArtifactError("timeline preview output contract is invalid")
+
+    subtitle = _closed_mapping(
+        result.get("subtitleManifest"),
+        {"subtitleManifestRef", "subtitleManifestDigest"},
+        label="timeline preview subtitle manifest",
+    )
+    _timeline_preview_ref(
+        subtitle["subtitleManifestRef"], label="subtitleManifestRef"
+    )
+    _timeline_preview_raw_digest(
+        subtitle["subtitleManifestDigest"], label="subtitleManifestDigest"
+    )
+
+    audio_mix = _closed_mapping(
+        result.get("audioMix"),
+        {
+            "mixRequestRef",
+            "mixRequestDigest",
+            "timelineVersionRef",
+            "timelineVersionDigest",
+            "stemSetVersionRef",
+            "stemSetDigest",
+            "sampleRate",
+            "channelCount",
+            "durationSamples",
+            "roundingRule",
+            "mixParameters",
+            "mixParametersDigest",
+            "clips",
+        },
+        label="timeline preview audio mix",
+    )
+    for field in ("mixRequestRef", "timelineVersionRef", "stemSetVersionRef"):
+        _timeline_preview_ref(audio_mix[field], label=f"audioMix.{field}")
+    for field in (
+        "mixRequestDigest",
+        "timelineVersionDigest",
+        "stemSetDigest",
+        "mixParametersDigest",
+    ):
+        _timeline_preview_raw_digest(audio_mix[field], label=f"audioMix.{field}")
+    expected_mix_parameters = {
+        "rolePriority": _TIMELINE_PREVIEW_ROLE_PRIORITY,
+        "roleGainDb": _TIMELINE_PREVIEW_ROLE_GAIN_DB,
+        "ducking": _TIMELINE_PREVIEW_DUCKING,
+        "limiter": _TIMELINE_PREVIEW_LIMITER,
+    }
+    mix_sample_rate = _integer(
+        audio_mix["sampleRate"],
+        label="timeline preview audio mix sample rate",
+        minimum=1,
+    )
+    mix_channel_count = _integer(
+        audio_mix["channelCount"],
+        label="timeline preview audio mix channel count",
+        minimum=1,
+    )
+    mix_duration_samples = _integer(
+        audio_mix["durationSamples"],
+        label="timeline preview audio mix duration samples",
+        minimum=1,
+    )
+    if (
+        audio_mix["timelineVersionRef"] != result["timelineVersionRef"]
+        or audio_mix["timelineVersionDigest"] != result["timelineVersionDigest"]
+        or mix_sample_rate != CANONICAL_PCM_SAMPLE_RATE
+        or mix_channel_count != CANONICAL_PCM_CHANNEL_COUNT
+        or mix_duration_samples != duration_samples
+        or audio_mix["roundingRule"] != "FLOOR_EACH_BOUNDARY"
+        or audio_mix["mixParameters"] != expected_mix_parameters
+        or audio_mix["mixParametersDigest"]
+        != sha256(
+            _timeline_preview_canonical_json(expected_mix_parameters)
+        ).hexdigest()
+    ):
+        raise RenderArtifactError("timeline preview audio mix contract is invalid")
+    clips = audio_mix["clips"]
+    if not isinstance(clips, list) or not clips or len(clips) > 64:
+        raise RenderArtifactError("timeline preview audio clips are invalid")
+    role_asset_types = {
+        "dialogue": "DialogueAssetVersion",
+        "narration": "DialogueAssetVersion",
+        "sfx": "SfxAssetVersion",
+        "ambience": "AmbienceAssetVersion",
+        "music": "MusicAssetVersion",
+    }
+    clip_fields = {
+        "clipRef",
+        "clipDigest",
+        "stemMemberRef",
+        "stemMemberDigest",
+        "audioRole",
+        "assetVersionRef",
+        "assetVersionType",
+        "assetVersionDigest",
+        "technicalValidationRef",
+        "technicalValidationDigest",
+        "storageKey",
+        "fileDigest",
+        "pcmContentDigest",
+        "sampleRate",
+        "sourceChannelCount",
+        "sourceSampleCount",
+        "sourceStartSample",
+        "sourceEndSampleExclusive",
+        "timelineStartFrame",
+        "timelineEndFrameExclusive",
+        "timelineStartSample",
+        "timelineEndSampleExclusive",
+        "gainDb",
+        "fadeInSamples",
+        "fadeOutSamples",
+    }
+    seen_clip_refs: set[str] = set()
+    seen_stem_refs: set[str] = set()
+    normalized_clips: list[Mapping[str, Any]] = []
+    for index, raw_clip in enumerate(clips):
+        clip = _closed_mapping(
+            raw_clip, clip_fields, label=f"timeline preview audio clip {index}"
+        )
+        clip_ref = _timeline_preview_ref(
+            clip["clipRef"], label=f"audioMix.clips[{index}].clipRef"
+        )
+        stem_ref = _timeline_preview_ref(
+            clip["stemMemberRef"],
+            label=f"audioMix.clips[{index}].stemMemberRef",
+        )
+        if clip_ref in seen_clip_refs or stem_ref in seen_stem_refs:
+            raise RenderArtifactError("timeline preview audio clip is duplicated")
+        seen_clip_refs.add(clip_ref)
+        seen_stem_refs.add(stem_ref)
+        for field in (
+            "assetVersionRef",
+            "technicalValidationRef",
+        ):
+            _timeline_preview_ref(
+                clip[field], label=f"audioMix.clips[{index}].{field}"
+            )
+        for field in (
+            "clipDigest",
+            "stemMemberDigest",
+            "assetVersionDigest",
+            "technicalValidationDigest",
+            "fileDigest",
+            "pcmContentDigest",
+        ):
+            _timeline_preview_raw_digest(
+                clip[field], label=f"audioMix.clips[{index}].{field}"
+            )
+        _timeline_preview_storage_key(
+            clip["storageKey"],
+            label=f"audioMix.clips[{index}].storageKey",
+        )
+        role = clip["audioRole"]
+        clip_sample_rate = _integer(
+            clip["sampleRate"],
+            label=f"audioMix.clips[{index}].sampleRate",
+            minimum=1,
+        )
+        source_channel_count = _integer(
+            clip["sourceChannelCount"],
+            label=f"audioMix.clips[{index}].sourceChannelCount",
+            minimum=1,
+        )
+        if (
+            role not in role_asset_types
+            or clip["assetVersionType"] != role_asset_types[role]
+            or clip_sample_rate != CANONICAL_PCM_SAMPLE_RATE
+            or source_channel_count not in {1, 2}
+        ):
+            raise RenderArtifactError(
+                "timeline preview audio role or source format is invalid"
+            )
+        source_count = _integer(
+            clip["sourceSampleCount"],
+            label=f"audioMix.clips[{index}].sourceSampleCount",
+            minimum=1,
+        )
+        source_start = _integer(
+            clip["sourceStartSample"],
+            label=f"audioMix.clips[{index}].sourceStartSample",
+        )
+        source_end = _integer(
+            clip["sourceEndSampleExclusive"],
+            label=f"audioMix.clips[{index}].sourceEndSampleExclusive",
+            minimum=1,
+        )
+        timeline_start_frame = _integer(
+            clip["timelineStartFrame"],
+            label=f"audioMix.clips[{index}].timelineStartFrame",
+        )
+        timeline_end_frame = _integer(
+            clip["timelineEndFrameExclusive"],
+            label=f"audioMix.clips[{index}].timelineEndFrameExclusive",
+            minimum=1,
+        )
+        timeline_start_sample = _integer(
+            clip["timelineStartSample"],
+            label=f"audioMix.clips[{index}].timelineStartSample",
+        )
+        timeline_end_sample = _integer(
+            clip["timelineEndSampleExclusive"],
+            label=f"audioMix.clips[{index}].timelineEndSampleExclusive",
+            minimum=1,
+        )
+        gain_db = _timeline_preview_signed_integer(
+            clip["gainDb"],
+            label=f"audioMix.clips[{index}].gainDb",
+            minimum=-96,
+            maximum=24,
+        )
+        fade_in = _integer(
+            clip["fadeInSamples"],
+            label=f"audioMix.clips[{index}].fadeInSamples",
+        )
+        fade_out = _integer(
+            clip["fadeOutSamples"],
+            label=f"audioMix.clips[{index}].fadeOutSamples",
+        )
+        source_span = source_end - source_start
+        timeline_span = timeline_end_sample - timeline_start_sample
+        if (
+            source_start >= source_end
+            or source_end > source_count
+            or timeline_start_frame >= timeline_end_frame
+            or timeline_end_frame > total_frames
+            or timeline_start_sample
+            != _timeline_preview_frame_to_sample(timeline_start_frame, output_rate)
+            or timeline_end_sample
+            != _timeline_preview_frame_to_sample(timeline_end_frame, output_rate)
+            or timeline_end_sample > duration_samples
+            or source_span != timeline_span
+            or fade_in + fade_out > source_span
+            or not -96 <= gain_db <= 24
+        ):
+            raise RenderArtifactError("timeline preview audio clip timing is invalid")
+        normalized_clips.append(clip)
+    if list(clips) != sorted(
+        normalized_clips,
+        key=lambda item: (
+            -_TIMELINE_PREVIEW_ROLE_PRIORITY[item["audioRole"]],
+            item["clipRef"],
+        ),
+    ):
+        raise RenderArtifactError("timeline preview audio clips are not canonical")
+
+    expected_bindings_digest = sha256(
+        _timeline_preview_canonical_json(
+            {
+                "videoInput": video,
+                "audioMix": audio_mix,
+                "subtitleManifest": subtitle,
+            }
+        )
+    ).hexdigest()
+    if result["inputBindingsDigest"] != expected_bindings_digest:
+        raise RenderArtifactError("timeline preview inputBindingsDigest is invalid")
+    output_contract_digest = sha256(
+        _timeline_preview_canonical_json(output)
+    ).hexdigest()
+    expected_execution_ref = "m13-composition-execution-" + sha256(
+        _timeline_preview_canonical_json(
+            {
+                "timelineVersionRef": result["timelineVersionRef"],
+                "timelineVersionDigest": result["timelineVersionDigest"],
+                "inputBindingsDigest": result["inputBindingsDigest"],
+                "outputContractDigest": output_contract_digest,
+            }
+        )
+    ).hexdigest()[:32]
+    if result["executionRequestRef"] != expected_execution_ref:
+        raise RenderArtifactError("timeline preview executionRequestRef is invalid")
+    return result
 
 
 class DeterministicFfmpegComposer:
@@ -1735,6 +3250,482 @@ class DeterministicFfmpegComposer:
                 destination.relative_to(self.artifact_root)
             )
             return artifact
+
+    def compose_timeline_preview_v1(
+        self, execution_request: Mapping[str, Any]
+    ) -> dict[str, Any]:
+        """Mix one sealed M13 timeline and mux it with a glyph-v2 video.
+
+        The request contains only server-resolved relative storage keys and
+        closed parameters.  FFmpeg argv and filter expressions are derived
+        here and never accepted across the V4/V3 boundary.
+        """
+
+        request = _validate_timeline_preview_execution_request(execution_request)
+        with (
+            _PinnedRuntimeBinary(
+                _runtime_path("ffmpeg"), label="FFmpeg"
+            ) as ffmpeg_runtime,
+            _PinnedRuntimeBinary(
+                _runtime_path("ffprobe"), label="FFprobe"
+            ) as ffprobe_runtime,
+        ):
+            return self._compose_timeline_preview_v1_with_runtimes(
+                request,
+                ffmpeg_runtime=ffmpeg_runtime,
+                ffprobe_runtime=ffprobe_runtime,
+            )
+
+    def _compose_timeline_preview_v1_with_runtimes(
+        self,
+        request: Mapping[str, Any],
+        *,
+        ffmpeg_runtime: _PinnedRuntimeBinary,
+        ffprobe_runtime: _PinnedRuntimeBinary,
+    ) -> dict[str, Any]:
+        video = request["videoInput"]
+        audio_mix = request["audioMix"]
+        output = request["output"]
+        output_rate = _timeline_preview_frame_rate(
+            output["frameRate"], label="timeline preview output frame rate"
+        )
+        ffmpeg_path = ffmpeg_runtime.executable_path
+        ffprobe_path = ffprobe_runtime.executable_path
+        runtime_pass_fds = (
+            *ffmpeg_runtime.pass_fds,
+            *ffprobe_runtime.pass_fds,
+        )
+        ffmpeg_identity = (
+            f"ffmpeg={ffmpeg_runtime.version_identity()} || "
+            f"ffprobe={ffprobe_runtime.version_identity()}"
+        )
+        if len(ffmpeg_identity) > 500:
+            raise RenderArtifactError(
+                "timeline preview runtime identity is invalid"
+            )
+        root = _glyph_scope_path(
+            self.artifact_root,
+            request["workspaceRef"],
+            request["productionRunRef"],
+        )
+        output_name = f"preview-{request['payloadDigest']}.mp4"
+        with tempfile.TemporaryDirectory(
+            prefix=".timeline-preview-work-",
+            dir=self.artifact_root,
+            ignore_cleanup_errors=True,
+        ) as temporary_directory:
+            work_root = Path(temporary_directory)
+            work_root.chmod(0o700)
+            input_root = work_root / "inputs"
+            input_root.mkdir(mode=0o700)
+            video_path = input_root / "glyph-video.mp4"
+            _stage_timeline_preview_input(
+                root=self.artifact_root,
+                storage_key=video["storageKey"],
+                expected_digest=video["fileDigest"],
+                destination=video_path,
+                prefixed_digest=True,
+            )
+            video_probe = _glyph_probe(
+                video_path,
+                ffprobe_path,
+                pass_fds=ffprobe_runtime.pass_fds,
+            )
+            video_stream = _one_video_stream(
+                video_probe, label="timeline preview video input"
+            )
+            if video_stream.get("side_data_list") or (
+                isinstance(video_stream.get("tags"), Mapping)
+                and str(video_stream["tags"].get("rotate", "0")) != "0"
+            ):
+                raise RenderArtifactError(
+                    "timeline preview video display transform is unsupported"
+                )
+            if (
+                video_stream.get("codec_name") != video["codec"]
+                or video_stream.get("pix_fmt") != video["pixelFormat"]
+                or _stream_integer(
+                    video_stream, "width", label="timeline preview video width"
+                )
+                != video["width"]
+                or _stream_integer(
+                    video_stream, "height", label="timeline preview video height"
+                )
+                != video["height"]
+                or _stream_frame_count(
+                    video_stream, label="timeline preview video input"
+                )
+                != video["frameCount"]
+                or _stream_frame_rate(
+                    video_stream, label="timeline preview video input"
+                )
+                != output_rate
+            ):
+                raise RenderArtifactError(
+                    "timeline preview video input media contract changed"
+                )
+            try:
+                video_content = decoded_frame_pixel_digest_metadata(
+                    video_path,
+                    ffmpeg_path=ffmpeg_path,
+                    ffprobe_path=ffprobe_path,
+                    pass_fds=runtime_pass_fds,
+                )
+            except DigestError as exc:
+                raise RenderArtifactError(
+                    "timeline preview video input digest failed"
+                ) from exc
+            if (
+                video_content.get("fileDigest") != video["fileDigest"]
+                or video_content.get("decodedFramePixelDigest")
+                != video["decodedFramePixelDigest"]
+                or video_content.get("decodedFramePixelDigestSpec")
+                != video["decodedFramePixelDigestSpec"]
+            ):
+                raise RenderArtifactError(
+                    "timeline preview video input content changed"
+                )
+
+            audio_paths: list[Path] = []
+            for index, clip in enumerate(audio_mix["clips"]):
+                audio_path = input_root / f"audio-{index:04d}.wav"
+                _stage_timeline_preview_input(
+                    root=self.artifact_root,
+                    storage_key=clip["storageKey"],
+                    expected_digest=clip["fileDigest"],
+                    destination=audio_path,
+                    prefixed_digest=False,
+                )
+                try:
+                    pcm = canonical_pcm_digest_metadata(
+                        audio_path,
+                        expected_sample_count=clip["sourceSampleCount"],
+                        ffmpeg_path=ffmpeg_path,
+                        ffprobe_path=ffprobe_path,
+                        pass_fds=runtime_pass_fds,
+                    )
+                except DigestError as exc:
+                    raise RenderArtifactError(
+                        f"timeline preview audio input {index} digest failed"
+                    ) from exc
+                if (
+                    pcm.get("pcmContentDigest") != clip["pcmContentDigest"]
+                    or pcm.get("pcmDigestSpec") != PCM_CONTENT_DIGEST_SPEC
+                    or pcm.get("sampleRate") != clip["sampleRate"]
+                    or pcm.get("sourceChannelCount")
+                    != clip["sourceChannelCount"]
+                    or pcm.get("sourceCodecName") != "pcm_s16le"
+                ):
+                    raise RenderArtifactError(
+                        f"timeline preview audio input {index} content changed"
+                    )
+                audio_paths.append(audio_path)
+
+            filter_graph = _timeline_preview_mix_filter_graph(audio_mix)
+            candidate = work_root / "candidate.mp4"
+            command = [
+                str(ffmpeg_path),
+                "-hide_banner",
+                "-loglevel", "error",
+                "-xerror",
+                "-nostdin",
+                "-threads", "1",
+                "-filter_threads", "1",
+                "-filter_complex_threads", "1",
+                "-fflags", "+bitexact",
+                "-hwaccel", "none",
+                "-noautorotate",
+                "-i", str(video_path),
+            ]
+            for audio_path in audio_paths:
+                command.extend(["-i", str(audio_path)])
+            command.extend(
+                [
+                    "-filter_complex", filter_graph,
+                    "-map", "0:v:0",
+                    "-map", "[aout]",
+                    "-frames:v", str(output["totalFrames"]),
+                    "-fps_mode", "passthrough",
+                    "-c:v", "copy",
+                    "-c:a", "aac",
+                    "-b:a", str(output["audioBitRate"]),
+                    "-ar", str(output["sampleRate"]),
+                    "-ac", str(output["channelCount"]),
+                    "-flags:a", "+bitexact",
+                    "-map_metadata", "-1",
+                    "-map_chapters", "-1",
+                    "-metadata", "creation_time=1970-01-01T00:00:00Z",
+                    "-movflags", "+faststart",
+                    "-video_track_timescale",
+                    str(output_rate.numerator * 512),
+                    "-n", str(candidate),
+                ]
+            )
+            try:
+                subprocess.run(
+                    command,
+                    check=True,
+                    capture_output=True,
+                    timeout=300,
+                    env=_fixed_environment(),
+                    pass_fds=ffmpeg_runtime.pass_fds,
+                )
+            except (OSError, subprocess.SubprocessError) as exc:
+                raise RenderArtifactError(
+                    "FFmpeg timeline preview composition failed"
+                ) from exc
+
+            return self._finalize_timeline_preview_candidate_v1(
+                candidate=candidate,
+                request=request,
+                video=video,
+                output=output,
+                output_rate=output_rate,
+                root=root,
+                output_name=output_name,
+                ffmpeg_runtime=ffmpeg_runtime,
+                ffprobe_runtime=ffprobe_runtime,
+                ffmpeg_identity=ffmpeg_identity,
+            )
+
+    def _finalize_timeline_preview_candidate_v1(
+        self,
+        *,
+        candidate: Path,
+        request: Mapping[str, Any],
+        video: Mapping[str, Any],
+        output: Mapping[str, Any],
+        output_rate: Fraction,
+        root: Path,
+        output_name: str,
+        ffmpeg_runtime: _PinnedRuntimeBinary,
+        ffprobe_runtime: _PinnedRuntimeBinary,
+        ffmpeg_identity: str,
+    ) -> dict[str, Any]:
+        with _PinnedRegularFile(
+            candidate,
+            label="timeline preview candidate",
+        ) as pinned_candidate:
+            return self._finalize_pinned_timeline_preview_candidate_v1(
+                pinned_candidate=pinned_candidate,
+                request=request,
+                video=video,
+                output=output,
+                output_rate=output_rate,
+                root=root,
+                output_name=output_name,
+                ffmpeg_runtime=ffmpeg_runtime,
+                ffprobe_runtime=ffprobe_runtime,
+                ffmpeg_identity=ffmpeg_identity,
+            )
+
+    def _finalize_pinned_timeline_preview_candidate_v1(
+        self,
+        *,
+        pinned_candidate: _PinnedRegularFile,
+        request: Mapping[str, Any],
+        video: Mapping[str, Any],
+        output: Mapping[str, Any],
+        output_rate: Fraction,
+        root: Path,
+        output_name: str,
+        ffmpeg_runtime: _PinnedRuntimeBinary,
+        ffprobe_runtime: _PinnedRuntimeBinary,
+        ffmpeg_identity: str,
+    ) -> dict[str, Any]:
+        candidate = pinned_candidate.descriptor_path
+        ffmpeg_path = ffmpeg_runtime.executable_path
+        ffprobe_path = ffprobe_runtime.executable_path
+        pass_fds = (
+            *pinned_candidate.pass_fds,
+            *ffmpeg_runtime.pass_fds,
+            *ffprobe_runtime.pass_fds,
+        )
+        candidate_probe = _glyph_probe(
+            candidate,
+            ffprobe_path,
+            pass_fds=pass_fds,
+        )
+        streams = candidate_probe.get("streams")
+        if not isinstance(streams, list):
+            raise RenderArtifactError(
+                "timeline preview output stream layout is invalid"
+            )
+        video_streams = [
+            stream
+            for stream in streams
+            if isinstance(stream, Mapping)
+            and stream.get("codec_type") == "video"
+        ]
+        audio_streams = [
+            stream
+            for stream in streams
+            if isinstance(stream, Mapping)
+            and stream.get("codec_type") == "audio"
+        ]
+        if (
+            len(streams) != 2
+            or len(video_streams) != 1
+            or len(audio_streams) != 1
+        ):
+            raise RenderArtifactError(
+                "timeline preview output stream layout is invalid"
+            )
+        output_video = video_streams[0]
+        output_audio = audio_streams[0]
+        try:
+            output_audio_rate = int(output_audio.get("sample_rate"))
+            output_audio_channels = int(output_audio.get("channels"))
+        except (TypeError, ValueError) as exc:
+            raise RenderArtifactError(
+                "timeline preview output audio probe is invalid"
+            ) from exc
+        if (
+            output_video.get("codec_name") != output["videoCodec"]
+            or output_video.get("pix_fmt") != output["pixelFormat"]
+            or _stream_integer(
+                output_video, "width", label="timeline preview output width"
+            )
+            != output["width"]
+            or _stream_integer(
+                output_video, "height", label="timeline preview output height"
+            )
+            != output["height"]
+            or _stream_frame_count(
+                output_video, label="timeline preview output"
+            )
+            != output["totalFrames"]
+            or _stream_frame_rate(
+                output_video, label="timeline preview output"
+            )
+            != output_rate
+            or output_audio.get("codec_name") != output["audioCodec"]
+            or output_audio_rate != output["sampleRate"]
+            or output_audio_channels != output["channelCount"]
+        ):
+            raise RenderArtifactError(
+                "timeline preview output media contract is invalid"
+            )
+        try:
+            pixel_digest = decoded_frame_pixel_digest_metadata(
+                candidate,
+                ffmpeg_path=ffmpeg_path,
+                ffprobe_path=ffprobe_path,
+                pass_fds=pass_fds,
+            )
+            pcm_digest = canonical_pcm_digest_metadata(
+                pinned_candidate.source_path,
+                expected_sample_count=output["durationSamples"],
+                allow_aac_frame_padding=True,
+                ffmpeg_path=ffmpeg_path,
+                ffprobe_path=ffprobe_path,
+                pass_fds=(
+                    *ffmpeg_runtime.pass_fds,
+                    *ffprobe_runtime.pass_fds,
+                ),
+                _input_descriptor=pinned_candidate.descriptor,
+            )
+        except DigestError as exc:
+            raise RenderArtifactError(
+                "timeline preview output digest failed"
+            ) from exc
+        pinned_candidate.require_stable()
+        if (
+            pixel_digest.get("decodedFramePixelDigest")
+            != video["decodedFramePixelDigest"]
+            or pixel_digest.get("decodedFramePixelDigestSpec")
+            != DECODED_FRAME_PIXEL_DIGEST_SPEC_V2
+            or pixel_digest.get("width") != output["width"]
+            or pixel_digest.get("height") != output["height"]
+            or pixel_digest.get("frameCount") != output["totalFrames"]
+            or pcm_digest.get("pcmDigestSpec") != PCM_CONTENT_DIGEST_SPEC
+            or pcm_digest.get("sampleRate") != output["sampleRate"]
+            or pcm_digest.get("channelCount") != output["channelCount"]
+            or pcm_digest.get("sampleCount") != output["durationSamples"]
+            or pcm_digest.get("sourceChannelCount") != output["channelCount"]
+            or pcm_digest.get("sourceCodecName") != output["audioCodec"]
+        ):
+            raise RenderArtifactError(
+                "timeline preview output content contract is invalid"
+            )
+        output_digest = {
+            "fileDigest": pixel_digest["fileDigest"],
+            "fileDigestAlgorithm": pixel_digest["fileDigestAlgorithm"],
+            "decodedFramePixelDigest": pixel_digest[
+                "decodedFramePixelDigest"
+            ],
+            "decodedFramePixelDigestSpec": pixel_digest[
+                "decodedFramePixelDigestSpec"
+            ],
+            "pixelMode": pixel_digest["pixelMode"],
+            "width": pixel_digest["width"],
+            "height": pixel_digest["height"],
+            "frameCount": pixel_digest["frameCount"],
+            "frameRate": dict(output["frameRate"]),
+            "pcmContentDigest": pcm_digest["pcmContentDigest"],
+            "pcmDigestSpec": pcm_digest["pcmDigestSpec"],
+            "sampleRate": pcm_digest["sampleRate"],
+            "channelCount": pcm_digest["channelCount"],
+            "sampleCount": pcm_digest["sampleCount"],
+        }
+        output_media_probe = {
+            "container": output["container"],
+            "videoCodec": output["videoCodec"],
+            "pixelFormat": output["pixelFormat"],
+            "width": output["width"],
+            "height": output["height"],
+            "frameRate": dict(output["frameRate"]),
+            "frameCount": output["totalFrames"],
+            "audioCodec": output["audioCodec"],
+            "sampleRate": output["sampleRate"],
+            "channelCount": output["channelCount"],
+            "sampleCount": output["durationSamples"],
+        }
+        ffmpeg_runtime.require_stable()
+        ffprobe_runtime.require_stable()
+        pinned_candidate.require_stable()
+        runtime_payload = {
+            "ffmpegIdentity": ffmpeg_identity,
+            "rendererIdentity": _TIMELINE_PREVIEW_RENDERER_IDENTITY,
+            "rendererVersion": _TIMELINE_PREVIEW_RENDERER_VERSION,
+        }
+        runtime_evidence_digest = "sha256:" + sha256(
+            _timeline_preview_canonical_json(runtime_payload)
+        ).hexdigest()
+        destination = _publish_timeline_output_v1(
+            root=self.artifact_root,
+            directory=root / "composition",
+            source=pinned_candidate,
+            expected_file_digest=output_digest["fileDigest"],
+            output_name=output_name,
+        )
+        return {
+            "internalPath": str(destination),
+            "outputStorageKey": str(
+                destination.relative_to(self.artifact_root)
+            ),
+            "outputByteSize": os.fstat(
+                pinned_candidate.descriptor
+            ).st_size,
+            "outputMediaProbe": output_media_probe,
+            "outputDigest": output_digest,
+            "rendererIdentity": _TIMELINE_PREVIEW_RENDERER_IDENTITY,
+            "rendererVersion": _TIMELINE_PREVIEW_RENDERER_VERSION,
+            "ffmpegIdentity": ffmpeg_identity,
+            "runtimeEvidenceDigest": runtime_evidence_digest,
+            "executionRequestRef": request["executionRequestRef"],
+            "executionRequestDigest": request["payloadDigest"],
+            "timelineVersionRef": request["timelineVersionRef"],
+            "timelineVersionDigest": request["timelineVersionDigest"],
+            "inputBindingsDigest": request["inputBindingsDigest"],
+            "subtitleManifestRef": request["subtitleManifest"][
+                "subtitleManifestRef"
+            ],
+            "subtitleManifestDigest": request["subtitleManifest"][
+                "subtitleManifestDigest"
+            ],
+            "publicationAllowed": False,
+        }
 
     def compose(
         self,

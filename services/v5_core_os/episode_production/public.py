@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import os
 from pathlib import Path
-from typing import Any, Mapping
+from typing import Any, Mapping, Sequence
 from uuid import uuid4
 
 from services.v4_platform import (
@@ -60,6 +60,7 @@ from .delivery import (
     K2DeliveryService,
     RejectingApprovalAuthority,
 )
+from .timeline_preview import TIMELINE_VERSION_SCHEMA_VERSION_V2
 from .production_policy import (
     InMemoryProductionPolicyAdapter,
     K2ProductionPolicyService,
@@ -126,6 +127,27 @@ _INTERNAL_MEDIA_LOCATOR_FIELDS = frozenset(
     }
 )
 
+_PRIVATE_PREVIEW_DETAIL_FIELDS = frozenset(
+    {
+        "argv",
+        "credential",
+        "credentialref",
+        "diagnostics",
+        "ffmpegargv",
+        "ffmpegcommand",
+        "ffmpegfilter",
+        "filter",
+        "filterexpression",
+        "path",
+        "privatediagnostics",
+        "privateruntimediagnostics",
+        "runtimediagnostics",
+        "stderr",
+        "stdout",
+        "token",
+    }
+)
+
 
 def _is_internal_media_locator(field: Any) -> bool:
     if not isinstance(field, str):
@@ -151,6 +173,36 @@ def _strip_internal_media_locators(value: Any) -> Any:
         return [_strip_internal_media_locators(item) for item in value]
     if isinstance(value, tuple):
         return tuple(_strip_internal_media_locators(item) for item in value)
+    return value
+
+
+def _is_private_preview_detail(field: Any) -> bool:
+    if _is_internal_media_locator(field):
+        return True
+    if not isinstance(field, str):
+        return False
+    normalized = field.replace("_", "").replace("-", "").lower()
+    return (
+        normalized in _PRIVATE_PREVIEW_DETAIL_FIELDS
+        or normalized.endswith("argv")
+        or normalized.endswith("filterexpression")
+        or normalized.endswith("privatediagnostics")
+    )
+
+
+def _strip_private_preview_details(value: Any) -> Any:
+    """Return a detached preview DTO without execution-private details."""
+
+    if isinstance(value, Mapping):
+        return {
+            key: _strip_private_preview_details(item)
+            for key, item in value.items()
+            if not _is_private_preview_detail(key)
+        }
+    if isinstance(value, list):
+        return [_strip_private_preview_details(item) for item in value]
+    if isinstance(value, tuple):
+        return tuple(_strip_private_preview_details(item) for item in value)
     return value
 
 
@@ -252,6 +304,11 @@ class EpisodeProductionPublicBoundary:
 
     def _invoke_public_media(self, operation, *args, **kwargs):
         return _strip_internal_media_locators(
+            self._invoke(operation, *args, **kwargs)
+        )
+
+    def _invoke_public_preview(self, operation, *args, **kwargs):
+        return _strip_private_preview_details(
             self._invoke(operation, *args, **kwargs)
         )
 
@@ -359,7 +416,41 @@ class EpisodeProductionPublicBoundary:
         return self._invoke(self.__media.get_media_bundle, workspace_ref, run_ref)
 
     def compose_and_qc(self, command: Mapping[str, Any]) -> dict[str, Any]:
-        return self._invoke(self.__delivery.compose_and_qc, command)
+        result = self._invoke(self.__delivery.compose_and_qc, command)
+        timeline_version = result.get("timelineVersion")
+        if (
+            isinstance(timeline_version, Mapping)
+            and timeline_version.get("schemaVersion")
+            == TIMELINE_VERSION_SCHEMA_VERSION_V2
+        ):
+            return _strip_private_preview_details(result)
+        return result
+
+    def record_m12_m13_inputs(
+        self,
+        *,
+        workspace_ref: str,
+        production_run_ref: str,
+        idempotency_key: str,
+        audio_input_bindings: Sequence[Any],
+        audio_cues: Sequence[Any],
+        audio_stem_set: Any,
+        glyph_reveal_requirement: Any,
+        mask_assets: Sequence[Mapping[str, Any]],
+    ) -> dict[str, Any]:
+        """Trusted Python boundary for immutable, server-resolved inputs."""
+
+        return self._invoke(
+            self.__delivery.record_m12_m13_inputs,
+            workspace_ref=workspace_ref,
+            production_run_ref=production_run_ref,
+            idempotency_key=idempotency_key,
+            audio_input_bindings=audio_input_bindings,
+            audio_cues=audio_cues,
+            audio_stem_set=audio_stem_set,
+            glyph_reveal_requirement=glyph_reveal_requirement,
+            mask_assets=mask_assets,
+        )
 
     def approve_and_finalize(self, command: Mapping[str, Any]) -> dict[str, Any]:
         return self._invoke(self.__delivery.approve_and_finalize, command)
@@ -367,8 +458,23 @@ class EpisodeProductionPublicBoundary:
     def get_delivery_bundle(
         self, workspace_ref: str, run_ref: str
     ) -> dict[str, Any]:
-        return self._invoke(
+        result = self._invoke(
             self.__delivery.get_delivery_bundle, workspace_ref, run_ref
+        )
+        timeline_version = result.get("timelineVersion")
+        if (
+            isinstance(timeline_version, Mapping)
+            and timeline_version.get("schemaVersion")
+            == TIMELINE_VERSION_SCHEMA_VERSION_V2
+        ):
+            return _strip_private_preview_details(result)
+        return result
+
+    def get_preview_bundle(
+        self, workspace_ref: str, run_ref: str
+    ) -> dict[str, Any]:
+        return self._invoke_public_preview(
+            self.__delivery.get_preview_bundle, workspace_ref, run_ref
         )
 
     def plan_real_images(self, command: Mapping[str, Any]) -> dict[str, Any]:
@@ -529,6 +635,7 @@ def _services(
     composition_execution=None,
     approval_authority=None,
     media_selection_approval_authority=None,
+    glyph_inspection_adapter=None,
     ref_factory=None,
     clock=None,
 ) -> tuple[
@@ -623,6 +730,7 @@ def _services(
         approval_authority or RejectingApprovalAuthority(),
         ref_factory=selected_ref_factory,
         clock=selected_clock,
+        glyph_inspection_adapter=glyph_inspection_adapter,
     )
     real_media_revision = K2RealMediaRevisionService(
         shot_graph,
@@ -677,6 +785,7 @@ def create_in_memory_boundary(
     composition_execution=None,
     approval_authority=None,
     media_selection_approval_authority=None,
+    glyph_inspection_adapter=None,
     ref_factory=None,
     clock=None,
 ) -> EpisodeProductionPublicBoundary:
@@ -713,6 +822,7 @@ def create_in_memory_boundary(
         composition_execution=composition_execution,
         approval_authority=approval_authority,
         media_selection_approval_authority=media_selection_approval_authority,
+        glyph_inspection_adapter=glyph_inspection_adapter,
         ref_factory=ref_factory,
         clock=clock,
     )
@@ -753,6 +863,7 @@ def create_local_development_boundary(
     composition_execution=None,
     approval_authority=None,
     media_selection_approval_authority=None,
+    glyph_inspection_adapter=None,
     ref_factory=None,
     clock=None,
     initialize_if_missing: bool = True,
@@ -822,6 +933,7 @@ def create_local_development_boundary(
         composition_execution=composition_execution,
         approval_authority=approval_authority,
         media_selection_approval_authority=media_selection_approval_authority,
+        glyph_inspection_adapter=glyph_inspection_adapter,
         ref_factory=ref_factory,
         clock=clock,
     )
