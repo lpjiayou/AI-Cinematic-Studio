@@ -17,7 +17,11 @@ from pathlib import PurePosixPath
 import re
 from typing import Any, Mapping
 
-from .audio import normalize_speech_parameters
+from .audio import (
+    SPEECH_EMOTION_TAGS,
+    normalize_clone_speech_parameters,
+    normalize_speech_parameters,
+)
 from .foundation import (
     EpisodeProductionError,
     StaleInputError,
@@ -27,7 +31,10 @@ from .foundation import (
     _required_ref,
 )
 from .voice import (
+    CLONE_VOICE_ENGINE_FAMILY,
+    CLONE_VOICE_MODEL_ID,
     VoiceLockNotConfirmedError,
+    validate_confirmed_clone_voice_lock_bundle,
     validate_confirmed_voice_lock_bundle,
 )
 
@@ -40,6 +47,10 @@ AUDIO_REQUESTED_PROVENANCE_SCHEMA_VERSION = "v5.audio-requested-provenance.v1"
 
 DIALOGUE_ASSET_VERSION_SCHEMA_VERSION = "v5.dialogue-asset-version.v1"
 VOICE_ASSET_VERSION_SCHEMA_VERSION = "v5.voice-asset-version.v1"
+DIALOGUE_ASSET_VERSION_V2_SCHEMA_VERSION = (
+    "v5.m12-dialogue-asset-version.v2"
+)
+VOICE_ASSET_VERSION_V2_SCHEMA_VERSION = "v5.m12-voice-asset-version.v2"
 MUSIC_ASSET_VERSION_SCHEMA_VERSION = "v5.music-asset-version.v1"
 SFX_ASSET_VERSION_SCHEMA_VERSION = "v5.sfx-asset-version.v1"
 AMBIENCE_ASSET_VERSION_SCHEMA_VERSION = "v5.ambience-asset-version.v1"
@@ -269,6 +280,40 @@ _VOICE_FIELDS = _COMMON_ASSET_FIELDS | frozenset(
         "consentGrantRef",
         "consentGrantVersionRef",
         "consentGrantDigest",
+    }
+)
+_CLONE_VOICE_FIELDS = _COMMON_ASSET_FIELDS | frozenset(
+    {
+        "voiceIdentityRef",
+        "characterRef",
+        "voiceProfileRef",
+        "voiceProfileVersionRef",
+        "voiceProfileVersionDigest",
+        "voiceLockVersionRef",
+        "voiceLockVersionDigest",
+        "voiceSourceKind",
+        "voiceSourceSubjectRef",
+        "sourceRecordingBindingRef",
+        "sourceRecordingBindingDigest",
+        "consentGrantRef",
+        "consentGrantVersionRef",
+        "consentGrantVersionDigest",
+        "rightsBindingRef",
+        "rightsBindingDigest",
+        "engineId",
+        "engineCommit",
+        "modelId",
+        "modelBundleDigest",
+        "dependencyLockDigest",
+        "runtimeManifestDigest",
+    }
+)
+_CLONE_DIALOGUE_FIELDS = _DIALOGUE_FIELDS | frozenset(
+    {
+        "audioTechnicalValidationRef",
+        "audioTechnicalValidationDigest",
+        "audioFileDigest",
+        "audioPcmContentDigest",
     }
 )
 _MUSIC_FIELDS = _COMMON_ASSET_FIELDS | frozenset(
@@ -759,11 +804,18 @@ def _artifact(value: Any, asset_version_type: str) -> dict[str, Any]:
     return result
 
 
-def _common_asset(value: Any, asset_version_type: str) -> dict[str, Any]:
-    fields = _ASSET_FIELDS_BY_TYPE[asset_version_type]
-    result = _verify_sealed(value, fields, asset_version_type)
+def _common_asset(
+    value: Any,
+    asset_version_type: str,
+    *,
+    schema_version: str | None = None,
+    fields: frozenset[str] | None = None,
+) -> dict[str, Any]:
+    selected_fields = fields or _ASSET_FIELDS_BY_TYPE[asset_version_type]
+    selected_schema = schema_version or _SCHEMA_BY_TYPE[asset_version_type]
+    result = _verify_sealed(value, selected_fields, asset_version_type)
     if (
-        result["schemaVersion"] != _SCHEMA_BY_TYPE[asset_version_type]
+        result["schemaVersion"] != selected_schema
         or result["assetVersionType"] != asset_version_type
         or result["audioKind"] != _AUDIO_KIND_BY_TYPE[asset_version_type]
         or result["assetKind"] != "audio"
@@ -860,6 +912,158 @@ def _confirmed_voice(value: Any) -> dict[str, Any]:
     return validate_confirmed_voice_lock_bundle(value)
 
 
+def _voice_lineage_wrapper(
+    value: Any,
+    *,
+    class_name: str,
+    label: str,
+) -> dict[str, Any]:
+    """Require an immutable C1 wrapper, never a detached caller mapping."""
+
+    from . import voice_profile as voice_profile_contracts
+
+    expected_type = getattr(voice_profile_contracts, class_name, None)
+    if expected_type is None or type(value) is not expected_type:
+        raise AudioDomainTypeMismatchError(
+            f"{label} requires the exact immutable {class_name} wrapper"
+        )
+    result = value.as_dict()
+    if not isinstance(result, Mapping):
+        raise AudioDomainTypeMismatchError(f"{label} wrapper is invalid")
+    unsigned = deepcopy(dict(result))
+    supplied = unsigned.pop("payloadDigest", None)
+    if not isinstance(supplied, str) or supplied != _digest(unsigned):
+        raise StaleInputError(f"{label} payloadDigest is invalid")
+    return deepcopy(dict(result))
+
+
+def _effective_clone_consent(
+    value: Any,
+    *,
+    evaluated_at: str | None,
+) -> dict[str, Any]:
+    consent = _voice_lineage_wrapper(
+        value,
+        class_name="ConsentGrantVersionV2",
+        label="clone ConsentGrantVersion",
+    )
+    if evaluated_at is None:
+        raise AudioConsentRequiredError(
+            "clone consent requires an explicit evaluation time"
+        )
+    instant = _timestamp(evaluated_at, "evaluatedAt")
+    if (
+        consent.get("revocationState") != "ACTIVE"
+        or not {
+            "VOICE_CLONING",
+            "VOICE_PROFILE_USE",
+            "AUDIO_PRODUCTION",
+        }.issubset(set(consent.get("allowedUses", ())))
+        or instant < _timestamp(consent.get("validFrom"), "validFrom")
+        or instant >= _timestamp(consent.get("expiresAt"), "expiresAt")
+    ):
+        raise AudioConsentNotEffectiveError(
+            "clone ConsentGrantVersion is not effective"
+        )
+    return consent
+
+
+def _current_clone_authority(
+    value: Any,
+    *,
+    voice_profile_version: Any,
+    consent_grant_version: Any,
+    source_recording_binding: Any,
+    confirmed_voice_lock: Any,
+    rights_binding: Mapping[str, Any],
+    evaluated_at: str | None,
+    required: bool,
+    expected_scope: tuple[str, str, str, str],
+) -> dict[str, Any] | None:
+    """Match a service-issued current-head proof to every explicit input.
+
+    The proof is ephemeral and never enters an AssetVersion payload.  Historical
+    validators may omit it, while every clone builder sets ``required=True`` so
+    a detached CONFIRMED/ACTIVE historical version cannot authorize a new write.
+    """
+
+    if value is None:
+        if required:
+            raise AudioConsentNotEffectiveError(
+                "a service-issued current VoiceProfile authority is required"
+            )
+        return None
+    from .voice_profile import CurrentConfirmedVoiceProfileAuthority
+
+    if type(value) is not CurrentConfirmedVoiceProfileAuthority:
+        raise AudioDomainTypeMismatchError(
+            "current clone VoiceProfile authority requires the exact "
+            "service-issued wrapper"
+        )
+    assert_current = getattr(value, "assert_current", None)
+    if not callable(assert_current):
+        raise AudioDomainTypeMismatchError(
+            "current clone VoiceProfile authority cannot revalidate its journal head"
+        )
+    # This is deliberately performed at every consumption point.  It re-reads
+    # the evidence journal so a proof issued before a revocation successor
+    # cannot authorize a later proposal.
+    assert_current()
+    authority = _voice_lineage_wrapper(
+        value,
+        class_name="CurrentConfirmedVoiceProfileAuthority",
+        label="current clone VoiceProfile authority",
+    )
+    if evaluated_at is None or authority.get("evaluatedAt") != evaluated_at:
+        raise StaleInputError(
+            "current clone VoiceProfile authority evaluation time is stale"
+        )
+    if tuple(
+        authority.get(field)
+        for field in (
+            "workspaceRef",
+            "projectRef",
+            "seriesRef",
+            "productionRunRef",
+        )
+    ) != expected_scope:
+        raise StaleInputError(
+            "current clone VoiceProfile authority production scope is stale"
+        )
+    profile = _voice_lineage_wrapper(
+        voice_profile_version,
+        class_name="VoiceProfileVersion",
+        label="VoiceProfileVersion",
+    )
+    consent = _voice_lineage_wrapper(
+        consent_grant_version,
+        class_name="ConsentGrantVersionV2",
+        label="clone ConsentGrantVersion",
+    )
+    source = _voice_lineage_wrapper(
+        source_recording_binding,
+        class_name="SourceVoiceRecordingAssetVersionBinding",
+        label="source voice recording binding",
+    )
+    lock = validate_confirmed_clone_voice_lock_bundle(confirmed_voice_lock)
+    expected = {
+        "voiceProfileVersion": profile,
+        "consentGrantVersion": consent,
+        "sourceRecordingBinding": source,
+        "confirmedVoiceLock": lock,
+        "rightsBinding": deepcopy(dict(rights_binding)),
+    }
+    if any(authority.get(field) != selected for field, selected in expected.items()):
+        raise StaleInputError(
+            "current clone VoiceProfile authority upstream binding is stale"
+        )
+    if authority.get("publicationAllowed") is not False:
+        raise AudioDomainTypeMismatchError(
+            "current clone VoiceProfile authority overclaims publication"
+        )
+    return authority
+
+
 def _match_voice_asset_to_lock(
     value: Mapping[str, Any], confirmed_voice_lock: Any
 ) -> dict[str, Any]:
@@ -932,6 +1136,463 @@ def _validate_dialogue_asset_version(
     return result
 
 
+def validate_persisted_audio_domain_asset_version_evidence(
+    value: Any,
+    *,
+    expected_scope: tuple[str, str, str, str, str],
+    expected_asset_version_ref: str,
+    expected_asset_version_digest: str,
+) -> dict[str, Any]:
+    """Validate one journaled typed DialogueAssetVersion without detached locks.
+
+    This read-only resolver boundary accepts only the historical v1 dialogue
+    contract.  It verifies the exact sealed payload, proposal lifecycle,
+    rights/provenance, PCM artifact binding, and closed speech projection.  A
+    separate canonical AssetAdmission fact remains responsible for admission;
+    this helper neither creates nor upgrades authority.
+    """
+
+    if (
+        not isinstance(expected_scope, tuple)
+        or len(expected_scope) != 5
+    ):
+        raise EpisodeProductionError(
+            "expected_scope must contain the five audio scope refs"
+        )
+    selected_scope = tuple(
+        _required_ref(selected, field)
+        for field, selected in zip(
+            (
+                "workspaceRef",
+                "projectRef",
+                "seriesRef",
+                "episodeRef",
+                "productionRunRef",
+            ),
+            expected_scope,
+        )
+    )
+    selected_ref = _required_ref(
+        expected_asset_version_ref,
+        "expected_asset_version_ref",
+    )
+    selected_digest = _sha256(
+        expected_asset_version_digest,
+        "expected_asset_version_digest",
+    )
+    result = _common_asset(value, "DialogueAssetVersion")
+    if (
+        tuple(
+            result[field]
+            for field in (
+                "workspaceRef",
+                "projectRef",
+                "seriesRef",
+                "episodeRef",
+                "productionRunRef",
+            )
+        )
+        != selected_scope
+        or result["assetVersionRef"] != selected_ref
+        or result["payloadDigest"] != selected_digest
+    ):
+        raise StaleInputError(
+            "persisted DialogueAssetVersion identity or scope is stale"
+        )
+    role = result["speechRole"]
+    if not isinstance(role, str) or role not in {"dialogue", "narration"}:
+        raise AudioDomainTypeMismatchError("speechRole is invalid")
+    _required_ref(result["scriptVersionRef"], "scriptVersionRef")
+    _sha256(result["scriptVersionDigest"], "scriptVersionDigest")
+    if role == "dialogue":
+        _required_ref(result["dialogueRef"], "dialogueRef")
+        if result["narrationRef"] is not None:
+            raise AudioDomainTypeMismatchError(
+                "dialogue cannot bind narrationRef"
+            )
+    else:
+        _required_ref(result["narrationRef"], "narrationRef")
+        if result["dialogueRef"] is not None:
+            raise AudioDomainTypeMismatchError(
+                "narration cannot bind dialogueRef"
+            )
+    _required_ref(result["voiceAssetVersionRef"], "voiceAssetVersionRef")
+    _sha256(result["voiceAssetVersionDigest"], "voiceAssetVersionDigest")
+    _text(result["language"], "language")
+    parameters = result["normalizedSpeechParameters"]
+    if not isinstance(parameters, Mapping):
+        raise EpisodeProductionError(
+            "normalizedSpeechParameters are invalid"
+        )
+    required_parameters = {
+        "speechSynthesis",
+        "text",
+        "voiceRef",
+        "sampleRate",
+        "channels",
+        "audioRole",
+    }
+    optional_parameters = {"emotionTag"}
+    if (
+        not required_parameters.issubset(parameters)
+        or set(parameters) - required_parameters - optional_parameters
+        or parameters["speechSynthesis"] is not True
+        or parameters["audioRole"] != role
+    ):
+        raise EpisodeProductionError(
+            "normalizedSpeechParameters are invalid"
+        )
+    _text(parameters["text"], "normalizedSpeechParameters.text")
+    _required_ref(
+        parameters["voiceRef"],
+        "normalizedSpeechParameters.voiceRef",
+    )
+    sample_rate = parameters["sampleRate"]
+    channels = parameters["channels"]
+    if (
+        isinstance(sample_rate, bool)
+        or not isinstance(sample_rate, int)
+        or sample_rate < 8_000
+        or sample_rate > 384_000
+        or isinstance(channels, bool)
+        or not isinstance(channels, int)
+        or channels not in {1, 2}
+    ):
+        raise EpisodeProductionError(
+            "normalizedSpeechParameters technical format is invalid"
+        )
+    emotion = parameters.get("emotionTag")
+    if emotion is not None and (
+        not isinstance(emotion, str) or emotion not in SPEECH_EMOTION_TAGS
+    ):
+        raise EpisodeProductionError(
+            "normalizedSpeechParameters emotionTag is invalid"
+        )
+    _deferred_audio_cue_refs(result["sourceAudioCueRefs"])
+    return result
+
+
+def _validated_v4_generation_evidence(
+    generation_result: Any,
+    artifact_evidence: Any,
+) -> tuple[dict[str, Any], dict[str, Any]]:
+    from .audio import (
+        V4_AUDIO_ARTIFACT_EVIDENCE_SCHEMA_VERSION,
+        V4_AUDIO_GENERATION_RESULT_SCHEMA_VERSION,
+        _V4_AUDIO_ARTIFACT_EVIDENCE_FIELDS,
+        _V4_AUDIO_GENERATION_RESULT_FIELDS,
+    )
+
+    result = _verify_sealed(
+        generation_result,
+        _V4_AUDIO_GENERATION_RESULT_FIELDS,
+        "V4 audio GenerationResult",
+    )
+    evidence = _verify_sealed(
+        artifact_evidence,
+        _V4_AUDIO_ARTIFACT_EVIDENCE_FIELDS,
+        "V4 audio ArtifactEvidence",
+    )
+    if (
+        result["schemaVersion"] != V4_AUDIO_GENERATION_RESULT_SCHEMA_VERSION
+        or evidence["schemaVersion"]
+        != V4_AUDIO_ARTIFACT_EVIDENCE_SCHEMA_VERSION
+        or result["state"] != "SUCCEEDED"
+        or evidence["state"] != "TECHNICALLY_VERIFIED"
+        or result["provenance"] != "LOCAL_EVIDENCE"
+        or result["publicationAllowed"] is not False
+        or evidence["publicationAllowed"] is not False
+        or result["artifactEvidenceRef"] != evidence["artifactEvidenceRef"]
+        or result["artifactEvidenceDigest"] != evidence["payloadDigest"]
+    ):
+        raise StaleInputError("V4 audio generation evidence is stale")
+    shared = set(result) & set(evidence) - {
+        "schemaVersion",
+        "state",
+        "payloadDigest",
+    }
+    if any(result[field] != evidence[field] for field in shared):
+        raise StaleInputError("V4 audio generation evidence aliases are stale")
+    return result, evidence
+
+
+def _audio_technical_validation_wrapper(value: Any) -> dict[str, Any]:
+    from .audio_validation import (
+        AUDIO_TECHNICAL_VALIDATION_AUTHORITY_STATE,
+        AUDIO_TECHNICAL_VALIDATION_STATE,
+        AUDIO_TECHNICAL_VALIDATION_V2_SCHEMA_VERSION,
+        AudioTechnicalValidation,
+    )
+
+    if type(value) is not AudioTechnicalValidation:
+        raise AudioDomainTypeMismatchError(
+            "clone DialogueAssetVersion requires an exact "
+            "AudioTechnicalValidation wrapper"
+        )
+    result = value.as_dict()
+    unsigned = deepcopy(result)
+    supplied = unsigned.pop("payloadDigest", None)
+    if not isinstance(supplied, str) or supplied != _digest(unsigned):
+        raise StaleInputError("AudioTechnicalValidation payloadDigest is invalid")
+    if (
+        result.get("schemaVersion")
+        != AUDIO_TECHNICAL_VALIDATION_V2_SCHEMA_VERSION
+        or result.get("validationKind")
+        != "PRE_ASSET_GENERATION_EVIDENCE"
+        or result.get("state") != AUDIO_TECHNICAL_VALIDATION_STATE
+        or result.get("authorityState")
+        != AUDIO_TECHNICAL_VALIDATION_AUTHORITY_STATE
+        or result.get("immutable") is not True
+        or result.get("publicationAllowed") is not False
+    ):
+        raise AudioDomainTypeMismatchError(
+            "clone DialogueAssetVersion requires pre-asset "
+            "AudioTechnicalValidation v2"
+        )
+    return result
+
+
+def _validate_clone_dialogue_asset_version(
+    value: Any,
+    *,
+    voice_asset_version: Any,
+    audio_generation_request: Any,
+    generation_result: Any,
+    artifact_evidence: Any,
+    audio_technical_validation: Any,
+    confirmed_voice_lock: Any,
+    voice_profile_version: Any,
+    consent_grant_version: Any,
+    source_recording_binding: Any,
+    evaluated_at: str | None,
+    current_voice_profile_authority: Any = None,
+    require_current_authority: bool = False,
+) -> dict[str, Any]:
+    result = _common_asset(
+        value,
+        "DialogueAssetVersion",
+        schema_version=DIALOGUE_ASSET_VERSION_V2_SCHEMA_VERSION,
+        fields=_CLONE_DIALOGUE_FIELDS,
+    )
+    if type(voice_asset_version) is not VoiceAssetVersion:
+        raise AudioDomainTypeMismatchError(
+            "clone DialogueAssetVersion requires an exact VoiceAssetVersion wrapper"
+        )
+    selected_voice = voice_asset_version.as_dict()
+    if selected_voice.get("schemaVersion") != VOICE_ASSET_VERSION_V2_SCHEMA_VERSION:
+        raise AudioDomainTypeMismatchError(
+            "fixed-voice v1 cannot satisfy clone DialogueAssetVersion"
+        )
+    voice = _validate_clone_voice_asset_version(
+        selected_voice,
+        voice_profile_version=voice_profile_version,
+        confirmed_voice_lock=confirmed_voice_lock,
+        consent_grant_version=consent_grant_version,
+        source_recording_binding=source_recording_binding,
+        evaluated_at=evaluated_at,
+        current_voice_profile_authority=current_voice_profile_authority,
+        require_current_authority=require_current_authority,
+    )
+    if type(audio_generation_request) is not AudioGenerationRequest:
+        raise AudioDomainTypeMismatchError(
+            "clone DialogueAssetVersion requires an exact AudioGenerationRequest wrapper"
+        )
+    request = _validate_audio_generation_request(
+        audio_generation_request.as_dict(),
+        confirmed_voice_lock=confirmed_voice_lock,
+        voice_asset_version=voice_asset_version,
+        evaluated_at=evaluated_at,
+        voice_profile_version=voice_profile_version,
+        consent_grant_version=consent_grant_version,
+        source_recording_binding=source_recording_binding,
+        current_voice_profile_authority=current_voice_profile_authority,
+        require_current_authority=require_current_authority,
+    )
+    generation, evidence = _validated_v4_generation_evidence(
+        generation_result,
+        artifact_evidence,
+    )
+    technical = _audio_technical_validation_wrapper(audio_technical_validation)
+    lock_bundle = validate_confirmed_clone_voice_lock_bundle(
+        confirmed_voice_lock
+    )
+
+    if result["speechRole"] not in {"dialogue", "narration"}:
+        raise AudioDomainTypeMismatchError("speechRole is invalid")
+    _required_ref(result["scriptVersionRef"], "scriptVersionRef")
+    _sha256(result["scriptVersionDigest"], "scriptVersionDigest")
+    if result["speechRole"] == "dialogue":
+        _required_ref(result["dialogueRef"], "dialogueRef")
+        if result["narrationRef"] is not None:
+            raise AudioDomainTypeMismatchError("dialogue cannot bind narrationRef")
+    else:
+        _required_ref(result["narrationRef"], "narrationRef")
+        if result["dialogueRef"] is not None:
+            raise AudioDomainTypeMismatchError("narration cannot bind dialogueRef")
+    _text(result["language"], "language")
+    normalized = normalize_clone_speech_parameters(
+        result["normalizedSpeechParameters"],
+        confirmed_voice_lock=lock_bundle,
+    )
+    if (
+        normalized != result["normalizedSpeechParameters"]
+        or normalized["audioRole"] != result["speechRole"]
+    ):
+        raise StaleInputError("clone dialogue speech parameters are stale")
+    _deferred_audio_cue_refs(result["sourceAudioCueRefs"])
+    if (
+        result["voiceAssetVersionRef"] != voice["assetVersionRef"]
+        or result["voiceAssetVersionDigest"] != voice["payloadDigest"]
+    ):
+        raise StaleInputError("clone DialogueAssetVersion voice binding is stale")
+    expected_request_kind = (
+        "DIALOGUE_SYNTHESIS"
+        if result["speechRole"] == "dialogue"
+        else "NARRATION_SYNTHESIS"
+    )
+    request_spec = request.get("requestSpec")
+    if (
+        request.get("requestKind") != expected_request_kind
+        or request.get("outputAssetVersionType") != "DialogueAssetVersion"
+        or not isinstance(request_spec, Mapping)
+        or result["generationRequestRef"] != request["generationRequestRef"]
+        or result["generationRequestVersionRef"]
+        != request["generationRequestVersionRef"]
+        or result["generationRequestDigest"] != request["payloadDigest"]
+        or result["assetRequirementRef"] != request["assetRequirementRef"]
+        or result["assetRequirementDigest"]
+        != request["assetRequirementDigest"]
+        or result["scriptVersionRef"] != request_spec.get("scriptVersionRef")
+        or result["scriptVersionDigest"]
+        != request_spec.get("scriptVersionDigest")
+        or result["dialogueRef"] != request_spec.get("dialogueRef")
+        or result["narrationRef"] != request_spec.get("narrationRef")
+        or result["voiceAssetVersionRef"]
+        != request_spec.get("voiceAssetVersionRef")
+        or result["voiceAssetVersionDigest"]
+        != request_spec.get("voiceAssetVersionDigest")
+        or result["language"] != request_spec.get("language")
+        or result["normalizedSpeechParameters"]
+        != request_spec.get("normalizedSpeechParameters")
+        or result["sourceAudioCueRefs"]
+        != request_spec.get("sourceAudioCueRefs")
+    ):
+        raise StaleInputError("clone audio generation request binding is stale")
+    if (
+        result["generationResultRef"] != generation["generationResultRef"]
+        or result["generationResultDigest"] != generation["payloadDigest"]
+        or generation["generationRequestRef"] != request["generationRequestRef"]
+        or generation["generationRequestVersionRef"]
+        != request["generationRequestVersionRef"]
+        or generation["generationRequestDigest"] != request["payloadDigest"]
+        or generation["assetRequirementRef"]
+        != request["assetRequirementRef"]
+        or generation["assetRequirementDigest"]
+        != request["assetRequirementDigest"]
+        or generation["scriptVersionRef"]
+        != request_spec["scriptVersionRef"]
+        or generation["scriptVersionDigest"]
+        != request_spec["scriptVersionDigest"]
+        or generation["audioRole"] != result["speechRole"]
+    ):
+        raise StaleInputError("clone GenerationResult binding is stale")
+    artifact = result["artifact"]
+    if (
+        artifact["artifactEvidenceRef"] != evidence["artifactEvidenceRef"]
+        or artifact["artifactEvidenceDigest"] != evidence["payloadDigest"]
+        or artifact["artifactRef"] != evidence["artifactRef"]
+        or artifact["storageKey"] != evidence["storageKey"]
+        or artifact["byteSize"] != evidence["byteSize"]
+        or artifact["fileDigest"] != evidence["sha256"]
+    ):
+        raise StaleInputError("clone ArtifactEvidence binding is stale")
+    provenance = result["provenance"]
+    requested_provenance = request["requestedProvenance"]
+    if (
+        requested_provenance["adapterIdentity"]
+        != generation["adapterIdentity"]
+        or requested_provenance["originKind"] != provenance["originKind"]
+        or requested_provenance["parametersDigest"]
+        != generation["parametersDigest"]
+        or provenance["adapterIdentity"] != generation["adapterIdentity"]
+        or provenance["generationRecordRef"]
+        != generation["generationResultRef"]
+        or provenance["parametersDigest"] != generation["parametersDigest"]
+        or provenance["artifactEvidenceRef"]
+        != evidence["artifactEvidenceRef"]
+        or provenance["artifactEvidenceDigest"] != evidence["payloadDigest"]
+        or not any(
+            source["sourceRef"] == request["generationRequestVersionRef"]
+            and source["sourceDigest"] == request["payloadDigest"]
+            for source in provenance["sourceRefs"]
+        )
+        or not any(
+            source["sourceRef"] == generation["generationResultRef"]
+            and source["sourceDigest"] == generation["payloadDigest"]
+            for source in provenance["sourceRefs"]
+        )
+    ):
+        raise StaleInputError("clone audio provenance binding is stale")
+    for field in (
+        "audioTechnicalValidationDigest",
+        "audioFileDigest",
+        "audioPcmContentDigest",
+    ):
+        _sha256(result[field], field)
+    _required_ref(
+        result["audioTechnicalValidationRef"],
+        "audioTechnicalValidationRef",
+    )
+    _required_ref(technical["analysisEvidenceRef"], "analysisEvidenceRef")
+    _sha256(technical["analysisEvidenceDigest"], "analysisEvidenceDigest")
+    if (
+        result["audioTechnicalValidationRef"]
+        != technical["validationVersionRef"]
+        or result["audioTechnicalValidationDigest"] != technical["payloadDigest"]
+        or result["audioFileDigest"] != artifact["fileDigest"]
+        or result["audioFileDigest"] != technical["fileDigest"]
+        or result["audioPcmContentDigest"] != technical["pcmContentDigest"]
+        or technical["generationRequestRef"] != request["generationRequestRef"]
+        or technical["generationRequestVersionRef"]
+        != request["generationRequestVersionRef"]
+        or technical["generationRequestDigest"] != request["payloadDigest"]
+        or technical["generationResultRef"]
+        != generation["generationResultRef"]
+        or technical["generationResultDigest"] != generation["payloadDigest"]
+        or technical["artifactEvidenceRef"]
+        != evidence["artifactEvidenceRef"]
+        or technical["artifactEvidenceDigest"] != evidence["payloadDigest"]
+        or technical["artifactRef"] != evidence["artifactRef"]
+        or technical["storageKey"] != evidence["storageKey"]
+        or technical["byteSize"] != evidence["byteSize"]
+        or technical["validationState"] != "PASSED"
+    ):
+        raise StaleInputError("clone AudioTechnicalValidation binding is stale")
+    expected_scope = (
+        result["workspaceRef"],
+        result["productionRunRef"],
+    )
+    if any(
+        (item["workspaceRef"], item["productionRunRef"]) != expected_scope
+        for item in (request, generation, evidence, technical)
+    ):
+        raise StaleInputError("clone dialogue production scope is stale")
+    full_scope_fields = (
+        "workspaceRef",
+        "projectRef",
+        "seriesRef",
+        "episodeRef",
+        "productionRunRef",
+    )
+    dialogue_scope = tuple(result[field] for field in full_scope_fields)
+    if any(
+        tuple(item[field] for field in full_scope_fields) != dialogue_scope
+        for item in (voice, request)
+    ):
+        raise StaleInputError("clone dialogue full production scope is stale")
+    return result
+
+
 def validate_dialogue_asset_version(
     value: Any,
     *,
@@ -939,6 +1600,15 @@ def validate_dialogue_asset_version(
     voice_asset_version: Any,
     consent_grant: Any = None,
     evaluated_at: str | None = None,
+    audio_generation_request: Any = None,
+    generation_result: Any = None,
+    artifact_evidence: Any = None,
+    audio_technical_validation: Any = None,
+    voice_profile_version: Any = None,
+    consent_grant_version: Any = None,
+    source_recording_binding: Any = None,
+    current_voice_profile_authority: Any = None,
+    require_current_authority: bool = False,
 ) -> "DialogueAssetVersion":
     return DialogueAssetVersion.from_mapping(
         value,
@@ -946,6 +1616,54 @@ def validate_dialogue_asset_version(
         voice_asset_version=voice_asset_version,
         consent_grant=consent_grant,
         evaluated_at=evaluated_at,
+        audio_generation_request=audio_generation_request,
+        generation_result=generation_result,
+        artifact_evidence=artifact_evidence,
+        audio_technical_validation=audio_technical_validation,
+        voice_profile_version=voice_profile_version,
+        consent_grant_version=consent_grant_version,
+        source_recording_binding=source_recording_binding,
+        current_voice_profile_authority=current_voice_profile_authority,
+        require_current_authority=require_current_authority,
+    )
+
+
+def validate_clone_dialogue_asset_version(
+    value: Any,
+    *,
+    voice_asset_version: Any,
+    audio_generation_request: Any,
+    generation_result: Any,
+    artifact_evidence: Any,
+    audio_technical_validation: Any,
+    confirmed_voice_lock: Any,
+    voice_profile_version: Any,
+    consent_grant_version: Any,
+    source_recording_binding: Any,
+    evaluated_at: str,
+    current_voice_profile_authority: Any = None,
+) -> "DialogueAssetVersion":
+    if not isinstance(value, Mapping) or value.get("schemaVersion") != (
+        DIALOGUE_ASSET_VERSION_V2_SCHEMA_VERSION
+    ):
+        raise AudioDomainTypeMismatchError(
+            "clone DialogueAssetVersion v2 schema is required"
+        )
+    return DialogueAssetVersion._from_validated(
+        _validate_clone_dialogue_asset_version(
+            value,
+            voice_asset_version=voice_asset_version,
+            audio_generation_request=audio_generation_request,
+            generation_result=generation_result,
+            artifact_evidence=artifact_evidence,
+            audio_technical_validation=audio_technical_validation,
+            confirmed_voice_lock=confirmed_voice_lock,
+            voice_profile_version=voice_profile_version,
+            consent_grant_version=consent_grant_version,
+            source_recording_binding=source_recording_binding,
+            evaluated_at=evaluated_at,
+            current_voice_profile_authority=current_voice_profile_authority,
+        )
     )
 
 
@@ -1036,18 +1754,258 @@ def _validate_voice_asset_version(
     return result
 
 
+def _validate_clone_voice_asset_version(
+    value: Any,
+    *,
+    voice_profile_version: Any,
+    confirmed_voice_lock: Any,
+    consent_grant_version: Any,
+    source_recording_binding: Any,
+    evaluated_at: str | None,
+    current_voice_profile_authority: Any = None,
+    require_current_authority: bool = False,
+) -> dict[str, Any]:
+    result = _common_asset(
+        value,
+        "VoiceAssetVersion",
+        schema_version=VOICE_ASSET_VERSION_V2_SCHEMA_VERSION,
+        fields=_CLONE_VOICE_FIELDS,
+    )
+    for field in (
+        "voiceIdentityRef",
+        "characterRef",
+        "voiceProfileRef",
+        "voiceProfileVersionRef",
+        "voiceLockVersionRef",
+        "voiceSourceSubjectRef",
+        "sourceRecordingBindingRef",
+        "consentGrantRef",
+        "consentGrantVersionRef",
+        "rightsBindingRef",
+    ):
+        _required_ref(result[field], field)
+    _text(result["engineId"], "engineId")
+    _text(result["modelId"], "modelId")
+    if (
+        result["engineId"] != CLONE_VOICE_ENGINE_FAMILY
+        or result["modelId"] != CLONE_VOICE_MODEL_ID
+    ):
+        raise AudioDomainTypeMismatchError(
+            "clone VoiceAssetVersion runtime identity is not the frozen "
+            "zero-shot clone runtime"
+        )
+    if (
+        not isinstance(result["engineCommit"], str)
+        or re.fullmatch(r"[0-9a-f]{40}", result["engineCommit"]) is None
+    ):
+        raise EpisodeProductionError("engineCommit must be a pinned commit SHA")
+    for field in (
+        "voiceProfileVersionDigest",
+        "voiceLockVersionDigest",
+        "sourceRecordingBindingDigest",
+        "consentGrantVersionDigest",
+        "rightsBindingDigest",
+        "modelBundleDigest",
+        "dependencyLockDigest",
+        "runtimeManifestDigest",
+    ):
+        _sha256(result[field], field)
+    if result["voiceSourceKind"] != "CLONED_WITH_CONSENT":
+        raise AudioDomainTypeMismatchError(
+            "clone VoiceAssetVersion cannot represent a fixed preset voice"
+        )
+
+    source = _voice_lineage_wrapper(
+        source_recording_binding,
+        class_name="SourceVoiceRecordingAssetVersionBinding",
+        label="source voice recording binding",
+    )
+    consent = _effective_clone_consent(
+        consent_grant_version,
+        evaluated_at=evaluated_at,
+    )
+    profile = _voice_lineage_wrapper(
+        voice_profile_version,
+        class_name="VoiceProfileVersion",
+        label="VoiceProfileVersion",
+    )
+    lock_bundle = validate_confirmed_clone_voice_lock_bundle(
+        confirmed_voice_lock
+    )
+    lock_root = lock_bundle["voiceLock"]
+    lock_version = lock_bundle["voiceLockVersion"]
+    confirmation = lock_bundle["voiceLockConfirmation"]
+    rights = _validate_rights_binding(
+        result["rightsBinding"],
+        required_uses=frozenset(
+            {"VOICE_CLONING", "VOICE_PROFILE_USE", "AUDIO_PRODUCTION"}
+        ),
+    )
+    scope = tuple(
+        result[field] for field in ("workspaceRef", "projectRef", "seriesRef")
+    )
+    if any(
+        tuple(item[field] for field in ("workspaceRef", "projectRef", "seriesRef"))
+        != scope
+        for item in (source, consent, profile, lock_root, lock_version)
+    ):
+        raise StaleInputError("clone voice scope binding is stale")
+    if (
+        source["subjectRef"] != result["voiceSourceSubjectRef"]
+        or consent["subjectRef"] != source["subjectRef"]
+        or profile["subjectRef"] != source["subjectRef"]
+        or lock_version["subjectRef"] != source["subjectRef"]
+    ):
+        raise StaleInputError("clone voice subject binding is stale")
+    if (
+        result["voiceIdentityRef"] != profile["voiceIdentityRef"]
+        or result["voiceIdentityRef"] != lock_version["voiceIdentityRef"]
+        or result["characterRef"] != lock_root["characterRef"]
+        or result["voiceProfileRef"] != profile["voiceProfileRef"]
+        or result["voiceProfileVersionRef"]
+        != profile["voiceProfileVersionRef"]
+        or result["voiceProfileVersionDigest"] != profile["payloadDigest"]
+        or profile.get("status") != "CONFIRMED"
+        or profile.get("confirmedAt") is None
+    ):
+        raise StaleInputError("clone VoiceProfileVersion binding is stale")
+    if (
+        result["voiceLockVersionRef"] != lock_version["voiceLockVersionRef"]
+        or result["voiceLockVersionDigest"] != lock_version["payloadDigest"]
+        or profile["voiceLockRef"] != lock_root["voiceRef"]
+        or profile["voiceLockVersionRef"] != lock_version["voiceLockVersionRef"]
+        or profile["voiceLockVersionDigest"] != lock_version["payloadDigest"]
+        or profile["voiceLockConfirmationRef"]
+        != confirmation["voiceLockConfirmationRef"]
+        or profile["voiceLockConfirmationDigest"]
+        != confirmation["payloadDigest"]
+    ):
+        raise StaleInputError("clone VoiceLock binding is stale")
+    if (
+        result["sourceRecordingBindingRef"]
+        != source["sourceRecordingBindingRef"]
+        or result["sourceRecordingBindingDigest"] != source["payloadDigest"]
+        or consent["sourceRecordingBindingRef"]
+        != source["sourceRecordingBindingRef"]
+        or consent["sourceRecordingBindingDigest"] != source["payloadDigest"]
+        or profile["sourceRecordingBindingRef"]
+        != source["sourceRecordingBindingRef"]
+        or profile["sourceRecordingBindingDigest"] != source["payloadDigest"]
+        or lock_version["sourceRecordingBindingRef"]
+        != source["sourceRecordingBindingRef"]
+        or lock_version["sourceRecordingBindingDigest"] != source["payloadDigest"]
+    ):
+        raise StaleInputError("clone source-recording binding is stale")
+    if (
+        result["consentGrantRef"] != consent["consentGrantRef"]
+        or result["consentGrantVersionRef"]
+        != consent["consentGrantVersionRef"]
+        or result["consentGrantVersionDigest"] != consent["payloadDigest"]
+        or profile["consentGrantVersionRef"]
+        != consent["consentGrantVersionRef"]
+        or profile["consentGrantVersionDigest"] != consent["payloadDigest"]
+        or lock_version["consentGrantVersionRef"]
+        != consent["consentGrantVersionRef"]
+        or lock_version["consentGrantVersionDigest"] != consent["payloadDigest"]
+    ):
+        raise StaleInputError("clone consent binding is stale")
+    if (
+        result["rightsBindingRef"] != rights["rightsBindingRef"]
+        or result["rightsBindingDigest"] != rights["payloadDigest"]
+        or consent["rightsBindingRef"] != rights["rightsBindingRef"]
+        or consent["rightsBindingDigest"] != rights["payloadDigest"]
+        or profile["rightsBindingRef"] != rights["rightsBindingRef"]
+        or profile["rightsBindingDigest"] != rights["payloadDigest"]
+        or lock_version["rightsBindingRef"] != rights["rightsBindingRef"]
+        or lock_version["rightsBindingDigest"] != rights["payloadDigest"]
+    ):
+        raise StaleInputError("clone rights binding is stale")
+    runtime_fields = (
+        "engineId",
+        "engineCommit",
+        "modelId",
+        "modelBundleDigest",
+        "dependencyLockDigest",
+        "runtimeManifestDigest",
+    )
+    if any(result[field] != profile[field] for field in runtime_fields):
+        raise StaleInputError("clone runtime binding is stale")
+    package = profile.get("profilePackage")
+    if (
+        not isinstance(package, Mapping)
+        or result["artifact"]["fileDigest"] != package.get("fileDigest")
+    ):
+        raise StaleInputError("clone profile package artifact binding is stale")
+    _current_clone_authority(
+        current_voice_profile_authority,
+        voice_profile_version=voice_profile_version,
+        consent_grant_version=consent_grant_version,
+        source_recording_binding=source_recording_binding,
+        confirmed_voice_lock=confirmed_voice_lock,
+        rights_binding=rights,
+        evaluated_at=evaluated_at,
+        required=require_current_authority,
+        expected_scope=(
+            result["workspaceRef"],
+            result["projectRef"],
+            result["seriesRef"],
+            result["productionRunRef"],
+        ),
+    )
+    return result
+
+
 def validate_voice_asset_version(
     value: Any,
     *,
     confirmed_voice_lock: Any,
     consent_grant: Any = None,
     evaluated_at: str | None = None,
+    voice_profile_version: Any = None,
+    consent_grant_version: Any = None,
+    source_recording_binding: Any = None,
+    current_voice_profile_authority: Any = None,
+    require_current_authority: bool = False,
 ) -> "VoiceAssetVersion":
     return VoiceAssetVersion.from_mapping(
         value,
         confirmed_voice_lock=confirmed_voice_lock,
         consent_grant=consent_grant,
         evaluated_at=evaluated_at,
+        voice_profile_version=voice_profile_version,
+        consent_grant_version=consent_grant_version,
+        source_recording_binding=source_recording_binding,
+        current_voice_profile_authority=current_voice_profile_authority,
+        require_current_authority=require_current_authority,
+    )
+
+
+def validate_clone_voice_asset_version(
+    value: Any,
+    *,
+    voice_profile_version: Any,
+    confirmed_voice_lock: Any,
+    consent_grant_version: Any,
+    source_recording_binding: Any,
+    evaluated_at: str,
+    current_voice_profile_authority: Any = None,
+) -> "VoiceAssetVersion":
+    if not isinstance(value, Mapping) or value.get("schemaVersion") != (
+        VOICE_ASSET_VERSION_V2_SCHEMA_VERSION
+    ):
+        raise AudioDomainTypeMismatchError(
+            "clone VoiceAssetVersion v2 schema is required"
+        )
+    return VoiceAssetVersion._from_validated(
+        _validate_clone_voice_asset_version(
+            value,
+            voice_profile_version=voice_profile_version,
+            confirmed_voice_lock=confirmed_voice_lock,
+            consent_grant_version=consent_grant_version,
+            source_recording_binding=source_recording_binding,
+            evaluated_at=evaluated_at,
+            current_voice_profile_authority=current_voice_profile_authority,
+        )
     )
 
 
@@ -1095,6 +2053,15 @@ def validate_audio_domain_asset_version(
     voice_asset_version: Any = None,
     consent_grant: Any = None,
     evaluated_at: str | None = None,
+    voice_profile_version: Any = None,
+    consent_grant_version: Any = None,
+    source_recording_binding: Any = None,
+    audio_generation_request: Any = None,
+    generation_result: Any = None,
+    artifact_evidence: Any = None,
+    audio_technical_validation: Any = None,
+    current_voice_profile_authority: Any = None,
+    require_current_authority: bool = False,
 ) -> "_ImmutableContract":
     if not isinstance(value, Mapping):
         raise EpisodeProductionError("audio AssetVersion is invalid")
@@ -1106,6 +2073,15 @@ def validate_audio_domain_asset_version(
             voice_asset_version=voice_asset_version,
             consent_grant=consent_grant,
             evaluated_at=evaluated_at,
+            audio_generation_request=audio_generation_request,
+            generation_result=generation_result,
+            artifact_evidence=artifact_evidence,
+            audio_technical_validation=audio_technical_validation,
+            voice_profile_version=voice_profile_version,
+            consent_grant_version=consent_grant_version,
+            source_recording_binding=source_recording_binding,
+            current_voice_profile_authority=current_voice_profile_authority,
+            require_current_authority=require_current_authority,
         )
     if asset_type == "VoiceAssetVersion":
         return validate_voice_asset_version(
@@ -1113,6 +2089,11 @@ def validate_audio_domain_asset_version(
             confirmed_voice_lock=confirmed_voice_lock,
             consent_grant=consent_grant,
             evaluated_at=evaluated_at,
+            voice_profile_version=voice_profile_version,
+            consent_grant_version=consent_grant_version,
+            source_recording_binding=source_recording_binding,
+            current_voice_profile_authority=current_voice_profile_authority,
+            require_current_authority=require_current_authority,
         )
     if asset_type == "MusicAssetVersion":
         return validate_music_asset_version(value)
@@ -1131,6 +2112,11 @@ def _request_spec(
     voice_asset_version: Any,
     consent_grant: Any,
     evaluated_at: str | None,
+    voice_profile_version: Any = None,
+    consent_grant_version: Any = None,
+    source_recording_binding: Any = None,
+    current_voice_profile_authority: Any = None,
+    require_current_authority: bool = False,
 ) -> dict[str, Any]:
     if not isinstance(value, Mapping):
         raise EpisodeProductionError("requestSpec is invalid")
@@ -1164,24 +2150,61 @@ def _request_spec(
             _required_ref(result["narrationRef"], "narrationRef")
             if result["dialogueRef"] is not None:
                 raise AudioDomainTypeMismatchError("narration request has dialogueRef")
-        voice = _validate_voice_asset_version(
-            voice_asset_version,
-            confirmed_voice_lock=confirmed_voice_lock,
-            consent_grant=consent_grant,
-            evaluated_at=evaluated_at,
+        exact_voice_wrapper = type(voice_asset_version) is VoiceAssetVersion
+        selected_voice_asset = (
+            voice_asset_version.as_dict()
+            if exact_voice_wrapper
+            else voice_asset_version
         )
+        clone_voice_requested = voice_profile_version is not None or (
+            isinstance(selected_voice_asset, Mapping)
+            and selected_voice_asset.get("schemaVersion")
+            == VOICE_ASSET_VERSION_V2_SCHEMA_VERSION
+        )
+        if clone_voice_requested:
+            if not exact_voice_wrapper:
+                raise AudioDomainTypeMismatchError(
+                    "clone speech request requires an exact VoiceAssetVersion wrapper"
+                )
+            voice = _validate_clone_voice_asset_version(
+                selected_voice_asset,
+                voice_profile_version=voice_profile_version,
+                confirmed_voice_lock=confirmed_voice_lock,
+                consent_grant_version=consent_grant_version,
+                source_recording_binding=source_recording_binding,
+                evaluated_at=evaluated_at,
+                current_voice_profile_authority=current_voice_profile_authority,
+                require_current_authority=require_current_authority,
+            )
+        else:
+            voice = _validate_voice_asset_version(
+                selected_voice_asset,
+                confirmed_voice_lock=confirmed_voice_lock,
+                consent_grant=consent_grant,
+                evaluated_at=evaluated_at,
+            )
         if (
             result["voiceAssetVersionRef"] != voice["assetVersionRef"]
             or result["voiceAssetVersionDigest"] != voice["payloadDigest"]
         ):
             raise StaleInputError("request voice AssetVersion binding is stale")
         _text(result["language"], "language")
-        voice_version = _confirmed_voice(confirmed_voice_lock)["voiceLockVersion"]
+        voice_lock_bundle = (
+            validate_confirmed_clone_voice_lock_bundle(confirmed_voice_lock)
+            if clone_voice_requested
+            else _confirmed_voice(confirmed_voice_lock)
+        )
+        voice_version = voice_lock_bundle["voiceLockVersion"]
         if result["language"] != voice_version["languageCode"]:
             raise StaleInputError("speech request language binding is stale")
-        normalized = normalize_speech_parameters(
+        normalizer = (
+            normalize_clone_speech_parameters
+            if clone_voice_requested
+            else normalize_speech_parameters
+        )
+        normalized = normalizer(
             result["normalizedSpeechParameters"],
-            confirmed_voice_lock=confirmed_voice_lock,
+            confirmed_voice_lock=voice_lock_bundle,
         )
         if normalized != result["normalizedSpeechParameters"]:
             raise StaleInputError("request speech parameters are not normalized")
@@ -1285,6 +2308,11 @@ def _validate_audio_generation_request(
     voice_asset_version: Any = None,
     consent_grant: Any = None,
     evaluated_at: str | None = None,
+    voice_profile_version: Any = None,
+    consent_grant_version: Any = None,
+    source_recording_binding: Any = None,
+    current_voice_profile_authority: Any = None,
+    require_current_authority: bool = False,
 ) -> dict[str, Any]:
     result = _verify_sealed(
         value, _GENERATION_REQUEST_FIELDS, "AudioGenerationRequest"
@@ -1330,13 +2358,48 @@ def _validate_audio_generation_request(
         voice_asset_version=voice_asset_version,
         consent_grant=consent_grant,
         evaluated_at=evaluated_at,
+        voice_profile_version=voice_profile_version,
+        consent_grant_version=consent_grant_version,
+        source_recording_binding=source_recording_binding,
+        current_voice_profile_authority=current_voice_profile_authority,
+        require_current_authority=require_current_authority,
     )
+    is_clone_speech_request = False
+    if kind in {"DIALOGUE_SYNTHESIS", "NARRATION_SYNTHESIS"}:
+        selected_voice = (
+            voice_asset_version.as_dict()
+            if type(voice_asset_version) is VoiceAssetVersion
+            else voice_asset_version
+        )
+        is_clone_speech_request = voice_profile_version is not None or (
+            isinstance(selected_voice, Mapping)
+            and selected_voice.get("schemaVersion")
+            == VOICE_ASSET_VERSION_V2_SCHEMA_VERSION
+        )
+        if is_clone_speech_request:
+            full_scope_fields = (
+                "workspaceRef",
+                "projectRef",
+                "seriesRef",
+                "episodeRef",
+                "productionRunRef",
+            )
+            if tuple(result[field] for field in full_scope_fields) != tuple(
+                selected_voice.get(field) for field in full_scope_fields
+            ):
+                raise StaleInputError(
+                    "clone audio request VoiceAsset production scope is stale"
+                )
     if kind in {
         "DIALOGUE_SYNTHESIS",
         "NARRATION_SYNTHESIS",
         "VOICE_PROFILE_CREATION",
     }:
-        bundle = _confirmed_voice(confirmed_voice_lock)
+        bundle = (
+            validate_confirmed_clone_voice_lock_bundle(confirmed_voice_lock)
+            if is_clone_speech_request
+            else _confirmed_voice(confirmed_voice_lock)
+        )
         root = bundle["voiceLock"]
         if tuple(result[field] for field in ("workspaceRef", "projectRef", "seriesRef")) != tuple(
             root[field] for field in ("workspaceRef", "projectRef", "seriesRef")
@@ -1383,6 +2446,14 @@ def _validate_audio_generation_request(
     requested_provenance = _validate_requested_provenance(
         result["requestedProvenance"]
     )
+    if (
+        is_clone_speech_request
+        and requested_provenance["parametersDigest"]
+        != _digest(request_spec["normalizedSpeechParameters"])
+    ):
+        raise StaleInputError(
+            "clone speech requested parameters digest is stale"
+        )
     if not any(
         source["sourceRef"] == result["assetRequirementRef"]
         and source["sourceDigest"] == result["assetRequirementDigest"]
@@ -1408,6 +2479,11 @@ def validate_audio_generation_request(
     voice_asset_version: Any = None,
     consent_grant: Any = None,
     evaluated_at: str | None = None,
+    voice_profile_version: Any = None,
+    consent_grant_version: Any = None,
+    source_recording_binding: Any = None,
+    current_voice_profile_authority: Any = None,
+    require_current_authority: bool = False,
 ) -> "AudioGenerationRequest":
     return AudioGenerationRequest.from_mapping(
         value,
@@ -1415,6 +2491,11 @@ def validate_audio_generation_request(
         voice_asset_version=voice_asset_version,
         consent_grant=consent_grant,
         evaluated_at=evaluated_at,
+        voice_profile_version=voice_profile_version,
+        consent_grant_version=consent_grant_version,
+        source_recording_binding=source_recording_binding,
+        current_voice_profile_authority=current_voice_profile_authority,
+        require_current_authority=require_current_authority,
     )
 
 
@@ -1425,6 +2506,10 @@ def build_audio_generation_request(
     voice_asset_version: Any = None,
     consent_grant: Any = None,
     evaluated_at: str | None = None,
+    voice_profile_version: Any = None,
+    consent_grant_version: Any = None,
+    source_recording_binding: Any = None,
+    current_voice_profile_authority: Any = None,
 ) -> dict[str, Any]:
     fields = _GENERATION_REQUEST_FIELDS - {
         "schemaVersion",
@@ -1434,6 +2519,32 @@ def build_audio_generation_request(
         "payloadDigest",
     }
     value = _exact(command, fields, "AudioGenerationRequest command")
+    request_spec = value.get("requestSpec")
+    if (
+        value.get("requestKind") == "VOICE_PROFILE_CREATION"
+        and isinstance(request_spec, Mapping)
+        and request_spec.get("voiceSourceKind") == "CLONED_WITH_CONSENT"
+    ):
+        raise AudioDomainTypeMismatchError(
+            "new cloned voices cannot use the legacy voice-profile request path"
+        )
+    selected_voice_asset = (
+        voice_asset_version.as_dict()
+        if type(voice_asset_version) is VoiceAssetVersion
+        else voice_asset_version
+    )
+    if (
+        value.get("requestKind")
+        in {"DIALOGUE_SYNTHESIS", "NARRATION_SYNTHESIS"}
+        and isinstance(selected_voice_asset, Mapping)
+        and selected_voice_asset.get("schemaVersion")
+        == VOICE_ASSET_VERSION_SCHEMA_VERSION
+        and selected_voice_asset.get("voiceSourceKind")
+        == "CLONED_WITH_CONSENT"
+    ):
+        raise AudioDomainTypeMismatchError(
+            "new clone speech requests require VoiceAssetVersion v2"
+        )
     result = _seal(
         {
             "schemaVersion": AUDIO_GENERATION_REQUEST_SCHEMA_VERSION,
@@ -1449,6 +2560,11 @@ def build_audio_generation_request(
         voice_asset_version=voice_asset_version,
         consent_grant=consent_grant,
         evaluated_at=evaluated_at,
+        voice_profile_version=voice_profile_version,
+        consent_grant_version=consent_grant_version,
+        source_recording_binding=source_recording_binding,
+        current_voice_profile_authority=current_voice_profile_authority,
+        require_current_authority=True,
     ).as_dict()
 
 
@@ -1485,12 +2601,136 @@ def _build_asset_version(
     return validate_audio_domain_asset_version(result, **validation).as_dict()
 
 
-def build_dialogue_asset_version(command: Mapping[str, Any], **validation: Any) -> dict[str, Any]:
+def _build_clone_asset_version(
+    asset_version_type: str,
+    command: Mapping[str, Any],
+    **validation: Any,
+) -> dict[str, Any]:
+    contract = {
+        "VoiceAssetVersion": (
+            VOICE_ASSET_VERSION_V2_SCHEMA_VERSION,
+            _CLONE_VOICE_FIELDS,
+        ),
+        "DialogueAssetVersion": (
+            DIALOGUE_ASSET_VERSION_V2_SCHEMA_VERSION,
+            _CLONE_DIALOGUE_FIELDS,
+        ),
+    }.get(asset_version_type)
+    if contract is None:
+        raise AudioDomainTypeMismatchError("clone audio AssetVersion type is invalid")
+    schema_version, fields = contract
+    command_fields = fields - {
+        "schemaVersion",
+        "assetVersionType",
+        "assetKind",
+        "audioKind",
+        "state",
+        "authorityState",
+        "immutable",
+        "publicationAllowed",
+        "payloadDigest",
+    }
+    value = _exact(command, command_fields, f"clone {asset_version_type} command")
+    result = _seal(
+        {
+            "schemaVersion": schema_version,
+            "assetVersionType": asset_version_type,
+            **value,
+            "assetKind": "audio",
+            "audioKind": _AUDIO_KIND_BY_TYPE[asset_version_type],
+            "state": "PROPOSED",
+            "authorityState": "CONTRACT_ONLY_NOT_ADMITTED",
+            "immutable": True,
+            "publicationAllowed": False,
+        }
+    )
+    return validate_audio_domain_asset_version(result, **validation).as_dict()
+
+
+def build_dialogue_asset_version(
+    command: Mapping[str, Any], **validation: Any
+) -> dict[str, Any]:
+    selected_voice_asset = validation.get("voice_asset_version")
+    if type(selected_voice_asset) is VoiceAssetVersion:
+        selected_voice_asset = selected_voice_asset.as_dict()
+    if (
+        isinstance(selected_voice_asset, Mapping)
+        and selected_voice_asset.get("voiceSourceKind")
+        == "CLONED_WITH_CONSENT"
+    ):
+        raise AudioDomainTypeMismatchError(
+            "new clone dialogue assets require DialogueAssetVersion v2"
+        )
     return _build_asset_version("DialogueAssetVersion", command, **validation)
 
 
-def build_voice_asset_version(command: Mapping[str, Any], **validation: Any) -> dict[str, Any]:
+def build_voice_asset_version(
+    command: Mapping[str, Any], **validation: Any
+) -> dict[str, Any]:
+    if (
+        isinstance(command, Mapping)
+        and command.get("voiceSourceKind") == "CLONED_WITH_CONSENT"
+    ):
+        raise AudioDomainTypeMismatchError(
+            "new cloned voices require VoiceAssetVersion v2"
+        )
     return _build_asset_version("VoiceAssetVersion", command, **validation)
+
+
+def build_clone_voice_asset_version(
+    command: Mapping[str, Any],
+    *,
+    voice_profile_version: Any,
+    confirmed_voice_lock: Any,
+    consent_grant_version: Any,
+    source_recording_binding: Any,
+    evaluated_at: str,
+    current_voice_profile_authority: Any,
+) -> dict[str, Any]:
+    return _build_clone_asset_version(
+        "VoiceAssetVersion",
+        command,
+        voice_profile_version=voice_profile_version,
+        confirmed_voice_lock=confirmed_voice_lock,
+        consent_grant_version=consent_grant_version,
+        source_recording_binding=source_recording_binding,
+        evaluated_at=evaluated_at,
+        current_voice_profile_authority=current_voice_profile_authority,
+        require_current_authority=True,
+    )
+
+
+def build_clone_dialogue_asset_version(
+    command: Mapping[str, Any],
+    *,
+    voice_asset_version: Any,
+    audio_generation_request: Any,
+    generation_result: Any,
+    artifact_evidence: Any,
+    audio_technical_validation: Any,
+    confirmed_voice_lock: Any,
+    voice_profile_version: Any,
+    consent_grant_version: Any,
+    source_recording_binding: Any,
+    evaluated_at: str,
+    current_voice_profile_authority: Any,
+) -> dict[str, Any]:
+    return _build_clone_asset_version(
+        "DialogueAssetVersion",
+        command,
+        voice_asset_version=voice_asset_version,
+        audio_generation_request=audio_generation_request,
+        generation_result=generation_result,
+        artifact_evidence=artifact_evidence,
+        audio_technical_validation=audio_technical_validation,
+        confirmed_voice_lock=confirmed_voice_lock,
+        voice_profile_version=voice_profile_version,
+        consent_grant_version=consent_grant_version,
+        source_recording_binding=source_recording_binding,
+        evaluated_at=evaluated_at,
+        current_voice_profile_authority=current_voice_profile_authority,
+        require_current_authority=True,
+    )
 
 
 def build_music_asset_version(command: Mapping[str, Any]) -> dict[str, Any]:
@@ -1542,15 +2782,82 @@ class AudioGenerationRequest(_ImmutableContract):
 class DialogueAssetVersion(_ImmutableContract):
     @classmethod
     def from_mapping(cls, value: Any, **validation: Any) -> "DialogueAssetVersion":
+        if (
+            isinstance(value, Mapping)
+            and value.get("schemaVersion")
+            == DIALOGUE_ASSET_VERSION_V2_SCHEMA_VERSION
+        ):
+            return cls._from_validated(
+                _validate_clone_dialogue_asset_version(
+                    value,
+                    voice_asset_version=validation.get("voice_asset_version"),
+                    audio_generation_request=validation.get(
+                        "audio_generation_request"
+                    ),
+                    generation_result=validation.get("generation_result"),
+                    artifact_evidence=validation.get("artifact_evidence"),
+                    audio_technical_validation=validation.get(
+                        "audio_technical_validation"
+                    ),
+                    confirmed_voice_lock=validation.get("confirmed_voice_lock"),
+                    voice_profile_version=validation.get("voice_profile_version"),
+                    consent_grant_version=validation.get("consent_grant_version"),
+                    source_recording_binding=validation.get(
+                        "source_recording_binding"
+                    ),
+                    evaluated_at=validation.get("evaluated_at"),
+                    current_voice_profile_authority=validation.get(
+                        "current_voice_profile_authority"
+                    ),
+                    require_current_authority=validation.get(
+                        "require_current_authority", False
+                    ),
+                )
+            )
         return cls._from_validated(
-            _validate_dialogue_asset_version(value, **validation)
+            _validate_dialogue_asset_version(
+                value,
+                confirmed_voice_lock=validation.get("confirmed_voice_lock"),
+                voice_asset_version=validation.get("voice_asset_version"),
+                consent_grant=validation.get("consent_grant"),
+                evaluated_at=validation.get("evaluated_at"),
+            )
         )
 
 
 class VoiceAssetVersion(_ImmutableContract):
     @classmethod
     def from_mapping(cls, value: Any, **validation: Any) -> "VoiceAssetVersion":
-        return cls._from_validated(_validate_voice_asset_version(value, **validation))
+        if (
+            isinstance(value, Mapping)
+            and value.get("schemaVersion") == VOICE_ASSET_VERSION_V2_SCHEMA_VERSION
+        ):
+            return cls._from_validated(
+                _validate_clone_voice_asset_version(
+                    value,
+                    voice_profile_version=validation.get("voice_profile_version"),
+                    confirmed_voice_lock=validation.get("confirmed_voice_lock"),
+                    consent_grant_version=validation.get("consent_grant_version"),
+                    source_recording_binding=validation.get(
+                        "source_recording_binding"
+                    ),
+                    evaluated_at=validation.get("evaluated_at"),
+                    current_voice_profile_authority=validation.get(
+                        "current_voice_profile_authority"
+                    ),
+                    require_current_authority=validation.get(
+                        "require_current_authority", False
+                    ),
+                )
+            )
+        return cls._from_validated(
+            _validate_voice_asset_version(
+                value,
+                confirmed_voice_lock=validation.get("confirmed_voice_lock"),
+                consent_grant=validation.get("consent_grant"),
+                evaluated_at=validation.get("evaluated_at"),
+            )
+        )
 
 
 class MusicAssetVersion(_ImmutableContract):
@@ -1580,9 +2887,11 @@ __all__ = [
     "AUDIO_RIGHTS_BINDING_SCHEMA_VERSION",
     "CONSENT_GRANT_SCHEMA_VERSION",
     "DIALOGUE_ASSET_VERSION_SCHEMA_VERSION",
+    "DIALOGUE_ASSET_VERSION_V2_SCHEMA_VERSION",
     "MUSIC_ASSET_VERSION_SCHEMA_VERSION",
     "SFX_ASSET_VERSION_SCHEMA_VERSION",
     "VOICE_ASSET_VERSION_SCHEMA_VERSION",
+    "VOICE_ASSET_VERSION_V2_SCHEMA_VERSION",
     "AmbienceAssetVersion",
     "AudioConsentNotEffectiveError",
     "AudioConsentRequiredError",
@@ -1600,6 +2909,8 @@ __all__ = [
     "build_ambience_asset_version",
     "build_audio_generation_request",
     "build_audio_provenance",
+    "build_clone_dialogue_asset_version",
+    "build_clone_voice_asset_version",
     "build_consent_grant",
     "build_dialogue_asset_version",
     "build_music_asset_version",
@@ -1613,8 +2924,11 @@ __all__ = [
     "validate_audio_generation_request",
     "validate_audio_provenance",
     "validate_consent_grant",
+    "validate_clone_dialogue_asset_version",
+    "validate_clone_voice_asset_version",
     "validate_dialogue_asset_version",
     "validate_music_asset_version",
+    "validate_persisted_audio_domain_asset_version_evidence",
     "validate_rights_binding",
     "validate_sfx_asset_version",
     "validate_voice_asset_version",

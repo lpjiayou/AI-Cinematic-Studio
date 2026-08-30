@@ -26,9 +26,16 @@ from services.v5_core_os.episode_production.foundation import (
 
 WORKSPACE = "workspace-k2-records"
 RUN = "episode-production-run-k2-records"
+OTHER_RUN = "episode-production-run-k2-records-other"
 
 
-def record(*, version=1, key="visual-qc-shot-0001-v1", decision="PASS"):
+def record(
+    *,
+    version=1,
+    key="visual-qc-shot-0001-v1",
+    decision="PASS",
+    run=RUN,
+):
     payload = {
         "schemaVersion": "v5.semantic-visual-qc-decision.v1",
         "candidateRef": "candidate-shot-0001-v1",
@@ -39,7 +46,7 @@ def record(*, version=1, key="visual-qc-shot-0001-v1", decision="PASS"):
     }
     return EvidenceRecord(
         workspaceRef=WORKSPACE,
-        productionRunRef=RUN,
+        productionRunRef=run,
         recordKind="SemanticVisualQCDecision",
         recordRef="visual-qc-decision-shot-0001",
         recordVersion=version,
@@ -197,17 +204,72 @@ class AppendOnlyEvidenceRecordMixin:
     def test_append_records_exact_replay_accepts_original_head(self):
         repository = self.repository()
         expected_head = repository.record_journal_head(WORKSPACE, RUN)
+        expected_workspace_head = repository.workspace_record_journal_head(
+            WORKSPACE
+        )
+        expected_revision = repository.read_snapshot(
+            WORKSPACE, RUN
+        ).revisionToken
         stored, replayed = repository.append_records(
             (record(),),
             expected_record_journal_head=expected_head,
+            expected_workspace_record_journal_head=expected_workspace_head,
+            expected_evidence_revision_token=expected_revision,
         )
         replay, was_replayed = repository.append_records(
             (record(),),
             expected_record_journal_head=expected_head,
+            expected_workspace_record_journal_head=expected_workspace_head,
+            expected_evidence_revision_token=expected_revision,
         )
         self.assertFalse(replayed)
         self.assertTrue(was_replayed)
         self.assertEqual(replay, stored)
+
+    def test_composite_cas_rejects_same_run_gate_append(self):
+        repository = self.repository()
+        expected_workspace_head = repository.workspace_record_journal_head(
+            WORKSPACE
+        )
+        expected_revision = repository.read_snapshot(
+            WORKSPACE, RUN
+        ).revisionToken
+        repository.append_gate(gate())
+
+        with self.assertRaises(StaleInputError):
+            repository.append_records(
+                (record(),),
+                expected_workspace_record_journal_head=expected_workspace_head,
+                expected_evidence_revision_token=expected_revision,
+            )
+
+        self.assertEqual(repository.list_records(WORKSPACE, RUN), [])
+
+    def test_composite_cas_rejects_other_run_record_append(self):
+        repository = self.repository()
+        expected_workspace_head = repository.workspace_record_journal_head(
+            WORKSPACE
+        )
+        expected_revision = repository.read_snapshot(
+            WORKSPACE, RUN
+        ).revisionToken
+        repository.append_record(record(run=OTHER_RUN))
+
+        # The current-run snapshot is unchanged; the workspace head is the
+        # independent CAS component that detects this cross-run write.
+        self.assertEqual(
+            repository.read_snapshot(WORKSPACE, RUN).revisionToken,
+            expected_revision,
+        )
+        with self.assertRaises(StaleInputError):
+            repository.append_records(
+                (record(),),
+                expected_workspace_record_journal_head=expected_workspace_head,
+                expected_evidence_revision_token=expected_revision,
+            )
+
+        self.assertEqual(repository.list_records(WORKSPACE, RUN), [])
+        self.assertEqual(len(repository.list_records(WORKSPACE, OTHER_RUN)), 1)
 
     def test_append_records_and_gate_cas_rolls_back_on_intervening_append(self):
         repository = self.repository()

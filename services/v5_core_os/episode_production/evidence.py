@@ -34,6 +34,19 @@ ALLOWED_EVIDENCE_RECORD_KINDS = frozenset(
         "AudioInputBinding",
         "AudioCue",
         "AudioStemSet",
+        "AudioTechnicalValidation",
+        "TranscriptVersion",
+        "RightsBinding",
+        "SourceRecordingRequirement",
+        "SourceRecordingImportEvidence",
+        "SourceRecordingProvenance",
+        "SourceRecordingClassification",
+        "VoiceProfileTechnicalValidation",
+        "SourceVoiceRecordingAssetVersionBinding",
+        "ConsentGrant",
+        "ConsentGrantVersion",
+        "VoiceProfile",
+        "VoiceProfileVersion",
         "GlyphRevealRequirement",
         "MaskAssetVersion",
         "Timeline",
@@ -161,14 +174,20 @@ class EpisodeProductionEvidenceRepository(Protocol):
     def list_records(
         self, workspace_ref: str, run_ref: str, *, record_kind: str | None = None
     ) -> list[dict[str, Any]]: ...
+    def list_workspace_records(
+        self, workspace_ref: str, *, record_kind: str | None = None
+    ) -> list[dict[str, Any]]: ...
     def append_record(self, record: EvidenceRecord) -> tuple[dict[str, Any], bool]: ...
     def append_records(
         self,
         records: Sequence[EvidenceRecord],
         *,
         expected_record_journal_head: str | None = None,
+        expected_workspace_record_journal_head: str | None = None,
+        expected_evidence_revision_token: str | None = None,
     ) -> tuple[list[dict[str, Any]], bool]: ...
     def record_journal_head(self, workspace_ref: str, run_ref: str) -> str: ...
+    def workspace_record_journal_head(self, workspace_ref: str) -> str: ...
     def read_snapshot(
         self, workspace_ref: str, run_ref: str
     ) -> EvidenceSnapshot: ...
@@ -291,6 +310,64 @@ def _optional_record_journal_head(value: str | None) -> str | None:
         return None
     _validate_digest(value, "expectedRecordJournalHead")
     return value
+
+
+def _optional_evidence_revision_token(value: str | None) -> str | None:
+    if value is None:
+        return None
+    _validate_digest(value, "expectedEvidenceRevisionToken")
+    return value
+
+
+def _workspace_record_journal_head_value(
+    workspace_ref: str,
+    records: Sequence[Mapping[str, Any]],
+) -> str:
+    """Seal every record in a workspace into one cross-run CAS token.
+
+    Record sequence numbers are local to a production run, so the workspace
+    projection deliberately orders immutable record identities instead.  This
+    makes the token stable across adapters while still changing for every
+    append or coordinated payload mutation.
+    """
+
+    workspace = _required_ref(workspace_ref, "workspaceRef")
+    entries: list[dict[str, Any]] = []
+    for item in records:
+        if not isinstance(item, Mapping) or item.get("workspaceRef") != workspace:
+            raise RepositoryUnavailableError(
+                "workspace record journal scope is invalid"
+            )
+        entries.append(
+            {
+                "productionRunRef": item.get("productionRunRef"),
+                "recordKind": item.get("recordKind"),
+                "recordRef": item.get("recordRef"),
+                "recordVersion": item.get("recordVersion"),
+                "idempotencyKey": item.get("idempotencyKey"),
+                "requestDigest": item.get("requestDigest"),
+                "createdAt": item.get("createdAt"),
+                "payloadDigest": item.get("payloadDigest"),
+            }
+        )
+    entries.sort(
+        key=lambda item: (
+            str(item["productionRunRef"]),
+            str(item["recordKind"]),
+            str(item["recordRef"]),
+            int(item["recordVersion"]),
+            str(item["payloadDigest"]),
+        )
+    )
+    return _digest(
+        {
+            "schemaVersion": (
+                "v5.episode-production-workspace-record-journal-head.v1"
+            ),
+            "workspaceRef": workspace,
+            "records": entries,
+        }
+    )
 
 
 def _record_journal_head_value(
@@ -706,6 +783,29 @@ class InMemoryEpisodeProductionEvidenceAdapter:
                 records = [item for item in records if item.recordKind == record_kind]
             return [_record_mapping(item) for item in records]
 
+    def list_workspace_records(
+        self, workspace_ref: str, *, record_kind: str | None = None
+    ) -> list[dict[str, Any]]:
+        workspace = _required_ref(workspace_ref, "workspaceRef")
+        with self._lock:
+            records = [
+                item
+                for (item_workspace, _run_ref, _record_ref, _version), item
+                in self._records.items()
+                if item_workspace == workspace
+                and (record_kind is None or item.recordKind == record_kind)
+            ]
+            records.sort(
+                key=lambda item: (
+                    item.productionRunRef,
+                    item.recordKind,
+                    item.recordRef,
+                    item.recordVersion,
+                    item.payloadDigest,
+                )
+            )
+            return [_record_mapping(item) for item in records]
+
     def append_record(self, record: EvidenceRecord) -> tuple[dict[str, Any], bool]:
         stored, replayed = self.append_records((record,))
         return stored[0], replayed
@@ -715,6 +815,8 @@ class InMemoryEpisodeProductionEvidenceAdapter:
         records: Sequence[EvidenceRecord],
         *,
         expected_record_journal_head: str | None = None,
+        expected_workspace_record_journal_head: str | None = None,
+        expected_evidence_revision_token: str | None = None,
     ) -> tuple[list[dict[str, Any]], bool]:
         if not records:
             raise EpisodeProductionError("record batch is empty")
@@ -728,9 +830,21 @@ class InMemoryEpisodeProductionEvidenceAdapter:
         expected_head = _optional_record_journal_head(
             expected_record_journal_head
         )
+        expected_workspace_head = _optional_record_journal_head(
+            expected_workspace_record_journal_head
+        )
+        expected_revision = _optional_evidence_revision_token(
+            expected_evidence_revision_token
+        )
         with self._lock:
             workspace_ref, run_ref = next(iter(scope))
             current_head = self.record_journal_head(workspace_ref, run_ref)
+            current_workspace_head = self.workspace_record_journal_head(
+                workspace_ref
+            )
+            current_revision = self.read_snapshot(
+                workspace_ref, run_ref
+            ).revisionToken
             replayed: list[EvidenceRecord] = []
             new_count = 0
             for record in records:
@@ -774,6 +888,16 @@ class InMemoryEpisodeProductionEvidenceAdapter:
                 return [_record_mapping(item) for item in replayed], True
             if expected_head is not None and current_head != expected_head:
                 raise StaleInputError("record journal head changed")
+            if (
+                expected_workspace_head is not None
+                and current_workspace_head != expected_workspace_head
+            ):
+                raise StaleInputError("workspace record journal head changed")
+            if (
+                expected_revision is not None
+                and current_revision != expected_revision
+            ):
+                raise StaleInputError("evidence snapshot revision changed")
             for record in records:
                 key = (
                     record.workspaceRef,
@@ -795,6 +919,14 @@ class InMemoryEpisodeProductionEvidenceAdapter:
                     (record.workspaceRef, record.productionRunRef), []
                 ).append((record.recordRef, record.recordVersion))
             return [_record_mapping(item) for item in records], False
+
+    def workspace_record_journal_head(self, workspace_ref: str) -> str:
+        workspace = _required_ref(workspace_ref, "workspaceRef")
+        with self._lock:
+            return _workspace_record_journal_head_value(
+                workspace,
+                self.list_workspace_records(workspace),
+            )
 
     def record_journal_head(self, workspace_ref: str, run_ref: str) -> str:
         with self._lock:
@@ -1333,6 +1465,33 @@ class SqliteEpisodeProductionEvidenceAdapter:
         finally:
             connection.close()
 
+    def list_workspace_records(
+        self, workspace_ref: str, *, record_kind: str | None = None
+    ) -> list[dict[str, Any]]:
+        workspace = _required_ref(workspace_ref, "workspaceRef")
+        connection = self._connect()
+        try:
+            query = (
+                "SELECT * FROM v5_episode_production_records "
+                "WHERE workspace_ref=?"
+            )
+            parameters: list[Any] = [workspace]
+            if record_kind is not None:
+                query += " AND record_kind=?"
+                parameters.append(record_kind)
+            query += (
+                " ORDER BY production_run_ref, record_kind, record_ref, "
+                "record_version, payload_digest"
+            )
+            rows = connection.execute(query, tuple(parameters)).fetchall()
+            return [self._decode_record(row) for row in rows]
+        except sqlite3.DatabaseError as exc:
+            raise RepositoryUnavailableError(
+                "workspace evidence record read failed"
+            ) from exc
+        finally:
+            connection.close()
+
     def get_record_by_idempotency_key(
         self, workspace_ref: str, run_ref: str, idempotency_key: str
     ) -> dict[str, Any] | None:
@@ -1591,6 +1750,8 @@ class SqliteEpisodeProductionEvidenceAdapter:
         records: Sequence[EvidenceRecord],
         *,
         expected_record_journal_head: str | None = None,
+        expected_workspace_record_journal_head: str | None = None,
+        expected_evidence_revision_token: str | None = None,
     ) -> tuple[list[dict[str, Any]], bool]:
         if not records:
             raise EpisodeProductionError("record batch is empty")
@@ -1604,11 +1765,25 @@ class SqliteEpisodeProductionEvidenceAdapter:
         expected_head = _optional_record_journal_head(
             expected_record_journal_head
         )
+        expected_workspace_head = _optional_record_journal_head(
+            expected_workspace_record_journal_head
+        )
+        expected_revision = _optional_evidence_revision_token(
+            expected_evidence_revision_token
+        )
         connection = self._connect()
         try:
             connection.execute("BEGIN IMMEDIATE")
             workspace_ref, run_ref = next(iter(scope))
             current_head = self._record_journal_head_in_connection(
+                connection, workspace_ref, run_ref
+            )
+            current_workspace_head = (
+                self._workspace_record_journal_head_in_connection(
+                    connection, workspace_ref
+                )
+            )
+            current_revision = self._evidence_revision_token_in_connection(
                 connection, workspace_ref, run_ref
             )
             replays: list[sqlite3.Row] = []
@@ -1654,6 +1829,16 @@ class SqliteEpisodeProductionEvidenceAdapter:
                 return result, True
             if expected_head is not None and current_head != expected_head:
                 raise StaleInputError("record journal head changed")
+            if (
+                expected_workspace_head is not None
+                and current_workspace_head != expected_workspace_head
+            ):
+                raise StaleInputError("workspace record journal head changed")
+            if (
+                expected_revision is not None
+                and current_revision != expected_revision
+            ):
+                raise StaleInputError("evidence snapshot revision changed")
             current = connection.execute(
                 "SELECT MAX(sequence) FROM v5_episode_production_records "
                 "WHERE workspace_ref=? AND production_run_ref=?",
@@ -1706,6 +1891,63 @@ class SqliteEpisodeProductionEvidenceAdapter:
             raise RepositoryUnavailableError("episode evidence record write failed") from exc
         finally:
             connection.close()
+
+    @classmethod
+    def _workspace_record_journal_head_in_connection(
+        cls,
+        connection: sqlite3.Connection,
+        workspace_ref: str,
+    ) -> str:
+        rows = connection.execute(
+            "SELECT * FROM v5_episode_production_records WHERE workspace_ref=? "
+            "ORDER BY production_run_ref, record_kind, record_ref, "
+            "record_version, payload_digest",
+            (workspace_ref,),
+        ).fetchall()
+        return _workspace_record_journal_head_value(
+            workspace_ref,
+            [cls._decode_record(row) for row in rows],
+        )
+
+    @classmethod
+    def _evidence_revision_token_in_connection(
+        cls,
+        connection: sqlite3.Connection,
+        workspace_ref: str,
+        run_ref: str,
+    ) -> str:
+        transition = connection.execute(
+            "SELECT to_state FROM v5_episode_production_transitions "
+            "WHERE workspace_ref=? AND production_run_ref=? "
+            "ORDER BY sequence DESC LIMIT 1",
+            (workspace_ref, run_ref),
+        ).fetchone()
+        current_state = (
+            ROOTS_READY if transition is None else str(transition["to_state"])
+        )
+        gate_rows = connection.execute(
+            "SELECT g.* FROM v5_episode_production_gates g "
+            "JOIN v5_episode_production_transitions t USING "
+            "(workspace_ref,production_run_ref,gate_name) "
+            "WHERE g.workspace_ref=? AND g.production_run_ref=? "
+            "ORDER BY t.sequence",
+            (workspace_ref, run_ref),
+        ).fetchall()
+        gates = tuple(cls._decode_gate(connection, row) for row in gate_rows)
+        record_rows = connection.execute(
+            "SELECT * FROM v5_episode_production_records "
+            "WHERE workspace_ref=? AND production_run_ref=? "
+            "ORDER BY sequence",
+            (workspace_ref, run_ref),
+        ).fetchall()
+        records = tuple(cls._decode_record(row) for row in record_rows)
+        return _snapshot_revision_token(
+            workspace_ref,
+            run_ref,
+            current_state,
+            gates,
+            records,
+        )
 
     @classmethod
     def _record_journal_head_in_connection(
@@ -1765,6 +2007,27 @@ class SqliteEpisodeProductionEvidenceAdapter:
             connection.rollback()
             raise RepositoryUnavailableError(
                 "episode evidence record journal read failed"
+            ) from exc
+        finally:
+            connection.close()
+
+    def workspace_record_journal_head(self, workspace_ref: str) -> str:
+        workspace = _required_ref(workspace_ref, "workspaceRef")
+        connection = self._connect()
+        try:
+            connection.execute("BEGIN")
+            head = self._workspace_record_journal_head_in_connection(
+                connection, workspace
+            )
+            connection.rollback()
+            return head
+        except EpisodeProductionError:
+            connection.rollback()
+            raise
+        except sqlite3.DatabaseError as exc:
+            connection.rollback()
+            raise RepositoryUnavailableError(
+                "workspace evidence record journal read failed"
             ) from exc
         finally:
             connection.close()
