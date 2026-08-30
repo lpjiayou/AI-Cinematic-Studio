@@ -6,6 +6,7 @@ from copy import deepcopy
 from dataclasses import dataclass
 from datetime import datetime
 from hashlib import sha256
+from math import gcd
 from pathlib import Path
 from typing import Any, Callable, Mapping, Protocol, Sequence
 
@@ -20,6 +21,12 @@ from services.v4_platform import (
     probe_media,
 )
 
+from .assets import (
+    ASSET_PLAN_SCHEMA_VERSION as G4_ASSET_PLAN_SCHEMA_VERSION,
+    ASSET_REQUIREMENT_SCHEMA_VERSION as G4_ASSET_REQUIREMENT_SCHEMA_VERSION,
+    GENERATION_REQUEST_SCHEMA_VERSION as G4_GENERATION_REQUEST_SCHEMA_VERSION,
+    RESOLVER_ID as ASSET_RESOLVER_ID,
+)
 from .audio_timing import AudioCue, AudioStemSet
 from .evidence import (
     EpisodeProductionEvidenceRepository,
@@ -39,7 +46,15 @@ from .foundation import (
     _idempotency_key,
     _required_ref,
 )
-from .media import ArtifactRejectedError, K2MediaExecutionService, WorkerUnavailableError
+from .media import (
+    ADMISSION_ID as MEDIA_ADMISSION_ID,
+    ASSET_VERSION_SCHEMA_VERSION as G5_ASSET_VERSION_SCHEMA_VERSION,
+    GENERATION_RESULT_SCHEMA_VERSION as G5_GENERATION_RESULT_SCHEMA_VERSION,
+    MEDIA_MANIFEST_SCHEMA_VERSION as G5_MEDIA_MANIFEST_SCHEMA_VERSION,
+    ArtifactRejectedError,
+    K2MediaExecutionService,
+    WorkerUnavailableError,
+)
 from .glyph_reveal_v2 import (
     DigestPinnedBasePlateGlyphInspectionAdapter,
     GlyphRevealRequirementV2,
@@ -51,7 +66,10 @@ from .timeline_preview import (
     AudioInputBinding,
     COMPOSITION_RESULT_SCHEMA_VERSION,
     PREVIEW_CANDIDATE_SCHEMA_VERSION_V2,
+    TIMELINE_CLIP_SCHEMA_VERSION as LEGACY_TIMELINE_CLIP_SCHEMA_VERSION,
+    TIMELINE_TRACK_SCHEMA_VERSION as LEGACY_TIMELINE_TRACK_SCHEMA_VERSION,
     TIMELINE_VERSION_SCHEMA_VERSION_V2,
+    TIMELINE_SCHEMA_VERSION_V2,
     build_timeline,
     build_timeline_clip,
     build_composition_result,
@@ -76,6 +94,29 @@ from .timeline_preview import (
     validate_timeline_track,
     validate_timeline_version,
 )
+from .timeline_editing import (
+    TIMELINE_CLIP_SCHEMA_VERSION as EDITING_TIMELINE_CLIP_SCHEMA_VERSION,
+    TIMELINE_EDIT_COMMAND_SCHEMA_VERSION as EDITING_TIMELINE_EDIT_COMMAND_SCHEMA_VERSION,
+    TIMELINE_SCHEMA_VERSION as EDITING_TIMELINE_SCHEMA_VERSION,
+    TIMELINE_TRACK_KINDS as EDITING_TIMELINE_TRACK_KINDS,
+    TIMELINE_TRACK_SCHEMA_VERSION as EDITING_TIMELINE_TRACK_SCHEMA_VERSION,
+    TIMELINE_VERSION_SCHEMA_VERSION as EDITING_TIMELINE_VERSION_SCHEMA_VERSION,
+    Timeline as EditingTimeline,
+    TimelineClip as EditingTimelineClip,
+    TimelineEditCommand as EditingTimelineEditCommand,
+    TimelineTrack as EditingTimelineTrack,
+    TimelineVersion as EditingTimelineVersion,
+    apply_timeline_edit,
+    build_output_profile_binding,
+    build_timeline as build_editing_timeline,
+    build_timeline_edit_command,
+    build_timeline_track as build_editing_timeline_track,
+    build_timeline_version as build_editing_timeline_version,
+    validate_timeline as validate_editing_timeline,
+    validate_timeline_edit_chain,
+    validate_timeline_snapshot as validate_editing_timeline_snapshot,
+    validate_timeline_version as validate_editing_timeline_version,
+)
 
 
 COMPOSITION_GATE = "G6_COMPOSITION"
@@ -92,6 +133,13 @@ MASTER_SCHEMA_VERSION = "v5.episode-master.v1"
 EXPORT_SCHEMA_VERSION = "v5.export-artifact.v1"
 DELIVERY_ID = "v5.k2.delivery.v1"
 TIMELINE_PREVIEW_DELIVERY_ID = "v5.k2.timeline-preview-delivery.v1"
+TIMELINE_EDITING_DELIVERY_ID = "v5.k2.timeline-editing-delivery.v1"
+TIMELINE_EDIT_CREATE_REQUEST_SCHEMA_VERSION = (
+    "v5.k2.timeline-edit-create-request.v1"
+)
+TIMELINE_EDIT_SUCCESSOR_REQUEST_SCHEMA_VERSION = (
+    "v5.k2.timeline-edit-successor-request.v1"
+)
 APPROVAL_KINDS = (
     "CREATIVE_DIRECTION",
     "IDENTITY_CONTINUITY",
@@ -715,6 +763,2501 @@ class K2DeliveryService:
         if confirmed.revisionToken != revision:
             raise StaleInputError("episode evidence changed during input validation")
         return head
+
+    @staticmethod
+    def _timeline_record_idempotency_key(client_key: str, slot: str) -> str:
+        return _digest(
+            {
+                "clientIdempotencyKey": _idempotency_key(client_key),
+                "stage": "m13-t1-timeline-editing",
+                "slot": _required_ref(slot, "record slot"),
+            }
+        )
+
+    @staticmethod
+    def _timeline_evidence_record(
+        *,
+        workspace: str,
+        run_ref: str,
+        record_kind: str,
+        record_ref: str,
+        record_version: int,
+        client_key: str,
+        slot: str,
+        request_digest: str,
+        created_at: str,
+        payload: Mapping[str, Any],
+    ) -> EvidenceRecord:
+        """Build one immutable M13-T1 record in the shared evidence journal."""
+
+        canonical = _immutable_payload(payload, record_kind)
+        return EvidenceRecord(
+            workspaceRef=_required_ref(workspace, "workspaceRef"),
+            productionRunRef=_required_ref(run_ref, "productionRunRef"),
+            recordKind=record_kind,
+            recordRef=_required_ref(record_ref, "recordRef"),
+            recordVersion=_positive_version(record_version, "recordVersion"),
+            idempotencyKey=K2DeliveryService._timeline_record_idempotency_key(
+                client_key, slot
+            ),
+            requestDigest=request_digest,
+            createdAt=created_at,
+            payload=canonical,
+            payloadDigest=canonical["payloadDigest"],
+        )
+
+    def _timeline_authority_context(
+        self,
+        workspace: str,
+        run_ref: str,
+        *,
+        expected_run_version: int | None,
+    ) -> dict[str, Any]:
+        """Resolve the current run, ScriptVersion and StoryboardVersion.
+
+        Timeline commands never get to establish these authority facts.  They
+        are re-read from the existing Episode Production root and evidence
+        journal immediately before the compare-and-swap append.
+        """
+
+        workspace = _required_ref(workspace, "workspaceRef")
+        run_ref = _required_ref(run_ref, "productionRunRef")
+        try:
+            root_service = self.media.assets.shot_graph.root_service
+            run = root_service.verify_run_current(workspace, run_ref)
+        except AttributeError as exc:
+            raise RepositoryUnavailableError(
+                "Episode Production root authority is unavailable"
+            ) from exc
+        if not isinstance(run, Mapping):
+            raise RepositoryUnavailableError(
+                "Episode Production root projection is invalid"
+            )
+        run = deepcopy(dict(run))
+        graph_service = self.media.assets.shot_graph
+        verify_graph_current = getattr(
+            graph_service, "verify_shot_graph_current", None
+        )
+        verified_graph_bundle = None
+        if callable(verify_graph_current):
+            verified_graph_bundle = verify_graph_current(workspace, run_ref)
+            if not isinstance(verified_graph_bundle, Mapping):
+                raise RepositoryUnavailableError(
+                    "current ShotGraph authority is invalid"
+                )
+        expected = (
+            _positive_version(run.get("version"), "run version")
+            if expected_run_version is None
+            else _positive_version(expected_run_version, "expectedRunVersion")
+        )
+        if (
+            run.get("workspaceRef") != workspace
+            or run.get("productionRunRef") != run_ref
+            or run.get("version") != expected
+        ):
+            raise StaleInputError("Episode Production run version is stale")
+        for field in ("projectRef", "seriesRef", "episodeRef", "scriptVersionRef"):
+            _required_ref(run.get(field), field)
+        upstream = run.get("upstreamSnapshot")
+        script = upstream.get("script") if isinstance(upstream, Mapping) else None
+        if (
+            not isinstance(script, Mapping)
+            or script.get("scriptVersionRef") != run["scriptVersionRef"]
+            or not _is_sha256(script.get("versionDigest"))
+        ):
+            raise RepositoryUnavailableError(
+                "frozen ScriptVersion authority is invalid"
+            )
+
+        snapshot = validated_evidence_snapshot(
+            self.evidence.read_snapshot(workspace, run_ref),
+            workspace_ref=workspace,
+            run_ref=run_ref,
+        )
+        matching_gates = [
+            gate for gate in snapshot.gates if gate.get("gateName") == "G3_SHOT_GRAPH"
+        ]
+        if len(matching_gates) != 1:
+            raise UpstreamNotReadyError(
+                "confirmed StoryboardVersion evidence is unavailable"
+            )
+        storyboard_facts = [
+            fact
+            for fact in matching_gates[0].get("facts", [])
+            if isinstance(fact, Mapping)
+            and fact.get("factKind") == "StoryboardVersion"
+        ]
+        if len(storyboard_facts) != 1:
+            raise UpstreamNotReadyError(
+                "confirmed StoryboardVersion evidence is unavailable"
+            )
+        storyboard = _immutable_payload(
+            storyboard_facts[0].get("payload"), "StoryboardVersion"
+        )
+        graph_facts = [
+            fact
+            for fact in matching_gates[0].get("facts", [])
+            if isinstance(fact, Mapping)
+            and fact.get("factKind") == "ExecutableShotGraph"
+        ]
+        if len(graph_facts) != 1:
+            raise UpstreamNotReadyError(
+                "ExecutableShotGraph evidence is unavailable"
+            )
+        graph = _immutable_payload(
+            graph_facts[0].get("payload"), "ExecutableShotGraph"
+        )
+        if (
+            storyboard_facts[0].get("factRef")
+            != storyboard.get("storyboardVersionRef")
+            or storyboard_facts[0].get("payloadDigest")
+            != storyboard.get("payloadDigest")
+            or storyboard.get("workspaceRef") != workspace
+            or storyboard.get("productionRunRef") != run_ref
+            or storyboard.get("rootPayloadDigest") != run.get("payloadDigest")
+            or storyboard.get("scriptVersionRef") != run["scriptVersionRef"]
+            or storyboard.get("scriptVersionDigest") != script["versionDigest"]
+            or graph_facts[0].get("factRef")
+            != graph.get("executableShotGraphVersionRef")
+            or graph_facts[0].get("payloadDigest")
+            != graph.get("payloadDigest")
+            or graph.get("workspaceRef") != workspace
+            or graph.get("productionRunRef") != run_ref
+            or graph.get("rootPayloadDigest") != run.get("payloadDigest")
+            or graph.get("scriptVersionRef") != run["scriptVersionRef"]
+            or graph.get("scriptVersionDigest") != script["versionDigest"]
+            or graph.get("storyboardDigest") != storyboard["payloadDigest"]
+        ):
+            raise StaleInputError("Storyboard/ShotGraph authority is stale")
+        if verified_graph_bundle is not None:
+            current_graph = verified_graph_bundle.get("executableShotGraph")
+            if not isinstance(current_graph, Mapping) or dict(current_graph) != graph:
+                raise StaleInputError(
+                    "ExecutableShotGraph does not match current authority"
+                )
+        return {
+            "run": run,
+            "scriptVersionRef": run["scriptVersionRef"],
+            "scriptVersionDigest": script["versionDigest"],
+            "storyboardVersionRef": storyboard["storyboardVersionRef"],
+            "storyboardVersionDigest": storyboard["payloadDigest"],
+            "executableShotGraph": graph,
+            "snapshot": snapshot,
+        }
+
+    def _timeline_source_resolver(
+        self,
+        snapshot: Any,
+        *,
+        expected_script_version_ref: str,
+        expected_script_version_digest: str,
+        expected_timeline_frame_rate: Mapping[str, Any],
+        expected_root_digest: str,
+        expected_graph_version_ref: str,
+        expected_graph_digest: str,
+    ) -> Callable[[str, str], Mapping[str, Any] | None]:
+        """Project only fully revalidated server-held source authorities."""
+
+        candidates: dict[tuple[str, str], list[dict[str, Any]]] = {}
+        workspace = snapshot.workspaceRef
+        run_ref = snapshot.productionRunRef
+
+        def add(source_type: str, source_ref: Any, payload: Any) -> None:
+            if not isinstance(source_ref, str) or not isinstance(payload, Mapping):
+                raise RepositoryUnavailableError(
+                    "Timeline source authority identity is invalid"
+                )
+            candidates.setdefault((source_type, source_ref), []).append(
+                deepcopy(dict(payload))
+            )
+
+        def records(kind: str, identity_field: str) -> list[dict[str, Any]]:
+            result: list[dict[str, Any]] = []
+            seen: set[str] = set()
+            for record in snapshot.records:
+                if record.get("recordKind") != kind:
+                    continue
+                payload = _immutable_payload(record.get("payload"), kind)
+                record_version = record.get("recordVersion")
+                payload_version = payload.get("version")
+                expected_unversioned_record_version = {
+                    "AudioInputBinding": 1,
+                    "GlyphRevealRequirement": 2,
+                    "MaskAssetVersion": 1,
+                }.get(kind, 1)
+                identity = payload.get(identity_field)
+                if (
+                    record.get("recordRef") != payload.get(identity_field)
+                    or record.get("payloadDigest") != payload["payloadDigest"]
+                    or isinstance(record_version, bool)
+                    or not isinstance(record_version, int)
+                    or record_version < 1
+                    or (
+                        payload_version is not None
+                        and payload_version != record_version
+                    )
+                    or (
+                        payload_version is None
+                        and record_version
+                        != expected_unversioned_record_version
+                    )
+                    or not isinstance(identity, str)
+                    or identity in seen
+                ):
+                    raise RepositoryUnavailableError(
+                        f"{kind} evidence envelope is invalid"
+                    )
+                seen.add(identity)
+                result.append(payload)
+            return result
+
+        # VIDEO sources are accepted only from the real G5 producer fact shape;
+        # arbitrary AssetVersion records are not a current media authority.
+        g5_asset_fields = {
+            "schemaVersion",
+            "workspaceRef",
+            "productionRunRef",
+            "assetRef",
+            "assetVersionRef",
+            "version",
+            "ordinal",
+            "assetRequirementRef",
+            "generationRequestRef",
+            "generationRequestVersionRef",
+            "generationRequestDigest",
+            "generationResultRef",
+            "generationResultDigest",
+            "creativeShotRef",
+            "creativeShotVersionRef",
+            "creativeShotDigest",
+            "mediaKind",
+            "mediaType",
+            "storageKey",
+            "byteSize",
+            "sha256",
+            "probe",
+            "adapterIdentity",
+            "provenance",
+            "rightsState",
+            "state",
+            "publicationAllowed",
+            "createdBy",
+            "createdAt",
+            "payloadDigest",
+        }
+        g4_request_fields = {
+            "schemaVersion",
+            "workspaceRef",
+            "productionRunRef",
+            "generationRequestRef",
+            "generationRequestVersionRef",
+            "version",
+            "ordinal",
+            "assetRequirementRef",
+            "assetRequirementDigest",
+            "creativeShotRef",
+            "creativeShotVersionRef",
+            "creativeShotDigest",
+            "mediaKind",
+            "mediaType",
+            "adapterCapability",
+            "providerSelection",
+            "parameters",
+            "state",
+            "requestedProvenance",
+            "publicationAllowed",
+            "createdBy",
+            "createdAt",
+            "payloadDigest",
+        }
+        g4_media_requirement_fields = {
+            "schemaVersion",
+            "workspaceRef",
+            "productionRunRef",
+            "assetRequirementRef",
+            "version",
+            "ordinal",
+            "requirementKey",
+            "requirementType",
+            "required",
+            "mediaType",
+            "creativeShotRef",
+            "creativeShotVersionRef",
+            "creativeShotDigest",
+            "upstreamAuthorityRequirementKeys",
+            "executableShotGraphVersionRef",
+            "executableShotGraphDigest",
+            "resolutionState",
+            "resolutionKind",
+            "requestedProvenance",
+            "rightsState",
+            "publicationAllowed",
+            "createdBy",
+            "createdAt",
+            "payloadDigest",
+        }
+        g5_result_fields = {
+            "schemaVersion",
+            "workspaceRef",
+            "productionRunRef",
+            "generationResultRef",
+            "version",
+            "ordinal",
+            "generationRequestRef",
+            "generationRequestVersionRef",
+            "generationRequestDigest",
+            "jobRef",
+            "attemptRef",
+            "attemptNumber",
+            "adapterIdentity",
+            "parameters",
+            "mediaKind",
+            "mediaType",
+            "artifactSha256",
+            "artifactByteSize",
+            "probe",
+            "state",
+            "provenance",
+            "rightsState",
+            "gpuUsed",
+            "publicationAllowed",
+            "createdBy",
+            "createdAt",
+            "payloadDigest",
+        }
+        g5_manifest_fields = {
+            "schemaVersion",
+            "workspaceRef",
+            "productionRunRef",
+            "mediaManifestRef",
+            "version",
+            "rootPayloadDigest",
+            "executableShotGraphVersionRef",
+            "executableShotGraphDigest",
+            "assetResolutionManifestRef",
+            "assetResolutionManifestDigest",
+            "generationResultRefs",
+            "assetVersionRefs",
+            "summary",
+            "state",
+            "executionScope",
+            "provenance",
+            "gpuUsed",
+            "publicationAllowed",
+            "createdBy",
+            "createdAt",
+            "payloadDigest",
+        }
+        graph_facts = [
+            fact
+            for gate in snapshot.gates
+            if gate.get("gateName") == "G3_SHOT_GRAPH"
+            for fact in gate.get("facts", [])
+            if isinstance(fact, Mapping)
+            and fact.get("factKind") == "ExecutableShotGraph"
+        ]
+        if len(graph_facts) != 1:
+            raise RepositoryUnavailableError(
+                "current ExecutableShotGraph authority is ambiguous"
+            )
+        graph_payload = _immutable_payload(
+            graph_facts[0].get("payload"), "ExecutableShotGraph"
+        )
+        graph_shots = graph_payload.get("shots")
+        if (
+            graph_payload.get("executableShotGraphVersionRef")
+            != expected_graph_version_ref
+            or graph_payload.get("payloadDigest") != expected_graph_digest
+            or not isinstance(graph_shots, list)
+        ):
+            raise RepositoryUnavailableError(
+                "current ExecutableShotGraph authority is stale"
+            )
+        graph_shots_by_version = {
+            item.get("creativeShotVersionRef"): item
+            for item in graph_shots
+            if isinstance(item, Mapping)
+        }
+        if (
+            len(graph_shots_by_version) != len(graph_shots)
+            or None in graph_shots_by_version
+        ):
+            raise RepositoryUnavailableError(
+                "current ExecutableShotGraph shot identity is invalid"
+            )
+        validated_videos: dict[str, dict[str, Any]] = {}
+        media_gates = [
+            gate
+            for gate in snapshot.gates
+            if gate.get("gateName") == "G5_MEDIA_EXECUTION"
+        ]
+        if len(media_gates) > 1:
+            raise RepositoryUnavailableError("G5 media authority is ambiguous")
+        for gate in media_gates:
+            if (
+                gate.get("workspaceRef") != workspace
+                or gate.get("productionRunRef") != run_ref
+                or gate.get("rootPayloadDigest") != expected_root_digest
+                or gate.get("toState") != "MEDIA_READY"
+            ):
+                raise RepositoryUnavailableError("G5 media gate is stale")
+            facts = gate.get("facts")
+            if not isinstance(facts, list):
+                raise RepositoryUnavailableError("G5 media facts are invalid")
+            manifest_facts = [
+                fact
+                for fact in facts
+                if isinstance(fact, Mapping)
+                and fact.get("factKind") == "MediaManifest"
+            ]
+            if len(manifest_facts) != 1:
+                raise RepositoryUnavailableError(
+                    "G5 MediaManifest authority is ambiguous"
+                )
+            manifest_fact = manifest_facts[0]
+            manifest = _immutable_payload(
+                manifest_fact.get("payload"), "G5 MediaManifest"
+            )
+            asset_plan_gates = [
+                item
+                for item in snapshot.gates
+                if item.get("gateName") == "G4_ASSET_RESOLUTION"
+            ]
+            if len(asset_plan_gates) != 1:
+                raise RepositoryUnavailableError(
+                    "G4 AssetResolution authority is ambiguous"
+                )
+            asset_plan_gate = asset_plan_gates[0]
+            plan_facts = [
+                fact
+                for fact in asset_plan_gate.get("facts", [])
+                if isinstance(fact, Mapping)
+                and fact.get("factKind") == "AssetResolutionManifest"
+            ]
+            if len(plan_facts) != 1:
+                raise RepositoryUnavailableError(
+                    "G4 AssetResolutionManifest authority is ambiguous"
+                )
+            plan_fact = plan_facts[0]
+            plan = _immutable_payload(
+                plan_fact.get("payload"), "G4 AssetResolutionManifest"
+            )
+            if (
+                plan.get("schemaVersion") != G4_ASSET_PLAN_SCHEMA_VERSION
+                or asset_plan_gate.get("workspaceRef") != workspace
+                or asset_plan_gate.get("productionRunRef") != run_ref
+                or asset_plan_gate.get("toState") != "ASSETS_READY"
+                or asset_plan_gate.get("rootPayloadDigest")
+                != expected_root_digest
+                or plan.get("rootPayloadDigest") != expected_root_digest
+                or plan.get("executableShotGraphVersionRef")
+                != expected_graph_version_ref
+                or plan.get("executableShotGraphDigest")
+                != expected_graph_digest
+                or plan_fact.get("factRef")
+                != plan.get("assetResolutionManifestRef")
+                or plan_fact.get("factVersion") != plan.get("version")
+                or plan_fact.get("payloadDigest") != plan["payloadDigest"]
+            ):
+                raise RepositoryUnavailableError(
+                    "G4 AssetResolutionManifest authority is stale"
+                )
+            request_facts = [
+                fact
+                for fact in asset_plan_gate.get("facts", [])
+                if isinstance(fact, Mapping)
+                and str(fact.get("factKind", "")).startswith(
+                    "GenerationRequest:"
+                )
+            ]
+            requirement_facts = [
+                fact
+                for fact in asset_plan_gate.get("facts", [])
+                if isinstance(fact, Mapping)
+                and str(fact.get("factKind", "")).startswith(
+                    "AssetRequirement:"
+                )
+            ]
+            requests_by_ref: dict[str, dict[str, Any]] = {}
+            requirements_by_ref: dict[str, dict[str, Any]] = {}
+            for requirement_fact in requirement_facts:
+                requirement = _immutable_payload(
+                    requirement_fact.get("payload"), "G4 AssetRequirement"
+                )
+                requirement_ref = requirement.get("assetRequirementRef")
+                if (
+                    requirement.get("schemaVersion")
+                    != G4_ASSET_REQUIREMENT_SCHEMA_VERSION
+                    or requirement_fact.get("factKind")
+                    != f"AssetRequirement:{requirement.get('ordinal'):04d}"
+                    or requirement_fact.get("factRef") != requirement_ref
+                    or requirement_fact.get("factVersion")
+                    != requirement.get("version")
+                    or requirement_fact.get("payloadDigest")
+                    != requirement.get("payloadDigest")
+                    or requirement.get("workspaceRef") != workspace
+                    or requirement.get("productionRunRef") != run_ref
+                    or requirement_ref in requirements_by_ref
+                ):
+                    raise RepositoryUnavailableError(
+                        "G4 AssetRequirement authority is invalid"
+                    )
+                requirements_by_ref[requirement_ref] = requirement
+            for request_fact in request_facts:
+                request = _immutable_payload(
+                    request_fact.get("payload"), "G4 GenerationRequest"
+                )
+                request_ref = request.get("generationRequestRef")
+                shot = graph_shots_by_version.get(
+                    request.get("creativeShotVersionRef")
+                )
+                requirement = requirements_by_ref.get(
+                    request.get("assetRequirementRef")
+                )
+                if (
+                    set(request) != g4_request_fields
+                    or request.get("schemaVersion")
+                    != G4_GENERATION_REQUEST_SCHEMA_VERSION
+                    or request_fact.get("factKind")
+                    != f"GenerationRequest:{request.get('ordinal'):04d}"
+                    or request_fact.get("factRef")
+                    != request.get("generationRequestVersionRef")
+                    or request_fact.get("factVersion") != request.get("version")
+                    or request_fact.get("payloadDigest")
+                    != request.get("payloadDigest")
+                    or request.get("workspaceRef") != workspace
+                    or request.get("productionRunRef") != run_ref
+                    or request.get("state") != "READY_FOR_DISPATCH"
+                    or request.get("providerSelection") != "UNSELECTED"
+                    or request.get("createdBy") != ASSET_RESOLVER_ID
+                    or request.get("publicationAllowed") is not False
+                    or request_ref in requests_by_ref
+                    or not isinstance(shot, Mapping)
+                    or request.get("creativeShotRef")
+                    != shot.get("creativeShotRef")
+                    or request.get("creativeShotDigest")
+                    != shot.get("payloadDigest")
+                    or not isinstance(requirement, Mapping)
+                    or set(requirement) != g4_media_requirement_fields
+                    or request.get("assetRequirementDigest")
+                    != requirement.get("payloadDigest")
+                    or request.get("creativeShotRef")
+                    != requirement.get("creativeShotRef")
+                    or request.get("creativeShotVersionRef")
+                    != requirement.get("creativeShotVersionRef")
+                    or request.get("creativeShotDigest")
+                    != requirement.get("creativeShotDigest")
+                    or request.get("mediaType") != requirement.get("mediaType")
+                    or requirement.get("required") is not True
+                    or requirement.get("requirementType")
+                    != f"shot-{request.get('mediaKind')}"
+                    or requirement.get("resolutionState")
+                    != "GENERATION_REQUESTED"
+                    or requirement.get("resolutionKind")
+                    != "V4_ADAPTER_REQUIRED"
+                    or requirement.get("executableShotGraphVersionRef")
+                    != expected_graph_version_ref
+                    or requirement.get("executableShotGraphDigest")
+                    != expected_graph_digest
+                    or requirement.get("createdBy") != ASSET_RESOLVER_ID
+                    or requirement.get("publicationAllowed") is not False
+                ):
+                    raise RepositoryUnavailableError(
+                        "G4 GenerationRequest authority is invalid"
+                    )
+                requests_by_ref[request_ref] = request
+            plan_request_refs = plan.get("generationRequestRefs")
+            plan_requirement_refs = plan.get("assetRequirementRefs")
+            generation_requested_requirement_refs = {
+                ref
+                for ref, item in requirements_by_ref.items()
+                if item.get("resolutionState") == "GENERATION_REQUESTED"
+            }
+            if (
+                not isinstance(plan_request_refs, list)
+                or len(set(plan_request_refs)) != len(plan_request_refs)
+                or set(plan_request_refs) != set(requests_by_ref)
+                or not isinstance(plan_requirement_refs, list)
+                or len(set(plan_requirement_refs)) != len(plan_requirement_refs)
+                or set(plan_requirement_refs) != set(requirements_by_ref)
+                or {
+                    item.get("assetRequirementRef")
+                    for item in requests_by_ref.values()
+                }
+                != generation_requested_requirement_refs
+            ):
+                raise RepositoryUnavailableError(
+                    "G4 AssetResolutionManifest membership is stale"
+                )
+            if (
+                set(manifest) != g5_manifest_fields
+                or manifest.get("schemaVersion")
+                != G5_MEDIA_MANIFEST_SCHEMA_VERSION
+                or manifest_fact.get("factRef")
+                != manifest.get("mediaManifestRef")
+                or manifest_fact.get("factVersion") != manifest.get("version")
+                or manifest_fact.get("payloadDigest") != manifest["payloadDigest"]
+                or manifest.get("workspaceRef") != workspace
+                or manifest.get("productionRunRef") != run_ref
+                or manifest.get("rootPayloadDigest") != expected_root_digest
+                or manifest.get("executableShotGraphVersionRef")
+                != expected_graph_version_ref
+                or manifest.get("executableShotGraphDigest")
+                != expected_graph_digest
+                or manifest.get("assetResolutionManifestRef")
+                != plan.get("assetResolutionManifestRef")
+                or manifest.get("assetResolutionManifestDigest")
+                != plan.get("payloadDigest")
+                or manifest.get("state") != "MEDIA_VERIFIED"
+                or manifest.get("executionScope") != "SINGLE_EPISODE"
+                or manifest.get("createdBy") != MEDIA_ADMISSION_ID
+                or manifest.get("publicationAllowed") is not False
+            ):
+                raise RepositoryUnavailableError(
+                    "G5 MediaManifest authority is stale"
+                )
+            result_facts = [
+                fact
+                for fact in facts
+                if isinstance(fact, Mapping)
+                and str(fact.get("factKind", "")).startswith(
+                    "GenerationResult:"
+                )
+            ]
+            results_by_ref: dict[str, dict[str, Any]] = {}
+            for result_fact in result_facts:
+                result = _immutable_payload(
+                    result_fact.get("payload"), "G5 GenerationResult"
+                )
+                result_ref = result.get("generationResultRef")
+                request = requests_by_ref.get(
+                    result.get("generationRequestRef")
+                )
+                if (
+                    set(result) != g5_result_fields
+                    or result.get("schemaVersion")
+                    != G5_GENERATION_RESULT_SCHEMA_VERSION
+                    or isinstance(result.get("ordinal"), bool)
+                    or not isinstance(result.get("ordinal"), int)
+                    or result_fact.get("factKind")
+                    != f"GenerationResult:{result.get('ordinal'):04d}"
+                    or result_fact.get("factRef") != result_ref
+                    or result_fact.get("factVersion") != result.get("version")
+                    or result_fact.get("payloadDigest")
+                    != result.get("payloadDigest")
+                    or result.get("workspaceRef") != workspace
+                    or result.get("productionRunRef") != run_ref
+                    or result_ref in results_by_ref
+                    or not isinstance(request, Mapping)
+                    or result.get("ordinal") != request.get("ordinal")
+                    or result.get("generationRequestVersionRef")
+                    != request.get("generationRequestVersionRef")
+                    or result.get("generationRequestDigest")
+                    != request.get("payloadDigest")
+                    or result.get("parameters") != request.get("parameters")
+                    or result.get("mediaKind") != request.get("mediaKind")
+                    or result.get("mediaType") != request.get("mediaType")
+                    or result.get("state") != "VERIFIED"
+                    or result.get("provenance") != "LOCAL_EVIDENCE"
+                    or result.get("rightsState") != "LOCAL_EVIDENCE_ONLY"
+                    or result.get("gpuUsed") is not False
+                    or result.get("publicationAllowed") is not False
+                    or result.get("createdBy") != MEDIA_ADMISSION_ID
+                ):
+                    raise RepositoryUnavailableError(
+                        "G5 GenerationResult authority is invalid"
+                    )
+                results_by_ref[result_ref] = result
+            manifest_result_refs = manifest.get("generationResultRefs")
+            if (
+                not isinstance(manifest_result_refs, list)
+                or len(set(manifest_result_refs)) != len(manifest_result_refs)
+                or set(manifest_result_refs) != set(results_by_ref)
+                or len(result_facts) != len(manifest_result_refs)
+            ):
+                raise RepositoryUnavailableError(
+                    "G5 MediaManifest GenerationResult membership is stale"
+                )
+            asset_facts = [
+                fact
+                for fact in facts
+                if isinstance(fact, Mapping)
+                and str(fact.get("factKind", "")).startswith("AssetVersion:")
+            ]
+            manifest_asset_refs = manifest.get("assetVersionRefs")
+            if (
+                not isinstance(manifest_asset_refs, list)
+                or len(set(manifest_asset_refs)) != len(manifest_asset_refs)
+                or len({fact.get("factRef") for fact in asset_facts})
+                != len(asset_facts)
+                or {fact.get("factRef") for fact in asset_facts}
+                != set(manifest_asset_refs)
+                or len(asset_facts) != len(manifest_asset_refs)
+            ):
+                raise RepositoryUnavailableError(
+                    "G5 MediaManifest AssetVersion membership is stale"
+                )
+            validated_asset_payloads: list[dict[str, Any]] = []
+            for fact in asset_facts:
+                payload = fact.get("payload")
+                if not isinstance(payload, Mapping):
+                    raise RepositoryUnavailableError(
+                        "G5 AssetVersion authority is invalid"
+                    )
+                asset = _immutable_payload(payload, "G5 AssetVersion")
+                request = requests_by_ref.get(
+                    asset.get("generationRequestRef")
+                )
+                result = results_by_ref.get(asset.get("generationResultRef"))
+                if (
+                    set(asset) != g5_asset_fields
+                    or asset.get("schemaVersion")
+                    != G5_ASSET_VERSION_SCHEMA_VERSION
+                    or isinstance(asset.get("ordinal"), bool)
+                    or not isinstance(asset.get("ordinal"), int)
+                    or fact.get("factKind")
+                    != f"AssetVersion:{asset.get('ordinal'):04d}"
+                    or fact.get("factRef") != asset.get("assetVersionRef")
+                    or fact.get("factVersion") != asset.get("version")
+                    or fact.get("payloadDigest") != asset["payloadDigest"]
+                    or asset.get("workspaceRef") != workspace
+                    or asset.get("productionRunRef") != run_ref
+                    or not isinstance(request, Mapping)
+                    or asset.get("ordinal") != request.get("ordinal")
+                    or asset.get("assetRequirementRef")
+                    != request.get("assetRequirementRef")
+                    or asset.get("generationRequestVersionRef")
+                    != request.get("generationRequestVersionRef")
+                    or asset.get("generationRequestDigest")
+                    != request.get("payloadDigest")
+                    or asset.get("creativeShotRef")
+                    != request.get("creativeShotRef")
+                    or asset.get("creativeShotVersionRef")
+                    != request.get("creativeShotVersionRef")
+                    or asset.get("creativeShotDigest")
+                    != request.get("creativeShotDigest")
+                    or asset.get("mediaKind") != request.get("mediaKind")
+                    or asset.get("mediaType") != request.get("mediaType")
+                    or not isinstance(result, Mapping)
+                    or asset.get("generationResultDigest")
+                    != result.get("payloadDigest")
+                    or asset.get("ordinal") != result.get("ordinal")
+                    or asset.get("generationRequestRef")
+                    != result.get("generationRequestRef")
+                    or asset.get("generationRequestVersionRef")
+                    != result.get("generationRequestVersionRef")
+                    or asset.get("generationRequestDigest")
+                    != result.get("generationRequestDigest")
+                    or asset.get("mediaKind") != result.get("mediaKind")
+                    or asset.get("mediaType") != result.get("mediaType")
+                    or asset.get("sha256") != result.get("artifactSha256")
+                    or asset.get("byteSize") != result.get("artifactByteSize")
+                    or asset.get("probe") != result.get("probe")
+                    or asset.get("adapterIdentity")
+                    != result.get("adapterIdentity")
+                    or asset.get("state") != "REGISTERED"
+                    or asset.get("provenance") != "LOCAL_EVIDENCE"
+                    or asset.get("rightsState") != "LOCAL_EVIDENCE_ONLY"
+                    or asset.get("publicationAllowed") is not False
+                    or asset.get("createdBy") != MEDIA_ADMISSION_ID
+                ):
+                    raise RepositoryUnavailableError(
+                        "G5 AssetVersion authority is invalid"
+                    )
+                validated_asset_payloads.append(asset)
+                if asset.get("mediaKind") != "video":
+                    continue
+                if asset.get("mediaType") != "video/mp4":
+                    raise RepositoryUnavailableError(
+                        "G5 VIDEO AssetVersion media type is invalid"
+                    )
+                video_facts = self._base_video_facts(asset)
+                projected = {
+                    **asset,
+                    "frameCount": video_facts["frameCount"],
+                    "frameRate": video_facts["frameRate"],
+                }
+                ref = _required_ref(asset.get("assetVersionRef"), "assetVersionRef")
+                previous = validated_videos.get(ref)
+                if previous is not None and previous != projected:
+                    raise RepositoryUnavailableError(
+                        "G5 VIDEO AssetVersion authority is ambiguous"
+                    )
+                validated_videos[ref] = projected
+                add("ASSET_VERSION", ref, projected)
+
+            manifest_summary = manifest.get("summary")
+            if (
+                len(validated_asset_payloads) != len(requests_by_ref)
+                or {
+                    item.get("generationRequestRef")
+                    for item in validated_asset_payloads
+                }
+                != set(requests_by_ref)
+                or {
+                    item.get("generationResultRef")
+                    for item in validated_asset_payloads
+                }
+                != set(results_by_ref)
+                or len(
+                    {
+                        item.get("generationRequestRef")
+                        for item in results_by_ref.values()
+                    }
+                )
+                != len(results_by_ref)
+                or not isinstance(manifest_summary, Mapping)
+                or manifest_summary
+                != {
+                    "requested": len(requests_by_ref),
+                    "verifiedResults": len(results_by_ref),
+                    "registeredAssets": len(validated_asset_payloads),
+                    "videoAssets": sum(
+                        item.get("mediaKind") == "video"
+                        for item in validated_asset_payloads
+                    ),
+                    "audioAssets": sum(
+                        item.get("mediaKind") == "audio"
+                        for item in validated_asset_payloads
+                    ),
+                    "failed": 0,
+                }
+            ):
+                raise RepositoryUnavailableError(
+                    "G5 media semantic closure is stale"
+                )
+
+            # Reuse the existing producer-side current-authority validator when
+            # the production service is present.  The schema/envelope checks
+            # above remain necessary for repository adapters used by restore;
+            # this call additionally closes the live G1/G3/G4/G5 lineage and
+            # re-probes the registered artifacts before their AssetVersions can
+            # be consumed by a Timeline.
+            verify_media_current = getattr(
+                self.media, "verify_media_current", None
+            )
+            if not callable(verify_media_current):
+                raise RepositoryUnavailableError(
+                    "current G5 media validator is unavailable"
+                )
+            current_media = verify_media_current(workspace, run_ref)
+            if not isinstance(current_media, Mapping):
+                raise RepositoryUnavailableError(
+                    "current G5 media authority is invalid"
+                )
+            current_assets = current_media.get("assetVersions")
+            if (
+                current_media.get("mediaManifest") != manifest
+                or current_media.get("assetResolutionManifest") != plan
+                or not isinstance(current_assets, list)
+                or sorted(
+                    (deepcopy(dict(item)) for item in current_assets),
+                    key=lambda item: item.get("assetVersionRef", ""),
+                )
+                != sorted(
+                    validated_asset_payloads,
+                    key=lambda item: item.get("assetVersionRef", ""),
+                )
+            ):
+                raise RepositoryUnavailableError(
+                    "current G5 media authority changed during resolution"
+                )
+
+        # Audio is reconstructed through the existing closed TimelineInputBundle
+        # validator.  This revalidates AudioInputBinding, Cue, StemMember and
+        # StemSet shapes and their exact cross-record semantic closure.
+        binding_wrappers: dict[str, AudioInputBinding] = {}
+        for payload in records("AudioInputBinding", "audioInputBindingRef"):
+            wrapper = validate_audio_input_binding(payload)
+            mapping = wrapper.as_dict()
+            if (
+                mapping.get("workspaceRef") != workspace
+                or mapping.get("productionRunRef") != run_ref
+                or mapping["assetVersionRef"] in binding_wrappers
+            ):
+                raise RepositoryUnavailableError(
+                    "AudioInputBinding authority is ambiguous or stale"
+                )
+            binding_wrappers[mapping["assetVersionRef"]] = wrapper
+        cue_records = records("AudioCue", "cueVersionRef")
+        cue_payloads = {item["cueVersionRef"]: item for item in cue_records}
+        if len(cue_payloads) != len(cue_records):
+            raise RepositoryUnavailableError("AudioCue authority is ambiguous")
+        stem_sets = records("AudioStemSet", "stemSetVersionRef")
+        for stem_set in stem_sets:
+            members = stem_set.get("members")
+            if not isinstance(members, list) or not members:
+                raise RepositoryUnavailableError(
+                    "AudioStemSet authority has no members"
+                )
+            asset_refs = {
+                item.get("sourceAssetVersionRef")
+                for item in members
+                if isinstance(item, Mapping)
+            }
+            cue_refs = {
+                item.get("sourceCueVersionRef")
+                for item in members
+                if isinstance(item, Mapping)
+                and item.get("sourceCueVersionRef") is not None
+            }
+            if (
+                len(asset_refs) == 0
+                or any(ref not in binding_wrappers for ref in asset_refs)
+                or any(ref not in cue_payloads for ref in cue_refs)
+            ):
+                raise RepositoryUnavailableError(
+                    "AudioStemSet authority closure is incomplete"
+                )
+            selected_bindings = [
+                binding_wrappers[str(ref)] for ref in sorted(asset_refs)
+            ]
+            selected_cues = [cue_payloads[str(ref)] for ref in sorted(cue_refs)]
+            bundle_ref = "m13-source-authority-" + _digest(
+                {
+                    "stemSetVersionRef": stem_set.get("stemSetVersionRef"),
+                    "stemSetDigest": stem_set.get("payloadDigest"),
+                }
+            )[:32]
+            bundle = validate_timeline_input_bundle(
+                build_timeline_input_bundle(
+                    {
+                        "workspaceRef": workspace,
+                        "productionRunRef": run_ref,
+                        "timelineInputBundleRef": bundle_ref,
+                        "scriptVersionRef": expected_script_version_ref,
+                        "scriptVersionDigest": expected_script_version_digest,
+                    },
+                    audio_input_bindings=selected_bindings,
+                    audio_cues=selected_cues,
+                    audio_stem_set=stem_set,
+                    audio_stem_members=members,
+                    glyph_reveal_requirements=(),
+                    mask_asset_bindings=(),
+                )
+            ).as_dict()
+            for binding in bundle["audioInputBindings"]:
+                asset = deepcopy(dict(binding["assetVersion"]))
+                asset["sampleRate"] = binding["sampleRate"]
+                asset["sampleCount"] = binding["sampleCount"]
+                add(
+                    "AUDIO_ASSET_VERSION",
+                    binding["assetVersionRef"],
+                    asset,
+                )
+            for cue in bundle["audioCues"]:
+                projected = deepcopy(dict(cue))
+                subtitle = projected.get("subtitleTimingReference")
+                if isinstance(subtitle, Mapping):
+                    matching_members = [
+                        member
+                        for member in bundle["audioStemMembers"]
+                        if member.get("sourceCueVersionRef")
+                        == projected["cueVersionRef"]
+                    ]
+                    if len(matching_members) != 1:
+                        raise RepositoryUnavailableError(
+                            "AudioCue Timeline stem placement is ambiguous"
+                        )
+                    member = matching_members[0]
+                    sample_rate = stem_set["sampleRate"]
+                    rate = self._editing_frame_rate(
+                        expected_timeline_frame_rate
+                    )
+
+                    def timeline_frame(source_sample: int) -> int:
+                        timeline_sample = (
+                            member["stemStartSample"]
+                            + source_sample
+                            - member["sourceStartSample"]
+                        )
+                        return map_sample_boundary_to_frame(
+                            timeline_sample,
+                            sample_rate=sample_rate,
+                            frame_rate_numerator=rate["numerator"],
+                            frame_rate_denominator=rate["denominator"],
+                        )
+
+                    projected.update(
+                        {
+                            "textStart": subtitle.get("textRangeStart"),
+                            "textEndExclusive": subtitle.get(
+                                "textRangeEndExclusive"
+                            ),
+                            "textDigest": subtitle.get("textDigest"),
+                            "language": subtitle.get("language"),
+                            "timelineStartFrameInclusive": timeline_frame(
+                                projected["sourceStartSample"]
+                            ),
+                            "timelineEndFrameExclusive": timeline_frame(
+                                projected["sourceEndSample"]
+                            ),
+                            "timelineWordTiming": [
+                                {
+                                    "wordRef": word["wordRef"],
+                                    "textStart": word["textRangeStart"],
+                                    "textEndExclusive": word[
+                                        "textRangeEndExclusive"
+                                    ],
+                                    "timelineStartFrameInclusive": timeline_frame(
+                                        word["sourceStartSample"]
+                                    ),
+                                    "timelineEndFrameExclusive": timeline_frame(
+                                        word["sourceEndSample"]
+                                    ),
+                                    "textDigest": word["textDigest"],
+                                }
+                                for word in projected["wordTimings"]
+                            ],
+                        }
+                    )
+                add("AUDIO_CUE", projected["cueVersionRef"], projected)
+            add("AUDIO_STEM_SET", stem_set["stemSetVersionRef"], stem_set)
+            for member in bundle["audioStemMembers"]:
+                projected = {
+                    **deepcopy(dict(member)),
+                    "workspaceRef": workspace,
+                    "productionRunRef": run_ref,
+                    "scriptVersionRef": expected_script_version_ref,
+                    "scriptVersionDigest": expected_script_version_digest,
+                    "sampleRate": stem_set["sampleRate"],
+                }
+                add("AUDIO_STEM_MEMBER", member["stemMemberRef"], projected)
+
+        mask_records = records("MaskAssetVersion", "assetVersionRef")
+        mask_payloads = {item["assetVersionRef"]: item for item in mask_records}
+        if len(mask_payloads) != len(mask_records):
+            raise RepositoryUnavailableError(
+                "MaskAssetVersion authority is ambiguous"
+            )
+        for payload in records("GlyphRevealRequirement", "requirementRef"):
+            requirement = GlyphRevealRequirementV2.from_mapping(payload)
+            if (
+                requirement.workspace_ref != workspace
+                or requirement.production_run_ref != run_ref
+            ):
+                raise RepositoryUnavailableError(
+                    "GlyphRevealRequirement authority scope is stale"
+                )
+            base = validated_videos.get(requirement.base_plate_asset_version_ref)
+            if (
+                base is None
+                or base.get("payloadDigest")
+                != requirement.base_plate_asset_version_digest
+                or f"sha256:{base.get('sha256')}"
+                != requirement.base_plate_file_digest
+                or requirement.target_shot_ref
+                not in {
+                    base.get("creativeShotRef"),
+                    base.get("creativeShotVersionRef"),
+                }
+            ):
+                raise RepositoryUnavailableError(
+                    "GlyphRevealRequirement base plate authority is stale"
+                )
+            for ordinal, expected_mask in enumerate(
+                requirement.mask_asset_version_bindings, start=1
+            ):
+                raw = mask_payloads.get(expected_mask["assetVersionRef"])
+                if raw is None:
+                    raise RepositoryUnavailableError(
+                        "GlyphRevealRequirement mask authority is missing"
+                    )
+                binding = self._mask_binding_wrapper(
+                    workspace=workspace,
+                    run_ref=run_ref,
+                    glyph_slug=requirement.glyph_slug,
+                    ordinal=ordinal,
+                    asset=raw,
+                ).as_dict()
+                expected_projection = {
+                    "assetVersionRef": raw.get("assetVersionRef"),
+                    "assetVersionDigest": raw.get("payloadDigest"),
+                    "fileDigest": f"sha256:{raw.get('sha256')}",
+                    "pixelDigest": raw.get("pixelDigest"),
+                    "pixelDigestSpec": raw.get("pixelDigestSpec"),
+                    "pixelMode": raw.get("pixelMode"),
+                    "width": raw.get("width"),
+                    "height": raw.get("height"),
+                    "glyphSlug": raw.get("glyphSlug"),
+                    "revealOrdinal": raw.get("revealOrdinal"),
+                    "assetRole": raw.get("assetRole"),
+                    "glyphManifestDigest": raw.get("glyphManifestDigest"),
+                }
+                if (
+                    _contains_path_authority(raw)
+                    or expected_projection != expected_mask
+                    or binding["assetVersionDigest"]
+                    != expected_mask["assetVersionDigest"]
+                    or binding["fileDigest"] != expected_mask["fileDigest"]
+                    or binding["pixelDigest"] != expected_mask["pixelDigest"]
+                ):
+                    raise RepositoryUnavailableError(
+                        "GlyphRevealRequirement mask authority is stale"
+                    )
+                add("MASK_ASSET_VERSION", raw["assetVersionRef"], raw)
+            add("EFFECT_REQUIREMENT", requirement.requirement_ref, payload)
+
+        def resolve(source_type: str, source_ref: str) -> Mapping[str, Any] | None:
+            matches = candidates.get((source_type, source_ref), [])
+            if len(matches) > 1:
+                raise RepositoryUnavailableError(
+                    "Timeline source authority is ambiguous"
+                )
+            return None if not matches else deepcopy(matches[0])
+
+        return resolve
+
+    @staticmethod
+    def _editing_payload_records(
+        snapshot: Any,
+        *,
+        record_kind: str,
+        schema_version: str,
+    ) -> list[tuple[dict[str, Any], dict[str, Any]]]:
+        result: list[tuple[dict[str, Any], dict[str, Any]]] = []
+        for record in snapshot.records:
+            if record.get("recordKind") != record_kind:
+                continue
+            payload = record.get("payload")
+            if not isinstance(payload, Mapping) or payload.get(
+                "schemaVersion"
+            ) != schema_version:
+                continue
+            canonical = _immutable_payload(payload, record_kind)
+            if canonical["payloadDigest"] != record.get("payloadDigest"):
+                raise RepositoryUnavailableError(
+                    f"{record_kind} evidence digest is inconsistent"
+                )
+            result.append((deepcopy(dict(record)), canonical))
+        return result
+
+    @staticmethod
+    def _timeline_authority_records_or_facts(snapshot: Any) -> tuple[dict[str, Any], ...]:
+        """Audit and return every Timeline authority envelope.
+
+        ``Timeline`` and ``TimelineVersion`` are authority record kinds.  An
+        unknown schema on either kind is therefore evidence corruption, not an
+        unrelated record that can safely be ignored.
+        """
+
+        schemas_by_kind = {
+            "Timeline": {
+                EDITING_TIMELINE_SCHEMA_VERSION: "editing",
+                TIMELINE_SCHEMA_VERSION_V2: "legacy",
+            },
+            "TimelineVersion": {
+                EDITING_TIMELINE_VERSION_SCHEMA_VERSION: "editing",
+                TIMELINE_VERSION_SCHEMA_VERSION_V2: "legacy",
+                TIMELINE_SCHEMA_VERSION: "legacy",
+            },
+            "TimelineTrack": {
+                EDITING_TIMELINE_TRACK_SCHEMA_VERSION: "editing",
+                LEGACY_TIMELINE_TRACK_SCHEMA_VERSION: "legacy",
+            },
+            "TimelineClip": {
+                EDITING_TIMELINE_CLIP_SCHEMA_VERSION: "editing",
+                LEGACY_TIMELINE_CLIP_SCHEMA_VERSION: "legacy",
+            },
+            "TimelineEditOperation": {
+                EDITING_TIMELINE_EDIT_COMMAND_SCHEMA_VERSION: "editing",
+            },
+        }
+        identity_by_kind = {
+            "Timeline": "timelineRef",
+            "TimelineVersion": "timelineVersionRef",
+            "TimelineTrack": "trackRef",
+            "TimelineClip": "clipRef",
+            "TimelineEditOperation": "operationRef",
+        }
+        result: list[dict[str, Any]] = []
+        classifications: list[str] = []
+
+        def audit(
+            envelope: Mapping[str, Any],
+            *,
+            kind_field: str,
+            ref_field: str,
+            version_field: str,
+        ) -> None:
+            kind = envelope.get(kind_field)
+            if kind not in schemas_by_kind:
+                return
+            payload = envelope.get("payload")
+            if not isinstance(payload, Mapping):
+                raise RepositoryUnavailableError(
+                    f"{kind} authority payload is missing"
+                )
+            canonical = _immutable_payload(payload, str(kind))
+            schema = canonical.get("schemaVersion")
+            classification = schemas_by_kind[str(kind)].get(schema)
+            if classification is None:
+                raise RepositoryUnavailableError(
+                    f"{kind} authority schema is unsupported"
+                )
+            if classification == "editing" and kind_field == "factKind":
+                raise RepositoryUnavailableError(
+                    "M13 Timeline authority must use the record journal"
+                )
+            identity_field = identity_by_kind[str(kind)]
+            envelope_version = envelope.get(version_field)
+            if (
+                envelope.get(ref_field) != canonical.get(identity_field)
+                or envelope.get("payloadDigest") != canonical["payloadDigest"]
+                or isinstance(envelope_version, bool)
+                or not isinstance(envelope_version, int)
+                or envelope_version < 1
+            ):
+                raise RepositoryUnavailableError(
+                    f"{kind} authority envelope is invalid"
+                )
+            if kind == "Timeline" and envelope_version != 1:
+                raise RepositoryUnavailableError(
+                    "Timeline root authority version is invalid"
+                )
+            if kind == "TimelineVersion":
+                payload_version = canonical.get("versionNumber")
+                if payload_version is None:
+                    payload_version = canonical.get("version")
+                if payload_version != envelope_version:
+                    raise RepositoryUnavailableError(
+                        "TimelineVersion authority version is invalid"
+                    )
+            if kind == "TimelineEditOperation" and envelope_version != 1:
+                raise RepositoryUnavailableError(
+                    "TimelineEditOperation authority version is invalid"
+                )
+            result.append(deepcopy(dict(envelope)))
+            classifications.append(classification)
+
+        for record in snapshot.records:
+            if isinstance(record, Mapping):
+                audit(
+                    record,
+                    kind_field="recordKind",
+                    ref_field="recordRef",
+                    version_field="recordVersion",
+                )
+        for gate in snapshot.gates:
+            for fact in gate.get("facts", []):
+                if isinstance(fact, Mapping):
+                    audit(
+                        fact,
+                        kind_field="factKind",
+                        ref_field="factRef",
+                        version_field="factVersion",
+                    )
+        observed = set(classifications)
+        if observed == {"editing", "legacy"}:
+            raise RepositoryUnavailableError(
+                "legacy and M13 Timeline authorities cannot coexist"
+            )
+        return tuple(result)
+
+    @staticmethod
+    def _has_editing_timeline_authority(snapshot: Any) -> bool:
+        editing_schemas = {
+            EDITING_TIMELINE_SCHEMA_VERSION,
+            EDITING_TIMELINE_VERSION_SCHEMA_VERSION,
+            EDITING_TIMELINE_TRACK_SCHEMA_VERSION,
+            EDITING_TIMELINE_CLIP_SCHEMA_VERSION,
+            EDITING_TIMELINE_EDIT_COMMAND_SCHEMA_VERSION,
+        }
+        return any(
+            isinstance(item.get("payload"), Mapping)
+            and item["payload"].get("schemaVersion") in editing_schemas
+            for item in K2DeliveryService._timeline_authority_records_or_facts(
+                snapshot
+            )
+        )
+
+    @staticmethod
+    def _reject_legacy_timeline_write_if_editing_authority(snapshot: Any) -> None:
+        if K2DeliveryService._has_editing_timeline_authority(snapshot):
+            raise IdempotencyConflictError(
+                "M13 Timeline authority exists; legacy Timeline writes are closed"
+            )
+
+    def _restore_editing_timeline(
+        self,
+        context: Mapping[str, Any],
+        *,
+        timeline_version_ref: str | None = None,
+    ) -> dict[str, Any]:
+        snapshot = context["snapshot"]
+        authorities = self._timeline_authority_records_or_facts(snapshot)
+        editing_schemas = {
+            EDITING_TIMELINE_SCHEMA_VERSION,
+            EDITING_TIMELINE_VERSION_SCHEMA_VERSION,
+            EDITING_TIMELINE_TRACK_SCHEMA_VERSION,
+            EDITING_TIMELINE_CLIP_SCHEMA_VERSION,
+            EDITING_TIMELINE_EDIT_COMMAND_SCHEMA_VERSION,
+        }
+        if any(
+            item["payload"].get("schemaVersion") not in editing_schemas
+            for item in authorities
+        ):
+            raise RepositoryUnavailableError(
+                "non-M13 Timeline authority cannot coexist with M13 restore"
+            )
+        roots = self._editing_payload_records(
+            snapshot,
+            record_kind="Timeline",
+            schema_version=EDITING_TIMELINE_SCHEMA_VERSION,
+        )
+        if len(roots) != 1:
+            if not roots:
+                raise UpstreamNotReadyError("M13 Timeline is not ready")
+            raise RepositoryUnavailableError("Timeline root authority is ambiguous")
+        root_record, root_payload = roots[0]
+        root = validate_editing_timeline(root_payload)
+        root_mapping = root.as_dict()
+        run = context["run"]
+        if (
+            root_record.get("recordRef") != root_mapping["timelineRef"]
+            or root_record.get("recordVersion") != 1
+            or root_record.get("createdAt") != root_mapping["createdAt"]
+            or not _is_sha256(root_record.get("idempotencyKey"))
+            or not _is_sha256(root_record.get("requestDigest"))
+            or any(
+                root_mapping.get(field) != run.get(field)
+                for field in (
+                    "workspaceRef",
+                    "projectRef",
+                    "seriesRef",
+                    "episodeRef",
+                    "productionRunRef",
+                )
+            )
+        ):
+            raise RepositoryUnavailableError("Timeline root evidence is invalid")
+
+        version_records = self._editing_payload_records(
+            snapshot,
+            record_kind="TimelineVersion",
+            schema_version=EDITING_TIMELINE_VERSION_SCHEMA_VERSION,
+        )
+        if any(
+            item[1].get("timelineRef") != root_mapping["timelineRef"]
+            for item in version_records
+        ):
+            raise RepositoryUnavailableError(
+                "TimelineVersion authority has an orphan root"
+            )
+        version_records.sort(key=lambda item: item[1].get("versionNumber", -1))
+        if not version_records:
+            raise RepositoryUnavailableError("TimelineVersion history is missing")
+        wrappers: list[EditingTimelineVersion] = []
+        refs: set[str] = set()
+        predecessor: EditingTimelineVersion | None = None
+        for index, (record, payload) in enumerate(version_records, start=1):
+            if (
+                payload.get("versionNumber") != index
+                or record.get("recordRef") != payload.get("timelineVersionRef")
+                or record.get("recordVersion") != index
+                or record.get("createdAt") != payload.get("createdAt")
+                or not _is_sha256(record.get("idempotencyKey"))
+                or not _is_sha256(record.get("requestDigest"))
+                or payload.get("timelineVersionRef") in refs
+            ):
+                raise RepositoryUnavailableError(
+                    "TimelineVersion journal is not a contiguous chain"
+                )
+            wrapper = validate_editing_timeline_version(
+                payload,
+                predecessor=predecessor,
+            )
+            refs.add(wrapper.as_dict()["timelineVersionRef"])
+            wrappers.append(wrapper)
+            predecessor = wrapper
+        server_profile = self._server_output_profile(
+            context["executableShotGraph"]
+        )
+        if any(
+            item.as_dict().get("outputProfileBindings") != [server_profile]
+            for item in wrappers
+        ):
+            raise StaleInputError(
+                "Timeline OutputProfileBinding is not current server authority"
+            )
+        expected_script = {
+            "scriptVersionRef": context["scriptVersionRef"],
+            "scriptVersionDigest": context["scriptVersionDigest"],
+        }
+        expected_storyboard = {
+            "storyboardVersionRef": context["storyboardVersionRef"],
+            "storyboardVersionDigest": context["storyboardVersionDigest"],
+        }
+        all_track_records = self._editing_payload_records(
+            snapshot,
+            record_kind="TimelineTrack",
+            schema_version=EDITING_TIMELINE_TRACK_SCHEMA_VERSION,
+        )
+        all_clip_records = self._editing_payload_records(
+            snapshot,
+            record_kind="TimelineClip",
+            schema_version=EDITING_TIMELINE_CLIP_SCHEMA_VERSION,
+        )
+        if any(
+            payload.get("timelineVersionRef") not in refs
+            for _, payload in (*all_track_records, *all_clip_records)
+        ):
+            raise RepositoryUnavailableError(
+                "Timeline Track/Clip evidence has an orphan version"
+            )
+        source_resolver = self._timeline_source_resolver(
+            snapshot,
+            expected_script_version_ref=context["scriptVersionRef"],
+            expected_script_version_digest=context["scriptVersionDigest"],
+            expected_timeline_frame_rate=wrappers[0].as_dict()["frameRate"],
+            expected_root_digest=context["run"]["payloadDigest"],
+            expected_graph_version_ref=context["executableShotGraph"][
+                "executableShotGraphVersionRef"
+            ],
+            expected_graph_digest=context["executableShotGraph"][
+                "payloadDigest"
+            ],
+        )
+        snapshots_by_ref: dict[str, Any] = {}
+        track_batches: dict[
+            str, list[tuple[dict[str, Any], dict[str, Any]]]
+        ] = {}
+        clip_batches: dict[
+            str, list[tuple[dict[str, Any], dict[str, Any]]]
+        ] = {}
+        for index, version in enumerate(wrappers):
+            version_mapping = version.as_dict()
+            version_ref = version_mapping["timelineVersionRef"]
+            version_number = version_mapping["versionNumber"]
+            track_records = [
+                item
+                for item in all_track_records
+                if item[1].get("timelineVersionRef") == version_ref
+            ]
+            clip_records = [
+                item
+                for item in all_clip_records
+                if item[1].get("timelineVersionRef") == version_ref
+            ]
+            track_batches[version_ref] = track_records
+            clip_batches[version_ref] = clip_records
+            if any(
+                record.get("recordRef") != payload.get("trackRef")
+                or record.get("recordVersion") != version_number
+                or record.get("createdAt") != version_mapping["createdAt"]
+                or not _is_sha256(record.get("idempotencyKey"))
+                or not _is_sha256(record.get("requestDigest"))
+                for record, payload in track_records
+            ) or any(
+                record.get("recordRef") != payload.get("clipRef")
+                or record.get("recordVersion") != version_number
+                or record.get("createdAt") != version_mapping["createdAt"]
+                or not _is_sha256(record.get("idempotencyKey"))
+                or not _is_sha256(record.get("requestDigest"))
+                for record, payload in clip_records
+            ):
+                raise RepositoryUnavailableError(
+                    "Timeline Track/Clip evidence envelope is invalid"
+                )
+            restored = validate_editing_timeline_snapshot(
+                version,
+                [
+                    EditingTimelineTrack.from_mapping(item[1])
+                    for item in track_records
+                ],
+                [
+                    EditingTimelineClip.from_mapping(item[1])
+                    for item in clip_records
+                ],
+                timeline=root,
+                predecessor=None if index == 0 else wrappers[index - 1],
+                source_resolver=source_resolver,
+                expected_script=expected_script,
+                expected_storyboard=expected_storyboard,
+            )
+            snapshots_by_ref[version_ref] = restored
+
+        edit_records: list[tuple[dict[str, Any], EditingTimelineEditCommand]] = []
+        for record in snapshot.records:
+            if record.get("recordKind") != "TimelineEditOperation":
+                continue
+            canonical = _immutable_payload(
+                record.get("payload"), "TimelineEditOperation"
+            )
+            command = EditingTimelineEditCommand.from_mapping(canonical)
+            command_mapping = command.as_dict()
+            if (
+                record.get("recordRef") != command_mapping["operationRef"]
+                or record.get("recordVersion") != 1
+                or record.get("createdAt") != command_mapping["createdAt"]
+                or record.get("idempotencyKey")
+                != self._timeline_record_idempotency_key(
+                    command_mapping["idempotencyKey"], "edit-operation"
+                )
+                or not _is_sha256(record.get("requestDigest"))
+            ):
+                raise RepositoryUnavailableError(
+                    "TimelineEditOperation evidence envelope is invalid"
+                )
+            edit_records.append((deepcopy(dict(record)), command))
+        validate_timeline_edit_chain(
+            wrappers,
+            [item[1] for item in edit_records],
+        )
+        version_records_by_ref = {
+            payload["timelineVersionRef"]: record
+            for record, payload in version_records
+        }
+        initial_version = wrappers[0].as_dict()
+        initial_track_batch = sorted(
+            track_batches[initial_version["timelineVersionRef"]],
+            key=lambda item: (item[1]["order"], item[1]["trackRef"]),
+        )
+        initial_clip_batch = sorted(
+            clip_batches[initial_version["timelineVersionRef"]],
+            key=lambda item: item[1]["clipRef"],
+        )
+        initial_batch_records = [
+            root_record,
+            version_records_by_ref[initial_version["timelineVersionRef"]],
+            *(item[0] for item in initial_track_batch),
+            *(item[0] for item in initial_clip_batch),
+        ]
+        initial_seed = self._timeline_create_batch_request_digest(
+            context,
+            root,
+            wrappers[0],
+            [item[1] for item in initial_track_batch],
+            [item[1] for item in initial_clip_batch],
+        )
+        initial_expected_keys = [
+            self._timeline_record_idempotency_key(
+                initial_seed, "timeline-root"
+            ),
+            self._timeline_record_idempotency_key(
+                initial_seed, "timeline-version"
+            ),
+            *(
+                self._timeline_record_idempotency_key(
+                    initial_seed, f"track:{index}"
+                )
+                for index in range(
+                    len(track_batches[initial_version["timelineVersionRef"]])
+                )
+            ),
+            *(
+                self._timeline_record_idempotency_key(
+                    initial_seed, f"clip:{index}"
+                )
+                for index in range(
+                    len(clip_batches[initial_version["timelineVersionRef"]])
+                )
+            ),
+        ]
+        if (
+            any(
+                item.get("createdAt") != initial_version["createdAt"]
+                for item in initial_batch_records
+            )
+            or root_record.get("requestDigest") != initial_seed
+            or len(
+                {item.get("requestDigest") for item in initial_batch_records}
+            )
+            != 1
+            or [
+                item.get("idempotencyKey") for item in initial_batch_records
+            ]
+            != initial_expected_keys
+        ):
+            raise RepositoryUnavailableError(
+                "Timeline create evidence batch metadata is inconsistent"
+            )
+        edit_records_by_successor = {
+            command.as_dict()["newTimelineVersionRef"]: (record, command)
+            for record, command in edit_records
+        }
+        for version in wrappers[1:]:
+            version_mapping = version.as_dict()
+            version_ref = version_mapping["timelineVersionRef"]
+            edit_record, edit_command = edit_records_by_successor[version_ref]
+            command_mapping = edit_command.as_dict()
+            client_key = command_mapping["idempotencyKey"]
+            expected_edit_request_digest = _digest(
+                {
+                    "schemaVersion": TIMELINE_EDIT_SUCCESSOR_REQUEST_SCHEMA_VERSION,
+                    "workspaceRef": root_mapping["workspaceRef"],
+                    "productionRunRef": root_mapping["productionRunRef"],
+                    "operationRef": command_mapping["operationRef"],
+                    "idempotencyKey": client_key,
+                    "expectedRunVersion": context["run"]["version"],
+                    "parentTimelineVersionRef": command_mapping[
+                        "parentTimelineVersionRef"
+                    ],
+                    "parentTimelineVersionDigest": command_mapping[
+                        "parentTimelineVersionDigest"
+                    ],
+                    "editCommand": {
+                        "operation": command_mapping["operation"],
+                        "arguments": command_mapping["arguments"],
+                    },
+                    "runDigest": context["run"]["payloadDigest"],
+                    "scriptVersionRef": context["scriptVersionRef"],
+                    "scriptVersionDigest": context["scriptVersionDigest"],
+                    "storyboardVersionRef": context["storyboardVersionRef"],
+                    "storyboardVersionDigest": context[
+                        "storyboardVersionDigest"
+                    ],
+                }
+            )
+            batch_records = [
+                edit_record,
+                version_records_by_ref[version_ref],
+                *(
+                    item[0]
+                    for item in sorted(
+                        track_batches[version_ref],
+                        key=lambda item: (
+                            item[1]["order"], item[1]["trackRef"]
+                        ),
+                    )
+                ),
+                *(
+                    item[0]
+                    for item in sorted(
+                        clip_batches[version_ref],
+                        key=lambda item: item[1]["clipRef"],
+                    )
+                ),
+            ]
+            expected_keys = [
+                self._timeline_record_idempotency_key(
+                    client_key, "edit-operation"
+                ),
+                self._timeline_record_idempotency_key(
+                    client_key, "timeline-version"
+                ),
+                *(
+                    self._timeline_record_idempotency_key(
+                        client_key, f"track:{index}"
+                    )
+                    for index in range(len(track_batches[version_ref]))
+                ),
+                *(
+                    self._timeline_record_idempotency_key(
+                        client_key, f"clip:{index}"
+                    )
+                    for index in range(len(clip_batches[version_ref]))
+                ),
+            ]
+            if (
+                [item.get("idempotencyKey") for item in batch_records]
+                != expected_keys
+                or edit_record.get("requestDigest")
+                != expected_edit_request_digest
+                or any(
+                    item.get("requestDigest")
+                    != edit_record.get("requestDigest")
+                    for item in batch_records
+                )
+                or any(
+                    item.get("createdAt") != command_mapping["createdAt"]
+                    for item in batch_records
+                )
+            ):
+                raise RepositoryUnavailableError(
+                    "Timeline edit evidence batch metadata is inconsistent"
+                )
+        edits_by_successor = {
+            item[1].as_dict()["newTimelineVersionRef"]: item[1]
+            for item in edit_records
+        }
+        for predecessor_index, (predecessor, successor) in enumerate(
+            zip(wrappers, wrappers[1:]), start=1
+        ):
+            predecessor_ref = predecessor.as_dict()["timelineVersionRef"]
+            successor_ref = successor.as_dict()["timelineVersionRef"]
+            predecessor_snapshot = snapshots_by_ref[predecessor_ref]
+            persisted_successor = snapshots_by_ref[successor_ref]
+            replayed_successor = apply_timeline_edit(
+                predecessor_snapshot.timeline_version,
+                predecessor_snapshot.tracks,
+                predecessor_snapshot.clips,
+                edits_by_successor[successor_ref],
+                existing_timeline_versions=wrappers[:predecessor_index],
+                timeline=root,
+                source_resolver=source_resolver,
+                expected_script=expected_script,
+                expected_storyboard=expected_storyboard,
+            )
+            if (
+                replayed_successor.timeline_version.as_dict()
+                != persisted_successor.timeline_version.as_dict()
+                or [item.as_dict() for item in replayed_successor.tracks]
+                != [item.as_dict() for item in persisted_successor.tracks]
+                or [item.as_dict() for item in replayed_successor.clips]
+                != [item.as_dict() for item in persisted_successor.clips]
+            ):
+                raise RepositoryUnavailableError(
+                    "Timeline successor does not match its edit operation"
+                )
+
+        selected_ref = (
+            wrappers[-1].as_dict()["timelineVersionRef"]
+            if timeline_version_ref is None
+            else timeline_version_ref
+        )
+        selected = snapshots_by_ref.get(selected_ref)
+        if selected is None:
+            raise RecordNotFoundError("TimelineVersion was not found")
+        return {
+            "timeline": root,
+            "timelineVersion": selected.timeline_version,
+            "tracks": selected.tracks,
+            "clips": selected.clips,
+            "versionHistory": tuple(wrappers),
+        }
+
+    @staticmethod
+    def _editing_projection(
+        restored: Mapping[str, Any],
+        *,
+        evidence_revision: str,
+        replayed: bool,
+        edit_operation: Mapping[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        result = {
+            "timeline": restored["timeline"].as_dict(),
+            "timelineVersion": restored["timelineVersion"].as_dict(),
+            "tracks": [item.as_dict() for item in restored["tracks"]],
+            "clips": [item.as_dict() for item in restored["clips"]],
+            "lineage": [
+                {
+                    "timelineVersionRef": item.as_dict()["timelineVersionRef"],
+                    "versionNumber": item.as_dict()["versionNumber"],
+                    "payloadDigest": item.as_dict()["payloadDigest"],
+                    "parentTimelineVersionRef": item.as_dict()[
+                        "parentTimelineVersionRef"
+                    ],
+                    "parentTimelineVersionDigest": item.as_dict()[
+                        "parentTimelineVersionDigest"
+                    ],
+                }
+                for item in restored["versionHistory"]
+            ],
+            "stale": False,
+            "publicationAllowed": False,
+            "evidenceRevision": evidence_revision,
+            "idempotentReplay": replayed,
+        }
+        if edit_operation is not None:
+            result["editOperation"] = deepcopy(dict(edit_operation))
+        return result
+
+    @staticmethod
+    def _editing_frame_rate(value: Any) -> dict[str, int]:
+        if isinstance(value, bool):
+            raise RepositoryUnavailableError("ShotGraph frameRate is invalid")
+        if isinstance(value, int):
+            numerator, denominator = value, 1
+        elif isinstance(value, Mapping) and set(value) == {
+            "numerator",
+            "denominator",
+        }:
+            numerator, denominator = value["numerator"], value["denominator"]
+        else:
+            raise RepositoryUnavailableError("ShotGraph frameRate is invalid")
+        if (
+            isinstance(numerator, bool)
+            or not isinstance(numerator, int)
+            or isinstance(denominator, bool)
+            or not isinstance(denominator, int)
+            or numerator < 1
+            or denominator < 1
+        ):
+            raise RepositoryUnavailableError("ShotGraph frameRate is invalid")
+        common = gcd(numerator, denominator)
+        return {
+            "numerator": numerator // common,
+            "denominator": denominator // common,
+        }
+
+    @classmethod
+    def _server_output_profile(cls, graph: Mapping[str, Any]) -> dict[str, Any]:
+        """Derive the only T1 OutputProfileBinding from current ShotGraph facts."""
+
+        output = graph.get("output")
+        if not isinstance(output, Mapping):
+            raise RepositoryUnavailableError("ShotGraph output is invalid")
+        frame_rate = cls._editing_frame_rate(output.get("frameRate"))
+        width = _positive_version(output.get("width"), "canvasWidth")
+        height = _positive_version(output.get("height"), "canvasHeight")
+        aspect_common = gcd(width, height)
+        output_digest = _digest(dict(output))
+        return build_output_profile_binding(
+            {
+                "outputProfileRef": f"m13-output-profile-{output_digest[:32]}",
+                "outputProfileDigest": output_digest,
+                "canvasWidth": width,
+                "canvasHeight": height,
+                "frameRate": frame_rate,
+                "pixelAspectRatio": {"numerator": 1, "denominator": 1},
+                "displayAspectRatio": {
+                    "numerator": width // aspect_common,
+                    "denominator": height // aspect_common,
+                },
+            }
+        )
+
+    @staticmethod
+    def _timeline_create_batch_request_digest(
+        context: Mapping[str, Any],
+        timeline: EditingTimeline | Mapping[str, Any],
+        timeline_version: EditingTimelineVersion | Mapping[str, Any],
+        tracks: Sequence[EditingTimelineTrack | Mapping[str, Any]],
+        clips: Sequence[EditingTimelineClip | Mapping[str, Any]],
+    ) -> str:
+        """Seal the initial journal batch using only persisted/current facts.
+
+        The Timeline ref embeds the digest of the exact client create command.
+        Everything else here can be reconstructed during restart restore, so a
+        coordinated SQL rewrite of requestDigest and the slot keys cannot mint
+        a different create batch without also changing sealed authority data.
+        """
+
+        def mapping(value: Any) -> dict[str, Any]:
+            if hasattr(value, "as_dict"):
+                value = value.as_dict()
+            if not isinstance(value, Mapping):
+                raise RepositoryUnavailableError(
+                    "Timeline create batch payload is invalid"
+                )
+            return deepcopy(dict(value))
+
+        root = mapping(timeline)
+        version = mapping(timeline_version)
+        track_payloads = sorted(
+            (mapping(item) for item in tracks),
+            key=lambda item: (item.get("order", -1), item.get("trackRef", "")),
+        )
+        clip_payloads = sorted(
+            (mapping(item) for item in clips),
+            key=lambda item: item.get("clipRef", ""),
+        )
+        run = context.get("run")
+        graph = context.get("executableShotGraph")
+        if not isinstance(run, Mapping) or not isinstance(graph, Mapping):
+            raise RepositoryUnavailableError(
+                "Timeline create authority context is invalid"
+            )
+        return _digest(
+            {
+                "schemaVersion": TIMELINE_EDIT_CREATE_REQUEST_SCHEMA_VERSION,
+                "timelineRef": root.get("timelineRef"),
+                "timelineDigest": root.get("payloadDigest"),
+                "timelineVersionRef": version.get("timelineVersionRef"),
+                "timelineVersionDigest": version.get("payloadDigest"),
+                "trackDigests": [item.get("payloadDigest") for item in track_payloads],
+                "clipDigests": [item.get("payloadDigest") for item in clip_payloads],
+                "workspaceRef": root.get("workspaceRef"),
+                "productionRunRef": root.get("productionRunRef"),
+                "expectedRunVersion": run.get("version"),
+                "runDigest": run.get("payloadDigest"),
+                "scriptVersionRef": context.get("scriptVersionRef"),
+                "scriptVersionDigest": context.get("scriptVersionDigest"),
+                "storyboardVersionRef": context.get("storyboardVersionRef"),
+                "storyboardVersionDigest": context.get("storyboardVersionDigest"),
+                "executableShotGraphDigest": graph.get("payloadDigest"),
+            }
+        )
+
+    def create_timeline(self, command: Mapping[str, Any]) -> dict[str, Any]:
+        fields = {
+            "workspaceRef",
+            "productionRunRef",
+            "operationRef",
+            "idempotencyKey",
+            "expectedRunVersion",
+        }
+        if not isinstance(command, Mapping) or set(command) != fields:
+            raise EpisodeProductionError(
+                "command fields do not match the M13 Timeline create contract"
+            )
+        workspace = _required_ref(command.get("workspaceRef"), "workspaceRef")
+        run_ref = _required_ref(
+            command.get("productionRunRef"), "productionRunRef"
+        )
+        operation_ref = _required_ref(command.get("operationRef"), "operationRef")
+        client_key = _idempotency_key(command.get("idempotencyKey"))
+        expected_run_version = _positive_version(
+            command.get("expectedRunVersion"), "expectedRunVersion"
+        )
+        context = self._timeline_authority_context(
+            workspace,
+            run_ref,
+            expected_run_version=expected_run_version,
+        )
+        run = context["run"]
+        graph = context["executableShotGraph"]
+        output = graph.get("output")
+        if not isinstance(output, Mapping):
+            raise RepositoryUnavailableError("ShotGraph output is invalid")
+        frame_rate = self._editing_frame_rate(output.get("frameRate"))
+        width = _positive_version(output.get("width"), "canvasWidth")
+        height = _positive_version(output.get("height"), "canvasHeight")
+        duration = _positive_version(output.get("totalFrames"), "durationFrames")
+        pixel_aspect = {"numerator": 1, "denominator": 1}
+        aspect_common = gcd(width, height)
+        display_aspect = {
+            "numerator": width // aspect_common,
+            "denominator": height // aspect_common,
+        }
+        output_digest = _digest(dict(output))
+        create_operation_digest = _digest(
+            {
+                "schemaVersion": TIMELINE_EDIT_CREATE_REQUEST_SCHEMA_VERSION,
+                "workspaceRef": workspace,
+                "productionRunRef": run_ref,
+                "operationRef": operation_ref,
+                "idempotencyKey": client_key,
+                "expectedRunVersion": expected_run_version,
+                "runDigest": run["payloadDigest"],
+                "scriptVersionRef": context["scriptVersionRef"],
+                "scriptVersionDigest": context["scriptVersionDigest"],
+                "storyboardVersionRef": context["storyboardVersionRef"],
+                "storyboardVersionDigest": context["storyboardVersionDigest"],
+                "executableShotGraphDigest": graph["payloadDigest"],
+                "outputProfileDigest": output_digest,
+            }
+        )
+        timeline_ref = f"m13-timeline-{create_operation_digest}"
+        timeline_version_ref = f"{timeline_ref}-version-1"
+        existing_matches = [
+            item
+            for item in context["snapshot"].records
+            if item.get("recordKind") == "Timeline"
+            and item.get("recordRef") == timeline_ref
+        ]
+        if len(existing_matches) > 1:
+            raise RepositoryUnavailableError(
+                "Timeline create replay authority is ambiguous"
+            )
+        if existing_matches:
+            existing = existing_matches[0]
+            payload = existing.get("payload")
+            if (
+                existing.get("recordKind") != "Timeline"
+                or existing.get("recordVersion") != 1
+                or not isinstance(payload, Mapping)
+                or payload.get("schemaVersion")
+                != EDITING_TIMELINE_SCHEMA_VERSION
+                or existing.get("recordRef") != payload.get("timelineRef")
+                or existing.get("payloadDigest") != payload.get("payloadDigest")
+            ):
+                raise RepositoryUnavailableError(
+                    "Timeline create replay evidence is invalid"
+                )
+            initial_versions = [
+                item
+                for item in context["snapshot"].records
+                if item.get("recordKind") == "TimelineVersion"
+                and item.get("recordRef") == timeline_version_ref
+                and item.get("recordVersion") == 1
+            ]
+            if len(initial_versions) != 1:
+                raise RepositoryUnavailableError(
+                    "Timeline create version replay evidence is invalid"
+                )
+            restored = self._restore_editing_timeline(
+                context,
+                timeline_version_ref=timeline_version_ref,
+            )
+            restored = {
+                **restored,
+                "versionHistory": (restored["timelineVersion"],),
+            }
+            return self._editing_projection(
+                restored,
+                evidence_revision=context["snapshot"].revisionToken,
+                replayed=True,
+            )
+        if self._timeline_authority_records_or_facts(context["snapshot"]):
+            raise IdempotencyConflictError(
+                "Timeline authority already exists; T1 has no upgrade operation"
+            )
+        created_at = self._clock()
+        timeline = validate_editing_timeline(
+            build_editing_timeline(
+                {
+                    "timelineRef": timeline_ref,
+                    "workspaceRef": workspace,
+                    "projectRef": run["projectRef"],
+                    "seriesRef": run["seriesRef"],
+                    "episodeRef": run["episodeRef"],
+                    "productionRunRef": run_ref,
+                    "createdAt": created_at,
+                }
+            )
+        )
+        lane_policies = {
+            "VIDEO": "LAYERED_Z_ORDER",
+            "AUDIO": "MIX",
+            "SUBTITLE": "LAYERED",
+            "EFFECT": "LAYERED_Z_ORDER",
+        }
+        tracks = tuple(
+            EditingTimelineTrack.from_mapping(
+                build_editing_timeline_track(
+                    {
+                        "trackRef": f"{timeline_ref}-track-{kind.lower()}",
+                        "timelineVersionRef": timeline_version_ref,
+                        "trackKind": kind,
+                        "order": order,
+                        "enabled": True,
+                        "lanePolicy": lane_policies[kind],
+                    }
+                )
+            )
+            for order, kind in enumerate(EDITING_TIMELINE_TRACK_KINDS)
+        )
+        output_profile = self._server_output_profile(graph)
+        timeline_version = validate_editing_timeline_version(
+            build_editing_timeline_version(
+                {
+                    "timelineRef": timeline_ref,
+                    "timelineVersionRef": timeline_version_ref,
+                    "versionNumber": 1,
+                    "parentTimelineVersionRef": None,
+                    "parentTimelineVersionDigest": None,
+                    "workspaceRef": workspace,
+                    "projectRef": run["projectRef"],
+                    "seriesRef": run["seriesRef"],
+                    "episodeRef": run["episodeRef"],
+                    "productionRunRef": run_ref,
+                    "scriptVersionRef": context["scriptVersionRef"],
+                    "scriptVersionDigest": context["scriptVersionDigest"],
+                    "storyboardVersionRef": context["storyboardVersionRef"],
+                    "storyboardVersionDigest": context[
+                        "storyboardVersionDigest"
+                    ],
+                    "frameRate": frame_rate,
+                    "canvasWidth": width,
+                    "canvasHeight": height,
+                    "pixelAspectRatio": pixel_aspect,
+                    "displayAspectRatio": display_aspect,
+                    "durationFrames": duration,
+                    "safeArea": {
+                        "leftPixels": 0,
+                        "topPixels": 0,
+                        "rightPixels": 0,
+                        "bottomPixels": 0,
+                    },
+                    "trackRefs": [item.as_dict()["trackRef"] for item in tracks],
+                    "createdAt": created_at,
+                },
+                output_profile_bindings=(output_profile,),
+                tracks=tracks,
+                clips=(),
+            )
+        )
+        created = validate_editing_timeline_snapshot(
+            timeline_version,
+            tracks,
+            (),
+            timeline=timeline,
+            expected_script={
+                "scriptVersionRef": context["scriptVersionRef"],
+                "scriptVersionDigest": context["scriptVersionDigest"],
+            },
+            expected_storyboard={
+                "storyboardVersionRef": context["storyboardVersionRef"],
+                "storyboardVersionDigest": context["storyboardVersionDigest"],
+            },
+        )
+        request_digest = self._timeline_create_batch_request_digest(
+            context,
+            timeline,
+            created.timeline_version,
+            created.tracks,
+            created.clips,
+        )
+        records = [
+            self._timeline_evidence_record(
+                workspace=workspace,
+                run_ref=run_ref,
+                record_kind="Timeline",
+                record_ref=timeline_ref,
+                record_version=1,
+                client_key=request_digest,
+                slot="timeline-root",
+                request_digest=request_digest,
+                created_at=created_at,
+                payload=timeline.as_dict(),
+            ),
+            self._timeline_evidence_record(
+                workspace=workspace,
+                run_ref=run_ref,
+                record_kind="TimelineVersion",
+                record_ref=timeline_version_ref,
+                record_version=1,
+                client_key=request_digest,
+                slot="timeline-version",
+                request_digest=request_digest,
+                created_at=created_at,
+                payload=created.timeline_version.as_dict(),
+            ),
+        ]
+        records.extend(
+            self._timeline_evidence_record(
+                workspace=workspace,
+                run_ref=run_ref,
+                record_kind="TimelineTrack",
+                record_ref=item.as_dict()["trackRef"],
+                record_version=1,
+                client_key=request_digest,
+                slot=f"track:{index}",
+                request_digest=request_digest,
+                created_at=created_at,
+                payload=item.as_dict(),
+            )
+            for index, item in enumerate(
+                sorted(
+                    created.tracks,
+                    key=lambda track: (
+                        track.as_dict()["order"],
+                        track.as_dict()["trackRef"],
+                    ),
+                )
+            )
+        )
+        journal_head = self._stable_record_head(
+            workspace,
+            run_ref,
+            context["snapshot"].revisionToken,
+        )
+        _, replayed = self.evidence.append_records(
+            records,
+            expected_record_journal_head=journal_head,
+        )
+        result_snapshot = validated_evidence_snapshot(
+            self.evidence.read_snapshot(workspace, run_ref),
+            workspace_ref=workspace,
+            run_ref=run_ref,
+        )
+        result_context = {**context, "snapshot": result_snapshot}
+        restored = self._restore_editing_timeline(
+            result_context,
+            timeline_version_ref=timeline_version_ref,
+        )
+        return self._editing_projection(
+            restored,
+            evidence_revision=result_snapshot.revisionToken,
+            replayed=replayed,
+        )
+
+    def edit_timeline(self, command: Mapping[str, Any]) -> dict[str, Any]:
+        fields = {
+            "workspaceRef",
+            "productionRunRef",
+            "operationRef",
+            "idempotencyKey",
+            "expectedRunVersion",
+            "parentTimelineVersionRef",
+            "parentTimelineVersionDigest",
+            "editCommand",
+        }
+        if not isinstance(command, Mapping) or set(command) != fields:
+            raise EpisodeProductionError(
+                "command fields do not match the M13 Timeline edit contract"
+            )
+        workspace = _required_ref(command.get("workspaceRef"), "workspaceRef")
+        run_ref = _required_ref(
+            command.get("productionRunRef"), "productionRunRef"
+        )
+        operation_ref = _required_ref(command.get("operationRef"), "operationRef")
+        client_key = _idempotency_key(command.get("idempotencyKey"))
+        expected_run_version = _positive_version(
+            command.get("expectedRunVersion"), "expectedRunVersion"
+        )
+        parent_ref = _required_ref(
+            command.get("parentTimelineVersionRef"),
+            "parentTimelineVersionRef",
+        )
+        parent_digest = command.get("parentTimelineVersionDigest")
+        if not _is_sha256(parent_digest):
+            raise EpisodeProductionError(
+                "parentTimelineVersionDigest is invalid"
+            )
+        edit_input = command.get("editCommand")
+        if not isinstance(edit_input, Mapping) or set(edit_input) != {
+            "operation",
+            "arguments",
+        }:
+            raise EpisodeProductionError("editCommand fields are invalid")
+        edit_input = deepcopy(dict(edit_input))
+        context = self._timeline_authority_context(
+            workspace,
+            run_ref,
+            expected_run_version=expected_run_version,
+        )
+        request_digest = _digest(
+            {
+                "schemaVersion": TIMELINE_EDIT_SUCCESSOR_REQUEST_SCHEMA_VERSION,
+                "workspaceRef": workspace,
+                "productionRunRef": run_ref,
+                "operationRef": operation_ref,
+                "idempotencyKey": client_key,
+                "expectedRunVersion": expected_run_version,
+                "parentTimelineVersionRef": parent_ref,
+                "parentTimelineVersionDigest": parent_digest,
+                "editCommand": edit_input,
+                "runDigest": context["run"]["payloadDigest"],
+                "scriptVersionRef": context["scriptVersionRef"],
+                "scriptVersionDigest": context["scriptVersionDigest"],
+                "storyboardVersionRef": context["storyboardVersionRef"],
+                "storyboardVersionDigest": context["storyboardVersionDigest"],
+            }
+        )
+        replay_key = self._timeline_record_idempotency_key(
+            client_key, "edit-operation"
+        )
+        existing = self.evidence.get_record_by_idempotency_key(
+            workspace, run_ref, replay_key
+        )
+        if existing is not None:
+            if existing.get("requestDigest") != request_digest:
+                raise IdempotencyConflictError(
+                    "Timeline edit idempotency content changed"
+                )
+            if existing.get("recordKind") != "TimelineEditOperation":
+                raise RepositoryUnavailableError(
+                    "Timeline edit replay evidence is invalid"
+                )
+            edit_operation = EditingTimelineEditCommand.from_mapping(
+                existing.get("payload")
+            ).as_dict()
+            restored = self._restore_editing_timeline(
+                context,
+                timeline_version_ref=edit_operation["newTimelineVersionRef"],
+            )
+            selected_version_number = restored[
+                "timelineVersion"
+            ].as_dict()["versionNumber"]
+            restored = {
+                **restored,
+                "versionHistory": tuple(
+                    item
+                    for item in restored["versionHistory"]
+                    if item.as_dict()["versionNumber"]
+                    <= selected_version_number
+                ),
+            }
+            return self._editing_projection(
+                restored,
+                evidence_revision=context["snapshot"].revisionToken,
+                replayed=True,
+                edit_operation=edit_operation,
+            )
+
+        parent = self._restore_editing_timeline(
+            context,
+            timeline_version_ref=parent_ref,
+        )
+        parent_version = parent["timelineVersion"]
+        parent_mapping = parent_version.as_dict()
+        latest = parent["versionHistory"][-1].as_dict()
+        if (
+            parent_mapping["payloadDigest"] != parent_digest
+            or latest["timelineVersionRef"] != parent_ref
+            or latest["payloadDigest"] != parent_digest
+        ):
+            raise StaleInputError("Timeline edit parent is stale")
+        next_number = parent_mapping["versionNumber"] + 1
+        new_version_ref = (
+            f"{parent_mapping['timelineRef']}-version-{next_number}"
+        )
+        created_at = self._clock()
+        edit_command = EditingTimelineEditCommand.from_mapping(
+            build_timeline_edit_command(
+                {
+                    "operationRef": operation_ref,
+                    "idempotencyKey": client_key,
+                    "parentTimelineVersionRef": parent_ref,
+                    "parentTimelineVersionDigest": parent_digest,
+                    "newTimelineVersionRef": new_version_ref,
+                    "operation": edit_input["operation"],
+                    "arguments": edit_input["arguments"],
+                    "createdAt": created_at,
+                }
+            )
+        )
+        edit_mapping = edit_command.as_dict()
+        if edit_mapping["operation"] == "SET_OUTPUT_PROFILES" and edit_mapping[
+            "arguments"
+        ]["outputProfileBindings"] != [
+            self._server_output_profile(context["executableShotGraph"])
+        ]:
+            raise StaleInputError(
+                "OutputProfileBinding is not resolvable from current ShotGraph"
+            )
+        edited = apply_timeline_edit(
+            parent_version,
+            parent["tracks"],
+            parent["clips"],
+            edit_command,
+            existing_timeline_versions=parent["versionHistory"],
+            timeline=parent["timeline"],
+            source_resolver=self._timeline_source_resolver(
+                context["snapshot"],
+                expected_script_version_ref=context["scriptVersionRef"],
+                expected_script_version_digest=context["scriptVersionDigest"],
+                expected_timeline_frame_rate=parent_mapping["frameRate"],
+                expected_root_digest=context["run"]["payloadDigest"],
+                expected_graph_version_ref=context["executableShotGraph"][
+                    "executableShotGraphVersionRef"
+                ],
+                expected_graph_digest=context["executableShotGraph"][
+                    "payloadDigest"
+                ],
+            ),
+            expected_script={
+                "scriptVersionRef": context["scriptVersionRef"],
+                "scriptVersionDigest": context["scriptVersionDigest"],
+            },
+            expected_storyboard={
+                "storyboardVersionRef": context["storyboardVersionRef"],
+                "storyboardVersionDigest": context["storyboardVersionDigest"],
+            },
+        )
+        records = [
+            self._timeline_evidence_record(
+                workspace=workspace,
+                run_ref=run_ref,
+                record_kind="TimelineEditOperation",
+                record_ref=operation_ref,
+                record_version=1,
+                client_key=client_key,
+                slot="edit-operation",
+                request_digest=request_digest,
+                created_at=created_at,
+                payload=edited.edit_command.as_dict(),
+            ),
+            self._timeline_evidence_record(
+                workspace=workspace,
+                run_ref=run_ref,
+                record_kind="TimelineVersion",
+                record_ref=new_version_ref,
+                record_version=next_number,
+                client_key=client_key,
+                slot="timeline-version",
+                request_digest=request_digest,
+                created_at=created_at,
+                payload=edited.timeline_version.as_dict(),
+            ),
+        ]
+        records.extend(
+            self._timeline_evidence_record(
+                workspace=workspace,
+                run_ref=run_ref,
+                record_kind="TimelineTrack",
+                record_ref=item.as_dict()["trackRef"],
+                record_version=next_number,
+                client_key=client_key,
+                slot=f"track:{index}",
+                request_digest=request_digest,
+                created_at=created_at,
+                payload=item.as_dict(),
+            )
+            for index, item in enumerate(
+                sorted(
+                    edited.tracks,
+                    key=lambda track: (
+                        track.as_dict()["order"],
+                        track.as_dict()["trackRef"],
+                    ),
+                )
+            )
+        )
+        records.extend(
+            self._timeline_evidence_record(
+                workspace=workspace,
+                run_ref=run_ref,
+                record_kind="TimelineClip",
+                record_ref=item.as_dict()["clipRef"],
+                record_version=next_number,
+                client_key=client_key,
+                slot=f"clip:{index}",
+                request_digest=request_digest,
+                created_at=created_at,
+                payload=item.as_dict(),
+            )
+            for index, item in enumerate(
+                sorted(
+                    edited.clips,
+                    key=lambda clip: clip.as_dict()["clipRef"],
+                )
+            )
+        )
+        journal_head = self._stable_record_head(
+            workspace,
+            run_ref,
+            context["snapshot"].revisionToken,
+        )
+        _, replayed = self.evidence.append_records(
+            records,
+            expected_record_journal_head=journal_head,
+        )
+        result_snapshot = validated_evidence_snapshot(
+            self.evidence.read_snapshot(workspace, run_ref),
+            workspace_ref=workspace,
+            run_ref=run_ref,
+        )
+        result_context = {**context, "snapshot": result_snapshot}
+        restored = self._restore_editing_timeline(
+            result_context,
+            timeline_version_ref=new_version_ref,
+        )
+        return self._editing_projection(
+            restored,
+            evidence_revision=result_snapshot.revisionToken,
+            replayed=replayed,
+            edit_operation=edited.edit_command.as_dict(),
+        )
+
+    def get_timeline(self, workspace_ref: str, run_ref: str) -> dict[str, Any]:
+        workspace = _required_ref(workspace_ref, "workspaceRef")
+        production_run = _required_ref(run_ref, "productionRunRef")
+        context = self._timeline_authority_context(
+            workspace,
+            production_run,
+            expected_run_version=None,
+        )
+        restored = self._restore_editing_timeline(context)
+        return self._editing_projection(
+            restored,
+            evidence_revision=context["snapshot"].revisionToken,
+            replayed=False,
+        )
+
+    def get_timeline_versions(
+        self, workspace_ref: str, run_ref: str
+    ) -> dict[str, Any]:
+        workspace = _required_ref(workspace_ref, "workspaceRef")
+        production_run = _required_ref(run_ref, "productionRunRef")
+        context = self._timeline_authority_context(
+            workspace,
+            production_run,
+            expected_run_version=None,
+        )
+        restored = self._restore_editing_timeline(context)
+        return {
+            "timeline": restored["timeline"].as_dict(),
+            "versions": [
+                item.as_dict() for item in restored["versionHistory"]
+            ],
+            "stale": False,
+            "publicationAllowed": False,
+            "evidenceRevision": context["snapshot"].revisionToken,
+        }
 
     @staticmethod
     def _snapshot_record_payload(
@@ -2480,6 +5023,14 @@ class K2DeliveryService:
         )
         if run.get("version") != normalized["expectedRunVersion"]:
             raise StaleInputError("EpisodeProductionRun version changed")
+        authority_snapshot = validated_evidence_snapshot(
+            self.evidence.read_snapshot(workspace, run_ref),
+            workspace_ref=workspace,
+            run_ref=run_ref,
+        )
+        self._reject_legacy_timeline_write_if_editing_authority(
+            authority_snapshot
+        )
         if self.composition is None:
             raise WorkerUnavailableError("composition execution is not configured")
 
@@ -3053,6 +5604,14 @@ class K2DeliveryService:
         workspace = _required_ref(command.get("workspaceRef"), "workspaceRef")
         run_ref = _required_ref(command.get("productionRunRef"), "productionRunRef")
         client_key = _idempotency_key(command.get("idempotencyKey"))
+        authority_snapshot = validated_evidence_snapshot(
+            self.evidence.read_snapshot(workspace, run_ref),
+            workspace_ref=workspace,
+            run_ref=run_ref,
+        )
+        self._reject_legacy_timeline_write_if_editing_authority(
+            authority_snapshot
+        )
         verified = self.media.verify_media_current(workspace, run_ref)
         root = verified["root"]
         graph = verified["executableShotGraph"]
