@@ -17,6 +17,7 @@ from typing import Any, Mapping
 from .digests import (
     DigestError,
     IMAGE_PIXEL_DIGEST_SPEC,
+    decoded_frame_pixel_digest_metadata,
     file_digest,
     image_digest_metadata,
     video_digest_metadata,
@@ -30,6 +31,8 @@ class RenderArtifactError(RuntimeError):
 _HEX_DIGEST = re.compile(r"[0-9a-f]{64}")
 _PREFIXED_DIGEST = re.compile(r"sha256:[0-9a-f]{64}")
 _GLYPH_COMPOSER_IDENTITY = "v3.deterministic-glyph-reveal-ffmpeg.v1"
+_GLYPH_RENDERER_IDENTITY_V2 = "v3.deterministic-glyph-reveal-ffmpeg"
+_GLYPH_RENDERER_VERSION_V2 = "2"
 _GLYPH_BLEND_MODE = "GRAZING_LIGHT_RELIEF"
 _SUPPORTED_GLYPH_BASE_PIXEL_FORMATS = {"yuv420p", "yuv422p", "yuv444p"}
 
@@ -321,6 +324,76 @@ def _secure_output_directory(root: Path, directory: Path) -> Path:
     return resolved
 
 
+def _publish_glyph_output_v2(
+    *,
+    root: Path,
+    directory: Path,
+    source: Path,
+    output_name: str,
+) -> Path:
+    """Publish through held directory descriptors without reopening path parts."""
+
+    try:
+        relative = directory.relative_to(root)
+    except ValueError as exc:
+        raise RenderArtifactError("glyph output escaped artifact root") from exc
+    if (
+        not relative.parts
+        or any(part in {"", ".", ".."} for part in relative.parts)
+        or not output_name
+        or Path(output_name).name != output_name
+        or output_name in {".", ".."}
+    ):
+        raise RenderArtifactError("glyph output path is invalid")
+    no_follow = getattr(os, "O_NOFOLLOW", None)
+    directory_flag = getattr(os, "O_DIRECTORY", None)
+    if no_follow is None or directory_flag is None:
+        raise RenderArtifactError(
+            "glyph output no-follow directory support is unavailable"
+        )
+    flags = os.O_RDONLY | no_follow | directory_flag
+    if hasattr(os, "O_CLOEXEC"):
+        flags |= os.O_CLOEXEC
+    descriptors: list[int] = []
+    try:
+        current_descriptor = os.open(root, flags)
+        descriptors.append(current_descriptor)
+        for part in relative.parts:
+            try:
+                os.mkdir(part, mode=0o700, dir_fd=current_descriptor)
+            except FileExistsError:
+                pass
+            next_descriptor = os.open(
+                part,
+                flags,
+                dir_fd=current_descriptor,
+            )
+            descriptors.append(next_descriptor)
+            current_descriptor = next_descriptor
+        try:
+            os.link(
+                source,
+                output_name,
+                dst_dir_fd=current_descriptor,
+                follow_symlinks=False,
+            )
+        except FileExistsError as exc:
+            raise RenderArtifactError("glyph output already exists") from exc
+    except RenderArtifactError:
+        raise
+    except (OSError, TypeError, NotImplementedError) as exc:
+        raise RenderArtifactError(
+            "glyph output could not be published atomically"
+        ) from exc
+    finally:
+        for descriptor in reversed(descriptors):
+            try:
+                os.close(descriptor)
+            except OSError:
+                pass
+    return directory / output_name
+
+
 def _decoded_opaque_grayscale_png_pixels(
     path: Path,
     *,
@@ -558,6 +631,74 @@ def _stage_ranges(start: int, end: int, count: int) -> list[tuple[int, int | Non
     return result
 
 
+def _explicit_stage_ranges_v2(
+    value: object,
+    *,
+    masks: list[Mapping[str, Any]],
+    frame_range_start: int,
+    frame_range_end: int,
+) -> list[tuple[int, int | None]]:
+    """Validate a zero-based, end-exclusive schedule without deriving durations."""
+
+    if (
+        not isinstance(value, list)
+        or not value
+        or not isinstance(masks, list)
+        or len(value) != len(masks)
+        or any(not isinstance(mask, Mapping) for mask in masks)
+    ):
+        raise RenderArtifactError("glyph reveal schedule count is invalid")
+    ranges: list[tuple[int, int | None]] = []
+    previous_end = frame_range_start
+    for index, raw_entry in enumerate(value):
+        entry = _closed_mapping(
+            raw_entry,
+            {
+                "revealOrdinal",
+                "maskAssetVersionRef",
+                "startFrameInclusive",
+                "endFrameExclusive",
+            },
+            label=f"glyph reveal schedule {index}",
+        )
+        ordinal = _integer(
+            entry["revealOrdinal"],
+            label=f"glyph reveal schedule {index} ordinal",
+            minimum=1,
+        )
+        if ordinal != index + 1:
+            raise RenderArtifactError("glyph reveal schedule ordinals are invalid")
+        mask_ref = entry["maskAssetVersionRef"]
+        mask_ordinal = _integer(
+            masks[index].get("revealOrdinal"),
+            label=f"glyph mask {index} reveal ordinal",
+            minimum=1,
+        )
+        if (
+            not isinstance(mask_ref, str)
+            or not mask_ref
+            or mask_ref != masks[index].get("assetVersionRef")
+            or mask_ordinal != ordinal
+        ):
+            raise RenderArtifactError("glyph reveal schedule mask binding is invalid")
+        start = _integer(
+            entry["startFrameInclusive"],
+            label=f"glyph reveal schedule {index} start",
+        )
+        end = _integer(
+            entry["endFrameExclusive"],
+            label=f"glyph reveal schedule {index} end",
+            minimum=1,
+        )
+        if start != previous_end or end <= start or end > frame_range_end:
+            raise RenderArtifactError("glyph reveal schedule intervals are invalid")
+        previous_end = end
+        ranges.append((start, None if index == len(value) - 1 else end - 1))
+    if previous_end != frame_range_end:
+        raise RenderArtifactError("glyph reveal schedule does not cover frame range")
+    return ranges
+
+
 def _glyph_filter_graph(
     *,
     stage_count: int,
@@ -740,6 +881,87 @@ class DeterministicFfmpegComposer:
             "ffprobeVersion": ffprobe_version,
             "publicationAllowed": False,
             "outputDigest": output_digest,
+        }
+
+    def _glyph_artifact_v2(
+        self,
+        path: Path,
+        *,
+        requirement_ref: str,
+        requirement_digest: str,
+        execution_request_ref: str,
+        execution_request_digest: str,
+        ffmpeg_path: Path,
+        ffprobe_path: Path,
+        ffmpeg_identity: str,
+        width: int,
+        height: int,
+        frame_rate: int,
+        frame_count: int,
+        pixel_format: str,
+    ) -> dict[str, Any]:
+        """Measure one v2 artifact without reinterpreting the frozen v1 record."""
+
+        _validate_glyph_output(
+            path,
+            ffprobe_path=ffprobe_path,
+            width=width,
+            height=height,
+            frame_rate=frame_rate,
+            frame_count=frame_count,
+            pixel_format=pixel_format,
+        )
+        before = _file_state(path)
+        try:
+            output_digest = decoded_frame_pixel_digest_metadata(
+                path,
+                ffmpeg_path=ffmpeg_path,
+                ffprobe_path=ffprobe_path,
+            )
+        except DigestError as exc:
+            raise RenderArtifactError("glyph output digest failed") from exc
+        if _file_state(path) != before:
+            raise RenderArtifactError("glyph output changed during digest")
+        if (
+            output_digest.get("width") != width
+            or output_digest.get("height") != height
+            or output_digest.get("frameCount") != frame_count
+        ):
+            raise RenderArtifactError("glyph output digest media contract is invalid")
+        output_digest["frameRate"] = frame_rate
+        runtime_payload = json.dumps(
+            {
+                "ffmpegIdentity": ffmpeg_identity,
+                "rendererIdentity": _GLYPH_RENDERER_IDENTITY_V2,
+                "rendererVersion": _GLYPH_RENDERER_VERSION_V2,
+            },
+            ensure_ascii=True,
+            sort_keys=True,
+            separators=(",", ":"),
+        )
+        runtime_evidence_digest = (
+            "sha256:" + sha256(runtime_payload.encode("utf-8")).hexdigest()
+        )
+        return {
+            "internalPath": str(path),
+            "outputStorageKey": str(path.relative_to(self.artifact_root)),
+            "outputByteSize": path.stat().st_size,
+            "outputMediaProbe": {
+                "width": width,
+                "height": height,
+                "frameCount": frame_count,
+                "frameRate": frame_rate,
+            },
+            "outputDigest": output_digest,
+            "rendererIdentity": _GLYPH_RENDERER_IDENTITY_V2,
+            "rendererVersion": _GLYPH_RENDERER_VERSION_V2,
+            "ffmpegIdentity": ffmpeg_identity,
+            "runtimeEvidenceDigest": runtime_evidence_digest,
+            "requirementRef": requirement_ref,
+            "requirementDigest": requirement_digest,
+            "executionRequestRef": execution_request_ref,
+            "executionRequestDigest": execution_request_digest,
+            "publicationAllowed": False,
         }
 
     def compose_glyph_reveal(
@@ -1115,6 +1337,401 @@ class DeterministicFfmpegComposer:
                 ) from exc
             artifact["internalPath"] = str(destination)
             artifact["storageKey"] = str(
+                destination.relative_to(self.artifact_root)
+            )
+            return artifact
+
+    def compose_glyph_reveal_v2(
+        self,
+        *,
+        workspace_ref: str,
+        run_ref: str,
+        requirement_ref: str,
+        requirement_digest: str,
+        execution_request_ref: str,
+        execution_request_digest: str,
+        base_plate: Mapping[str, Any],
+        masks: list[Mapping[str, Any]],
+        frame_range_start: int,
+        frame_range_end: int,
+        reveal_schedule: list[Mapping[str, Any]],
+        composite_params: Mapping[str, Any],
+        output: Mapping[str, Any],
+    ) -> dict[str, Any]:
+        """Composite a v2 glyph reveal from an explicit zero-based schedule.
+
+        ``frame_range_end`` is exclusive.  V3 never derives stage durations;
+        the final cumulative mask remains active through the base-plate tail.
+        """
+
+        if not isinstance(workspace_ref, str) or not workspace_ref:
+            raise RenderArtifactError("glyph workspace reference is invalid")
+        if not isinstance(run_ref, str) or not run_ref:
+            raise RenderArtifactError("glyph run reference is invalid")
+        if not isinstance(requirement_ref, str) or not requirement_ref:
+            raise RenderArtifactError("glyph requirement reference is invalid")
+        if not isinstance(execution_request_ref, str) or not execution_request_ref:
+            raise RenderArtifactError(
+                "glyph execution request reference is invalid"
+            )
+        if (
+            not isinstance(requirement_digest, str)
+            or _HEX_DIGEST.fullmatch(requirement_digest) is None
+        ):
+            raise RenderArtifactError("glyph requirement digest is invalid")
+        if (
+            not isinstance(execution_request_digest, str)
+            or _HEX_DIGEST.fullmatch(execution_request_digest) is None
+        ):
+            raise RenderArtifactError("glyph execution request digest is invalid")
+        if not isinstance(masks, list) or not masks:
+            raise RenderArtifactError("glyph mask count is invalid")
+        start = _integer(frame_range_start, label="glyph frame range start")
+        end = _integer(frame_range_end, label="glyph frame range end", minimum=1)
+        if end <= start:
+            raise RenderArtifactError("glyph frame range is invalid")
+        stage_ranges = _explicit_stage_ranges_v2(
+            reveal_schedule,
+            masks=masks,
+            frame_range_start=start,
+            frame_range_end=end,
+        )
+        count = len(stage_ranges)
+
+        base_record = _closed_mapping(
+            base_plate,
+            {"storageKey", "fileDigest"},
+            label="glyph base plate",
+        )
+        output_record = _closed_mapping(
+            output,
+            {"width", "height", "frameRate", "totalFrames"},
+            label="glyph output",
+        )
+        ffmpeg_path = _runtime_path("ffmpeg")
+        ffprobe_path = _runtime_path("ffprobe")
+        ffmpeg_identity = _runtime_version(ffmpeg_path).strip()
+        if (
+            not ffmpeg_identity
+            or len(ffmpeg_identity) > 500
+            or any(
+                ord(character) < 32 or ord(character) == 127
+                for character in ffmpeg_identity
+            )
+        ):
+            raise RenderArtifactError("FFmpeg runtime identity is invalid")
+
+        base_source = _safe_glyph_input(
+            self.artifact_root, base_record["storageKey"]
+        )
+        frame_rate = _integer(
+            output_record["frameRate"], label="glyph output frame rate", minimum=1
+        )
+        output_width = _integer(
+            output_record["width"], label="glyph output width", minimum=1
+        )
+        output_height = _integer(
+            output_record["height"], label="glyph output height", minimum=1
+        )
+        output_frames = _integer(
+            output_record["totalFrames"],
+            label="glyph output frame count",
+            minimum=1,
+        )
+
+        root = _glyph_scope_path(self.artifact_root, workspace_ref, run_ref)
+        output_name = f"glyph-reveal-{execution_request_digest}.mp4"
+        with tempfile.TemporaryDirectory(
+            prefix=".glyph-reveal-work-",
+            dir=self.artifact_root,
+            ignore_cleanup_errors=True,
+        ) as temporary_directory:
+            work_root = Path(temporary_directory)
+            work_root.chmod(0o700)
+            input_root = work_root / "inputs"
+            input_root.mkdir(mode=0o700)
+            base_path = input_root / "base-plate.media"
+            _stage_digest_pinned_input(
+                base_source,
+                base_path,
+                base_record["fileDigest"],
+            )
+            base_probe = _glyph_probe(base_path, ffprobe_path)
+            base_stream = _one_video_stream(base_probe, label="glyph base plate")
+            if base_stream.get("side_data_list") or (
+                isinstance(base_stream.get("tags"), Mapping)
+                and str(base_stream["tags"].get("rotate", "0")) != "0"
+            ):
+                raise RenderArtifactError(
+                    "glyph base plate display transform is unsupported"
+                )
+            base_pixel_format = base_stream.get("pix_fmt")
+            if base_pixel_format not in _SUPPORTED_GLYPH_BASE_PIXEL_FORMATS:
+                raise RenderArtifactError(
+                    "glyph base plate pixel format is unsupported"
+                )
+            base_width = _stream_integer(
+                base_stream, "width", label="glyph base plate width"
+            )
+            base_height = _stream_integer(
+                base_stream, "height", label="glyph base plate height"
+            )
+            base_frames = _stream_frame_count(base_stream, label="glyph base plate")
+            base_rate = _stream_frame_rate(base_stream, label="glyph base plate")
+            if base_rate.denominator != 1:
+                raise RenderArtifactError(
+                    "glyph base plate frame rate must be integral"
+                )
+            if (
+                output_width != base_width
+                or output_height != base_height
+                or output_frames != base_frames
+                or Fraction(frame_rate, 1) != base_rate
+            ):
+                raise RenderArtifactError(
+                    "glyph output does not match base plate media"
+                )
+            if end > base_frames:
+                raise RenderArtifactError("glyph frame range exceeds base plate")
+
+            geometry = _validate_composite_params(
+                composite_params,
+                canvas_width=base_width,
+                canvas_height=base_height,
+            )
+            mask_paths: list[Path] = []
+            mask_dimensions: tuple[int, int] | None = None
+            seen_pixel_digests: set[str] = set()
+            seen_gray_stages: set[bytes] = set()
+            previous_gray_stage: bytes | None = None
+            for index, mask in enumerate(masks):
+                mask_record = _closed_mapping(
+                    mask,
+                    {
+                        "assetVersionRef",
+                        "revealOrdinal",
+                        "storageKey",
+                        "fileDigest",
+                        "pixelDigest",
+                        "pixelDigestSpec",
+                        "width",
+                        "height",
+                    },
+                    label=f"glyph mask {index}",
+                )
+                mask_ordinal = _integer(
+                    mask_record["revealOrdinal"],
+                    label=f"glyph mask {index} reveal ordinal",
+                    minimum=1,
+                )
+                if (
+                    not isinstance(mask_record["assetVersionRef"], str)
+                    or not mask_record["assetVersionRef"]
+                    or mask_ordinal != index + 1
+                ):
+                    raise RenderArtifactError(
+                        "glyph mask schedule binding is invalid"
+                    )
+                if mask_record["pixelDigestSpec"] != IMAGE_PIXEL_DIGEST_SPEC:
+                    raise RenderArtifactError(
+                        "glyph mask pixel digest spec is invalid"
+                    )
+                expected_pixel = mask_record["pixelDigest"]
+                if (
+                    not isinstance(expected_pixel, str)
+                    or _PREFIXED_DIGEST.fullmatch(expected_pixel) is None
+                ):
+                    raise RenderArtifactError("glyph mask pixel digest is invalid")
+                declared_dimensions = (
+                    _integer(
+                        mask_record["width"],
+                        label=f"glyph mask {index} declared width",
+                        minimum=1,
+                    ),
+                    _integer(
+                        mask_record["height"],
+                        label=f"glyph mask {index} declared height",
+                        minimum=1,
+                    ),
+                )
+                storage_key = mask_record["storageKey"]
+                if (
+                    not isinstance(storage_key, str)
+                    or Path(storage_key).suffix.lower() != ".png"
+                ):
+                    raise RenderArtifactError("glyph mask must use PNG storage")
+                mask_source = _safe_glyph_input(
+                    self.artifact_root, storage_key
+                )
+                mask_path = input_root / f"mask-{index + 1:04d}.png"
+                _stage_digest_pinned_input(
+                    mask_source,
+                    mask_path,
+                    mask_record["fileDigest"],
+                )
+                mask_probe = _glyph_probe(mask_path, ffprobe_path)
+                mask_stream = _one_video_stream(mask_probe, label="glyph mask")
+                if (
+                    mask_stream.get("codec_name") != "png"
+                    or mask_probe["format"].get("format_name") != "png_pipe"
+                    or _stream_frame_count(mask_stream, label="glyph mask") != 1
+                ):
+                    raise RenderArtifactError(
+                        "glyph mask must be a one-frame PNG image"
+                    )
+                dimensions = (
+                    _stream_integer(
+                        mask_stream, "width", label="glyph mask width"
+                    ),
+                    _stream_integer(
+                        mask_stream, "height", label="glyph mask height"
+                    ),
+                )
+                if dimensions != declared_dimensions:
+                    raise RenderArtifactError(
+                        "glyph mask dimensions changed from the execution request"
+                    )
+                if mask_dimensions is None:
+                    mask_dimensions = dimensions
+                elif dimensions != mask_dimensions:
+                    raise RenderArtifactError(
+                        "glyph mask dimensions do not match"
+                    )
+                try:
+                    pixel_metadata = image_digest_metadata(
+                        mask_path,
+                        ffmpeg_path=ffmpeg_path,
+                        ffprobe_path=ffprobe_path,
+                    )
+                except DigestError as exc:
+                    raise RenderArtifactError(
+                        "glyph mask pixel digest failed"
+                    ) from exc
+                if (
+                    pixel_metadata["pixel_digest"] != expected_pixel
+                    or pixel_metadata["pixel_digest_spec"]
+                    != IMAGE_PIXEL_DIGEST_SPEC
+                    or (
+                        pixel_metadata["width"], pixel_metadata["height"]
+                    )
+                    != dimensions
+                ):
+                    raise RenderArtifactError("glyph mask pixel digest changed")
+                actual_pixel_digest = str(pixel_metadata["pixel_digest"])
+                if actual_pixel_digest in seen_pixel_digests:
+                    raise RenderArtifactError(
+                        "glyph mask pixel digests must be unique"
+                    )
+                gray_stage = _decoded_opaque_grayscale_png_pixels(
+                    mask_path,
+                    ffmpeg_path=ffmpeg_path,
+                    width=dimensions[0],
+                    height=dimensions[1],
+                )
+                if gray_stage in seen_gray_stages:
+                    raise RenderArtifactError(
+                        "glyph decoded gray stages must be unique"
+                    )
+                _validate_cumulative_gray_stage(previous_gray_stage, gray_stage)
+                seen_pixel_digests.add(actual_pixel_digest)
+                seen_gray_stages.add(gray_stage)
+                previous_gray_stage = gray_stage
+                mask_paths.append(mask_path)
+
+            filter_graph = _glyph_filter_graph(
+                stage_count=count,
+                stage_ranges=stage_ranges,
+                frame_rate=frame_rate,
+                canvas_width=base_width,
+                canvas_height=base_height,
+                base_pixel_format=base_pixel_format,
+                geometry=geometry,
+            )
+            candidate = work_root / "candidate.mp4"
+            command = [
+                str(ffmpeg_path),
+                "-hide_banner",
+                "-loglevel", "error",
+                "-xerror",
+                "-nostdin",
+                "-threads", "1",
+                "-filter_threads", "1",
+                "-filter_complex_threads", "1",
+                "-sws_flags", "bitexact+accurate_rnd+full_chroma_int",
+                "-hwaccel", "none",
+                "-noautorotate",
+                "-i", str(base_path),
+            ]
+            for mask_path in mask_paths:
+                command.extend(
+                    [
+                        "-loop", "1",
+                        "-framerate", str(frame_rate),
+                        "-i", str(mask_path),
+                    ]
+                )
+            command.extend(
+                [
+                    "-filter_complex", filter_graph,
+                    "-map", "[vout]",
+                    "-an",
+                    "-frames:v", str(base_frames),
+                    "-fps_mode", "passthrough",
+                    "-c:v", "libx264",
+                    "-preset", "medium",
+                    "-crf", "0",
+                    "-pix_fmt", base_pixel_format,
+                    "-threads:v", "1",
+                    "-x264-params",
+                    (
+                        "threads=1:lookahead_threads=1:sliced_threads=0:"
+                        "sync-lookahead=0:rc-lookahead=0:scenecut=0"
+                    ),
+                    "-fflags", "+bitexact",
+                    "-flags:v", "+bitexact",
+                    "-map_metadata", "-1",
+                    "-map_chapters", "-1",
+                    "-metadata", "creation_time=1970-01-01T00:00:00Z",
+                    "-movflags", "+faststart",
+                    "-video_track_timescale", str(frame_rate * 512),
+                    "-n", str(candidate),
+                ]
+            )
+            try:
+                subprocess.run(
+                    command,
+                    check=True,
+                    capture_output=True,
+                    timeout=300,
+                    env=_fixed_environment(),
+                )
+            except (OSError, subprocess.SubprocessError) as exc:
+                raise RenderArtifactError(
+                    "FFmpeg glyph reveal composition failed"
+                ) from exc
+            artifact = self._glyph_artifact_v2(
+                candidate,
+                requirement_ref=requirement_ref,
+                requirement_digest=requirement_digest,
+                execution_request_ref=execution_request_ref,
+                execution_request_digest=execution_request_digest,
+                ffmpeg_path=ffmpeg_path,
+                ffprobe_path=ffprobe_path,
+                ffmpeg_identity=ffmpeg_identity,
+                width=base_width,
+                height=base_height,
+                frame_rate=frame_rate,
+                frame_count=base_frames,
+                pixel_format=base_pixel_format,
+            )
+            destination = _publish_glyph_output_v2(
+                root=self.artifact_root,
+                directory=root / "glyph-reveal",
+                source=candidate,
+                output_name=output_name,
+            )
+            artifact["internalPath"] = str(destination)
+            artifact["outputStorageKey"] = str(
                 destination.relative_to(self.artifact_root)
             )
             return artifact
