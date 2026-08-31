@@ -164,7 +164,10 @@ _PRIVATE_DETERMINISTIC_EFFECT_FIELDS = frozenset(
         "baseplatefiledigest",
         "baseplatepixeldigest",
         "canonicalmutations",
+        "command",
+        "commandline",
         "environmentoverride",
+        "environment",
         "externaldecisiondigest",
         "executionresult",
         "identitylockdigest",
@@ -185,12 +188,36 @@ _PRIVATE_DETERMINISTIC_EFFECT_FIELDS = frozenset(
         "licenselocalpath",
         "markfiledigest",
         "markpixeldigest",
+        "maskfiledigest",
+        "maskpixeldigest",
         "modelpath",
         "networkurl",
         "pythonexpression",
+        "rawassetversion",
+        "rawbaseplateassetversion",
+        "rawmaskassetversion",
+        "rawshotversion",
+        "rawsubjectlayerassetversion",
+        "rawtimelineversion",
+        "rawvariantassetversion",
         "resolvedtext",
         "resolvedtextdigest",
+        "runtimeenvironment",
         "shellcommand",
+        "subjectlayerfiledigest",
+        "subjectlayerpixeldigest",
+        "variantbytesize",
+        "variantfiledigest",
+        "variantframecount",
+        "variantheight",
+        "variantmediatype",
+        "variantpixeldigest",
+        "variantpixelformat",
+        "variantpixelmode",
+        "variantramerate",
+        "variantstoragebindingref",
+        "variantstoragekey",
+        "variantwidth",
     }
 )
 
@@ -300,6 +327,9 @@ def _is_private_deterministic_effect_detail(field: Any) -> bool:
         normalized in _PRIVATE_DETERMINISTIC_EFFECT_FIELDS
         or normalized.endswith("path")
         or normalized.endswith("argv")
+        or normalized.endswith("storagekey")
+        or normalized.endswith("storagekeys")
+        or normalized.endswith("runtimediagnostics")
         or "filter" in normalized
     )
 

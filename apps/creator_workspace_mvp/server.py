@@ -169,6 +169,7 @@ _DETERMINISTIC_EFFECT_KINDS = frozenset(
         "SMOKE",
         "NAMEPLATE_TEXT",
         "FACE_MARK_COMPENSATION",
+        "DISTANCE_STATE_TRANSITION",
     }
 )
 _DETERMINISTIC_EFFECT_WRITE_FIELDS = frozenset(
@@ -217,12 +218,18 @@ _DETERMINISTIC_EFFECT_FORBIDDEN_CLIENT_FIELDS = frozenset(
         "publicationallowed",
         "pythonexpression",
         "rawassetversion",
+        "rawbaseplateassetversion",
         "rawidentitylock",
         "rawidentityversion",
+        "rawmaskassetversion",
+        "rawrequirement",
+        "rawshotversion",
+        "rawsubjectlayerassetversion",
         "rawtextsource",
         "resolvedtext",
         "resolvedtextdigest",
         "rawtimelineversion",
+        "rawvariantassetversion",
         "shellcommand",
         "storagebindingref",
         "storagekey",
@@ -232,6 +239,56 @@ _DETERMINISTIC_EFFECT_FORBIDDEN_CLIENT_FIELDS = frozenset(
 )
 _DETERMINISTIC_OVERLAY_SERVER_FIELDS = frozenset(
     {"baseplatefiledigest", "baseplatepixeldigest"}
+)
+_DISTANCE_STATE_SERVER_FIELDS = frozenset(
+    {
+        "baseplatefiledigest",
+        "baseplatepixeldigest",
+        "subjectlayerfiledigest",
+        "subjectlayerpixeldigest",
+        "maskfiledigest",
+        "maskpixeldigest",
+        "variantfilesdigest",
+        "variantfiledigest",
+        "variantpixeldigest",
+        "variantstoragebindingref",
+        "variantstoragekey",
+        "variantbytesize",
+        "variantmediatype",
+        "variantpixelmode",
+        "variantpixelformat",
+        "variantwidth",
+        "variantheight",
+        "variantframecount",
+        "variantramerate",
+    }
+)
+_DISTANCE_STATE_FORBIDDEN_FIELDS = frozenset(
+    {
+        "distanceprompt",
+        "distancetext",
+        "naturallanguage",
+        "naturallanguagedistance",
+        "narrativestate",
+        "physicaldistance",
+        "prompt",
+        "realworlddistance",
+        "centimeters",
+        "distanceunit",
+        "meters",
+        "worlddistance",
+        "worldcentimeters",
+        "worldmeters",
+        "worldstate",
+    }
+)
+_DISTANCE_STATE_FORBIDDEN_VALUES = frozenset(
+    {
+        "NATURAL_LANGUAGE",
+        "UNSPECIFIED_3D",
+        "WORLD_CENTIMETERS",
+        "WORLD_METERS",
+    }
 )
 _TIMELINE_FORBIDDEN_CLIENT_FIELDS = frozenset(
     {
@@ -295,6 +352,11 @@ def _contains_forbidden_timeline_client_claim(value: Any) -> bool:
 def _contains_forbidden_deterministic_effect_claim(
     value: Any, *, effect_kind: str | None = None
 ) -> bool:
+    if effect_kind == "DISTANCE_STATE_TRANSITION" and isinstance(value, float):
+        # Python's JSON decoder accepts NaN/Infinity by default.  Reject every
+        # E4 float, finite or otherwise, before it reaches V5 authority.  The
+        # older deterministic-effect contracts retain their frozen semantics.
+        return True
     if isinstance(value, Mapping):
         if effect_kind is None and isinstance(value.get("effectKind"), str):
             effect_kind = value["effectKind"]
@@ -306,6 +368,43 @@ def _contains_forbidden_deterministic_effect_claim(
                     effect_kind
                     in {"NAMEPLATE_TEXT", "FACE_MARK_COMPENSATION"}
                     and normalized in _DETERMINISTIC_OVERLAY_SERVER_FIELDS
+                )
+                or (
+                    effect_kind == "DISTANCE_STATE_TRANSITION"
+                    and (
+                        normalized in _DISTANCE_STATE_SERVER_FIELDS
+                        or normalized in _DISTANCE_STATE_FORBIDDEN_FIELDS
+                        or (
+                            normalized == "metric"
+                            and (
+                                not isinstance(item, str)
+                                or item
+                                not in {
+                                    "SCREEN_EUCLIDEAN_PIXELS",
+                                    "RELATIVE_SCALE_PERMILLE",
+                                }
+                            )
+                        )
+                        or (
+                            normalized == "coordinatespace"
+                            and (
+                                not isinstance(item, str)
+                                or item
+                                not in {
+                                    "CANVAS_PIXELS",
+                                    "NORMALIZED_PERMILLE",
+                                }
+                            )
+                        )
+                        or "worlddistance" in normalized
+                        or "worldmeter" in normalized
+                        or "worldcentimeter" in normalized
+                        or "realworld" in normalized
+                        or "physicaldistance" in normalized
+                        or "naturallanguage" in normalized
+                        or "expression" in normalized
+                        or "random" in normalized
+                    )
                 )
                 or normalized.endswith("path")
                 or normalized.endswith("storagekey")
@@ -326,13 +425,19 @@ def _contains_forbidden_deterministic_effect_claim(
                 )
             ):
                 return True
-    elif isinstance(value, list):
+    elif isinstance(value, (list, tuple)):
         return any(
             _contains_forbidden_deterministic_effect_claim(
                 item, effect_kind=effect_kind
             )
             for item in value
         )
+    elif (
+        effect_kind == "DISTANCE_STATE_TRANSITION"
+        and isinstance(value, str)
+        and value.strip().upper() in _DISTANCE_STATE_FORBIDDEN_VALUES
+    ):
+        return True
     return False
 
 

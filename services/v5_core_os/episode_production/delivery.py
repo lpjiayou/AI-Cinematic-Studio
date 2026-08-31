@@ -2511,6 +2511,144 @@ class K2DeliveryService:
                 "deterministic overlay evidence chain is incomplete"
             )
 
+        # E4 is a fifth independently typed Result chain in the same generic
+        # evidence journal.  Re-resolve it and prove every resolved member was
+        # observed in this exact snapshot before it becomes Timeline source
+        # authority; the current media closure is re-read by the dispatcher.
+        from .distance_state import (
+            DISTANCE_STATE_ARTIFACT_EVIDENCE_RECORD_KIND,
+            DISTANCE_STATE_EXECUTION_REQUEST_RECORD_KIND,
+            DISTANCE_STATE_RUNTIME_EVIDENCE_RECORD_KIND,
+            DISTANCE_STATE_TRANSITION_REQUIREMENT_RECORD_KIND,
+            DISTANCE_STATE_TRANSITION_RESULT_RECORD_KIND,
+        )
+
+        distance_specs = (
+            (
+                DISTANCE_STATE_TRANSITION_REQUIREMENT_RECORD_KIND,
+                "requirementRef",
+            ),
+            (
+                DISTANCE_STATE_EXECUTION_REQUEST_RECORD_KIND,
+                "executionRequestRef",
+            ),
+            (
+                DISTANCE_STATE_ARTIFACT_EVIDENCE_RECORD_KIND,
+                "artifactEvidenceRef",
+            ),
+            (
+                DISTANCE_STATE_RUNTIME_EVIDENCE_RECORD_KIND,
+                "runtimeEvidenceRef",
+            ),
+            (
+                DISTANCE_STATE_TRANSITION_RESULT_RECORD_KIND,
+                "resultRef",
+            ),
+        )
+        distance_records: dict[tuple[str, str], dict[str, Any]] = {}
+        for record_kind, identity_field in distance_specs:
+            for payload in records(record_kind, identity_field):
+                key = (record_kind, payload[identity_field])
+                if key in distance_records:
+                    raise RepositoryUnavailableError(
+                        "Distance/State evidence is ambiguous"
+                    )
+                distance_records[key] = payload
+        used_distance_records: set[tuple[str, str]] = set()
+        for (record_kind, _), stored_result in distance_records.items():
+            if record_kind != DISTANCE_STATE_TRANSITION_RESULT_RECORD_KIND:
+                continue
+            chain = self._resolve_effect_result_chain(
+                context=authority_context,
+                result_ref=stored_result["resultRef"],
+                result_digest=stored_result["payloadDigest"],
+            )
+            requirement = chain["requirement"]
+            request = chain["executionRequest"]
+            artifact = chain["artifactEvidence"]
+            runtime = chain["runtimeEvidence"]
+            result = chain["result"]
+            members = (
+                (
+                    DISTANCE_STATE_TRANSITION_REQUIREMENT_RECORD_KIND,
+                    requirement["requirementRef"],
+                    requirement,
+                ),
+                (
+                    DISTANCE_STATE_EXECUTION_REQUEST_RECORD_KIND,
+                    request["executionRequestRef"],
+                    request,
+                ),
+                (
+                    DISTANCE_STATE_ARTIFACT_EVIDENCE_RECORD_KIND,
+                    artifact["artifactEvidenceRef"],
+                    artifact,
+                ),
+                (
+                    DISTANCE_STATE_RUNTIME_EVIDENCE_RECORD_KIND,
+                    runtime["runtimeEvidenceRef"],
+                    runtime,
+                ),
+                (
+                    DISTANCE_STATE_TRANSITION_RESULT_RECORD_KIND,
+                    result["resultRef"],
+                    result,
+                ),
+            )
+            base = validated_videos.get(
+                requirement["basePlateAssetVersionRef"]
+            )
+            if (
+                requirement.get("effectMode")
+                != "DISTANCE_STATE_TRANSITION"
+                or result.get("effectMode")
+                != "DISTANCE_STATE_TRANSITION"
+                or any(
+                    distance_records.get((kind, reference)) != payload
+                    for kind, reference, payload in members
+                )
+                or base is None
+                or base.get("payloadDigest")
+                != requirement["basePlateAssetVersionDigest"]
+                or f"sha256:{base.get('sha256')}"
+                != requirement["basePlateFileDigest"]
+                or base.get("creativeShotRef")
+                != requirement["targetShotRef"]
+                or base.get("creativeShotVersionRef")
+                != requirement["targetShotVersionRef"]
+                or base.get("creativeShotDigest")
+                != requirement["targetShotVersionDigest"]
+            ):
+                raise RepositoryUnavailableError(
+                    "Distance/State snapshot closure is stale"
+                )
+            used_distance_records.update(
+                (kind, reference) for kind, reference, _ in members
+            )
+            add(
+                "EFFECT_REQUIREMENT",
+                requirement["requirementRef"],
+                requirement,
+            )
+            add(
+                "EFFECT_RESULT",
+                result["resultRef"],
+                {
+                    **result,
+                    "targetShotRef": requirement["targetShotRef"],
+                    "frameRangeStartInclusive": requirement[
+                        "frameRangeStartInclusive"
+                    ],
+                    "frameRangeEndExclusive": requirement[
+                        "frameRangeEndExclusive"
+                    ],
+                },
+            )
+        if used_distance_records != set(distance_records):
+            raise RepositoryUnavailableError(
+                "Distance/State evidence chain is incomplete"
+            )
+
         def resolve(source_type: str, source_ref: str) -> Mapping[str, Any] | None:
             matches = candidates.get((source_type, source_ref), [])
             if len(matches) > 1:
@@ -3471,6 +3609,260 @@ class K2DeliveryService:
             "deterministicEffect": chain.as_dict(),
         }
 
+    def _execute_distance_state_transition(
+        self,
+        *,
+        workspace: str,
+        run_ref: str,
+        client_key: str,
+        expected_run_version: int,
+        requirement_command: Mapping[str, Any],
+    ) -> dict[str, Any]:
+        """Execute the closed E4 transition through the existing V4 owner."""
+
+        from .distance_state import (
+            append_distance_state_result_chain,
+            build_distance_state_execution_request,
+            build_distance_state_requirement,
+            build_distance_state_result,
+        )
+
+        target_kind = requirement_command.get("targetKind")
+        definitions = requirement_command.get("visualStateDefinitions")
+        transition_mode = requirement_command.get("transitionMode")
+        if not isinstance(definitions, list) or (
+            transition_mode != "SCREEN_DISTANCE" and not definitions
+        ):
+            raise EpisodeProductionError(
+                "visualStateDefinitions do not match transitionMode"
+            )
+        role_refs: dict[str, str] = {}
+
+        def role(reference: Any, digest: Any, label: str) -> None:
+            reference_value = _required_ref(reference, f"{label}Ref")
+            if not _is_sha256(digest):
+                raise EpisodeProductionError(f"{label}Digest is invalid")
+            if reference_value in role_refs:
+                raise EpisodeProductionError(
+                    "Distance/State AssetVersion roles must be distinct"
+                )
+            role_refs[reference_value] = str(digest)
+
+        role(
+            requirement_command.get("basePlateAssetVersionRef"),
+            requirement_command.get("basePlateAssetVersionDigest"),
+            "basePlateAssetVersion",
+        )
+        variant_digests: dict[str, str] = {}
+        for index, state in enumerate(definitions):
+            if not isinstance(state, Mapping):
+                raise EpisodeProductionError(
+                    f"visualStateDefinitions[{index}] is invalid"
+                )
+            reference = state.get("variantAssetVersionRef")
+            digest = state.get("variantAssetVersionDigest")
+            if reference is None and digest is None:
+                continue
+            reference_value = _required_ref(
+                reference,
+                f"visualStateDefinitions[{index}].variantAssetVersionRef",
+            )
+            if not _is_sha256(digest):
+                raise EpisodeProductionError(
+                    f"visualStateDefinitions[{index}].variantAssetVersionDigest is invalid"
+                )
+            if reference_value in role_refs:
+                raise EpisodeProductionError(
+                    "Distance/State variant collides with another asset role"
+                )
+            previous = variant_digests.setdefault(reference_value, str(digest))
+            if previous != digest:
+                raise EpisodeProductionError(
+                    "Distance/State variant ref has conflicting digests"
+                )
+        if target_kind == "FULL_FRAME":
+            if any(
+                requirement_command.get(field) is not None
+                for field in (
+                    "subjectLayerAssetVersionRef",
+                    "subjectLayerAssetVersionDigest",
+                    "maskAssetVersionRef",
+                    "maskAssetVersionDigest",
+                )
+            ) or variant_digests:
+                raise EpisodeProductionError(
+                    "FULL_FRAME forbids subject, mask, and variant assets"
+                )
+        elif target_kind == "OVERLAY_LAYER":
+            role(
+                requirement_command.get("subjectLayerAssetVersionRef"),
+                requirement_command.get("subjectLayerAssetVersionDigest"),
+                "subjectLayerAssetVersion",
+            )
+            role(
+                requirement_command.get("maskAssetVersionRef"),
+                requirement_command.get("maskAssetVersionDigest"),
+                "maskAssetVersion",
+            )
+            if any(reference in role_refs for reference in variant_digests):
+                raise EpisodeProductionError(
+                    "Distance/State variant collides with another asset role"
+                )
+        else:
+            raise EpisodeProductionError("targetKind is invalid")
+
+        context = self._timeline_authority_context(
+            workspace,
+            run_ref,
+            expected_run_version=expected_run_version,
+        )
+        if context["snapshot"].currentState not in M13_PREVIEW_STATE_TRANSITIONS:
+            raise UpstreamNotReadyError(
+                "Distance/State transitions require current video media"
+            )
+        creation_assets = self._resolved_distance_state_authorities(
+            context=context,
+            requirement=requirement_command,
+            enforce_requirement_digests=False,
+        )
+        base = creation_assets[
+            requirement_command["basePlateAssetVersionRef"]
+        ]
+        subject = (
+            creation_assets[
+                requirement_command["subjectLayerAssetVersionRef"]
+            ]
+            if requirement_command.get("subjectLayerAssetVersionRef")
+            is not None
+            else None
+        )
+        mask = (
+            creation_assets[requirement_command["maskAssetVersionRef"]]
+            if requirement_command.get("maskAssetVersionRef") is not None
+            else None
+        )
+        variants: list[dict[str, Any]] = []
+        seen_variants: set[str] = set()
+        for state in requirement_command.get("visualStateDefinitions", []):
+            if not isinstance(state, Mapping):
+                continue
+            reference = state.get("variantAssetVersionRef")
+            if isinstance(reference, str) and reference not in seen_variants:
+                variants.append(creation_assets[reference])
+                seen_variants.add(reference)
+        requirement = build_distance_state_requirement(
+            requirement_command,
+            resolved_base=base,
+            resolved_subject=subject,
+            resolved_mask=mask,
+            resolved_variants=variants,
+        )
+
+        # Creation-time observations do not authorize execution.  Re-read the
+        # current Root/Shot/media closure immediately before sealing V4.
+        execution_context = self._timeline_authority_context(
+            workspace,
+            run_ref,
+            expected_run_version=expected_run_version,
+        )
+        resolved_assets = self._resolved_distance_state_authorities(
+            context=execution_context,
+            requirement=requirement.as_dict(),
+        )
+        execution_request = build_distance_state_execution_request(requirement)
+        execute = (
+            getattr(self.composition, "execute_distance_state", None)
+            if self.composition is not None
+            else None
+        )
+        if not callable(execute):
+            raise WorkerUnavailableError(
+                "M13-E4 deterministic Distance/State execution is not configured"
+            )
+        record_head = self._stable_record_head(
+            workspace,
+            run_ref,
+            execution_context["snapshot"].revisionToken,
+        )
+        try:
+            execution = execute(
+                execution_request.as_dict(),
+                resolved_asset_versions=resolved_assets,
+            )
+        except CompositionExecutionError as exc:
+            raise WorkerUnavailableError(
+                "M13-E4 deterministic Distance/State execution failed"
+            ) from exc
+        if not isinstance(execution, Mapping) or set(execution) != {
+            "artifactEvidence",
+            "runtimeEvidence",
+            "evidenceBindings",
+        }:
+            raise RepositoryUnavailableError(
+                "M13-E4 deterministic Distance/State evidence is invalid"
+            )
+
+        # Close the independent-authority window: the current Root/Shot/media
+        # selection may change without changing the evidence-journal head.
+        # Re-read it after rendering, then physically remeasure the produced
+        # artifact before any immutable evidence is appended.
+        post_execution_context = self._timeline_authority_context(
+            workspace,
+            run_ref,
+            expected_run_version=expected_run_version,
+        )
+        post_execution_assets = self._resolved_distance_state_authorities(
+            context=post_execution_context,
+            requirement=requirement.as_dict(),
+        )
+        if post_execution_assets != resolved_assets:
+            raise StaleInputError(
+                "Distance/State current media changed during execution"
+            )
+        verify_artifact = (
+            getattr(self.composition, "verify_distance_state_artifact", None)
+            if self.composition is not None
+            else None
+        )
+        if not callable(verify_artifact):
+            raise WorkerUnavailableError(
+                "M13-E4 artifact verification is not configured"
+            )
+        try:
+            verified_artifact = verify_artifact(
+                execution["artifactEvidence"],
+                runtime_evidence=execution["runtimeEvidence"],
+            )
+        except CompositionExecutionError as exc:
+            raise WorkerUnavailableError(
+                "M13-E4 artifact verification failed"
+            ) from exc
+        if verified_artifact != execution["artifactEvidence"]:
+            raise RepositoryUnavailableError(
+                "M13-E4 artifact verification projection is stale"
+            )
+        result = build_distance_state_result(
+            requirement=requirement,
+            execution_request=execution_request,
+            evidence_bindings=execution["evidenceBindings"],
+            artifact_evidence=execution["artifactEvidence"],
+        )
+        chain, replayed = append_distance_state_result_chain(
+            self.evidence,
+            requirement=requirement,
+            execution_request=execution_request,
+            artifact_evidence=execution["artifactEvidence"],
+            runtime_evidence=execution["runtimeEvidence"],
+            result=result,
+            idempotency_key=client_key,
+            created_at=self._clock(),
+            expected_record_journal_head=record_head,
+        )
+        return {
+            "idempotentReplay": replayed,
+            "deterministicEffect": chain.as_dict(),
+        }
+
     def execute_deterministic_effect(
         self, command: Mapping[str, Any]
     ) -> dict[str, Any]:
@@ -3499,6 +3891,7 @@ class K2DeliveryService:
             SMOKE,
             "NAMEPLATE_TEXT",
             "FACE_MARK_COMPENSATION",
+            "DISTANCE_STATE_TRANSITION",
         }:
             raise EpisodeProductionError("effectKind is invalid")
         requirement_input = command.get("requirement")
@@ -3529,6 +3922,16 @@ class K2DeliveryService:
                     command.get("expectedRunVersion"), "expectedRunVersion"
                 ),
                 effect_kind=effect_kind,
+                requirement_command=requirement_command,
+            )
+        if effect_kind == "DISTANCE_STATE_TRANSITION":
+            return self._execute_distance_state_transition(
+                workspace=workspace,
+                run_ref=run_ref,
+                client_key=client_key,
+                expected_run_version=_positive_version(
+                    command.get("expectedRunVersion"), "expectedRunVersion"
+                ),
                 requirement_command=requirement_command,
             )
         requirement = (
@@ -3786,6 +4189,10 @@ class K2DeliveryService:
             NAMEPLATE_TEXT_RESULT_RECORD_KIND,
             resolve_overlay_result_chain,
         )
+        from .distance_state import (
+            DISTANCE_STATE_TRANSITION_RESULT_RECORD_KIND,
+            resolve_distance_state_result_chain,
+        )
 
         snapshot = context["snapshot"]
         matches = [
@@ -3800,6 +4207,7 @@ class K2DeliveryService:
                 SMOKE_RESULT_RECORD_KIND,
                 NAMEPLATE_TEXT_RESULT_RECORD_KIND,
                 FACE_MARK_COMPENSATION_RESULT_RECORD_KIND,
+                DISTANCE_STATE_TRANSITION_RESULT_RECORD_KIND,
             }
         ]
         if len(matches) != 1 or matches[0].get("payloadDigest") != result_digest:
@@ -3824,6 +4232,48 @@ class K2DeliveryService:
                 requirement=chain["requirement"],
             )
             return chain
+        if (
+            matches[0]["recordKind"]
+            == DISTANCE_STATE_TRANSITION_RESULT_RECORD_KIND
+        ):
+            chain = resolve_distance_state_result_chain(
+                self.evidence,
+                workspace_ref=workspace,
+                production_run_ref=run_ref,
+                result_ref=result_ref,
+                result_digest=result_digest,
+            ).as_dict()
+            self._resolved_distance_state_authorities(
+                context=context,
+                requirement=chain["requirement"],
+            )
+            verify_artifact = (
+                getattr(
+                    self.composition,
+                    "verify_distance_state_artifact",
+                    None,
+                )
+                if self.composition is not None
+                else None
+            )
+            if not callable(verify_artifact):
+                raise WorkerUnavailableError(
+                    "M13-E4 artifact verification is not configured"
+                )
+            try:
+                verified = verify_artifact(
+                    chain["artifactEvidence"],
+                    runtime_evidence=chain["runtimeEvidence"],
+                )
+            except CompositionExecutionError as exc:
+                raise WorkerUnavailableError(
+                    "M13-E4 artifact verification failed"
+                ) from exc
+            if verified != chain["artifactEvidence"]:
+                raise RepositoryUnavailableError(
+                    "M13-E4 artifact verification projection is stale"
+                )
+            return chain
         return resolve_deterministic_effect_result_chain(
             self.evidence,
             workspace_ref=workspace,
@@ -3847,12 +4297,16 @@ class K2DeliveryService:
             FACE_MARK_COMPENSATION_RESULT_RECORD_KIND,
             NAMEPLATE_TEXT_RESULT_RECORD_KIND,
         )
+        from .distance_state import (
+            DISTANCE_STATE_TRANSITION_RESULT_RECORD_KIND,
+        )
 
         supported_result_kinds = {
             FLAME_EXTINGUISH_RESULT_RECORD_KIND,
             SMOKE_RESULT_RECORD_KIND,
             NAMEPLATE_TEXT_RESULT_RECORD_KIND,
             FACE_MARK_COMPENSATION_RESULT_RECORD_KIND,
+            DISTANCE_STATE_TRANSITION_RESULT_RECORD_KIND,
         }
         result_records: list[dict[str, Any]] = []
         for record in snapshot.records:
@@ -5264,6 +5718,234 @@ class K2DeliveryService:
             "deterministic overlay mode is unsupported"
         )
 
+    def _resolved_distance_state_authorities(
+        self,
+        *,
+        context: Mapping[str, Any],
+        requirement: Mapping[str, Any],
+        enforce_requirement_digests: bool = True,
+    ) -> dict[str, dict[str, Any]]:
+        """Freshly resolve every current input of one E4 Requirement.
+
+        The Requirement carries immutable refs/digests and measured content
+        facts, but it is never itself currentness authority.  This method is
+        called at creation, immediately before execution, and while restoring
+        Timeline/Preview projections so every canonical media dependency is
+        re-read through its existing owner.
+        """
+
+        workspace = context["run"]["workspaceRef"]
+        run_ref = context["run"]["productionRunRef"]
+        shot_args = {
+            "target_shot_ref": requirement.get("targetShotRef"),
+            "target_shot_version_ref": requirement.get(
+                "targetShotVersionRef"
+            ),
+            "target_shot_version_digest": requirement.get(
+                "targetShotVersionDigest"
+            ),
+        }
+        base = self._current_overlay_base(
+            context=context,
+            asset_version_ref=requirement.get(
+                "basePlateAssetVersionRef"
+            ),
+            asset_version_digest=requirement.get(
+                "basePlateAssetVersionDigest"
+            ),
+            frame_range_end_exclusive=requirement.get(
+                "frameRangeEndExclusive"
+            ),
+            **shot_args,
+        )
+        if enforce_requirement_digests and (
+            requirement.get("basePlateFileDigest") != base["fileDigest"]
+            or requirement.get("basePlatePixelDigest")
+            != base["pixelDigest"]
+        ):
+            raise StaleInputError(
+                "Distance/State base Requirement is stale"
+            )
+        resolved: dict[str, dict[str, Any]] = {
+            base["assetVersionRef"]: base
+        }
+
+        if requirement.get("targetKind") == "FULL_FRAME":
+            return resolved
+        if requirement.get("targetKind") != "OVERLAY_LAYER":
+            raise RepositoryUnavailableError(
+                "Distance/State targetKind is unsupported"
+            )
+
+        image_fields = (
+            "assetVersionRef",
+            "assetVersionDigest",
+            "storageKey",
+            "fileDigest",
+            "pixelDigest",
+            "pixelDigestSpec",
+            "pixelMode",
+            "width",
+            "height",
+        )
+
+        def current_layer(
+            *, asset_ref: Any, asset_digest: Any, label: str
+        ) -> dict[str, Any]:
+            layer = self._current_mark_asset(
+                context=context,
+                asset_version_ref=asset_ref,
+                asset_version_digest=asset_digest,
+                **shot_args,
+            )
+            if layer.get("pixelMode") != "RGBA":
+                raise StaleInputError(f"{label} is not an RGBA image")
+            return {field: deepcopy(layer[field]) for field in image_fields}
+
+        subject = current_layer(
+            asset_ref=requirement.get("subjectLayerAssetVersionRef"),
+            asset_digest=requirement.get(
+                "subjectLayerAssetVersionDigest"
+            ),
+            label="Distance/State subject layer",
+        )
+        if enforce_requirement_digests and (
+            requirement.get("subjectLayerFileDigest")
+            != subject["fileDigest"]
+            or requirement.get("subjectLayerPixelDigest")
+            != subject["pixelDigest"]
+        ):
+            raise StaleInputError(
+                "Distance/State subject Requirement is stale"
+            )
+        resolved[subject["assetVersionRef"]] = subject
+
+        mask_ref = requirement.get("maskAssetVersionRef")
+        mask_digest = requirement.get("maskAssetVersionDigest")
+        if mask_ref is not None or mask_digest is not None:
+            if not isinstance(mask_ref, str) or not isinstance(
+                mask_digest, str
+            ):
+                raise StaleInputError(
+                    "Distance/State mask binding is partial"
+                )
+            mask_payload = self._snapshot_record_payload(
+                context["snapshot"],
+                record_kind="MaskAssetVersion",
+                record_ref=mask_ref,
+            )
+            file_digest = mask_payload.get("fileDigest")
+            if file_digest is None and _is_sha256(mask_payload.get("sha256")):
+                file_digest = f"sha256:{mask_payload['sha256']}"
+            mask = self._resolved_effect_image_asset(
+                snapshot=context["snapshot"],
+                workspace=workspace,
+                run_ref=run_ref,
+                asset_version_ref=mask_ref,
+                asset_version_digest=mask_digest,
+                file_digest=file_digest,
+                pixel_digest=mask_payload.get("pixelDigest"),
+                label="Distance/State mask",
+            )
+            inspect_mask = (
+                getattr(
+                    self.composition,
+                    "inspect_deterministic_overlay_image",
+                    None,
+                )
+                if self.composition is not None
+                else None
+            )
+            if not callable(inspect_mask):
+                raise WorkerUnavailableError(
+                    "digest-pinned Distance/State mask inspection is not configured"
+                )
+            try:
+                measured_mask = inspect_mask(
+                    {
+                        "assetVersionRef": mask_ref,
+                        "assetVersionDigest": mask_digest,
+                        "storageKey": mask_payload.get("storageKey"),
+                        "fileDigest": file_digest,
+                        "mediaType": mask_payload.get("mediaType"),
+                        "byteSize": mask_payload.get("byteSize"),
+                    }
+                )
+            except EpisodeProductionError:
+                raise
+            except Exception as exc:
+                raise WorkerUnavailableError(
+                    "digest-pinned Distance/State mask inspection failed"
+                ) from exc
+            if not isinstance(measured_mask, Mapping) or any(
+                measured_mask.get(field) != mask[field]
+                for field in (
+                    "assetVersionRef",
+                    "assetVersionDigest",
+                    "fileDigest",
+                    "pixelDigest",
+                    "pixelDigestSpec",
+                    "pixelMode",
+                    "width",
+                    "height",
+                )
+            ):
+                raise StaleInputError(
+                    "Distance/State mask bytes or pixels are stale"
+                )
+            if (
+                mask["width"] != subject["width"]
+                or mask["height"] != subject["height"]
+                or (
+                    enforce_requirement_digests
+                    and (
+                        requirement.get("maskFileDigest")
+                        != mask["fileDigest"]
+                        or requirement.get("maskPixelDigest")
+                        != mask["pixelDigest"]
+                    )
+                )
+            ):
+                raise StaleInputError(
+                    "Distance/State mask Requirement is stale"
+                )
+            resolved[mask["assetVersionRef"]] = mask
+
+        definitions = requirement.get("visualStateDefinitions")
+        if not isinstance(definitions, list):
+            raise RepositoryUnavailableError(
+                "Distance/State visual states are invalid"
+            )
+        for index, definition in enumerate(definitions):
+            if not isinstance(definition, Mapping):
+                raise RepositoryUnavailableError(
+                    "Distance/State visual state is invalid"
+                )
+            variant_ref = definition.get("variantAssetVersionRef")
+            variant_digest = definition.get("variantAssetVersionDigest")
+            if variant_ref is None and variant_digest is None:
+                continue
+            if not isinstance(variant_ref, str) or not isinstance(
+                variant_digest, str
+            ):
+                raise StaleInputError(
+                    "Distance/State variant binding is partial"
+                )
+            variant = current_layer(
+                asset_ref=variant_ref,
+                asset_digest=variant_digest,
+                label=f"Distance/State variant {index}",
+            )
+            if (
+                variant["width"] != subject["width"]
+                or variant["height"] != subject["height"]
+            ):
+                raise StaleInputError(
+                    "Distance/State variant dimensions are stale"
+                )
+            resolved[variant["assetVersionRef"]] = variant
+        return resolved
+
     def _resolved_effect_image_asset(
         self,
         *,
@@ -6490,6 +7172,7 @@ class K2DeliveryService:
                 "SMOKE",
                 "NAMEPLATE_TEXT",
                 "FACE_MARK_COMPENSATION",
+                "DISTANCE_STATE_TRANSITION",
             }
         ]
         glyphs = [
@@ -6502,8 +7185,8 @@ class K2DeliveryService:
             or not active["AUDIO"]
             or not active["SUBTITLE"]
             or len(glyphs) != 1
-            or len(effects) not in {3, 5, 7}
-            or len(deterministic) not in {2, 4, 6}
+            or len(effects) not in {3, 5, 7, 8}
+            or len(deterministic) not in {2, 4, 6, 7}
             or len(effects) != len(deterministic) + 1
         ):
             raise UpstreamNotReadyError(
@@ -6517,6 +7200,7 @@ class K2DeliveryService:
             "SMOKE": 3,
             "NAMEPLATE_TEXT": 4,
             "FACE_MARK_COMPENSATION": 5,
+            "DISTANCE_STATE_TRANSITION": 6,
         }
         deterministic.sort(
             key=lambda item: (
@@ -6534,6 +7218,7 @@ class K2DeliveryService:
             2: [0, 1],
             4: [0, 1, 2, 3],
             6: [0, 1, 2, 3, 4, 5],
+            7: [0, 1, 2, 3, 4, 5, 6],
         }[len(deterministic)]
         timeline_order = [
             (item["layer"], item["zOrder"]) for item in deterministic
@@ -6557,6 +7242,7 @@ class K2DeliveryService:
                 2: "M13_E1",
                 4: "M13_E2",
                 6: "M13_E3",
+                7: "M13_E4",
             }[len(deterministic)],
         }
 
@@ -7087,6 +7773,18 @@ class K2DeliveryService:
                     for reference, item in current_overlay_assets.items()
                     if reference != resolved_base["assetVersionRef"]
                 )
+            elif mode == "DISTANCE_STATE_TRANSITION":
+                current_transition_assets = (
+                    self._resolved_distance_state_authorities(
+                        context=context,
+                        requirement=requirement,
+                    )
+                )
+                resolved_images.extend(
+                    deepcopy(item)
+                    for reference, item in current_transition_assets.items()
+                    if reference != resolved_base["assetVersionRef"]
+                )
             else:
                 raise RepositoryUnavailableError(
                     "deterministic Effect mode is unsupported"
@@ -7101,6 +7799,7 @@ class K2DeliveryService:
                 SMOKE,
                 "NAMEPLATE_TEXT",
                 "FACE_MARK_COMPENSATION",
+                "DISTANCE_STATE_TRANSITION",
             } and (
                 result.get("outputFileDigest") != output["fileDigest"]
                 or result.get("outputDecodedFramePixelDigest")
@@ -7123,13 +7822,20 @@ class K2DeliveryService:
                     "artifactEvidenceRef": artifact["artifactEvidenceRef"],
                     "artifactEvidenceDigest": artifact["payloadDigest"],
                     "storageKey": (
-                        f"{workspace_hash}/{run_hash}/deterministic-overlays/"
-                        f"overlay-{v3_digest}.mp4"
-                        if mode
-                        in {"NAMEPLATE_TEXT", "FACE_MARK_COMPENSATION"}
+                        (
+                            f"{workspace_hash}/{run_hash}/distance-state/"
+                            f"distance-state-{v3_digest}.mp4"
+                        )
+                        if mode == "DISTANCE_STATE_TRANSITION"
                         else (
+                            f"{workspace_hash}/{run_hash}/deterministic-overlays/"
+                            f"overlay-{v3_digest}.mp4"
+                            if mode
+                            in {"NAMEPLATE_TEXT", "FACE_MARK_COMPENSATION"}
+                            else (
                             f"{workspace_hash}/{run_hash}/masked-surface/"
                             f"masked-surface-{v3_digest}.mp4"
+                            )
                         )
                     ),
                     "fileDigest": output["fileDigest"],
@@ -8307,6 +9013,7 @@ class K2DeliveryService:
                     "M13_E1": "m13-e1-editing-timeline-composition",
                     "M13_E2": "m13-e2-editing-timeline-composition",
                     "M13_E3": "m13-e3-editing-timeline-composition",
+                    "M13_E4": "m13-e4-editing-timeline-composition",
                 }[effect_profile],
             }
         )
@@ -8316,6 +9023,7 @@ class K2DeliveryService:
                     "M13_E1": "v5.m13-effect-preview-command.v1",
                     "M13_E2": "v5.m13-effect-preview-command.v2",
                     "M13_E3": "v5.m13-effect-preview-command.v3",
+                    "M13_E4": "v5.m13-effect-preview-command.v4",
                 }[effect_profile],
                 "command": normalized,
                 "deliveryId": TIMELINE_PREVIEW_DELIVERY_ID,
@@ -8355,16 +9063,46 @@ class K2DeliveryService:
                 raise WorkerUnavailableError(
                     "M13 deterministic effect Preview composition failed"
                 ) from exc
+
+            # The generic evidence journal is not the sole currentness owner
+            # for Root/Shot/current media.  Close the render window by reading
+            # every authority again and rebuilding the exact projection before
+            # the CompositionResult or PreviewCandidate becomes immutable.
+            post_render_context = self._timeline_authority_context(
+                workspace,
+                run_ref,
+                expected_run_version=normalized["expectedRunVersion"],
+            )
+            post_render_restored = self._restore_editing_timeline(
+                post_render_context,
+                timeline_version_ref=normalized["timelineVersionRef"],
+            )
+            post_render_projection = self._editing_effect_preview_projection(
+                context=post_render_context,
+                restored=post_render_restored,
+            )
+            if (
+                post_render_context["snapshot"].revisionToken
+                != normalized["expectedEvidenceRevision"]
+                or post_render_context["snapshot"].revisionToken
+                != context["snapshot"].revisionToken
+                or post_render_context["snapshot"].currentState
+                != source_state
+                or post_render_projection != projection
+            ):
+                raise StaleInputError(
+                    "M13 effect Preview authority changed during composition"
+                )
             composition_result = validate_effect_preview_composition_result(
                 build_effect_preview_composition_result(
                     {
                         "createdBy": TIMELINE_PREVIEW_DELIVERY_ID,
                         "createdAt": now,
                     },
-                    timeline_version=restored["timelineVersion"],
+                    timeline_version=post_render_restored["timelineVersion"],
                     execution_result=execution_result,
                 ),
-                timeline_version=restored["timelineVersion"],
+                timeline_version=post_render_restored["timelineVersion"],
             )
             composition_payload = composition_result.as_dict()
             preview_ref = "m13-effect-preview-candidate-" + _digest(
@@ -8392,10 +9130,10 @@ class K2DeliveryService:
                         "createdBy": TIMELINE_PREVIEW_DELIVERY_ID,
                         "createdAt": now,
                     },
-                    timeline_version=restored["timelineVersion"],
+                    timeline_version=post_render_restored["timelineVersion"],
                     composition_result=composition_result,
                 ),
-                timeline_version=restored["timelineVersion"],
+                timeline_version=post_render_restored["timelineVersion"],
                 composition_result=composition_result,
             )
             preview_payload = preview_candidate.as_dict()
@@ -8431,7 +9169,9 @@ class K2DeliveryService:
                 ),
             )
             journal_head = self._stable_record_head(
-                workspace, run_ref, context["snapshot"].revisionToken
+                workspace,
+                run_ref,
+                post_render_context["snapshot"].revisionToken,
             )
             _, composition_gate, atomic_replay = (
                 self.evidence.append_records_and_gate(
@@ -8463,7 +9203,7 @@ class K2DeliveryService:
             )
             composition_replay = atomic_replay
             stored = {
-                "timelineVersion": restored["timelineVersion"],
+                "timelineVersion": post_render_restored["timelineVersion"],
                 "compositionResult": composition_result,
                 "previewCandidate": preview_candidate,
                 "projection": projection,

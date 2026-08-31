@@ -71,14 +71,19 @@ EFFECT_PREVIEW_V3_REQUEST_SCHEMA_VERSION_V3 = (
 EFFECT_PREVIEW_V3_REQUEST_SCHEMA_VERSION_V4 = (
     "v4.m13-effect-preview-execution-request.v4"
 )
+EFFECT_PREVIEW_V3_REQUEST_SCHEMA_VERSION_V5 = (
+    "v4.m13-effect-preview-execution-request.v5"
+)
 EFFECT_PREVIEW_V4_RESULT_SCHEMA_VERSION = "v4.m13-composition-result.v2"
 EFFECT_PREVIEW_BINDINGS_SCHEMA_VERSION = "v5.m13-effect-preview-bindings.v1"
 EFFECT_PREVIEW_BINDINGS_SCHEMA_VERSION_V2 = "v5.m13-effect-preview-bindings.v2"
 EFFECT_PREVIEW_BINDINGS_SCHEMA_VERSION_V3 = "v5.m13-effect-preview-bindings.v3"
+EFFECT_PREVIEW_BINDINGS_SCHEMA_VERSION_V4 = "v5.m13-effect-preview-bindings.v4"
 EFFECT_PREVIEW_RENDERER_IDENTITY = "v3.deterministic-timeline-preview-ffmpeg"
 EFFECT_PREVIEW_RENDERER_VERSION = "2"
 EFFECT_PREVIEW_RENDERER_VERSION_V3 = "3"
 EFFECT_PREVIEW_RENDERER_VERSION_V4 = "4"
+EFFECT_PREVIEW_RENDERER_VERSION_V5 = "5"
 EFFECT_PREVIEW_ADAPTER_IDENTITY = "v4.local-composition-executor.v1"
 
 E1_EFFECT_MODES = ("SCRATCH_REVEAL", "LIGHT_SWEEP", "LOCAL_EXPOSURE")
@@ -2369,9 +2374,9 @@ def _frame_rate(value: Any, field: str) -> dict[str, int]:
 def _effect_preview_bindings(
     effect_bindings: Any, glyph_binding: Any
 ) -> tuple[list[dict[str, Any]], dict[str, Any], str]:
-    if not isinstance(effect_bindings, list) or len(effect_bindings) not in {2, 4, 6}:
+    if not isinstance(effect_bindings, list) or len(effect_bindings) not in {2, 4, 6, 7}:
         raise MaskedSurfaceRequestValidationError(
-            "effectResultBindings must match a closed two-, four-, or six-stage profile"
+            "effectResultBindings must match a closed two-, four-, six-, or seven-stage profile"
         )
     stage_count = len(effect_bindings)
     result: list[dict[str, Any]] = []
@@ -2383,6 +2388,7 @@ def _effect_preview_bindings(
         "SMOKE": 3,
         "NAMEPLATE_TEXT": 4,
         "FACE_MARK_COMPENSATION": 5,
+        "DISTANCE_STATE_TRANSITION": 6,
     }
     seen_clips: set[str] = set()
     seen_results: set[str] = set()
@@ -2437,6 +2443,7 @@ def _effect_preview_bindings(
         2: [0, 1],
         4: [0, 1, 2, 3],
         6: [0, 1, 2, 3, 4, 5],
+        7: [0, 1, 2, 3, 4, 5, 6],
     }[stage_count]
     if [ranks[item["effectMode"]] for item in result] != expected_ranks:
         raise MaskedSurfaceRequestValidationError(
@@ -2460,6 +2467,7 @@ def _effect_preview_bindings(
                     2: EFFECT_PREVIEW_BINDINGS_SCHEMA_VERSION,
                     4: EFFECT_PREVIEW_BINDINGS_SCHEMA_VERSION_V2,
                     6: EFFECT_PREVIEW_BINDINGS_SCHEMA_VERSION_V3,
+                    7: EFFECT_PREVIEW_BINDINGS_SCHEMA_VERSION_V4,
                 }[stage_count],
                 "effectResultBindings": result,
                 "glyphRequirementBinding": glyph,
@@ -3367,7 +3375,24 @@ def _build_effect_preview_v3_request(
     )
     stages: list[dict[str, Any]] = []
     for binding in bindings:
-        if binding["effectMode"] in {
+        if binding["effectMode"] == "DISTANCE_STATE_TRANSITION":
+            from .distance_state import (
+                DistanceStateExecutionError,
+                resolve_distance_state_preview_stage,
+            )
+
+            try:
+                stage = resolve_distance_state_preview_stage(
+                    binding,
+                    effect_resolutions[binding["resultRef"]],
+                    artifact_root=artifact_root,
+                    base=base,
+                )
+            except DistanceStateExecutionError as exc:
+                raise MaskedSurfaceExecutionError(
+                    "distance/state execution chain could not be resolved"
+                ) from exc
+        elif binding["effectMode"] in {
             "NAMEPLATE_TEXT",
             "FACE_MARK_COMPENSATION",
         }:
@@ -3463,7 +3488,7 @@ def _build_effect_preview_v3_request(
         "baseVideo": deepcopy(base),
         (
             "deterministicEffectRequestDigests"
-            if len(stages) == 6
+            if len(stages) in {6, 7}
             else "maskedSurfaceRequestDigests"
         ): [stage["payloadDigest"] for stage in stages],
         "glyphRevealRequestDigest": glyph_stage["payloadDigest"],
@@ -3491,6 +3516,7 @@ def _build_effect_preview_v3_request(
                 2: EFFECT_PREVIEW_V3_REQUEST_SCHEMA_VERSION,
                 4: EFFECT_PREVIEW_V3_REQUEST_SCHEMA_VERSION_V3,
                 6: EFFECT_PREVIEW_V3_REQUEST_SCHEMA_VERSION_V4,
+                7: EFFECT_PREVIEW_V3_REQUEST_SCHEMA_VERSION_V5,
             }[len(stages)],
             "executionRequestRef": execution_ref,
             "workspaceRef": command["workspaceRef"],
@@ -3638,6 +3664,7 @@ def _validate_v3_effect_preview_result(
         EFFECT_PREVIEW_V3_REQUEST_SCHEMA_VERSION: EFFECT_PREVIEW_RENDERER_VERSION,
         EFFECT_PREVIEW_V3_REQUEST_SCHEMA_VERSION_V3: EFFECT_PREVIEW_RENDERER_VERSION_V3,
         EFFECT_PREVIEW_V3_REQUEST_SCHEMA_VERSION_V4: EFFECT_PREVIEW_RENDERER_VERSION_V4,
+        EFFECT_PREVIEW_V3_REQUEST_SCHEMA_VERSION_V5: EFFECT_PREVIEW_RENDERER_VERSION_V5,
     }[request["schemaVersion"]]
     runtime_identity = {
         "ffmpegIdentity": ffmpeg_identity,
@@ -3981,13 +4008,16 @@ __all__ = [
     "EFFECT_PREVIEW_BINDINGS_SCHEMA_VERSION",
     "EFFECT_PREVIEW_BINDINGS_SCHEMA_VERSION_V2",
     "EFFECT_PREVIEW_BINDINGS_SCHEMA_VERSION_V3",
+    "EFFECT_PREVIEW_BINDINGS_SCHEMA_VERSION_V4",
     "EFFECT_PREVIEW_RENDERER_IDENTITY",
     "EFFECT_PREVIEW_RENDERER_VERSION",
     "EFFECT_PREVIEW_RENDERER_VERSION_V3",
     "EFFECT_PREVIEW_RENDERER_VERSION_V4",
+    "EFFECT_PREVIEW_RENDERER_VERSION_V5",
     "EFFECT_PREVIEW_V3_REQUEST_SCHEMA_VERSION",
     "EFFECT_PREVIEW_V3_REQUEST_SCHEMA_VERSION_V3",
     "EFFECT_PREVIEW_V3_REQUEST_SCHEMA_VERSION_V4",
+    "EFFECT_PREVIEW_V3_REQUEST_SCHEMA_VERSION_V5",
     "EFFECT_PREVIEW_V4_RESULT_SCHEMA_VERSION",
     "FLAME_EXTINGUISH_REQUIREMENT_SCHEMA_VERSION",
     "FLAME_SMOKE_EXECUTION_REQUEST_SCHEMA_VERSION",

@@ -64,10 +64,14 @@ EFFECT_PREVIEW_EXECUTION_REQUEST_SCHEMA_VERSION_V3 = (
 EFFECT_PREVIEW_EXECUTION_REQUEST_SCHEMA_VERSION_V4 = (
     "v4.m13-effect-preview-execution-request.v4"
 )
+EFFECT_PREVIEW_EXECUTION_REQUEST_SCHEMA_VERSION_V5 = (
+    "v4.m13-effect-preview-execution-request.v5"
+)
 EFFECT_PREVIEW_RENDERER_IDENTITY = "v3.deterministic-timeline-preview-ffmpeg"
 EFFECT_PREVIEW_RENDERER_VERSION = "2"
 EFFECT_PREVIEW_RENDERER_VERSION_V3 = "3"
 EFFECT_PREVIEW_RENDERER_VERSION_V4 = "4"
+EFFECT_PREVIEW_RENDERER_VERSION_V5 = "5"
 
 _RAW_DIGEST = re.compile(r"[0-9a-f]{64}\Z")
 _PREFIXED_DIGEST = re.compile(r"sha256:[0-9a-f]{64}\Z")
@@ -1095,6 +1099,9 @@ def _validate_effect_preview_request(value: Mapping[str, Any]) -> dict[str, Any]
     elif schema == EFFECT_PREVIEW_EXECUTION_REQUEST_SCHEMA_VERSION_V4:
         expected_stage_count = 6
         bindings_schema = "v5.m13-effect-preview-bindings.v3"
+    elif schema == EFFECT_PREVIEW_EXECUTION_REQUEST_SCHEMA_VERSION_V5:
+        expected_stage_count = 7
+        bindings_schema = "v5.m13-effect-preview-bindings.v4"
     else:
         raise RenderArtifactError("effect preview execution schema is unsupported")
     if request["publicationAllowed"] is not False:
@@ -1120,10 +1127,14 @@ def _validate_effect_preview_request(value: Mapping[str, Any]) -> dict[str, Any]
     for index, stage in enumerate(stages):
         if index < 4:
             normalized_stages.append(_validate_effect_request(stage))
-        else:
+        elif index < 6:
             from .deterministic_overlays import validate_overlay_preview_stage
 
             normalized_stages.append(validate_overlay_preview_stage(stage))
+        else:
+            from .distance_state import validate_distance_state_preview_stage
+
+            normalized_stages.append(validate_distance_state_preview_stage(stage))
     expected_modes = [
         normalized_stages[0]["effectMode"],
         "LOCAL_EXPOSURE",
@@ -1136,7 +1147,12 @@ def _validate_effect_preview_request(value: Mapping[str, Any]) -> dict[str, Any]
                 "NAMEPLATE_TEXT",
                 "FACE_MARK_COMPENSATION",
             ]
-            if expected_stage_count == 6
+            if expected_stage_count in {6, 7}
+            else []
+        ),
+        *(
+            ["DISTANCE_STATE_TRANSITION"]
+            if expected_stage_count == 7
             else []
         ),
     ]
@@ -1148,7 +1164,7 @@ def _validate_effect_preview_request(value: Mapping[str, Any]) -> dict[str, Any]
     ):
         raise RenderArtifactError("effect preview stages are not in fixed order")
     if (
-        expected_stage_count in {4, 6}
+        expected_stage_count in {4, 6, 7}
         and normalized_stages[2]["localExposureStage"]
         != normalized_stages[1]
     ):
@@ -1246,7 +1262,7 @@ def _validate_effect_preview_request(value: Mapping[str, Any]) -> dict[str, Any]
                 "baseVideo": base,
                 (
                     "deterministicEffectRequestDigests"
-                    if expected_stage_count == 6
+                    if expected_stage_count in {6, 7}
                     else "maskedSurfaceRequestDigests"
                 ): [stage["payloadDigest"] for stage in normalized_stages],
                 "glyphRevealRequestDigest": glyph["payloadDigest"],
@@ -2051,6 +2067,7 @@ class DeterministicMaskedSurfaceExecutor:
             effect_inputs: list[tuple[str, Path]] = []
             stage_input_indices: list[tuple[int, ...]] = []
             overlay_stage_files: dict[int, dict[str, Path]] = {}
+            distance_stage_input_names: dict[int, tuple[str, ...]] = {}
 
             def stage_image(
                 binding: Mapping[str, Any], *, label: str
@@ -2187,6 +2204,24 @@ class DeterministicMaskedSurfaceExecutor:
                         label=f"stage-{index}-face-mark",
                     )
                     stage_input_indices.append((mark_index,))
+                elif mode == "DISTANCE_STATE_TRANSITION":
+                    from .distance_state import distance_state_preview_assets
+
+                    distance_assets = distance_state_preview_assets(stage)
+                    distance_stage_input_names[index] = tuple(
+                        name for name, _binding in distance_assets
+                    )
+                    stage_input_indices.append(
+                        tuple(
+                            stage_image(
+                                binding,
+                                label=f"stage-{index}-distance-{asset_index}",
+                            )
+                            for asset_index, (_name, binding) in enumerate(
+                                distance_assets
+                            )
+                        )
+                    )
                 else:
                     raise RenderArtifactError(
                         "effect preview stage profile is unsupported"
@@ -2253,6 +2288,25 @@ class DeterministicMaskedSurfaceExecutor:
                         input_label=previous_label,
                         smoke_input_index=input_indices[0],
                         emission_input_index=input_indices[1],
+                        prefix=prefix,
+                    )
+                elif stage["effectMode"] == "DISTANCE_STATE_TRANSITION":
+                    from .distance_state import build_distance_state_preview_filters
+
+                    input_names = distance_stage_input_names.get(index, ())
+                    if len(input_names) != len(input_indices):
+                        raise RenderArtifactError(
+                            "distance/state preview inputs are inconsistent"
+                        )
+                    stage_filters, output_label = build_distance_state_preview_filters(
+                        stage,
+                        input_label=previous_label,
+                        asset_input_labels={
+                            name: f"{input_index}:v"
+                            for name, input_index in zip(
+                                input_names, input_indices, strict=True
+                            )
+                        },
                         prefix=prefix,
                     )
                 else:
@@ -2450,6 +2504,7 @@ class DeterministicMaskedSurfaceExecutor:
             EFFECT_PREVIEW_EXECUTION_REQUEST_SCHEMA_VERSION: EFFECT_PREVIEW_RENDERER_VERSION,
             EFFECT_PREVIEW_EXECUTION_REQUEST_SCHEMA_VERSION_V3: EFFECT_PREVIEW_RENDERER_VERSION_V3,
             EFFECT_PREVIEW_EXECUTION_REQUEST_SCHEMA_VERSION_V4: EFFECT_PREVIEW_RENDERER_VERSION_V4,
+            EFFECT_PREVIEW_EXECUTION_REQUEST_SCHEMA_VERSION_V5: EFFECT_PREVIEW_RENDERER_VERSION_V5,
         }[request["schemaVersion"]]
         runtime_payload = {
             "ffmpegIdentity": raw_result["ffmpegIdentity"],
@@ -3120,10 +3175,12 @@ __all__ = [
     "EFFECT_PREVIEW_EXECUTION_REQUEST_SCHEMA_VERSION",
     "EFFECT_PREVIEW_EXECUTION_REQUEST_SCHEMA_VERSION_V3",
     "EFFECT_PREVIEW_EXECUTION_REQUEST_SCHEMA_VERSION_V4",
+    "EFFECT_PREVIEW_EXECUTION_REQUEST_SCHEMA_VERSION_V5",
     "EFFECT_PREVIEW_RENDERER_IDENTITY",
     "EFFECT_PREVIEW_RENDERER_VERSION",
     "EFFECT_PREVIEW_RENDERER_VERSION_V3",
     "EFFECT_PREVIEW_RENDERER_VERSION_V4",
+    "EFFECT_PREVIEW_RENDERER_VERSION_V5",
     "FLAME_SMOKE_EXECUTION_REQUEST_SCHEMA_VERSION",
     "MASKED_SURFACE_EXECUTION_REQUEST_SCHEMA_VERSION",
     "MASKED_SURFACE_RENDERER_IDENTITY",

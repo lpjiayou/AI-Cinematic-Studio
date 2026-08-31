@@ -4,15 +4,15 @@
 >
 > Execution Mode: `AUTO-SEQUENTIAL / CONTRACT-FIRST / FAIL-CLOSED`
 >
-> Project Lead Authorization: `ACS-V5-IDENTITY-REFERENCE-PROJECTION-AND-M13-E3-UNBLOCK`
+> Project Lead Authorization: `ACS-M13-E4-DISTANCE-STATE-AND-FRONTEND-PIN`
 >
-> Authorized Wave: `IDENTITY REFERENCE ARCHITECTURE CHECKPOINT → V5 READ-ONLY IDENTITY REFERENCE PROJECTION → M13-E3 → FRONTEND PIN / SERIAL ONLY`
+> Authorized Wave: `M13-E4 DISTANCE/STATE TRANSITION → FRONTEND PIN / SERIAL ONLY`
 >
-> Current Task: `ACS-V5-IDENTITY-REFERENCE-PROJECTION-AND-M13-E3-UNBLOCK`
+> Current Task: `ACS-M13-E4-DISTANCE-STATE-AND-FRONTEND-PIN`
 >
-> Current Work Package: `M13-E3 IMPLEMENTED CPU-ONLY / M13-E4 NEXT / M12-C3/C4 ENVIRONMENT_HOLD`
+> Current Work Package: `M13-E4 IMPLEMENTED CPU-ONLY / M13-R1 NEXT / M12-C3/C4 ENVIRONMENT_HOLD`
 >
-> Authorized Source Base: `CORE b92bb90a57a5534ca17361c42fc7eb2d7582a448 / TREE 6adb078a7e08629f02dd0a56fa45c94e38f14553 / VERIFIED PR-A/PR-B MERGES`
+> Authorized Source Base: `CORE 023b4b5309969e0cdf21b682b718159cbc16c8c6 / TREE b6cf6028525c0a0f37b2e323852d58741095ea0e / VERIFIED M13-E3 MERGE`
 >
 > M6 Authorization: `ACCEPTED SURFACES / K2-002 MUST CREATE DISTINCT SCOPE AND APPROVALS / NO K2-001 AUTHORITY INHERITANCE`
 >
@@ -36,13 +36,13 @@
 
 ## 0. 2026-08-31 current authority and transition
 
-The Project Lead, Architecture Owner, V5 Identity Domain Owner and M13 Domain Owner
-authorize `ACS-V5-IDENTITY-REFERENCE-PROJECTION-AND-M13-E3-UNBLOCK`. This current
-overlay retains the accepted `ACS-M12-M13-ARCHITECTURE-CORRECTION-20260830` boundary
-and authorizes the serial Identity Reference architecture checkpoint, read-only
-projection/currentness implementation, M13-E3 resumption and Frontend pin update. It
-does not authorize a second Identity authority, live identity writes, Provider/GPU use,
-Asset Admission, publication or later milestones.
+The Project Lead, Architecture Owner and M13 Domain Owner authorize
+`ACS-M13-E4-DISTANCE-STATE-AND-FRONTEND-PIN`. This current overlay retains the
+accepted `ACS-M12-M13-ARCHITECTURE-CORRECTION-20260830` and ADR-0016 boundaries and
+authorizes only the serial M13-E4 deterministic screen-space Distance/State Transition
+and Frontend pin update. It does not authorize real-world distance claims, M6/M8 state
+writes, a second Transform/Timeline/Preview authority, RenderCandidate, Provider/GPU
+use, Asset Admission, publication or later milestones.
 
 The stopped `ACS-M13-E3-CLOSEOUT-AFTER-FONT-AUTHORITY` result remains immutable history:
 M13-E3 was correctly blocked because canonical Identity reference projection and
@@ -60,10 +60,12 @@ no runtime or ML dependency and added no Creator HTTP route. M12-C3/C4 remain on
 The merged prerequisite is a read-only `IdentityReferenceVersionProjection` owned by
 the existing K2 authority identity service and derived from the existing Episode
 Production IdentityLock plus a freshly revalidated external identity-reference decision.
-It creates no Identity root, repository, database, registry or successor lock. M13-E3 now
-adds deterministic Nameplate Text and Face Mark Compensation through the existing V5
-Requirement/Result journal, V4 sealed execution, V3 CPU renderer, Timeline successor and
-PreviewCandidate authorities. A100 remains unauthorized.
+It creates no Identity root, repository, database, registry or successor lock. M13-E3
+added deterministic Nameplate Text and Face Mark Compensation. M13-E4 now adds one
+closed `DISTANCE_STATE_TRANSITION` through the same V5 Requirement/Result journal, V4
+sealed execution, V3 CPU renderer, immutable Timeline successor and PreviewCandidate.
+Its distance semantics are exact screen-space only and its visual states are rendering
+states only, never canonical M6/M8 state. A100 remains unauthorized.
 
 The accepted M12 architecture freezes two distinct isolated runtimes:
 
@@ -120,8 +122,9 @@ BLOCK_REASON=PERSISTENT_CPU_BUILD_ARTIFACT_ROOT_UNAVAILABLE
 M13_FULL_BACKEND_IMPLEMENTATION=AUTHORIZED_CPU_ONLY
 M13_E2=IMPLEMENTED_CPU_ONLY
 M13_E3=IMPLEMENTED_CPU_ONLY
-M13_DETERMINISTIC_POST_PRODUCTION_WIRED=7/8
-M13_E4=NEXT
+M13_E4=IMPLEMENTED_CPU_ONLY
+M13_DETERMINISTIC_POST_PRODUCTION_WIRED=8/8
+M13_R1=NEXT
 V5_FONT_AUTHORITY_CAPABILITY=IMPLEMENTED
 IDENTITY_REFERENCE_PROJECTION=AVAILABLE
 IDENTITY_REFERENCE_CURRENTNESS_REVALIDATION=AVAILABLE

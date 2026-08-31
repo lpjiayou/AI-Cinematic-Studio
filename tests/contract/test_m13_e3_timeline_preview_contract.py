@@ -122,7 +122,7 @@ class M13E3TimelinePreviewContractTests(unittest.TestCase):
         self.assertEqual(V4_BINDINGS_V3, EFFECT_PREVIEW_BINDINGS_SCHEMA_VERSION_V3)
         self.assertEqual(v4_effect_preview_bindings(bindings, GLYPH)[2], expected)
 
-    def test_only_two_four_or_six_stage_profiles_are_accepted(self) -> None:
+    def test_only_closed_stage_lengths_and_ranks_are_accepted(self) -> None:
         bindings = _profile(_SIX_STAGE_MODES)
         for count in (1, 3, 5):
             with self.subTest(count=count):
