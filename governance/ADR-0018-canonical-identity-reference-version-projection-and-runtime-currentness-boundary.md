@@ -127,13 +127,24 @@ digest-pinned external authority bundle，再重新调用 current reader。以�
 拒绝：
 
 - external authority/current reader 未配置；
-- bundle digest 改变或无法验证；
+- 当前 bundle 实际摘要与当前独立配置的预期 SHA-256 不一致，或摘要无法验证；
 - `referenceRef`、`referenceVersionRef` 或 `contentDigest` 漂移；
 - `mediaType`、`rightsState`、`provenance` 或 `approvalRef` 漂移；
 - Root、M6 baseline、IdentityLock scope/lineage/digest stale。
 
 不得在 restart 后仅返回 SQLite 中的历史锁并声明身份引用仍 current，也不得持久化投影
 作为跳过后续外部复核的依据。
+
+`ACS-IDENTITY-CURRENT-PIN-SEMANTICS-20260831` 明确：这里的 bundle pin 是
+`CURRENT_CONFIG_EXACT_SHA256_PER_PROCESS_START`。每次进程启动或 authority reader
+重新装配时，都必须重新读取当前配置的绝对路径与独立预期 SHA-256、重新计算文件摘要，
+并在两者不一致时 fail closed。IdentityLock v1 不持久化 bundle SHA-256，也不要求跨重启
+bundle SHA-256 相等。若 operator 更新当前配置 pin，且新 bundle 通过 closed-world、重复键、
+scope 与字段验证，则 bundle bytes 或无关 entry 的改变不会使七字段完全相同的已锁身份决定
+失效。身份语义 currentness 仍只由锁内七字段的精确匹配证明；bundle SHA-256 不进入
+`IdentityReferenceVersionProjection` 内容摘要，不创建 BundleVersion repository，也不形成
+第二 Identity authority。未来若需长期 bundle identity 谱系，必须另行通过 Accepted ADR 与
+additive 持久化合同授权。
 
 ### M13 Face Mark 请求与服务端解析边界
 
@@ -268,4 +279,5 @@ payload digest，或必须让 M13 写 Identity，则立即停止。
 
 | 日期 | 决策方 | 变更 | Decision Ref |
 | --- | --- | --- | --- |
+| `2026-08-31` | Project Lead / Architecture Owner / V5 Identity Domain Owner | 明确 current-config pin 语义：每次装配重新验证当前 bundle 与当前 SHA-256；不持久化或跨重启绑定 bundle SHA，身份 currentness 继续以七字段精确匹配为准 | `ACS-IDENTITY-CURRENT-PIN-SEMANTICS-20260831` |
 | `2026-08-31` | Project Lead / Architecture Owner / V5 Identity Domain Owner / M13 Domain Owner / Security / External Authority Boundary Owner | 创建并接受 ADR-0018；冻结 existing IdentityLock + fresh external decision 的只读 projection、runtime currentness 和 M13 服务端解析边界 | `ACS-V5-IDENTITY-REFERENCE-PROJECTION-AND-M13-E3-UNBLOCK` |

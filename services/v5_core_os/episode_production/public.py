@@ -23,6 +23,7 @@ from .authority import (
     AuthorityRequiredError,
     K2AuthorityIdentityService,
     RejectingIdentityReferenceAuthority,
+    RejectingIdentityReferenceCurrentReader,
 )
 from .assets import K2AssetPipelineService
 from .audio import K2AudioProductionService
@@ -418,6 +419,19 @@ class EpisodeProductionPublicBoundary:
     ) -> dict[str, Any]:
         return self._invoke(
             self.__authority_identity.get_authority_identity, workspace_ref, run_ref
+        )
+
+    def require_current_identity_reference_projection(
+        self,
+        workspace_ref: str,
+        run_ref: str,
+        character_ref: str,
+    ) -> dict[str, Any]:
+        return self._invoke(
+            self.__authority_identity.require_current_identity_reference_projection,
+            workspace_ref,
+            run_ref,
+            character_ref,
         )
 
     def record_production_policy(self, command: Mapping[str, Any]) -> dict[str, Any]:
@@ -904,6 +918,7 @@ def _services(
     series_planning_boundary,
     script_studio_boundary,
     identity_reference_authority=None,
+    identity_reference_current_reader=None,
     rights_evidence_authority=None,
     provider_policy_authority=None,
     provider_experiment_execution=None,
@@ -935,6 +950,23 @@ def _services(
         lambda prefix: f"{prefix}-{uuid4().hex}"
     )
     selected_clock = clock or _utc_now
+    selected_identity_reference_authority = (
+        identity_reference_authority
+        if identity_reference_authority is not None
+        else RejectingIdentityReferenceAuthority()
+    )
+    selected_identity_reference_current_reader = identity_reference_current_reader
+    if selected_identity_reference_current_reader is None:
+        candidate_reader = getattr(
+            selected_identity_reference_authority,
+            "require_current_reference",
+            None,
+        )
+        selected_identity_reference_current_reader = (
+            selected_identity_reference_authority
+            if callable(candidate_reader)
+            else RejectingIdentityReferenceCurrentReader()
+        )
     service = EpisodeProductionService(
         repository,
         project_reader=project_boundary,
@@ -948,8 +980,9 @@ def _services(
         service,
         evidence_repository,
         m6_reader=script_studio_boundary,
-        identity_reference_authority=(
-            identity_reference_authority or RejectingIdentityReferenceAuthority()
+        identity_reference_authority=selected_identity_reference_authority,
+        identity_reference_current_reader=(
+            selected_identity_reference_current_reader
         ),
         ref_factory=selected_ref_factory,
         clock=selected_clock,
@@ -1064,6 +1097,7 @@ def create_in_memory_boundary(
     series_planning_boundary,
     script_studio_boundary,
     identity_reference_authority=None,
+    identity_reference_current_reader=None,
     rights_evidence_authority=None,
     provider_policy_authority=None,
     provider_experiment_execution=None,
@@ -1102,6 +1136,7 @@ def create_in_memory_boundary(
         series_planning_boundary=series_planning_boundary,
         script_studio_boundary=script_studio_boundary,
         identity_reference_authority=identity_reference_authority,
+        identity_reference_current_reader=identity_reference_current_reader,
         rights_evidence_authority=rights_evidence_authority,
         provider_policy_authority=provider_policy_authority,
         provider_experiment_execution=provider_experiment_execution,
@@ -1144,6 +1179,7 @@ def create_local_development_boundary(
     provider_experiment_database_path: Path | str | None = None,
     voice_lock_database_path: Path | str | None = None,
     identity_reference_authority=None,
+    identity_reference_current_reader=None,
     rights_evidence_authority=None,
     provider_policy_authority=None,
     provider_experiment_execution=None,
@@ -1215,6 +1251,7 @@ def create_local_development_boundary(
         series_planning_boundary=series_planning_boundary,
         script_studio_boundary=script_studio_boundary,
         identity_reference_authority=identity_reference_authority,
+        identity_reference_current_reader=identity_reference_current_reader,
         rights_evidence_authority=rights_evidence_authority,
         provider_policy_authority=provider_policy_authority,
         provider_experiment_execution=provider_experiment_execution,
@@ -1257,6 +1294,17 @@ def create_local_development_boundary_from_environment(
     rights_authority, provider_authority = external_authorities_from_environment(values)
     identity_reference_authority = (
         identity_reference_authority_from_environment(values)
+    )
+    identity_reference_current_reader = (
+        identity_reference_authority
+        if callable(
+            getattr(
+                identity_reference_authority,
+                "require_current_reference",
+                None,
+            )
+        )
+        else None
     )
     approval_authority = delivery_approval_authority_from_environment(values)
     media_selection_approval_authority = (
@@ -1357,6 +1405,7 @@ def create_local_development_boundary_from_environment(
         script_studio_boundary=script_studio_boundary,
         production_policy_database_path=production_policy_path,
         identity_reference_authority=identity_reference_authority,
+        identity_reference_current_reader=identity_reference_current_reader,
         rights_evidence_authority=rights_authority,
         provider_policy_authority=provider_authority,
         provider_experiment_execution=provider_experiment_execution,
