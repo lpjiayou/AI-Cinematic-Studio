@@ -163,7 +163,14 @@ EPISODE_PRODUCTION_SUBRESOURCES = {
 
 _TIMELINE_WRITE_RESOURCES = frozenset({"timeline", "timeline-edits"})
 _DETERMINISTIC_EFFECT_WRITE_RESOURCE = "deterministic-effects"
-_DETERMINISTIC_EFFECT_KINDS = frozenset({"FLAME_EXTINGUISH", "SMOKE"})
+_DETERMINISTIC_EFFECT_KINDS = frozenset(
+    {
+        "FLAME_EXTINGUISH",
+        "SMOKE",
+        "NAMEPLATE_TEXT",
+        "FACE_MARK_COMPENSATION",
+    }
+)
 _DETERMINISTIC_EFFECT_WRITE_FIELDS = frozenset(
     {"expectedRunVersion", "idempotencyKey", "effectKind", "requirement"}
 )
@@ -173,11 +180,36 @@ _DETERMINISTIC_EFFECT_FORBIDDEN_CLIENT_FIELDS = frozenset(
         "actorref",
         "approvalref",
         "canonicalmutations",
+        "css",
         "environmentoverride",
         "filter",
         "filterexpression",
         "ffmpegargv",
         "ffmpegfilter",
+        "externaldecisiondigest",
+        "fontfiledigest",
+        "fontlicensebindingversiondigest",
+        "fontlicensebindingversionref",
+        "fontpath",
+        "fonttechnicalvalidationdigest",
+        "fonttechnicalvalidationref",
+        "html",
+        "identitylock",
+        "identitylockdigest",
+        "identitylockref",
+        "identitylockversionref",
+        "identityreferencecontentdigest",
+        "identityreferenceprojectiondigest",
+        "identityreferenceref",
+        "identityreferenceversionref",
+        "identityversion",
+        "identityversiondigest",
+        "identityversionref",
+        "language",
+        "licenselocalpath",
+        "markfiledigest",
+        "markpath",
+        "markpixeldigest",
         "modelpath",
         "networkurl",
         "path",
@@ -185,11 +217,21 @@ _DETERMINISTIC_EFFECT_FORBIDDEN_CLIENT_FIELDS = frozenset(
         "publicationallowed",
         "pythonexpression",
         "rawassetversion",
+        "rawidentitylock",
+        "rawidentityversion",
+        "rawtextsource",
+        "resolvedtext",
+        "resolvedtextdigest",
         "rawtimelineversion",
         "shellcommand",
+        "storagebindingref",
         "storagekey",
+        "svg",
         "workspaceref",
     }
+)
+_DETERMINISTIC_OVERLAY_SERVER_FIELDS = frozenset(
+    {"baseplatefiledigest", "baseplatepixeldigest"}
 )
 _TIMELINE_FORBIDDEN_CLIENT_FIELDS = frozenset(
     {
@@ -250,12 +292,21 @@ def _contains_forbidden_timeline_client_claim(value: Any) -> bool:
     return False
 
 
-def _contains_forbidden_deterministic_effect_claim(value: Any) -> bool:
+def _contains_forbidden_deterministic_effect_claim(
+    value: Any, *, effect_kind: str | None = None
+) -> bool:
     if isinstance(value, Mapping):
+        if effect_kind is None and isinstance(value.get("effectKind"), str):
+            effect_kind = value["effectKind"]
         for field, item in value.items():
             normalized = str(field).replace("_", "").replace("-", "").lower()
             if (
                 normalized in _DETERMINISTIC_EFFECT_FORBIDDEN_CLIENT_FIELDS
+                or (
+                    effect_kind
+                    in {"NAMEPLATE_TEXT", "FACE_MARK_COMPENSATION"}
+                    and normalized in _DETERMINISTIC_OVERLAY_SERVER_FIELDS
+                )
                 or normalized.endswith("path")
                 or normalized.endswith("storagekey")
                 or normalized.endswith("argv")
@@ -270,12 +321,16 @@ def _contains_forbidden_deterministic_effect_claim(value: Any) -> bool:
                         "outputpath",
                     )
                 )
-                or _contains_forbidden_deterministic_effect_claim(item)
+                or _contains_forbidden_deterministic_effect_claim(
+                    item, effect_kind=effect_kind
+                )
             ):
                 return True
     elif isinstance(value, list):
         return any(
-            _contains_forbidden_deterministic_effect_claim(item)
+            _contains_forbidden_deterministic_effect_claim(
+                item, effect_kind=effect_kind
+            )
             for item in value
         )
     return False
@@ -559,7 +614,9 @@ class CreatorRequestHandler(BaseHTTPRequestHandler):
                     or payload.get("effectKind") not in _DETERMINISTIC_EFFECT_KINDS
                     or not isinstance(requirement, Mapping)
                     or requirement.get("effectMode") != payload.get("effectKind")
-                    or _contains_forbidden_deterministic_effect_claim(payload)
+                    or _contains_forbidden_deterministic_effect_claim(
+                        payload, effect_kind=payload.get("effectKind")
+                    )
                 ):
                     self._send_application_error(400, "invalid_request")
                     return

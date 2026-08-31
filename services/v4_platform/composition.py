@@ -1955,14 +1955,37 @@ class V4CompositionExecutor:
     adapter_identity = "v4.local-composition-executor.v1"
     provenance = "LOCAL_EVIDENCE"
 
-    def __init__(self, composer: DeterministicFfmpegComposer) -> None:
+    def __init__(
+        self,
+        composer: DeterministicFfmpegComposer,
+        *,
+        font_asset_authority: Any | None = None,
+    ) -> None:
         self.composer = composer
         self.artifact_root = Path(composer.artifact_root).resolve()
+        self.font_asset_authority = font_asset_authority
 
     @classmethod
-    def from_artifact_root(cls, artifact_root: Path | str) -> "V4CompositionExecutor":
+    def from_artifact_root(
+        cls,
+        artifact_root: Path | str,
+        *,
+        font_asset_authority: Any | None = None,
+    ) -> "V4CompositionExecutor":
         """Compose the V4 execution boundary without exposing V3 to V5 callers."""
-        return cls(DeterministicFfmpegComposer(artifact_root))
+        return cls(
+            DeterministicFfmpegComposer(artifact_root),
+            font_asset_authority=font_asset_authority,
+        )
+
+    def bind_font_asset_authority(self, authority: Any) -> None:
+        """Late-bind the one existing FONT authority; replacement is forbidden."""
+
+        if authority is None:
+            raise CompositionExecutionError("FONT authority is required")
+        if self.font_asset_authority is not None and self.font_asset_authority is not authority:
+            raise CompositionExecutionError("FONT authority is already bound")
+        self.font_asset_authority = authority
 
     def compose(self, command: Mapping[str, Any]) -> dict[str, Any]:
         try:
@@ -2245,6 +2268,7 @@ class V4CompositionExecutor:
             executor = V4MaskedSurfaceEffectExecutor(
                 self.artifact_root,
                 DeterministicMaskedSurfaceExecutor(self.artifact_root),
+                font_asset_authority=self.font_asset_authority,
             )
             return executor.compose_timeline_preview_v2(
                 command,
@@ -2285,6 +2309,73 @@ class V4CompositionExecutor:
         except MaskedSurfaceExecutionError as exc:
             raise CompositionExecutionError(
                 "V3 Flame/Smoke composition failed"
+            ) from exc
+
+    def execute_deterministic_overlay(
+        self,
+        request: Mapping[str, Any],
+        *,
+        resolved_asset_versions: Mapping[str, Mapping[str, Any]],
+    ) -> dict[str, Any]:
+        """Bridge one closed M13-E3 overlay through the existing V4 owner."""
+
+        from .deterministic_overlays import (
+            OverlayExecutionError,
+            V4DeterministicOverlayExecutor,
+        )
+
+        try:
+            executor = V4DeterministicOverlayExecutor.from_artifact_root(
+                self.artifact_root,
+                font_asset_authority=self.font_asset_authority,
+            )
+            return executor.execute(
+                request,
+                resolved_asset_versions=resolved_asset_versions,
+            )
+        except OverlayExecutionError as exc:
+            raise CompositionExecutionError(
+                "V3 deterministic overlay composition failed"
+            ) from exc
+
+    def inspect_deterministic_overlay_image(
+        self, asset: Mapping[str, Any]
+    ) -> dict[str, Any]:
+        """Remeasure one canonical PNG mark without accepting a caller path."""
+
+        from .deterministic_overlays import (
+            OverlayExecutionError,
+            inspect_deterministic_overlay_image,
+        )
+
+        try:
+            return inspect_deterministic_overlay_image(
+                self.artifact_root,
+                asset,
+            )
+        except OverlayExecutionError as exc:
+            raise CompositionExecutionError(
+                "deterministic overlay image inspection failed"
+            ) from exc
+
+    def inspect_deterministic_overlay_video(
+        self, asset: Mapping[str, Any]
+    ) -> dict[str, Any]:
+        """Remeasure one canonical base video without accepting a caller path."""
+
+        from .deterministic_overlays import (
+            OverlayExecutionError,
+            inspect_deterministic_overlay_video,
+        )
+
+        try:
+            return inspect_deterministic_overlay_video(
+                self.artifact_root,
+                asset,
+            )
+        except OverlayExecutionError as exc:
+            raise CompositionExecutionError(
+                "deterministic overlay video inspection failed"
             ) from exc
 
     def finalize(self, command: Mapping[str, Any]) -> dict[str, Any]:

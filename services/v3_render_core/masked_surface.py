@@ -8,6 +8,7 @@ integer keyframes.
 
 from __future__ import annotations
 
+from contextlib import ExitStack
 from copy import deepcopy
 from fractions import Fraction
 from hashlib import sha256
@@ -39,6 +40,8 @@ from .digests import (
     DECODED_FRAME_PIXEL_DIGEST_SPEC_V2,
     DigestError,
     IMAGE_PIXEL_DIGEST_SPEC,
+    _decoded_rgba_sha256,
+    _probe_video_stream,
     decoded_frame_pixel_digest_metadata,
     image_digest_metadata,
 )
@@ -58,9 +61,13 @@ EFFECT_PREVIEW_EXECUTION_REQUEST_SCHEMA_VERSION = (
 EFFECT_PREVIEW_EXECUTION_REQUEST_SCHEMA_VERSION_V3 = (
     "v4.m13-effect-preview-execution-request.v3"
 )
+EFFECT_PREVIEW_EXECUTION_REQUEST_SCHEMA_VERSION_V4 = (
+    "v4.m13-effect-preview-execution-request.v4"
+)
 EFFECT_PREVIEW_RENDERER_IDENTITY = "v3.deterministic-timeline-preview-ffmpeg"
 EFFECT_PREVIEW_RENDERER_VERSION = "2"
 EFFECT_PREVIEW_RENDERER_VERSION_V3 = "3"
+EFFECT_PREVIEW_RENDERER_VERSION_V4 = "4"
 
 _RAW_DIGEST = re.compile(r"[0-9a-f]{64}\Z")
 _PREFIXED_DIGEST = re.compile(r"sha256:[0-9a-f]{64}\Z")
@@ -1085,6 +1092,9 @@ def _validate_effect_preview_request(value: Mapping[str, Any]) -> dict[str, Any]
     elif schema == EFFECT_PREVIEW_EXECUTION_REQUEST_SCHEMA_VERSION_V3:
         expected_stage_count = 4
         bindings_schema = "v5.m13-effect-preview-bindings.v2"
+    elif schema == EFFECT_PREVIEW_EXECUTION_REQUEST_SCHEMA_VERSION_V4:
+        expected_stage_count = 6
+        bindings_schema = "v5.m13-effect-preview-bindings.v3"
     else:
         raise RenderArtifactError("effect preview execution schema is unsupported")
     if request["publicationAllowed"] is not False:
@@ -1106,11 +1116,29 @@ def _validate_effect_preview_request(value: Mapping[str, Any]) -> dict[str, Any]
     stages = request["effectStages"]
     if not isinstance(stages, list) or len(stages) != expected_stage_count:
         raise RenderArtifactError("effect preview stage profile is invalid")
-    normalized_stages = [_validate_effect_request(stage) for stage in stages]
+    normalized_stages = []
+    for index, stage in enumerate(stages):
+        if index < 4:
+            normalized_stages.append(_validate_effect_request(stage))
+        else:
+            from .deterministic_overlays import validate_overlay_preview_stage
+
+            normalized_stages.append(validate_overlay_preview_stage(stage))
     expected_modes = [
         normalized_stages[0]["effectMode"],
         "LOCAL_EXPOSURE",
-        *(["FLAME_EXTINGUISH", "SMOKE"] if expected_stage_count == 4 else []),
+        *(
+            ["FLAME_EXTINGUISH", "SMOKE"]
+            if expected_stage_count == 4
+            else [
+                "FLAME_EXTINGUISH",
+                "SMOKE",
+                "NAMEPLATE_TEXT",
+                "FACE_MARK_COMPENSATION",
+            ]
+            if expected_stage_count == 6
+            else []
+        ),
     ]
     if (
         normalized_stages[0]["effectMode"]
@@ -1120,7 +1148,7 @@ def _validate_effect_preview_request(value: Mapping[str, Any]) -> dict[str, Any]
     ):
         raise RenderArtifactError("effect preview stages are not in fixed order")
     if (
-        expected_stage_count == 4
+        expected_stage_count in {4, 6}
         and normalized_stages[2]["localExposureStage"]
         != normalized_stages[1]
     ):
@@ -1143,6 +1171,12 @@ def _validate_effect_preview_request(value: Mapping[str, Any]) -> dict[str, Any]
         raise RenderArtifactError("effect preview result bindings are invalid")
     bindings: list[dict[str, Any]] = []
     for index, (item, stage) in enumerate(zip(bindings_value, normalized_stages, strict=True)):
+        stage_semantics = (
+            stage["overlaySpec"]
+            if stage["effectMode"]
+            in {"NAMEPLATE_TEXT", "FACE_MARK_COMPENSATION"}
+            else stage
+        )
         binding = _closed(
             item,
             _EFFECT_RESULT_BINDING_FIELDS,
@@ -1172,8 +1206,10 @@ def _validate_effect_preview_request(value: Mapping[str, Any]) -> dict[str, Any]
             or binding["requirementDigest"] != stage["requirementDigest"]
             or binding["executionRequestRef"] != stage["v5ExecutionRequestRef"]
             or binding["executionRequestDigest"] != stage["v5ExecutionRequestDigest"]
-            or binding["frameRangeStartInclusive"] != stage["frameRangeStartInclusive"]
-            or binding["frameRangeEndExclusive"] != stage["frameRangeEndExclusive"]
+            or binding["frameRangeStartInclusive"]
+            != stage_semantics["frameRangeStartInclusive"]
+            or binding["frameRangeEndExclusive"]
+            != stage_semantics["frameRangeEndExclusive"]
         ):
             raise RenderArtifactError("effect preview result binding is stale")
         bindings.append(binding)
@@ -1208,7 +1244,11 @@ def _validate_effect_preview_request(value: Mapping[str, Any]) -> dict[str, Any]
         _canonical_json(
             {
                 "baseVideo": base,
-                "maskedSurfaceRequestDigests": [stage["payloadDigest"] for stage in normalized_stages],
+                (
+                    "deterministicEffectRequestDigests"
+                    if expected_stage_count == 6
+                    else "maskedSurfaceRequestDigests"
+                ): [stage["payloadDigest"] for stage in normalized_stages],
                 "glyphRevealRequestDigest": glyph["payloadDigest"],
                 "effectResultBindings": bindings,
                 "glyphRequirementBinding": glyph_binding,
@@ -1687,7 +1727,12 @@ def _glyph_stage_filters(
     return filters, final_label
 
 
-def _probe_video(path: Path, ffprobe: _PinnedRuntimeBinary) -> dict[str, Any]:
+def _probe_video(
+    path: Path,
+    ffprobe: _PinnedRuntimeBinary,
+    *,
+    pass_fds: Sequence[int] = (),
+) -> dict[str, Any]:
     try:
         completed = subprocess.run(
             [
@@ -1714,7 +1759,7 @@ def _probe_video(path: Path, ffprobe: _PinnedRuntimeBinary) -> dict[str, Any]:
             errors="strict",
             timeout=60,
             env=_fixed_environment(),
-            pass_fds=ffprobe.pass_fds,
+            pass_fds=tuple(dict.fromkeys(ffprobe.pass_fds + tuple(pass_fds))),
         )
         payload = json.loads(completed.stdout)
     except (OSError, subprocess.SubprocessError, UnicodeError, json.JSONDecodeError) as exc:
@@ -1756,6 +1801,48 @@ def _probe_video(path: Path, ffprobe: _PinnedRuntimeBinary) -> dict[str, Any]:
         "pixelFormat": stream.get("pix_fmt"),
         "videoCodec": stream.get("codec_name"),
         "formatName": payload.get("format", {}).get("format_name"),
+    }
+
+
+def _held_png_digest_metadata(
+    path: Path,
+    *,
+    ffmpeg: _PinnedRuntimeBinary,
+    ffprobe: _PinnedRuntimeBinary,
+    pass_fds: tuple[int, ...],
+) -> dict[str, object]:
+    """Measure one held PNG inode without reopening its staging path."""
+
+    probe = _probe_video_stream(
+        path,
+        ffprobe_path=ffprobe.executable_path,
+        pass_fds=pass_fds,
+    )
+    if (
+        probe["codecName"] != "png"
+        or probe["formatName"] != "png_pipe"
+        or probe["frameCount"] != 1
+    ):
+        raise DigestError(
+            "image pixel digest input must be a single-frame PNG"
+        )
+    pixel_hex, byte_count = _decoded_rgba_sha256(
+        path,
+        frame_count=1,
+        ffmpeg_path=ffmpeg.executable_path,
+        pass_fds=pass_fds,
+    )
+    if byte_count != probe["width"] * probe["height"] * 4:
+        raise DigestError(
+            "image pixel digest decoded byte count is invalid"
+        )
+    return {
+        "width": probe["width"],
+        "height": probe["height"],
+        "source_mode": None,
+        "pixel_mode": "RGBA",
+        "pixel_digest": f"sha256:{pixel_hex}",
+        "pixel_digest_spec": IMAGE_PIXEL_DIGEST_SPEC,
     }
 
 
@@ -1905,7 +1992,7 @@ class DeterministicMaskedSurfaceExecutor:
         pass_fds = tuple(dict.fromkeys(ffmpeg.pass_fds + ffprobe.pass_fds))
         with tempfile.TemporaryDirectory(
             prefix=".effect-preview-work-", dir=self.artifact_root
-        ) as temporary:
+        ) as temporary, ExitStack() as overlay_stack:
             work_root = Path(temporary)
             work_root.chmod(0o700)
             inputs = work_root / "inputs"
@@ -1914,7 +2001,28 @@ class DeterministicMaskedSurfaceExecutor:
             _stage_digest_pinned_input(
                 base_source, base_path, base["fileDigest"]
             )
-            base_probe = _probe_video(base_path, ffprobe)
+            input_file_pins: list[_PinnedRegularFile] = []
+            input_pass_fds: list[int] = []
+
+            def pin_input(path: Path, *, label: str) -> Path:
+                pinned = overlay_stack.enter_context(
+                    _PinnedRegularFile(path, label=label)
+                )
+                input_file_pins.append(pinned)
+                input_pass_fds.extend(pinned.pass_fds)
+                return pinned.descriptor_path
+
+            def active_pass_fds() -> tuple[int, ...]:
+                return tuple(
+                    dict.fromkeys(pass_fds + tuple(input_pass_fds))
+                )
+
+            base_path = pin_input(
+                base_path, label="effect preview staged base"
+            )
+            base_probe = _probe_video(
+                base_path, ffprobe, pass_fds=active_pass_fds()
+            )
             expected_visual = {
                 "width": base["width"],
                 "height": base["height"],
@@ -1930,7 +2038,7 @@ class DeterministicMaskedSurfaceExecutor:
                     base_path,
                     ffmpeg_path=ffmpeg.executable_path,
                     ffprobe_path=ffprobe.executable_path,
-                    pass_fds=pass_fds,
+                    pass_fds=active_pass_fds(),
                 )
             except DigestError as exc:
                 raise RenderArtifactError("effect preview base digest failed") from exc
@@ -1942,6 +2050,7 @@ class DeterministicMaskedSurfaceExecutor:
 
             effect_inputs: list[tuple[str, Path]] = []
             stage_input_indices: list[tuple[int, ...]] = []
+            overlay_stage_files: dict[int, dict[str, Path]] = {}
 
             def stage_image(
                 binding: Mapping[str, Any], *, label: str
@@ -1951,12 +2060,15 @@ class DeterministicMaskedSurfaceExecutor:
                 )
                 path = inputs / f"effect-{len(effect_inputs):04d}-{label}.png"
                 _stage_digest_pinned_input(source, path, binding["fileDigest"])
+                path = pin_input(
+                    path, label=f"effect preview staged {label}"
+                )
                 try:
-                    measured = image_digest_metadata(
+                    measured = _held_png_digest_metadata(
                         path,
-                        ffmpeg_path=ffmpeg.executable_path,
-                        ffprobe_path=ffprobe.executable_path,
-                        pass_fds=pass_fds,
+                        ffmpeg=ffmpeg,
+                        ffprobe=ffprobe,
+                        pass_fds=active_pass_fds(),
                     )
                 except DigestError as exc:
                     raise RenderArtifactError(
@@ -1992,7 +2104,7 @@ class DeterministicMaskedSurfaceExecutor:
                             ),
                         )
                     )
-                else:
+                elif mode == "SMOKE":
                     if stage["smokeSourceKind"] == "PINNED_SMOKE_LAYER":
                         smoke_index = stage_image(
                             stage["smokeLayer"],
@@ -2005,6 +2117,13 @@ class DeterministicMaskedSurfaceExecutor:
                             seed=stage["deterministicSeed"],
                             frame_count=base["frameCount"],
                         )
+                        path = pin_input(
+                            path,
+                            label=(
+                                "effect preview staged procedural smoke "
+                                f"{index}"
+                            ),
+                        )
                         smoke_index = 1 + len(effect_inputs)
                         effect_inputs.append(("raw-smoke", path))
                     emission_index = stage_image(
@@ -2012,6 +2131,66 @@ class DeterministicMaskedSurfaceExecutor:
                         label=f"stage-{index}-emission-mask",
                     )
                     stage_input_indices.append((smoke_index, emission_index))
+                elif mode == "NAMEPLATE_TEXT":
+                    from .deterministic_overlays import overlay_text_bytes
+
+                    font = stage["overlayAsset"]
+                    source = _safe_glyph_input(
+                        self.artifact_root, font["storageKey"]
+                    )
+                    font_path = inputs / f"overlay-{index:04d}-font.ttf"
+                    _stage_digest_pinned_input(
+                        source, font_path, font["fileDigest"]
+                    )
+                    text_path = inputs / f"overlay-{index:04d}-text.txt"
+                    text_fd: int | None = None
+                    try:
+                        text_fd = os.open(
+                            text_path,
+                            os.O_WRONLY
+                            | os.O_CREAT
+                            | os.O_EXCL
+                            | getattr(os, "O_NOFOLLOW", 0),
+                            0o400,
+                        )
+                        text_payload = overlay_text_bytes(stage)
+                        view = memoryview(text_payload)
+                        while view:
+                            written = os.write(text_fd, view)
+                            if written <= 0:
+                                raise OSError("short Nameplate text write")
+                            view = view[written:]
+                        os.fsync(text_fd)
+                    except (OSError, UnicodeError) as exc:
+                        raise RenderArtifactError(
+                            "effect preview Nameplate text staging failed"
+                        ) from exc
+                    finally:
+                        if text_fd is not None:
+                            os.close(text_fd)
+                    font_path = pin_input(
+                        font_path,
+                        label=f"effect preview Nameplate font {index}",
+                    )
+                    text_path = pin_input(
+                        text_path,
+                        label=f"effect preview Nameplate text {index}",
+                    )
+                    overlay_stage_files[index] = {
+                        "fontPath": font_path,
+                        "textPath": text_path,
+                    }
+                    stage_input_indices.append(())
+                elif mode == "FACE_MARK_COMPENSATION":
+                    mark_index = stage_image(
+                        stage["overlayAsset"],
+                        label=f"stage-{index}-face-mark",
+                    )
+                    stage_input_indices.append((mark_index,))
+                else:
+                    raise RenderArtifactError(
+                        "effect preview stage profile is unsupported"
+                    )
 
             glyph_mask_paths: list[Path] = []
             for index, mask in enumerate(glyph["masks"]):
@@ -2020,12 +2199,16 @@ class DeterministicMaskedSurfaceExecutor:
                 )
                 path = inputs / f"glyph-mask-{index}.png"
                 _stage_digest_pinned_input(source, path, mask["fileDigest"])
+                path = pin_input(
+                    path,
+                    label=f"effect preview staged Glyph mask {index}",
+                )
                 try:
-                    measured = image_digest_metadata(
+                    measured = _held_png_digest_metadata(
                         path,
-                        ffmpeg_path=ffmpeg.executable_path,
-                        ffprobe_path=ffprobe.executable_path,
-                        pass_fds=pass_fds,
+                        ffmpeg=ffmpeg,
+                        ffprobe=ffprobe,
+                        pass_fds=active_pass_fds(),
                     )
                 except DigestError as exc:
                     raise RenderArtifactError(
@@ -2064,13 +2247,32 @@ class DeterministicMaskedSurfaceExecutor:
                         mask_input_index=input_indices[0],
                         prefix=prefix,
                     )
-                else:
+                elif stage["effectMode"] == "SMOKE":
                     stage_filters, output_label = _smoke_stage_filters(
                         stage,
                         input_label=previous_label,
                         smoke_input_index=input_indices[0],
                         emission_input_index=input_indices[1],
                         prefix=prefix,
+                    )
+                else:
+                    from .deterministic_overlays import (
+                        build_overlay_stage_filters,
+                    )
+
+                    overlay_files = overlay_stage_files.get(index, {})
+                    stage_filters, output_label = build_overlay_stage_filters(
+                        stage,
+                        input_label=previous_label,
+                        prefix=prefix,
+                        font_path=overlay_files.get("fontPath"),
+                        text_path=overlay_files.get("textPath"),
+                        overlay_input_label=(
+                            f"{input_indices[0]}:v"
+                            if stage["effectMode"]
+                            == "FACE_MARK_COMPENSATION"
+                            else None
+                        ),
                     )
                 filters.extend(stage_filters)
                 previous_label = output_label
@@ -2196,7 +2398,7 @@ class DeterministicMaskedSurfaceExecutor:
                     capture_output=True,
                     timeout=300,
                     env=_fixed_environment(),
-                    pass_fds=pass_fds,
+                    pass_fds=active_pass_fds(),
                 )
             except (OSError, subprocess.SubprocessError) as exc:
                 message = ""
@@ -2208,6 +2410,8 @@ class DeterministicMaskedSurfaceExecutor:
                     "FFmpeg effect preview visual replay failed"
                     + (f": {message}" if message else "")
                 ) from exc
+            for input_pin in input_file_pins:
+                input_pin.require_stable()
             _validate_probe(_probe_video(visual, ffprobe), expected_visual, input_media=False)
             try:
                 visual_digest = decoded_frame_pixel_digest_metadata(
@@ -2242,12 +2446,11 @@ class DeterministicMaskedSurfaceExecutor:
             ffmpeg.require_stable()
             ffprobe.require_stable()
 
-        renderer_version = (
-            EFFECT_PREVIEW_RENDERER_VERSION
-            if request["schemaVersion"]
-            == EFFECT_PREVIEW_EXECUTION_REQUEST_SCHEMA_VERSION
-            else EFFECT_PREVIEW_RENDERER_VERSION_V3
-        )
+        renderer_version = {
+            EFFECT_PREVIEW_EXECUTION_REQUEST_SCHEMA_VERSION: EFFECT_PREVIEW_RENDERER_VERSION,
+            EFFECT_PREVIEW_EXECUTION_REQUEST_SCHEMA_VERSION_V3: EFFECT_PREVIEW_RENDERER_VERSION_V3,
+            EFFECT_PREVIEW_EXECUTION_REQUEST_SCHEMA_VERSION_V4: EFFECT_PREVIEW_RENDERER_VERSION_V4,
+        }[request["schemaVersion"]]
         runtime_payload = {
             "ffmpegIdentity": raw_result["ffmpegIdentity"],
             "rendererIdentity": EFFECT_PREVIEW_RENDERER_IDENTITY,
@@ -2916,9 +3119,11 @@ __all__ = [
     "DeterministicMaskedSurfaceExecutor",
     "EFFECT_PREVIEW_EXECUTION_REQUEST_SCHEMA_VERSION",
     "EFFECT_PREVIEW_EXECUTION_REQUEST_SCHEMA_VERSION_V3",
+    "EFFECT_PREVIEW_EXECUTION_REQUEST_SCHEMA_VERSION_V4",
     "EFFECT_PREVIEW_RENDERER_IDENTITY",
     "EFFECT_PREVIEW_RENDERER_VERSION",
     "EFFECT_PREVIEW_RENDERER_VERSION_V3",
+    "EFFECT_PREVIEW_RENDERER_VERSION_V4",
     "FLAME_SMOKE_EXECUTION_REQUEST_SCHEMA_VERSION",
     "MASKED_SURFACE_EXECUTION_REQUEST_SCHEMA_VERSION",
     "MASKED_SURFACE_RENDERER_IDENTITY",

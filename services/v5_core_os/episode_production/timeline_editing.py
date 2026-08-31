@@ -109,12 +109,17 @@ M13_E1_DETERMINISTIC_EFFECT_KINDS = frozenset(
 M13_E2_DETERMINISTIC_EFFECT_KINDS = frozenset(
     {"FLAME_EXTINGUISH", "SMOKE"}
 )
+M13_E3_DETERMINISTIC_EFFECT_KINDS = frozenset(
+    {"NAMEPLATE_TEXT", "FACE_MARK_COMPENSATION"}
+)
 DETERMINISTIC_EFFECT_KINDS = (
     "SCRATCH_REVEAL",
     "LIGHT_SWEEP",
     "LOCAL_EXPOSURE",
     "FLAME_EXTINGUISH",
     "SMOKE",
+    "NAMEPLATE_TEXT",
+    "FACE_MARK_COMPENSATION",
 )
 
 TIMELINE_PROVENANCE = "V5_K2_DELIVERY_SERVICE"
@@ -840,7 +845,7 @@ SourceAuthorityResolver = Callable[[str, str], Mapping[str, Any] | None]
 
 
 def _deterministic_effect_kind(value: Mapping[str, Any]) -> Any:
-    """Read one closed E1/E2 kind without weakening either source schema."""
+    """Read one closed deterministic-effect kind without weakening its source schema."""
 
     mode = value.get("effectMode")
     kind = value.get("effectKind")
@@ -854,7 +859,7 @@ def _effect_result_is_bindable(
 ) -> bool:
     if effect_kind in M13_E1_DETERMINISTIC_EFFECT_KINDS:
         return value.get("state") == "SUCCEEDED"
-    if effect_kind in M13_E2_DETERMINISTIC_EFFECT_KINDS:
+    if effect_kind in M13_E2_DETERMINISTIC_EFFECT_KINDS | M13_E3_DETERMINISTIC_EFFECT_KINDS:
         return (
             value.get("state") == "COMPOSED_CANDIDATE"
             and value.get("assetAdmissionState") == "NOT_ADMITTED"
@@ -3137,6 +3142,7 @@ __all__ = [
     "LEGACY_TIMELINE_VERSION_SCHEMA_VERSION",
     "M13_E1_DETERMINISTIC_EFFECT_KINDS",
     "M13_E2_DETERMINISTIC_EFFECT_KINDS",
+    "M13_E3_DETERMINISTIC_EFFECT_KINDS",
     "MASK_BINDING_SCHEMA_VERSION",
     "MASK_MODES",
     "MaskBinding",

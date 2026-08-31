@@ -6,12 +6,17 @@ from copy import deepcopy
 from dataclasses import dataclass
 from datetime import datetime
 from hashlib import sha256
+import json
 from math import gcd
+import os
 from pathlib import Path
+import shutil
+import subprocess
 from typing import Any, Callable, Mapping, Protocol, Sequence
 
 from services.v3_render_core.digests import (
     DigestError,
+    IMAGE_PIXEL_DIGEST_SPEC,
     canonical_pcm_digest_metadata,
     decoded_frame_pixel_digest_metadata,
 )
@@ -219,6 +224,18 @@ class CompositionExecutionPort(Protocol):
         resolved_asset_versions: Mapping[str, Mapping[str, Any]],
         resolved_effect_dependencies: Mapping[str, Mapping[str, Any]],
     ) -> dict[str, Any]: ...
+    def execute_deterministic_overlay(
+        self,
+        request: Mapping[str, Any],
+        *,
+        resolved_asset_versions: Mapping[str, Mapping[str, Any]],
+    ) -> dict[str, Any]: ...
+    def inspect_deterministic_overlay_image(
+        self, asset: Mapping[str, Any]
+    ) -> dict[str, Any]: ...
+    def inspect_deterministic_overlay_video(
+        self, asset: Mapping[str, Any]
+    ) -> dict[str, Any]: ...
     def finalize(self, command: Mapping[str, Any]) -> dict[str, Any]: ...
 
 
@@ -231,6 +248,33 @@ class RealVideoAuthorityPort(Protocol):
         production_run_ref: str,
         *,
         evidence_snapshot: Any | None = None,
+    ) -> dict[str, Any]: ...
+
+
+class IdentityReferenceProjectionReaderPort(Protocol):
+    def require_current_identity_reference_projection(
+        self,
+        workspace_ref: str,
+        production_run_ref: str,
+        character_ref: str,
+    ) -> dict[str, Any]: ...
+
+
+class ScriptTextReaderPort(Protocol):
+    def get_workspace(
+        self, workspace_ref: str, series_ref: str, episode_ref: str
+    ) -> dict[str, Any]: ...
+
+
+class FontAssetAuthorityPort(Protocol):
+    def require_current_font_asset_projection(
+        self,
+        workspace_ref: str,
+        production_run_ref: str,
+        asset_version_ref: str,
+        asset_version_digest: str,
+        *,
+        required_text: str | None = None,
     ) -> dict[str, Any]: ...
 
 
@@ -712,6 +756,11 @@ class K2DeliveryService:
         glyph_inspection_adapter: (
             DigestPinnedBasePlateGlyphInspectionAdapter | None
         ) = None,
+        identity_reference_projection_reader: (
+            IdentityReferenceProjectionReaderPort | None
+        ) = None,
+        script_text_reader: ScriptTextReaderPort | None = None,
+        font_asset_authority: FontAssetAuthorityPort | None = None,
     ) -> None:
         self.media = media
         self.evidence = evidence
@@ -719,6 +768,11 @@ class K2DeliveryService:
         self.approval_authority = approval_authority
         self.real_video_authority = real_video_authority
         self.glyph_inspection_adapter = glyph_inspection_adapter
+        self.identity_reference_projection_reader = (
+            identity_reference_projection_reader
+        )
+        self.script_text_reader = script_text_reader
+        self.font_asset_authority = font_asset_authority
         self._ref_factory = ref_factory
         self._clock = clock
 
@@ -1073,6 +1127,7 @@ class K2DeliveryService:
         self,
         snapshot: Any,
         *,
+        authority_context: Mapping[str, Any],
         expected_script_version_ref: str,
         expected_script_version_digest: str,
         expected_timeline_frame_rate: Mapping[str, Any],
@@ -1085,6 +1140,10 @@ class K2DeliveryService:
         candidates: dict[tuple[str, str], list[dict[str, Any]]] = {}
         workspace = snapshot.workspaceRef
         run_ref = snapshot.productionRunRef
+        if authority_context.get("snapshot") is not snapshot:
+            raise RepositoryUnavailableError(
+                "Timeline source authority context is inconsistent"
+            )
 
         def add(source_type: str, source_ref: Any, payload: Any) -> None:
             if not isinstance(source_ref, str) or not isinstance(payload, Mapping):
@@ -2319,6 +2378,139 @@ class K2DeliveryService:
                 "deterministic Effect evidence chain is incomplete"
             )
 
+        # E3 uses the same generic journal and Timeline source types, but its
+        # five typed records remain independently closed so an older masked
+        # surface record can never be substituted into an overlay chain.
+        from .deterministic_overlays import (
+            FACE_MARK_COMPENSATION_REQUIREMENT_RECORD_KIND,
+            FACE_MARK_COMPENSATION_RESULT_RECORD_KIND,
+            NAMEPLATE_TEXT_REQUIREMENT_RECORD_KIND,
+            NAMEPLATE_TEXT_RESULT_RECORD_KIND,
+            OVERLAY_ARTIFACT_EVIDENCE_RECORD_KIND,
+            OVERLAY_EXECUTION_REQUEST_RECORD_KIND,
+            OVERLAY_RUNTIME_EVIDENCE_RECORD_KIND,
+        )
+
+        overlay_specs = (
+            (NAMEPLATE_TEXT_REQUIREMENT_RECORD_KIND, "requirementRef"),
+            (FACE_MARK_COMPENSATION_REQUIREMENT_RECORD_KIND, "requirementRef"),
+            (OVERLAY_EXECUTION_REQUEST_RECORD_KIND, "executionRequestRef"),
+            (OVERLAY_ARTIFACT_EVIDENCE_RECORD_KIND, "artifactEvidenceRef"),
+            (OVERLAY_RUNTIME_EVIDENCE_RECORD_KIND, "runtimeEvidenceRef"),
+            (NAMEPLATE_TEXT_RESULT_RECORD_KIND, "resultRef"),
+            (FACE_MARK_COMPENSATION_RESULT_RECORD_KIND, "resultRef"),
+        )
+        overlay_records: dict[tuple[str, str], dict[str, Any]] = {}
+        for record_kind, identity_field in overlay_specs:
+            for payload in records(record_kind, identity_field):
+                key = (record_kind, payload[identity_field])
+                if key in overlay_records:
+                    raise RepositoryUnavailableError(
+                        "deterministic overlay evidence is ambiguous"
+                    )
+                overlay_records[key] = payload
+        overlay_result_kinds = {
+            NAMEPLATE_TEXT_RESULT_RECORD_KIND,
+            FACE_MARK_COMPENSATION_RESULT_RECORD_KIND,
+        }
+        used_overlay_records: set[tuple[str, str]] = set()
+        for (result_kind, _), stored_result in overlay_records.items():
+            if result_kind not in overlay_result_kinds:
+                continue
+            chain = self._resolve_effect_result_chain(
+                context=authority_context,
+                result_ref=stored_result["resultRef"],
+                result_digest=stored_result["payloadDigest"],
+            )
+            requirement = chain["requirement"]
+            request = chain["executionRequest"]
+            artifact = chain["artifactEvidence"]
+            runtime = chain["runtimeEvidence"]
+            result = chain["result"]
+            expected_requirement_kind = (
+                NAMEPLATE_TEXT_REQUIREMENT_RECORD_KIND
+                if requirement["effectMode"] == "NAMEPLATE_TEXT"
+                else FACE_MARK_COMPENSATION_REQUIREMENT_RECORD_KIND
+            )
+            expected_result_kind = (
+                NAMEPLATE_TEXT_RESULT_RECORD_KIND
+                if result["effectMode"] == "NAMEPLATE_TEXT"
+                else FACE_MARK_COMPENSATION_RESULT_RECORD_KIND
+            )
+            members = (
+                (
+                    expected_requirement_kind,
+                    requirement["requirementRef"],
+                    requirement,
+                ),
+                (
+                    OVERLAY_EXECUTION_REQUEST_RECORD_KIND,
+                    request["executionRequestRef"],
+                    request,
+                ),
+                (
+                    OVERLAY_ARTIFACT_EVIDENCE_RECORD_KIND,
+                    artifact["artifactEvidenceRef"],
+                    artifact,
+                ),
+                (
+                    OVERLAY_RUNTIME_EVIDENCE_RECORD_KIND,
+                    runtime["runtimeEvidenceRef"],
+                    runtime,
+                ),
+                (expected_result_kind, result["resultRef"], result),
+            )
+            base = validated_videos.get(
+                requirement["basePlateAssetVersionRef"]
+            )
+            if (
+                result_kind != expected_result_kind
+                or any(
+                    overlay_records.get((kind, reference)) != payload
+                    for kind, reference, payload in members
+                )
+                or base is None
+                or base.get("payloadDigest")
+                != requirement["basePlateAssetVersionDigest"]
+                or f"sha256:{base.get('sha256')}"
+                != requirement["basePlateFileDigest"]
+                or base.get("creativeShotRef")
+                != requirement["targetShotRef"]
+                or base.get("creativeShotVersionRef")
+                != requirement["targetShotVersionRef"]
+                or base.get("creativeShotDigest")
+                != requirement["targetShotVersionDigest"]
+            ):
+                raise RepositoryUnavailableError(
+                    "deterministic overlay snapshot closure is stale"
+                )
+            used_overlay_records.update(
+                (kind, reference) for kind, reference, _ in members
+            )
+            add(
+                "EFFECT_REQUIREMENT",
+                requirement["requirementRef"],
+                requirement,
+            )
+            add(
+                "EFFECT_RESULT",
+                result["resultRef"],
+                {
+                    **result,
+                    "targetShotRef": requirement["targetShotRef"],
+                    "frameRangeStartInclusive": requirement[
+                        "frameRangeStartInclusive"
+                    ],
+                    "frameRangeEndExclusive": requirement[
+                        "frameRangeEndExclusive"
+                    ],
+                },
+            )
+        if used_overlay_records != set(overlay_records):
+            raise RepositoryUnavailableError(
+                "deterministic overlay evidence chain is incomplete"
+            )
+
         def resolve(source_type: str, source_ref: str) -> Mapping[str, Any] | None:
             matches = candidates.get((source_type, source_ref), [])
             if len(matches) > 1:
@@ -2644,6 +2836,7 @@ class K2DeliveryService:
             )
         source_resolver = self._timeline_source_resolver(
             snapshot,
+            authority_context=context,
             expected_script_version_ref=context["scriptVersionRef"],
             expected_script_version_digest=context["scriptVersionDigest"],
             expected_timeline_frame_rate=wrappers[0].as_dict()["frameRate"],
@@ -3107,6 +3300,177 @@ class K2DeliveryService:
             }
         )
 
+    def _execute_deterministic_overlay(
+        self,
+        *,
+        workspace: str,
+        run_ref: str,
+        client_key: str,
+        expected_run_version: int,
+        effect_kind: str,
+        requirement_command: Mapping[str, Any],
+    ) -> dict[str, Any]:
+        """Execute E3 through the same V4 owner and evidence journal."""
+
+        from .deterministic_overlays import (
+            FACE_MARK_COMPENSATION,
+            NAMEPLATE_TEXT,
+            append_overlay_result_chain,
+            build_face_mark_compensation_requirement,
+            build_nameplate_text_requirement,
+            build_overlay_execution_request,
+            build_overlay_result,
+        )
+
+        context = self._timeline_authority_context(
+            workspace,
+            run_ref,
+            expected_run_version=expected_run_version,
+        )
+        if context["snapshot"].currentState not in M13_PREVIEW_STATE_TRANSITIONS:
+            raise UpstreamNotReadyError(
+                "deterministic overlays require current video media"
+            )
+        base = self._current_overlay_base(
+            context=context,
+            asset_version_ref=requirement_command.get(
+                "basePlateAssetVersionRef"
+            ),
+            asset_version_digest=requirement_command.get(
+                "basePlateAssetVersionDigest"
+            ),
+            target_shot_ref=requirement_command.get("targetShotRef"),
+            target_shot_version_ref=requirement_command.get(
+                "targetShotVersionRef"
+            ),
+            target_shot_version_digest=requirement_command.get(
+                "targetShotVersionDigest"
+            ),
+            frame_range_end_exclusive=requirement_command.get(
+                "frameRangeEndExclusive"
+            ),
+        )
+        if effect_kind == NAMEPLATE_TEXT:
+            text = self._current_script_text_projection(context=context)
+            font = self._current_font_projection(
+                context=context,
+                asset_version_ref=requirement_command.get(
+                    "fontAssetVersionRef"
+                ),
+                asset_version_digest=requirement_command.get(
+                    "fontAssetVersionDigest"
+                ),
+                required_text=text["resolvedText"],
+            )
+            requirement = build_nameplate_text_requirement(
+                requirement_command,
+                resolved_base=base,
+                resolved_text_source=text,
+                resolved_font=font,
+            )
+        elif effect_kind == FACE_MARK_COMPENSATION:
+            projection = self._current_identity_reference_projection(
+                context=context,
+                character_ref=requirement_command.get("characterRef"),
+                target_shot_ref=requirement_command.get("targetShotRef"),
+                target_shot_version_ref=requirement_command.get(
+                    "targetShotVersionRef"
+                ),
+                target_shot_version_digest=requirement_command.get(
+                    "targetShotVersionDigest"
+                ),
+            )
+            mark = self._current_mark_asset(
+                context=context,
+                asset_version_ref=requirement_command.get(
+                    "markAssetVersionRef"
+                ),
+                asset_version_digest=requirement_command.get(
+                    "markAssetVersionDigest"
+                ),
+                target_shot_ref=requirement_command.get("targetShotRef"),
+                target_shot_version_ref=requirement_command.get(
+                    "targetShotVersionRef"
+                ),
+                target_shot_version_digest=requirement_command.get(
+                    "targetShotVersionDigest"
+                ),
+            )
+            requirement = build_face_mark_compensation_requirement(
+                requirement_command,
+                resolved_base=base,
+                identity_projection=projection,
+                resolved_mark=mark,
+            )
+        else:  # pragma: no cover - guarded by the public dispatch above.
+            raise EpisodeProductionError("effectKind is invalid")
+
+        requirement_value = requirement.as_dict()
+        # Creation-time resolution is not execution authority.  Re-read every
+        # current dependency immediately before sealing the V4 request.
+        execution_context = self._timeline_authority_context(
+            workspace,
+            run_ref,
+            expected_run_version=expected_run_version,
+        )
+        resolved_assets = self._resolved_overlay_authorities(
+            context=execution_context,
+            requirement=requirement_value,
+        )
+        execution_request = build_overlay_execution_request(requirement)
+        execute = (
+            getattr(self.composition, "execute_deterministic_overlay", None)
+            if self.composition is not None
+            else None
+        )
+        if not callable(execute):
+            raise WorkerUnavailableError(
+                "M13-E3 deterministic overlay execution is not configured"
+            )
+        record_head = self._stable_record_head(
+            workspace,
+            run_ref,
+            execution_context["snapshot"].revisionToken,
+        )
+        try:
+            execution = execute(
+                execution_request.as_dict(),
+                resolved_asset_versions=resolved_assets,
+            )
+        except CompositionExecutionError as exc:
+            raise WorkerUnavailableError(
+                "M13-E3 deterministic overlay execution failed"
+            ) from exc
+        if not isinstance(execution, Mapping) or set(execution) != {
+            "artifactEvidence",
+            "runtimeEvidence",
+            "evidenceBindings",
+        }:
+            raise RepositoryUnavailableError(
+                "M13-E3 deterministic overlay evidence is invalid"
+            )
+        result = build_overlay_result(
+            requirement=requirement,
+            execution_request=execution_request,
+            evidence_bindings=execution["evidenceBindings"],
+            artifact_evidence=execution["artifactEvidence"],
+        )
+        chain, replayed = append_overlay_result_chain(
+            self.evidence,
+            requirement=requirement,
+            execution_request=execution_request,
+            artifact_evidence=execution["artifactEvidence"],
+            runtime_evidence=execution["runtimeEvidence"],
+            result=result,
+            idempotency_key=client_key,
+            created_at=self._clock(),
+            expected_record_journal_head=record_head,
+        )
+        return {
+            "idempotentReplay": replayed,
+            "deterministicEffect": chain.as_dict(),
+        }
+
     def execute_deterministic_effect(
         self, command: Mapping[str, Any]
     ) -> dict[str, Any]:
@@ -3130,7 +3494,12 @@ class K2DeliveryService:
         )
         client_key = _idempotency_key(command.get("idempotencyKey"))
         effect_kind = command.get("effectKind")
-        if effect_kind not in {FLAME_EXTINGUISH, SMOKE}:
+        if effect_kind not in {
+            FLAME_EXTINGUISH,
+            SMOKE,
+            "NAMEPLATE_TEXT",
+            "FACE_MARK_COMPENSATION",
+        }:
             raise EpisodeProductionError("effectKind is invalid")
         requirement_input = command.get("requirement")
         if not isinstance(requirement_input, Mapping):
@@ -3150,6 +3519,17 @@ class K2DeliveryService:
         if requirement_command.get("effectMode") != effect_kind:
             raise EpisodeProductionError(
                 "effectKind and Requirement effectMode differ"
+            )
+        if effect_kind in {"NAMEPLATE_TEXT", "FACE_MARK_COMPENSATION"}:
+            return self._execute_deterministic_overlay(
+                workspace=workspace,
+                run_ref=run_ref,
+                client_key=client_key,
+                expected_run_version=_positive_version(
+                    command.get("expectedRunVersion"), "expectedRunVersion"
+                ),
+                effect_kind=effect_kind,
+                requirement_command=requirement_command,
             )
         requirement = (
             build_flame_extinguish_requirement(requirement_command)
@@ -3392,6 +3772,66 @@ class K2DeliveryService:
             "deterministicEffect": chain.as_dict(),
         }
 
+    def _resolve_effect_result_chain(
+        self,
+        *,
+        context: Mapping[str, Any],
+        result_ref: str,
+        result_digest: str,
+    ) -> dict[str, Any]:
+        """Dispatch one exact result ref to its existing closed chain owner."""
+
+        from .deterministic_overlays import (
+            FACE_MARK_COMPENSATION_RESULT_RECORD_KIND,
+            NAMEPLATE_TEXT_RESULT_RECORD_KIND,
+            resolve_overlay_result_chain,
+        )
+
+        snapshot = context["snapshot"]
+        matches = [
+            item
+            for item in snapshot.records
+            if item.get("recordRef") == result_ref
+            and item.get("recordKind")
+            in {
+                SCRATCH_LIGHT_RESULT_RECORD_KIND,
+                LOCAL_EXPOSURE_RESULT_RECORD_KIND,
+                FLAME_EXTINGUISH_RESULT_RECORD_KIND,
+                SMOKE_RESULT_RECORD_KIND,
+                NAMEPLATE_TEXT_RESULT_RECORD_KIND,
+                FACE_MARK_COMPENSATION_RESULT_RECORD_KIND,
+            }
+        ]
+        if len(matches) != 1 or matches[0].get("payloadDigest") != result_digest:
+            raise UpstreamNotReadyError(
+                "exact deterministic Effect Result evidence is unavailable"
+            )
+        workspace = context["run"]["workspaceRef"]
+        run_ref = context["run"]["productionRunRef"]
+        if matches[0]["recordKind"] in {
+            NAMEPLATE_TEXT_RESULT_RECORD_KIND,
+            FACE_MARK_COMPENSATION_RESULT_RECORD_KIND,
+        }:
+            chain = resolve_overlay_result_chain(
+                self.evidence,
+                workspace_ref=workspace,
+                production_run_ref=run_ref,
+                result_ref=result_ref,
+                result_digest=result_digest,
+            ).as_dict()
+            self._resolved_overlay_authorities(
+                context=context,
+                requirement=chain["requirement"],
+            )
+            return chain
+        return resolve_deterministic_effect_result_chain(
+            self.evidence,
+            workspace_ref=workspace,
+            production_run_ref=run_ref,
+            result_ref=result_ref,
+            result_digest=result_digest,
+        ).as_dict()
+
     def get_deterministic_effects(
         self, workspace_ref: str, run_ref: str
     ) -> dict[str, Any]:
@@ -3403,12 +3843,20 @@ class K2DeliveryService:
             expected_run_version=None,
         )
         snapshot = context["snapshot"]
+        from .deterministic_overlays import (
+            FACE_MARK_COMPENSATION_RESULT_RECORD_KIND,
+            NAMEPLATE_TEXT_RESULT_RECORD_KIND,
+        )
+
+        supported_result_kinds = {
+            FLAME_EXTINGUISH_RESULT_RECORD_KIND,
+            SMOKE_RESULT_RECORD_KIND,
+            NAMEPLATE_TEXT_RESULT_RECORD_KIND,
+            FACE_MARK_COMPENSATION_RESULT_RECORD_KIND,
+        }
         result_records: list[dict[str, Any]] = []
         for record in snapshot.records:
-            if record.get("recordKind") not in {
-                FLAME_EXTINGUISH_RESULT_RECORD_KIND,
-                SMOKE_RESULT_RECORD_KIND,
-            }:
+            if record.get("recordKind") not in supported_result_kinds:
                 continue
             payload = _immutable_payload(
                 record.get("payload"), str(record.get("recordKind"))
@@ -3425,13 +3873,11 @@ class K2DeliveryService:
         result_records.sort(key=lambda item: item["resultRef"])
         return {
             "deterministicEffects": [
-                resolve_deterministic_effect_result_chain(
-                    self.evidence,
-                    workspace_ref=workspace,
-                    production_run_ref=production_run,
+                self._resolve_effect_result_chain(
+                    context=context,
                     result_ref=item["resultRef"],
                     result_digest=item["payloadDigest"],
-                ).as_dict()
+                )
                 for item in result_records
             ],
             "publicationAllowed": False,
@@ -3875,6 +4321,7 @@ class K2DeliveryService:
             timeline=parent["timeline"],
             source_resolver=self._timeline_source_resolver(
                 context["snapshot"],
+                authority_context=context,
                 expected_script_version_ref=context["scriptVersionRef"],
                 expected_script_version_digest=context["scriptVersionDigest"],
                 expected_timeline_frame_rate=parent_mapping["frameRate"],
@@ -4047,6 +4494,775 @@ class K2DeliveryService:
                 f"{record_kind} evidence digest is inconsistent"
             )
         return payload
+
+    def _current_script_text_projection(
+        self, *, context: Mapping[str, Any]
+    ) -> dict[str, Any]:
+        """Resolve the one frozen SCRIPT_TEXT source from the current reader."""
+
+        if self.script_text_reader is None or not callable(
+            getattr(self.script_text_reader, "get_workspace", None)
+        ):
+            raise UpstreamNotReadyError(
+                "current SCRIPT_TEXT authority is not configured"
+            )
+        run = context.get("run")
+        if not isinstance(run, Mapping):
+            raise RepositoryUnavailableError("current run authority is invalid")
+        workspace = _required_ref(run.get("workspaceRef"), "workspaceRef")
+        series_ref = _required_ref(run.get("seriesRef"), "seriesRef")
+        episode_ref = _required_ref(run.get("episodeRef"), "episodeRef")
+        try:
+            raw = self.script_text_reader.get_workspace(
+                workspace, series_ref, episode_ref
+            )
+        except EpisodeProductionError:
+            raise
+        except Exception as exc:
+            raise RepositoryUnavailableError(
+                "current SCRIPT_TEXT authority is unavailable"
+            ) from exc
+        if not isinstance(raw, Mapping):
+            raise RepositoryUnavailableError(
+                "current SCRIPT_TEXT projection is invalid"
+            )
+        script = raw.get("script")
+        versions = raw.get("versions")
+        upstream = run.get("upstreamSnapshot")
+        frozen = upstream.get("script") if isinstance(upstream, Mapping) else None
+        confirmed_ref = (
+            script.get("confirmedScriptVersionRef")
+            if isinstance(script, Mapping)
+            else None
+        )
+        matches = [
+            deepcopy(dict(item))
+            for item in versions or []
+            if isinstance(item, Mapping)
+            and item.get("scriptVersionRef") == confirmed_ref
+        ]
+        if (
+            not isinstance(script, Mapping)
+            or not isinstance(versions, list)
+            or len(matches) != 1
+            or not isinstance(frozen, Mapping)
+            or confirmed_ref != context.get("scriptVersionRef")
+            or script.get("scriptRef") != frozen.get("scriptRef")
+        ):
+            raise StaleInputError("current SCRIPT_TEXT authority is stale")
+        version = matches[0]
+        version_digest = _digest(version)
+        title = version.get("title")
+        if (
+            version_digest != context.get("scriptVersionDigest")
+            or frozen.get("versionDigest") != version_digest
+            or not isinstance(title, str)
+            or title != title.strip()
+            or not title
+        ):
+            raise StaleInputError("current SCRIPT_TEXT version is stale")
+        return {
+            "textSourceKind": "SCRIPT_TEXT",
+            "textSourceRef": _required_ref(script.get("scriptRef"), "textSourceRef"),
+            "textSourceVersionRef": _required_ref(
+                confirmed_ref, "textSourceVersionRef"
+            ),
+            "textSourceDigest": version_digest,
+            "resolvedText": title,
+            "resolvedTextDigest": _digest({"utf8": title}),
+            "language": "und",
+        }
+
+    @staticmethod
+    def _require_character_in_target_shot(
+        *,
+        context: Mapping[str, Any],
+        target_shot_ref: str,
+        target_shot_version_ref: str,
+        target_shot_version_digest: str,
+        character_ref: str,
+    ) -> dict[str, Any]:
+        graph = context.get("executableShotGraph")
+        shots = graph.get("shots") if isinstance(graph, Mapping) else None
+        matches = [
+            deepcopy(dict(item))
+            for item in shots or []
+            if isinstance(item, Mapping)
+            and item.get("creativeShotRef") == target_shot_ref
+            and item.get("creativeShotVersionRef") == target_shot_version_ref
+            and item.get("payloadDigest") == target_shot_version_digest
+        ]
+        if len(matches) != 1:
+            raise StaleInputError("target ShotVersion is not current")
+        locks = matches[0].get("requiredCharacterIdentityLocks")
+        character_matches = [
+            item
+            for item in locks or []
+            if isinstance(item, Mapping)
+            and item.get("characterRef") == character_ref
+        ]
+        if not isinstance(locks, list) or len(character_matches) != 1:
+            raise StaleInputError("character is not bound to the target ShotVersion")
+        return matches[0]
+
+    def _current_identity_reference_projection(
+        self,
+        *,
+        context: Mapping[str, Any],
+        character_ref: str,
+        target_shot_ref: str,
+        target_shot_version_ref: str,
+        target_shot_version_digest: str,
+    ) -> dict[str, Any]:
+        self._require_character_in_target_shot(
+            context=context,
+            target_shot_ref=target_shot_ref,
+            target_shot_version_ref=target_shot_version_ref,
+            target_shot_version_digest=target_shot_version_digest,
+            character_ref=character_ref,
+        )
+        reader = self.identity_reference_projection_reader
+        if reader is None or not callable(
+            getattr(reader, "require_current_identity_reference_projection", None)
+        ):
+            raise UpstreamNotReadyError(
+                "current identity reference projection reader is not configured"
+            )
+        workspace = context["run"]["workspaceRef"]
+        run_ref = context["run"]["productionRunRef"]
+        try:
+            raw = reader.require_current_identity_reference_projection(
+                workspace, run_ref, character_ref
+            )
+        except EpisodeProductionError:
+            raise
+        except Exception as exc:
+            raise RepositoryUnavailableError(
+                "current identity reference projection is unavailable"
+            ) from exc
+        required = {
+            "schemaVersion",
+            "workspaceRef",
+            "productionRunRef",
+            "characterRef",
+            "scriptCharacterName",
+            "identityLockRef",
+            "identityLockVersionRef",
+            "identityLockDigest",
+            "referenceRef",
+            "referenceVersionRef",
+            "contentDigest",
+            "mediaType",
+            "rightsState",
+            "provenance",
+            "approvalRef",
+            "externalDecisionDigest",
+            "projectionCheckedAt",
+            "projectionDigest",
+        }
+        projection = deepcopy(dict(raw)) if isinstance(raw, Mapping) else {}
+        if (
+            set(projection) != required
+            or projection.get("schemaVersion")
+            != "v5.identity-reference-version-projection.v1"
+            or projection.get("workspaceRef") != workspace
+            or projection.get("productionRunRef") != run_ref
+            or projection.get("characterRef") != character_ref
+            or not _is_sha256(projection.get("projectionDigest"))
+        ):
+            raise RepositoryUnavailableError(
+                "current identity reference projection is invalid"
+            )
+        projection_base = {
+            key: value
+            for key, value in projection.items()
+            if key not in {"projectionCheckedAt", "projectionDigest"}
+        }
+        if _digest(projection_base) != projection["projectionDigest"]:
+            raise StaleInputError(
+                "current identity reference projection digest is stale"
+            )
+        return projection
+
+    def _current_font_projection(
+        self,
+        *,
+        context: Mapping[str, Any],
+        asset_version_ref: str,
+        asset_version_digest: str,
+        required_text: str,
+    ) -> dict[str, Any]:
+        from .static_resources import (
+            FONT_ASSET_VERSION_PROJECTION_SCHEMA_VERSION,
+            FONT_TECHNICAL_VALIDATION_SCHEMA_VERSION,
+            RESOURCE_LICENSE_BINDING_VERSION_SCHEMA_VERSION,
+        )
+
+        authority = self.font_asset_authority
+        if authority is None or not callable(
+            getattr(authority, "require_current_font_asset_projection", None)
+        ):
+            raise UpstreamNotReadyError(
+                "current canonical FONT AssetVersion authority is not configured"
+            )
+        workspace = context["run"]["workspaceRef"]
+        run_ref = context["run"]["productionRunRef"]
+        try:
+            value = authority.require_current_font_asset_projection(
+                workspace,
+                run_ref,
+                asset_version_ref,
+                asset_version_digest,
+                required_text=required_text,
+            )
+        except EpisodeProductionError:
+            raise
+        except Exception as exc:
+            raise RepositoryUnavailableError(
+                "current canonical FONT AssetVersion authority is unavailable"
+            ) from exc
+        if not isinstance(value, Mapping):
+            raise RepositoryUnavailableError(
+                "current canonical FONT projection is invalid"
+            )
+        projection = deepcopy(dict(value))
+        asset = projection.get("fontAssetVersion")
+        validation = projection.get("fontTechnicalValidation")
+        license_binding = projection.get("fontLicenseBindingVersion")
+        projection_fields = {
+            "fontAssetVersion",
+            "fontTechnicalValidation",
+            "fontLicenseBindingVersion",
+            "storageBindingRef",
+            "publicationAllowed",
+        }
+        asset_fields = {
+            "schemaVersion",
+            "workspaceRef",
+            "productionRunRef",
+            "projectRef",
+            "seriesRef",
+            "episodeRef",
+            "assetRef",
+            "assetVersionRef",
+            "version",
+            "assetClass",
+            "resourceKind",
+            "candidateRef",
+            "candidateDigest",
+            "technicalValidationRef",
+            "technicalValidationDigest",
+            "licenseBindingVersionRef",
+            "licenseBindingVersionDigest",
+            "admissionDecisionRef",
+            "admissionDecisionDigest",
+            "mediaType",
+            "fontFormat",
+            "byteSize",
+            "fileDigest",
+            "state",
+            "admissionState",
+            "publicationAllowed",
+            "createdAt",
+            "payloadDigest",
+        }
+        validation_fields = {
+            "schemaVersion",
+            "workspaceRef",
+            "productionRunRef",
+            "validationRef",
+            "candidateRef",
+            "candidateDigest",
+            "fileDigest",
+            "byteSize",
+            "fontFormat",
+            "sfntSignature",
+            "fontFamily",
+            "fontSubfamily",
+            "postScriptName",
+            "nameTableDigest",
+            "variableFont",
+            "variationAxesDigest",
+            "rendererProbeRef",
+            "rendererProbeDigest",
+            "rendererIdentity",
+            "rendererVersion",
+            "ffmpegIdentity",
+            "freetypeIdentity",
+            "validationState",
+            "failureReasons",
+            "createdAt",
+            "publicationAllowed",
+            "payloadDigest",
+        }
+        license_fields = {
+            "schemaVersion",
+            "workspaceRef",
+            "productionRunRef",
+            "licenseBindingRef",
+            "licenseBindingVersionRef",
+            "versionNumber",
+            "parentLicenseBindingVersionRef",
+            "candidateRef",
+            "candidateDigest",
+            "fontFileDigest",
+            "licenseSpdxId",
+            "licenseTextDigest",
+            "licenseEvidenceRef",
+            "licenseEvidenceDigest",
+            "decisionAuthorityRef",
+            "decisionAuthorityDigest",
+            "commercialUseAllowed",
+            "technicalPreviewAllowed",
+            "renderCandidateUseAllowed",
+            "embeddingAllowed",
+            "redistributionAllowed",
+            "modificationAllowed",
+            "attributionRequired",
+            "reservedFontNames",
+            "territories",
+            "revocationState",
+            "validFrom",
+            "expiresAt",
+            "createdAt",
+            "publicationAllowed",
+            "payloadDigest",
+        }
+        if (
+            set(projection) != projection_fields
+            or not isinstance(asset, Mapping)
+            or not isinstance(validation, Mapping)
+            or not isinstance(license_binding, Mapping)
+            or set(asset) != asset_fields
+            or set(validation) != validation_fields
+            or set(license_binding) != license_fields
+            or asset.get("assetVersionRef") != asset_version_ref
+            or asset.get("payloadDigest") != asset_version_digest
+            or asset.get("workspaceRef") != workspace
+            or asset.get("productionRunRef") != run_ref
+            or asset.get("schemaVersion")
+            != FONT_ASSET_VERSION_PROJECTION_SCHEMA_VERSION
+            or asset.get("assetClass") != "STATIC_RESOURCE"
+            or asset.get("resourceKind") != "FONT"
+            or asset.get("state") != "REGISTERED"
+            or asset.get("admissionState") != "ADMITTED"
+            or asset.get("publicationAllowed") is not False
+            or projection.get("publicationAllowed") is not False
+            or validation.get("schemaVersion")
+            != FONT_TECHNICAL_VALIDATION_SCHEMA_VERSION
+            or validation.get("workspaceRef") != workspace
+            or validation.get("productionRunRef") != run_ref
+            or validation.get("publicationAllowed") is not False
+            or validation.get("validationState") != "PASS"
+            or license_binding.get("schemaVersion")
+            != RESOURCE_LICENSE_BINDING_VERSION_SCHEMA_VERSION
+            or license_binding.get("workspaceRef") != workspace
+            or license_binding.get("productionRunRef") != run_ref
+            or license_binding.get("publicationAllowed") is not False
+            or license_binding.get("revocationState") != "ACTIVE"
+            or license_binding.get("technicalPreviewAllowed") is not True
+            or license_binding.get("renderCandidateUseAllowed") is not True
+        ):
+            raise StaleInputError("current canonical FONT projection is stale")
+        return projection
+
+    def _current_mark_asset(
+        self,
+        *,
+        context: Mapping[str, Any],
+        asset_version_ref: str,
+        asset_version_digest: str,
+        target_shot_ref: str,
+        target_shot_version_ref: str,
+        target_shot_version_digest: str,
+    ) -> dict[str, Any]:
+        """Resolve and physically remeasure one current canonical M10 image."""
+
+        if self.real_video_authority is None:
+            raise UpstreamNotReadyError(
+                "current canonical mark AssetVersion authority is unavailable"
+            )
+        workspace = context["run"]["workspaceRef"]
+        run_ref = context["run"]["productionRunRef"]
+        bundle = self.real_video_authority.get_revision_bundle(
+            workspace,
+            run_ref,
+            evidence_snapshot=context["snapshot"],
+        )
+        assets = bundle.get("assetVersions") if isinstance(bundle, Mapping) else None
+        matches = [
+            deepcopy(dict(item))
+            for item in assets or []
+            if isinstance(item, Mapping)
+            and item.get("assetVersionRef") == asset_version_ref
+            and item.get("payloadDigest") == asset_version_digest
+        ]
+        if len(matches) != 1:
+            raise StaleInputError(
+                "mark AssetVersion is not current canonical image media"
+            )
+        asset = matches[0]
+        if (
+            asset.get("schemaVersion")
+            != "v5.k2-real-image-asset-version.v1"
+            or asset.get("workspaceRef") != workspace
+            or asset.get("productionRunRef") != run_ref
+            or asset.get("creativeShotRef") != target_shot_ref
+            or asset.get("creativeShotVersionRef") != target_shot_version_ref
+            or asset.get("creativeShotDigest") != target_shot_version_digest
+            or str(asset.get("mediaKind", "")).lower() != "image"
+            or asset.get("mediaType") != "image/png"
+            or asset.get("state") != "REGISTERED"
+            or asset.get("immutable") is not True
+            or asset.get("publicationAllowed") is not False
+            or not _is_sha256(asset.get("sha256"))
+            or _contains_path_authority(asset)
+        ):
+            raise StaleInputError("mark AssetVersion authority is stale")
+        inspect = (
+            getattr(self.composition, "inspect_deterministic_overlay_image", None)
+            if self.composition is not None
+            else None
+        )
+        if not callable(inspect):
+            raise WorkerUnavailableError(
+                "digest-pinned mark image inspection is not configured"
+            )
+        resolved = {
+            "assetVersionRef": asset_version_ref,
+            "assetVersionDigest": asset_version_digest,
+            "storageKey": asset.get("storageKey"),
+            "fileDigest": f"sha256:{asset['sha256']}",
+            "mediaType": "image/png",
+            "byteSize": asset.get("byteSize"),
+        }
+        try:
+            measured = inspect(resolved)
+        except EpisodeProductionError:
+            raise
+        except Exception as exc:
+            raise WorkerUnavailableError(
+                "digest-pinned mark image inspection failed"
+            ) from exc
+        if not isinstance(measured, Mapping):
+            raise RepositoryUnavailableError("mark image inspection is invalid")
+        measurement_fields = {
+            "assetVersionRef",
+            "assetVersionDigest",
+            "fileDigest",
+            "pixelDigest",
+            "pixelDigestSpec",
+            "pixelMode",
+            "width",
+            "height",
+        }
+        if (
+            set(measured) != measurement_fields
+            or measured.get("assetVersionRef") != asset_version_ref
+            or measured.get("assetVersionDigest") != asset_version_digest
+            or measured.get("fileDigest") != resolved["fileDigest"]
+            or not isinstance(measured.get("pixelDigest"), str)
+            or not measured["pixelDigest"].startswith("sha256:")
+            or measured.get("pixelMode") != "RGBA"
+            or measured.get("pixelDigestSpec")
+            != IMAGE_PIXEL_DIGEST_SPEC
+            or isinstance(measured.get("width"), bool)
+            or not isinstance(measured.get("width"), int)
+            or measured["width"] < 1
+            or isinstance(measured.get("height"), bool)
+            or not isinstance(measured.get("height"), int)
+            or measured["height"] < 1
+        ):
+            raise StaleInputError("mark image bytes or pixels are stale")
+        return {
+            **resolved,
+            **{
+                field: deepcopy(measured[field])
+                for field in measurement_fields
+            },
+        }
+
+    def _current_overlay_base(
+        self,
+        *,
+        context: Mapping[str, Any],
+        asset_version_ref: str,
+        asset_version_digest: str,
+        target_shot_ref: str,
+        target_shot_version_ref: str,
+        target_shot_version_digest: str,
+        frame_range_end_exclusive: int,
+    ) -> dict[str, Any]:
+        """Resolve and physically remeasure one current canonical M11 video."""
+
+        workspace = context["run"]["workspaceRef"]
+        run_ref = context["run"]["productionRunRef"]
+        matches = [
+            deepcopy(dict(item))
+            for item in self._current_glyph_video_assets(
+                workspace,
+                run_ref,
+                evidence_snapshot=context["snapshot"],
+            )
+            if item.get("assetVersionRef") == asset_version_ref
+            and item.get("payloadDigest") == asset_version_digest
+        ]
+        if len(matches) != 1:
+            raise StaleInputError(
+                "overlay base AssetVersion is not current canonical video"
+            )
+        asset = matches[0]
+        if (
+            asset.get("schemaVersion")
+            != "v5.k2-real-video-asset-version.v1"
+            or asset.get("workspaceRef") != workspace
+            or asset.get("productionRunRef") != run_ref
+            or asset.get("creativeShotRef") != target_shot_ref
+            or asset.get("creativeShotVersionRef") != target_shot_version_ref
+            or asset.get("creativeShotDigest") != target_shot_version_digest
+            or str(asset.get("mediaKind", "")).lower() != "video"
+            or asset.get("mediaType") != "video/mp4"
+            or asset.get("state") != "REGISTERED"
+            or asset.get("immutable") is not True
+            or asset.get("publicationAllowed") is not False
+            or not _is_sha256(asset.get("sha256"))
+            or isinstance(asset.get("byteSize"), bool)
+            or not isinstance(asset.get("byteSize"), int)
+            or asset["byteSize"] < 1
+            or _contains_path_authority(asset)
+        ):
+            raise StaleInputError("overlay base AssetVersion authority is stale")
+        inspect = (
+            getattr(self.composition, "inspect_deterministic_overlay_video", None)
+            if self.composition is not None
+            else None
+        )
+        if not callable(inspect):
+            raise WorkerUnavailableError(
+                "digest-pinned overlay base video inspection is not configured"
+            )
+        resolved = {
+            "assetVersionRef": asset_version_ref,
+            "assetVersionDigest": asset_version_digest,
+            "storageKey": asset.get("storageKey"),
+            "fileDigest": f"sha256:{asset['sha256']}",
+            "mediaType": "video/mp4",
+            "byteSize": asset["byteSize"],
+        }
+        try:
+            measured = inspect(resolved)
+        except EpisodeProductionError:
+            raise
+        except Exception as exc:
+            raise WorkerUnavailableError(
+                "digest-pinned overlay base video inspection failed"
+            ) from exc
+        measurement_fields = {
+            "assetVersionRef",
+            "assetVersionDigest",
+            "fileDigest",
+            "pixelDigest",
+            "pixelDigestSpec",
+            "width",
+            "height",
+            "frameCount",
+            "frameRate",
+            "pixelFormat",
+        }
+        if (
+            not isinstance(measured, Mapping)
+            or set(measured) != measurement_fields
+            or measured.get("assetVersionRef") != asset_version_ref
+            or measured.get("assetVersionDigest") != asset_version_digest
+            or measured.get("fileDigest") != resolved["fileDigest"]
+            or not isinstance(measured.get("pixelDigest"), str)
+            or not measured["pixelDigest"].startswith("sha256:")
+            or measured.get("pixelDigestSpec")
+            != DECODED_FRAME_PIXEL_DIGEST_SPEC
+            or measured.get("pixelFormat") != "yuv420p"
+            or any(
+                isinstance(measured.get(field), bool)
+                or not isinstance(measured.get(field), int)
+                or measured[field] < 1
+                for field in (
+                    "width",
+                    "height",
+                    "frameCount",
+                    "frameRate",
+                )
+            )
+            or isinstance(frame_range_end_exclusive, bool)
+            or not isinstance(frame_range_end_exclusive, int)
+            or frame_range_end_exclusive < 1
+            or frame_range_end_exclusive > measured["frameCount"]
+        ):
+            raise StaleInputError("overlay base video bytes or pixels are stale")
+        return {
+            "assetVersionRef": asset_version_ref,
+            "assetVersionDigest": asset_version_digest,
+            "storageKey": resolved["storageKey"],
+            **{
+                field: deepcopy(measured[field])
+                for field in measurement_fields
+                if field not in {"assetVersionRef", "assetVersionDigest"}
+            },
+        }
+
+    def _resolved_overlay_authorities(
+        self,
+        *,
+        context: Mapping[str, Any],
+        requirement: Mapping[str, Any],
+    ) -> dict[str, dict[str, Any]]:
+        """Freshly resolve every server-owned E3 input for execution/replay."""
+
+        mode = requirement.get("effectMode")
+        base = self._current_overlay_base(
+            context=context,
+            asset_version_ref=requirement.get("basePlateAssetVersionRef"),
+            asset_version_digest=requirement.get(
+                "basePlateAssetVersionDigest"
+            ),
+            target_shot_ref=requirement.get("targetShotRef"),
+            target_shot_version_ref=requirement.get("targetShotVersionRef"),
+            target_shot_version_digest=requirement.get(
+                "targetShotVersionDigest"
+            ),
+            frame_range_end_exclusive=requirement.get(
+                "frameRangeEndExclusive"
+            ),
+        )
+        if (
+            requirement.get("basePlateFileDigest") != base["fileDigest"]
+            or requirement.get("basePlatePixelDigest") != base["pixelDigest"]
+        ):
+            raise StaleInputError("overlay base Requirement is stale")
+        resolved: dict[str, dict[str, Any]] = {
+            base["assetVersionRef"]: base
+        }
+        if mode == "NAMEPLATE_TEXT":
+            text = self._current_script_text_projection(context=context)
+            if any(
+                requirement.get(field) != text[field]
+                for field in (
+                    "textSourceKind",
+                    "textSourceRef",
+                    "textSourceVersionRef",
+                    "textSourceDigest",
+                    "resolvedText",
+                    "resolvedTextDigest",
+                    "language",
+                )
+            ):
+                raise StaleInputError("Nameplate SCRIPT_TEXT authority is stale")
+            font = self._current_font_projection(
+                context=context,
+                asset_version_ref=requirement.get("fontAssetVersionRef"),
+                asset_version_digest=requirement.get("fontAssetVersionDigest"),
+                required_text=text["resolvedText"],
+            )
+            asset = font["fontAssetVersion"]
+            validation = font["fontTechnicalValidation"]
+            license_binding = font["fontLicenseBindingVersion"]
+            if (
+                requirement.get("fontFileDigest") != asset.get("fileDigest")
+                or requirement.get("fontTechnicalValidationRef")
+                != validation.get("validationRef")
+                or requirement.get("fontTechnicalValidationDigest")
+                != validation.get("payloadDigest")
+                or requirement.get("fontLicenseBindingVersionRef")
+                != license_binding.get("licenseBindingVersionRef")
+                or requirement.get("fontLicenseBindingVersionDigest")
+                != license_binding.get("payloadDigest")
+            ):
+                raise StaleInputError("Nameplate FONT authority is stale")
+            resolved[asset["assetVersionRef"]] = {
+                "assetVersionRef": asset["assetVersionRef"],
+                "assetVersionDigest": asset["payloadDigest"],
+                "storageBindingRef": font["storageBindingRef"],
+                "fileDigest": asset["fileDigest"],
+                "byteSize": asset["byteSize"],
+                "mediaType": asset["mediaType"],
+                "fontFormat": asset["fontFormat"],
+                "validationRef": validation["validationRef"],
+                "validationDigest": validation["payloadDigest"],
+                "licenseBindingRef": license_binding[
+                    "licenseBindingVersionRef"
+                ],
+                "licenseBindingDigest": license_binding["payloadDigest"],
+            }
+            return resolved
+        if mode == "FACE_MARK_COMPENSATION":
+            projection = self._current_identity_reference_projection(
+                context=context,
+                character_ref=requirement.get("characterRef"),
+                target_shot_ref=requirement.get("targetShotRef"),
+                target_shot_version_ref=requirement.get(
+                    "targetShotVersionRef"
+                ),
+                target_shot_version_digest=requirement.get(
+                    "targetShotVersionDigest"
+                ),
+            )
+            expected_identity = {
+                "identityReferenceRef": projection["referenceRef"],
+                "identityReferenceVersionRef": projection[
+                    "referenceVersionRef"
+                ],
+                "identityReferenceContentDigest": projection[
+                    "contentDigest"
+                ],
+                "identityReferenceProjectionDigest": projection[
+                    "projectionDigest"
+                ],
+                "identityLockRef": projection["identityLockRef"],
+                "identityLockVersionRef": projection[
+                    "identityLockVersionRef"
+                ],
+                "identityLockDigest": projection["identityLockDigest"],
+            }
+            if any(
+                requirement.get(field) != expected
+                for field, expected in expected_identity.items()
+            ):
+                raise StaleInputError(
+                    "Face Mark identity reference projection is stale"
+                )
+            mark = self._current_mark_asset(
+                context=context,
+                asset_version_ref=requirement.get("markAssetVersionRef"),
+                asset_version_digest=requirement.get("markAssetVersionDigest"),
+                target_shot_ref=requirement.get("targetShotRef"),
+                target_shot_version_ref=requirement.get(
+                    "targetShotVersionRef"
+                ),
+                target_shot_version_digest=requirement.get(
+                    "targetShotVersionDigest"
+                ),
+            )
+            if (
+                requirement.get("markFileDigest") != mark["fileDigest"]
+                or requirement.get("markPixelDigest") != mark["pixelDigest"]
+            ):
+                raise StaleInputError("Face Mark AssetVersion is stale")
+            resolved[mark["assetVersionRef"]] = {
+                field: deepcopy(mark[field])
+                for field in (
+                    "assetVersionRef",
+                    "assetVersionDigest",
+                    "storageKey",
+                    "fileDigest",
+                    "pixelDigest",
+                    "pixelDigestSpec",
+                    "pixelMode",
+                    "width",
+                    "height",
+                )
+            }
+            return resolved
+        raise RepositoryUnavailableError(
+            "deterministic overlay mode is unsupported"
+        )
 
     def _resolved_effect_image_asset(
         self,
@@ -4231,16 +5447,144 @@ class K2DeliveryService:
         ):
             raise ArtifactRejectedError("preview artifact authority is invalid")
         path = self._composition_storage_path(result.get("outputStorageKey"))
-        actual_sha, actual_size = self._file_sha256_and_size(path)
-        if (
-            actual_sha != prefixed_file_digest.removeprefix("sha256:")
-            or actual_size != result.get("outputByteSize")
-        ):
-            raise ArtifactRejectedError("preview artifact file digest changed")
+        ffmpeg_path = shutil.which("ffmpeg")
+        ffprobe_path = shutil.which("ffprobe")
+        if ffmpeg_path is None or ffprobe_path is None:
+            raise ArtifactRejectedError(
+                "pinned preview verification runtime is unavailable"
+            )
+        from services.v3_render_core.composition import (
+            RenderArtifactError,
+            _PinnedRegularFile,
+            _PinnedRuntimeBinary,
+            _fixed_environment,
+        )
+
         try:
-            observed_probe = probe_media(path)
-        except ArtifactVerificationError as exc:
-            raise ArtifactRejectedError("preview artifact probe failed") from exc
+            with (
+                _PinnedRegularFile(
+                    path, label="stored timeline preview artifact"
+                ) as pinned_artifact,
+                _PinnedRuntimeBinary(
+                    Path(os.path.realpath(ffmpeg_path)), label="FFmpeg"
+                ) as ffmpeg,
+                _PinnedRuntimeBinary(
+                    Path(os.path.realpath(ffprobe_path)), label="FFprobe"
+                ) as ffprobe,
+            ):
+                if (
+                    pinned_artifact.descriptor is None
+                    or os.fstat(pinned_artifact.descriptor).st_size
+                    != result.get("outputByteSize")
+                ):
+                    raise ArtifactRejectedError(
+                        "preview artifact byte size changed"
+                    )
+                pass_fds = tuple(
+                    dict.fromkeys(
+                        pinned_artifact.pass_fds
+                        + ffmpeg.pass_fds
+                        + ffprobe.pass_fds
+                    )
+                )
+                completed = subprocess.run(
+                    [
+                        str(ffprobe.executable_path),
+                        "-v",
+                        "error",
+                        "-count_frames",
+                        "-show_streams",
+                        "-show_format",
+                        "-of",
+                        "json",
+                        str(pinned_artifact.descriptor_path),
+                    ],
+                    check=True,
+                    capture_output=True,
+                    text=True,
+                    encoding="utf-8",
+                    errors="strict",
+                    timeout=60,
+                    env=_fixed_environment(),
+                    pass_fds=pass_fds,
+                )
+                payload = json.loads(completed.stdout)
+                if not isinstance(payload, Mapping) or not isinstance(
+                    payload.get("format"), Mapping
+                ):
+                    raise ArtifactRejectedError(
+                        "preview artifact probe payload is malformed"
+                    )
+                streams = payload.get("streams")
+                if not isinstance(streams, list) or not streams:
+                    raise ArtifactRejectedError(
+                        "preview artifact has no media stream"
+                    )
+                normalized_streams = []
+                for stream in streams:
+                    if not isinstance(stream, Mapping):
+                        raise ArtifactRejectedError(
+                            "preview artifact stream is malformed"
+                        )
+                    normalized_streams.append(
+                        {
+                            key: stream.get(key)
+                            for key in (
+                                "codec_type",
+                                "codec_name",
+                                "width",
+                                "height",
+                                "pix_fmt",
+                                "avg_frame_rate",
+                                "nb_frames",
+                                "nb_read_frames",
+                                "sample_rate",
+                                "channels",
+                                "duration",
+                            )
+                            if stream.get(key) is not None
+                        }
+                    )
+                observed_probe = {
+                    "streams": normalized_streams,
+                    "formatName": payload.get("format", {}).get(
+                        "format_name"
+                    ),
+                    "durationSeconds": payload.get("format", {}).get(
+                        "duration"
+                    ),
+                }
+                pixels = decoded_frame_pixel_digest_metadata(
+                    pinned_artifact.descriptor_path,
+                    ffmpeg_path=ffmpeg.executable_path,
+                    ffprobe_path=ffprobe.executable_path,
+                    pass_fds=pass_fds,
+                )
+                pcm = canonical_pcm_digest_metadata(
+                    path,
+                    expected_sample_count=output_digest.get("sampleCount"),
+                    allow_aac_frame_padding=True,
+                    ffmpeg_path=ffmpeg.executable_path,
+                    ffprobe_path=ffprobe.executable_path,
+                    pass_fds=pass_fds,
+                    _input_descriptor=pinned_artifact.descriptor,
+                )
+                pinned_artifact.require_stable()
+                ffmpeg.require_stable()
+                ffprobe.require_stable()
+        except ArtifactRejectedError:
+            raise
+        except (
+            DigestError,
+            RenderArtifactError,
+            OSError,
+            subprocess.SubprocessError,
+            UnicodeError,
+            json.JSONDecodeError,
+        ) as exc:
+            raise ArtifactRejectedError(
+                "preview artifact verification failed"
+            ) from exc
         observed_streams = observed_probe.get("streams")
         videos = [
             item
@@ -4284,17 +5628,6 @@ class K2DeliveryService:
             or audio.get("channels") != output_probe.get("channelCount")
         ):
             raise ArtifactRejectedError("preview artifact probe changed")
-        try:
-            pixels = decoded_frame_pixel_digest_metadata(path)
-            pcm = canonical_pcm_digest_metadata(
-                path,
-                expected_sample_count=output_digest.get("sampleCount"),
-                allow_aac_frame_padding=True,
-            )
-        except DigestError as exc:
-            raise ArtifactRejectedError(
-                "preview artifact PCM verification failed"
-            ) from exc
         if (
             pixels.get("fileDigest") != prefixed_file_digest
             or pixels.get("decodedFramePixelDigest")
@@ -4323,11 +5656,6 @@ class K2DeliveryService:
             != output_digest.get("frameRate")
         ):
             raise ArtifactRejectedError("preview artifact content digest changed")
-        final_sha, final_size = self._file_sha256_and_size(path)
-        if final_sha != actual_sha or final_size != actual_size:
-            raise ArtifactRejectedError(
-                "preview artifact changed during verification"
-            )
         return path
 
     def _glyph_video_input(
@@ -5160,6 +6488,8 @@ class K2DeliveryService:
                 "LOCAL_EXPOSURE",
                 "FLAME_EXTINGUISH",
                 "SMOKE",
+                "NAMEPLATE_TEXT",
+                "FACE_MARK_COMPENSATION",
             }
         ]
         glyphs = [
@@ -5172,8 +6502,8 @@ class K2DeliveryService:
             or not active["AUDIO"]
             or not active["SUBTITLE"]
             or len(glyphs) != 1
-            or len(effects) not in {3, 5}
-            or len(deterministic) not in {2, 4}
+            or len(effects) not in {3, 5, 7}
+            or len(deterministic) not in {2, 4, 6}
             or len(effects) != len(deterministic) + 1
         ):
             raise UpstreamNotReadyError(
@@ -5185,6 +6515,8 @@ class K2DeliveryService:
             "LOCAL_EXPOSURE": 1,
             "FLAME_EXTINGUISH": 2,
             "SMOKE": 3,
+            "NAMEPLATE_TEXT": 4,
+            "FACE_MARK_COMPENSATION": 5,
         }
         deterministic.sort(
             key=lambda item: (
@@ -5198,7 +6530,11 @@ class K2DeliveryService:
             ranks[item["sourceBinding"]["effectKind"]]
             for item in deterministic
         ]
-        expected_profile = [0, 1] if len(deterministic) == 2 else [0, 1, 2, 3]
+        expected_profile = {
+            2: [0, 1],
+            4: [0, 1, 2, 3],
+            6: [0, 1, 2, 3, 4, 5],
+        }[len(deterministic)]
         timeline_order = [
             (item["layer"], item["zOrder"]) for item in deterministic
         ]
@@ -5217,7 +6553,11 @@ class K2DeliveryService:
             "subtitles": active["SUBTITLE"],
             "deterministicEffects": deterministic,
             "glyph": glyphs[0],
-            "effectProfile": "M13_E1" if len(deterministic) == 2 else "M13_E2",
+            "effectProfile": {
+                2: "M13_E1",
+                4: "M13_E2",
+                6: "M13_E3",
+            }[len(deterministic)],
         }
 
     def _editing_preview_input_refs(
@@ -5549,13 +6889,11 @@ class K2DeliveryService:
                 raise UpstreamNotReadyError(
                     "editing Timeline effect Result is not bound"
                 )
-            chain = resolve_deterministic_effect_result_chain(
-                self.evidence,
-                workspace_ref=workspace,
-                production_run_ref=run_ref,
+            chain = self._resolve_effect_result_chain(
+                context=context,
                 result_ref=result_ref,
                 result_digest=result_digest,
-            ).as_dict()
+            )
             requirement = chain["requirement"]
             request = chain["executionRequest"]
             artifact = chain["artifactEvidence"]
@@ -5739,6 +7077,16 @@ class K2DeliveryService:
                             allow_canonical_asset=True,
                         )
                     )
+            elif mode in {"NAMEPLATE_TEXT", "FACE_MARK_COMPENSATION"}:
+                current_overlay_assets = self._resolved_overlay_authorities(
+                    context=context,
+                    requirement=requirement,
+                )
+                resolved_images.extend(
+                    deepcopy(item)
+                    for reference, item in current_overlay_assets.items()
+                    if reference != resolved_base["assetVersionRef"]
+                )
             else:
                 raise RepositoryUnavailableError(
                     "deterministic Effect mode is unsupported"
@@ -5748,7 +7096,12 @@ class K2DeliveryService:
             run_hash = sha256(run_ref.encode("utf-8")).hexdigest()[:20]
             output = artifact["outputDigest"]
             probe = artifact["outputMediaProbe"]
-            if mode in {FLAME_EXTINGUISH, SMOKE} and (
+            if mode in {
+                FLAME_EXTINGUISH,
+                SMOKE,
+                "NAMEPLATE_TEXT",
+                "FACE_MARK_COMPENSATION",
+            } and (
                 result.get("outputFileDigest") != output["fileDigest"]
                 or result.get("outputDecodedFramePixelDigest")
                 != output["decodedFramePixelDigest"]
@@ -5770,8 +7123,14 @@ class K2DeliveryService:
                     "artifactEvidenceRef": artifact["artifactEvidenceRef"],
                     "artifactEvidenceDigest": artifact["payloadDigest"],
                     "storageKey": (
-                        f"{workspace_hash}/{run_hash}/masked-surface/"
-                        f"masked-surface-{v3_digest}.mp4"
+                        f"{workspace_hash}/{run_hash}/deterministic-overlays/"
+                        f"overlay-{v3_digest}.mp4"
+                        if mode
+                        in {"NAMEPLATE_TEXT", "FACE_MARK_COMPENSATION"}
+                        else (
+                            f"{workspace_hash}/{run_hash}/masked-surface/"
+                            f"masked-surface-{v3_digest}.mp4"
+                        )
                     ),
                     "fileDigest": output["fileDigest"],
                     "pixelDigest": output["decodedFramePixelDigest"],
@@ -6944,20 +8303,20 @@ class K2DeliveryService:
             {
                 "clientIdempotencyKey": client_key,
                 "operationRef": operation_ref,
-                "stage": (
-                    "m13-e1-editing-timeline-composition"
-                    if effect_profile == "M13_E1"
-                    else "m13-e2-editing-timeline-composition"
-                ),
+                "stage": {
+                    "M13_E1": "m13-e1-editing-timeline-composition",
+                    "M13_E2": "m13-e2-editing-timeline-composition",
+                    "M13_E3": "m13-e3-editing-timeline-composition",
+                }[effect_profile],
             }
         )
         composition_request_digest = _digest(
             {
-                "schemaVersion": (
-                    "v5.m13-effect-preview-command.v1"
-                    if effect_profile == "M13_E1"
-                    else "v5.m13-effect-preview-command.v2"
-                ),
+                "schemaVersion": {
+                    "M13_E1": "v5.m13-effect-preview-command.v1",
+                    "M13_E2": "v5.m13-effect-preview-command.v2",
+                    "M13_E3": "v5.m13-effect-preview-command.v3",
+                }[effect_profile],
                 "command": normalized,
                 "deliveryId": TIMELINE_PREVIEW_DELIVERY_ID,
             }

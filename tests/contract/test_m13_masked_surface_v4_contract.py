@@ -111,10 +111,18 @@ class FakeV3Executor:
         path = self.root / key
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_bytes(b"combined-effect-preview-output")
+        renderer_version = {
+            subject.EFFECT_PREVIEW_V3_REQUEST_SCHEMA_VERSION:
+                subject.EFFECT_PREVIEW_RENDERER_VERSION,
+            subject.EFFECT_PREVIEW_V3_REQUEST_SCHEMA_VERSION_V3:
+                subject.EFFECT_PREVIEW_RENDERER_VERSION_V3,
+            subject.EFFECT_PREVIEW_V3_REQUEST_SCHEMA_VERSION_V4:
+                subject.EFFECT_PREVIEW_RENDERER_VERSION_V4,
+        }[request["schemaVersion"]]
         identity = {
             "ffmpegIdentity": "ffmpeg combined test identity",
             "rendererIdentity": subject.EFFECT_PREVIEW_RENDERER_IDENTITY,
-            "rendererVersion": subject.EFFECT_PREVIEW_RENDERER_VERSION,
+            "rendererVersion": renderer_version,
         }
         output = request["output"]
         probe = {
@@ -523,7 +531,7 @@ class MaskedSurfaceV4ContractTests(unittest.TestCase):
         fake = FakeV3Executor(self.root)
         executor = subject.V4MaskedSurfaceEffectExecutor(self.root, fake)
 
-        def decoded(path: Path) -> dict:
+        def decoded(path: Path, **_: object) -> dict:
             candidate = Path(path)
             if candidate == self.base_path:
                 return self._decoded(candidate)
@@ -594,6 +602,116 @@ class MaskedSurfaceV4ContractTests(unittest.TestCase):
                 command,
                 resolved_artifacts=self._preview_resolved(command),
             )
+
+    def test_combined_preview_v4_adds_exact_six_stage_profile(self) -> None:
+        command = self._preview_command()
+        face_binding = self._effect_binding(5, "FACE_MARK_COMPENSATION")
+        face_binding["runtimeEvidenceDigest"] = "f" * 64
+        command["effectResultBindings"].extend(
+            [
+                self._effect_binding(2, "FLAME_EXTINGUISH"),
+                self._effect_binding(3, "SMOKE"),
+                self._effect_binding(4, "NAMEPLATE_TEXT"),
+                face_binding,
+            ]
+        )
+        resolved = self._preview_resolved(command)
+        base = deepcopy(self.assets["base-version-1"])
+
+        def stage(index: int) -> dict:
+            value = {
+                "schemaVersion": "test-stage.v1",
+                "payload": f"stage-{index}",
+                "workspaceRef": "workspace-1",
+                "productionRunRef": "run-1",
+            }
+            if index < 4:
+                value["frameRangeEndExclusive"] = 5
+            else:
+                value["overlaySpec"] = {
+                    "frameRangeStartInclusive": 0,
+                    "frameRangeEndExclusive": 5,
+                }
+            return seal(value)
+
+        stages = [stage(index) for index in range(6)]
+        glyph = seal(
+            {
+                "schemaVersion": "v5.m13-glyph-reveal-execution-request.v2",
+                "executionRequestRef": "glyph-execution-1",
+                "payload": "glyph",
+                "workspaceRef": "workspace-1",
+                "productionRunRef": "run-1",
+            }
+        )
+        legacy = {
+            "audioMix": deepcopy(command["audioMix"]),
+            "subtitleManifest": deepcopy(command["subtitleManifest"]),
+            "output": deepcopy(command["output"]),
+        }
+        fake = FakeV3Executor(self.root)
+        executor = subject.V4MaskedSurfaceEffectExecutor(self.root, fake)
+
+        def decoded(path: Path, **_: object) -> dict:
+            candidate = Path(path)
+            if candidate == self.base_path:
+                return self._decoded(candidate)
+            return {
+                "fileDigest": file_digest(candidate),
+                "fileDigestAlgorithm": "sha256",
+                "decodedFramePixelDigest": "sha256:" + "e" * 64,
+                "decodedFramePixelDigestSpec": DECODED_FRAME_PIXEL_DIGEST_SPEC_V2,
+                "pixelMode": "RGBA",
+                "width": 640,
+                "height": 360,
+                "frameCount": 6,
+            }
+
+        with (
+            mock.patch.object(subject, "_resolve_preview_base", return_value=base),
+            mock.patch.object(
+                subject, "_resolve_effect_stage", side_effect=stages[:4]
+            ),
+            mock.patch.object(
+                subject, "_resolve_overlay_preview_stage", side_effect=stages[4:]
+            ),
+            mock.patch.object(subject, "_resolve_glyph_stage", return_value=glyph),
+            mock.patch(
+                "services.v4_platform.composition._build_timeline_preview_execution_request_v1",
+                return_value=legacy,
+            ),
+            mock.patch.object(
+                subject, "decoded_frame_pixel_digest_metadata", side_effect=decoded
+            ),
+            mock.patch.object(
+                subject,
+                "canonical_pcm_digest_metadata",
+                return_value={
+                    "pcmContentDigest": "f" * 64,
+                    "pcmDigestSpec": PCM_CONTENT_DIGEST_SPEC,
+                    "sampleRate": 48_000,
+                    "channelCount": 2,
+                    "sampleCount": 12_000,
+                },
+            ),
+        ):
+            result = executor.compose_timeline_preview_v2(
+                command, resolved_artifacts=resolved
+            )
+
+        assert fake.request is not None
+        self.assertEqual(
+            subject.EFFECT_PREVIEW_V3_REQUEST_SCHEMA_VERSION_V4,
+            fake.request["schemaVersion"],
+        )
+        self.assertEqual(
+            [f"stage-{index}" for index in range(6)],
+            [item["payload"] for item in fake.request["effectStages"]],
+        )
+        self.assertEqual(
+            subject.EFFECT_PREVIEW_RENDERER_VERSION_V4,
+            result["rendererVersion"],
+        )
 
 
 if __name__ == "__main__":

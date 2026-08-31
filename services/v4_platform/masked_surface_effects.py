@@ -68,12 +68,17 @@ EFFECT_PREVIEW_V3_REQUEST_SCHEMA_VERSION = (
 EFFECT_PREVIEW_V3_REQUEST_SCHEMA_VERSION_V3 = (
     "v4.m13-effect-preview-execution-request.v3"
 )
+EFFECT_PREVIEW_V3_REQUEST_SCHEMA_VERSION_V4 = (
+    "v4.m13-effect-preview-execution-request.v4"
+)
 EFFECT_PREVIEW_V4_RESULT_SCHEMA_VERSION = "v4.m13-composition-result.v2"
 EFFECT_PREVIEW_BINDINGS_SCHEMA_VERSION = "v5.m13-effect-preview-bindings.v1"
 EFFECT_PREVIEW_BINDINGS_SCHEMA_VERSION_V2 = "v5.m13-effect-preview-bindings.v2"
+EFFECT_PREVIEW_BINDINGS_SCHEMA_VERSION_V3 = "v5.m13-effect-preview-bindings.v3"
 EFFECT_PREVIEW_RENDERER_IDENTITY = "v3.deterministic-timeline-preview-ffmpeg"
 EFFECT_PREVIEW_RENDERER_VERSION = "2"
 EFFECT_PREVIEW_RENDERER_VERSION_V3 = "3"
+EFFECT_PREVIEW_RENDERER_VERSION_V4 = "4"
 EFFECT_PREVIEW_ADAPTER_IDENTITY = "v4.local-composition-executor.v1"
 
 E1_EFFECT_MODES = ("SCRATCH_REVEAL", "LIGHT_SWEEP", "LOCAL_EXPOSURE")
@@ -2364,9 +2369,9 @@ def _frame_rate(value: Any, field: str) -> dict[str, int]:
 def _effect_preview_bindings(
     effect_bindings: Any, glyph_binding: Any
 ) -> tuple[list[dict[str, Any]], dict[str, Any], str]:
-    if not isinstance(effect_bindings, list) or len(effect_bindings) not in {2, 4}:
+    if not isinstance(effect_bindings, list) or len(effect_bindings) not in {2, 4, 6}:
         raise MaskedSurfaceRequestValidationError(
-            "effectResultBindings must match a closed two- or four-stage profile"
+            "effectResultBindings must match a closed two-, four-, or six-stage profile"
         )
     stage_count = len(effect_bindings)
     result: list[dict[str, Any]] = []
@@ -2376,6 +2381,8 @@ def _effect_preview_bindings(
         "LOCAL_EXPOSURE": 1,
         "FLAME_EXTINGUISH": 2,
         "SMOKE": 3,
+        "NAMEPLATE_TEXT": 4,
+        "FACE_MARK_COMPENSATION": 5,
     }
     seen_clips: set[str] = set()
     seen_results: set[str] = set()
@@ -2426,7 +2433,11 @@ def _effect_preview_bindings(
         seen_clips.add(item["clipRef"])
         seen_results.add(item["resultRef"])
         result.append(item)
-    expected_ranks = [0, 1] if stage_count == 2 else [0, 1, 2, 3]
+    expected_ranks = {
+        2: [0, 1],
+        4: [0, 1, 2, 3],
+        6: [0, 1, 2, 3, 4, 5],
+    }[stage_count]
     if [ranks[item["effectMode"]] for item in result] != expected_ranks:
         raise MaskedSurfaceRequestValidationError(
             "effect Result bindings are not in fixed phase order"
@@ -2445,11 +2456,11 @@ def _effect_preview_bindings(
     digest = sha256(
         _canonical_json(
             {
-                "schemaVersion": (
-                    EFFECT_PREVIEW_BINDINGS_SCHEMA_VERSION
-                    if stage_count == 2
-                    else EFFECT_PREVIEW_BINDINGS_SCHEMA_VERSION_V2
-                ),
+                "schemaVersion": {
+                    2: EFFECT_PREVIEW_BINDINGS_SCHEMA_VERSION,
+                    4: EFFECT_PREVIEW_BINDINGS_SCHEMA_VERSION_V2,
+                    6: EFFECT_PREVIEW_BINDINGS_SCHEMA_VERSION_V3,
+                }[stage_count],
                 "effectResultBindings": result,
                 "glyphRequirementBinding": glyph,
             }
@@ -2705,7 +2716,7 @@ def _validate_effect_artifact_storage(
     except MaskedSurfaceRequestValidationError as exc:
         raise MaskedSurfaceAssetResolutionError("artifactStorage is invalid") from exc
     output = artifact["outputDigest"]
-    probe = artifact["outputMediaProbe"]
+    expected_probe = artifact["outputMediaProbe"]
     expected_key = _expected_output_storage_key(
         {
             "workspaceRef": artifact["workspaceRef"],
@@ -2724,7 +2735,7 @@ def _validate_effect_artifact_storage(
         "height": output["height"],
         "frameCount": output["frameCount"],
         "frameRate": output["frameRate"],
-        "pixelFormat": probe["pixelFormat"],
+        "pixelFormat": expected_probe["pixelFormat"],
     }
     if any(storage[field] != expected_value for field, expected_value in expected.items()):
         raise MaskedSurfaceAssetResolutionError(
@@ -2911,6 +2922,274 @@ def _resolve_effect_stage(
     return stage_request
 
 
+def _resolve_overlay_preview_stage_impl(
+    binding: Mapping[str, Any],
+    resolution: Any,
+    *,
+    artifact_root: Path,
+    base: Mapping[str, Any],
+    font_asset_authority: Any | None,
+) -> dict[str, Any]:
+    """Rebuild one E3 stage through the standalone overlay authority."""
+
+    from services.v5_core_os.episode_production.deterministic_overlays import (
+        OverlayResult,
+        build_overlay_execution_request,
+        parse_overlay_requirement,
+    )
+    from .deterministic_overlays import (
+        rebuild_overlay_v3_request,
+        validate_overlay_artifact_evidence,
+        validate_overlay_execution_request,
+        validate_overlay_runtime_evidence,
+    )
+
+    resolved = _closed(
+        resolution,
+        _EFFECT_EXECUTION_RESOLUTION_FIELDS,
+        f"overlay execution {binding['resultRef']}",
+    )
+    requirement_wrapper = parse_overlay_requirement(resolved["requirement"])
+    requirement = requirement_wrapper.as_dict()
+    request = validate_overlay_execution_request(resolved["executionRequest"])
+    if request != build_overlay_execution_request(requirement_wrapper).as_dict():
+        raise MaskedSurfaceExecutionError(
+            "overlay execution request is stale"
+        )
+    runtime = validate_overlay_runtime_evidence(resolved["runtimeEvidence"])
+    artifact = validate_overlay_artifact_evidence(
+        resolved["artifactEvidence"], runtime_evidence=runtime
+    )
+    result = OverlayResult.from_mapping(resolved["result"]).as_dict()
+
+    expected_lineage = {
+        "workspaceRef": request["workspaceRef"],
+        "productionRunRef": request["productionRunRef"],
+        "requirementRef": request["requirementRef"],
+        "requirementDigest": request["requirementDigest"],
+        "executionRequestRef": request["executionRequestRef"],
+        "executionRequestDigest": request["payloadDigest"],
+        "effectMode": request["effectMode"],
+    }
+    if any(
+        runtime[field] != expected
+        or artifact[field] != expected
+        or result[field] != expected
+        for field, expected in expected_lineage.items()
+    ):
+        raise MaskedSurfaceExecutionError(
+            "overlay Requirement, evidence, and Result lineage disagree"
+        )
+    expected_result = {
+        "resultRef": binding["resultRef"],
+        "payloadDigest": binding["resultDigest"],
+        "artifactEvidenceRef": artifact["artifactEvidenceRef"],
+        "artifactEvidenceDigest": artifact["payloadDigest"],
+        "runtimeEvidenceRef": runtime["runtimeEvidenceRef"],
+        "runtimeEvidenceDigest": runtime["payloadDigest"],
+        "outputFileDigest": artifact["outputDigest"]["fileDigest"],
+        "outputDecodedFramePixelDigest": artifact["outputDigest"][
+            "decodedFramePixelDigest"
+        ],
+        "outputMediaProbe": artifact["outputMediaProbe"],
+    }
+    if any(result[field] != expected for field, expected in expected_result.items()):
+        raise MaskedSurfaceExecutionError("overlay Result binding is stale")
+
+    overlay_spec = request["overlaySpec"]
+    expected_binding = {
+        "effectMode": request["effectMode"],
+        "requirementRef": request["requirementRef"],
+        "requirementDigest": request["requirementDigest"],
+        "executionRequestRef": request["executionRequestRef"],
+        "executionRequestDigest": request["payloadDigest"],
+        "artifactEvidenceRef": artifact["artifactEvidenceRef"],
+        "artifactEvidenceDigest": artifact["payloadDigest"],
+        "runtimeEvidenceRef": runtime["runtimeEvidenceRef"],
+        "runtimeEvidenceDigest": runtime["payloadDigest"],
+        "frameRangeStartInclusive": overlay_spec[
+            "frameRangeStartInclusive"
+        ],
+        "frameRangeEndExclusive": overlay_spec["frameRangeEndExclusive"],
+    }
+    if any(binding[field] != expected for field, expected in expected_binding.items()):
+        raise MaskedSurfaceExecutionError(
+            "overlay Result binding does not match its evidence chain"
+        )
+
+    stage = rebuild_overlay_v3_request(
+        request,
+        resolved_asset_versions=resolved["assetVersions"],
+        artifact_root=artifact_root,
+        font_asset_authority=font_asset_authority,
+    )
+    if (
+        runtime["v3ExecutionRequestDigest"] != stage["payloadDigest"]
+        or artifact["v3ExecutionRequestDigest"] != stage["payloadDigest"]
+    ):
+        raise MaskedSurfaceExecutionError(
+            "overlay evidence does not bind the rebuilt V3 request"
+        )
+    if any(
+        stage["basePlate"][field] != base[field]
+        for field in _RESOLVED_BASE_FIELDS
+    ):
+        raise MaskedSurfaceAssetResolutionError(
+            "overlay stage does not use the exact preview baseVideo"
+        )
+
+    storage = _closed(
+        resolved["artifactStorage"],
+        _EFFECT_ARTIFACT_STORAGE_FIELDS,
+        "overlay artifactStorage",
+    )
+    output = artifact["outputDigest"]
+    expected_probe = artifact["outputMediaProbe"]
+    workspace_hash = sha256(request["workspaceRef"].encode("utf-8")).hexdigest()[:20]
+    run_hash = sha256(request["productionRunRef"].encode("utf-8")).hexdigest()[:20]
+    expected_storage = {
+        "artifactEvidenceRef": artifact["artifactEvidenceRef"],
+        "artifactEvidenceDigest": artifact["payloadDigest"],
+        "storageKey": str(
+            PurePosixPath(
+                workspace_hash,
+                run_hash,
+                "deterministic-overlays",
+                f"overlay-{stage['payloadDigest']}.mp4",
+            )
+        ),
+        "fileDigest": output["fileDigest"],
+        "pixelDigest": output["decodedFramePixelDigest"],
+        "pixelDigestSpec": output["decodedFramePixelDigestSpec"],
+        "width": output["width"],
+        "height": output["height"],
+        "frameCount": output["frameCount"],
+        "frameRate": output["frameRate"],
+        "pixelFormat": expected_probe["pixelFormat"],
+    }
+    if storage != expected_storage:
+        raise MaskedSurfaceAssetResolutionError(
+            "overlay artifactStorage does not match evidence"
+        )
+    output_path = _server_file(
+        artifact_root, storage["storageKey"], label="overlay artifactStorage"
+    )
+    from shutil import which
+    from services.v3_render_core.composition import (
+        RenderArtifactError,
+        _PinnedRegularFile,
+        _PinnedRuntimeBinary,
+    )
+    from services.v3_render_core.masked_surface import (
+        _probe_video,
+        _validate_probe,
+    )
+
+    ffmpeg_path = which("ffmpeg")
+    ffprobe_path = which("ffprobe")
+    if ffmpeg_path is None or ffprobe_path is None:
+        raise MaskedSurfaceAssetResolutionError(
+            "pinned overlay artifact measurement runtime is unavailable"
+        )
+    try:
+        with (
+            _PinnedRegularFile(
+                output_path, label="resolved overlay artifact"
+            ) as pinned_output,
+            _PinnedRuntimeBinary(
+                Path(os.path.realpath(ffmpeg_path)), label="FFmpeg"
+            ) as ffmpeg,
+            _PinnedRuntimeBinary(
+                Path(os.path.realpath(ffprobe_path)), label="FFprobe"
+            ) as ffprobe,
+        ):
+            if (
+                pinned_output.descriptor is None
+                or os.fstat(pinned_output.descriptor).st_size
+                != artifact["outputByteSize"]
+            ):
+                raise MaskedSurfaceAssetResolutionError(
+                    "overlay artifact byte size is stale"
+                )
+            pass_fds = tuple(
+                dict.fromkeys(
+                    pinned_output.pass_fds
+                    + ffmpeg.pass_fds
+                    + ffprobe.pass_fds
+                )
+            )
+            actual_probe = _probe_video(
+                pinned_output.descriptor_path,
+                ffprobe,
+                pass_fds=pass_fds,
+            )
+            _validate_probe(
+                actual_probe, expected_probe, input_media=False
+            )
+            measured = decoded_frame_pixel_digest_metadata(
+                pinned_output.descriptor_path,
+                ffmpeg_path=ffmpeg.executable_path,
+                ffprobe_path=ffprobe.executable_path,
+                pass_fds=pass_fds,
+            )
+            pinned_output.require_stable()
+            ffmpeg.require_stable()
+            ffprobe.require_stable()
+    except MaskedSurfaceAssetResolutionError:
+        raise
+    except (DigestError, RenderArtifactError, OSError) as exc:
+        raise MaskedSurfaceAssetResolutionError(
+            "overlay artifact could not be measured"
+        ) from exc
+    if (
+        measured.get("fileDigest") != storage["fileDigest"]
+        or measured.get("decodedFramePixelDigest") != storage["pixelDigest"]
+        or measured.get("decodedFramePixelDigestSpec")
+        != storage["pixelDigestSpec"]
+        or measured.get("width") != storage["width"]
+        or measured.get("height") != storage["height"]
+        or measured.get("frameCount") != storage["frameCount"]
+    ):
+        raise MaskedSurfaceAssetResolutionError(
+            "overlay artifact content identity is stale"
+        )
+    return stage
+
+
+def _resolve_overlay_preview_stage(
+    binding: Mapping[str, Any],
+    resolution: Any,
+    *,
+    artifact_root: Path,
+    base: Mapping[str, Any],
+    font_asset_authority: Any | None,
+) -> dict[str, Any]:
+    """Translate overlay-domain failures into this composition boundary."""
+
+    from services.v5_core_os.episode_production.foundation import (
+        EpisodeProductionError,
+    )
+    from .deterministic_overlays import OverlayExecutionError
+
+    try:
+        return _resolve_overlay_preview_stage_impl(
+            binding,
+            resolution,
+            artifact_root=artifact_root,
+            base=base,
+            font_asset_authority=font_asset_authority,
+        )
+    except (
+        MaskedSurfaceExecutionError,
+        MaskedSurfaceAssetResolutionError,
+    ):
+        raise
+    except (EpisodeProductionError, OverlayExecutionError) as exc:
+        raise MaskedSurfaceExecutionError(
+            "overlay execution chain could not be resolved"
+        ) from exc
+
+
 def _verify_generic_sealed_mapping(value: Any, label: str) -> dict[str, Any]:
     if not isinstance(value, Mapping) or "payloadDigest" not in value:
         raise MaskedSurfaceExecutionError(f"{label} is not sealed")
@@ -3059,6 +3338,7 @@ def _build_effect_preview_v3_request(
     resolved_artifacts: Any,
     *,
     artifact_root: Path,
+    font_asset_authority: Any | None = None,
 ) -> dict[str, Any]:
     from .composition import _build_timeline_preview_execution_request_v1
 
@@ -3084,31 +3364,49 @@ def _build_effect_preview_v3_request(
     if not isinstance(effect_resolutions, Mapping) or set(effect_resolutions) != expected_results:
         raise MaskedSurfaceAssetResolutionError(
             "effectExecutions do not match effectResultBindings"
-        )
+    )
     stages: list[dict[str, Any]] = []
     for binding in bindings:
-        stage = _resolve_effect_stage(
-            binding,
-            effect_resolutions[binding["resultRef"]],
-            artifact_root=artifact_root,
-            base=base,
-            local_exposure_stage=(
-                stages[1]
-                if binding["effectMode"] == "FLAME_EXTINGUISH"
-                and len(stages) == 2
-                else None
-            ),
-            local_exposure_binding=(
-                bindings[1]
-                if binding["effectMode"] == "FLAME_EXTINGUISH"
-                and len(stages) == 2
-                else None
-            ),
+        if binding["effectMode"] in {
+            "NAMEPLATE_TEXT",
+            "FACE_MARK_COMPENSATION",
+        }:
+            stage = _resolve_overlay_preview_stage(
+                binding,
+                effect_resolutions[binding["resultRef"]],
+                artifact_root=artifact_root,
+                base=base,
+                font_asset_authority=font_asset_authority,
+            )
+        else:
+            stage = _resolve_effect_stage(
+                binding,
+                effect_resolutions[binding["resultRef"]],
+                artifact_root=artifact_root,
+                base=base,
+                local_exposure_stage=(
+                    stages[1]
+                    if binding["effectMode"] == "FLAME_EXTINGUISH"
+                    and len(stages) == 2
+                    else None
+                ),
+                local_exposure_binding=(
+                    bindings[1]
+                    if binding["effectMode"] == "FLAME_EXTINGUISH"
+                    and len(stages) == 2
+                    else None
+                ),
+            )
+        stage_semantics = (
+            stage["overlaySpec"]
+            if binding["effectMode"]
+            in {"NAMEPLATE_TEXT", "FACE_MARK_COMPENSATION"}
+            else stage
         )
         if (
             stage["workspaceRef"] != command["workspaceRef"]
             or stage["productionRunRef"] != command["productionRunRef"]
-            or stage["frameRangeEndExclusive"] > base["frameCount"]
+            or stage_semantics["frameRangeEndExclusive"] > base["frameCount"]
         ):
             raise MaskedSurfaceExecutionError(
                 "effect stage scope or frame range is stale"
@@ -3163,7 +3461,11 @@ def _build_effect_preview_v3_request(
     )
     input_payload = {
         "baseVideo": deepcopy(base),
-        "maskedSurfaceRequestDigests": [stage["payloadDigest"] for stage in stages],
+        (
+            "deterministicEffectRequestDigests"
+            if len(stages) == 6
+            else "maskedSurfaceRequestDigests"
+        ): [stage["payloadDigest"] for stage in stages],
         "glyphRevealRequestDigest": glyph_stage["payloadDigest"],
         "effectResultBindings": deepcopy(bindings),
         "glyphRequirementBinding": deepcopy(glyph_binding),
@@ -3185,11 +3487,11 @@ def _build_effect_preview_v3_request(
     ).hexdigest()[:32]
     request = _seal(
         {
-            "schemaVersion": (
-                EFFECT_PREVIEW_V3_REQUEST_SCHEMA_VERSION
-                if len(stages) == 2
-                else EFFECT_PREVIEW_V3_REQUEST_SCHEMA_VERSION_V3
-            ),
+            "schemaVersion": {
+                2: EFFECT_PREVIEW_V3_REQUEST_SCHEMA_VERSION,
+                4: EFFECT_PREVIEW_V3_REQUEST_SCHEMA_VERSION_V3,
+                6: EFFECT_PREVIEW_V3_REQUEST_SCHEMA_VERSION_V4,
+            }[len(stages)],
             "executionRequestRef": execution_ref,
             "workspaceRef": command["workspaceRef"],
             "productionRunRef": command["productionRunRef"],
@@ -3276,8 +3578,6 @@ def _validate_v3_effect_preview_result(
         )
     except MaskedSurfaceRequestValidationError as exc:
         raise MaskedSurfaceExecutionError("V3 effect preview size is invalid") from exc
-    if path.stat().st_size != size:
-        raise MaskedSurfaceExecutionError("V3 effect preview byte size is stale")
     output = request["output"]
     expected_probe = {
         "container": output["container"],
@@ -3334,11 +3634,11 @@ def _validate_v3_effect_preview_result(
             "V3 effect preview digest contract is stale"
         )
     ffmpeg_identity = result["ffmpegIdentity"]
-    expected_renderer_version = (
-        EFFECT_PREVIEW_RENDERER_VERSION
-        if request["schemaVersion"] == EFFECT_PREVIEW_V3_REQUEST_SCHEMA_VERSION
-        else EFFECT_PREVIEW_RENDERER_VERSION_V3
-    )
+    expected_renderer_version = {
+        EFFECT_PREVIEW_V3_REQUEST_SCHEMA_VERSION: EFFECT_PREVIEW_RENDERER_VERSION,
+        EFFECT_PREVIEW_V3_REQUEST_SCHEMA_VERSION_V3: EFFECT_PREVIEW_RENDERER_VERSION_V3,
+        EFFECT_PREVIEW_V3_REQUEST_SCHEMA_VERSION_V4: EFFECT_PREVIEW_RENDERER_VERSION_V4,
+    }[request["schemaVersion"]]
     runtime_identity = {
         "ffmpegIdentity": ffmpeg_identity,
         "rendererIdentity": result["rendererIdentity"],
@@ -3360,14 +3660,66 @@ def _validate_v3_effect_preview_result(
         raise MaskedSurfaceExecutionError(
             "V3 effect preview runtime evidence is stale"
         )
-    try:
-        pixels = decoded_frame_pixel_digest_metadata(path)
-        pcm = canonical_pcm_digest_metadata(
-            path,
-            expected_sample_count=output["durationSamples"],
-            allow_aac_frame_padding=True,
+    from shutil import which
+    from services.v3_render_core.composition import (
+        RenderArtifactError,
+        _PinnedRegularFile,
+        _PinnedRuntimeBinary,
+    )
+
+    ffmpeg_path = which("ffmpeg")
+    ffprobe_path = which("ffprobe")
+    if ffmpeg_path is None or ffprobe_path is None:
+        raise MaskedSurfaceExecutionError(
+            "pinned effect preview measurement runtime is unavailable"
         )
-    except DigestError as exc:
+    try:
+        with (
+            _PinnedRegularFile(
+                path, label="V3 effect preview output"
+            ) as pinned_output,
+            _PinnedRuntimeBinary(
+                Path(os.path.realpath(ffmpeg_path)), label="FFmpeg"
+            ) as ffmpeg,
+            _PinnedRuntimeBinary(
+                Path(os.path.realpath(ffprobe_path)), label="FFprobe"
+            ) as ffprobe,
+        ):
+            if (
+                pinned_output.descriptor is None
+                or os.fstat(pinned_output.descriptor).st_size != size
+            ):
+                raise MaskedSurfaceExecutionError(
+                    "V3 effect preview byte size is stale"
+                )
+            pass_fds = tuple(
+                dict.fromkeys(
+                    pinned_output.pass_fds
+                    + ffmpeg.pass_fds
+                    + ffprobe.pass_fds
+                )
+            )
+            pixels = decoded_frame_pixel_digest_metadata(
+                pinned_output.descriptor_path,
+                ffmpeg_path=ffmpeg.executable_path,
+                ffprobe_path=ffprobe.executable_path,
+                pass_fds=pass_fds,
+            )
+            pcm = canonical_pcm_digest_metadata(
+                path,
+                expected_sample_count=output["durationSamples"],
+                allow_aac_frame_padding=True,
+                ffmpeg_path=ffmpeg.executable_path,
+                ffprobe_path=ffprobe.executable_path,
+                pass_fds=pass_fds,
+                _input_descriptor=pinned_output.descriptor,
+            )
+            pinned_output.require_stable()
+            ffmpeg.require_stable()
+            ffprobe.require_stable()
+    except MaskedSurfaceExecutionError:
+        raise
+    except (DigestError, RenderArtifactError, OSError) as exc:
         raise MaskedSurfaceExecutionError(
             "V3 effect preview output could not be remeasured"
         ) from exc
@@ -3467,17 +3819,27 @@ def _build_v4_effect_preview_result(
 class V4MaskedSurfaceEffectExecutor:
     """One V4 orchestration boundary; it creates no domain authority."""
 
-    def __init__(self, artifact_root: Path | str, v3_executor: Any) -> None:
+    def __init__(
+        self,
+        artifact_root: Path | str,
+        v3_executor: Any,
+        *,
+        font_asset_authority: Any | None = None,
+    ) -> None:
         self.artifact_root = Path(artifact_root).resolve()
         if not self.artifact_root.is_dir() or self.artifact_root.is_symlink():
             raise MaskedSurfaceAssetResolutionError("artifact root is invalid")
         if not callable(getattr(v3_executor, "execute", None)):
             raise MaskedSurfaceExecutionError("V3 masked-surface executor is required")
         self.v3_executor = v3_executor
+        self.font_asset_authority = font_asset_authority
 
     @classmethod
     def from_artifact_root(
-        cls, artifact_root: Path | str
+        cls,
+        artifact_root: Path | str,
+        *,
+        font_asset_authority: Any | None = None,
     ) -> "V4MaskedSurfaceEffectExecutor":
         """Create the production V3 primitive without exposing it to V5."""
 
@@ -3486,7 +3848,11 @@ class V4MaskedSurfaceEffectExecutor:
         )
 
         root = Path(artifact_root).resolve()
-        return cls(root, DeterministicMaskedSurfaceExecutor(root))
+        return cls(
+            root,
+            DeterministicMaskedSurfaceExecutor(root),
+            font_asset_authority=font_asset_authority,
+        )
 
     def execute(
         self,
@@ -3588,6 +3954,7 @@ class V4MaskedSurfaceEffectExecutor:
             command,
             resolved_artifacts,
             artifact_root=self.artifact_root,
+            font_asset_authority=self.font_asset_authority,
         )
         compose = getattr(self.v3_executor, "compose_timeline_preview_v2", None)
         if not callable(compose):
@@ -3613,11 +3980,14 @@ __all__ = [
     "EFFECT_MODES",
     "EFFECT_PREVIEW_BINDINGS_SCHEMA_VERSION",
     "EFFECT_PREVIEW_BINDINGS_SCHEMA_VERSION_V2",
+    "EFFECT_PREVIEW_BINDINGS_SCHEMA_VERSION_V3",
     "EFFECT_PREVIEW_RENDERER_IDENTITY",
     "EFFECT_PREVIEW_RENDERER_VERSION",
     "EFFECT_PREVIEW_RENDERER_VERSION_V3",
+    "EFFECT_PREVIEW_RENDERER_VERSION_V4",
     "EFFECT_PREVIEW_V3_REQUEST_SCHEMA_VERSION",
     "EFFECT_PREVIEW_V3_REQUEST_SCHEMA_VERSION_V3",
+    "EFFECT_PREVIEW_V3_REQUEST_SCHEMA_VERSION_V4",
     "EFFECT_PREVIEW_V4_RESULT_SCHEMA_VERSION",
     "FLAME_EXTINGUISH_REQUIREMENT_SCHEMA_VERSION",
     "FLAME_SMOKE_EXECUTION_REQUEST_SCHEMA_VERSION",
