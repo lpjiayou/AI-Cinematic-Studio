@@ -4,15 +4,15 @@
 >
 > Execution Mode: `AUTO-SEQUENTIAL / CONTRACT-FIRST / FAIL-CLOSED`
 >
-> Project Lead Authorization: `ACS-V5-FONT-AUTHORITY-AND-M13-E3-UNBLOCK`
+> Project Lead Authorization: `ACS-V5-IDENTITY-REFERENCE-PROJECTION-AND-M13-E3-UNBLOCK`
 >
-> Authorized Wave: `ARCHITECTURE CHECKPOINT → M12-C1 → M12-C2 → M12-C3/C4 WHEN PERSISTENT CPU ROOT EXISTS; M13-T1 → M13-E1 → M13-E2 → M13-E3 → M13-E4 → M13-R1 → M13-R2 / NON-GPU ONLY`
+> Authorized Wave: `IDENTITY REFERENCE ARCHITECTURE CHECKPOINT → V5 READ-ONLY IDENTITY REFERENCE PROJECTION → M13-E3 → FRONTEND PIN / SERIAL ONLY`
 >
-> Current Task: `ACS-V5-FONT-AUTHORITY-AND-M13-E3-UNBLOCK`
+> Current Task: `ACS-V5-IDENTITY-REFERENCE-PROJECTION-AND-M13-E3-UNBLOCK`
 >
-> Current Work Package: `V5 FONT ASSET PREREQUISITE AUTHORIZED / M13-E3 BLOCKED PENDING FONT AUTHORITY / M12-C3/C4 ENVIRONMENT_HOLD`
+> Current Work Package: `IDENTITY REFERENCE PROJECTION AUTHORIZED / M13-E3 BLOCKED PENDING IDENTITY PROJECTION / M12-C3/C4 ENVIRONMENT_HOLD`
 >
-> Authorized Source Base: `CORE 05d77a800d69e12d3a612a3066dfcf91dd1b0686 / TREE 87742ea509df346d39c6f6d18f55c4ea9c293a0c / VERIFIED M13-E2 MERGE`
+> Authorized Source Base: `CORE b92bb90a57a5534ca17361c42fc7eb2d7582a448 / TREE 6adb078a7e08629f02dd0a56fa45c94e38f14553 / VERIFIED PR-A/PR-B MERGES`
 >
 > M6 Authorization: `ACCEPTED SURFACES / K2-002 MUST CREATE DISTINCT SCOPE AND APPROVALS / NO K2-001 AUTHORITY INHERITANCE`
 >
@@ -36,26 +36,33 @@
 
 ## 0. 2026-08-31 current authority and transition
 
-The Project Lead, Architecture Owner and the respective M12/M13 Domain Owners authorize
-`ACS-M12-M13-ARCHITECTURE-CORRECTION-20260830`. This decision replaces the conflicting
-original `ACS-M12-RUNTIME-G0-UNBLOCK-AND-M13-BACKEND-COMPLETION` implementation
-authority and supersedes the earlier minimal M12/M13 vertical-slice overlay for future
-work. Already merged M12 PR-1 through PR-6 audio capabilities, M13 glyph work and the
-minimal Timeline/Preview slice remain immutable implementation history.
+The Project Lead, Architecture Owner, V5 Identity Domain Owner and M13 Domain Owner
+authorize `ACS-V5-IDENTITY-REFERENCE-PROJECTION-AND-M13-E3-UNBLOCK`. This current
+overlay retains the accepted `ACS-M12-M13-ARCHITECTURE-CORRECTION-20260830` boundary
+and authorizes the serial Identity Reference architecture checkpoint, read-only
+projection/currentness implementation, M13-E3 resumption and Frontend pin update. It
+does not authorize a second Identity authority, live identity writes, Provider/GPU use,
+Asset Admission, publication or later milestones.
 
-The architecture checkpoint, M12-C1, M13-T1, M12-C2 and M13-E1 predecessors are merged
-and remotely verified. M12-C2 added only the closed isolated Kokoro/CosyVoice runtime
-protocol and V4 adapter boundary; it installed no runtime or ML dependency and added no
-Creator HTTP route. M12-C3/C4 remain on `ENVIRONMENT_HOLD` because the persistent CPU
-build root is absent.
+The stopped `ACS-M13-E3-CLOSEOUT-AFTER-FONT-AUTHORITY` result remains immutable history:
+M13-E3 was correctly blocked because canonical Identity reference projection and
+external currentness revalidation were absent. This authorization does not rewrite or
+disguise that result; M13-E3 may resume only after the authorized projection capability
+is independently implemented, verified and merged.
 
-M13-E2 is the current CPU-only implementation work package. It consumes the shared
-M13-E1 masked-surface primitive and existing Local Exposure authority to add closed,
-deterministic `FLAME_EXTINGUISH` and `SMOKE` effects. Their Results persist in the
-existing Episode Production journal, bind one-way through the existing Effect Clip into
-immutable successor TimelineVersions, and reuse the existing PreviewCandidate/API
-boundary. The next M13 work package after an independently verified M13-E2 merge is
-M13-E3. A100 remains unauthorized.
+The architecture checkpoint, M12-C1, M13-T1, M12-C2, M13-E1 and M13-E2 predecessors are
+merged and remotely verified. Core PR #37 merged the Accepted FONT authority checkpoint;
+Core PR #38 merged the canonical FONT AssetVersion v2 capability. M12-C2 added only the
+closed isolated Kokoro/CosyVoice runtime protocol and V4 adapter boundary; it installed
+no runtime or ML dependency and added no Creator HTTP route. M12-C3/C4 remain on
+`ENVIRONMENT_HOLD` because the persistent CPU build root is absent.
+
+The current prerequisite is a read-only `IdentityReferenceVersionProjection` owned by
+the existing K2 authority identity service and derived from the existing Episode
+Production IdentityLock plus a freshly revalidated external identity-reference decision.
+It creates no Identity root, repository, database, registry or successor lock. M13-E3 is
+blocked until that capability is merged, then is authorized to resume from the latest
+main. A100 remains unauthorized.
 
 The accepted M12 architecture freezes two distinct isolated runtimes:
 
@@ -112,9 +119,11 @@ BLOCK_REASON=PERSISTENT_CPU_BUILD_ARTIFACT_ROOT_UNAVAILABLE
 M13_FULL_BACKEND_IMPLEMENTATION=AUTHORIZED_CPU_ONLY
 M13_E2=IMPLEMENTED_CPU_ONLY
 M13_DETERMINISTIC_POST_PRODUCTION_WIRED=5/8
-V5_FONT_ASSET_PREREQUISITE=AUTHORIZED
-M13_E3=BLOCKED_PENDING_FONT_AUTHORITY
-M13_E3_RESUME_AFTER_FONT_AUTHORITY=AUTHORIZED
+V5_FONT_AUTHORITY_CAPABILITY=IMPLEMENTED
+IDENTITY_REFERENCE_PROJECTION=AUTHORIZED
+IDENTITY_REFERENCE_CURRENTNESS_REVALIDATION=AUTHORIZED
+M13_E3=BLOCKED_PENDING_IDENTITY_REFERENCE_PROJECTION
+M13_E3_RESUME_AFTER_IDENTITY_PROJECTION=AUTHORIZED
 M13_BACKEND_CAPABILITY_COMPLETE=false
 M13_RENDER_CANDIDATE_STATE=NOT_IMPLEMENTED
 M13_RENDER_CANDIDATE=AUTHORIZED_NON_PUBLISHING
@@ -244,8 +253,10 @@ append and V4 dispatch remain blocked/not integrated. Any future continuation mu
 Public API → V5 → V4 → Compute spine and must not create a K2-002-specific database or
 AssetVersion authority.
 
-Within section 0, only the
-`ACS-M12-M13-ARCHITECTURE-CORRECTION-20260830` overlay governs current execution.
+Within section 0, the
+`ACS-V5-IDENTITY-REFERENCE-PROJECTION-AND-M13-E3-UNBLOCK` overlay governs current
+execution while retaining the accepted `ACS-M12-M13-ARCHITECTURE-CORRECTION-20260830`
+architecture boundary.
 The retained K2 prose is factual live-production background and grants no input or
 execution authority for this work package. Sections 0A–16 below are dated historical
 snapshots or inherited specifications. Their “current”, “next action”, “pending”,
