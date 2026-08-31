@@ -10,9 +10,9 @@
 >
 > Revision: `ACS-M12-M13-ARCHITECTURE-CORRECTION-20260830`
 >
-> Architecture Decisions: `ADR-0001 / Accepted`; `ADR-0005 — M6 Consumer Boundary / Accepted as architecture only`; `ADR-0006 — V5 Text Generation Capability Boundary / Accepted for bounded G1`; `ADR-0014 — K2-001 archived and K2-002 non-GPU preproduction active / Accepted`; `ADR-0015 — M12 Isolated Audio Runtime and Acyclic Voice-Clone Lineage / Accepted`; `ADR-0016 — M13 Timeline, Render Candidate and Deterministic Post Boundary / Accepted`
+> Architecture Decisions: `ADR-0001 / Accepted`; `ADR-0005 — M6 Consumer Boundary / Accepted as architecture only`; `ADR-0006 — V5 Text Generation Capability Boundary / Accepted for bounded G1`; `ADR-0014 — K2-001 archived and K2-002 non-GPU preproduction active / Accepted`; `ADR-0015 — M12 Isolated Audio Runtime and Acyclic Voice-Clone Lineage / Accepted`; `ADR-0016 — M13 Timeline, Render Candidate and Deterministic Post Boundary / Accepted`; `ADR-0017 — Canonical Static Resource Assets and Font License Boundary / Accepted`
 >
-> Current Exact-Scope Governance: [Current Milestone](CURRENT_MILESTONE.md); [ADR-0015](governance/ADR-0015-m12-isolated-audio-runtime-and-acyclic-voice-clone-lineage.md); [ADR-0016](governance/ADR-0016-m13-timeline-render-candidate-and-deterministic-post-boundary.md)
+> Current Exact-Scope Governance: [Current Milestone](CURRENT_MILESTONE.md); [ADR-0015](governance/ADR-0015-m12-isolated-audio-runtime-and-acyclic-voice-clone-lineage.md); [ADR-0016](governance/ADR-0016-m13-timeline-render-candidate-and-deterministic-post-boundary.md); [ADR-0017](governance/ADR-0017-canonical-static-resource-assets-and-font-license-boundary.md)
 >
 > Scope: AI Cinematic Studio 全系统产品、Domain、生产链、技术分层、研发顺序与验收基线
 >
@@ -3064,6 +3064,17 @@ STOP。
 # 62. Current System State
 
 ## 62.1 Current architecture overlay — 2026-08-30
+
+The 2026-08-31 additive architecture checkpoint
+[`ADR-0017`](governance/ADR-0017-canonical-static-resource-assets-and-font-license-boundary.md)
+keeps the existing canonical AssetVersion authority and Episode Production evidence
+journal as the sole static-resource owner and persistence boundary. AssetVersion v1
+remains historical and immutable; AssetVersion v2 initially opens only the closed
+`STATIC_RESOURCE/FONT` envelope. The sole font lineage is Candidate → server-side
+technical validation → immutable license binding → explicit static-resource admission
+decision → canonical AssetVersion v2 → read-only font projection. System/network font
+fallback, a FontRegistry, a second asset store, live font admission and M13-owned font
+facts are prohibited. M13-E3 remains blocked until this prerequisite capability is merged.
 
 The Project Lead, Architecture Owner and the respective M12/M13 Domain Owners accepted
 [ADR-0015](governance/ADR-0015-m12-isolated-audio-runtime-and-acyclic-voice-clone-lineage.md)
