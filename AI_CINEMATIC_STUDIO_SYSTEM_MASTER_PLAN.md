@@ -10,9 +10,9 @@
 >
 > Revision: `ACS-M12-M13-ARCHITECTURE-CORRECTION-20260830`
 >
-> Architecture Decisions: `ADR-0001 / Accepted`; `ADR-0005 — M6 Consumer Boundary / Accepted as architecture only`; `ADR-0006 — V5 Text Generation Capability Boundary / Accepted for bounded G1`; `ADR-0014 — K2-001 archived and K2-002 non-GPU preproduction active / Accepted`; `ADR-0015 — M12 Isolated Audio Runtime and Acyclic Voice-Clone Lineage / Accepted`; `ADR-0016 — M13 Timeline, Render Candidate and Deterministic Post Boundary / Accepted`; `ADR-0017 — Canonical Static Resource Assets and Font License Boundary / Accepted`
+> Architecture Decisions: `ADR-0001 / Accepted`; `ADR-0005 — M6 Consumer Boundary / Accepted as architecture only`; `ADR-0006 — V5 Text Generation Capability Boundary / Accepted for bounded G1`; `ADR-0014 — K2-001 archived and K2-002 non-GPU preproduction active / Accepted`; `ADR-0015 — M12 Isolated Audio Runtime and Acyclic Voice-Clone Lineage / Accepted`; `ADR-0016 — M13 Timeline, Render Candidate and Deterministic Post Boundary / Accepted`; `ADR-0017 — Canonical Static Resource Assets and Font License Boundary / Accepted`; `ADR-0018 — Canonical Identity Reference Version Projection and Runtime Currentness Boundary / Accepted`
 >
-> Current Exact-Scope Governance: [Current Milestone](CURRENT_MILESTONE.md); [ADR-0015](governance/ADR-0015-m12-isolated-audio-runtime-and-acyclic-voice-clone-lineage.md); [ADR-0016](governance/ADR-0016-m13-timeline-render-candidate-and-deterministic-post-boundary.md); [ADR-0017](governance/ADR-0017-canonical-static-resource-assets-and-font-license-boundary.md)
+> Current Exact-Scope Governance: [Current Milestone](CURRENT_MILESTONE.md); [ADR-0015](governance/ADR-0015-m12-isolated-audio-runtime-and-acyclic-voice-clone-lineage.md); [ADR-0016](governance/ADR-0016-m13-timeline-render-candidate-and-deterministic-post-boundary.md); [ADR-0017](governance/ADR-0017-canonical-static-resource-assets-and-font-license-boundary.md); [ADR-0018](governance/ADR-0018-canonical-identity-reference-version-projection-and-runtime-currentness-boundary.md)
 >
 > Scope: AI Cinematic Studio 全系统产品、Domain、生产链、技术分层、研发顺序与验收基线
 >
@@ -3064,6 +3064,27 @@ STOP。
 # 62. Current System State
 
 ## 62.1 Current architecture overlay — 2026-08-30
+
+The 2026-08-31 additive architecture checkpoint
+[`ADR-0018`](governance/ADR-0018-canonical-identity-reference-version-projection-and-runtime-currentness-boundary.md)
+freezes `v5.identity-reference-version-projection.v1` as a read-only projection over the
+existing IdentityLock plus a fresh decision from the existing external identity-reference
+authority through the existing `K2AuthorityIdentityService`. It is not an Identity or
+IdentityVersion root, repository, store, approval
+authority, AssetVersion or IdentityLock successor. Its formal mappings preserve the
+external authority vocabulary:
+`identityReferenceRef=referenceRef`,
+`identityReferenceVersionRef=referenceVersionRef` and
+`identityReferenceContentDigest=contentDigest`; `contentDigest` must not be relabelled as
+a payload digest. Every consumption, including after restart, must re-read the current
+Root, M6 baseline and IdentityLock, invoke the external current reader, and exactly
+revalidate `referenceRef`, `referenceVersionRef`, `contentDigest`, `mediaType`,
+`rightsState`, `provenance` and `approvalRef`. Missing authority or any drift fails
+closed; persisted IdentityLock evidence alone cannot establish currentness. Public M13
+FaceMark requests may provide only server-resolvable character/shot refs, the mark
+AssetVersion, explicit keyframes and closed effect parameters; the server resolves the
+projection and lock lineage. No second Identity authority, database, registry or sidecar
+is authorized, and M13-E3 may resume only after the projection capability is merged.
 
 The 2026-08-31 additive architecture checkpoint
 [`ADR-0017`](governance/ADR-0017-canonical-static-resource-assets-and-font-license-boundary.md)
