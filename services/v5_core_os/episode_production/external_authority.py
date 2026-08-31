@@ -17,6 +17,7 @@ from typing import Any, Mapping
 from .authority import (
     AuthorityRequiredError,
     RejectingIdentityReferenceAuthority,
+    _identity_reference,
 )
 from .foundation import EpisodeProductionError, _required_ref
 from .production_policy import (
@@ -60,15 +61,69 @@ class DigestPinnedIdentityReferenceAuthority:
         if not isinstance(character_ref, str):
             raise AuthorityRequiredError("identity reference was not authorized")
         try:
-            return deepcopy(
-                self._references[
-                    (workspace_ref, production_run_ref, character_ref)
-                ]
+            return _identity_reference(
+                deepcopy(
+                    self._references[
+                        (workspace_ref, production_run_ref, character_ref)
+                    ]
+                )
             )
         except KeyError:
             raise AuthorityRequiredError(
                 "identity reference was not authorized for the exact K2 scope"
             ) from None
+
+    def require_current_reference(
+        self,
+        *,
+        workspace_ref: str,
+        production_run_ref: str,
+        character_ref: str,
+        locked_reference_ref: str,
+        locked_reference_version_ref: str,
+        locked_content_digest: str,
+    ) -> Mapping[str, Any]:
+        """Read the fresh decision for one exact locked identity scope.
+
+        The locked values are validated as opaque inputs but are deliberately not used
+        as lookup keys: a changed current decision must be returned to the V5 service so
+        it can classify the seven-field mismatch as stale instead of hiding drift as an
+        unavailable authority.
+        """
+
+        try:
+            scope = (
+                _required_ref(workspace_ref, "workspaceRef"),
+                _required_ref(production_run_ref, "productionRunRef"),
+                _required_ref(character_ref, "characterRef"),
+            )
+            _required_ref(locked_reference_ref, "lockedReferenceRef")
+            _required_ref(
+                locked_reference_version_ref,
+                "lockedReferenceVersionRef",
+            )
+        except EpisodeProductionError:
+            raise AuthorityRequiredError(
+                "locked identity reference scope is invalid"
+            ) from None
+        if (
+            not isinstance(locked_content_digest, str)
+            or len(locked_content_digest) != 64
+            or any(
+                character not in "0123456789abcdef"
+                for character in locked_content_digest
+            )
+        ):
+            raise AuthorityRequiredError(
+                "locked identity reference digest is invalid"
+            )
+        try:
+            decision = deepcopy(self._references[scope])
+        except KeyError:
+            raise AuthorityRequiredError(
+                "current identity reference is unavailable for the exact K2 scope"
+            ) from None
+        return _identity_reference(decision)
 
 
 def _authority_ref(value: Any, field: str) -> str:

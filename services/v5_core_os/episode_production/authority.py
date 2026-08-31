@@ -13,6 +13,7 @@ from .evidence import (
 from .foundation import (
     EpisodeProductionError,
     EpisodeProductionService,
+    RecordNotFoundError,
     RepositoryUnavailableError,
     StaleInputError,
     UpstreamNotReadyError,
@@ -24,6 +25,9 @@ from .foundation import (
 
 AUTHORITY_DECISION_SCHEMA_VERSION = "v5.m6-authority-decision.v1"
 IDENTITY_LOCK_SCHEMA_VERSION = "v5.identity-lock.v1"
+IDENTITY_REFERENCE_VERSION_PROJECTION_SCHEMA_VERSION = (
+    "v5.identity-reference-version-projection.v1"
+)
 AUTHORITY_GATE = "G2_AUTHORITY_IDENTITY"
 
 
@@ -51,9 +55,29 @@ class IdentityReferenceAuthorityPort(Protocol):
     ) -> Mapping[str, Any]: ...
 
 
+class IdentityReferenceCurrentReaderPort(Protocol):
+    def require_current_reference(
+        self,
+        *,
+        workspace_ref: str,
+        production_run_ref: str,
+        character_ref: str,
+        locked_reference_ref: str,
+        locked_reference_version_ref: str,
+        locked_content_digest: str,
+    ) -> Mapping[str, Any]: ...
+
+
 class RejectingIdentityReferenceAuthority:
     def authorize_reference(self, **_: Any) -> Mapping[str, Any]:
         raise AuthorityRequiredError("identity reference authority is unavailable")
+
+
+class RejectingIdentityReferenceCurrentReader:
+    def require_current_reference(self, **_: Any) -> Mapping[str, Any]:
+        raise AuthorityRequiredError(
+            "identity reference current reader is unavailable"
+        )
 
 
 class StaticIdentityReferenceAuthority:
@@ -73,6 +97,27 @@ class StaticIdentityReferenceAuthority:
         character_ref = character.get("characterRef")
         if not isinstance(character_ref, str) or character_ref not in self._references:
             raise AuthorityRequiredError("identity reference was not authorized")
+        return deepcopy(dict(self._references[character_ref]))
+
+    def require_current_reference(
+        self,
+        *,
+        workspace_ref: str,
+        production_run_ref: str,
+        character_ref: str,
+        locked_reference_ref: str,
+        locked_reference_version_ref: str,
+        locked_content_digest: str,
+    ) -> Mapping[str, Any]:
+        del (
+            workspace_ref,
+            production_run_ref,
+            locked_reference_ref,
+            locked_reference_version_ref,
+            locked_content_digest,
+        )
+        if character_ref not in self._references:
+            raise AuthorityRequiredError("identity reference is no longer available")
         return deepcopy(dict(self._references[character_ref]))
 
 
@@ -142,6 +187,7 @@ class K2AuthorityIdentityService:
         *,
         m6_reader: Any,
         identity_reference_authority: IdentityReferenceAuthorityPort,
+        identity_reference_current_reader: IdentityReferenceCurrentReaderPort,
         ref_factory: Callable[[str], str],
         clock: Callable[[], str],
     ) -> None:
@@ -149,6 +195,7 @@ class K2AuthorityIdentityService:
         self.evidence = evidence
         self.m6_reader = m6_reader
         self.identity_reference_authority = identity_reference_authority
+        self.identity_reference_current_reader = identity_reference_current_reader
         self._ref_factory = ref_factory
         self._clock = clock
 
@@ -192,9 +239,6 @@ class K2AuthorityIdentityService:
         root = self.root_service.verify_run_current(
             workspace_ref, production_run_ref
         )
-        bundle = self.get_authority_identity(workspace_ref, production_run_ref)
-        authority = bundle["authorityDecision"]
-        identity = bundle["identityLock"]
         baseline = _m6_baseline(
             lambda: self.m6_reader.get_m6_episode_baseline(
                 workspace_ref,
@@ -203,6 +247,9 @@ class K2AuthorityIdentityService:
                 root["episodeRef"],
             )
         )
+        bundle = self.get_authority_identity(workspace_ref, production_run_ref)
+        authority = bundle["authorityDecision"]
+        identity = bundle["identityLock"]
         expected_scope = (
             workspace_ref,
             root["projectRef"],
@@ -266,7 +313,185 @@ class K2AuthorityIdentityService:
             != sorted(root["manifest"]["requiredCharacterNames"])
         ):
             raise StaleInputError("identity lock does not cover the frozen manifest")
-        return {"root": root, **bundle, "m6Baseline": deepcopy(dict(baseline))}
+        identity_lock_ref = _required_ref(
+            identity.get("identityLockRef"), "identityLockRef"
+        )
+        identity_lock_version_ref = _required_ref(
+            identity.get("identityLockVersionRef"), "identityLockVersionRef"
+        )
+        identity_lock_digest = _sha256(
+            identity.get("payloadDigest"), "identityLockDigest"
+        )
+        projection_bases: list[dict[str, Any]] = []
+        seen_character_refs: set[str] = set()
+        for locked_identity in identities:
+            character_ref = _required_ref(
+                locked_identity.get("characterRef"), "characterRef"
+            )
+            script_character_name = locked_identity.get("scriptCharacterName")
+            if (
+                character_ref in seen_character_refs
+                or not isinstance(script_character_name, str)
+                or script_character_name != script_character_name.strip()
+                or not script_character_name
+            ):
+                raise StaleInputError("identity lock character mapping is inconsistent")
+            seen_character_refs.add(character_ref)
+            raw_locked_reference = locked_identity.get("reference")
+            try:
+                locked_reference = _identity_reference(raw_locked_reference)
+            except AuthorityRequiredError:
+                raise StaleInputError(
+                    "locked identity reference is invalid"
+                ) from None
+            decision_fields = (
+                "referenceRef",
+                "referenceVersionRef",
+                "contentDigest",
+                "mediaType",
+                "rightsState",
+                "provenance",
+                "approvalRef",
+            )
+            try:
+                raw_current_reference = (
+                    self.identity_reference_current_reader.require_current_reference(
+                        workspace_ref=workspace_ref,
+                        production_run_ref=production_run_ref,
+                        character_ref=character_ref,
+                        locked_reference_ref=locked_reference["referenceRef"],
+                        locked_reference_version_ref=locked_reference[
+                            "referenceVersionRef"
+                        ],
+                        locked_content_digest=locked_reference["contentDigest"],
+                    )
+                )
+            except EpisodeProductionError:
+                raise
+            except Exception:
+                raise RepositoryUnavailableError(
+                    "identity reference current reader is unavailable"
+                ) from None
+            if (
+                isinstance(raw_current_reference, Mapping)
+                and set(raw_current_reference) == set(decision_fields)
+                and any(
+                    raw_current_reference.get(field) != locked_reference[field]
+                    for field in decision_fields
+                )
+            ):
+                raise StaleInputError("identity reference decision is stale")
+            try:
+                current_reference = _identity_reference(raw_current_reference)
+            except AuthorityRequiredError:
+                raise StaleInputError(
+                    "current identity reference decision is invalid"
+                ) from None
+            if (
+                any(
+                    current_reference[field] != locked_reference[field]
+                    for field in decision_fields
+                )
+                or _digest(current_reference) != _digest(locked_reference)
+            ):
+                raise StaleInputError("identity reference decision is stale")
+            external_decision_digest = _digest(current_reference)
+            projection_base = {
+                "schemaVersion": (
+                    IDENTITY_REFERENCE_VERSION_PROJECTION_SCHEMA_VERSION
+                ),
+                "workspaceRef": workspace_ref,
+                "productionRunRef": production_run_ref,
+                "characterRef": character_ref,
+                "scriptCharacterName": script_character_name,
+                "identityLockRef": identity_lock_ref,
+                "identityLockVersionRef": identity_lock_version_ref,
+                "identityLockDigest": identity_lock_digest,
+                **current_reference,
+                "externalDecisionDigest": external_decision_digest,
+            }
+            projection_bases.append(projection_base)
+        final_root = self.root_service.verify_run_current(
+            workspace_ref, production_run_ref
+        )
+        final_baseline = _m6_baseline(
+            lambda: self.m6_reader.get_m6_episode_baseline(
+                workspace_ref,
+                final_root["projectRef"],
+                final_root["seriesRef"],
+                final_root["episodeRef"],
+            )
+        )
+        final_bundle = self.get_authority_identity(
+            workspace_ref, production_run_ref
+        )
+        baseline_signature_fields = (
+            "schemaVersion",
+            "workspaceRef",
+            "projectRef",
+            "seriesRef",
+            "episodeRef",
+            "episodePlanItemRef",
+            "seriesPlanVersionRef",
+            "compatibility",
+            "m6BaselineSnapshotRef",
+            "activationRevision",
+            "m6BaselineCanonicalDigest",
+            "seriesPlanVersionDigest",
+            "seriesBibleVersionRef",
+            "seriesBibleVersionDigest",
+            "characterContinuityVersionRef",
+            "characterContinuityVersionDigest",
+        )
+        if (
+            final_root.get("payloadDigest") != root.get("payloadDigest")
+            or tuple(final_baseline.get(field) for field in baseline_signature_fields)
+            != tuple(baseline.get(field) for field in baseline_signature_fields)
+            or final_bundle.get("authorityDecision") != authority
+            or final_bundle.get("identityLock") != identity
+        ):
+            raise StaleInputError(
+                "K2 roots, M6 authority, or IdentityLock changed during revalidation"
+            )
+        projection_checked_at = self._clock()
+        projections = [
+            {
+                **projection_base,
+                "projectionCheckedAt": projection_checked_at,
+                "projectionDigest": _digest(projection_base),
+            }
+            for projection_base in projection_bases
+        ]
+        projections.sort(
+            key=lambda item: (item["scriptCharacterName"], item["characterRef"])
+        )
+        return {
+            "root": root,
+            **bundle,
+            "m6Baseline": deepcopy(dict(baseline)),
+            "identityReferenceVersions": projections,
+        }
+
+    def require_current_identity_reference_projection(
+        self,
+        workspace_ref: str,
+        production_run_ref: str,
+        character_ref: str,
+    ) -> dict[str, Any]:
+        required_character_ref = _required_ref(character_ref, "characterRef")
+        verified = self.verify_authority_identity_current(
+            workspace_ref, production_run_ref
+        )
+        matches = [
+            projection
+            for projection in verified["identityReferenceVersions"]
+            if projection.get("characterRef") == required_character_ref
+        ]
+        if len(matches) != 1:
+            raise RecordNotFoundError(
+                "character is not present in the current identity lock"
+            )
+        return deepcopy(dict(matches[0]))
 
     def authorize_and_lock(self, command: Mapping[str, Any]) -> dict[str, Any]:
         if not isinstance(command, Mapping):

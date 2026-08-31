@@ -2,7 +2,10 @@
 
 from .authority import (
     IdentityReferenceAuthorityPort,
+    IdentityReferenceCurrentReaderPort,
+    IDENTITY_REFERENCE_VERSION_PROJECTION_SCHEMA_VERSION,
     RejectingIdentityReferenceAuthority,
+    RejectingIdentityReferenceCurrentReader,
     StaticIdentityReferenceAuthority,
 )
 
@@ -504,7 +507,10 @@ __all__ = [
     "EpisodeProductionService",
     "InMemoryEpisodeProductionAdapter",
     "IdentityReferenceAuthorityPort",
+    "IdentityReferenceCurrentReaderPort",
+    "IDENTITY_REFERENCE_VERSION_PROJECTION_SCHEMA_VERSION",
     "RejectingIdentityReferenceAuthority",
+    "RejectingIdentityReferenceCurrentReader",
     "SqliteEpisodeProductionAdapter",
     "StaticIdentityReferenceAuthority",
     "ApprovalAuthorityPort",
