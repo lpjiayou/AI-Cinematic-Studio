@@ -549,6 +549,26 @@ class CanonicalAssetVersionAuthority:
     @staticmethod
     def _add(index: dict[str, dict[str, Any]], value: dict[str, Any]) -> None:
         ref = _required_ref(value.get("assetVersionRef"), "assetVersionRef")
+        if value.get("schemaVersion") == "v5.asset-version.v2":
+            required = {
+                "schemaVersion", "workspaceRef", "productionRunRef", "projectRef",
+                "seriesRef", "episodeRef", "assetRef", "assetVersionRef", "version",
+                "assetClass", "resourceKind", "candidateRef", "candidateDigest",
+                "technicalValidationRef", "technicalValidationDigest",
+                "licenseBindingVersionRef", "licenseBindingVersionDigest",
+                "admissionDecisionRef", "admissionDecisionDigest", "mediaType",
+                "fontFormat", "byteSize", "fileDigest", "storageBindingRef", "state",
+                "admissionState", "publicationAllowed", "createdAt", "payloadDigest",
+            }
+            if (
+                set(value) != required
+                or value.get("assetClass") != "STATIC_RESOURCE"
+                or value.get("resourceKind") != "FONT"
+                or value.get("state") != "REGISTERED"
+                or value.get("admissionState") != "ADMITTED"
+                or value.get("publicationAllowed") is not False
+            ):
+                raise CandidateLifecycleError("AssetVersion v2 is invalid")
         existing = index.get(ref)
         if existing is not None and existing != value:
             raise CandidateLifecycleError("AssetVersion authority has conflicting facts")
