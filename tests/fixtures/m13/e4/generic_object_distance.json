@@ -1,0 +1,78 @@
+{
+  "schemaVersion": "m13.e4.generic-object-distance-technical-fixture.v1",
+  "classificationLabels": [
+    "TECHNICAL_FIXTURE_ONLY",
+    "NOT_LIVE_K2",
+    "NOT_LIVE_ASSET",
+    "NOT_SELECTED",
+    "NOT_MASTER"
+  ],
+  "publicationAllowed": false,
+  "semanticBoundary": {
+    "distanceSemantics": "EXACT_SCREEN_SPACE_ONLY",
+    "worldDistanceClaim": false,
+    "visualStateIsCanonical": false
+  },
+  "fixtureIntent": "Move a generic geometric overlay from a farther screen position to a nearer screen position using an exact APPROACH contract.",
+  "publicRequirement": {
+    "workspaceRef": "workspace-e4-fixture",
+    "productionRunRef": "run-e4-fixture",
+    "requirementRef": "requirement-generic-object-approach",
+    "effectMode": "DISTANCE_STATE_TRANSITION",
+    "targetShotRef": "technical-shot-distance",
+    "targetShotVersionRef": "technical-shot-distance-v1",
+    "targetShotVersionDigest": "1111111111111111111111111111111111111111111111111111111111111111",
+    "basePlateAssetVersionRef": "technical-base-distance-v1",
+    "basePlateAssetVersionDigest": "2222222222222222222222222222222222222222222222222222222222222222",
+    "targetKind": "OVERLAY_LAYER",
+    "subjectLayerAssetVersionRef": "technical-generic-object-v1",
+    "subjectLayerAssetVersionDigest": "3333333333333333333333333333333333333333333333333333333333333333",
+    "maskAssetVersionRef": "technical-generic-object-mask-v1",
+    "maskAssetVersionDigest": "4444444444444444444444444444444444444444444444444444444444444444",
+    "frameRangeStartInclusive": 0,
+    "frameRangeEndExclusive": 10,
+    "transitionMode": "SCREEN_DISTANCE",
+    "coordinateSpace": "CANVAS_PIXELS",
+    "motionKeyframes": [
+      {
+        "frame": 0,
+        "x": 100,
+        "y": 300,
+        "scaleXNumerator": 1,
+        "scaleXDenominator": 1,
+        "scaleYNumerator": 1,
+        "scaleYDenominator": 1,
+        "rotationMilliDegrees": 0,
+        "perspectiveQuad": [0, 0, 64, 0, 64, 64, 0, 64],
+        "interpolation": "LINEAR"
+      },
+      {
+        "frame": 9,
+        "x": 500,
+        "y": 300,
+        "scaleXNumerator": 2,
+        "scaleXDenominator": 1,
+        "scaleYNumerator": 2,
+        "scaleYDenominator": 1,
+        "rotationMilliDegrees": 0,
+        "perspectiveQuad": [0, 0, 64, 0, 64, 64, 0, 64],
+        "interpolation": "LINEAR"
+      }
+    ],
+    "distanceContract": {
+      "metric": "SCREEN_EUCLIDEAN_PIXELS",
+      "startValue": 500,
+      "endValue": 100,
+      "tolerance": 0,
+      "direction": "APPROACH",
+      "referenceX": 600,
+      "referenceY": 300
+    },
+    "startStateRef": null,
+    "endStateRef": null,
+    "visualStateDefinitions": [],
+    "visualStateSchedule": [],
+    "blendMode": "NORMAL",
+    "layer": 7
+  }
+}

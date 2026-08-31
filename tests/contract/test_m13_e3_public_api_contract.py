@@ -89,7 +89,7 @@ def _normalized_keys(value):
 
 
 class M13E3PublicApiContractTests(unittest.TestCase):
-    def test_existing_route_adds_only_two_closed_effect_kinds(self):
+    def test_existing_route_retains_the_closed_effect_kind_set(self):
         self.assertIn("deterministic-effects", EPISODE_PRODUCTION_SUBRESOURCES)
         self.assertEqual(
             _DETERMINISTIC_EFFECT_KINDS,
@@ -98,6 +98,7 @@ class M13E3PublicApiContractTests(unittest.TestCase):
                 "SMOKE",
                 "NAMEPLATE_TEXT",
                 "FACE_MARK_COMPENSATION",
+                "DISTANCE_STATE_TRANSITION",
             },
         )
 

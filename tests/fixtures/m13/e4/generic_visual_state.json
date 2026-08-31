@@ -1,0 +1,112 @@
+{
+  "schemaVersion": "m13.e4.generic-visual-state-technical-fixture.v1",
+  "classificationLabels": [
+    "TECHNICAL_FIXTURE_ONLY",
+    "NOT_LIVE_K2",
+    "NOT_LIVE_ASSET",
+    "NOT_SELECTED",
+    "NOT_MASTER"
+  ],
+  "publicationAllowed": false,
+  "semanticBoundary": {
+    "distanceSemantics": "EXACT_SCREEN_SPACE_ONLY",
+    "worldDistanceClaim": false,
+    "visualStateIsCanonical": false
+  },
+  "fixtureIntent": "Switch a generic technical overlay from variant A to variant B with a closed STEP schedule and no narrative or world-state fact.",
+  "publicRequirement": {
+    "workspaceRef": "workspace-e4-fixture",
+    "productionRunRef": "run-e4-fixture",
+    "requirementRef": "requirement-generic-visual-state",
+    "effectMode": "DISTANCE_STATE_TRANSITION",
+    "targetShotRef": "technical-shot-state",
+    "targetShotVersionRef": "technical-shot-state-v1",
+    "targetShotVersionDigest": "1111111111111111111111111111111111111111111111111111111111111111",
+    "basePlateAssetVersionRef": "technical-base-state-v1",
+    "basePlateAssetVersionDigest": "2222222222222222222222222222222222222222222222222222222222222222",
+    "targetKind": "OVERLAY_LAYER",
+    "subjectLayerAssetVersionRef": "technical-generic-state-subject-v1",
+    "subjectLayerAssetVersionDigest": "3333333333333333333333333333333333333333333333333333333333333333",
+    "maskAssetVersionRef": "technical-generic-state-mask-v1",
+    "maskAssetVersionDigest": "4444444444444444444444444444444444444444444444444444444444444444",
+    "frameRangeStartInclusive": 0,
+    "frameRangeEndExclusive": 10,
+    "transitionMode": "VISUAL_STATE",
+    "coordinateSpace": "CANVAS_PIXELS",
+    "motionKeyframes": [
+      {
+        "frame": 0,
+        "x": 320,
+        "y": 180,
+        "scaleXNumerator": 1,
+        "scaleXDenominator": 1,
+        "scaleYNumerator": 1,
+        "scaleYDenominator": 1,
+        "rotationMilliDegrees": 0,
+        "perspectiveQuad": [0, 0, 64, 0, 64, 64, 0, 64],
+        "interpolation": "STEP"
+      },
+      {
+        "frame": 9,
+        "x": 320,
+        "y": 180,
+        "scaleXNumerator": 1,
+        "scaleXDenominator": 1,
+        "scaleYNumerator": 1,
+        "scaleYDenominator": 1,
+        "rotationMilliDegrees": 0,
+        "perspectiveQuad": [0, 0, 64, 0, 64, 64, 0, 64],
+        "interpolation": "STEP"
+      }
+    ],
+    "distanceContract": null,
+    "startStateRef": "technical-state-a",
+    "endStateRef": "technical-state-b",
+    "visualStateDefinitions": [
+      {
+        "stateRef": "technical-state-a",
+        "visibility": "VISIBLE",
+        "opacityPermille": 1000,
+        "variantAssetVersionRef": "technical-variant-a-v1",
+        "variantAssetVersionDigest": "5555555555555555555555555555555555555555555555555555555555555555",
+        "layer": 7,
+        "blendMode": "NORMAL"
+      },
+      {
+        "stateRef": "technical-state-b",
+        "visibility": "VISIBLE",
+        "opacityPermille": 1000,
+        "variantAssetVersionRef": "technical-variant-b-v1",
+        "variantAssetVersionDigest": "6666666666666666666666666666666666666666666666666666666666666666",
+        "layer": 7,
+        "blendMode": "NORMAL"
+      }
+    ],
+    "visualStateSchedule": [
+      {
+        "stateRef": "technical-state-a",
+        "startFrameInclusive": 0,
+        "endFrameExclusive": 5,
+        "transitionInterpolation": "STEP"
+      },
+      {
+        "stateRef": "technical-state-b",
+        "startFrameInclusive": 5,
+        "endFrameExclusive": 10,
+        "transitionInterpolation": "STEP"
+      }
+    ],
+    "blendMode": "NORMAL",
+    "layer": 7
+  },
+  "technicalVariantBindings": [
+    {
+      "assetVersionRef": "technical-variant-a-v1",
+      "assetVersionDigest": "5555555555555555555555555555555555555555555555555555555555555555"
+    },
+    {
+      "assetVersionRef": "technical-variant-b-v1",
+      "assetVersionDigest": "6666666666666666666666666666666666666666666666666666666666666666"
+    }
+  ]
+}

@@ -2338,6 +2338,55 @@ class V4CompositionExecutor:
                 "V3 deterministic overlay composition failed"
             ) from exc
 
+    def execute_distance_state(
+        self,
+        request: Mapping[str, Any],
+        *,
+        resolved_asset_versions: Mapping[str, Mapping[str, Any]],
+    ) -> dict[str, Any]:
+        """Bridge one closed M13-E4 request through the same V4 owner."""
+
+        from .distance_state import (
+            DistanceStateExecutionError,
+            V4DistanceStateExecutor,
+        )
+
+        try:
+            return V4DistanceStateExecutor.from_artifact_root(
+                self.artifact_root
+            ).execute(
+                request,
+                resolved_asset_versions=resolved_asset_versions,
+            )
+        except DistanceStateExecutionError as exc:
+            raise CompositionExecutionError(
+                "V3 distance/state composition failed"
+            ) from exc
+
+    def verify_distance_state_artifact(
+        self,
+        artifact_evidence: Mapping[str, Any],
+        *,
+        runtime_evidence: Mapping[str, Any],
+    ) -> dict[str, Any]:
+        """Remeasure a path-free E4 artifact through held file/runtime FDs."""
+
+        from .distance_state import (
+            DistanceStateExecutionError,
+            verify_distance_state_artifact,
+        )
+
+        try:
+            return verify_distance_state_artifact(
+                self.artifact_root,
+                artifact_evidence,
+                runtime_evidence=runtime_evidence,
+            )
+        except DistanceStateExecutionError as exc:
+            raise CompositionExecutionError(
+                "distance/state artifact verification failed"
+            ) from exc
+
     def inspect_deterministic_overlay_image(
         self, asset: Mapping[str, Any]
     ) -> dict[str, Any]:

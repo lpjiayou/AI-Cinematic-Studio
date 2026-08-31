@@ -362,6 +362,7 @@ class M13E1TimelineEffectBindingTests(unittest.TestCase):
             "SMOKE",
             "NAMEPLATE_TEXT",
             "FACE_MARK_COMPENSATION",
+            "DISTANCE_STATE_TRANSITION",
         })
         self.assertEqual(
             bind_command.as_dict()["schemaVersion"],
