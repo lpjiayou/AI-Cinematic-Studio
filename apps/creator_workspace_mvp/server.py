@@ -140,6 +140,7 @@ EPISODE_PRODUCTION_SUBRESOURCES = {
     "shot-graph",
     "assets",
     "media",
+    "deterministic-effects",
     "timeline",
     "timeline-versions",
     "timeline-edits",
@@ -161,6 +162,35 @@ EPISODE_PRODUCTION_SUBRESOURCES = {
 }
 
 _TIMELINE_WRITE_RESOURCES = frozenset({"timeline", "timeline-edits"})
+_DETERMINISTIC_EFFECT_WRITE_RESOURCE = "deterministic-effects"
+_DETERMINISTIC_EFFECT_KINDS = frozenset({"FLAME_EXTINGUISH", "SMOKE"})
+_DETERMINISTIC_EFFECT_WRITE_FIELDS = frozenset(
+    {"expectedRunVersion", "idempotencyKey", "effectKind", "requirement"}
+)
+_DETERMINISTIC_EFFECT_FORBIDDEN_CLIENT_FIELDS = frozenset(
+    {
+        "absolutepath",
+        "actorref",
+        "approvalref",
+        "canonicalmutations",
+        "environmentoverride",
+        "filter",
+        "filterexpression",
+        "ffmpegargv",
+        "ffmpegfilter",
+        "modelpath",
+        "networkurl",
+        "path",
+        "productionrunref",
+        "publicationallowed",
+        "pythonexpression",
+        "rawassetversion",
+        "rawtimelineversion",
+        "shellcommand",
+        "storagekey",
+        "workspaceref",
+    }
+)
 _TIMELINE_FORBIDDEN_CLIENT_FIELDS = frozenset(
     {
         "absolutepath",
@@ -217,6 +247,37 @@ def _contains_forbidden_timeline_client_claim(value: Any) -> bool:
         return False
     if isinstance(value, (list, tuple)):
         return any(_contains_forbidden_timeline_client_claim(item) for item in value)
+    return False
+
+
+def _contains_forbidden_deterministic_effect_claim(value: Any) -> bool:
+    if isinstance(value, Mapping):
+        for field, item in value.items():
+            normalized = str(field).replace("_", "").replace("-", "").lower()
+            if (
+                normalized in _DETERMINISTIC_EFFECT_FORBIDDEN_CLIENT_FIELDS
+                or normalized.endswith("path")
+                or normalized.endswith("storagekey")
+                or normalized.endswith("argv")
+                or "filter" in normalized
+                or any(
+                    marker in normalized
+                    for marker in (
+                        "absolutepath",
+                        "ffmpegfilter",
+                        "inputpath",
+                        "internalpath",
+                        "outputpath",
+                    )
+                )
+                or _contains_forbidden_deterministic_effect_claim(item)
+            ):
+                return True
+    elif isinstance(value, list):
+        return any(
+            _contains_forbidden_deterministic_effect_claim(item)
+            for item in value
+        )
     return False
 
 
@@ -486,6 +547,25 @@ class CreatorRequestHandler(BaseHTTPRequestHandler):
             if (
                 production_subresource is not None
                 and production_subresource[1]
+                == _DETERMINISTIC_EFFECT_WRITE_RESOURCE
+            ):
+                expected_run_version = payload.get("expectedRunVersion")
+                requirement = payload.get("requirement")
+                if (
+                    set(payload) != _DETERMINISTIC_EFFECT_WRITE_FIELDS
+                    or isinstance(expected_run_version, bool)
+                    or not isinstance(expected_run_version, int)
+                    or expected_run_version < 1
+                    or payload.get("effectKind") not in _DETERMINISTIC_EFFECT_KINDS
+                    or not isinstance(requirement, Mapping)
+                    or requirement.get("effectMode") != payload.get("effectKind")
+                    or _contains_forbidden_deterministic_effect_claim(payload)
+                ):
+                    self._send_application_error(400, "invalid_request")
+                    return
+            if (
+                production_subresource is not None
+                and production_subresource[1]
                 in {
                     "production-readiness",
                     "semantic-visual-qc",
@@ -588,6 +668,11 @@ class CreatorRequestHandler(BaseHTTPRequestHandler):
                     result = self.episode_production_boundary.resolve_assets(command)
                 elif resource == "media":
                     result = self.episode_production_boundary.execute_media(command)
+                elif resource == "deterministic-effects":
+                    result = (
+                        self.episode_production_boundary
+                        .execute_deterministic_effect(command)
+                    )
                 elif resource == "timeline":
                     result = self.episode_production_boundary.create_timeline(command)
                 elif resource == "timeline-edits":
@@ -846,6 +931,11 @@ class CreatorRequestHandler(BaseHTTPRequestHandler):
                     elif resource == "media":
                         result = self.episode_production_boundary.get_media_bundle(
                             workspace_ref, run_ref
+                        )
+                    elif resource == "deterministic-effects":
+                        result = (
+                            self.episode_production_boundary
+                            .get_deterministic_effects(workspace_ref, run_ref)
                         )
                     elif resource == "timeline":
                         result = self.episode_production_boundary.get_timeline(

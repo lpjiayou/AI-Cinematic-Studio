@@ -47,19 +47,37 @@ from .digests import (
 MASKED_SURFACE_EXECUTION_REQUEST_SCHEMA_VERSION = (
     "v4.m13-masked-surface-execution-request.v1"
 )
+FLAME_SMOKE_EXECUTION_REQUEST_SCHEMA_VERSION = (
+    "v4.m13-flame-smoke-execution-request.v1"
+)
 MASKED_SURFACE_RENDERER_IDENTITY = "v3.deterministic-masked-surface-ffmpeg"
 MASKED_SURFACE_RENDERER_VERSION = "1"
 EFFECT_PREVIEW_EXECUTION_REQUEST_SCHEMA_VERSION = (
     "v4.m13-effect-preview-execution-request.v2"
 )
+EFFECT_PREVIEW_EXECUTION_REQUEST_SCHEMA_VERSION_V3 = (
+    "v4.m13-effect-preview-execution-request.v3"
+)
 EFFECT_PREVIEW_RENDERER_IDENTITY = "v3.deterministic-timeline-preview-ffmpeg"
 EFFECT_PREVIEW_RENDERER_VERSION = "2"
+EFFECT_PREVIEW_RENDERER_VERSION_V3 = "3"
 
 _RAW_DIGEST = re.compile(r"[0-9a-f]{64}\Z")
 _PREFIXED_DIGEST = re.compile(r"sha256:[0-9a-f]{64}\Z")
 _REF = re.compile(r"[A-Za-z0-9][A-Za-z0-9._:-]{0,199}\Z")
-_EFFECT_MODES = {"SCRATCH_REVEAL", "LIGHT_SWEEP", "LOCAL_EXPOSURE"}
+_E1_EFFECT_MODES = {"SCRATCH_REVEAL", "LIGHT_SWEEP", "LOCAL_EXPOSURE"}
+_E2_EFFECT_MODES = {"FLAME_EXTINGUISH", "SMOKE"}
+_EFFECT_MODES = _E1_EFFECT_MODES | _E2_EFFECT_MODES
 _INTERPOLATIONS = {"STEP", "LINEAR", "EASE_IN", "EASE_OUT", "EASE_IN_OUT"}
+_FLAME_STATE_PROFILES = {
+    ("LIT", "DIMMING", "EXTINGUISHED", "DARK"),
+    ("LIT", "DIMMING", "EXTINGUISHED", "EMBER", "DARK"),
+}
+_SMOKE_SOURCE_KINDS = {"PINNED_SMOKE_LAYER", "DETERMINISTIC_CPU_PROCEDURAL"}
+_SMOKE_ALGORITHM_IDENTITY = "v3.deterministic-smoke-cpu"
+_SMOKE_ALGORITHM_VERSION = "1"
+_PROCEDURAL_SMOKE_TILE_WIDTH = 32
+_PROCEDURAL_SMOKE_TILE_HEIGHT = 32
 _BLEND_FILTERS = {
     "NORMAL": "normal",
     "MULTIPLY": "multiply",
@@ -91,6 +109,66 @@ _REQUEST_FIELDS = {
     "position",
     "scale",
     "perspective",
+    "blendMode",
+    "layer",
+    "output",
+    "publicationAllowed",
+    "payloadDigest",
+}
+_FLAME_REQUEST_FIELDS = {
+    "schemaVersion",
+    "v5ExecutionRequestRef",
+    "v5ExecutionRequestDigest",
+    "workspaceRef",
+    "productionRunRef",
+    "requirementSchemaVersion",
+    "requirementRef",
+    "requirementDigest",
+    "effectMode",
+    "targetShot",
+    "basePlate",
+    "flameMask",
+    "frameRangeStartInclusive",
+    "frameRangeEndExclusive",
+    "stateSchedule",
+    "brightnessCurve",
+    "alphaCurve",
+    "localExposureRequirementRef",
+    "localExposureRequirementDigest",
+    "localExposureResultRef",
+    "localExposureResultDigest",
+    "localExposureStage",
+    "blendMode",
+    "layer",
+    "output",
+    "publicationAllowed",
+    "payloadDigest",
+}
+_SMOKE_REQUEST_FIELDS = {
+    "schemaVersion",
+    "v5ExecutionRequestRef",
+    "v5ExecutionRequestDigest",
+    "workspaceRef",
+    "productionRunRef",
+    "requirementSchemaVersion",
+    "requirementRef",
+    "requirementDigest",
+    "effectMode",
+    "targetShot",
+    "basePlate",
+    "smokeSourceKind",
+    "smokeLayer",
+    "emissionMask",
+    "frameRangeStartInclusive",
+    "frameRangeEndExclusive",
+    "opacitySchedule",
+    "positionKeyframes",
+    "scaleKeyframes",
+    "driftKeyframes",
+    "dissipationCurve",
+    "algorithmIdentity",
+    "algorithmVersion",
+    "deterministicSeed",
     "blendMode",
     "layer",
     "output",
@@ -380,6 +458,357 @@ def _validate_keyframes(
     return result
 
 
+def _validate_e2_keyframes(
+    value: object,
+    *,
+    fields: set[str],
+    bounds: Mapping[str, tuple[int, int]],
+    start: int,
+    end: int,
+    label: str,
+) -> list[dict[str, Any]]:
+    if not isinstance(value, list) or not value or len(value) > 4_096:
+        raise RenderArtifactError(f"{label} is invalid")
+    result: list[dict[str, Any]] = []
+    previous = -1
+    for index, item in enumerate(value):
+        record = _closed(item, fields, label=f"{label} {index}")
+        frame = _integer(
+            record["frame"],
+            label=f"{label} {index} frame",
+            minimum=start,
+            maximum=end - 1,
+        )
+        if frame <= previous or record["interpolation"] not in _INTERPOLATIONS:
+            raise RenderArtifactError(f"{label} order is invalid")
+        for field, (minimum, maximum) in bounds.items():
+            _integer(
+                record[field],
+                label=f"{label} {index} {field}",
+                minimum=minimum,
+                maximum=maximum,
+            )
+        result.append(record)
+        previous = frame
+    if result[0]["frame"] != start or result[-1]["frame"] != end - 1:
+        raise RenderArtifactError(f"{label} endpoints are invalid")
+    return result
+
+
+def _validate_flame_state_schedule(
+    value: object, *, start: int, end: int
+) -> list[dict[str, Any]]:
+    if not isinstance(value, list) or not value or len(value) > 5:
+        raise RenderArtifactError("flame stateSchedule is invalid")
+    result: list[dict[str, Any]] = []
+    cursor = start
+    for index, item in enumerate(value):
+        record = _closed(
+            item,
+            {"state", "startFrameInclusive", "endFrameExclusive"},
+            label=f"flame stateSchedule {index}",
+        )
+        item_start = _integer(
+            record["startFrameInclusive"],
+            label=f"flame stateSchedule {index} start",
+            minimum=start,
+            maximum=end - 1,
+        )
+        item_end = _integer(
+            record["endFrameExclusive"],
+            label=f"flame stateSchedule {index} end",
+            minimum=start + 1,
+            maximum=end,
+        )
+        if item_start != cursor or item_end <= item_start:
+            raise RenderArtifactError("flame stateSchedule has overlap or gap")
+        if not isinstance(record["state"], str):
+            raise RenderArtifactError("flame stateSchedule state is invalid")
+        result.append(record)
+        cursor = item_end
+    if cursor != end or tuple(item["state"] for item in result) not in _FLAME_STATE_PROFILES:
+        raise RenderArtifactError("flame stateSchedule order is invalid")
+    return result
+
+
+def _validate_e2_base(value: object, *, label: str) -> dict[str, Any]:
+    base = _closed(value, _BASE_FIELDS, label=label)
+    _reference(base["assetVersionRef"], label=f"{label}.assetVersionRef")
+    _raw_digest(base["assetVersionDigest"], label=f"{label}.assetVersionDigest")
+    _prefixed_digest(base["fileDigest"], label=f"{label}.fileDigest")
+    _prefixed_digest(base["pixelDigest"], label=f"{label}.pixelDigest")
+    width = _integer(base["width"], label=f"{label}.width", minimum=2, maximum=16_384)
+    height = _integer(base["height"], label=f"{label}.height", minimum=2, maximum=16_384)
+    _integer(
+        base["frameCount"],
+        label=f"{label}.frameCount",
+        minimum=1,
+        maximum=10_000_000,
+    )
+    _integer(base["frameRate"], label=f"{label}.frameRate", minimum=1, maximum=240)
+    if (
+        base["pixelDigestSpec"] != DECODED_FRAME_PIXEL_DIGEST_SPEC_V2
+        or base["pixelFormat"] != "yuv420p"
+        or width % 2
+        or height % 2
+    ):
+        raise RenderArtifactError(f"{label} media contract is unsupported")
+    return base
+
+
+def _validate_e2_mask(value: object, *, label: str) -> dict[str, Any]:
+    mask = _closed(value, _MASK_FIELDS, label=label)
+    _reference(mask["assetVersionRef"], label=f"{label}.assetVersionRef")
+    _raw_digest(mask["assetVersionDigest"], label=f"{label}.assetVersionDigest")
+    _prefixed_digest(mask["fileDigest"], label=f"{label}.fileDigest")
+    _prefixed_digest(mask["pixelDigest"], label=f"{label}.pixelDigest")
+    _integer(mask["width"], label=f"{label}.width", minimum=1, maximum=16_384)
+    _integer(mask["height"], label=f"{label}.height", minimum=1, maximum=16_384)
+    if mask["pixelDigestSpec"] != IMAGE_PIXEL_DIGEST_SPEC or mask["pixelMode"] != "RGBA":
+        raise RenderArtifactError(f"{label} pixel contract is unsupported")
+    return mask
+
+
+def _validate_e2_common(
+    request: dict[str, Any], *, expected_mode: str
+) -> tuple[dict[str, Any], dict[str, Any], int, int]:
+    if (
+        request["schemaVersion"] != FLAME_SMOKE_EXECUTION_REQUEST_SCHEMA_VERSION
+        or request["effectMode"] != expected_mode
+        or request["publicationAllowed"] is not False
+    ):
+        raise RenderArtifactError("flame/smoke execution boundary is invalid")
+    expected_requirement_schema = (
+        "v5.m13-flame-extinguish-requirement.v1"
+        if expected_mode == "FLAME_EXTINGUISH"
+        else "v5.m13-smoke-requirement.v1"
+    )
+    if request["requirementSchemaVersion"] != expected_requirement_schema:
+        raise RenderArtifactError("flame/smoke Requirement schema is invalid")
+    for field in (
+        "v5ExecutionRequestRef",
+        "workspaceRef",
+        "productionRunRef",
+        "requirementRef",
+    ):
+        _reference(request[field], label=field)
+    for field in ("v5ExecutionRequestDigest", "requirementDigest", "payloadDigest"):
+        _raw_digest(request[field], label=field)
+    unsealed = deepcopy(request)
+    claimed = unsealed.pop("payloadDigest")
+    if claimed != sha256(_canonical_json(unsealed)).hexdigest():
+        raise RenderArtifactError("flame/smoke request seal is invalid")
+    shot = _closed(
+        request["targetShot"],
+        {"shotRef", "shotVersionRef", "shotVersionDigest"},
+        label="flame/smoke targetShot",
+    )
+    _reference(shot["shotRef"], label="targetShot.shotRef")
+    _reference(shot["shotVersionRef"], label="targetShot.shotVersionRef")
+    _raw_digest(shot["shotVersionDigest"], label="targetShot.shotVersionDigest")
+    base = _validate_e2_base(request["basePlate"], label="flame/smoke basePlate")
+    start = _integer(
+        request["frameRangeStartInclusive"],
+        label="frameRangeStartInclusive",
+        minimum=0,
+        maximum=base["frameCount"] - 1,
+    )
+    end = _integer(
+        request["frameRangeEndExclusive"],
+        label="frameRangeEndExclusive",
+        minimum=1,
+        maximum=base["frameCount"],
+    )
+    if end <= start:
+        raise RenderArtifactError("flame/smoke frame range is invalid")
+    output = _closed(request["output"], _OUTPUT_FIELDS, label="flame/smoke output")
+    if output != {
+        "width": base["width"],
+        "height": base["height"],
+        "frameCount": base["frameCount"],
+        "frameRate": base["frameRate"],
+        "pixelFormat": "yuv420p",
+        "container": "mp4",
+        "videoCodec": "h264",
+    }:
+        raise RenderArtifactError("flame/smoke output does not match basePlate")
+    if request["blendMode"] not in _BLEND_FILTERS:
+        raise RenderArtifactError("flame/smoke blend mode is unsupported")
+    _integer(request["layer"], label="flame/smoke layer", minimum=0, maximum=1024)
+    request["targetShot"] = shot
+    request["basePlate"] = base
+    request["output"] = output
+    return base, output, start, end
+
+
+def _validate_flame_request(value: Mapping[str, Any]) -> dict[str, Any]:
+    request = _closed(value, _FLAME_REQUEST_FIELDS, label="flame request")
+    base, _, start, end = _validate_e2_common(
+        request, expected_mode="FLAME_EXTINGUISH"
+    )
+    flame_mask = _validate_e2_mask(request["flameMask"], label="flameMask")
+    if flame_mask["assetVersionRef"] == base["assetVersionRef"]:
+        raise RenderArtifactError("flameMask must be distinct from basePlate")
+    states = _validate_flame_state_schedule(request["stateSchedule"], start=start, end=end)
+    brightness = _validate_e2_keyframes(
+        request["brightnessCurve"],
+        fields={"frame", "valuePermille", "interpolation"},
+        bounds={"valuePermille": (0, 1000)},
+        start=start,
+        end=end,
+        label="flame brightnessCurve",
+    )
+    alpha = _validate_e2_keyframes(
+        request["alphaCurve"],
+        fields={"frame", "valuePermille", "interpolation"},
+        bounds={"valuePermille": (0, 1000)},
+        start=start,
+        end=end,
+        label="flame alphaCurve",
+    )
+    dark_start = next(
+        item["startFrameInclusive"]
+        for item in states
+        if item["state"] == "DARK"
+    )
+    for label, curve in (("brightnessCurve", brightness), ("alphaCurve", alpha)):
+        values = [item["valuePermille"] for item in curve]
+        if (
+            values[0] <= 0
+            or any(left < right for left, right in zip(values, values[1:]))
+            or not any(item["frame"] == dark_start for item in curve)
+            or any(
+                item["valuePermille"] != 0
+                for item in curve
+                if item["frame"] >= dark_start
+            )
+        ):
+            raise RenderArtifactError(f"flame {label} extinction profile is invalid")
+    for field in ("localExposureRequirementRef", "localExposureResultRef"):
+        _reference(request[field], label=field)
+    for field in ("localExposureRequirementDigest", "localExposureResultDigest"):
+        _raw_digest(request[field], label=field)
+    local = _validate_request(request["localExposureStage"])
+    if (
+        local["effectMode"] != "LOCAL_EXPOSURE"
+        or local["workspaceRef"] != request["workspaceRef"]
+        or local["productionRunRef"] != request["productionRunRef"]
+        or local["requirementRef"] != request["localExposureRequirementRef"]
+        or local["requirementDigest"] != request["localExposureRequirementDigest"]
+        or local["targetShot"] != request["targetShot"]
+        or local["basePlate"] != base
+        or local["mask"] != flame_mask
+        or local["frameRangeStartInclusive"] != start
+        or local["frameRangeEndExclusive"] != end
+        or local["exposureCurve"][-1]["valueMilliStops"] >= 0
+    ):
+        raise RenderArtifactError("flame LocalExposure stage is stale")
+    request["flameMask"] = flame_mask
+    request["stateSchedule"] = states
+    request["brightnessCurve"] = brightness
+    request["alphaCurve"] = alpha
+    request["localExposureStage"] = local
+    return request
+
+
+def _validate_smoke_request(value: Mapping[str, Any]) -> dict[str, Any]:
+    request = _closed(value, _SMOKE_REQUEST_FIELDS, label="smoke request")
+    base, _, start, end = _validate_e2_common(request, expected_mode="SMOKE")
+    emission = _validate_e2_mask(request["emissionMask"], label="emissionMask")
+    if emission["assetVersionRef"] == base["assetVersionRef"]:
+        raise RenderArtifactError("emissionMask must be distinct from basePlate")
+    source_kind = request["smokeSourceKind"]
+    if source_kind not in _SMOKE_SOURCE_KINDS:
+        raise RenderArtifactError("smoke source kind is unsupported")
+    if source_kind == "PINNED_SMOKE_LAYER":
+        layer = _validate_e2_mask(request["smokeLayer"], label="smokeLayer")
+        if layer["assetVersionRef"] in {
+            base["assetVersionRef"],
+            emission["assetVersionRef"],
+        }:
+            raise RenderArtifactError("smoke AssetVersions must be distinct")
+        if any(
+            request[field] is not None
+            for field in ("algorithmIdentity", "algorithmVersion", "deterministicSeed")
+        ):
+            raise RenderArtifactError("pinned smoke cannot declare a procedural algorithm")
+    else:
+        layer = None
+        if (
+            request["smokeLayer"] is not None
+            or request["algorithmIdentity"] != _SMOKE_ALGORITHM_IDENTITY
+            or request["algorithmVersion"] != _SMOKE_ALGORITHM_VERSION
+        ):
+            raise RenderArtifactError("procedural smoke algorithm is not frozen")
+        _integer(
+            request["deterministicSeed"],
+            label="deterministicSeed",
+            minimum=0,
+            maximum=(1 << 63) - 1,
+        )
+    opacity = _validate_e2_keyframes(
+        request["opacitySchedule"],
+        fields={"frame", "valuePermille", "interpolation"},
+        bounds={"valuePermille": (0, 1000)},
+        start=start,
+        end=end,
+        label="smoke opacitySchedule",
+    )
+    position = _validate_e2_keyframes(
+        request["positionKeyframes"],
+        fields={"frame", "xPermille", "yPermille", "interpolation"},
+        bounds={"xPermille": (0, 1000), "yPermille": (0, 1000)},
+        start=start,
+        end=end,
+        label="smoke positionKeyframes",
+    )
+    scale = _validate_e2_keyframes(
+        request["scaleKeyframes"],
+        fields={"frame", "xPermille", "yPermille", "interpolation"},
+        bounds={"xPermille": (1, 4000), "yPermille": (1, 4000)},
+        start=start,
+        end=end,
+        label="smoke scaleKeyframes",
+    )
+    drift = _validate_e2_keyframes(
+        request["driftKeyframes"],
+        fields={"frame", "xDeltaPermille", "yDeltaPermille", "interpolation"},
+        bounds={"xDeltaPermille": (-4000, 4000), "yDeltaPermille": (-4000, 4000)},
+        start=start,
+        end=end,
+        label="smoke driftKeyframes",
+    )
+    dissipation = _validate_e2_keyframes(
+        request["dissipationCurve"],
+        fields={"frame", "valuePermille", "interpolation"},
+        bounds={"valuePermille": (0, 1000)},
+        start=start,
+        end=end,
+        label="smoke dissipationCurve",
+    )
+    request["smokeLayer"] = layer
+    request["emissionMask"] = emission
+    request["opacitySchedule"] = opacity
+    request["positionKeyframes"] = position
+    request["scaleKeyframes"] = scale
+    request["driftKeyframes"] = drift
+    request["dissipationCurve"] = dissipation
+    return request
+
+
+def _validate_effect_request(value: Mapping[str, Any]) -> dict[str, Any]:
+    schema = value.get("schemaVersion") if isinstance(value, Mapping) else None
+    if schema == MASKED_SURFACE_EXECUTION_REQUEST_SCHEMA_VERSION:
+        return _validate_request(value)
+    if schema == FLAME_SMOKE_EXECUTION_REQUEST_SCHEMA_VERSION:
+        mode = value.get("effectMode")
+        if mode == "FLAME_EXTINGUISH":
+            return _validate_flame_request(value)
+        if mode == "SMOKE":
+            return _validate_smoke_request(value)
+    raise RenderArtifactError("deterministic effect request schema is unsupported")
+
+
 def _validate_request(value: Mapping[str, Any]) -> dict[str, Any]:
     request = _closed(value, _REQUEST_FIELDS, label="masked-surface request")
     if request["schemaVersion"] != MASKED_SURFACE_EXECUTION_REQUEST_SCHEMA_VERSION:
@@ -394,7 +823,7 @@ def _validate_request(value: Mapping[str, Any]) -> dict[str, Any]:
     for field in ("v5ExecutionRequestDigest", "requirementDigest", "payloadDigest"):
         _raw_digest(request[field], label=field)
     effect_mode = request["effectMode"]
-    if effect_mode not in _EFFECT_MODES:
+    if effect_mode not in _E1_EFFECT_MODES:
         raise RenderArtifactError("masked-surface effect mode is unsupported")
     expected_schema = (
         "v5.m13-local-exposure-requirement.v1"
@@ -649,10 +1078,16 @@ def _validate_effect_preview_request(value: Mapping[str, Any]) -> dict[str, Any]
     unsealed.pop("payloadDigest")
     if claimed != sha256(_canonical_json(unsealed)).hexdigest():
         raise RenderArtifactError("effect preview request seal is invalid")
-    if (
-        request["schemaVersion"] != EFFECT_PREVIEW_EXECUTION_REQUEST_SCHEMA_VERSION
-        or request["publicationAllowed"] is not False
-    ):
+    schema = request["schemaVersion"]
+    if schema == EFFECT_PREVIEW_EXECUTION_REQUEST_SCHEMA_VERSION:
+        expected_stage_count = 2
+        bindings_schema = "v5.m13-effect-preview-bindings.v1"
+    elif schema == EFFECT_PREVIEW_EXECUTION_REQUEST_SCHEMA_VERSION_V3:
+        expected_stage_count = 4
+        bindings_schema = "v5.m13-effect-preview-bindings.v2"
+    else:
+        raise RenderArtifactError("effect preview execution schema is unsupported")
+    if request["publicationAllowed"] is not False:
         raise RenderArtifactError("effect preview execution boundary is invalid")
     for field in (
         "executionRequestRef",
@@ -669,14 +1104,29 @@ def _validate_effect_preview_request(value: Mapping[str, Any]) -> dict[str, Any]
         _raw_digest(request[field], label=field)
     base = _closed(request["baseVideo"], _BASE_FIELDS, label="effect preview base video")
     stages = request["effectStages"]
-    if not isinstance(stages, list) or len(stages) != 2:
-        raise RenderArtifactError("effect preview requires exactly two masked-surface stages")
-    normalized_stages = [_validate_request(stage) for stage in stages]
+    if not isinstance(stages, list) or len(stages) != expected_stage_count:
+        raise RenderArtifactError("effect preview stage profile is invalid")
+    normalized_stages = [_validate_effect_request(stage) for stage in stages]
+    expected_modes = [
+        normalized_stages[0]["effectMode"],
+        "LOCAL_EXPOSURE",
+        *(["FLAME_EXTINGUISH", "SMOKE"] if expected_stage_count == 4 else []),
+    ]
     if (
-        normalized_stages[0]["effectMode"] not in {"SCRATCH_REVEAL", "LIGHT_SWEEP"}
-        or normalized_stages[1]["effectMode"] != "LOCAL_EXPOSURE"
+        normalized_stages[0]["effectMode"]
+        not in {"SCRATCH_REVEAL", "LIGHT_SWEEP"}
+        or [stage["effectMode"] for stage in normalized_stages]
+        != expected_modes
     ):
         raise RenderArtifactError("effect preview stages are not in fixed order")
+    if (
+        expected_stage_count == 4
+        and normalized_stages[2]["localExposureStage"]
+        != normalized_stages[1]
+    ):
+        raise RenderArtifactError(
+            "effect preview Flame does not bind the exact LocalExposure stage"
+        )
     for stage in normalized_stages:
         if (
             stage["workspaceRef"] != request["workspaceRef"]
@@ -686,7 +1136,10 @@ def _validate_effect_preview_request(value: Mapping[str, Any]) -> dict[str, Any]
             raise RenderArtifactError("effect preview stage base lineage is invalid")
 
     bindings_value = request["effectResultBindings"]
-    if not isinstance(bindings_value, list) or len(bindings_value) != 2:
+    if (
+        not isinstance(bindings_value, list)
+        or len(bindings_value) != expected_stage_count
+    ):
         raise RenderArtifactError("effect preview result bindings are invalid")
     bindings: list[dict[str, Any]] = []
     for index, (item, stage) in enumerate(zip(bindings_value, normalized_stages, strict=True)):
@@ -736,7 +1189,7 @@ def _validate_effect_preview_request(value: Mapping[str, Any]) -> dict[str, Any]
     expected_effect_digest = sha256(
         _canonical_json(
             {
-                "schemaVersion": "v5.m13-effect-preview-bindings.v1",
+                "schemaVersion": bindings_schema,
                 "effectResultBindings": bindings,
                 "glyphRequirementBinding": glyph_binding,
             }
@@ -955,6 +1408,209 @@ def _filter_graph(request: Mapping[str, Any]) -> str:
     return ";".join(filters)
 
 
+def _state_expression(
+    records: Sequence[Mapping[str, Any]], state: str, *, frame_variable: str = "N"
+) -> str:
+    parts = [
+        (
+            f"between({frame_variable},{record['startFrameInclusive']},"
+            f"{record['endFrameExclusive'] - 1})"
+        )
+        for record in records
+        if record["state"] == state
+    ]
+    return "+".join(parts) if parts else "0"
+
+
+def _fixed_masked_composite_filters(
+    *,
+    input_label: str,
+    effect_label: str,
+    mask_label: str,
+    blend_mode: str,
+    frame_rate: int,
+    prefix: str,
+) -> tuple[list[str], str]:
+    filters: list[str] = []
+    if blend_mode == "NORMAL":
+        filters.append(
+            f"[{input_label}]settb=expr=1/{frame_rate},setpts=N,"
+            f"format=gbrp[{prefix}baseout]"
+        )
+        selected_effect = effect_label
+    else:
+        filters.extend(
+            [
+                (
+                    f"[{input_label}]settb=expr=1/{frame_rate},setpts=N,"
+                    f"format=gbrp,split=2[{prefix}baseout][{prefix}blendbase]"
+                ),
+                (
+                    f"[{prefix}blendbase][{effect_label}]"
+                    f"blend=all_mode={_BLEND_FILTERS[blend_mode]}[{prefix}blended]"
+                ),
+            ]
+        )
+        selected_effect = f"{prefix}blended"
+    output_label = f"{prefix}out"
+    filters.append(
+        f"[{prefix}baseout][{selected_effect}][{mask_label}]"
+        f"maskedmerge,format=yuv420p[{output_label}]"
+    )
+    return filters, output_label
+
+
+def _flame_stage_filters(
+    request: Mapping[str, Any],
+    *,
+    input_label: str,
+    mask_input_index: int,
+    prefix: str,
+) -> tuple[list[str], str]:
+    output = request["output"]
+    width = output["width"]
+    height = output["height"]
+    frame_rate = output["frameRate"]
+    brightness = _curve_expression(request["brightnessCurve"], "valuePermille")
+    alpha = _curve_expression(request["alphaCurve"], "valuePermille")
+    ember = _state_expression(request["stateSchedule"], "EMBER")
+    in_range = (
+        f"between(N,{request['frameRangeStartInclusive']},"
+        f"{request['frameRangeEndExclusive'] - 1})"
+    )
+    filters = [
+        (
+            f"[{mask_input_index}:v]settb=expr=1/{frame_rate},setpts=N,"
+            f"format=gray,scale={width}:{height}:flags=neighbor:"
+            f"in_range=full:out_range=full,"
+            f"geq=lum='clip(lum(X,Y)*({in_range})*(1000-({alpha}))/1000,0,255)'"
+            f"[{prefix}mask]"
+        ),
+        (
+            f"[{input_label}]settb=expr=1/{frame_rate},setpts=N,format=gbrp,"
+            f"split=2[{prefix}base][{prefix}source]"
+        ),
+        (
+            f"[{prefix}source]geq="
+            f"r='clip(r(X,Y)*({brightness})/1000+255*({ember})*({alpha})/1000,0,255)':"
+            f"g='clip(g(X,Y)*({brightness})/1000+72*({ember})*({alpha})/1000,0,255)':"
+            f"b='clip(b(X,Y)*({brightness})/1000+8*({ember})*({alpha})/1000,0,255)'"
+            f"[{prefix}effect]"
+        ),
+    ]
+    composite, output_label = _fixed_masked_composite_filters(
+        input_label=f"{prefix}base",
+        effect_label=f"{prefix}effect",
+        mask_label=f"{prefix}mask",
+        blend_mode=request["blendMode"],
+        frame_rate=frame_rate,
+        prefix=prefix,
+    )
+    filters.extend(composite)
+    return filters, output_label
+
+
+def _smoke_stage_filters(
+    request: Mapping[str, Any],
+    *,
+    input_label: str,
+    smoke_input_index: int,
+    emission_input_index: int,
+    prefix: str,
+) -> tuple[list[str], str]:
+    output = request["output"]
+    width = output["width"]
+    height = output["height"]
+    frame_rate = output["frameRate"]
+    opacity = _curve_expression(request["opacitySchedule"], "valuePermille")
+    dissipation = _curve_expression(
+        request["dissipationCurve"], "valuePermille"
+    )
+    position_x = _curve_expression(
+        request["positionKeyframes"], "xPermille", frame_variable="n"
+    )
+    position_y = _curve_expression(
+        request["positionKeyframes"], "yPermille", frame_variable="n"
+    )
+    drift_x = _curve_expression(
+        request["driftKeyframes"], "xDeltaPermille", frame_variable="n"
+    )
+    drift_y = _curve_expression(
+        request["driftKeyframes"], "yDeltaPermille", frame_variable="n"
+    )
+    scale_x = _curve_expression(
+        request["scaleKeyframes"], "xPermille", frame_variable="n"
+    )
+    scale_y = _curve_expression(
+        request["scaleKeyframes"], "yPermille", frame_variable="n"
+    )
+    scale_width = f"max(1,trunc({width}*({scale_x})/1000))"
+    scale_height = f"max(1,trunc({height}*({scale_y})/1000))"
+    x_expression = f"trunc({width}*(({position_x})+({drift_x}))/1000)"
+    y_expression = f"trunc({height}*(({position_y})+({drift_y}))/1000)"
+    active = (
+        f"between(N,{request['frameRangeStartInclusive']},"
+        f"{request['frameRangeEndExclusive'] - 1})"
+    )
+    filters = [
+        (
+            f"[{smoke_input_index}:v]settb=expr=1/{frame_rate},setpts=N,format=gray,"
+            f"scale={_PROCEDURAL_SMOKE_TILE_WIDTH}:{_PROCEDURAL_SMOKE_TILE_HEIGHT}:"
+            f"flags=bilinear:eval=init,"
+            f"split=2[{prefix}texture][{prefix}density]"
+        ),
+        (
+            f"[{emission_input_index}:v]settb=expr=1/{frame_rate},setpts=N,format=gray,"
+            f"scale={_PROCEDURAL_SMOKE_TILE_WIDTH}:{_PROCEDURAL_SMOKE_TILE_HEIGHT}:"
+            f"flags=bilinear:eval=init"
+            f"[{prefix}emission]"
+        ),
+        (
+            f"[{prefix}density][{prefix}emission]blend=all_mode=multiply,"
+            f"geq=lum='clip(lum(X,Y)*({active})*({opacity})*"
+            f"(1000-({dissipation}))/1000000,0,255)'[{prefix}alpha]"
+        ),
+        (
+            f"[{prefix}texture]geq=lum='clip(64+lum(X,Y)*3/4,0,255)',"
+            f"format=rgb24[{prefix}rgb]"
+        ),
+        (
+            f"color=c=black:s={_PROCEDURAL_SMOKE_TILE_WIDTH}x"
+            f"{_PROCEDURAL_SMOKE_TILE_HEIGHT}:r={frame_rate},"
+            f"format=rgb24[{prefix}localblack]"
+        ),
+        (
+            f"[{prefix}localblack][{prefix}rgb][{prefix}alpha]"
+            f"maskedmerge[{prefix}local0]"
+        ),
+        (
+            f"[{prefix}local0]scale=w='{scale_width}':h='{scale_height}':"
+            f"flags=bilinear:eval=frame[{prefix}local]"
+        ),
+        (
+            f"color=c=black:s={width}x{height}:r={frame_rate},"
+            f"format=rgb24[{prefix}canvas]"
+        ),
+        (
+            f"[{prefix}canvas][{prefix}local]overlay=x='{x_expression}':y='{y_expression}':"
+            f"eval=frame:eof_action=repeat:shortest=0:format=auto[{prefix}placed]"
+        ),
+        f"[{prefix}placed]split=2[{prefix}placedrgb][{prefix}placedalpha]",
+        f"[{prefix}placedrgb]format=gbrp[{prefix}effect]",
+        f"[{prefix}placedalpha]format=gray[{prefix}mask]",
+    ]
+    composite, output_label = _fixed_masked_composite_filters(
+        input_label=input_label,
+        effect_label=f"{prefix}effect",
+        mask_label=f"{prefix}mask",
+        blend_mode=request["blendMode"],
+        frame_rate=frame_rate,
+        prefix=prefix,
+    )
+    filters.extend(composite)
+    return filters, output_label
+
+
 def _glyph_stage_filters(
     glyph: Mapping[str, Any],
     *,
@@ -1039,12 +1695,12 @@ def _probe_video(path: Path, ffprobe: _PinnedRuntimeBinary) -> dict[str, Any]:
                 "-v",
                 "error",
                 "-count_frames",
-                "-select_streams",
-                "v",
                 "-show_entries",
                 (
-                    "stream=codec_name,width,height,pix_fmt,avg_frame_rate,nb_frames,"
-                    "nb_read_frames:stream_tags=rotate:"
+                    "stream=codec_type,codec_name,width,height,pix_fmt,avg_frame_rate,"
+                    "r_frame_rate,nb_frames,nb_read_frames,time_base,start_pts,"
+                    "duration_ts:"
+                    "stream_tags=rotate:"
                     "stream_side_data=side_data_type,rotation:format=format_name"
                 ),
                 "-of",
@@ -1064,8 +1720,15 @@ def _probe_video(path: Path, ffprobe: _PinnedRuntimeBinary) -> dict[str, Any]:
     except (OSError, subprocess.SubprocessError, UnicodeError, json.JSONDecodeError) as exc:
         raise RenderArtifactError("masked-surface video probe failed") from exc
     streams = payload.get("streams")
-    if not isinstance(streams, list) or len(streams) != 1 or not isinstance(streams[0], Mapping):
-        raise RenderArtifactError("masked-surface video must contain one video stream")
+    if (
+        not isinstance(streams, list)
+        or len(streams) != 1
+        or not isinstance(streams[0], Mapping)
+        or streams[0].get("codec_type") != "video"
+    ):
+        raise RenderArtifactError(
+            "masked-surface media must contain exactly one video-only stream"
+        )
     stream = streams[0]
     if stream.get("side_data_list") or (
         isinstance(stream.get("tags"), Mapping) and str(stream["tags"].get("rotate", "0")) != "0"
@@ -1073,9 +1736,13 @@ def _probe_video(path: Path, ffprobe: _PinnedRuntimeBinary) -> dict[str, Any]:
         raise RenderArtifactError("masked-surface display transforms are unsupported")
     try:
         rate = Fraction(str(stream["avg_frame_rate"]))
+        real_rate = Fraction(str(stream["r_frame_rate"]))
         frame_count = int(stream.get("nb_read_frames") or stream["nb_frames"])
         width = int(stream["width"])
         height = int(stream["height"])
+        time_base = Fraction(str(stream["time_base"]))
+        start_time = int(stream["start_pts"]) * time_base
+        duration = int(stream["duration_ts"]) * time_base
     except (KeyError, TypeError, ValueError, ZeroDivisionError) as exc:
         raise RenderArtifactError("masked-surface video probe is incomplete") from exc
     return {
@@ -1083,6 +1750,9 @@ def _probe_video(path: Path, ffprobe: _PinnedRuntimeBinary) -> dict[str, Any]:
         "height": height,
         "frameCount": frame_count,
         "frameRate": rate,
+        "realFrameRate": real_rate,
+        "startTime": start_time,
+        "duration": duration,
         "pixelFormat": stream.get("pix_fmt"),
         "videoCodec": stream.get("codec_name"),
         "formatName": payload.get("format", {}).get("format_name"),
@@ -1095,6 +1765,13 @@ def _validate_probe(probe: Mapping[str, Any], output: Mapping[str, Any], *, inpu
         or probe["height"] != output["height"]
         or probe["frameCount"] != output["frameCount"]
         or probe["frameRate"] != Fraction(output["frameRate"], 1)
+        or probe["realFrameRate"] != Fraction(output["frameRate"], 1)
+        or probe["startTime"] != 0
+        or abs(
+            probe["duration"]
+            - Fraction(output["frameCount"], output["frameRate"])
+        )
+        > Fraction(1, 1_000_000)
         or probe["pixelFormat"] != output["pixelFormat"]
     ):
         raise RenderArtifactError("masked-surface media facts do not match output contract")
@@ -1103,6 +1780,59 @@ def _validate_probe(probe: Mapping[str, Any], output: Mapping[str, Any], *, inpu
         or "mp4" not in str(probe["formatName"]).split(",")
     ):
         raise RenderArtifactError("masked-surface output codec contract is invalid")
+
+
+def _procedural_smoke_sample(seed: int, frame: int, x: int, y: int) -> int:
+    """Return one code-owned, integer-only smoke texel.
+
+    This is deliberately a counter hash rather than a PRNG API: there is no
+    mutable generator state, platform entropy, clock, locale, or thread-order
+    input.  The constants and uint64 wrap are part of renderer version 1.
+    """
+
+    mask = (1 << 64) - 1
+    value = (
+        seed
+        ^ ((frame + 1) * 0x9E3779B97F4A7C15)
+        ^ ((x + 1) * 0xBF58476D1CE4E5B9)
+        ^ ((y + 1) * 0x94D049BB133111EB)
+    ) & mask
+    value ^= value >> 30
+    value = (value * 0xBF58476D1CE4E5B9) & mask
+    value ^= value >> 27
+    value = (value * 0x94D049BB133111EB) & mask
+    value ^= value >> 31
+    return (value >> 56) & 0xFF
+
+
+def _write_procedural_smoke(
+    destination: Path, *, seed: int, frame_count: int
+) -> str:
+    """Materialize the frozen gray8 procedural source with safe creation."""
+
+    flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL
+    flags |= getattr(os, "O_NOFOLLOW", 0)
+    try:
+        descriptor = os.open(destination, flags, 0o600)
+        with os.fdopen(descriptor, "wb", closefd=True) as handle:
+            for frame in range(frame_count):
+                payload = bytearray(
+                    _PROCEDURAL_SMOKE_TILE_WIDTH
+                    * _PROCEDURAL_SMOKE_TILE_HEIGHT
+                )
+                cursor = 0
+                for y in range(_PROCEDURAL_SMOKE_TILE_HEIGHT):
+                    for x in range(_PROCEDURAL_SMOKE_TILE_WIDTH):
+                        payload[cursor] = _procedural_smoke_sample(
+                            seed, frame, x, y
+                        )
+                        cursor += 1
+                handle.write(payload)
+            handle.flush()
+            os.fsync(handle.fileno())
+    except OSError as exc:
+        raise RenderArtifactError("procedural smoke staging failed") from exc
+    return "sha256:" + sha256(destination.read_bytes()).hexdigest()
 
 
 class DeterministicMaskedSurfaceExecutor:
@@ -1115,15 +1845,23 @@ class DeterministicMaskedSurfaceExecutor:
             raise RenderArtifactError("masked-surface artifact root is invalid")
 
     def execute(self, execution_request: Mapping[str, Any]) -> dict[str, Any]:
-        request = _validate_request(execution_request)
+        request = _validate_effect_request(execution_request)
         base_source = _safe_glyph_input(self.artifact_root, request["basePlate"]["storageKey"])
-        mask_source = _safe_glyph_input(self.artifact_root, request["mask"]["storageKey"])
-        if mask_source.suffix.lower() != ".png":
-            raise RenderArtifactError("masked-surface mask must be a PNG")
 
         with _PinnedRuntimeBinary(Path(os.path.realpath(self._runtime("ffmpeg"))), label="FFmpeg") as ffmpeg:
             with _PinnedRuntimeBinary(Path(os.path.realpath(self._runtime("ffprobe"))), label="FFprobe") as ffprobe:
-                return self._execute_with_runtimes(request, base_source, mask_source, ffmpeg, ffprobe)
+                if request["effectMode"] in _E1_EFFECT_MODES:
+                    mask_source = _safe_glyph_input(
+                        self.artifact_root, request["mask"]["storageKey"]
+                    )
+                    if mask_source.suffix.lower() != ".png":
+                        raise RenderArtifactError("masked-surface mask must be a PNG")
+                    return self._execute_with_runtimes(
+                        request, base_source, mask_source, ffmpeg, ffprobe
+                    )
+                return self._execute_flame_smoke_with_runtimes(
+                    request, base_source, ffmpeg, ffprobe
+                )
 
     def compose_timeline_preview_v2(
         self, execution_request: Mapping[str, Any]
@@ -1131,9 +1869,9 @@ class DeterministicMaskedSurfaceExecutor:
         """Replay Effect primitives in fixed phases, then Glyph and audio mux.
 
         Result artifacts from the independent executions are lineage evidence;
-        their full-frame videos are never overlaid.  The two sealed primitives
-        and the sealed Glyph request are replayed against one original base in
-        the code-owned Scratch/Light -> Local Exposure -> Glyph order.
+        their full-frame videos are never overlaid.  The exact sealed E1 or E2
+        stage profile and the sealed Glyph request are replayed against one
+        original base in the code-owned deterministic order.
         """
 
         request = _validate_effect_preview_request(execution_request)
@@ -1202,15 +1940,17 @@ class DeterministicMaskedSurfaceExecutor:
             ):
                 raise RenderArtifactError("effect preview base pixels changed")
 
-            effect_mask_paths: list[Path] = []
-            for index, stage in enumerate(stages):
+            effect_inputs: list[tuple[str, Path]] = []
+            stage_input_indices: list[tuple[int, ...]] = []
+
+            def stage_image(
+                binding: Mapping[str, Any], *, label: str
+            ) -> int:
                 source = _safe_glyph_input(
-                    self.artifact_root, stage["mask"]["storageKey"]
+                    self.artifact_root, binding["storageKey"]
                 )
-                path = inputs / f"effect-mask-{index}.png"
-                _stage_digest_pinned_input(
-                    source, path, stage["mask"]["fileDigest"]
-                )
+                path = inputs / f"effect-{len(effect_inputs):04d}-{label}.png"
+                _stage_digest_pinned_input(source, path, binding["fileDigest"])
                 try:
                     measured = image_digest_metadata(
                         path,
@@ -1220,19 +1960,58 @@ class DeterministicMaskedSurfaceExecutor:
                     )
                 except DigestError as exc:
                     raise RenderArtifactError(
-                        f"effect preview mask {index} digest failed"
+                        f"effect preview {label} digest failed"
                     ) from exc
                 if (
-                    measured["pixel_digest"] != stage["mask"]["pixelDigest"]
+                    measured["pixel_digest"] != binding["pixelDigest"]
                     or measured["pixel_digest_spec"]
-                    != stage["mask"]["pixelDigestSpec"]
-                    or measured["width"] != stage["mask"]["width"]
-                    or measured["height"] != stage["mask"]["height"]
+                    != binding["pixelDigestSpec"]
+                    or measured["pixel_mode"] != binding["pixelMode"]
+                    or measured["width"] != binding["width"]
+                    or measured["height"] != binding["height"]
                 ):
                     raise RenderArtifactError(
-                        f"effect preview mask {index} pixels changed"
+                        f"effect preview {label} pixels changed"
                     )
-                effect_mask_paths.append(path)
+                input_index = 1 + len(effect_inputs)
+                effect_inputs.append(("image", path))
+                return input_index
+
+            for index, stage in enumerate(stages):
+                mode = stage["effectMode"]
+                if mode in _E1_EFFECT_MODES:
+                    stage_input_indices.append(
+                        (stage_image(stage["mask"], label=f"stage-{index}-mask"),)
+                    )
+                elif mode == "FLAME_EXTINGUISH":
+                    stage_input_indices.append(
+                        (
+                            stage_image(
+                                stage["flameMask"],
+                                label=f"stage-{index}-flame-mask",
+                            ),
+                        )
+                    )
+                else:
+                    if stage["smokeSourceKind"] == "PINNED_SMOKE_LAYER":
+                        smoke_index = stage_image(
+                            stage["smokeLayer"],
+                            label=f"stage-{index}-smoke-layer",
+                        )
+                    else:
+                        path = inputs / f"effect-{len(effect_inputs):04d}-smoke.gray"
+                        _write_procedural_smoke(
+                            path,
+                            seed=stage["deterministicSeed"],
+                            frame_count=base["frameCount"],
+                        )
+                        smoke_index = 1 + len(effect_inputs)
+                        effect_inputs.append(("raw-smoke", path))
+                    emission_index = stage_image(
+                        stage["emissionMask"],
+                        label=f"stage-{index}-emission-mask",
+                    )
+                    stage_input_indices.append((smoke_index, emission_index))
 
             glyph_mask_paths: list[Path] = []
             for index, mask in enumerate(glyph["masks"]):
@@ -1264,20 +2043,46 @@ class DeterministicMaskedSurfaceExecutor:
                 glyph_mask_paths.append(path)
 
             filters: list[str] = []
-            stage_zero, label_zero = _effect_stage_filters(
-                stages[0], input_label="0:v", mask_input_index=1, prefix="phase0"
+            previous_label = "0:v"
+            for index, (stage, input_indices) in enumerate(
+                zip(stages, stage_input_indices, strict=True)
+            ):
+                prefix = f"phase{index}"
+                if stage["effectMode"] in _E1_EFFECT_MODES:
+                    stage_filters, output_label = _effect_stage_filters(
+                        stage,
+                        input_label=previous_label,
+                        mask_input_index=input_indices[0],
+                        prefix=prefix,
+                    )
+                elif stage["effectMode"] == "FLAME_EXTINGUISH":
+                    # LocalExposure is stage 1 and is deliberately not replayed
+                    # from Flame's dependency projection a second time.
+                    stage_filters, output_label = _flame_stage_filters(
+                        stage,
+                        input_label=previous_label,
+                        mask_input_index=input_indices[0],
+                        prefix=prefix,
+                    )
+                else:
+                    stage_filters, output_label = _smoke_stage_filters(
+                        stage,
+                        input_label=previous_label,
+                        smoke_input_index=input_indices[0],
+                        emission_input_index=input_indices[1],
+                        prefix=prefix,
+                    )
+                filters.extend(stage_filters)
+                previous_label = output_label
+            glyph_start = 1 + len(effect_inputs)
+            glyph_indices = list(
+                range(glyph_start, glyph_start + len(glyph_mask_paths))
             )
-            filters.extend(stage_zero)
-            stage_one, label_one = _effect_stage_filters(
-                stages[1], input_label=label_zero, mask_input_index=2, prefix="phase1"
-            )
-            filters.extend(stage_one)
-            glyph_indices = list(range(3, 3 + len(glyph_mask_paths)))
             glyph_filters, glyph_label = _glyph_stage_filters(
                 glyph,
-                input_label=label_one,
+                input_label=previous_label,
                 mask_input_indices=glyph_indices,
-                prefix="phase2glyph",
+                prefix=f"phase{len(stages)}glyph",
             )
             filters.extend(glyph_filters)
             filters.append(f"[{glyph_label}]null[vout]")
@@ -1303,7 +2108,34 @@ class DeterministicMaskedSurfaceExecutor:
                 "-i",
                 str(base_path),
             ]
-            for path in [*effect_mask_paths, *glyph_mask_paths]:
+            for kind, path in effect_inputs:
+                if kind == "raw-smoke":
+                    command.extend(
+                        [
+                            "-f",
+                            "rawvideo",
+                            "-pixel_format",
+                            "gray",
+                            "-video_size",
+                            f"{_PROCEDURAL_SMOKE_TILE_WIDTH}x{_PROCEDURAL_SMOKE_TILE_HEIGHT}",
+                            "-framerate",
+                            str(base["frameRate"]),
+                            "-i",
+                            str(path),
+                        ]
+                    )
+                else:
+                    command.extend(
+                        [
+                            "-loop",
+                            "1",
+                            "-framerate",
+                            str(base["frameRate"]),
+                            "-i",
+                            str(path),
+                        ]
+                    )
+            for path in glyph_mask_paths:
                 command.extend(
                     [
                         "-loop",
@@ -1410,10 +2242,16 @@ class DeterministicMaskedSurfaceExecutor:
             ffmpeg.require_stable()
             ffprobe.require_stable()
 
+        renderer_version = (
+            EFFECT_PREVIEW_RENDERER_VERSION
+            if request["schemaVersion"]
+            == EFFECT_PREVIEW_EXECUTION_REQUEST_SCHEMA_VERSION
+            else EFFECT_PREVIEW_RENDERER_VERSION_V3
+        )
         runtime_payload = {
             "ffmpegIdentity": raw_result["ffmpegIdentity"],
             "rendererIdentity": EFFECT_PREVIEW_RENDERER_IDENTITY,
-            "rendererVersion": EFFECT_PREVIEW_RENDERER_VERSION,
+            "rendererVersion": renderer_version,
         }
         runtime_digest = "sha256:" + sha256(_canonical_json(runtime_payload)).hexdigest()
         return {
@@ -1423,7 +2261,7 @@ class DeterministicMaskedSurfaceExecutor:
             "outputMediaProbe": raw_result["outputMediaProbe"],
             "outputDigest": raw_result["outputDigest"],
             "rendererIdentity": EFFECT_PREVIEW_RENDERER_IDENTITY,
-            "rendererVersion": EFFECT_PREVIEW_RENDERER_VERSION,
+            "rendererVersion": renderer_version,
             "ffmpegIdentity": raw_result["ffmpegIdentity"],
             "runtimeEvidenceDigest": runtime_digest,
             "executionRequestRef": request["executionRequestRef"],
@@ -1553,6 +2391,330 @@ class DeterministicMaskedSurfaceExecutor:
         if value is None:
             raise RenderArtifactError(f"{name} runtime is unavailable")
         return value
+
+    def _execute_flame_smoke_with_runtimes(
+        self,
+        request: Mapping[str, Any],
+        base_source: Path,
+        ffmpeg: _PinnedRuntimeBinary,
+        ffprobe: _PinnedRuntimeBinary,
+    ) -> dict[str, Any]:
+        """Execute one E2 graph without accepting a caller-authored graph."""
+
+        pass_fds = tuple(dict.fromkeys(ffmpeg.pass_fds + ffprobe.pass_fds))
+        ffmpeg_identity = ffmpeg.version_identity()
+        output = request["output"]
+        with tempfile.TemporaryDirectory(
+            prefix=".flame-smoke-work-", dir=self.artifact_root
+        ) as temporary:
+            work_root = Path(temporary)
+            work_root.chmod(0o700)
+            inputs = work_root / "inputs"
+            inputs.mkdir(mode=0o700)
+            base_path = inputs / "base-plate.media"
+            _stage_digest_pinned_input(
+                base_source, base_path, request["basePlate"]["fileDigest"]
+            )
+            _validate_probe(_probe_video(base_path, ffprobe), output, input_media=True)
+            try:
+                base_digest = decoded_frame_pixel_digest_metadata(
+                    base_path,
+                    ffmpeg_path=ffmpeg.executable_path,
+                    ffprobe_path=ffprobe.executable_path,
+                    pass_fds=pass_fds,
+                )
+            except DigestError as exc:
+                raise RenderArtifactError(
+                    "flame/smoke base pixel digest failed"
+                ) from exc
+            if (
+                base_digest["decodedFramePixelDigest"]
+                != request["basePlate"]["pixelDigest"]
+                or base_digest["decodedFramePixelDigestSpec"]
+                != request["basePlate"]["pixelDigestSpec"]
+                or base_digest["width"] != output["width"]
+                or base_digest["height"] != output["height"]
+                or base_digest["frameCount"] != output["frameCount"]
+            ):
+                raise RenderArtifactError("flame/smoke base pixels changed")
+
+            image_inputs: list[tuple[Path, Mapping[str, Any]]] = []
+            procedural_path: Path | None = None
+            if request["effectMode"] == "FLAME_EXTINGUISH":
+                flame = request["flameMask"]
+                source = _safe_glyph_input(self.artifact_root, flame["storageKey"])
+                flame_path = inputs / "flame-mask.png"
+                _stage_digest_pinned_input(source, flame_path, flame["fileDigest"])
+                image_inputs.append((flame_path, flame))
+                local_filters, local_label = _effect_stage_filters(
+                    request["localExposureStage"],
+                    input_label="0:v",
+                    mask_input_index=1,
+                    prefix="localexposure",
+                )
+                flame_filters, final_label = _flame_stage_filters(
+                    request,
+                    input_label=local_label,
+                    mask_input_index=1,
+                    prefix="flame",
+                )
+                filters = [*local_filters, *flame_filters]
+            else:
+                if request["smokeSourceKind"] == "PINNED_SMOKE_LAYER":
+                    smoke = request["smokeLayer"]
+                    smoke_source = _safe_glyph_input(
+                        self.artifact_root, smoke["storageKey"]
+                    )
+                    smoke_path = inputs / "smoke-layer.png"
+                    _stage_digest_pinned_input(
+                        smoke_source, smoke_path, smoke["fileDigest"]
+                    )
+                    image_inputs.append((smoke_path, smoke))
+                else:
+                    procedural_path = inputs / "procedural-smoke.gray"
+                    _write_procedural_smoke(
+                        procedural_path,
+                        seed=request["deterministicSeed"],
+                        frame_count=output["frameCount"],
+                    )
+                    smoke_path = procedural_path
+                emission = request["emissionMask"]
+                emission_source = _safe_glyph_input(
+                    self.artifact_root, emission["storageKey"]
+                )
+                emission_path = inputs / "emission-mask.png"
+                _stage_digest_pinned_input(
+                    emission_source, emission_path, emission["fileDigest"]
+                )
+                image_inputs.append((emission_path, emission))
+                filters, final_label = _smoke_stage_filters(
+                    request,
+                    input_label="0:v",
+                    smoke_input_index=1,
+                    emission_input_index=2,
+                    prefix="smoke",
+                )
+
+            for path, binding in image_inputs:
+                if path.suffix.lower() != ".png":
+                    raise RenderArtifactError(
+                        "flame/smoke image inputs must be PNG"
+                    )
+                try:
+                    measured = image_digest_metadata(
+                        path,
+                        ffmpeg_path=ffmpeg.executable_path,
+                        ffprobe_path=ffprobe.executable_path,
+                        pass_fds=pass_fds,
+                    )
+                except DigestError as exc:
+                    raise RenderArtifactError(
+                        "flame/smoke image pixel digest failed"
+                    ) from exc
+                if (
+                    measured["pixel_digest"] != binding["pixelDigest"]
+                    or measured["pixel_digest_spec"]
+                    != binding["pixelDigestSpec"]
+                    or measured["pixel_mode"] != binding["pixelMode"]
+                    or measured["width"] != binding["width"]
+                    or measured["height"] != binding["height"]
+                ):
+                    raise RenderArtifactError("flame/smoke input pixels changed")
+
+            candidate = work_root / "candidate.mp4"
+            command = [
+                str(ffmpeg.executable_path),
+                "-hide_banner",
+                "-loglevel",
+                "error",
+                "-xerror",
+                "-nostdin",
+                "-threads",
+                "1",
+                "-filter_threads",
+                "1",
+                "-filter_complex_threads",
+                "1",
+                "-sws_flags",
+                "bitexact+accurate_rnd+full_chroma_int",
+                "-hwaccel",
+                "none",
+                "-noautorotate",
+                "-i",
+                str(base_path),
+            ]
+            if request["effectMode"] == "FLAME_EXTINGUISH":
+                command.extend(
+                    [
+                        "-loop",
+                        "1",
+                        "-framerate",
+                        str(output["frameRate"]),
+                        "-i",
+                        str(image_inputs[0][0]),
+                    ]
+                )
+            else:
+                if procedural_path is None:
+                    command.extend(
+                        [
+                            "-loop",
+                            "1",
+                            "-framerate",
+                            str(output["frameRate"]),
+                            "-i",
+                            str(image_inputs[0][0]),
+                        ]
+                    )
+                else:
+                    command.extend(
+                        [
+                            "-f",
+                            "rawvideo",
+                            "-pixel_format",
+                            "gray",
+                            "-video_size",
+                            f"{_PROCEDURAL_SMOKE_TILE_WIDTH}x{_PROCEDURAL_SMOKE_TILE_HEIGHT}",
+                            "-framerate",
+                            str(output["frameRate"]),
+                            "-i",
+                            str(procedural_path),
+                        ]
+                    )
+                command.extend(
+                    [
+                        "-loop",
+                        "1",
+                        "-framerate",
+                        str(output["frameRate"]),
+                        "-i",
+                        str(image_inputs[-1][0]),
+                    ]
+                )
+            filters.append(f"[{final_label}]null[vout]")
+            command.extend(
+                [
+                    "-filter_complex",
+                    ";".join(filters),
+                    "-map",
+                    "[vout]",
+                    "-an",
+                    "-sn",
+                    "-dn",
+                    "-frames:v",
+                    str(output["frameCount"]),
+                    "-fps_mode",
+                    "passthrough",
+                    "-c:v",
+                    "libx264",
+                    "-preset",
+                    "medium",
+                    "-crf",
+                    "0",
+                    "-pix_fmt",
+                    "yuv420p",
+                    "-threads:v",
+                    "1",
+                    "-x264-params",
+                    "threads=1:lookahead_threads=1:sliced_threads=0:sync-lookahead=0:rc-lookahead=0:scenecut=0",
+                    "-fflags",
+                    "+bitexact",
+                    "-flags:v",
+                    "+bitexact",
+                    "-map_metadata",
+                    "-1",
+                    "-map_chapters",
+                    "-1",
+                    "-metadata",
+                    "creation_time=1970-01-01T00:00:00Z",
+                    "-movflags",
+                    "+faststart",
+                    "-video_track_timescale",
+                    str(output["frameRate"] * 512),
+                    "-n",
+                    str(candidate),
+                ]
+            )
+            try:
+                subprocess.run(
+                    command,
+                    check=True,
+                    capture_output=True,
+                    timeout=300,
+                    env=_fixed_environment(),
+                    pass_fds=pass_fds,
+                )
+            except (OSError, subprocess.SubprocessError) as exc:
+                message = ""
+                if isinstance(exc, subprocess.CalledProcessError) and exc.stderr:
+                    message = bytes(exc.stderr)[:1000].decode(
+                        "utf-8", "replace"
+                    ).strip()
+                raise RenderArtifactError(
+                    "FFmpeg flame/smoke execution failed"
+                    + (f": {message}" if message else "")
+                ) from exc
+
+            _validate_probe(_probe_video(candidate, ffprobe), output, input_media=False)
+            try:
+                output_digest = decoded_frame_pixel_digest_metadata(
+                    candidate,
+                    ffmpeg_path=ffmpeg.executable_path,
+                    ffprobe_path=ffprobe.executable_path,
+                    pass_fds=pass_fds,
+                )
+            except DigestError as exc:
+                raise RenderArtifactError("flame/smoke output digest failed") from exc
+            if (
+                output_digest["width"] != output["width"]
+                or output_digest["height"] != output["height"]
+                or output_digest["frameCount"] != output["frameCount"]
+            ):
+                raise RenderArtifactError("flame/smoke output media facts changed")
+            output_digest["frameRate"] = output["frameRate"]
+            workspace_hash = sha256(
+                request["workspaceRef"].encode("utf-8")
+            ).hexdigest()[:20]
+            run_hash = sha256(
+                request["productionRunRef"].encode("utf-8")
+            ).hexdigest()[:20]
+            directory = self.artifact_root / workspace_hash / run_hash / "masked-surface"
+            output_name = f"masked-surface-{request['payloadDigest']}.mp4"
+            with _PinnedRegularFile(candidate, label="flame/smoke candidate") as pinned:
+                destination = _publish_timeline_output_v1(
+                    root=self.artifact_root,
+                    directory=directory,
+                    source=pinned,
+                    expected_file_digest=output_digest["fileDigest"],
+                    output_name=output_name,
+                )
+            ffmpeg.require_stable()
+            ffprobe.require_stable()
+
+        runtime_payload = {
+            "ffmpegIdentity": ffmpeg_identity,
+            "rendererIdentity": MASKED_SURFACE_RENDERER_IDENTITY,
+            "rendererVersion": MASKED_SURFACE_RENDERER_VERSION,
+        }
+        return {
+            "internalPath": str(destination),
+            "outputStorageKey": str(destination.relative_to(self.artifact_root)),
+            "outputByteSize": destination.stat().st_size,
+            "outputMediaProbe": deepcopy(output),
+            "outputDigest": output_digest,
+            "rendererIdentity": MASKED_SURFACE_RENDERER_IDENTITY,
+            "rendererVersion": MASKED_SURFACE_RENDERER_VERSION,
+            "ffmpegIdentity": ffmpeg_identity,
+            "runtimeEvidenceDigest": "sha256:"
+            + sha256(_canonical_json(runtime_payload)).hexdigest(),
+            "v5ExecutionRequestRef": request["v5ExecutionRequestRef"],
+            "v5ExecutionRequestDigest": request["v5ExecutionRequestDigest"],
+            "v3ExecutionRequestDigest": request["payloadDigest"],
+            "requirementRef": request["requirementRef"],
+            "requirementDigest": request["requirementDigest"],
+            "effectMode": request["effectMode"],
+            "publicationAllowed": False,
+        }
 
     def _execute_with_runtimes(
         self,
@@ -1752,6 +2914,12 @@ class DeterministicMaskedSurfaceExecutor:
 
 __all__ = [
     "DeterministicMaskedSurfaceExecutor",
+    "EFFECT_PREVIEW_EXECUTION_REQUEST_SCHEMA_VERSION",
+    "EFFECT_PREVIEW_EXECUTION_REQUEST_SCHEMA_VERSION_V3",
+    "EFFECT_PREVIEW_RENDERER_IDENTITY",
+    "EFFECT_PREVIEW_RENDERER_VERSION",
+    "EFFECT_PREVIEW_RENDERER_VERSION_V3",
+    "FLAME_SMOKE_EXECUTION_REQUEST_SCHEMA_VERSION",
     "MASKED_SURFACE_EXECUTION_REQUEST_SCHEMA_VERSION",
     "MASKED_SURFACE_RENDERER_IDENTITY",
     "MASKED_SURFACE_RENDERER_VERSION",

@@ -36,6 +36,9 @@ from .evidence import (
     validated_evidence_snapshot,
 )
 from .deterministic_effects import (
+    FLAME_EXTINGUISH,
+    FLAME_EXTINGUISH_REQUIREMENT_RECORD_KIND,
+    FLAME_EXTINGUISH_RESULT_RECORD_KIND,
     LOCAL_EXPOSURE,
     LOCAL_EXPOSURE_REQUIREMENT_RECORD_KIND,
     LOCAL_EXPOSURE_RESULT_RECORD_KIND,
@@ -44,7 +47,16 @@ from .deterministic_effects import (
     MASKED_SURFACE_RUNTIME_EVIDENCE_RECORD_KIND,
     SCRATCH_LIGHT_REQUIREMENT_RECORD_KIND,
     SCRATCH_LIGHT_RESULT_RECORD_KIND,
+    SMOKE,
+    SMOKE_REQUIREMENT_RECORD_KIND,
+    SMOKE_RESULT_RECORD_KIND,
+    append_deterministic_effect_result_chain,
+    build_deterministic_effect_result,
+    build_flame_extinguish_requirement,
+    build_flame_smoke_execution_request,
+    build_smoke_requirement,
     resolve_deterministic_effect_result_chain,
+    validate_flame_local_exposure_compatibility,
 )
 from .foundation import (
     EpisodeProductionError,
@@ -66,6 +78,7 @@ from .media import (
     K2MediaExecutionService,
     WorkerUnavailableError,
 )
+from .media_candidate_review import CanonicalAssetVersionAuthority
 from .glyph_reveal_v2 import (
     DigestPinnedBasePlateGlyphInspectionAdapter,
     GlyphRevealRequirementV2,
@@ -198,6 +211,13 @@ class CompositionExecutionPort(Protocol):
         command: Mapping[str, Any],
         *,
         resolved_artifacts: Mapping[str, Any],
+    ) -> dict[str, Any]: ...
+    def execute_flame_smoke(
+        self,
+        request: Mapping[str, Any],
+        *,
+        resolved_asset_versions: Mapping[str, Mapping[str, Any]],
+        resolved_effect_dependencies: Mapping[str, Mapping[str, Any]],
     ) -> dict[str, Any]: ...
     def finalize(self, command: Mapping[str, Any]) -> dict[str, Any]: ...
 
@@ -2076,6 +2096,8 @@ class K2DeliveryService:
         effect_record_specs = (
             (SCRATCH_LIGHT_REQUIREMENT_RECORD_KIND, "requirementRef"),
             (LOCAL_EXPOSURE_REQUIREMENT_RECORD_KIND, "requirementRef"),
+            (FLAME_EXTINGUISH_REQUIREMENT_RECORD_KIND, "requirementRef"),
+            (SMOKE_REQUIREMENT_RECORD_KIND, "requirementRef"),
             (
                 MASKED_SURFACE_EXECUTION_REQUEST_RECORD_KIND,
                 "executionRequestRef",
@@ -2090,6 +2112,8 @@ class K2DeliveryService:
             ),
             (SCRATCH_LIGHT_RESULT_RECORD_KIND, "resultRef"),
             (LOCAL_EXPOSURE_RESULT_RECORD_KIND, "resultRef"),
+            (FLAME_EXTINGUISH_RESULT_RECORD_KIND, "resultRef"),
+            (SMOKE_RESULT_RECORD_KIND, "resultRef"),
         )
         effect_records: dict[tuple[str, str], dict[str, Any]] = {}
         for record_kind, identity_field in effect_record_specs:
@@ -2107,9 +2131,12 @@ class K2DeliveryService:
             in {
                 SCRATCH_LIGHT_RESULT_RECORD_KIND,
                 LOCAL_EXPOSURE_RESULT_RECORD_KIND,
+                FLAME_EXTINGUISH_RESULT_RECORD_KIND,
+                SMOKE_RESULT_RECORD_KIND,
             }
         ]
         used_effect_records: set[tuple[str, str]] = set()
+        resolved_effect_chains: list[dict[str, Any]] = []
         for result_record_kind, stored_result in result_records:
             try:
                 chain = resolve_deterministic_effect_result_chain(
@@ -2124,17 +2151,26 @@ class K2DeliveryService:
                     "deterministic Effect Result chain is invalid"
                 ) from exc
             resolved = chain.as_dict()
+            resolved_effect_chains.append(resolved)
             requirement = resolved["requirement"]
             result = resolved["result"]
-            requirement_record_kind = (
-                LOCAL_EXPOSURE_REQUIREMENT_RECORD_KIND
-                if requirement["effectMode"] == LOCAL_EXPOSURE
-                else SCRATCH_LIGHT_REQUIREMENT_RECORD_KIND
+            requirement_record_kinds = {
+                LOCAL_EXPOSURE: LOCAL_EXPOSURE_REQUIREMENT_RECORD_KIND,
+                FLAME_EXTINGUISH: FLAME_EXTINGUISH_REQUIREMENT_RECORD_KIND,
+                SMOKE: SMOKE_REQUIREMENT_RECORD_KIND,
+            }
+            result_record_kinds = {
+                LOCAL_EXPOSURE: LOCAL_EXPOSURE_RESULT_RECORD_KIND,
+                FLAME_EXTINGUISH: FLAME_EXTINGUISH_RESULT_RECORD_KIND,
+                SMOKE: SMOKE_RESULT_RECORD_KIND,
+            }
+            requirement_record_kind = requirement_record_kinds.get(
+                requirement["effectMode"],
+                SCRATCH_LIGHT_REQUIREMENT_RECORD_KIND,
             )
-            expected_result_kind = (
-                LOCAL_EXPOSURE_RESULT_RECORD_KIND
-                if result["effectMode"] == LOCAL_EXPOSURE
-                else SCRATCH_LIGHT_RESULT_RECORD_KIND
+            expected_result_kind = result_record_kinds.get(
+                result["effectMode"],
+                SCRATCH_LIGHT_RESULT_RECORD_KIND,
             )
             members = (
                 (
@@ -2214,6 +2250,70 @@ class K2DeliveryService:
                     ],
                 },
             )
+        exposure_by_requirement = {
+            chain["requirement"]["requirementRef"]: chain
+            for chain in resolved_effect_chains
+            if chain["requirement"]["effectMode"] == LOCAL_EXPOSURE
+        }
+        if len(exposure_by_requirement) != sum(
+            chain["requirement"]["effectMode"] == LOCAL_EXPOSURE
+            for chain in resolved_effect_chains
+        ):
+            raise RepositoryUnavailableError(
+                "Local Exposure Result authority is ambiguous"
+            )
+        for chain in resolved_effect_chains:
+            flame = chain["requirement"]
+            if flame["effectMode"] != FLAME_EXTINGUISH:
+                continue
+            exposure_chain = exposure_by_requirement.get(
+                flame["localExposureRequirementRef"]
+            )
+            if exposure_chain is None:
+                raise RepositoryUnavailableError(
+                    "Flame Extinguish requires one existing Local Exposure Result"
+                )
+            exposure = exposure_chain["requirement"]
+            exposure_result = exposure_chain["result"]
+            flame_request = chain["executionRequest"]
+            if (
+                exposure["payloadDigest"]
+                != flame["localExposureRequirementDigest"]
+                or flame_request.get("localExposureRequirementRef")
+                != exposure["requirementRef"]
+                or flame_request.get("localExposureRequirementDigest")
+                != exposure["payloadDigest"]
+                or flame_request.get("localExposureResultRef")
+                != exposure_result["resultRef"]
+                or flame_request.get("localExposureResultDigest")
+                != exposure_result["payloadDigest"]
+                or any(
+                    exposure[field] != flame[field]
+                    for field in (
+                        "workspaceRef",
+                        "productionRunRef",
+                        "targetShotRef",
+                        "targetShotVersionRef",
+                        "targetShotVersionDigest",
+                        "basePlateAssetVersionRef",
+                        "basePlateAssetVersionDigest",
+                        "basePlateFileDigest",
+                        "basePlatePixelDigest",
+                        "frameRangeStartInclusive",
+                        "frameRangeEndExclusive",
+                    )
+                )
+                or exposure["maskAssetVersionRef"]
+                != flame["flameMaskAssetVersionRef"]
+                or exposure["maskAssetVersionDigest"]
+                != flame["flameMaskAssetVersionDigest"]
+                or exposure["maskFileDigest"] != flame["flameMaskFileDigest"]
+                or exposure["maskPixelDigest"]
+                != flame["flameMaskPixelDigest"]
+            ):
+                raise RepositoryUnavailableError(
+                    "Flame Extinguish Local Exposure binding is stale"
+                )
         if used_effect_records != set(effect_records):
             raise RepositoryUnavailableError(
                 "deterministic Effect evidence chain is incomplete"
@@ -3007,6 +3107,336 @@ class K2DeliveryService:
             }
         )
 
+    def execute_deterministic_effect(
+        self, command: Mapping[str, Any]
+    ) -> dict[str, Any]:
+        """Execute one closed M13-E2 Requirement through the existing V4 owner."""
+
+        fields = {
+            "workspaceRef",
+            "productionRunRef",
+            "expectedRunVersion",
+            "idempotencyKey",
+            "effectKind",
+            "requirement",
+        }
+        if not isinstance(command, Mapping) or set(command) != fields:
+            raise EpisodeProductionError(
+                "command fields do not match the deterministic Effect contract"
+            )
+        workspace = _required_ref(command.get("workspaceRef"), "workspaceRef")
+        run_ref = _required_ref(
+            command.get("productionRunRef"), "productionRunRef"
+        )
+        client_key = _idempotency_key(command.get("idempotencyKey"))
+        effect_kind = command.get("effectKind")
+        if effect_kind not in {FLAME_EXTINGUISH, SMOKE}:
+            raise EpisodeProductionError("effectKind is invalid")
+        requirement_input = command.get("requirement")
+        if not isinstance(requirement_input, Mapping):
+            raise EpisodeProductionError("requirement must be an object")
+        if any(
+            field in requirement_input
+            for field in ("workspaceRef", "productionRunRef")
+        ):
+            raise EpisodeProductionError(
+                "Requirement workspace/run scope is server-owned"
+            )
+        requirement_command = {
+            **deepcopy(dict(requirement_input)),
+            "workspaceRef": workspace,
+            "productionRunRef": run_ref,
+        }
+        if requirement_command.get("effectMode") != effect_kind:
+            raise EpisodeProductionError(
+                "effectKind and Requirement effectMode differ"
+            )
+        requirement = (
+            build_flame_extinguish_requirement(requirement_command)
+            if effect_kind == FLAME_EXTINGUISH
+            else build_smoke_requirement(requirement_command)
+        )
+        requirement_value = requirement.as_dict()
+        context = self._timeline_authority_context(
+            workspace,
+            run_ref,
+            expected_run_version=_positive_version(
+                command.get("expectedRunVersion"), "expectedRunVersion"
+            ),
+        )
+        if context["snapshot"].currentState not in M13_PREVIEW_STATE_TRANSITIONS:
+            raise UpstreamNotReadyError(
+                "deterministic Effects require current video media"
+            )
+        resolved_base = self._resolved_deterministic_effect_base(
+            context=context,
+            requirement=requirement_value,
+        )
+        resolved_assets: dict[str, dict[str, Any]] = {
+            resolved_base["assetVersionRef"]: resolved_base
+        }
+        dependencies: dict[str, dict[str, Any]] = {}
+        result_exposure_requirement = None
+        result_exposure_result = None
+
+        if effect_kind == FLAME_EXTINGUISH:
+            resolved_flame_mask = self._resolved_effect_image_asset(
+                snapshot=context["snapshot"],
+                workspace=workspace,
+                run_ref=run_ref,
+                asset_version_ref=requirement_value[
+                    "flameMaskAssetVersionRef"
+                ],
+                asset_version_digest=requirement_value[
+                    "flameMaskAssetVersionDigest"
+                ],
+                file_digest=requirement_value["flameMaskFileDigest"],
+                pixel_digest=requirement_value["flameMaskPixelDigest"],
+                label="flame mask",
+            )
+            resolved_assets[
+                resolved_flame_mask["assetVersionRef"]
+            ] = resolved_flame_mask
+            exposure_results: list[dict[str, Any]] = []
+            for record in context["snapshot"].records:
+                if record.get("recordKind") != LOCAL_EXPOSURE_RESULT_RECORD_KIND:
+                    continue
+                payload = _immutable_payload(
+                    record.get("payload"), LOCAL_EXPOSURE_RESULT_RECORD_KIND
+                )
+                if (
+                    payload.get("requirementRef")
+                    == requirement_value["localExposureRequirementRef"]
+                    and payload.get("requirementDigest")
+                    == requirement_value["localExposureRequirementDigest"]
+                ):
+                    exposure_results.append(payload)
+            if len(exposure_results) != 1:
+                raise UpstreamNotReadyError(
+                    "exact Local Exposure Result dependency is unavailable"
+                )
+            exposure_result = exposure_results[0]
+            exposure_chain_wrapper = resolve_deterministic_effect_result_chain(
+                self.evidence,
+                workspace_ref=workspace,
+                production_run_ref=run_ref,
+                result_ref=exposure_result["resultRef"],
+                result_digest=exposure_result["payloadDigest"],
+            )
+            exposure_chain = exposure_chain_wrapper.as_dict()
+            exposure_requirement, exposure_result_wrapper = (
+                validate_flame_local_exposure_compatibility(
+                    requirement,
+                    exposure_chain_wrapper.requirement,
+                    exposure_chain_wrapper.result,
+                )
+            )
+            if exposure_result_wrapper is None:
+                raise RepositoryUnavailableError(
+                    "Local Exposure Result dependency is invalid"
+                )
+            result_exposure_requirement = exposure_requirement
+            result_exposure_result = exposure_result_wrapper
+            exposure_mask_value = exposure_requirement.as_dict()
+            resolved_exposure_mask = self._resolved_effect_image_asset(
+                snapshot=context["snapshot"],
+                workspace=workspace,
+                run_ref=run_ref,
+                asset_version_ref=exposure_mask_value[
+                    "maskAssetVersionRef"
+                ],
+                asset_version_digest=exposure_mask_value[
+                    "maskAssetVersionDigest"
+                ],
+                file_digest=exposure_mask_value["maskFileDigest"],
+                pixel_digest=exposure_mask_value["maskPixelDigest"],
+                label="Local Exposure mask",
+            )
+            exposure_artifact = exposure_chain["artifactEvidence"]
+            exposure_output = exposure_artifact["outputDigest"]
+            exposure_probe = exposure_artifact["outputMediaProbe"]
+            workspace_hash = sha256(workspace.encode("utf-8")).hexdigest()[:20]
+            run_hash = sha256(run_ref.encode("utf-8")).hexdigest()[:20]
+            dependencies[exposure_result["resultRef"]] = {
+                **exposure_chain,
+                "assetVersions": {
+                    resolved_base["assetVersionRef"]: deepcopy(resolved_base),
+                    resolved_exposure_mask[
+                        "assetVersionRef"
+                    ]: resolved_exposure_mask,
+                },
+                "artifactStorage": {
+                    "artifactEvidenceRef": exposure_artifact[
+                        "artifactEvidenceRef"
+                    ],
+                    "artifactEvidenceDigest": exposure_artifact[
+                        "payloadDigest"
+                    ],
+                    "storageKey": (
+                        f"{workspace_hash}/{run_hash}/masked-surface/"
+                        "masked-surface-"
+                        f"{exposure_artifact['v3ExecutionRequestDigest']}.mp4"
+                    ),
+                    "fileDigest": exposure_output["fileDigest"],
+                    "pixelDigest": exposure_output[
+                        "decodedFramePixelDigest"
+                    ],
+                    "pixelDigestSpec": exposure_output[
+                        "decodedFramePixelDigestSpec"
+                    ],
+                    "width": exposure_output["width"],
+                    "height": exposure_output["height"],
+                    "frameCount": exposure_output["frameCount"],
+                    "frameRate": exposure_output["frameRate"],
+                    "pixelFormat": exposure_probe["pixelFormat"],
+                },
+            }
+            execution_request = build_flame_smoke_execution_request(
+                requirement,
+                local_exposure_requirement=exposure_requirement,
+                local_exposure_result=exposure_result_wrapper,
+            )
+        else:
+            resolved_emission_mask = self._resolved_effect_image_asset(
+                snapshot=context["snapshot"],
+                workspace=workspace,
+                run_ref=run_ref,
+                asset_version_ref=requirement_value[
+                    "emissionMaskAssetVersionRef"
+                ],
+                asset_version_digest=requirement_value[
+                    "emissionMaskAssetVersionDigest"
+                ],
+                file_digest=requirement_value["emissionMaskFileDigest"],
+                pixel_digest=requirement_value["emissionMaskPixelDigest"],
+                label="smoke emission mask",
+            )
+            resolved_assets[
+                resolved_emission_mask["assetVersionRef"]
+            ] = resolved_emission_mask
+            if requirement_value["smokeSourceKind"] == "PINNED_SMOKE_LAYER":
+                resolved_smoke_layer = self._resolved_effect_image_asset(
+                    snapshot=context["snapshot"],
+                    workspace=workspace,
+                    run_ref=run_ref,
+                    asset_version_ref=requirement_value[
+                        "smokeLayerAssetVersionRef"
+                    ],
+                    asset_version_digest=requirement_value[
+                        "smokeLayerAssetVersionDigest"
+                    ],
+                    file_digest=requirement_value["smokeLayerFileDigest"],
+                    pixel_digest=requirement_value[
+                        "smokeLayerPixelDigest"
+                    ],
+                    label="pinned smoke layer",
+                    allow_canonical_asset=True,
+                )
+                resolved_assets[
+                    resolved_smoke_layer["assetVersionRef"]
+                ] = resolved_smoke_layer
+            execution_request = build_flame_smoke_execution_request(
+                requirement
+            )
+
+        if self.composition is None or not callable(
+            getattr(self.composition, "execute_flame_smoke", None)
+        ):
+            raise WorkerUnavailableError(
+                "M13-E2 deterministic Effect execution is not configured"
+            )
+        record_head = self._stable_record_head(
+            workspace,
+            run_ref,
+            context["snapshot"].revisionToken,
+        )
+        try:
+            execution = self.composition.execute_flame_smoke(
+                execution_request.as_dict(),
+                resolved_asset_versions=resolved_assets,
+                resolved_effect_dependencies=dependencies,
+            )
+        except CompositionExecutionError as exc:
+            raise WorkerUnavailableError(
+                "M13-E2 deterministic Effect execution failed"
+            ) from exc
+        if not isinstance(execution, Mapping) or set(execution) != {
+            "artifactEvidence",
+            "runtimeEvidence",
+            "evidenceBindings",
+        }:
+            raise RepositoryUnavailableError(
+                "M13-E2 deterministic Effect evidence is invalid"
+            )
+        result = build_deterministic_effect_result(
+            requirement=requirement,
+            execution_request=execution_request,
+            evidence_bindings=execution["evidenceBindings"],
+            artifact_evidence=execution["artifactEvidence"],
+            local_exposure_requirement=result_exposure_requirement,
+            local_exposure_result=result_exposure_result,
+        )
+        chain, replayed = append_deterministic_effect_result_chain(
+            self.evidence,
+            requirement=requirement,
+            execution_request=execution_request,
+            artifact_evidence=execution["artifactEvidence"],
+            runtime_evidence=execution["runtimeEvidence"],
+            result=result,
+            idempotency_key=client_key,
+            created_at=self._clock(),
+            expected_record_journal_head=record_head,
+        )
+        return {
+            "idempotentReplay": replayed,
+            "deterministicEffect": chain.as_dict(),
+        }
+
+    def get_deterministic_effects(
+        self, workspace_ref: str, run_ref: str
+    ) -> dict[str, Any]:
+        workspace = _required_ref(workspace_ref, "workspaceRef")
+        production_run = _required_ref(run_ref, "productionRunRef")
+        context = self._timeline_authority_context(
+            workspace,
+            production_run,
+            expected_run_version=None,
+        )
+        snapshot = context["snapshot"]
+        result_records: list[dict[str, Any]] = []
+        for record in snapshot.records:
+            if record.get("recordKind") not in {
+                FLAME_EXTINGUISH_RESULT_RECORD_KIND,
+                SMOKE_RESULT_RECORD_KIND,
+            }:
+                continue
+            payload = _immutable_payload(
+                record.get("payload"), str(record.get("recordKind"))
+            )
+            if (
+                payload.get("resultRef") != record.get("recordRef")
+                or payload.get("payloadDigest")
+                != record.get("payloadDigest")
+            ):
+                raise RepositoryUnavailableError(
+                    "deterministic Effect Result evidence is invalid"
+                )
+            result_records.append(payload)
+        result_records.sort(key=lambda item: item["resultRef"])
+        return {
+            "deterministicEffects": [
+                resolve_deterministic_effect_result_chain(
+                    self.evidence,
+                    workspace_ref=workspace,
+                    production_run_ref=production_run,
+                    result_ref=item["resultRef"],
+                    result_digest=item["payloadDigest"],
+                ).as_dict()
+                for item in result_records
+            ],
+            "publicationAllowed": False,
+        }
+
     def create_timeline(self, command: Mapping[str, Any]) -> dict[str, Any]:
         fields = {
             "workspaceRef",
@@ -3618,6 +4048,89 @@ class K2DeliveryService:
             )
         return payload
 
+    def _resolved_effect_image_asset(
+        self,
+        *,
+        snapshot: Any,
+        workspace: str,
+        run_ref: str,
+        asset_version_ref: str,
+        asset_version_digest: str,
+        file_digest: str,
+        pixel_digest: str,
+        label: str,
+        allow_canonical_asset: bool = False,
+    ) -> dict[str, Any]:
+        """Resolve one exact RGBA AssetVersion without accepting path authority."""
+
+        matches: list[dict[str, Any]] = []
+        mask_records = [
+            item
+            for item in snapshot.records
+            if item.get("recordKind") == "MaskAssetVersion"
+            and item.get("recordRef") == asset_version_ref
+        ]
+        if len(mask_records) > 1:
+            raise RepositoryUnavailableError(
+                f"{label} AssetVersion authority is ambiguous"
+            )
+        if mask_records:
+            matches.append(
+                self._snapshot_record_payload(
+                    snapshot,
+                    record_kind="MaskAssetVersion",
+                    record_ref=asset_version_ref,
+                )
+            )
+        if allow_canonical_asset:
+            canonical = {
+                item["assetVersionRef"]: item
+                for item in CanonicalAssetVersionAuthority(
+                    self.evidence
+                ).list_asset_versions(
+                    workspace,
+                    run_ref,
+                    gates=snapshot.gates,
+                    records=snapshot.records,
+                )
+            }.get(asset_version_ref)
+            if canonical is not None:
+                matches.append(deepcopy(canonical))
+        if not matches:
+            raise UpstreamNotReadyError(
+                f"exact {label} AssetVersion evidence is not available"
+            )
+        authority = matches[0]
+        if any(item != authority for item in matches[1:]):
+            raise RepositoryUnavailableError(
+                f"{label} AssetVersion authority is ambiguous"
+            )
+        authority_file_digest = authority.get("fileDigest")
+        if authority_file_digest is None and _is_sha256(
+            authority.get("sha256")
+        ):
+            authority_file_digest = f"sha256:{authority['sha256']}"
+        if (
+            authority.get("assetVersionRef") != asset_version_ref
+            or authority.get("payloadDigest") != asset_version_digest
+            or authority_file_digest != file_digest
+            or authority.get("pixelDigest") != pixel_digest
+            or authority.get("pixelMode") != "RGBA"
+            or _contains_path_authority(authority)
+        ):
+            raise StaleInputError(f"{label} AssetVersion is stale")
+        return {
+            "assetVersionRef": asset_version_ref,
+            "assetVersionDigest": asset_version_digest,
+            "storageKey": authority["storageKey"],
+            "fileDigest": authority_file_digest,
+            "pixelDigest": pixel_digest,
+            "pixelDigestSpec": authority["pixelDigestSpec"],
+            "pixelMode": authority["pixelMode"],
+            "width": authority["width"],
+            "height": authority["height"],
+        }
+
     def _composition_storage_path(self, storage_key: Any) -> Path:
         if self.composition is None:
             raise WorkerUnavailableError("composition execution is not configured")
@@ -4057,6 +4570,60 @@ class K2DeliveryService:
                 "denominator": rate_denominator,
             },
             "pixelFormat": stream["pix_fmt"],
+        }
+
+    def _resolved_deterministic_effect_base(
+        self,
+        *,
+        context: Mapping[str, Any],
+        requirement: Mapping[str, Any],
+    ) -> dict[str, Any]:
+        workspace = context["run"]["workspaceRef"]
+        run_ref = context["run"]["productionRunRef"]
+        matches = [
+            item
+            for item in self._current_glyph_video_assets(
+                workspace,
+                run_ref,
+                evidence_snapshot=context["snapshot"],
+            )
+            if item.get("assetVersionRef")
+            == requirement["basePlateAssetVersionRef"]
+        ]
+        if len(matches) != 1:
+            raise StaleInputError(
+                "deterministic Effect base AssetVersion is not current"
+            )
+        base = matches[0]
+        facts = self._base_video_facts(base)
+        if (
+            base.get("payloadDigest")
+            != requirement["basePlateAssetVersionDigest"]
+            or f"sha256:{base.get('sha256')}"
+            != requirement["basePlateFileDigest"]
+            or base.get("creativeShotRef") != requirement["targetShotRef"]
+            or base.get("creativeShotVersionRef")
+            != requirement["targetShotVersionRef"]
+            or base.get("creativeShotDigest")
+            != requirement["targetShotVersionDigest"]
+            or requirement["frameRangeEndExclusive"] > facts["frameCount"]
+            or _contains_path_authority(base)
+        ):
+            raise StaleInputError(
+                "deterministic Effect base/Shot authority is stale"
+            )
+        return {
+            "assetVersionRef": base["assetVersionRef"],
+            "assetVersionDigest": base["payloadDigest"],
+            "storageKey": base["storageKey"],
+            "fileDigest": f"sha256:{base['sha256']}",
+            "pixelDigest": requirement["basePlatePixelDigest"],
+            "pixelDigestSpec": DECODED_FRAME_PIXEL_DIGEST_SPEC,
+            "width": facts["width"],
+            "height": facts["height"],
+            "frameCount": facts["frameCount"],
+            "frameRate": facts["frameRate"]["numerator"],
+            "pixelFormat": facts["pixelFormat"],
         }
 
     def record_m12_m13_inputs(
@@ -4587,7 +5154,13 @@ class K2DeliveryService:
             item
             for item in effects
             if item["sourceBinding"].get("effectKind")
-            in {"SCRATCH_REVEAL", "LIGHT_SWEEP", "LOCAL_EXPOSURE"}
+            in {
+                "SCRATCH_REVEAL",
+                "LIGHT_SWEEP",
+                "LOCAL_EXPOSURE",
+                "FLAME_EXTINGUISH",
+                "SMOKE",
+            }
         ]
         glyphs = [
             item
@@ -4598,9 +5171,10 @@ class K2DeliveryService:
             len(active["VIDEO"]) != 1
             or not active["AUDIO"]
             or not active["SUBTITLE"]
-            or len(effects) != 3
-            or len(deterministic) != 2
             or len(glyphs) != 1
+            or len(effects) not in {3, 5}
+            or len(deterministic) not in {2, 4}
+            or len(effects) != len(deterministic) + 1
         ):
             raise UpstreamNotReadyError(
                 "editing Timeline does not have exact Preview source coverage"
@@ -4609,17 +5183,30 @@ class K2DeliveryService:
             "SCRATCH_REVEAL": 0,
             "LIGHT_SWEEP": 0,
             "LOCAL_EXPOSURE": 1,
+            "FLAME_EXTINGUISH": 2,
+            "SMOKE": 3,
         }
         deterministic.sort(
             key=lambda item: (
                 ranks[item["sourceBinding"]["effectKind"]],
+                item["layer"],
+                item["zOrder"],
                 item["clipRef"],
             )
         )
-        if [ranks[item["sourceBinding"]["effectKind"]] for item in deterministic] != [
-            0,
-            1,
-        ]:
+        profile = [
+            ranks[item["sourceBinding"]["effectKind"]]
+            for item in deterministic
+        ]
+        expected_profile = [0, 1] if len(deterministic) == 2 else [0, 1, 2, 3]
+        timeline_order = [
+            (item["layer"], item["zOrder"]) for item in deterministic
+        ]
+        if (
+            profile != expected_profile
+            or timeline_order != sorted(timeline_order)
+            or len(set(timeline_order)) != len(timeline_order)
+        ):
             raise UpstreamNotReadyError(
                 "editing Timeline effect stages are incomplete"
             )
@@ -4630,6 +5217,7 @@ class K2DeliveryService:
             "subtitles": active["SUBTITLE"],
             "deterministicEffects": deterministic,
             "glyph": glyphs[0],
+            "effectProfile": "M13_E1" if len(deterministic) == 2 else "M13_E2",
         }
 
     def _editing_preview_input_refs(
@@ -5039,45 +5627,144 @@ class K2DeliveryService:
             "pixelFormat": video_facts["pixelFormat"],
         }
 
+        exposure_chains = {
+            chain["requirement"]["requirementRef"]: chain
+            for chain in chains
+            if chain["requirement"]["effectMode"] == LOCAL_EXPOSURE
+        }
+        for chain in chains:
+            flame = chain["requirement"]
+            if flame["effectMode"] != FLAME_EXTINGUISH:
+                continue
+            exposure_chain = exposure_chains.get(
+                flame["localExposureRequirementRef"]
+            )
+            if exposure_chain is None:
+                raise StaleInputError(
+                    "Flame Extinguish Preview requires the bound Local Exposure Result"
+                )
+            exposure = exposure_chain["requirement"]
+            exposure_result = exposure_chain["result"]
+            flame_request = chain["executionRequest"]
+            if (
+                exposure["payloadDigest"]
+                != flame["localExposureRequirementDigest"]
+                or flame_request.get("localExposureResultRef")
+                != exposure_result["resultRef"]
+                or flame_request.get("localExposureResultDigest")
+                != exposure_result["payloadDigest"]
+            ):
+                raise StaleInputError(
+                    "Flame Extinguish Local Exposure Preview binding is stale"
+                )
+
         for binding, chain in zip(effect_bindings, chains, strict=True):
             requirement = chain["requirement"]
             artifact = chain["artifactEvidence"]
-            mask_asset = self._snapshot_record_payload(
-                snapshot,
-                record_kind="MaskAssetVersion",
-                record_ref=requirement["maskAssetVersionRef"],
-            )
-            if (
-                mask_asset.get("payloadDigest")
-                != requirement["maskAssetVersionDigest"]
-                or f"sha256:{mask_asset.get('sha256')}"
-                != requirement["maskFileDigest"]
-                or mask_asset.get("pixelDigest")
-                != requirement["maskPixelDigest"]
-                or _contains_path_authority(mask_asset)
-            ):
-                raise StaleInputError("effect mask AssetVersion is stale")
-            resolved_mask = {
-                "assetVersionRef": mask_asset["assetVersionRef"],
-                "assetVersionDigest": mask_asset["payloadDigest"],
-                "storageKey": mask_asset["storageKey"],
-                "fileDigest": f"sha256:{mask_asset['sha256']}",
-                "pixelDigest": mask_asset["pixelDigest"],
-                "pixelDigestSpec": mask_asset["pixelDigestSpec"],
-                "pixelMode": mask_asset["pixelMode"],
-                "width": mask_asset["width"],
-                "height": mask_asset["height"],
-            }
+            result = chain["result"]
+            mode = requirement["effectMode"]
+            resolved_images: list[dict[str, Any]] = []
+            if mode in {"SCRATCH_REVEAL", "LIGHT_SWEEP", LOCAL_EXPOSURE}:
+                resolved_images.append(
+                    self._resolved_effect_image_asset(
+                        snapshot=snapshot,
+                        workspace=workspace,
+                        run_ref=run_ref,
+                        asset_version_ref=requirement[
+                            "maskAssetVersionRef"
+                        ],
+                        asset_version_digest=requirement[
+                            "maskAssetVersionDigest"
+                        ],
+                        file_digest=requirement["maskFileDigest"],
+                        pixel_digest=requirement["maskPixelDigest"],
+                        label="effect mask",
+                    )
+                )
+            elif mode == FLAME_EXTINGUISH:
+                resolved_images.append(
+                    self._resolved_effect_image_asset(
+                        snapshot=snapshot,
+                        workspace=workspace,
+                        run_ref=run_ref,
+                        asset_version_ref=requirement[
+                            "flameMaskAssetVersionRef"
+                        ],
+                        asset_version_digest=requirement[
+                            "flameMaskAssetVersionDigest"
+                        ],
+                        file_digest=requirement["flameMaskFileDigest"],
+                        pixel_digest=requirement["flameMaskPixelDigest"],
+                        label="flame mask",
+                    )
+                )
+            elif mode == SMOKE:
+                resolved_images.append(
+                    self._resolved_effect_image_asset(
+                        snapshot=snapshot,
+                        workspace=workspace,
+                        run_ref=run_ref,
+                        asset_version_ref=requirement[
+                            "emissionMaskAssetVersionRef"
+                        ],
+                        asset_version_digest=requirement[
+                            "emissionMaskAssetVersionDigest"
+                        ],
+                        file_digest=requirement["emissionMaskFileDigest"],
+                        pixel_digest=requirement[
+                            "emissionMaskPixelDigest"
+                        ],
+                        label="smoke emission mask",
+                    )
+                )
+                if requirement["smokeSourceKind"] == "PINNED_SMOKE_LAYER":
+                    resolved_images.append(
+                        self._resolved_effect_image_asset(
+                            snapshot=snapshot,
+                            workspace=workspace,
+                            run_ref=run_ref,
+                            asset_version_ref=requirement[
+                                "smokeLayerAssetVersionRef"
+                            ],
+                            asset_version_digest=requirement[
+                                "smokeLayerAssetVersionDigest"
+                            ],
+                            file_digest=requirement[
+                                "smokeLayerFileDigest"
+                            ],
+                            pixel_digest=requirement[
+                                "smokeLayerPixelDigest"
+                            ],
+                            label="pinned smoke layer",
+                            allow_canonical_asset=True,
+                        )
+                    )
+            else:
+                raise RepositoryUnavailableError(
+                    "deterministic Effect mode is unsupported"
+                )
             v3_digest = artifact["v3ExecutionRequestDigest"]
             workspace_hash = sha256(workspace.encode("utf-8")).hexdigest()[:20]
             run_hash = sha256(run_ref.encode("utf-8")).hexdigest()[:20]
             output = artifact["outputDigest"]
             probe = artifact["outputMediaProbe"]
+            if mode in {FLAME_EXTINGUISH, SMOKE} and (
+                result.get("outputFileDigest") != output["fileDigest"]
+                or result.get("outputDecodedFramePixelDigest")
+                != output["decodedFramePixelDigest"]
+                or result.get("outputMediaProbe") != probe
+            ):
+                raise StaleInputError(
+                    "deterministic Effect Result output binding is stale"
+                )
             effect_executions[binding["resultRef"]] = {
                 **deepcopy(chain),
                 "assetVersions": {
                     resolved_base["assetVersionRef"]: deepcopy(resolved_base),
-                    resolved_mask["assetVersionRef"]: resolved_mask,
+                    **{
+                        item["assetVersionRef"]: item
+                        for item in resolved_images
+                    },
                 },
                 "artifactStorage": {
                     "artifactEvidenceRef": artifact["artifactEvidenceRef"],
@@ -6250,16 +6937,27 @@ class K2DeliveryService:
 
         client_key = normalized["idempotencyKey"]
         operation_ref = normalized["operationRef"]
+        effect_profile = self._editing_preview_layout(restored)[
+            "effectProfile"
+        ]
         composition_key = _digest(
             {
                 "clientIdempotencyKey": client_key,
                 "operationRef": operation_ref,
-                "stage": "m13-e1-editing-timeline-composition",
+                "stage": (
+                    "m13-e1-editing-timeline-composition"
+                    if effect_profile == "M13_E1"
+                    else "m13-e2-editing-timeline-composition"
+                ),
             }
         )
         composition_request_digest = _digest(
             {
-                "schemaVersion": "v5.m13-effect-preview-command.v1",
+                "schemaVersion": (
+                    "v5.m13-effect-preview-command.v1"
+                    if effect_profile == "M13_E1"
+                    else "v5.m13-effect-preview-command.v2"
+                ),
                 "command": normalized,
                 "deliveryId": TIMELINE_PREVIEW_DELIVERY_ID,
             }

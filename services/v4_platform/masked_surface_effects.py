@@ -35,6 +35,16 @@ MASKED_SURFACE_EXECUTION_REQUEST_SCHEMA_VERSION = (
 MASKED_SURFACE_V3_REQUEST_SCHEMA_VERSION = (
     "v4.m13-masked-surface-execution-request.v1"
 )
+FLAME_SMOKE_EXECUTION_REQUEST_SCHEMA_VERSION = (
+    "v5.m13-flame-smoke-execution-request.v1"
+)
+FLAME_SMOKE_V3_REQUEST_SCHEMA_VERSION = (
+    "v4.m13-flame-smoke-execution-request.v1"
+)
+FLAME_EXTINGUISH_REQUIREMENT_SCHEMA_VERSION = (
+    "v5.m13-flame-extinguish-requirement.v1"
+)
+SMOKE_REQUIREMENT_SCHEMA_VERSION = "v5.m13-smoke-requirement.v1"
 MASKED_SURFACE_ARTIFACT_EVIDENCE_SCHEMA_VERSION = (
     "v4.m13-masked-surface-artifact-evidence.v1"
 )
@@ -55,13 +65,20 @@ MASKED_SURFACE_PROVENANCE = "LOCAL_EVIDENCE"
 EFFECT_PREVIEW_V3_REQUEST_SCHEMA_VERSION = (
     "v4.m13-effect-preview-execution-request.v2"
 )
+EFFECT_PREVIEW_V3_REQUEST_SCHEMA_VERSION_V3 = (
+    "v4.m13-effect-preview-execution-request.v3"
+)
 EFFECT_PREVIEW_V4_RESULT_SCHEMA_VERSION = "v4.m13-composition-result.v2"
 EFFECT_PREVIEW_BINDINGS_SCHEMA_VERSION = "v5.m13-effect-preview-bindings.v1"
+EFFECT_PREVIEW_BINDINGS_SCHEMA_VERSION_V2 = "v5.m13-effect-preview-bindings.v2"
 EFFECT_PREVIEW_RENDERER_IDENTITY = "v3.deterministic-timeline-preview-ffmpeg"
 EFFECT_PREVIEW_RENDERER_VERSION = "2"
+EFFECT_PREVIEW_RENDERER_VERSION_V3 = "3"
 EFFECT_PREVIEW_ADAPTER_IDENTITY = "v4.local-composition-executor.v1"
 
-EFFECT_MODES = ("SCRATCH_REVEAL", "LIGHT_SWEEP", "LOCAL_EXPOSURE")
+E1_EFFECT_MODES = ("SCRATCH_REVEAL", "LIGHT_SWEEP", "LOCAL_EXPOSURE")
+E2_EFFECT_MODES = ("FLAME_EXTINGUISH", "SMOKE")
+EFFECT_MODES = (*E1_EFFECT_MODES, *E2_EFFECT_MODES)
 INTERPOLATIONS = ("STEP", "LINEAR", "EASE_IN", "EASE_OUT", "EASE_IN_OUT")
 BLEND_MODES = (
     "NORMAL",
@@ -99,6 +116,65 @@ _V5_REQUEST_FIELDS = frozenset(
         "position",
         "scale",
         "perspective",
+        "blendMode",
+        "layer",
+        "publicationAllowed",
+        "payloadDigest",
+    }
+)
+_FLAME_V5_REQUEST_FIELDS = frozenset(
+    {
+        "schemaVersion",
+        "executionRequestRef",
+        "workspaceRef",
+        "productionRunRef",
+        "requirementSchemaVersion",
+        "requirementRef",
+        "requirementDigest",
+        "effectMode",
+        "targetShot",
+        "basePlate",
+        "flameMask",
+        "frameRangeStartInclusive",
+        "frameRangeEndExclusive",
+        "stateSchedule",
+        "brightnessCurve",
+        "alphaCurve",
+        "localExposureRequirementRef",
+        "localExposureRequirementDigest",
+        "localExposureResultRef",
+        "localExposureResultDigest",
+        "blendMode",
+        "layer",
+        "publicationAllowed",
+        "payloadDigest",
+    }
+)
+_SMOKE_V5_REQUEST_FIELDS = frozenset(
+    {
+        "schemaVersion",
+        "executionRequestRef",
+        "workspaceRef",
+        "productionRunRef",
+        "requirementSchemaVersion",
+        "requirementRef",
+        "requirementDigest",
+        "effectMode",
+        "targetShot",
+        "basePlate",
+        "smokeSourceKind",
+        "smokeLayer",
+        "emissionMask",
+        "frameRangeStartInclusive",
+        "frameRangeEndExclusive",
+        "opacitySchedule",
+        "positionKeyframes",
+        "scaleKeyframes",
+        "driftKeyframes",
+        "dissipationCurve",
+        "algorithmIdentity",
+        "algorithmVersion",
+        "deterministicSeed",
         "blendMode",
         "layer",
         "publicationAllowed",
@@ -186,6 +262,70 @@ _V3_REQUEST_FIELDS = frozenset(
         "position",
         "scale",
         "perspective",
+        "blendMode",
+        "layer",
+        "output",
+        "publicationAllowed",
+        "payloadDigest",
+    }
+)
+_FLAME_V3_REQUEST_FIELDS = frozenset(
+    {
+        "schemaVersion",
+        "v5ExecutionRequestRef",
+        "v5ExecutionRequestDigest",
+        "workspaceRef",
+        "productionRunRef",
+        "requirementSchemaVersion",
+        "requirementRef",
+        "requirementDigest",
+        "effectMode",
+        "targetShot",
+        "basePlate",
+        "flameMask",
+        "frameRangeStartInclusive",
+        "frameRangeEndExclusive",
+        "stateSchedule",
+        "brightnessCurve",
+        "alphaCurve",
+        "localExposureRequirementRef",
+        "localExposureRequirementDigest",
+        "localExposureResultRef",
+        "localExposureResultDigest",
+        "localExposureStage",
+        "blendMode",
+        "layer",
+        "output",
+        "publicationAllowed",
+        "payloadDigest",
+    }
+)
+_SMOKE_V3_REQUEST_FIELDS = frozenset(
+    {
+        "schemaVersion",
+        "v5ExecutionRequestRef",
+        "v5ExecutionRequestDigest",
+        "workspaceRef",
+        "productionRunRef",
+        "requirementSchemaVersion",
+        "requirementRef",
+        "requirementDigest",
+        "effectMode",
+        "targetShot",
+        "basePlate",
+        "smokeSourceKind",
+        "smokeLayer",
+        "emissionMask",
+        "frameRangeStartInclusive",
+        "frameRangeEndExclusive",
+        "opacitySchedule",
+        "positionKeyframes",
+        "scaleKeyframes",
+        "driftKeyframes",
+        "dissipationCurve",
+        "algorithmIdentity",
+        "algorithmVersion",
+        "deterministicSeed",
         "blendMode",
         "layer",
         "output",
@@ -382,6 +522,16 @@ _RESULT_FIELDS = frozenset(
         "state",
         "publicationAllowed",
         "payloadDigest",
+    }
+)
+_E2_RESULT_FIELDS = _RESULT_FIELDS | frozenset(
+    {
+        "outputFileDigest",
+        "outputDecodedFramePixelDigest",
+        "outputMediaProbe",
+        "assetAdmissionState",
+        "masterState",
+        "exportState",
     }
 )
 _EFFECT_EXECUTION_RESOLUTION_FIELDS = frozenset(
@@ -734,6 +884,418 @@ def _validate_keyframes(
             f"{label} must bind both frame-range boundaries"
         )
     return result
+
+
+def _flame_smoke_execution_request_ref(request: Mapping[str, Any]) -> str:
+    mode = request["effectMode"]
+    identity = {
+        "schemaVersion": "v5.m13-flame-smoke-execution-request-identity.v1",
+        "effectMode": mode,
+        "requirementRef": request["requirementRef"],
+        "requirementDigest": request["requirementDigest"],
+        "localExposureResultRef": (
+            request["localExposureResultRef"]
+            if mode == "FLAME_EXTINGUISH"
+            else None
+        ),
+        "localExposureResultDigest": (
+            request["localExposureResultDigest"]
+            if mode == "FLAME_EXTINGUISH"
+            else None
+        ),
+    }
+    prefix = (
+        "m13-flame-extinguish-execution-"
+        if mode == "FLAME_EXTINGUISH"
+        else "m13-smoke-execution-"
+    )
+    return prefix + sha256(_canonical_json(identity)).hexdigest()[:32]
+
+
+def _request_asset(value: Any, label: str) -> dict[str, Any]:
+    binding = _closed(value, _REQUEST_ASSET_FIELDS, label)
+    _ref(binding["assetVersionRef"], f"{label}.assetVersionRef")
+    _raw_digest(binding["assetVersionDigest"], f"{label}.assetVersionDigest")
+    _prefixed_digest(binding["fileDigest"], f"{label}.fileDigest")
+    _prefixed_digest(binding["pixelDigest"], f"{label}.pixelDigest")
+    return binding
+
+
+def _validate_e2_curve(
+    value: Any,
+    *,
+    fields: frozenset[str],
+    bounds: Mapping[str, tuple[int, int]],
+    start: int,
+    end: int,
+    label: str,
+) -> list[dict[str, Any]]:
+    if not isinstance(value, list) or not 1 <= len(value) <= 4_096:
+        raise MaskedSurfaceRequestValidationError(f"{label} is invalid")
+    result: list[dict[str, Any]] = []
+    previous = -1
+    for index, raw in enumerate(value):
+        item = _closed(raw, fields, f"{label}[{index}]")
+        frame = _integer(
+            item["frame"],
+            f"{label}[{index}].frame",
+            minimum=start,
+            maximum=end - 1,
+        )
+        if frame <= previous or item["interpolation"] not in INTERPOLATIONS:
+            raise MaskedSurfaceRequestValidationError(
+                f"{label} order or interpolation is invalid"
+            )
+        previous = frame
+        for field, (minimum, maximum) in bounds.items():
+            _integer(
+                item[field],
+                f"{label}[{index}].{field}",
+                minimum=minimum,
+                maximum=maximum,
+            )
+        result.append(item)
+    if result[0]["frame"] != start or result[-1]["frame"] != end - 1:
+        raise MaskedSurfaceRequestValidationError(
+            f"{label} must bind both frame-range boundaries"
+        )
+    return result
+
+
+def validate_flame_smoke_execution_request(value: Any) -> dict[str, Any]:
+    """Independently validate one storage-free V5 E2 execution request."""
+
+    if not isinstance(value, Mapping):
+        raise MaskedSurfaceRequestValidationError(
+            "flame/smoke request must be an object"
+        )
+    mode = value.get("effectMode")
+    fields = (
+        _FLAME_V5_REQUEST_FIELDS
+        if mode == "FLAME_EXTINGUISH"
+        else _SMOKE_V5_REQUEST_FIELDS
+        if mode == "SMOKE"
+        else frozenset()
+    )
+    if not fields:
+        raise MaskedSurfaceRequestValidationError(
+            "flame/smoke effectMode is invalid"
+        )
+    request = _closed(value, fields, "flame/smoke request")
+    supplied = _raw_digest(request.pop("payloadDigest"), "payloadDigest")
+    if supplied != sha256(_canonical_json(request)).hexdigest():
+        raise MaskedSurfaceRequestValidationError(
+            "flame/smoke payloadDigest is stale"
+        )
+    request["payloadDigest"] = supplied
+    expected_schema = (
+        FLAME_EXTINGUISH_REQUIREMENT_SCHEMA_VERSION
+        if mode == "FLAME_EXTINGUISH"
+        else SMOKE_REQUIREMENT_SCHEMA_VERSION
+    )
+    if (
+        request["schemaVersion"] != FLAME_SMOKE_EXECUTION_REQUEST_SCHEMA_VERSION
+        or request["requirementSchemaVersion"] != expected_schema
+        or request["publicationAllowed"] is not False
+    ):
+        raise MaskedSurfaceRequestValidationError(
+            "flame/smoke request boundary is invalid"
+        )
+    for field in (
+        "executionRequestRef",
+        "workspaceRef",
+        "productionRunRef",
+        "requirementRef",
+    ):
+        _ref(request[field], field)
+    _raw_digest(request["requirementDigest"], "requirementDigest")
+    shot = _closed(request["targetShot"], _TARGET_SHOT_FIELDS, "targetShot")
+    _ref(shot["shotRef"], "targetShot.shotRef")
+    _ref(shot["shotVersionRef"], "targetShot.shotVersionRef")
+    _raw_digest(shot["shotVersionDigest"], "targetShot.shotVersionDigest")
+    request["targetShot"] = shot
+    base = _request_asset(request["basePlate"], "basePlate")
+    request["basePlate"] = base
+    start = _integer(
+        request["frameRangeStartInclusive"],
+        "frameRangeStartInclusive",
+        minimum=0,
+        maximum=10_000_000,
+    )
+    end = _integer(
+        request["frameRangeEndExclusive"],
+        "frameRangeEndExclusive",
+        minimum=1,
+        maximum=10_000_001,
+    )
+    if end <= start:
+        raise MaskedSurfaceRequestValidationError("flame/smoke frameRange is invalid")
+    if request["blendMode"] not in BLEND_MODES:
+        raise MaskedSurfaceRequestValidationError("flame/smoke blendMode is invalid")
+    _integer(request["layer"], "layer", minimum=0, maximum=1024)
+
+    if mode == "FLAME_EXTINGUISH":
+        flame = _request_asset(request["flameMask"], "flameMask")
+        if flame["assetVersionRef"] == base["assetVersionRef"]:
+            raise MaskedSurfaceRequestValidationError(
+                "basePlate and flameMask must be distinct"
+            )
+        states = request["stateSchedule"]
+        if not isinstance(states, list) or not 4 <= len(states) <= 5:
+            raise MaskedSurfaceRequestValidationError("stateSchedule is invalid")
+        cursor = start
+        sealed_states: list[dict[str, Any]] = []
+        for index, raw in enumerate(states):
+            item = _closed(
+                raw,
+                frozenset(
+                    {"state", "startFrameInclusive", "endFrameExclusive"}
+                ),
+                f"stateSchedule[{index}]",
+            )
+            item_start = _integer(
+                item["startFrameInclusive"],
+                f"stateSchedule[{index}].startFrameInclusive",
+                minimum=start,
+                maximum=end - 1,
+            )
+            item_end = _integer(
+                item["endFrameExclusive"],
+                f"stateSchedule[{index}].endFrameExclusive",
+                minimum=start + 1,
+                maximum=end,
+            )
+            if item_start != cursor or item_end <= item_start:
+                raise MaskedSurfaceRequestValidationError(
+                    "stateSchedule is not exact and contiguous"
+                )
+            cursor = item_end
+            sealed_states.append(item)
+        profiles = {
+            ("LIT", "DIMMING", "EXTINGUISHED", "DARK"),
+            ("LIT", "DIMMING", "EXTINGUISHED", "EMBER", "DARK"),
+        }
+        if (
+            cursor != end
+            or tuple(item["state"] for item in sealed_states) not in profiles
+        ):
+            raise MaskedSurfaceRequestValidationError(
+                "stateSchedule state order is invalid"
+            )
+        request["flameMask"] = flame
+        request["stateSchedule"] = sealed_states
+        request["brightnessCurve"] = _validate_e2_curve(
+            request["brightnessCurve"],
+            fields=frozenset({"frame", "valuePermille", "interpolation"}),
+            bounds={"valuePermille": (0, 1000)},
+            start=start,
+            end=end,
+            label="brightnessCurve",
+        )
+        request["alphaCurve"] = _validate_e2_curve(
+            request["alphaCurve"],
+            fields=frozenset({"frame", "valuePermille", "interpolation"}),
+            bounds={"valuePermille": (0, 1000)},
+            start=start,
+            end=end,
+            label="alphaCurve",
+        )
+        dark_start = next(
+            item["startFrameInclusive"]
+            for item in sealed_states
+            if item["state"] == "DARK"
+        )
+        for label in ("brightnessCurve", "alphaCurve"):
+            curve = request[label]
+            values = [item["valuePermille"] for item in curve]
+            if (
+                values[0] <= 0
+                or any(
+                    left < right for left, right in zip(values, values[1:])
+                )
+                or not any(item["frame"] == dark_start for item in curve)
+                or any(
+                    item["valuePermille"] != 0
+                    for item in curve
+                    if item["frame"] >= dark_start
+                )
+            ):
+                raise MaskedSurfaceRequestValidationError(
+                    f"{label} extinction profile is invalid"
+                )
+        for field in ("localExposureRequirementRef", "localExposureResultRef"):
+            _ref(request[field], field)
+        for field in (
+            "localExposureRequirementDigest",
+            "localExposureResultDigest",
+        ):
+            _raw_digest(request[field], field)
+    else:
+        emission = _request_asset(request["emissionMask"], "emissionMask")
+        if emission["assetVersionRef"] == base["assetVersionRef"]:
+            raise MaskedSurfaceRequestValidationError(
+                "basePlate and emissionMask must be distinct"
+            )
+        source_kind = request["smokeSourceKind"]
+        if source_kind == "PINNED_SMOKE_LAYER":
+            layer = _request_asset(request["smokeLayer"], "smokeLayer")
+            if layer["assetVersionRef"] in {
+                base["assetVersionRef"],
+                emission["assetVersionRef"],
+            }:
+                raise MaskedSurfaceRequestValidationError(
+                    "Smoke AssetVersions must be distinct"
+                )
+            if any(
+                request[field] is not None
+                for field in (
+                    "algorithmIdentity",
+                    "algorithmVersion",
+                    "deterministicSeed",
+                )
+            ):
+                raise MaskedSurfaceRequestValidationError(
+                    "pinned smoke cannot select a procedural algorithm"
+                )
+        elif source_kind == "DETERMINISTIC_CPU_PROCEDURAL":
+            layer = None
+            if (
+                request["smokeLayer"] is not None
+                or request["algorithmIdentity"] != "v3.deterministic-smoke-cpu"
+                or request["algorithmVersion"] != "1"
+            ):
+                raise MaskedSurfaceRequestValidationError(
+                    "procedural smoke algorithm is not frozen"
+                )
+            _integer(
+                request["deterministicSeed"],
+                "deterministicSeed",
+                minimum=0,
+                maximum=(1 << 63) - 1,
+            )
+        else:
+            raise MaskedSurfaceRequestValidationError(
+                "smokeSourceKind is invalid"
+            )
+        request["smokeLayer"] = layer
+        request["emissionMask"] = emission
+        for field, bounds in (
+            ("opacitySchedule", {"valuePermille": (0, 1000)}),
+            (
+                "positionKeyframes",
+                {"xPermille": (0, 1000), "yPermille": (0, 1000)},
+            ),
+            (
+                "scaleKeyframes",
+                {"xPermille": (1, 4000), "yPermille": (1, 4000)},
+            ),
+            (
+                "driftKeyframes",
+                {
+                    "xDeltaPermille": (-4000, 4000),
+                    "yDeltaPermille": (-4000, 4000),
+                },
+            ),
+            ("dissipationCurve", {"valuePermille": (0, 1000)}),
+        ):
+            curve_fields = frozenset({"frame", "interpolation", *bounds})
+            request[field] = _validate_e2_curve(
+                request[field],
+                fields=curve_fields,
+                bounds=bounds,
+                start=start,
+                end=end,
+                label=field,
+            )
+    requirement_projection: dict[str, Any] = {
+        "schemaVersion": request["requirementSchemaVersion"],
+        "workspaceRef": request["workspaceRef"],
+        "productionRunRef": request["productionRunRef"],
+        "requirementRef": request["requirementRef"],
+        "effectMode": request["effectMode"],
+        "targetShotRef": request["targetShot"]["shotRef"],
+        "targetShotVersionRef": request["targetShot"]["shotVersionRef"],
+        "targetShotVersionDigest": request["targetShot"]["shotVersionDigest"],
+        "basePlateAssetVersionRef": request["basePlate"]["assetVersionRef"],
+        "basePlateAssetVersionDigest": request["basePlate"]["assetVersionDigest"],
+        "basePlateFileDigest": request["basePlate"]["fileDigest"],
+        "basePlatePixelDigest": request["basePlate"]["pixelDigest"],
+        "frameRangeStartInclusive": request["frameRangeStartInclusive"],
+        "frameRangeEndExclusive": request["frameRangeEndExclusive"],
+        "blendMode": request["blendMode"],
+        "layer": request["layer"],
+        "publicationAllowed": False,
+    }
+    if mode == "FLAME_EXTINGUISH":
+        requirement_projection.update(
+            {
+                "flameMaskAssetVersionRef": request["flameMask"][
+                    "assetVersionRef"
+                ],
+                "flameMaskAssetVersionDigest": request["flameMask"][
+                    "assetVersionDigest"
+                ],
+                "flameMaskFileDigest": request["flameMask"]["fileDigest"],
+                "flameMaskPixelDigest": request["flameMask"]["pixelDigest"],
+                "stateSchedule": deepcopy(request["stateSchedule"]),
+                "brightnessCurve": deepcopy(request["brightnessCurve"]),
+                "alphaCurve": deepcopy(request["alphaCurve"]),
+                "localExposureRequirementRef": request[
+                    "localExposureRequirementRef"
+                ],
+                "localExposureRequirementDigest": request[
+                    "localExposureRequirementDigest"
+                ],
+            }
+        )
+    else:
+        smoke_layer = request["smokeLayer"]
+        requirement_projection.update(
+            {
+                "smokeSourceKind": request["smokeSourceKind"],
+                "smokeLayerAssetVersionRef": (
+                    None if smoke_layer is None else smoke_layer["assetVersionRef"]
+                ),
+                "smokeLayerAssetVersionDigest": (
+                    None
+                    if smoke_layer is None
+                    else smoke_layer["assetVersionDigest"]
+                ),
+                "smokeLayerFileDigest": (
+                    None if smoke_layer is None else smoke_layer["fileDigest"]
+                ),
+                "smokeLayerPixelDigest": (
+                    None if smoke_layer is None else smoke_layer["pixelDigest"]
+                ),
+                "emissionMaskAssetVersionRef": request["emissionMask"][
+                    "assetVersionRef"
+                ],
+                "emissionMaskAssetVersionDigest": request["emissionMask"][
+                    "assetVersionDigest"
+                ],
+                "emissionMaskFileDigest": request["emissionMask"]["fileDigest"],
+                "emissionMaskPixelDigest": request["emissionMask"]["pixelDigest"],
+                "opacitySchedule": deepcopy(request["opacitySchedule"]),
+                "positionKeyframes": deepcopy(request["positionKeyframes"]),
+                "scaleKeyframes": deepcopy(request["scaleKeyframes"]),
+                "driftKeyframes": deepcopy(request["driftKeyframes"]),
+                "dissipationCurve": deepcopy(request["dissipationCurve"]),
+                "algorithmIdentity": request["algorithmIdentity"],
+                "algorithmVersion": request["algorithmVersion"],
+                "deterministicSeed": request["deterministicSeed"],
+            }
+        )
+    if sha256(_canonical_json(requirement_projection)).hexdigest() != request[
+        "requirementDigest"
+    ]:
+        raise MaskedSurfaceRequestValidationError(
+            "flame/smoke Requirement projection is stale"
+        )
+    if request["executionRequestRef"] != _flame_smoke_execution_request_ref(request):
+        raise MaskedSurfaceRequestValidationError(
+            "flame/smoke executionRequestRef derivation is invalid"
+        )
+    return request
 
 
 def validate_masked_surface_execution_request(value: Any) -> dict[str, Any]:
@@ -1157,6 +1719,253 @@ def _build_v3_request(
     return result
 
 
+def _resolve_flame_smoke_assets(
+    request: Mapping[str, Any],
+    resolved_asset_versions: Any,
+    *,
+    artifact_root: Path,
+) -> dict[str, dict[str, Any]]:
+    if not isinstance(resolved_asset_versions, Mapping):
+        raise MaskedSurfaceAssetResolutionError(
+            "resolved_asset_versions must be a server-held mapping"
+        )
+    names = (
+        ("basePlate", "flameMask")
+        if request["effectMode"] == "FLAME_EXTINGUISH"
+        else (
+            ("basePlate", "emissionMask")
+            if request["smokeLayer"] is None
+            else ("basePlate", "emissionMask", "smokeLayer")
+        )
+    )
+    expected_refs = {request[name]["assetVersionRef"] for name in names}
+    if set(resolved_asset_versions) != expected_refs:
+        raise MaskedSurfaceAssetResolutionError(
+            "resolved Flame/Smoke AssetVersion set does not match the request"
+        )
+    result: dict[str, dict[str, Any]] = {}
+    base_ref = request["basePlate"]["assetVersionRef"]
+    for image_name in names[1:]:
+        image_ref = request[image_name]["assetVersionRef"]
+        pair_request = {
+            "basePlate": request["basePlate"],
+            "mask": request[image_name],
+            "frameRangeEndExclusive": request["frameRangeEndExclusive"],
+        }
+        base, image = _resolve_asset_versions(
+            pair_request,
+            {
+                base_ref: resolved_asset_versions[base_ref],
+                image_ref: resolved_asset_versions[image_ref],
+            },
+            artifact_root=artifact_root,
+        )
+        if "basePlate" in result and result["basePlate"] != base:
+            raise MaskedSurfaceAssetResolutionError(
+                "resolved Flame/Smoke basePlate changed during resolution"
+            )
+        result["basePlate"] = base
+        result[image_name] = image
+    return result
+
+
+def _resolve_flame_local_exposure_stage(
+    request: Mapping[str, Any],
+    resolved_effect_dependencies: Any,
+    *,
+    artifact_root: Path,
+    base: Mapping[str, Any],
+    flame_mask: Mapping[str, Any],
+) -> dict[str, Any]:
+    if (
+        not isinstance(resolved_effect_dependencies, Mapping)
+        or set(resolved_effect_dependencies)
+        != {request["localExposureResultRef"]}
+    ):
+        raise MaskedSurfaceAssetResolutionError(
+            "Flame requires its exact LocalExposure Result dependency"
+        )
+    raw = resolved_effect_dependencies[request["localExposureResultRef"]]
+    resolved = _closed(
+        raw,
+        _EFFECT_EXECUTION_RESOLUTION_FIELDS,
+        "Flame LocalExposure dependency",
+    )
+    local_request = validate_masked_surface_execution_request(
+        resolved["executionRequest"]
+    )
+    requirement = _validate_requirement_binding(
+        resolved["requirement"], execution_request=local_request
+    )
+    runtime = validate_masked_surface_runtime_evidence(
+        resolved["runtimeEvidence"]
+    )
+    artifact = validate_masked_surface_artifact_evidence(
+        resolved["artifactEvidence"], runtime_evidence=runtime
+    )
+    local_lineage = {
+        "workspaceRef": local_request["workspaceRef"],
+        "productionRunRef": local_request["productionRunRef"],
+        "requirementRef": local_request["requirementRef"],
+        "requirementDigest": local_request["requirementDigest"],
+        "executionRequestRef": local_request["executionRequestRef"],
+        "executionRequestDigest": local_request["payloadDigest"],
+        "effectMode": local_request["effectMode"],
+    }
+    if any(
+        runtime[field] != expected or artifact[field] != expected
+        for field, expected in local_lineage.items()
+    ):
+        raise MaskedSurfaceExecutionError(
+            "LocalExposure evidence does not bind its execution request"
+        )
+    _validate_result_binding(
+        resolved["result"],
+        binding={
+            "resultRef": request["localExposureResultRef"],
+            "resultDigest": request["localExposureResultDigest"],
+        },
+        request=local_request,
+        artifact=artifact,
+        runtime=runtime,
+    )
+    local_base, local_mask = _resolve_asset_versions(
+        local_request,
+        resolved["assetVersions"],
+        artifact_root=artifact_root,
+    )
+    _validate_effect_artifact_storage(
+        resolved["artifactStorage"],
+        artifact=artifact,
+        artifact_root=artifact_root,
+    )
+    exact = (
+        local_request["effectMode"] == "LOCAL_EXPOSURE"
+        and local_request["workspaceRef"] == request["workspaceRef"]
+        and local_request["productionRunRef"] == request["productionRunRef"]
+        and local_request["requirementRef"]
+        == request["localExposureRequirementRef"]
+        and local_request["requirementDigest"]
+        == request["localExposureRequirementDigest"]
+        and local_request["targetShot"] == request["targetShot"]
+        and local_request["frameRangeStartInclusive"]
+        == request["frameRangeStartInclusive"]
+        and local_request["frameRangeEndExclusive"]
+        == request["frameRangeEndExclusive"]
+        and local_request["exposureCurve"][-1]["valueMilliStops"] < 0
+        and all(local_base[field] == base[field] for field in _RESOLVED_BASE_FIELDS)
+        and all(
+            local_mask[field] == flame_mask[field]
+            for field in _RESOLVED_MASK_FIELDS
+        )
+    )
+    if not exact or requirement["payloadDigest"] != request[
+        "localExposureRequirementDigest"
+    ]:
+        raise MaskedSurfaceExecutionError(
+            "Flame LocalExposure dependency is stale"
+        )
+    local_stage = _build_v3_request(
+        local_request, base=local_base, mask=local_mask
+    )
+    if (
+        runtime["v3ExecutionRequestDigest"] != local_stage["payloadDigest"]
+        or artifact["v3ExecutionRequestDigest"]
+        != local_stage["payloadDigest"]
+    ):
+        raise MaskedSurfaceExecutionError(
+            "LocalExposure evidence does not bind the rebuilt V3 request"
+        )
+    return local_stage
+
+
+def _build_flame_smoke_v3_request(
+    request: Mapping[str, Any],
+    *,
+    assets: Mapping[str, Mapping[str, Any]],
+    local_exposure_stage: Mapping[str, Any] | None,
+) -> dict[str, Any]:
+    common: dict[str, Any] = {
+        "schemaVersion": FLAME_SMOKE_V3_REQUEST_SCHEMA_VERSION,
+        "v5ExecutionRequestRef": request["executionRequestRef"],
+        "v5ExecutionRequestDigest": request["payloadDigest"],
+        "workspaceRef": request["workspaceRef"],
+        "productionRunRef": request["productionRunRef"],
+        "requirementSchemaVersion": request["requirementSchemaVersion"],
+        "requirementRef": request["requirementRef"],
+        "requirementDigest": request["requirementDigest"],
+        "effectMode": request["effectMode"],
+        "targetShot": deepcopy(request["targetShot"]),
+        "basePlate": deepcopy(dict(assets["basePlate"])),
+        "frameRangeStartInclusive": request["frameRangeStartInclusive"],
+        "frameRangeEndExclusive": request["frameRangeEndExclusive"],
+        "blendMode": request["blendMode"],
+        "layer": request["layer"],
+        "output": {
+            "width": assets["basePlate"]["width"],
+            "height": assets["basePlate"]["height"],
+            "frameCount": assets["basePlate"]["frameCount"],
+            "frameRate": assets["basePlate"]["frameRate"],
+            "pixelFormat": "yuv420p",
+            "container": "mp4",
+            "videoCodec": "h264",
+        },
+        "publicationAllowed": False,
+    }
+    if request["effectMode"] == "FLAME_EXTINGUISH":
+        if local_exposure_stage is None:
+            raise MaskedSurfaceExecutionError(
+                "Flame LocalExposure stage was not resolved"
+            )
+        common.update(
+            {
+                "flameMask": deepcopy(dict(assets["flameMask"])),
+                "stateSchedule": deepcopy(request["stateSchedule"]),
+                "brightnessCurve": deepcopy(request["brightnessCurve"]),
+                "alphaCurve": deepcopy(request["alphaCurve"]),
+                "localExposureRequirementRef": request[
+                    "localExposureRequirementRef"
+                ],
+                "localExposureRequirementDigest": request[
+                    "localExposureRequirementDigest"
+                ],
+                "localExposureResultRef": request["localExposureResultRef"],
+                "localExposureResultDigest": request[
+                    "localExposureResultDigest"
+                ],
+                "localExposureStage": deepcopy(dict(local_exposure_stage)),
+            }
+        )
+        fields = _FLAME_V3_REQUEST_FIELDS
+    else:
+        common.update(
+            {
+                "smokeSourceKind": request["smokeSourceKind"],
+                "smokeLayer": (
+                    None
+                    if request["smokeLayer"] is None
+                    else deepcopy(dict(assets["smokeLayer"]))
+                ),
+                "emissionMask": deepcopy(dict(assets["emissionMask"])),
+                "opacitySchedule": deepcopy(request["opacitySchedule"]),
+                "positionKeyframes": deepcopy(request["positionKeyframes"]),
+                "scaleKeyframes": deepcopy(request["scaleKeyframes"]),
+                "driftKeyframes": deepcopy(request["driftKeyframes"]),
+                "dissipationCurve": deepcopy(request["dissipationCurve"]),
+                "algorithmIdentity": request["algorithmIdentity"],
+                "algorithmVersion": request["algorithmVersion"],
+                "deterministicSeed": request["deterministicSeed"],
+            }
+        )
+        fields = _SMOKE_V3_REQUEST_FIELDS
+    sealed = _seal(common)
+    if set(sealed) != fields:
+        raise MaskedSurfaceExecutionError(
+            "derived Flame/Smoke V3 request fields are invalid"
+        )
+    return sealed
+
+
 def _expected_output_storage_key(request: Mapping[str, Any]) -> str:
     workspace = sha256(str(request["workspaceRef"]).encode("utf-8")).hexdigest()[:20]
     run = sha256(str(request["productionRunRef"]).encode("utf-8")).hexdigest()[:20]
@@ -1555,12 +2364,19 @@ def _frame_rate(value: Any, field: str) -> dict[str, int]:
 def _effect_preview_bindings(
     effect_bindings: Any, glyph_binding: Any
 ) -> tuple[list[dict[str, Any]], dict[str, Any], str]:
-    if not isinstance(effect_bindings, list) or len(effect_bindings) != 2:
+    if not isinstance(effect_bindings, list) or len(effect_bindings) not in {2, 4}:
         raise MaskedSurfaceRequestValidationError(
-            "effectResultBindings must contain exactly two stages"
+            "effectResultBindings must match a closed two- or four-stage profile"
         )
+    stage_count = len(effect_bindings)
     result: list[dict[str, Any]] = []
-    ranks = {"SCRATCH_REVEAL": 0, "LIGHT_SWEEP": 0, "LOCAL_EXPOSURE": 1}
+    ranks = {
+        "SCRATCH_REVEAL": 0,
+        "LIGHT_SWEEP": 0,
+        "LOCAL_EXPOSURE": 1,
+        "FLAME_EXTINGUISH": 2,
+        "SMOKE": 3,
+    }
     seen_clips: set[str] = set()
     seen_results: set[str] = set()
     for index, raw in enumerate(effect_bindings):
@@ -1610,7 +2426,8 @@ def _effect_preview_bindings(
         seen_clips.add(item["clipRef"])
         seen_results.add(item["resultRef"])
         result.append(item)
-    if [ranks[item["effectMode"]] for item in result] != [0, 1]:
+    expected_ranks = [0, 1] if stage_count == 2 else [0, 1, 2, 3]
+    if [ranks[item["effectMode"]] for item in result] != expected_ranks:
         raise MaskedSurfaceRequestValidationError(
             "effect Result bindings are not in fixed phase order"
         )
@@ -1628,7 +2445,11 @@ def _effect_preview_bindings(
     digest = sha256(
         _canonical_json(
             {
-                "schemaVersion": EFFECT_PREVIEW_BINDINGS_SCHEMA_VERSION,
+                "schemaVersion": (
+                    EFFECT_PREVIEW_BINDINGS_SCHEMA_VERSION
+                    if stage_count == 2
+                    else EFFECT_PREVIEW_BINDINGS_SCHEMA_VERSION_V2
+                ),
                 "effectResultBindings": result,
                 "glyphRequirementBinding": glyph,
             }
@@ -1724,6 +2545,77 @@ def _validate_result_binding(
     if result["payloadDigest"] != binding["resultDigest"]:
         raise MaskedSurfaceExecutionError("Result digest binding is stale")
     return result
+
+
+def _validate_e2_result_binding(
+    value: Any,
+    *,
+    binding: Mapping[str, Any],
+    request: Mapping[str, Any],
+    artifact: Mapping[str, Any],
+    runtime: Mapping[str, Any],
+) -> dict[str, Any]:
+    result = _verify_sealed_evidence(
+        value, _E2_RESULT_FIELDS, "Flame/Smoke Result"
+    )
+    expected_schema = (
+        "v5.m13-flame-extinguish-result.v1"
+        if request["effectMode"] == "FLAME_EXTINGUISH"
+        else "v5.m13-smoke-result.v1"
+    )
+    expected = {
+        "schemaVersion": expected_schema,
+        "workspaceRef": request["workspaceRef"],
+        "productionRunRef": request["productionRunRef"],
+        "resultRef": binding["resultRef"],
+        "effectMode": request["effectMode"],
+        "requirementRef": request["requirementRef"],
+        "requirementDigest": request["requirementDigest"],
+        "executionRequestRef": request["executionRequestRef"],
+        "executionRequestDigest": request["payloadDigest"],
+        "artifactEvidenceRef": artifact["artifactEvidenceRef"],
+        "artifactEvidenceDigest": artifact["payloadDigest"],
+        "runtimeEvidenceRef": runtime["runtimeEvidenceRef"],
+        "runtimeEvidenceDigest": runtime["payloadDigest"],
+        "state": "COMPOSED_CANDIDATE",
+        "outputFileDigest": artifact["outputDigest"]["fileDigest"],
+        "outputDecodedFramePixelDigest": artifact["outputDigest"][
+            "decodedFramePixelDigest"
+        ],
+        "outputMediaProbe": artifact["outputMediaProbe"],
+        "assetAdmissionState": "NOT_ADMITTED",
+        "masterState": "NOT_CREATED",
+        "exportState": "NOT_CREATED",
+        "publicationAllowed": False,
+    }
+    if any(result[field] != expected_value for field, expected_value in expected.items()):
+        raise MaskedSurfaceExecutionError("Flame/Smoke Result evidence is stale")
+    if result["payloadDigest"] != binding["resultDigest"]:
+        raise MaskedSurfaceExecutionError("Flame/Smoke Result digest is stale")
+    return result
+
+
+def _validate_effect_request_evidence_lineage(
+    request: Mapping[str, Any],
+    runtime: Mapping[str, Any],
+    artifact: Mapping[str, Any],
+) -> None:
+    expected_lineage = {
+        "workspaceRef": request["workspaceRef"],
+        "productionRunRef": request["productionRunRef"],
+        "requirementRef": request["requirementRef"],
+        "requirementDigest": request["requirementDigest"],
+        "executionRequestRef": request["executionRequestRef"],
+        "executionRequestDigest": request["payloadDigest"],
+        "effectMode": request["effectMode"],
+    }
+    if any(
+        runtime[field] != expected or artifact[field] != expected
+        for field, expected in expected_lineage.items()
+    ):
+        raise MaskedSurfaceExecutionError(
+            "effect evidence does not bind the resolved execution request"
+        )
 
 
 def _resolve_preview_base(
@@ -1869,29 +2761,69 @@ def _resolve_effect_stage(
     *,
     artifact_root: Path,
     base: Mapping[str, Any],
+    local_exposure_stage: Mapping[str, Any] | None = None,
+    local_exposure_binding: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     resolved = _closed(
         resolution,
         _EFFECT_EXECUTION_RESOLUTION_FIELDS,
         f"effect execution {binding['resultRef']}",
     )
-    request = validate_masked_surface_execution_request(
-        resolved["executionRequest"]
+    request_schema = (
+        resolved["executionRequest"].get("schemaVersion")
+        if isinstance(resolved["executionRequest"], Mapping)
+        else None
     )
-    requirement = _validate_requirement_binding(
-        resolved["requirement"], execution_request=request
+    is_e2 = request_schema == FLAME_SMOKE_EXECUTION_REQUEST_SCHEMA_VERSION
+    request = (
+        validate_flame_smoke_execution_request(resolved["executionRequest"])
+        if is_e2
+        else validate_masked_surface_execution_request(
+            resolved["executionRequest"]
+        )
     )
+    if is_e2:
+        requirement = _verify_generic_sealed_mapping(
+            resolved["requirement"], "Flame/Smoke Requirement"
+        )
+        if (
+            requirement.get("payloadDigest") != request["requirementDigest"]
+            or requirement.get("schemaVersion")
+            != request["requirementSchemaVersion"]
+            or requirement.get("requirementRef") != request["requirementRef"]
+            or requirement.get("effectMode") != request["effectMode"]
+            or requirement.get("workspaceRef") != request["workspaceRef"]
+            or requirement.get("productionRunRef")
+            != request["productionRunRef"]
+        ):
+            raise MaskedSurfaceExecutionError(
+                "Flame/Smoke Requirement binding is stale"
+            )
+    else:
+        requirement = _validate_requirement_binding(
+            resolved["requirement"], execution_request=request
+        )
     runtime = validate_masked_surface_runtime_evidence(resolved["runtimeEvidence"])
     artifact = validate_masked_surface_artifact_evidence(
         resolved["artifactEvidence"], runtime_evidence=runtime
     )
-    _validate_result_binding(
-        resolved["result"],
-        binding=binding,
-        request=request,
-        artifact=artifact,
-        runtime=runtime,
-    )
+    _validate_effect_request_evidence_lineage(request, runtime, artifact)
+    if is_e2:
+        _validate_e2_result_binding(
+            resolved["result"],
+            binding=binding,
+            request=request,
+            artifact=artifact,
+            runtime=runtime,
+        )
+    else:
+        _validate_result_binding(
+            resolved["result"],
+            binding=binding,
+            request=request,
+            artifact=artifact,
+            runtime=runtime,
+        )
     expected_binding = {
         "effectMode": request["effectMode"],
         "requirementRef": request["requirementRef"],
@@ -1909,11 +2841,19 @@ def _resolve_effect_stage(
         raise MaskedSurfaceExecutionError(
             "effect Result binding does not match resolved execution chain"
         )
-    stage_base, stage_mask = _resolve_asset_versions(
-        request,
-        resolved["assetVersions"],
-        artifact_root=artifact_root,
-    )
+    if is_e2:
+        assets = _resolve_flame_smoke_assets(
+            request,
+            resolved["assetVersions"],
+            artifact_root=artifact_root,
+        )
+        stage_base = assets["basePlate"]
+    else:
+        stage_base, stage_mask = _resolve_asset_versions(
+            request,
+            resolved["assetVersions"],
+            artifact_root=artifact_root,
+        )
     if any(
         stage_base[field] != base[field]
         for field in _RESOLVED_BASE_FIELDS
@@ -1924,7 +2864,51 @@ def _resolve_effect_stage(
     _validate_effect_artifact_storage(
         resolved["artifactStorage"], artifact=artifact, artifact_root=artifact_root
     )
-    return _build_v3_request(request, base=stage_base, mask=stage_mask)
+    if not is_e2:
+        stage_request = _build_v3_request(
+            request, base=stage_base, mask=stage_mask
+        )
+    elif request["effectMode"] == "FLAME_EXTINGUISH":
+        if (
+            local_exposure_stage is None
+            or local_exposure_binding is None
+            or request["localExposureRequirementRef"]
+            != local_exposure_stage["requirementRef"]
+            or request["localExposureRequirementDigest"]
+            != local_exposure_stage["requirementDigest"]
+            or request["localExposureResultRef"]
+            != local_exposure_binding["resultRef"]
+            or request["localExposureResultDigest"]
+            != local_exposure_binding["resultDigest"]
+        ):
+            raise MaskedSurfaceExecutionError(
+                "Preview Flame LocalExposure dependency is stale"
+            )
+        local_stage = local_exposure_stage
+        stage_request = _build_flame_smoke_v3_request(
+            request,
+            assets=assets,
+            local_exposure_stage=local_stage,
+        )
+    else:
+        if local_exposure_stage is not None or local_exposure_binding is not None:
+            raise MaskedSurfaceExecutionError(
+                "Preview Smoke cannot bind LocalExposure authority"
+            )
+        stage_request = _build_flame_smoke_v3_request(
+            request,
+            assets=assets,
+            local_exposure_stage=None,
+        )
+    if (
+        runtime["v3ExecutionRequestDigest"] != stage_request["payloadDigest"]
+        or artifact["v3ExecutionRequestDigest"]
+        != stage_request["payloadDigest"]
+    ):
+        raise MaskedSurfaceExecutionError(
+            "effect evidence does not bind the rebuilt V3 request"
+        )
+    return stage_request
 
 
 def _verify_generic_sealed_mapping(value: Any, label: str) -> dict[str, Any]:
@@ -2108,6 +3092,18 @@ def _build_effect_preview_v3_request(
             effect_resolutions[binding["resultRef"]],
             artifact_root=artifact_root,
             base=base,
+            local_exposure_stage=(
+                stages[1]
+                if binding["effectMode"] == "FLAME_EXTINGUISH"
+                and len(stages) == 2
+                else None
+            ),
+            local_exposure_binding=(
+                bindings[1]
+                if binding["effectMode"] == "FLAME_EXTINGUISH"
+                and len(stages) == 2
+                else None
+            ),
         )
         if (
             stage["workspaceRef"] != command["workspaceRef"]
@@ -2132,7 +3128,7 @@ def _build_effect_preview_v3_request(
 
     # Reuse the existing closed M12 audio/output validator.  The temporary
     # video projection is validation-only; the combined V3 request below
-    # replays all three visual primitives against the original baseVideo.
+    # replays the exact closed visual profile against the original baseVideo.
     placeholder_artifact_ref = "m13-effect-preview-glyph-replay-" + sha256(
         glyph_stage["payloadDigest"].encode("ascii")
     ).hexdigest()[:32]
@@ -2189,7 +3185,11 @@ def _build_effect_preview_v3_request(
     ).hexdigest()[:32]
     request = _seal(
         {
-            "schemaVersion": EFFECT_PREVIEW_V3_REQUEST_SCHEMA_VERSION,
+            "schemaVersion": (
+                EFFECT_PREVIEW_V3_REQUEST_SCHEMA_VERSION
+                if len(stages) == 2
+                else EFFECT_PREVIEW_V3_REQUEST_SCHEMA_VERSION_V3
+            ),
             "executionRequestRef": execution_ref,
             "workspaceRef": command["workspaceRef"],
             "productionRunRef": command["productionRunRef"],
@@ -2334,6 +3334,11 @@ def _validate_v3_effect_preview_result(
             "V3 effect preview digest contract is stale"
         )
     ffmpeg_identity = result["ffmpegIdentity"]
+    expected_renderer_version = (
+        EFFECT_PREVIEW_RENDERER_VERSION
+        if request["schemaVersion"] == EFFECT_PREVIEW_V3_REQUEST_SCHEMA_VERSION
+        else EFFECT_PREVIEW_RENDERER_VERSION_V3
+    )
     runtime_identity = {
         "ffmpegIdentity": ffmpeg_identity,
         "rendererIdentity": result["rendererIdentity"],
@@ -2341,7 +3346,7 @@ def _validate_v3_effect_preview_result(
     }
     if (
         result["rendererIdentity"] != EFFECT_PREVIEW_RENDERER_IDENTITY
-        or result["rendererVersion"] != EFFECT_PREVIEW_RENDERER_VERSION
+        or result["rendererVersion"] != expected_renderer_version
         or not isinstance(ffmpeg_identity, str)
         or ffmpeg_identity != ffmpeg_identity.strip()
         or not 1 <= len(ffmpeg_identity) <= 500
@@ -2517,6 +3522,60 @@ class V4MaskedSurfaceEffectExecutor:
             result=result,
         )
 
+    def execute_flame_smoke(
+        self,
+        execution_request: Mapping[str, Any],
+        *,
+        resolved_asset_versions: Mapping[str, Mapping[str, Any]],
+        resolved_effect_dependencies: Mapping[str, Mapping[str, Any]],
+    ) -> dict[str, Any]:
+        """Execute one closed E2 request and return the existing evidence trio."""
+
+        request = validate_flame_smoke_execution_request(execution_request)
+        assets = _resolve_flame_smoke_assets(
+            request,
+            resolved_asset_versions,
+            artifact_root=self.artifact_root,
+        )
+        local_stage: dict[str, Any] | None = None
+        if request["effectMode"] == "FLAME_EXTINGUISH":
+            local_stage = _resolve_flame_local_exposure_stage(
+                request,
+                resolved_effect_dependencies,
+                artifact_root=self.artifact_root,
+                base=assets["basePlate"],
+                flame_mask=assets["flameMask"],
+            )
+        elif not isinstance(resolved_effect_dependencies, Mapping) or dict(
+            resolved_effect_dependencies
+        ):
+            raise MaskedSurfaceAssetResolutionError(
+                "Smoke cannot bind an Effect dependency"
+            )
+        v3_request = _build_flame_smoke_v3_request(
+            request,
+            assets=assets,
+            local_exposure_stage=local_stage,
+        )
+        try:
+            raw_result = self.v3_executor.execute(v3_request)
+        except MaskedSurfaceExecutionError:
+            raise
+        except Exception as exc:
+            raise MaskedSurfaceExecutionError(
+                "V3 Flame/Smoke execution failed"
+            ) from exc
+        result = _validate_v3_result(
+            raw_result,
+            request=v3_request,
+            artifact_root=self.artifact_root,
+        )
+        return _build_evidence(
+            v5_request=request,
+            v3_request=v3_request,
+            result=result,
+        )
+
     def compose_timeline_preview_v2(
         self,
         command: Mapping[str, Any],
@@ -2553,10 +3612,16 @@ __all__ = [
     "BLEND_MODES",
     "EFFECT_MODES",
     "EFFECT_PREVIEW_BINDINGS_SCHEMA_VERSION",
+    "EFFECT_PREVIEW_BINDINGS_SCHEMA_VERSION_V2",
     "EFFECT_PREVIEW_RENDERER_IDENTITY",
     "EFFECT_PREVIEW_RENDERER_VERSION",
+    "EFFECT_PREVIEW_RENDERER_VERSION_V3",
     "EFFECT_PREVIEW_V3_REQUEST_SCHEMA_VERSION",
+    "EFFECT_PREVIEW_V3_REQUEST_SCHEMA_VERSION_V3",
     "EFFECT_PREVIEW_V4_RESULT_SCHEMA_VERSION",
+    "FLAME_EXTINGUISH_REQUIREMENT_SCHEMA_VERSION",
+    "FLAME_SMOKE_EXECUTION_REQUEST_SCHEMA_VERSION",
+    "FLAME_SMOKE_V3_REQUEST_SCHEMA_VERSION",
     "INTERPOLATIONS",
     "LOCAL_EXPOSURE_REQUIREMENT_SCHEMA_VERSION",
     "MASKED_SURFACE_ARTIFACT_EVIDENCE_SCHEMA_VERSION",
@@ -2569,8 +3634,10 @@ __all__ = [
     "MaskedSurfaceExecutionError",
     "MaskedSurfaceRequestValidationError",
     "SCRATCH_LIGHT_REQUIREMENT_SCHEMA_VERSION",
+    "SMOKE_REQUIREMENT_SCHEMA_VERSION",
     "V4MaskedSurfaceEffectExecutor",
     "validate_masked_surface_artifact_evidence",
     "validate_masked_surface_execution_request",
+    "validate_flame_smoke_execution_request",
     "validate_masked_surface_runtime_evidence",
 ]

@@ -1,0 +1,67 @@
+{
+  "schemaVersion": "m13.e2.flame-smoke-semantic-fixture.v1",
+  "classificationLabels": [
+    "K2_SEMANTIC_TECHNICAL_FIXTURE",
+    "NOT_LIVE_K2",
+    "NOT_ADMITTED",
+    "NOT_SELECTED",
+    "NOT_MASTER"
+  ],
+  "publicationAllowed": false,
+  "canvas": {
+    "width": 16,
+    "height": 12,
+    "maxSampleValue": 255
+  },
+  "shots": [
+    {
+      "fixtureShotId": "SH17",
+      "semanticIntent": "Stable lit technical base plate before deterministic flame extinguish.",
+      "sourceRole": "STABLE_LIT_BASE",
+      "sourceFile": "sh17_stable_lit_base.ppm"
+    },
+    {
+      "fixtureShotId": "SH18",
+      "semanticIntent": "Deterministic flame extinction, local exposure darkening, and one thin smoke plume derived from SH17.",
+      "sourceRole": "DERIVED_EFFECT_TARGET",
+      "sourceFiles": [
+        "sh17_stable_lit_base.ppm",
+        "flame_mask.pgm",
+        "emission_mask.pgm",
+        "pinned_smoke_layer.pgm"
+      ]
+    }
+  ],
+  "files": [
+    {
+      "path": "sh17_stable_lit_base.ppm",
+      "format": "P3",
+      "role": "STABLE_LIT_BASE",
+      "byteSize": 2006,
+      "fileDigest": "sha256:db4106b0c8979dbab8cb785f87d85db5889362b4f8c7b279949ebf7dcf96d126"
+    },
+    {
+      "path": "flame_mask.pgm",
+      "format": "P2",
+      "role": "FLAME_MASK",
+      "byteSize": 460,
+      "fileDigest": "sha256:1dd57cb4e4e8e683be943aac20b8aa7cb346da3896fbb831d1582ac7f5c4c9c6"
+    },
+    {
+      "path": "emission_mask.pgm",
+      "format": "P2",
+      "role": "SMOKE_EMISSION_MASK",
+      "byteSize": 481,
+      "fileDigest": "sha256:09f3a7d0335e64adbad5a0c2277b7ee8d32289707f446068194db9a329852f4d"
+    },
+    {
+      "path": "pinned_smoke_layer.pgm",
+      "format": "P2",
+      "role": "PINNED_SMOKE_LAYER",
+      "byteSize": 470,
+      "fileDigest": "sha256:cf6c5cdeb7fcee3145d8dd525f13301ce3d36debff3f7666a5ae18163e73b5dc"
+    }
+  ],
+  "liveAuthority": false,
+  "livePathReferences": []
+}

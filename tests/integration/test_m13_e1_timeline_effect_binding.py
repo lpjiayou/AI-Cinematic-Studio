@@ -176,6 +176,31 @@ def _effect_authorities(
     return requirement, result
 
 
+def _e2_effect_authorities(effect_mode: str) -> tuple[dict, dict]:
+    requirement, result = _effect_authorities(effect_mode=effect_mode)
+    requirement["schemaVersion"] = (
+        "v5.m13-flame-extinguish-requirement.v1"
+        if effect_mode == "FLAME_EXTINGUISH"
+        else "v5.m13-smoke-requirement.v1"
+    )
+    requirement = _sealed(requirement)
+    result.update(
+        {
+            "schemaVersion": (
+                "v5.m13-flame-extinguish-result.v1"
+                if effect_mode == "FLAME_EXTINGUISH"
+                else "v5.m13-smoke-result.v1"
+            ),
+            "requirementDigest": requirement["payloadDigest"],
+            "state": "COMPOSED_CANDIDATE",
+            "assetAdmissionState": "NOT_ADMITTED",
+            "masterState": "NOT_CREATED",
+            "exportState": "NOT_CREATED",
+        }
+    )
+    return requirement, _sealed(result)
+
+
 def _source_resolver(requirement: dict, result: dict):
     def resolve(source_type: str, source_ref: str) -> dict:
         if (
@@ -333,6 +358,8 @@ class M13E1TimelineEffectBindingTests(unittest.TestCase):
             "SCRATCH_REVEAL",
             "LIGHT_SWEEP",
             "LOCAL_EXPOSURE",
+            "FLAME_EXTINGUISH",
+            "SMOKE",
         })
         self.assertEqual(
             bind_command.as_dict()["schemaVersion"],
@@ -407,6 +434,46 @@ class M13E1TimelineEffectBindingTests(unittest.TestCase):
                 (TimelineEditingStaleInputError, TimelineEditingAuthorityError)
             ):
                 _apply_insert_and_bind(requirement=requirement, result=result)
+
+    def test_e2_kinds_reuse_bind_with_composed_candidate_state(self):
+        for effect_mode in ("FLAME_EXTINGUISH", "SMOKE"):
+            requirement, result = _e2_effect_authorities(effect_mode)
+            with self.subTest(effectMode=effect_mode):
+                initial, inserted, bound, _, _, _ = _apply_insert_and_bind(
+                    requirement=requirement,
+                    result=result,
+                )
+                bound_source = next(
+                    item.as_dict()["sourceBinding"]
+                    for item in bound.clips
+                    if item.as_dict()["clipRef"]
+                    == "clip-masked-surface-e1"
+                )
+                self.assertEqual(
+                    bound_source["effectResultDigest"],
+                    result["payloadDigest"],
+                )
+                self.assertIsNone(
+                    next(
+                        item.as_dict()["sourceBinding"]
+                        for item in inserted.clips
+                        if item.as_dict()["clipRef"]
+                        == "clip-masked-surface-e1"
+                    )["effectResultRef"]
+                )
+                self.assertNotEqual(
+                    initial.as_dict()["payloadDigest"],
+                    bound.timeline_version.as_dict()["payloadDigest"],
+                )
+
+                invalid = deepcopy(result)
+                invalid["state"] = "SUCCEEDED"
+                invalid = _sealed(invalid)
+                with self.assertRaises(TimelineEditingStaleInputError):
+                    _apply_insert_and_bind(
+                        requirement=requirement,
+                        result=invalid,
+                    )
 
     def test_parent_is_immutable_and_mixed_v1_v2_chain_replays(self):
         initial, inserted, bound, insert, bind, _ = _apply_insert_and_bind()
