@@ -6,6 +6,7 @@ from copy import deepcopy
 from hashlib import sha256
 import os
 from pathlib import Path
+import struct
 import tempfile
 import unittest
 
@@ -31,6 +32,8 @@ from services.v5_core_os.episode_production.static_resources import (
     StaticDigestPinnedReferenceEvidence,
     StaticResourceAdmissionRequiredError,
     StaticResourceError,
+    _cmap_format_4_supports,
+    _cmap_format_12_supports,
     _parse_sfnt,
 )
 
@@ -72,6 +75,18 @@ class RefFactory:
     def __call__(self, prefix: str) -> str:
         self.value += 1
         return f"{prefix}-{self.value}"
+
+
+class MutableRootStub(RootStub):
+    def __init__(self):
+        self.calls = 0
+        self.project_ref = "project-font"
+
+    def verify_run_current(self, workspace_ref: str, run_ref: str):
+        self.calls += 1
+        value = super().verify_run_current(workspace_ref, run_ref)
+        value["projectRef"] = self.project_ref
+        return value
 
 
 def candidate_command(**changes):
@@ -161,6 +176,13 @@ class StaticFontAssetContractTests(unittest.TestCase):
             "assetVersionRef": "font-asset-version-1", "version": 1,
         })
 
+    def create_admitted_font(self):
+        candidate = self.create_candidate()
+        validation = self.validate(candidate)
+        license_value = self.bind_license(candidate)
+        asset = self.admit(candidate, validation, license_value)
+        return candidate, validation, license_value, asset
+
     def test_ttf_validation_and_repeatable_renderer_probe(self):
         candidate = self.create_candidate()
         first = self.validate(candidate)
@@ -189,6 +211,32 @@ class StaticFontAssetContractTests(unittest.TestCase):
         self.assertEqual("OTF", parsed["fontFormat"])
         with self.assertRaises(FontTechnicalValidationError):
             _parse_sfnt(bytes(data), "font/ttf")
+
+    def test_stdlib_cmap_format_4_and_12_report_real_non_notdef_glyphs(self):
+        format_4 = b"".join(
+            (
+                struct.pack(">HHHHHHH", 4, 32, 0, 4, 4, 1, 0),
+                struct.pack(">2H", 0x0041, 0xFFFF),
+                struct.pack(">H", 0),
+                struct.pack(">2H", 0x0041, 0xFFFF),
+                struct.pack(">2h", 3 - 0x0041, 1),
+                struct.pack(">2H", 0, 0),
+            )
+        )
+        supports_bmp = _cmap_format_4_supports(format_4, num_glyphs=5)
+        self.assertTrue(supports_bmp(ord("A")))
+        self.assertFalse(supports_bmp(ord("B")))
+        self.assertFalse(supports_bmp(0xFFFF))
+
+        format_12 = struct.pack(
+            ">HHIIIIII", 12, 0, 28, 0, 1, 0x1F600, 0x1F600, 3
+        )
+        supports_full = _cmap_format_12_supports(format_12, num_glyphs=5)
+        self.assertTrue(supports_full(0x1F600))
+        self.assertFalse(supports_full(ord("A")))
+
+        with self.assertRaises(FontTechnicalValidationError):
+            _cmap_format_12_supports(format_12[:-1], num_glyphs=5)
 
     def test_non_font_resource_kind_and_test_markers_are_rejected(self):
         with self.assertRaises(StaticResourceError):
@@ -382,6 +430,164 @@ class StaticFontAssetContractTests(unittest.TestCase):
         self.assertFalse(projection["publicationAllowed"])
         authority = CanonicalAssetVersionAuthority(self.evidence)
         self.assertEqual([asset], authority.list_asset_versions("workspace-font", "run-font"))
+
+    def test_current_projection_revalidates_chain_and_exact_glyph_coverage(self):
+        _candidate, _validation, _license_value, asset = self.create_admitted_font()
+        projection = self.service.require_current_font_asset_projection(
+            "workspace-font",
+            "run-font",
+            asset["assetVersionRef"],
+            asset["payloadDigest"],
+            required_text="FONT 123",
+        )
+        self.assertEqual(
+            asset["assetVersionRef"],
+            projection["fontAssetVersion"]["assetVersionRef"],
+        )
+        self.assertNotIn("storageBindingRef", projection["fontAssetVersion"])
+        self.assertEqual("font-fixture", projection["storageBindingRef"])
+        self.assertFalse(projection["publicationAllowed"])
+
+        with self.assertRaises(FontTechnicalValidationError):
+            self.service.require_current_font_asset_projection(
+                "workspace-font",
+                "run-font",
+                asset["assetVersionRef"],
+                asset["payloadDigest"],
+                required_text="长安",
+            )
+
+    def test_current_projection_rereads_root_and_external_authorities(self):
+        root = MutableRootStub()
+        self.service.root_service = root
+        _candidate, _validation, _license_value, asset = self.create_admitted_font()
+        calls_after_admission = root.calls
+        self.service.require_current_font_asset_projection(
+            "workspace-font", "run-font", asset["assetVersionRef"], asset["payloadDigest"]
+        )
+        self.assertEqual(calls_after_admission + 1, root.calls)
+
+        self.service.reference_evidence = StaticDigestPinnedReferenceEvidence({
+            "artifact-font-1": {"payloadDigest": DIGESTS[8]},
+            "provenance-font-1": {"payloadDigest": DIGESTS[2]},
+            "font-license-evidence": {"payloadDigest": DIGESTS[4]},
+            "license-text:OFL-1.1": {"payloadDigest": LICENSE_DIGEST},
+        })
+        with self.assertRaises(StaleInputError):
+            self.service.require_current_font_asset_projection(
+                "workspace-font", "run-font", asset["assetVersionRef"], asset["payloadDigest"]
+            )
+
+        self.service.reference_evidence = reference_evidence()
+        root.project_ref = "replaced-project"
+        with self.assertRaises(StaleInputError):
+            self.service.require_current_font_asset_projection(
+                "workspace-font", "run-font", asset["assetVersionRef"], asset["payloadDigest"]
+            )
+
+    def test_current_projection_redecides_license_and_admission(self):
+        candidate, validation, license_value, asset = self.create_admitted_font()
+        license_subject = {
+            "subjectDigest": _digest({
+                "candidateDigest": candidate["payloadDigest"],
+                "fontFileDigest": candidate["fileDigest"],
+                "licenseSpdxId": license_value["licenseSpdxId"],
+                "licenseTextDigest": license_value["licenseTextDigest"],
+                "licenseEvidenceRef": license_value["licenseEvidenceRef"],
+                "licenseEvidenceDigest": license_value["licenseEvidenceDigest"],
+            }),
+            "candidateRef": candidate["candidateRef"],
+            "fontFileDigest": candidate["fileDigest"],
+            "licenseSpdxId": license_value["licenseSpdxId"],
+            "licenseTextDigest": license_value["licenseTextDigest"],
+            "licenseEvidenceRef": license_value["licenseEvidenceRef"],
+            "licenseEvidenceDigest": license_value["licenseEvidenceDigest"],
+        }
+        stale_license = dict(self.service.license_authority.decide(license_subject))
+        stale_license["renderCandidateUseAllowed"] = False
+        self.service.license_authority = StaticDigestPinnedAuthority(
+            {license_subject["subjectDigest"]: stale_license}
+        )
+        with self.assertRaises(StaleInputError):
+            self.service.require_current_font_asset_projection(
+                "workspace-font", "run-font", asset["assetVersionRef"], asset["payloadDigest"]
+            )
+
+        self.service.license_authority = StaticDigestPinnedAuthority({
+            license_subject["subjectDigest"]: {
+                field: deepcopy(license_value[field])
+                for field in {
+                    "decisionAuthorityRef", "decisionAuthorityDigest",
+                    "commercialUseAllowed", "technicalPreviewAllowed",
+                    "renderCandidateUseAllowed", "embeddingAllowed",
+                    "redistributionAllowed", "modificationAllowed",
+                    "attributionRequired", "reservedFontNames", "territories",
+                    "revocationState",
+                }
+            }
+            | {"subjectDigest": license_subject["subjectDigest"]}
+        })
+        admission_subject = _digest({
+            "candidateDigest": candidate["payloadDigest"],
+            "technicalValidationDigest": validation["payloadDigest"],
+            "licenseBindingVersionDigest": license_value["payloadDigest"],
+        })
+        self.service.admission_authority = StaticDigestPinnedAuthority({
+            admission_subject: {
+                "subjectDigest": admission_subject,
+                "decisionAuthorityRef": "asset-admission-owner",
+                "decisionAuthorityDigest": DIGESTS[5],
+                "decisionState": "REJECT",
+            }
+        })
+        with self.assertRaises(StaleInputError):
+            self.service.require_current_font_asset_projection(
+                "workspace-font", "run-font", asset["assetVersionRef"], asset["payloadDigest"]
+            )
+
+    def test_current_projection_and_held_fd_remeasure_storage_bytes(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            mutable = root / "font.ttf"
+            mutable.write_bytes(FONT_PATH.read_bytes())
+            self.evidence = InMemoryEpisodeProductionEvidenceAdapter()
+            self.service = CanonicalStaticResourceService(
+                RootStub(), self.evidence,
+                storage=DirectoryStaticResourceStorage(root, {"font-fixture": mutable.name}),
+                reference_evidence=reference_evidence(),
+                clock=lambda: "2026-08-31T00:00:00Z", ref_factory=RefFactory(),
+            )
+            _candidate, _validation, _license_value, asset = self.create_admitted_font()
+            projection = self.service.require_current_font_asset_projection(
+                "workspace-font", "run-font", asset["assetVersionRef"], asset["payloadDigest"],
+                required_text="FONT",
+            )
+            fd = self.service.open_current_font_file(
+                projection["storageBindingRef"],
+                expected_file_digest=asset["fileDigest"],
+                expected_byte_size=asset["byteSize"],
+                declared_media_type=asset["mediaType"],
+                required_text="FONT",
+            )
+            try:
+                self.assertEqual(b"\x00\x01\x00\x00", os.read(fd, 4))
+            finally:
+                os.close(fd)
+
+            mutable.write_bytes(FONT_PATH.read_bytes() + b"tamper")
+            with self.assertRaises(StaleInputError):
+                self.service.require_current_font_asset_projection(
+                    "workspace-font", "run-font", asset["assetVersionRef"],
+                    asset["payloadDigest"], required_text="FONT",
+                )
+            with self.assertRaises(StaleInputError):
+                self.service.open_current_font_file(
+                    projection["storageBindingRef"],
+                    expected_file_digest=asset["fileDigest"],
+                    expected_byte_size=asset["byteSize"],
+                    declared_media_type=asset["mediaType"],
+                    required_text="FONT",
+                )
 
     def test_exact_replay_changed_replay_and_foreign_workspace(self):
         first = self.create_candidate()

@@ -132,6 +132,7 @@ _INTERNAL_MEDIA_LOCATOR_FIELDS = frozenset(
         "inputpath",
         "internalpath",
         "outputpath",
+        "storagebindingref",
     }
 )
 
@@ -160,12 +161,35 @@ _PRIVATE_PREVIEW_DETAIL_FIELDS = frozenset(
 
 _PRIVATE_DETERMINISTIC_EFFECT_FIELDS = frozenset(
     {
+        "baseplatefiledigest",
+        "baseplatepixeldigest",
         "canonicalmutations",
         "environmentoverride",
+        "externaldecisiondigest",
         "executionresult",
+        "identitylockdigest",
+        "identitylockref",
+        "identitylockversionref",
+        "identityreferencecontentdigest",
+        "identityreferenceprojectiondigest",
+        "identityreferenceref",
+        "identityreferenceversionref",
+        "identityversiondigest",
+        "identityversionref",
+        "fontfiledigest",
+        "fontlicensebindingversiondigest",
+        "fontlicensebindingversionref",
+        "fonttechnicalvalidationdigest",
+        "fonttechnicalvalidationref",
+        "language",
+        "licenselocalpath",
+        "markfiledigest",
+        "markpixeldigest",
         "modelpath",
         "networkurl",
         "pythonexpression",
+        "resolvedtext",
+        "resolvedtextdigest",
         "shellcommand",
     }
 )
@@ -930,6 +954,7 @@ def _services(
     approval_authority=None,
     media_selection_approval_authority=None,
     glyph_inspection_adapter=None,
+    font_asset_authority=None,
     ref_factory=None,
     clock=None,
 ) -> tuple[
@@ -1057,6 +1082,13 @@ def _services(
         ref_factory=selected_ref_factory,
         clock=selected_clock,
     )
+    if font_asset_authority is not None and composition_execution is not None:
+        bind_font_authority = getattr(
+            composition_execution, "bind_font_asset_authority", None
+        )
+        if not callable(bind_font_authority):
+            raise EpisodeProductionPublicError("authority_unavailable", 503)
+        bind_font_authority(font_asset_authority)
     delivery = K2DeliveryService(
         media,
         evidence_repository,
@@ -1066,6 +1098,9 @@ def _services(
         clock=selected_clock,
         real_video_authority=real_media_revision,
         glyph_inspection_adapter=glyph_inspection_adapter,
+        identity_reference_projection_reader=authority_identity,
+        script_text_reader=script_studio_boundary,
+        font_asset_authority=font_asset_authority,
     )
     real_media_revision.state_projection = K2ProductionStateProjectionService(
         service,
@@ -1109,6 +1144,7 @@ def create_in_memory_boundary(
     approval_authority=None,
     media_selection_approval_authority=None,
     glyph_inspection_adapter=None,
+    font_asset_authority=None,
     ref_factory=None,
     clock=None,
 ) -> EpisodeProductionPublicBoundary:
@@ -1148,6 +1184,7 @@ def create_in_memory_boundary(
         approval_authority=approval_authority,
         media_selection_approval_authority=media_selection_approval_authority,
         glyph_inspection_adapter=glyph_inspection_adapter,
+        font_asset_authority=font_asset_authority,
         ref_factory=ref_factory,
         clock=clock,
     )
@@ -1191,6 +1228,7 @@ def create_local_development_boundary(
     approval_authority=None,
     media_selection_approval_authority=None,
     glyph_inspection_adapter=None,
+    font_asset_authority=None,
     ref_factory=None,
     clock=None,
     initialize_if_missing: bool = True,
@@ -1263,6 +1301,7 @@ def create_local_development_boundary(
         approval_authority=approval_authority,
         media_selection_approval_authority=media_selection_approval_authority,
         glyph_inspection_adapter=glyph_inspection_adapter,
+        font_asset_authority=font_asset_authority,
         ref_factory=ref_factory,
         clock=clock,
     )

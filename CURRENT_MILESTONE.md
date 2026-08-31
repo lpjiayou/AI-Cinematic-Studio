@@ -10,7 +10,7 @@
 >
 > Current Task: `ACS-V5-IDENTITY-REFERENCE-PROJECTION-AND-M13-E3-UNBLOCK`
 >
-> Current Work Package: `IDENTITY REFERENCE PROJECTION AVAILABLE / M13-E3 AUTHORIZED TO RESUME / M12-C3/C4 ENVIRONMENT_HOLD`
+> Current Work Package: `M13-E3 IMPLEMENTED CPU-ONLY / M13-E4 NEXT / M12-C3/C4 ENVIRONMENT_HOLD`
 >
 > Authorized Source Base: `CORE b92bb90a57a5534ca17361c42fc7eb2d7582a448 / TREE 6adb078a7e08629f02dd0a56fa45c94e38f14553 / VERIFIED PR-A/PR-B MERGES`
 >
@@ -57,12 +57,13 @@ closed isolated Kokoro/CosyVoice runtime protocol and V4 adapter boundary; it in
 no runtime or ML dependency and added no Creator HTTP route. M12-C3/C4 remain on
 `ENVIRONMENT_HOLD` because the persistent CPU build root is absent.
 
-The completed prerequisite is a read-only `IdentityReferenceVersionProjection` owned by
+The merged prerequisite is a read-only `IdentityReferenceVersionProjection` owned by
 the existing K2 authority identity service and derived from the existing Episode
 Production IdentityLock plus a freshly revalidated external identity-reference decision.
-It creates no Identity root, repository, database, registry or successor lock. After this
-capability is merged, M13-E3 is authorized to resume from the latest main. A100 remains
-unauthorized.
+It creates no Identity root, repository, database, registry or successor lock. M13-E3 now
+adds deterministic Nameplate Text and Face Mark Compensation through the existing V5
+Requirement/Result journal, V4 sealed execution, V3 CPU renderer, Timeline successor and
+PreviewCandidate authorities. A100 remains unauthorized.
 
 The accepted M12 architecture freezes two distinct isolated runtimes:
 
@@ -118,7 +119,9 @@ BLOCK_REASON=PERSISTENT_CPU_BUILD_ARTIFACT_ROOT_UNAVAILABLE
 
 M13_FULL_BACKEND_IMPLEMENTATION=AUTHORIZED_CPU_ONLY
 M13_E2=IMPLEMENTED_CPU_ONLY
-M13_DETERMINISTIC_POST_PRODUCTION_WIRED=5/8
+M13_E3=IMPLEMENTED_CPU_ONLY
+M13_DETERMINISTIC_POST_PRODUCTION_WIRED=7/8
+M13_E4=NEXT
 V5_FONT_AUTHORITY_CAPABILITY=IMPLEMENTED
 IDENTITY_REFERENCE_PROJECTION=AVAILABLE
 IDENTITY_REFERENCE_CURRENTNESS_REVALIDATION=AVAILABLE
@@ -128,7 +131,6 @@ IDENTITY_LOCK_PERSISTS_BUNDLE_SHA256=false
 CROSS_RESTART_BUNDLE_SHA256_EQUALITY_REQUIRED=false
 NEW_BUNDLE_IDENTITY_BINDING_AUTHORIZED=false
 IDENTITY_SEMANTIC_CURRENTNESS=EXACT_SEVEN_FIELD_DECISION_MATCH
-M13_E3=AUTHORIZED_TO_RESUME
 M13_E3_RESUME_AFTER_IDENTITY_PROJECTION=AUTHORIZED
 M13_BACKEND_CAPABILITY_COMPLETE=false
 M13_RENDER_CANDIDATE_STATE=NOT_IMPLEMENTED

@@ -360,6 +360,8 @@ class M13E1TimelineEffectBindingTests(unittest.TestCase):
             "LOCAL_EXPOSURE",
             "FLAME_EXTINGUISH",
             "SMOKE",
+            "NAMEPLATE_TEXT",
+            "FACE_MARK_COMPENSATION",
         })
         self.assertEqual(
             bind_command.as_dict()["schemaVersion"],

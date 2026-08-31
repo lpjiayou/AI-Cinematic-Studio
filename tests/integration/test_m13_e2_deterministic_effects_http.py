@@ -20,7 +20,10 @@ from apps.creator_workspace_mvp.public_contract import (
     CAPABILITIES_ENDPOINT,
     PUBLIC_EPISODE_PRODUCTION_RUNS_ENDPOINT,
 )
-from apps.creator_workspace_mvp.server import create_server
+from apps.creator_workspace_mvp.server import (
+    EPISODE_PRODUCTION_SUBRESOURCES,
+    create_server,
+)
 from services.v3_render_core import decoded_frame_pixel_digest_metadata
 from services.v5_core_os.episode_production.evidence import (
     SqliteEpisodeProductionEvidenceAdapter,
@@ -56,18 +59,37 @@ def _assert_public_effect_sanitized(
     forbidden = {
         "absolutepath",
         "artifactpath",
+        "baseplatefiledigest",
+        "baseplatepixeldigest",
         "canonicalmutations",
         "environmentoverride",
         "executionresult",
         "ffmpegargv",
         "ffmpegfilter",
         "filtergraph",
+        "fontfiledigest",
+        "fontlicensebindingversiondigest",
+        "fontlicensebindingversionref",
+        "fonttechnicalvalidationdigest",
+        "fonttechnicalvalidationref",
+        "identitylockdigest",
+        "identitylockref",
+        "identitylockversionref",
+        "identityreferencecontentdigest",
+        "identityreferenceprojectiondigest",
+        "identityreferenceref",
+        "identityreferenceversionref",
         "internalpath",
+        "language",
+        "markfiledigest",
+        "markpixeldigest",
         "modelpath",
         "networkurl",
         "outputpath",
         "privateruntimediagnostics",
         "pythonexpression",
+        "resolvedtext",
+        "resolvedtextdigest",
         "shellcommand",
         "storagekey",
     }
@@ -94,19 +116,56 @@ class _DeterministicEffectDeliveryStub:
     def __init__(self) -> None:
         self.commands: list[dict] = []
         self.get_scopes: list[tuple[str, str]] = []
+        self.listed_effect_kinds = ["FLAME_EXTINGUISH", "SMOKE"]
 
     @staticmethod
     def _private_chain(effect_kind: str) -> dict:
+        requirement = {
+            "schemaVersion": "v5.m13-effect-requirement.v1",
+            "effectMode": effect_kind,
+            "workspaceRef": WORKSPACE,
+            "productionRunRef": RUN,
+            "requirementRef": f"requirement-{effect_kind.lower()}",
+            "payloadDigest": "1" * 64,
+            "publicationAllowed": False,
+            "absolutePath": "/private/base.mp4",
+        }
+        if effect_kind == "NAMEPLATE_TEXT":
+            requirement.update(
+                {
+                    "textSourceRef": "script-private",
+                    "resolvedText": "server-private-text",
+                    "resolvedTextDigest": "7" * 64,
+                    "language": "und",
+                    "basePlateFileDigest": "sha256:" + "8" * 64,
+                    "basePlatePixelDigest": "sha256:" + "9" * 64,
+                    "fontFileDigest": "a" * 64,
+                    "fontTechnicalValidationRef": "font-validation-private",
+                    "fontTechnicalValidationDigest": "b" * 64,
+                    "fontLicenseBindingVersionRef": "font-license-private",
+                    "fontLicenseBindingVersionDigest": "c" * 64,
+                }
+            )
+        elif effect_kind == "FACE_MARK_COMPENSATION":
+            requirement.update(
+                {
+                    "characterRef": "character-public",
+                    "identityReferenceRef": "identity-reference-private",
+                    "identityReferenceVersionRef": "identity-version-private",
+                    "identityReferenceContentDigest": "d" * 64,
+                    "identityReferenceProjectionDigest": "e" * 64,
+                    "identityLockRef": "identity-lock-private",
+                    "identityLockVersionRef": "identity-lock-version-private",
+                    "identityLockDigest": "f" * 64,
+                    "basePlateFileDigest": "sha256:" + "8" * 64,
+                    "basePlatePixelDigest": "sha256:" + "9" * 64,
+                    "markFileDigest": "sha256:" + "a" * 64,
+                    "markPixelDigest": "sha256:" + "b" * 64,
+                }
+            )
         return {
             "requirement": {
-                "schemaVersion": "v5.m13-effect-requirement.v1",
-                "effectMode": effect_kind,
-                "workspaceRef": WORKSPACE,
-                "productionRunRef": RUN,
-                "requirementRef": f"requirement-{effect_kind.lower()}",
-                "payloadDigest": "1" * 64,
-                "publicationAllowed": False,
-                "absolutePath": "/private/base.mp4",
+                **requirement,
             },
             "executionRequest": {
                 "executionRequestRef": f"execution-{effect_kind.lower()}",
@@ -164,8 +223,8 @@ class _DeterministicEffectDeliveryStub:
         self.get_scopes.append((workspace_ref, run_ref))
         return {
             "deterministicEffects": [
-                self._private_chain("FLAME_EXTINGUISH"),
-                self._private_chain("SMOKE"),
+                self._private_chain(effect_kind)
+                for effect_kind in self.listed_effect_kinds
             ],
             "publicationAllowed": False,
         }
@@ -244,6 +303,53 @@ class M13E2DeterministicEffectsHttpTests(unittest.TestCase):
                 "targetShotVersionRef": "shot-version-m13-e2-http",
                 "targetShotVersionDigest": "a" * 64,
             },
+        }
+
+    @staticmethod
+    def _e3_effect_payload(effect_kind: str) -> dict:
+        requirement = {
+            "effectMode": effect_kind,
+            "requirementRef": f"requirement-{effect_kind.lower()}-http",
+            "targetShotRef": "shot-m13-e3-http",
+            "targetShotVersionRef": "shot-version-m13-e3-http",
+            "targetShotVersionDigest": "a" * 64,
+            "basePlateAssetVersionRef": "base-version-m13-e3-http",
+            "basePlateAssetVersionDigest": "b" * 64,
+            "frameRangeStartInclusive": 0,
+            "frameRangeEndExclusive": 8,
+            "blendMode": "NORMAL",
+            "layer": (
+                6 if effect_kind == "NAMEPLATE_TEXT" else 7
+            ),
+        }
+        if effect_kind == "NAMEPLATE_TEXT":
+            requirement.update(
+                {
+                    "textSourceKind": "SCRIPT_TEXT",
+                    "textSourceRef": "script-m13-e3-http",
+                    "textSourceVersionRef": "script-version-m13-e3-http",
+                    "textSourceDigest": "c" * 64,
+                    "fontAssetVersionRef": "font-version-m13-e3-http",
+                    "fontAssetVersionDigest": "d" * 64,
+                }
+            )
+        else:
+            requirement.update(
+                {
+                    "characterRef": "character-m13-e3-http",
+                    "markType": "MOLE",
+                    "markAssetVersionRef": "mark-version-m13-e3-http",
+                    "markAssetVersionDigest": "e" * 64,
+                    "faceRegion": "LEFT_CHEEK",
+                    "trackingSourceKind": "EXPLICIT_KEYFRAMES",
+                    "occlusionPolicy": "ALWAYS_VISIBLE_WITHIN_TRACK",
+                }
+            )
+        return {
+            "expectedRunVersion": 1,
+            "idempotencyKey": f"m13-e3-http-{effect_kind.lower()}",
+            "effectKind": effect_kind,
+            "requirement": requirement,
         }
 
     def _post(
@@ -419,6 +525,108 @@ class M13E2DeterministicEffectsHttpTests(unittest.TestCase):
                     status=404,
                     code="not_found",
                 )
+
+    def test_e3_socket_rejects_server_claims_and_redacts_post_get(self) -> None:
+        self.assertEqual(len(EPISODE_PRODUCTION_SUBRESOURCES), 25)
+        self.assertIn(
+            "deterministic-effects", EPISODE_PRODUCTION_SUBRESOURCES
+        )
+        base_prefix = self.effects_path.rsplit("/", 1)[0]
+        for resource in (
+            "nameplate-text",
+            "face-mark-compensation",
+            "fonts",
+            "identity-references",
+        ):
+            with self.subTest(route=resource):
+                self._assert_error(
+                    lambda resource=resource: self._post(
+                        f"{base_prefix}/{resource}",
+                        self._e3_effect_payload("NAMEPLATE_TEXT"),
+                    ),
+                    status=404,
+                    code="not_found",
+                )
+
+        forbidden_by_kind = {
+            "NAMEPLATE_TEXT": {
+                "basePlateFileDigest": "sha256:" + "0" * 64,
+                "basePlatePixelDigest": "sha256:" + "1" * 64,
+                "resolvedText": "client-forged",
+                "resolvedTextDigest": "2" * 64,
+                "language": "zh-CN",
+                "fontFileDigest": "3" * 64,
+                "fontTechnicalValidationRef": "client-validation",
+                "fontTechnicalValidationDigest": "4" * 64,
+                "fontLicenseBindingVersionRef": "client-license",
+                "fontLicenseBindingVersionDigest": "5" * 64,
+                "storageBindingRef": "client-font-storage",
+                "fontPath": "/tmp/client-font.ttf",
+                "ffmpegFilter": "drawtext=fontfile=/tmp/client-font.ttf",
+            },
+            "FACE_MARK_COMPENSATION": {
+                "basePlateFileDigest": "sha256:" + "0" * 64,
+                "basePlatePixelDigest": "sha256:" + "1" * 64,
+                "identityVersionRef": "client-identity-version",
+                "identityVersionDigest": "5" * 64,
+                "identityReferenceRef": "client-identity",
+                "identityReferenceVersionRef": "client-identity-version",
+                "identityReferenceContentDigest": "6" * 64,
+                "identityReferenceProjectionDigest": "7" * 64,
+                "identityLockRef": "client-lock",
+                "identityLockVersionRef": "client-lock-version",
+                "identityLockDigest": "8" * 64,
+                "markFileDigest": "sha256:" + "9" * 64,
+                "markPixelDigest": "sha256:" + "a" * 64,
+                "storageKey": "client/mark.png",
+                "markPath": "/tmp/client-mark.png",
+                "filterExpression": "movie=/tmp/client-mark.png",
+            },
+        }
+        for effect_kind, forbidden in forbidden_by_kind.items():
+            base = self._e3_effect_payload(effect_kind)
+            for field, value in forbidden.items():
+                with self.subTest(effect_kind=effect_kind, field=field):
+                    payload = deepcopy(base)
+                    payload["requirement"][field] = value
+                    self._assert_error(
+                        lambda payload=payload: self._post(
+                            self.effects_path, payload
+                        ),
+                        status=400,
+                        code="invalid_request",
+                    )
+        self.assertEqual(self.delivery.commands, [])
+
+        created_by_kind = {}
+        for effect_kind in ("NAMEPLATE_TEXT", "FACE_MARK_COMPENSATION"):
+            status, created = self._post(
+                self.effects_path,
+                self._e3_effect_payload(effect_kind),
+            )
+            self.assertEqual(status, 201)
+            self.assertEqual(
+                created["deterministicEffect"]["result"]["effectMode"],
+                effect_kind,
+            )
+            self._assert_sanitized(created)
+            created_by_kind[effect_kind] = created
+
+        self.delivery.listed_effect_kinds = [
+            "NAMEPLATE_TEXT",
+            "FACE_MARK_COMPENSATION",
+        ]
+        status, current = self._get(self.effects_path)
+        self.assertEqual(status, 200)
+        self.assertEqual(
+            [
+                item["result"]["effectMode"]
+                for item in current["deterministicEffects"]
+            ],
+            ["NAMEPLATE_TEXT", "FACE_MARK_COMPENSATION"],
+        )
+        self._assert_sanitized(current)
+        self.assertEqual(len(created_by_kind), 2)
 
 
 @unittest.skipUnless(

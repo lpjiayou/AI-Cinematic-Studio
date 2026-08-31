@@ -89,6 +89,9 @@ EFFECT_PREVIEW_BINDINGS_SCHEMA_VERSION = (
 EFFECT_PREVIEW_BINDINGS_SCHEMA_VERSION_V2 = (
     "v5.m13-effect-preview-bindings.v2"
 )
+EFFECT_PREVIEW_BINDINGS_SCHEMA_VERSION_V3 = (
+    "v5.m13-effect-preview-bindings.v3"
+)
 EFFECT_PREVIEW_COMPOSITION_RESULT_SCHEMA_VERSION = (
     "v5.m13-composition-result.v2"
 )
@@ -3999,7 +4002,7 @@ def _effect_preview_bindings(
 ) -> tuple[list[dict[str, Any]], dict[str, Any], str]:
     if not isinstance(effect_result_bindings, list) or len(
         effect_result_bindings
-    ) not in {2, 4}:
+    ) not in {2, 4, 6}:
         raise TimelinePreviewContractError(
             "effectResultBindings do not match a closed M13 effect profile"
         )
@@ -4012,6 +4015,8 @@ def _effect_preview_bindings(
         "LOCAL_EXPOSURE": 1,
         "FLAME_EXTINGUISH": 2,
         "SMOKE": 3,
+        "NAMEPLATE_TEXT": 4,
+        "FACE_MARK_COMPENSATION": 5,
     }
     for index, raw in enumerate(effect_result_bindings):
         item = _closed(
@@ -4057,7 +4062,11 @@ def _effect_preview_bindings(
         seen_results.add(item["resultRef"])
         bindings.append(item)
     profile = [rank[item["effectMode"]] for item in bindings]
-    expected_profile = [0, 1] if len(bindings) == 2 else [0, 1, 2, 3]
+    expected_profile = {
+        2: [0, 1],
+        4: [0, 1, 2, 3],
+        6: [0, 1, 2, 3, 4, 5],
+    }[len(bindings)]
     if profile != expected_profile:
         raise TimelineSourceBindingError(
             "effect Result bindings do not match a closed stage order"
@@ -4074,11 +4083,11 @@ def _effect_preview_bindings(
         _sha256(glyph[field], f"glyphRequirementBinding.{field}")
     if glyph["clipRef"] in seen_clips:
         raise TimelineSourceBindingError("Glyph binding reuses an effect Clip")
-    bindings_schema_version = (
-        EFFECT_PREVIEW_BINDINGS_SCHEMA_VERSION
-        if len(bindings) == 2
-        else EFFECT_PREVIEW_BINDINGS_SCHEMA_VERSION_V2
-    )
+    bindings_schema_version = {
+        2: EFFECT_PREVIEW_BINDINGS_SCHEMA_VERSION,
+        4: EFFECT_PREVIEW_BINDINGS_SCHEMA_VERSION_V2,
+        6: EFFECT_PREVIEW_BINDINGS_SCHEMA_VERSION_V3,
+    }[len(bindings)]
     binding_digest = _digest(
         {
             "schemaVersion": bindings_schema_version,
@@ -4152,9 +4161,8 @@ def _v4_effect_preview_result(value: Any) -> dict[str, Any]:
         or output_digest["pcmDigestSpec"] != PCM_CONTENT_DIGEST_SPEC
         or result["rendererIdentity"]
         != "v3.deterministic-timeline-preview-ffmpeg"
-        or result["rendererVersion"] != (
-            "2" if len(bindings) == 2 else "3"
-        )
+        or result["rendererVersion"]
+        != {2: "2", 4: "3", 6: "4"}[len(bindings)]
         or result["adapterIdentity"] != "v4.local-composition-executor.v1"
         or result["provenance"] != TIMELINE_PROVENANCE
         or result["providerUsed"] is not False
@@ -4570,6 +4578,7 @@ __all__ = [
     "COMPOSITION_RESULT_SCHEMA_VERSION",
     "EFFECT_PREVIEW_BINDINGS_SCHEMA_VERSION",
     "EFFECT_PREVIEW_BINDINGS_SCHEMA_VERSION_V2",
+    "EFFECT_PREVIEW_BINDINGS_SCHEMA_VERSION_V3",
     "EFFECT_PREVIEW_COMPOSITION_RESULT_SCHEMA_VERSION",
     "MASK_ASSET_VERSION_BINDING_SCHEMA_VERSION",
     "PREVIEW_CANDIDATE_SCHEMA_VERSION_V2",
