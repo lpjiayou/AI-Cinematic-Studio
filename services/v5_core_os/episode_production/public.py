@@ -157,6 +157,18 @@ _PRIVATE_PREVIEW_DETAIL_FIELDS = frozenset(
     }
 )
 
+_PRIVATE_DETERMINISTIC_EFFECT_FIELDS = frozenset(
+    {
+        "canonicalmutations",
+        "environmentoverride",
+        "executionresult",
+        "modelpath",
+        "networkurl",
+        "pythonexpression",
+        "shellcommand",
+    }
+)
+
 
 def _is_internal_media_locator(field: Any) -> bool:
     if not isinstance(field, str):
@@ -235,6 +247,36 @@ def _strip_effect_preview_details(value: Any) -> Any:
     if isinstance(value, tuple):
         return tuple(_strip_effect_preview_details(item) for item in value)
     return value
+
+
+def _strip_deterministic_effect_details(value: Any) -> Any:
+    """Return a detached effect DTO without execution-private details."""
+
+    if isinstance(value, Mapping):
+        return {
+            key: _strip_deterministic_effect_details(item)
+            for key, item in value.items()
+            if not _is_private_deterministic_effect_detail(key)
+        }
+    if isinstance(value, list):
+        return [_strip_deterministic_effect_details(item) for item in value]
+    if isinstance(value, tuple):
+        return tuple(_strip_deterministic_effect_details(item) for item in value)
+    return value
+
+
+def _is_private_deterministic_effect_detail(field: Any) -> bool:
+    if _is_private_preview_detail(field):
+        return True
+    if not isinstance(field, str):
+        return False
+    normalized = field.replace("_", "").replace("-", "").lower()
+    return (
+        normalized in _PRIVATE_DETERMINISTIC_EFFECT_FIELDS
+        or normalized.endswith("path")
+        or normalized.endswith("argv")
+        or "filter" in normalized
+    )
 
 
 def _require_timeline_run_cas(command: Any) -> Mapping[str, Any]:
@@ -616,6 +658,27 @@ class EpisodeProductionPublicBoundary:
         return self._invoke_public_preview(
             self.__delivery.edit_timeline,
             _require_timeline_run_cas(command),
+        )
+
+    def execute_deterministic_effect(
+        self, command: Mapping[str, Any]
+    ) -> dict[str, Any]:
+        return _strip_deterministic_effect_details(
+            self._invoke(
+                self.__delivery.execute_deterministic_effect,
+                _require_timeline_run_cas(command),
+            )
+        )
+
+    def get_deterministic_effects(
+        self, workspace_ref: str, run_ref: str
+    ) -> dict[str, Any]:
+        return _strip_deterministic_effect_details(
+            self._invoke(
+                self.__delivery.get_deterministic_effects,
+                workspace_ref,
+                run_ref,
+            )
         )
 
     def get_timeline(

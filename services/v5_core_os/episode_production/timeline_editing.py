@@ -103,10 +103,18 @@ EDIT_OPERATIONS = (
     "SET_OUTPUT_PROFILES",
 )
 TIMELINE_EDIT_OPERATIONS_V2 = ("BIND_EFFECT_RESULT",)
+M13_E1_DETERMINISTIC_EFFECT_KINDS = frozenset(
+    {"SCRATCH_REVEAL", "LIGHT_SWEEP", "LOCAL_EXPOSURE"}
+)
+M13_E2_DETERMINISTIC_EFFECT_KINDS = frozenset(
+    {"FLAME_EXTINGUISH", "SMOKE"}
+)
 DETERMINISTIC_EFFECT_KINDS = (
     "SCRATCH_REVEAL",
     "LIGHT_SWEEP",
     "LOCAL_EXPOSURE",
+    "FLAME_EXTINGUISH",
+    "SMOKE",
 )
 
 TIMELINE_PROVENANCE = "V5_K2_DELIVERY_SERVICE"
@@ -831,6 +839,31 @@ _CLIP_COMMAND_FIELDS = _CLIP_FIELDS - frozenset({"schemaVersion", "payloadDigest
 SourceAuthorityResolver = Callable[[str, str], Mapping[str, Any] | None]
 
 
+def _deterministic_effect_kind(value: Mapping[str, Any]) -> Any:
+    """Read one closed E1/E2 kind without weakening either source schema."""
+
+    mode = value.get("effectMode")
+    kind = value.get("effectKind")
+    if mode is not None and kind is not None and mode != kind:
+        return None
+    return mode if mode is not None else kind
+
+
+def _effect_result_is_bindable(
+    value: Mapping[str, Any], *, effect_kind: str
+) -> bool:
+    if effect_kind in M13_E1_DETERMINISTIC_EFFECT_KINDS:
+        return value.get("state") == "SUCCEEDED"
+    if effect_kind in M13_E2_DETERMINISTIC_EFFECT_KINDS:
+        return (
+            value.get("state") == "COMPOSED_CANDIDATE"
+            and value.get("assetAdmissionState") == "NOT_ADMITTED"
+            and value.get("masterState") == "NOT_CREATED"
+            and value.get("exportState") == "NOT_CREATED"
+        )
+    return False
+
+
 def _validate_word_timing(value: Any, index: int) -> dict[str, Any]:
     result = _closed(value, _WORD_TIMING_FIELDS, f"wordTiming[{index}]")
     _ref(result["wordRef"], "wordRef")
@@ -1152,7 +1185,8 @@ def _validate_source_binding(
                 if (
                     authority.get("requirementRef")
                     != result["effectRequirementRef"]
-                    or authority.get("effectMode") != result["effectKind"]
+                    or _deterministic_effect_kind(authority)
+                    != result["effectKind"]
                     or authority.get("blendMode") != result["blendMode"]
                     or authority.get("layer") != result["layer"]
                     or isinstance(range_start, bool)
@@ -1207,7 +1241,7 @@ def _validate_source_binding(
                         != result["effectRequirementRef"]
                         or effect_result.get("requirementDigest")
                         != result["effectRequirementDigest"]
-                        or effect_result.get("effectMode")
+                        or _deterministic_effect_kind(effect_result)
                         != result["effectKind"]
                         or effect_result.get("workspaceRef")
                         != authority.get("workspaceRef")
@@ -1219,7 +1253,10 @@ def _validate_source_binding(
                         != range_start
                         or effect_result.get("frameRangeEndExclusive")
                         != range_end
-                        or effect_result.get("state") != "SUCCEEDED"
+                        or not _effect_result_is_bindable(
+                            effect_result,
+                            effect_kind=result["effectKind"],
+                        )
                         or effect_result.get("publicationAllowed") is not False
                     ):
                         raise TimelineEditingStaleInputError(
@@ -2752,7 +2789,8 @@ def apply_timeline_edit(
             != source["effectRequirementRef"]
             or effect_result.get("requirementDigest")
             != source["effectRequirementDigest"]
-            or effect_result.get("effectMode") != source["effectKind"]
+            or _deterministic_effect_kind(effect_result)
+            != source["effectKind"]
             or effect_result.get("workspaceRef") != version["workspaceRef"]
             or effect_result.get("productionRunRef")
             != version["productionRunRef"]
@@ -2767,6 +2805,11 @@ def apply_timeline_edit(
             != requirement.get("frameRangeStartInclusive")
             or effect_result.get("frameRangeEndExclusive")
             != requirement.get("frameRangeEndExclusive")
+            or not _effect_result_is_bindable(
+                effect_result,
+                effect_kind=source["effectKind"],
+            )
+            or effect_result.get("publicationAllowed") is not False
         ):
             raise TimelineEditingStaleInputError(
                 "BIND_EFFECT_RESULT authority is stale"
@@ -3092,6 +3135,8 @@ __all__ = [
     "LANE_POLICIES",
     "LEGACY_TIMELINE_SCHEMA_VERSION",
     "LEGACY_TIMELINE_VERSION_SCHEMA_VERSION",
+    "M13_E1_DETERMINISTIC_EFFECT_KINDS",
+    "M13_E2_DETERMINISTIC_EFFECT_KINDS",
     "MASK_BINDING_SCHEMA_VERSION",
     "MASK_MODES",
     "MaskBinding",

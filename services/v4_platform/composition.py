@@ -2255,6 +2255,38 @@ class V4CompositionExecutor:
                 "V3 effect timeline preview composition failed"
             ) from exc
 
+    def execute_flame_smoke(
+        self,
+        request: Mapping[str, Any],
+        *,
+        resolved_asset_versions: Mapping[str, Mapping[str, Any]],
+        resolved_effect_dependencies: Mapping[str, Mapping[str, Any]],
+    ) -> dict[str, Any]:
+        """Bridge the closed E2 execution through the existing V4 owner."""
+
+        from services.v3_render_core.masked_surface import (
+            DeterministicMaskedSurfaceExecutor,
+        )
+        from .masked_surface_effects import (
+            MaskedSurfaceExecutionError,
+            V4MaskedSurfaceEffectExecutor,
+        )
+
+        try:
+            executor = V4MaskedSurfaceEffectExecutor(
+                self.artifact_root,
+                DeterministicMaskedSurfaceExecutor(self.artifact_root),
+            )
+            return executor.execute_flame_smoke(
+                request,
+                resolved_asset_versions=resolved_asset_versions,
+                resolved_effect_dependencies=resolved_effect_dependencies,
+            )
+        except MaskedSurfaceExecutionError as exc:
+            raise CompositionExecutionError(
+                "V3 Flame/Smoke composition failed"
+            ) from exc
+
     def finalize(self, command: Mapping[str, Any]) -> dict[str, Any]:
         try:
             result = self.composer.finalize(

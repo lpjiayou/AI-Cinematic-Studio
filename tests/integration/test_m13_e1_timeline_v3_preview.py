@@ -628,8 +628,12 @@ def _insert_and_bind_timeline(service, inputs, run: dict, chains: list) -> dict:
         effect.update(
             {
                 "trackRef": tracks["EFFECT"],
-                "timelineStartFrameInclusive": 12,
-                "timelineEndFrameExclusive": 30,
+                "timelineStartFrameInclusive": requirement[
+                    "frameRangeStartInclusive"
+                ],
+                "timelineEndFrameExclusive": requirement[
+                    "frameRangeEndExclusive"
+                ],
                 "layer": requirement["layer"],
                 "zOrder": requirement["layer"],
                 "blendMode": requirement["blendMode"],

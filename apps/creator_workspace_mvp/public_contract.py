@@ -178,6 +178,7 @@ CAPABILITY_PROJECTION: Final = (
     {
         "id": "M13", "name": "Timeline + Composition + Render", "state": "local_evidence_only",
         "publicResources": [
+            "episode-production-runs/deterministic-effects",
             "episode-production-runs/timeline",
             "episode-production-runs/timeline-versions",
             "episode-production-runs/timeline-edits",

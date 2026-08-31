@@ -86,6 +86,9 @@ PREVIEW_CANDIDATE_SCHEMA_VERSION_V2 = "v5.preview-candidate.v2"
 EFFECT_PREVIEW_BINDINGS_SCHEMA_VERSION = (
     "v5.m13-effect-preview-bindings.v1"
 )
+EFFECT_PREVIEW_BINDINGS_SCHEMA_VERSION_V2 = (
+    "v5.m13-effect-preview-bindings.v2"
+)
 EFFECT_PREVIEW_COMPOSITION_RESULT_SCHEMA_VERSION = (
     "v5.m13-composition-result.v2"
 )
@@ -3996,14 +3999,20 @@ def _effect_preview_bindings(
 ) -> tuple[list[dict[str, Any]], dict[str, Any], str]:
     if not isinstance(effect_result_bindings, list) or len(
         effect_result_bindings
-    ) != 2:
+    ) not in {2, 4}:
         raise TimelinePreviewContractError(
-            "effectResultBindings must contain Scratch/Light and Local Exposure"
+            "effectResultBindings do not match a closed M13 effect profile"
         )
     bindings: list[dict[str, Any]] = []
     seen_clips: set[str] = set()
     seen_results: set[str] = set()
-    rank = {"SCRATCH_REVEAL": 0, "LIGHT_SWEEP": 0, "LOCAL_EXPOSURE": 1}
+    rank = {
+        "SCRATCH_REVEAL": 0,
+        "LIGHT_SWEEP": 0,
+        "LOCAL_EXPOSURE": 1,
+        "FLAME_EXTINGUISH": 2,
+        "SMOKE": 3,
+    }
     for index, raw in enumerate(effect_result_bindings):
         item = _closed(
             raw,
@@ -4047,9 +4056,11 @@ def _effect_preview_bindings(
         seen_clips.add(item["clipRef"])
         seen_results.add(item["resultRef"])
         bindings.append(item)
-    if [rank[item["effectMode"]] for item in bindings] != [0, 1]:
+    profile = [rank[item["effectMode"]] for item in bindings]
+    expected_profile = [0, 1] if len(bindings) == 2 else [0, 1, 2, 3]
+    if profile != expected_profile:
         raise TimelineSourceBindingError(
-            "effect Result bindings are not in fixed stage order"
+            "effect Result bindings do not match a closed stage order"
         )
 
     glyph = _closed(
@@ -4063,9 +4074,14 @@ def _effect_preview_bindings(
         _sha256(glyph[field], f"glyphRequirementBinding.{field}")
     if glyph["clipRef"] in seen_clips:
         raise TimelineSourceBindingError("Glyph binding reuses an effect Clip")
+    bindings_schema_version = (
+        EFFECT_PREVIEW_BINDINGS_SCHEMA_VERSION
+        if len(bindings) == 2
+        else EFFECT_PREVIEW_BINDINGS_SCHEMA_VERSION_V2
+    )
     binding_digest = _digest(
         {
-            "schemaVersion": EFFECT_PREVIEW_BINDINGS_SCHEMA_VERSION,
+            "schemaVersion": bindings_schema_version,
             "effectResultBindings": bindings,
             "glyphRequirementBinding": glyph,
         }
@@ -4136,7 +4152,9 @@ def _v4_effect_preview_result(value: Any) -> dict[str, Any]:
         or output_digest["pcmDigestSpec"] != PCM_CONTENT_DIGEST_SPEC
         or result["rendererIdentity"]
         != "v3.deterministic-timeline-preview-ffmpeg"
-        or result["rendererVersion"] != "2"
+        or result["rendererVersion"] != (
+            "2" if len(bindings) == 2 else "3"
+        )
         or result["adapterIdentity"] != "v4.local-composition-executor.v1"
         or result["provenance"] != TIMELINE_PROVENANCE
         or result["providerUsed"] is not False
@@ -4551,6 +4569,7 @@ __all__ = [
     "AUDIO_INPUT_BINDING_SCHEMA_VERSION",
     "COMPOSITION_RESULT_SCHEMA_VERSION",
     "EFFECT_PREVIEW_BINDINGS_SCHEMA_VERSION",
+    "EFFECT_PREVIEW_BINDINGS_SCHEMA_VERSION_V2",
     "EFFECT_PREVIEW_COMPOSITION_RESULT_SCHEMA_VERSION",
     "MASK_ASSET_VERSION_BINDING_SCHEMA_VERSION",
     "PREVIEW_CANDIDATE_SCHEMA_VERSION_V2",
