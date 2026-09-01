@@ -4,15 +4,15 @@
 >
 > Execution Mode: `AUTO-SEQUENTIAL / CONTRACT-FIRST / FAIL-CLOSED`
 >
-> Project Lead Authorization: `ACS-M13-E4-DISTANCE-STATE-AND-FRONTEND-PIN`
+> Project Lead Authorization: `ACS-M13-R1-COMPOSITION-RENDER-CANDIDATE`
 >
-> Authorized Wave: `M13-E4 DISTANCE/STATE TRANSITION → FRONTEND PIN / SERIAL ONLY`
+> Authorized Wave: `M13-R1A → M13-R1B → FRONTEND PIN / SERIAL ONLY`
 >
-> Current Task: `ACS-M13-E4-DISTANCE-STATE-AND-FRONTEND-PIN`
+> Current Task: `ACS-M13-R1-COMPOSITION-RENDER-CANDIDATE`
 >
-> Current Work Package: `M13-E4 IMPLEMENTED CPU-ONLY / M13-R1 NEXT / M12-C3/C4 ENVIRONMENT_HOLD`
+> Current Work Package: `M13-R1A IMPLEMENTED / M13-R1B NEXT / M12-C3/C4 ENVIRONMENT_HOLD`
 >
-> Authorized Source Base: `CORE 023b4b5309969e0cdf21b682b718159cbc16c8c6 / TREE b6cf6028525c0a0f37b2e323852d58741095ea0e / VERIFIED M13-E3 MERGE`
+> Authorized Source Base: `CORE f6689516c3517f4954f505f41a11804d178afdc1 / TREE 76386aa55ba8949007d4406ccb85923a500e2518 / VERIFIED M13-E4 MERGE`
 >
 > M6 Authorization: `ACCEPTED SURFACES / K2-002 MUST CREATE DISTINCT SCOPE AND APPROVALS / NO K2-001 AUTHORITY INHERITANCE`
 >
@@ -34,15 +34,15 @@
 
 ---
 
-## 0. 2026-08-31 current authority and transition
+## 0. 2026-09-01 current authority and transition
 
 The Project Lead, Architecture Owner and M13 Domain Owner authorize
-`ACS-M13-E4-DISTANCE-STATE-AND-FRONTEND-PIN`. This current overlay retains the
-accepted `ACS-M12-M13-ARCHITECTURE-CORRECTION-20260830` and ADR-0016 boundaries and
-authorizes only the serial M13-E4 deterministic screen-space Distance/State Transition
-and Frontend pin update. It does not authorize real-world distance claims, M6/M8 state
-writes, a second Transform/Timeline/Preview authority, RenderCandidate, Provider/GPU
-use, Asset Admission, publication or later milestones.
+`ACS-M13-R1-COMPOSITION-RENDER-CANDIDATE`. This current overlay retains the accepted
+`ACS-M12-M13-ARCHITECTURE-CORRECTION-20260830` and ADR-0016/0017/0018 boundaries and
+authorizes only the serial M13-R1A immutable CompositionVersion/RenderManifest facts,
+M13-R1B non-publishing deterministic CPU RenderCandidate and Frontend pin update. It
+does not authorize a second Timeline/Composition/Render/Asset authority, Provider/GPU
+use, Asset Admission, publication, Master, Export or later milestones.
 
 The stopped `ACS-M13-E3-CLOSEOUT-AFTER-FONT-AUTHORITY` result remains immutable history:
 M13-E3 was correctly blocked because canonical Identity reference projection and
@@ -50,12 +50,12 @@ external currentness revalidation were absent. This authorization does not rewri
 disguise that result; M13-E3 may resume only after the authorized projection capability
 is independently implemented, verified and merged.
 
-The architecture checkpoint, M12-C1, M13-T1, M12-C2, M13-E1 and M13-E2 predecessors are
-merged and remotely verified. Core PR #37 merged the Accepted FONT authority checkpoint;
-Core PR #38 merged the canonical FONT AssetVersion v2 capability. M12-C2 added only the
-closed isolated Kokoro/CosyVoice runtime protocol and V4 adapter boundary; it installed
-no runtime or ML dependency and added no Creator HTTP route. M12-C3/C4 remain on
-`ENVIRONMENT_HOLD` because the persistent CPU build root is absent.
+The architecture checkpoint, M12-C1, M13-T1, M12-C2 and M13-E1/E2/E3/E4 predecessors
+are merged and remotely verified. M13-R1A adds one Composition root, immutable
+CompositionVersion successors and result-free RenderManifest records through the
+existing Episode Production evidence journal. It creates no RenderCandidate or public
+HTTP route and preserves historical Preview and TimelineVersion reads. M12-C3/C4 remain
+on `ENVIRONMENT_HOLD` because the persistent CPU build root is absent.
 
 The merged prerequisite is a read-only `IdentityReferenceVersionProjection` owned by
 the existing K2 authority identity service and derived from the existing Episode
@@ -124,7 +124,9 @@ M13_E2=IMPLEMENTED_CPU_ONLY
 M13_E3=IMPLEMENTED_CPU_ONLY
 M13_E4=IMPLEMENTED_CPU_ONLY
 M13_DETERMINISTIC_POST_PRODUCTION_WIRED=8/8
-M13_R1=NEXT
+M13_R1A_COMPOSITION_VERSION=IMPLEMENTED
+M13_R1A_RENDER_MANIFEST=IMPLEMENTED
+M13_R1B=NEXT
 V5_FONT_AUTHORITY_CAPABILITY=IMPLEMENTED
 IDENTITY_REFERENCE_PROJECTION=AVAILABLE
 IDENTITY_REFERENCE_CURRENTNESS_REVALIDATION=AVAILABLE

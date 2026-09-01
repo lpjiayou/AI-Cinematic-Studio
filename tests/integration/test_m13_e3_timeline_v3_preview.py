@@ -210,6 +210,7 @@ def _service(
     identity_reader,
     script_reader,
     font_authority,
+    render_toolchain_identity=None,
 ) -> tuple[K2DeliveryService, _CountingComposition]:
     composition = _CountingComposition(
         artifact_root, font_asset_authority=font_authority
@@ -229,6 +230,7 @@ def _service(
         identity_reference_projection_reader=identity_reader,
         script_text_reader=script_reader,
         font_asset_authority=font_authority,
+        render_toolchain_identity=render_toolchain_identity,
     )
     service._test_e3_media_authority = media_authority
     return service, composition

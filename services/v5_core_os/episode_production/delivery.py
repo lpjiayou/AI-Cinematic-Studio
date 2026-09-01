@@ -157,6 +157,20 @@ from .timeline_editing import (
     validate_timeline_snapshot as validate_editing_timeline_snapshot,
     validate_timeline_version as validate_editing_timeline_version,
 )
+from .rendering import (
+    COMPOSITION_PROVENANCE,
+    REQUIRED_EFFECT_KINDS,
+    build_composition,
+    build_composition_version,
+    build_render_manifest,
+    composition_plan_digests,
+    render_manifest_digest_specs,
+    seal_composition_track_binding,
+    validate_composition,
+    validate_composition_version,
+    validate_render_manifest,
+    validate_render_toolchain_identity,
+)
 
 
 COMPOSITION_GATE = "G6_COMPOSITION"
@@ -180,6 +194,9 @@ TIMELINE_EDIT_CREATE_REQUEST_SCHEMA_VERSION = (
 )
 TIMELINE_EDIT_SUCCESSOR_REQUEST_SCHEMA_VERSION = (
     "v5.k2.timeline-edit-successor-request.v1"
+)
+M13_RENDER_DOMAIN_REQUEST_SCHEMA_VERSION = (
+    "v5.k2.composition-render-manifest-request.v1"
 )
 M13_PREVIEW_STATE_TRANSITIONS = {
     "MEDIA_READY": "PREVIEW_READY",
@@ -761,6 +778,7 @@ class K2DeliveryService:
         ) = None,
         script_text_reader: ScriptTextReaderPort | None = None,
         font_asset_authority: FontAssetAuthorityPort | None = None,
+        render_toolchain_identity: Mapping[str, Any] | None = None,
     ) -> None:
         self.media = media
         self.evidence = evidence
@@ -773,6 +791,11 @@ class K2DeliveryService:
         )
         self.script_text_reader = script_text_reader
         self.font_asset_authority = font_asset_authority
+        self.render_toolchain_identity = (
+            None
+            if render_toolchain_identity is None
+            else validate_render_toolchain_identity(render_toolchain_identity)
+        )
         self._ref_factory = ref_factory
         self._clock = clock
 
@@ -4926,6 +4949,1250 @@ class K2DeliveryService:
             "publicationAllowed": False,
             "evidenceRevision": context["snapshot"].revisionToken,
         }
+
+    @staticmethod
+    def _render_domain_record_idempotency_key(
+        client_key: str, slot: str
+    ) -> str:
+        return _digest(
+            {
+                "clientIdempotencyKey": _idempotency_key(client_key),
+                "stage": "m13-r1a-composition-render-manifest",
+                "slot": _required_ref(slot, "record slot"),
+            }
+        )
+
+    @staticmethod
+    def _render_domain_evidence_record(
+        *,
+        workspace: str,
+        run_ref: str,
+        record_kind: str,
+        record_ref: str,
+        record_version: int,
+        client_key: str,
+        slot: str,
+        request_digest: str,
+        created_at: str,
+        payload: Mapping[str, Any],
+    ) -> EvidenceRecord:
+        canonical = _immutable_payload(payload, record_kind)
+        return EvidenceRecord(
+            workspaceRef=_required_ref(workspace, "workspaceRef"),
+            productionRunRef=_required_ref(run_ref, "productionRunRef"),
+            recordKind=record_kind,
+            recordRef=_required_ref(record_ref, "recordRef"),
+            recordVersion=_positive_version(record_version, "recordVersion"),
+            idempotencyKey=K2DeliveryService._render_domain_record_idempotency_key(
+                client_key, slot
+            ),
+            requestDigest=request_digest,
+            createdAt=created_at,
+            payload=canonical,
+            payloadDigest=canonical["payloadDigest"],
+        )
+
+    def _render_asset_version_index(
+        self, context: Mapping[str, Any]
+    ) -> dict[tuple[str, str], int]:
+        """Index exact current AssetVersion identities without copying storage facts."""
+
+        snapshot = context["snapshot"]
+        workspace = context["run"]["workspaceRef"]
+        run_ref = context["run"]["productionRunRef"]
+        result: dict[tuple[str, str], int] = {}
+
+        def observe(value: Any, *, envelope_version: int | None = None) -> None:
+            if isinstance(value, Mapping):
+                reference = value.get("assetVersionRef")
+                digest = value.get("payloadDigest")
+                version = value.get("version", envelope_version)
+                if version is None and value.get("schemaVersion") in {
+                    "v5.k2-real-image-asset-version.v1",
+                    "v5.k2-real-video-asset-version.v1",
+                }:
+                    # These accepted M10/M11 immutable producer projections
+                    # predate an explicit integer field.  Their v1 schema is
+                    # the closed initial version; no later value can share the
+                    # same immutable assetVersionRef/payloadDigest pair.
+                    version = 1
+                if (
+                    isinstance(reference, str)
+                    and _is_sha256(digest)
+                    and isinstance(version, int)
+                    and not isinstance(version, bool)
+                    and version > 0
+                ):
+                    key = (reference, str(digest))
+                    previous = result.setdefault(key, version)
+                    if previous != version:
+                        raise RepositoryUnavailableError(
+                            "AssetVersion version authority is ambiguous"
+                        )
+                for item in value.values():
+                    observe(item)
+            elif isinstance(value, (list, tuple)):
+                for item in value:
+                    observe(item)
+
+        for record in snapshot.records:
+            if not isinstance(record, Mapping):
+                continue
+            payload = record.get("payload")
+            if isinstance(payload, Mapping):
+                observe(
+                    payload,
+                    envelope_version=(
+                        record.get("recordVersion")
+                        if isinstance(record.get("recordVersion"), int)
+                        else None
+                    ),
+                )
+        for gate in snapshot.gates:
+            for fact in gate.get("facts", []):
+                if isinstance(fact, Mapping) and isinstance(
+                    fact.get("payload"), Mapping
+                ):
+                    observe(
+                        fact["payload"],
+                        envelope_version=(
+                            fact.get("factVersion")
+                            if isinstance(fact.get("factVersion"), int)
+                            else None
+                        ),
+                    )
+        observe(
+            self._current_glyph_video_assets(
+                workspace,
+                run_ref,
+                evidence_snapshot=snapshot,
+            )
+        )
+        if self.real_video_authority is not None:
+            bundle = self.real_video_authority.get_revision_bundle(
+                workspace,
+                run_ref,
+                evidence_snapshot=snapshot,
+            )
+            if not isinstance(bundle, Mapping):
+                raise RepositoryUnavailableError(
+                    "current real-media AssetVersion bundle is invalid"
+                )
+            observe(bundle)
+        return result
+
+    @staticmethod
+    def _collect_asset_version_pairs(value: Any) -> set[tuple[str, str]]:
+        result: set[tuple[str, str]] = set()
+        if isinstance(value, Mapping):
+            for field, selected in value.items():
+                if (
+                    field == "assetVersionRef"
+                    or field.endswith("AssetVersionRef")
+                ) and selected is not None:
+                    digest_field = f"{field[:-3]}Digest"
+                    if digest_field not in value:
+                        # Some closed schedules repeat a ref whose exact
+                        # digest is bound once in the enclosing Requirement.
+                        # The Requirement validator has already proven that
+                        # semantic equality; collect only identity pairs here.
+                        continue
+                    digest = value[digest_field]
+                    if not isinstance(selected, str) or not _is_sha256(digest):
+                        raise RepositoryUnavailableError(
+                            "AssetVersion ref/digest binding is incomplete for "
+                            f"{field}"
+                        )
+                    result.add((selected, str(digest)))
+                result.update(
+                    K2DeliveryService._collect_asset_version_pairs(selected)
+                )
+        elif isinstance(value, (list, tuple)):
+            for item in value:
+                result.update(
+                    K2DeliveryService._collect_asset_version_pairs(item)
+                )
+        return result
+
+    @staticmethod
+    def _render_input_payloads(
+        snapshot: Any, record_kind: str
+    ) -> list[dict[str, Any]]:
+        result: list[dict[str, Any]] = []
+        for record in snapshot.records:
+            if record.get("recordKind") != record_kind:
+                continue
+            payload = _immutable_payload(record.get("payload"), record_kind)
+            if record.get("payloadDigest") != payload["payloadDigest"]:
+                raise RepositoryUnavailableError(
+                    f"{record_kind} evidence digest is inconsistent"
+                )
+            result.append(payload)
+        return result
+
+    def _project_composition_version(
+        self,
+        *,
+        context: Mapping[str, Any],
+        restored: Mapping[str, Any],
+        composition: Mapping[str, Any],
+        composition_version_ref: str,
+        version_number: int,
+        predecessor: Mapping[str, Any] | None,
+        created_at: str,
+    ) -> dict[str, Any]:
+        """Project only server-restored Timeline and current source authorities."""
+
+        timeline = restored["timeline"].as_dict()
+        timeline_version = restored["timelineVersion"].as_dict()
+        tracks = [item.as_dict() for item in restored["tracks"]]
+        clips = [item.as_dict() for item in restored["clips"]]
+        tracks_by_ref = {item["trackRef"]: item for item in tracks}
+        if len(tracks_by_ref) != len(tracks):
+            raise RepositoryUnavailableError("Timeline Track identity is ambiguous")
+
+        source_resolver = self._timeline_source_resolver(
+            context["snapshot"],
+            authority_context=context,
+            expected_script_version_ref=context["scriptVersionRef"],
+            expected_script_version_digest=context["scriptVersionDigest"],
+            expected_timeline_frame_rate=timeline_version["frameRate"],
+            expected_root_digest=context["run"]["payloadDigest"],
+            expected_graph_version_ref=context["executableShotGraph"][
+                "executableShotGraphVersionRef"
+            ],
+            expected_graph_digest=context["executableShotGraph"][
+                "payloadDigest"
+            ],
+        )
+        snapshot = context["snapshot"]
+        audio_bindings = {
+            item["assetVersionRef"]: validate_audio_input_binding(item).as_dict()
+            for item in self._render_input_payloads(snapshot, "AudioInputBinding")
+        }
+        cues = {
+            item["cueVersionRef"]: item
+            for item in self._render_input_payloads(snapshot, "AudioCue")
+        }
+        stem_sets = self._render_input_payloads(snapshot, "AudioStemSet")
+        asset_versions = self._render_asset_version_index(context)
+
+        # FONT versions live behind their existing static-resource owner, not
+        # a second render-domain authority.  Re-read the projection only for
+        # a Nameplate Requirement that actually appears in this composition.
+        for clip in clips:
+            source = clip.get("sourceBinding")
+            if (
+                clip.get("clipKind") != "EFFECT"
+                or not isinstance(source, Mapping)
+                or source.get("effectKind") != "NAMEPLATE_TEXT"
+            ):
+                continue
+            requirement = source_resolver(
+                "EFFECT_REQUIREMENT", source["effectRequirementRef"]
+            )
+            if not isinstance(requirement, Mapping):
+                raise UpstreamNotReadyError(
+                    "Nameplate Requirement is not current"
+                )
+            projection = self._current_font_projection(
+                context=context,
+                asset_version_ref=requirement.get("fontAssetVersionRef"),
+                asset_version_digest=requirement.get(
+                    "fontAssetVersionDigest"
+                ),
+                required_text=requirement.get("resolvedText"),
+            )
+            font = projection["fontAssetVersion"]
+            asset_versions[
+                (font["assetVersionRef"], font["payloadDigest"])
+            ] = _positive_version(font.get("version"), "FONT AssetVersion version")
+
+        def stem_for_member(member_ref: str) -> tuple[dict[str, Any], dict[str, Any]]:
+            matches = [
+                (stem_set, member)
+                for stem_set in stem_sets
+                for member in stem_set.get("members", [])
+                if isinstance(member, Mapping)
+                and member.get("stemMemberRef") == member_ref
+            ]
+            if len(matches) != 1:
+                raise UpstreamNotReadyError(
+                    "exact Audio StemMember authority is unavailable"
+                )
+            return matches[0]
+
+        def stem_for_cue(cue_ref: str) -> tuple[dict[str, Any], dict[str, Any]]:
+            matches = [
+                (stem_set, member)
+                for stem_set in stem_sets
+                for member in stem_set.get("members", [])
+                if isinstance(member, Mapping)
+                and member.get("sourceCueVersionRef") == cue_ref
+            ]
+            if len(matches) != 1:
+                raise UpstreamNotReadyError(
+                    "exact subtitle StemMember authority is unavailable"
+                )
+            return matches[0]
+
+        def asset_bindings(
+            pairs: set[tuple[str, str]],
+        ) -> list[dict[str, Any]]:
+            values: list[dict[str, Any]] = []
+            for reference, digest in sorted(pairs):
+                version = asset_versions.get((reference, digest))
+                if version is None:
+                    raise UpstreamNotReadyError(
+                        "exact source AssetVersion version is unavailable"
+                    )
+                values.append(
+                    {
+                        "assetVersionRef": reference,
+                        "version": version,
+                        "assetVersionDigest": digest,
+                    }
+                )
+            return values
+
+        projected: dict[str, list[dict[str, Any]]] = {
+            "VIDEO": [],
+            "AUDIO": [],
+            "SUBTITLE": [],
+            "EFFECT": [],
+        }
+        for clip in sorted(
+            clips,
+            key=lambda item: (
+                tracks_by_ref[item["trackRef"]]["order"],
+                item["timelineStartFrameInclusive"],
+                item["layer"],
+                item["zOrder"],
+                item["clipRef"],
+            ),
+        ):
+            track = tracks_by_ref.get(clip["trackRef"])
+            if not isinstance(track, Mapping) or track.get("trackKind") != clip.get(
+                "clipKind"
+            ):
+                raise RepositoryUnavailableError(
+                    "Timeline Track/Clip binding is invalid"
+                )
+            kind = str(clip["clipKind"])
+            source = deepcopy(dict(clip["sourceBinding"]))
+            pairs = self._collect_asset_version_pairs(source)
+            pairs.update(self._collect_asset_version_pairs(clip["maskBindings"]))
+            cue_binding = None
+            stem_binding = None
+            technical_binding = None
+            effect_binding = None
+
+            if kind == "AUDIO":
+                binding = audio_bindings.get(source["audioAssetVersionRef"])
+                if (
+                    binding is None
+                    or binding["assetVersionDigest"]
+                    != source["audioAssetVersionDigest"]
+                ):
+                    raise UpstreamNotReadyError(
+                        "exact AudioInputBinding is unavailable"
+                    )
+                stem_set, member = stem_for_member(source["stemMemberRef"])
+                if (
+                    member.get("sourceAssetVersionRef")
+                    != source["audioAssetVersionRef"]
+                    or member.get("sourceAssetVersionDigest")
+                    != source["audioAssetVersionDigest"]
+                ):
+                    raise StaleInputError("Audio StemMember source is stale")
+                validation = binding["technicalValidation"]
+                stem_binding = {
+                    "stemSetVersionRef": stem_set["stemSetVersionRef"],
+                    "stemSetVersion": stem_set["version"],
+                    "stemSetDigest": stem_set["payloadDigest"],
+                    "stemMemberRef": member["stemMemberRef"],
+                    "stemMemberDigest": member["payloadDigest"],
+                }
+                technical_binding = {
+                    "validationRef": validation["validationRef"],
+                    "validationVersionRef": validation["validationVersionRef"],
+                    "version": validation["version"],
+                    "validationDigest": validation["payloadDigest"],
+                    "validationState": validation["validationState"],
+                }
+            elif kind == "SUBTITLE":
+                cue = cues.get(source["audioCueRef"])
+                if cue is None or cue["payloadDigest"] != source["audioCueDigest"]:
+                    raise UpstreamNotReadyError(
+                        "exact subtitle AudioCue is unavailable"
+                    )
+                stem_set, member = stem_for_cue(cue["cueVersionRef"])
+                asset_ref = member.get("sourceAssetVersionRef")
+                asset_digest = member.get("sourceAssetVersionDigest")
+                binding = audio_bindings.get(asset_ref)
+                if (
+                    not isinstance(asset_ref, str)
+                    or not _is_sha256(asset_digest)
+                    or binding is None
+                    or binding["assetVersionDigest"] != asset_digest
+                ):
+                    raise UpstreamNotReadyError(
+                        "subtitle audio technical authority is unavailable"
+                    )
+                pairs.add((asset_ref, str(asset_digest)))
+                validation = binding["technicalValidation"]
+                cue_binding = {
+                    "cueVersionRef": cue["cueVersionRef"],
+                    "version": cue["version"],
+                    "cueDigest": cue["payloadDigest"],
+                }
+                stem_binding = {
+                    "stemSetVersionRef": stem_set["stemSetVersionRef"],
+                    "stemSetVersion": stem_set["version"],
+                    "stemSetDigest": stem_set["payloadDigest"],
+                    "stemMemberRef": member["stemMemberRef"],
+                    "stemMemberDigest": member["payloadDigest"],
+                }
+                technical_binding = {
+                    "validationRef": validation["validationRef"],
+                    "validationVersionRef": validation["validationVersionRef"],
+                    "version": validation["version"],
+                    "validationDigest": validation["payloadDigest"],
+                    "validationState": validation["validationState"],
+                }
+            elif kind == "EFFECT":
+                requirement = source_resolver(
+                    "EFFECT_REQUIREMENT", source["effectRequirementRef"]
+                )
+                if (
+                    not isinstance(requirement, Mapping)
+                    or requirement.get("payloadDigest")
+                    != source["effectRequirementDigest"]
+                ):
+                    raise UpstreamNotReadyError(
+                        "exact Effect Requirement is unavailable"
+                    )
+                pairs.update(self._collect_asset_version_pairs(requirement))
+                result_ref = source.get("effectResultRef")
+                result_digest = source.get("effectResultDigest")
+                if result_ref is not None:
+                    result = source_resolver("EFFECT_RESULT", result_ref)
+                    if (
+                        not isinstance(result, Mapping)
+                        or result.get("payloadDigest") != result_digest
+                    ):
+                        raise UpstreamNotReadyError(
+                            "exact Effect Result is unavailable"
+                        )
+                effect_binding = {
+                    "effectKind": source["effectKind"],
+                    "requirementRef": source["effectRequirementRef"],
+                    "requirementDigest": source["effectRequirementDigest"],
+                    "resultRef": result_ref,
+                    "resultDigest": result_digest,
+                }
+
+            projected[kind].append(
+                seal_composition_track_binding(
+                    {
+                        "trackRef": track["trackRef"],
+                        "trackDigest": track["payloadDigest"],
+                        "trackKind": track["trackKind"],
+                        "trackOrder": track["order"],
+                        "trackEnabled": track["enabled"],
+                        "lanePolicy": track["lanePolicy"],
+                        "clipRef": clip["clipRef"],
+                        "clipDigest": clip["payloadDigest"],
+                        "clipKind": clip["clipKind"],
+                        "timelineStartFrameInclusive": clip[
+                            "timelineStartFrameInclusive"
+                        ],
+                        "timelineEndFrameExclusive": clip[
+                            "timelineEndFrameExclusive"
+                        ],
+                        "enabled": clip["enabled"],
+                        "layer": clip["layer"],
+                        "zOrder": clip["zOrder"],
+                        "opacity": clip["opacity"],
+                        "blendMode": clip["blendMode"],
+                        "sourceBinding": source,
+                        "sourceAssetVersions": asset_bindings(pairs),
+                        "audioCueBinding": cue_binding,
+                        "stemBinding": stem_binding,
+                        "technicalValidationBinding": technical_binding,
+                        "effectBinding": effect_binding,
+                        "transitionIn": deepcopy(clip["transitionIn"]),
+                        "transitionOut": deepcopy(clip["transitionOut"]),
+                        "speed": deepcopy(clip["speed"]),
+                        "transform": deepcopy(clip["transform"]),
+                        "maskBindings": deepcopy(clip["maskBindings"]),
+                    }
+                )
+            )
+
+        if set(projected) != {"VIDEO", "AUDIO", "SUBTITLE", "EFFECT"}:
+            raise RepositoryUnavailableError("Composition Track set is invalid")
+        plan_input = {
+            "timelineRef": timeline["timelineRef"],
+            "timelineVersionRef": timeline_version["timelineVersionRef"],
+            "timelineVersionNumber": timeline_version["versionNumber"],
+            "timelineVersionDigest": timeline_version["payloadDigest"],
+            "videoTrackBindings": projected["VIDEO"],
+            "audioTrackBindings": projected["AUDIO"],
+            "subtitleTrackBindings": projected["SUBTITLE"],
+            "effectTrackBindings": projected["EFFECT"],
+        }
+        plans = composition_plan_digests(plan_input)
+        return build_composition_version(
+            {
+                "workspaceRef": timeline["workspaceRef"],
+                "productionRunRef": timeline["productionRunRef"],
+                "projectRef": timeline["projectRef"],
+                "seriesRef": timeline["seriesRef"],
+                "episodeRef": timeline["episodeRef"],
+                "compositionRef": composition["compositionRef"],
+                "compositionVersionRef": composition_version_ref,
+                "versionNumber": version_number,
+                "parentCompositionVersionRef": (
+                    None
+                    if predecessor is None
+                    else predecessor["compositionVersionRef"]
+                ),
+                "parentCompositionVersionDigest": (
+                    None if predecessor is None else predecessor["payloadDigest"]
+                ),
+                **plan_input,
+                **plans,
+                "createdAt": created_at,
+                "provenance": COMPOSITION_PROVENANCE,
+                "publicationAllowed": False,
+            },
+            predecessor=predecessor,
+        )
+
+    @staticmethod
+    def _render_domain_payload_records(
+        snapshot: Any,
+        *,
+        record_kind: str,
+    ) -> list[tuple[dict[str, Any], dict[str, Any]]]:
+        result: list[tuple[dict[str, Any], dict[str, Any]]] = []
+        for gate in snapshot.gates:
+            if any(
+                isinstance(fact, Mapping)
+                and fact.get("factKind") == record_kind
+                for fact in gate.get("facts", [])
+            ):
+                raise RepositoryUnavailableError(
+                    f"{record_kind} must use the evidence record journal"
+                )
+        for record in snapshot.records:
+            if record.get("recordKind") != record_kind:
+                continue
+            payload = _immutable_payload(record.get("payload"), record_kind)
+            if record.get("payloadDigest") != payload["payloadDigest"]:
+                raise RepositoryUnavailableError(
+                    f"{record_kind} evidence digest is inconsistent"
+                )
+            result.append((deepcopy(dict(record)), payload))
+        return result
+
+    def _restore_render_domain(
+        self,
+        context: Mapping[str, Any],
+        *,
+        render_manifest_ref: str | None = None,
+        require_current_manifest: bool = True,
+    ) -> dict[str, Any]:
+        restored_timeline = self._restore_editing_timeline(context)
+        timeline = restored_timeline["timeline"].as_dict()
+        timeline_version = restored_timeline["timelineVersion"].as_dict()
+        snapshot = context["snapshot"]
+
+        root_records = self._render_domain_payload_records(
+            snapshot, record_kind="Composition"
+        )
+        if len(root_records) != 1:
+            if not root_records:
+                raise UpstreamNotReadyError("Composition is not ready")
+            raise RepositoryUnavailableError("Composition authority is ambiguous")
+        root_record, root_payload = root_records[0]
+        composition = validate_composition(root_payload).as_dict()
+        run = context["run"]
+        if (
+            root_record.get("recordRef") != composition["compositionRef"]
+            or root_record.get("recordVersion") != 1
+            or root_record.get("createdAt") != composition["createdAt"]
+            or composition["workspaceRef"] != run["workspaceRef"]
+            or composition["productionRunRef"] != run["productionRunRef"]
+            or composition["projectRef"] != run["projectRef"]
+            or composition["seriesRef"] != run["seriesRef"]
+            or composition["episodeRef"] != run["episodeRef"]
+            or composition["timelineRef"] != timeline["timelineRef"]
+        ):
+            raise RepositoryUnavailableError("Composition authority is invalid")
+
+        version_records = self._render_domain_payload_records(
+            snapshot, record_kind="CompositionVersion"
+        )
+        version_records.sort(key=lambda item: item[1].get("versionNumber", -1))
+        versions: list[dict[str, Any]] = []
+        predecessor = None
+        for expected_number, (record, payload) in enumerate(
+            version_records, start=1
+        ):
+            wrapper = validate_composition_version(
+                payload, predecessor=predecessor
+            )
+            value = wrapper.as_dict()
+            if (
+                value["versionNumber"] != expected_number
+                or value["compositionRef"] != composition["compositionRef"]
+                or record.get("recordRef") != value["compositionVersionRef"]
+                or record.get("recordVersion") != expected_number
+                or record.get("createdAt") != value["createdAt"]
+                or value["workspaceRef"] != run["workspaceRef"]
+                or value["productionRunRef"] != run["productionRunRef"]
+            ):
+                raise RepositoryUnavailableError(
+                    "CompositionVersion journal is invalid"
+                )
+            versions.append(value)
+            predecessor = value
+        if not versions:
+            raise UpstreamNotReadyError("CompositionVersion is not ready")
+        current = versions[-1]
+        if (
+            current["timelineRef"] != timeline["timelineRef"]
+            or current["timelineVersionRef"]
+            != timeline_version["timelineVersionRef"]
+            or current["timelineVersionNumber"] != timeline_version["versionNumber"]
+            or current["timelineVersionDigest"] != timeline_version["payloadDigest"]
+        ):
+            raise StaleInputError("CompositionVersion Timeline authority is stale")
+        expected = self._project_composition_version(
+            context=context,
+            restored=restored_timeline,
+            composition=composition,
+            composition_version_ref=current["compositionVersionRef"],
+            version_number=current["versionNumber"],
+            predecessor=(versions[-2] if len(versions) > 1 else None),
+            created_at=current["createdAt"],
+        )
+        if expected != current:
+            raise StaleInputError("CompositionVersion source authority is stale")
+
+        manifest_records = self._render_domain_payload_records(
+            snapshot, record_kind="RenderManifest"
+        )
+        manifests: list[dict[str, Any]] = []
+        versions_by_ref = {
+            item["compositionVersionRef"]: item for item in versions
+        }
+        for record, payload in manifest_records:
+            manifest = validate_render_manifest(payload).as_dict()
+            bound_version = versions_by_ref.get(
+                manifest["compositionVersionRef"]
+            )
+            if (
+                record.get("recordRef") != manifest["renderManifestRef"]
+                or record.get("recordVersion") != 1
+                or record.get("createdAt") != manifest["createdAt"]
+                or manifest["workspaceRef"] != run["workspaceRef"]
+                or manifest["productionRunRef"] != run["productionRunRef"]
+                or not isinstance(bound_version, Mapping)
+                or manifest["compositionVersionDigest"]
+                != bound_version["payloadDigest"]
+                or manifest["timelineVersionRef"]
+                != bound_version["timelineVersionRef"]
+                or manifest["timelineVersionDigest"]
+                != bound_version["timelineVersionDigest"]
+            ):
+                raise RepositoryUnavailableError(
+                    "RenderManifest evidence envelope is invalid"
+                )
+            manifests.append(manifest)
+        if not manifests:
+            raise UpstreamNotReadyError("RenderManifest is not ready")
+        if len({item["renderManifestRef"] for item in manifests}) != len(manifests):
+            raise RepositoryUnavailableError("RenderManifest identity is ambiguous")
+        if render_manifest_ref is None:
+            if len(manifests) != 1:
+                raise RepositoryUnavailableError(
+                    "multiple RenderManifests require an exact ref"
+                )
+            manifest = manifests[0]
+        else:
+            matches = [
+                item
+                for item in manifests
+                if item["renderManifestRef"] == render_manifest_ref
+            ]
+            if len(matches) != 1:
+                raise RecordNotFoundError("RenderManifest was not found")
+            manifest = matches[0]
+        if (
+            manifest["timelineVersionRef"] != timeline_version["timelineVersionRef"]
+            or manifest["timelineVersionDigest"] != timeline_version["payloadDigest"]
+            or manifest["compositionVersionRef"] != current["compositionVersionRef"]
+            or manifest["compositionVersionDigest"] != current["payloadDigest"]
+        ):
+            raise StaleInputError("RenderManifest input authority is stale")
+        if require_current_manifest:
+            if self.render_toolchain_identity is None:
+                raise UpstreamNotReadyError(
+                    "trusted deterministic render toolchain is not configured"
+                )
+            if any(
+                manifest[field] != self.render_toolchain_identity[field]
+                for field in self.render_toolchain_identity
+            ):
+                raise StaleInputError("RenderManifest toolchain identity is stale")
+            if manifest["subtitleMode"] == "BURN_IN":
+                script_text = self._current_script_text_projection(context=context)
+                self._current_font_projection(
+                    context=context,
+                    asset_version_ref=manifest[
+                        "subtitleFontAssetVersionRef"
+                    ],
+                    asset_version_digest=manifest[
+                        "subtitleFontAssetVersionDigest"
+                    ],
+                    required_text=script_text["resolvedText"],
+                )
+        return {
+            "timeline": restored_timeline,
+            "composition": composition,
+            "compositionVersion": current,
+            "compositionVersionHistory": versions,
+            "renderManifest": manifest,
+            "renderManifestHistory": manifests,
+        }
+
+    @staticmethod
+    def _render_domain_projection(
+        restored: Mapping[str, Any],
+        *,
+        evidence_revision: str,
+        replayed: bool,
+    ) -> dict[str, Any]:
+        timeline = restored["timeline"]
+        return {
+            "timeline": timeline["timeline"].as_dict(),
+            "timelineVersion": timeline["timelineVersion"].as_dict(),
+            "composition": deepcopy(restored["composition"]),
+            "compositionVersion": deepcopy(restored["compositionVersion"]),
+            "compositionVersionHistory": deepcopy(
+                restored["compositionVersionHistory"]
+            ),
+            "renderManifest": deepcopy(restored["renderManifest"]),
+            "renderManifestHistory": deepcopy(
+                restored["renderManifestHistory"]
+            ),
+            "publicationAllowed": False,
+            "masterState": "NOT_CREATED",
+            "exportState": "NOT_CREATED",
+            "evidenceRevision": evidence_revision,
+            "idempotentReplay": replayed,
+        }
+
+    def create_composition_render_manifest(
+        self, command: Mapping[str, Any]
+    ) -> dict[str, Any]:
+        """Create immutable R1A facts without executing or publishing a render."""
+
+        fields = {
+            "workspaceRef",
+            "productionRunRef",
+            "operationRef",
+            "idempotencyKey",
+            "expectedRunVersion",
+            "timelineVersionRef",
+            "timelineVersionDigest",
+            "renderProfile",
+        }
+        if not isinstance(command, Mapping) or set(command) != fields:
+            raise EpisodeProductionError(
+                "command fields do not match the M13-R1A contract"
+            )
+        workspace = _required_ref(command.get("workspaceRef"), "workspaceRef")
+        run_ref = _required_ref(
+            command.get("productionRunRef"), "productionRunRef"
+        )
+        operation_ref = _required_ref(command.get("operationRef"), "operationRef")
+        client_key = _idempotency_key(command.get("idempotencyKey"))
+        expected_run_version = _positive_version(
+            command.get("expectedRunVersion"), "expectedRunVersion"
+        )
+        timeline_version_ref = _required_ref(
+            command.get("timelineVersionRef"), "timelineVersionRef"
+        )
+        timeline_version_digest = command.get("timelineVersionDigest")
+        if not _is_sha256(timeline_version_digest):
+            raise EpisodeProductionError("timelineVersionDigest is invalid")
+        profile_fields = {
+            "outputProfile",
+            "videoEncoding",
+            "colorMetadata",
+            "audioEncoding",
+            "subtitleMode",
+            "subtitleFontAssetVersionRef",
+            "subtitleFontAssetVersionDigest",
+        }
+        profile = command.get("renderProfile")
+        if not isinstance(profile, Mapping) or set(profile) != profile_fields:
+            raise EpisodeProductionError("renderProfile fields are invalid")
+        profile = deepcopy(dict(profile))
+        if self.render_toolchain_identity is None:
+            raise UpstreamNotReadyError(
+                "trusted deterministic render toolchain is not configured"
+            )
+
+        context = self._timeline_authority_context(
+            workspace,
+            run_ref,
+            expected_run_version=expected_run_version,
+        )
+        restored_timeline = self._restore_editing_timeline(context)
+        timeline = restored_timeline["timeline"].as_dict()
+        timeline_version = restored_timeline["timelineVersion"].as_dict()
+        latest_timeline_version = restored_timeline["versionHistory"][-1].as_dict()
+        if (
+            timeline_version["timelineVersionRef"] != timeline_version_ref
+            or timeline_version["payloadDigest"] != timeline_version_digest
+            or latest_timeline_version["timelineVersionRef"] != timeline_version_ref
+            or latest_timeline_version["payloadDigest"] != timeline_version_digest
+        ):
+            raise StaleInputError("Composition requires the current TimelineVersion")
+        frame_rate = timeline_version["frameRate"]
+        output_profile = profile.get("outputProfile")
+        if (
+            not isinstance(output_profile, Mapping)
+            or output_profile.get("frameRateNumerator")
+            != frame_rate["numerator"]
+            or output_profile.get("frameRateDenominator")
+            != frame_rate["denominator"]
+        ):
+            raise StaleInputError("RenderManifest frame rate differs from Timeline")
+        audio_encoding = profile.get("audioEncoding")
+        if not isinstance(audio_encoding, Mapping) or (
+            audio_encoding.get("enabled") is True
+            and (
+                audio_encoding.get("sampleRate") != 48_000
+                or audio_encoding.get("channelCount") != 2
+            )
+        ):
+            raise EpisodeProductionError(
+                "RenderManifest audio output must use canonical 48 kHz stereo"
+            )
+
+        root_identity = {
+            "schemaVersion": "v5.m13-composition-identity.v1",
+            "workspaceRef": workspace,
+            "productionRunRef": run_ref,
+            "timelineRef": timeline["timelineRef"],
+        }
+        composition_ref = f"m13-composition-{_digest(root_identity)}"
+        roots = self._render_domain_payload_records(
+            context["snapshot"], record_kind="Composition"
+        )
+        versions_with_records = self._render_domain_payload_records(
+            context["snapshot"], record_kind="CompositionVersion"
+        )
+        manifests_with_records = self._render_domain_payload_records(
+            context["snapshot"], record_kind="RenderManifest"
+        )
+        if len(roots) > 1:
+            raise RepositoryUnavailableError("Composition authority is ambiguous")
+        if not roots and (versions_with_records or manifests_with_records):
+            raise RepositoryUnavailableError(
+                "Composition descendant evidence has no root"
+            )
+        if roots and not versions_with_records and manifests_with_records:
+            raise RepositoryUnavailableError(
+                "RenderManifest evidence has no CompositionVersion"
+            )
+        created_at = self._clock()
+        if roots:
+            root_record = roots[0][0]
+            composition = validate_composition(roots[0][1]).as_dict()
+            if (
+                root_record.get("recordRef") != composition["compositionRef"]
+                or root_record.get("recordVersion") != 1
+                or root_record.get("createdAt") != composition["createdAt"]
+                or composition["workspaceRef"] != workspace
+                or composition["productionRunRef"] != run_ref
+                or composition["projectRef"] != context["run"]["projectRef"]
+                or composition["seriesRef"] != context["run"]["seriesRef"]
+                or composition["episodeRef"] != context["run"]["episodeRef"]
+                or composition["timelineRef"] != timeline["timelineRef"]
+            ):
+                raise RepositoryUnavailableError(
+                    "Composition evidence envelope is invalid"
+                )
+            if composition["compositionRef"] != composition_ref:
+                raise RepositoryUnavailableError(
+                    "a second Composition authority is forbidden"
+                )
+        else:
+            composition = build_composition(
+                {
+                    "workspaceRef": workspace,
+                    "productionRunRef": run_ref,
+                    "projectRef": context["run"]["projectRef"],
+                    "seriesRef": context["run"]["seriesRef"],
+                    "episodeRef": context["run"]["episodeRef"],
+                    "compositionRef": composition_ref,
+                    "timelineRef": timeline["timelineRef"],
+                    "createdAt": created_at,
+                    "provenance": COMPOSITION_PROVENANCE,
+                    "publicationAllowed": False,
+                }
+            )
+
+        versions_with_records.sort(
+            key=lambda item: item[1].get("versionNumber", -1)
+        )
+        versions: list[dict[str, Any]] = []
+        predecessor = None
+        for expected_number, (record, payload) in enumerate(
+            versions_with_records, start=1
+        ):
+            value = validate_composition_version(
+                payload, predecessor=predecessor
+            ).as_dict()
+            if (
+                value["versionNumber"] != expected_number
+                or value["compositionRef"] != composition["compositionRef"]
+                or value["timelineRef"] != timeline["timelineRef"]
+                or value["workspaceRef"] != workspace
+                or value["productionRunRef"] != run_ref
+                or record.get("recordRef") != value["compositionVersionRef"]
+                or record.get("recordVersion") != expected_number
+                or record.get("createdAt") != value["createdAt"]
+            ):
+                raise RepositoryUnavailableError(
+                    "CompositionVersion journal is invalid"
+                )
+            versions.append(value)
+            predecessor = value
+        validated_manifests: list[tuple[dict[str, Any], dict[str, Any]]] = []
+        versions_by_ref = {
+            item["compositionVersionRef"]: item for item in versions
+        }
+        for record, payload in manifests_with_records:
+            value = validate_render_manifest(payload).as_dict()
+            bound_version = versions_by_ref.get(value["compositionVersionRef"])
+            if (
+                record.get("recordRef") != value["renderManifestRef"]
+                or record.get("recordVersion") != 1
+                or record.get("createdAt") != value["createdAt"]
+                or value["workspaceRef"] != workspace
+                or value["productionRunRef"] != run_ref
+                or not isinstance(bound_version, Mapping)
+                or value["compositionVersionDigest"]
+                != bound_version["payloadDigest"]
+                or value["timelineVersionRef"]
+                != bound_version["timelineVersionRef"]
+                or value["timelineVersionDigest"]
+                != bound_version["timelineVersionDigest"]
+            ):
+                raise RepositoryUnavailableError(
+                    "RenderManifest evidence envelope is invalid"
+                )
+            validated_manifests.append((record, value))
+        manifests_with_records = validated_manifests
+        matching_versions = [
+            item
+            for item in versions
+            if item["timelineVersionRef"] == timeline_version_ref
+            and item["timelineVersionDigest"] == timeline_version_digest
+        ]
+        if len(matching_versions) > 1:
+            raise RepositoryUnavailableError(
+                "CompositionVersion Timeline binding is ambiguous"
+            )
+        new_version = False
+        if matching_versions:
+            composition_version = matching_versions[0]
+            if composition_version != versions[-1]:
+                raise StaleInputError("CompositionVersion history cannot regress")
+            expected_composition_version = self._project_composition_version(
+                context=context,
+                restored=restored_timeline,
+                composition=composition,
+                composition_version_ref=composition_version[
+                    "compositionVersionRef"
+                ],
+                version_number=composition_version["versionNumber"],
+                predecessor=(versions[-2] if len(versions) > 1 else None),
+                created_at=composition_version["createdAt"],
+            )
+            if expected_composition_version != composition_version:
+                raise StaleInputError("CompositionVersion source authority is stale")
+        else:
+            version_number = len(versions) + 1
+            composition_version_ref = (
+                f"{composition_ref}-version-{version_number}"
+            )
+            composition_version = self._project_composition_version(
+                context=context,
+                restored=restored_timeline,
+                composition=composition,
+                composition_version_ref=composition_version_ref,
+                version_number=version_number,
+                predecessor=(versions[-1] if versions else None),
+                created_at=created_at,
+            )
+            new_version = True
+
+        if profile["subtitleMode"] == "BURN_IN":
+            script_text = self._current_script_text_projection(context=context)
+            self._current_font_projection(
+                context=context,
+                asset_version_ref=profile["subtitleFontAssetVersionRef"],
+                asset_version_digest=profile[
+                    "subtitleFontAssetVersionDigest"
+                ],
+                required_text=script_text["resolvedText"],
+            )
+        manifest_identity = {
+            "schemaVersion": "v5.m13-render-manifest-identity.v1",
+            "workspaceRef": workspace,
+            "productionRunRef": run_ref,
+            "timelineVersionRef": timeline_version_ref,
+            "timelineVersionDigest": timeline_version_digest,
+            "compositionVersionRef": composition_version[
+                "compositionVersionRef"
+            ],
+            "compositionVersionDigest": composition_version["payloadDigest"],
+            "renderProfile": profile,
+            "toolchain": self.render_toolchain_identity,
+            "digestSpecs": render_manifest_digest_specs(),
+        }
+        manifest_ref = f"m13-render-manifest-{_digest(manifest_identity)}"
+        manifest_matches = [
+            (record, payload)
+            for record, payload in manifests_with_records
+            if payload.get("renderManifestRef") == manifest_ref
+        ]
+        if len(manifest_matches) > 1:
+            raise RepositoryUnavailableError("RenderManifest identity is ambiguous")
+
+        request_digest = _digest(
+            {
+                "schemaVersion": M13_RENDER_DOMAIN_REQUEST_SCHEMA_VERSION,
+                "workspaceRef": workspace,
+                "productionRunRef": run_ref,
+                "operationRef": operation_ref,
+                "idempotencyKey": client_key,
+                "expectedRunVersion": expected_run_version,
+                "timelineVersionRef": timeline_version_ref,
+                "timelineVersionDigest": timeline_version_digest,
+                "renderProfile": profile,
+                "renderToolchainIdentity": self.render_toolchain_identity,
+                "runDigest": context["run"]["payloadDigest"],
+                "scriptVersionRef": context["scriptVersionRef"],
+                "scriptVersionDigest": context["scriptVersionDigest"],
+                "storyboardVersionRef": context["storyboardVersionRef"],
+                "storyboardVersionDigest": context[
+                    "storyboardVersionDigest"
+                ],
+                "compositionVersionDigest": composition_version[
+                    "payloadDigest"
+                ],
+            }
+        )
+        replay_key = self._render_domain_record_idempotency_key(
+            client_key, "render-manifest"
+        )
+        existing_replay = self.evidence.get_record_by_idempotency_key(
+            workspace, run_ref, replay_key
+        )
+        if existing_replay is not None:
+            if existing_replay.get("requestDigest") != request_digest:
+                raise IdempotencyConflictError(
+                    "M13-R1A idempotency content changed"
+                )
+            restored = self._restore_render_domain(
+                context,
+                render_manifest_ref=existing_replay.get("recordRef"),
+            )
+            return self._render_domain_projection(
+                restored,
+                evidence_revision=context["snapshot"].revisionToken,
+                replayed=True,
+            )
+        if manifest_matches:
+            existing_record, existing_payload = manifest_matches[0]
+            if existing_record.get("idempotencyKey") != replay_key:
+                raise IdempotencyConflictError(
+                    "RenderManifest already exists under another idempotency key"
+                )
+            manifest = validate_render_manifest(existing_payload).as_dict()
+            restored = self._restore_render_domain(
+                context,
+                render_manifest_ref=manifest["renderManifestRef"],
+            )
+            return self._render_domain_projection(
+                restored,
+                evidence_revision=context["snapshot"].revisionToken,
+                replayed=True,
+            )
+
+        timing_digest = (
+            None
+            if profile["subtitleMode"] == "NONE"
+            else composition_version["subtitlePlanDigest"]
+        )
+        manifest = build_render_manifest(
+            {
+                "workspaceRef": workspace,
+                "productionRunRef": run_ref,
+                "renderManifestRef": manifest_ref,
+                "timelineVersionRef": timeline_version_ref,
+                "timelineVersionDigest": timeline_version_digest,
+                "compositionVersionRef": composition_version[
+                    "compositionVersionRef"
+                ],
+                "compositionVersionDigest": composition_version["payloadDigest"],
+                "outputProfile": profile["outputProfile"],
+                "videoEncoding": profile["videoEncoding"],
+                "colorMetadata": profile["colorMetadata"],
+                "audioEncoding": profile["audioEncoding"],
+                "subtitleMode": profile["subtitleMode"],
+                "subtitleTimingDigest": timing_digest,
+                "subtitleFontAssetVersionRef": profile[
+                    "subtitleFontAssetVersionRef"
+                ],
+                "subtitleFontAssetVersionDigest": profile[
+                    "subtitleFontAssetVersionDigest"
+                ],
+                **self.render_toolchain_identity,
+                **render_manifest_digest_specs(),
+                "publicationAllowed": False,
+                "masterState": "NOT_CREATED",
+                "exportState": "NOT_CREATED",
+                "createdAt": created_at,
+            }
+        )
+        records: list[EvidenceRecord] = []
+        if not roots:
+            records.append(
+                self._render_domain_evidence_record(
+                    workspace=workspace,
+                    run_ref=run_ref,
+                    record_kind="Composition",
+                    record_ref=composition["compositionRef"],
+                    record_version=1,
+                    client_key=client_key,
+                    slot="composition-root",
+                    request_digest=request_digest,
+                    created_at=composition["createdAt"],
+                    payload=composition,
+                )
+            )
+        if new_version:
+            records.append(
+                self._render_domain_evidence_record(
+                    workspace=workspace,
+                    run_ref=run_ref,
+                    record_kind="CompositionVersion",
+                    record_ref=composition_version["compositionVersionRef"],
+                    record_version=composition_version["versionNumber"],
+                    client_key=client_key,
+                    slot="composition-version",
+                    request_digest=request_digest,
+                    created_at=composition_version["createdAt"],
+                    payload=composition_version,
+                )
+            )
+        records.append(
+            self._render_domain_evidence_record(
+                workspace=workspace,
+                run_ref=run_ref,
+                record_kind="RenderManifest",
+                record_ref=manifest["renderManifestRef"],
+                record_version=1,
+                client_key=client_key,
+                slot="render-manifest",
+                request_digest=request_digest,
+                created_at=manifest["createdAt"],
+                payload=manifest,
+            )
+        )
+        journal_head = self._stable_record_head(
+            workspace,
+            run_ref,
+            context["snapshot"].revisionToken,
+        )
+        _, replayed = self.evidence.append_records(
+            records,
+            expected_record_journal_head=journal_head,
+            expected_evidence_revision_token=context["snapshot"].revisionToken,
+        )
+        result_context = self._timeline_authority_context(
+            workspace,
+            run_ref,
+            expected_run_version=expected_run_version,
+        )
+        restored = self._restore_render_domain(
+            result_context,
+            render_manifest_ref=manifest["renderManifestRef"],
+        )
+        return self._render_domain_projection(
+            restored,
+            evidence_revision=result_context["snapshot"].revisionToken,
+            replayed=replayed,
+        )
+
+    def get_composition_render_manifest(
+        self,
+        workspace_ref: str,
+        run_ref: str,
+        *,
+        render_manifest_ref: str | None = None,
+    ) -> dict[str, Any]:
+        workspace = _required_ref(workspace_ref, "workspaceRef")
+        production_run = _required_ref(run_ref, "productionRunRef")
+        selected_manifest_ref = (
+            None
+            if render_manifest_ref is None
+            else _required_ref(render_manifest_ref, "renderManifestRef")
+        )
+        context = self._timeline_authority_context(
+            workspace,
+            production_run,
+            expected_run_version=None,
+        )
+        restored = self._restore_render_domain(
+            context,
+            render_manifest_ref=selected_manifest_ref,
+        )
+        return self._render_domain_projection(
+            restored,
+            evidence_revision=context["snapshot"].revisionToken,
+            replayed=False,
+        )
+
+    def require_current_render_manifest(
+        self,
+        workspace_ref: str,
+        run_ref: str,
+        *,
+        render_manifest_ref: str,
+        render_manifest_digest: str,
+    ) -> dict[str, Any]:
+        if not _is_sha256(render_manifest_digest):
+            raise EpisodeProductionError("renderManifestDigest is invalid")
+        result = self.get_composition_render_manifest(
+            workspace_ref,
+            run_ref,
+            render_manifest_ref=render_manifest_ref,
+        )
+        if result["renderManifest"]["payloadDigest"] != render_manifest_digest:
+            raise StaleInputError("RenderManifest digest is stale")
+        return result
 
     @staticmethod
     def _snapshot_record_payload(
