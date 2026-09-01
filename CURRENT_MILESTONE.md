@@ -10,7 +10,7 @@
 >
 > Current Task: `ACS-M13-R2-C2-FLAME-SMOKE-RENDERER-V3`
 >
-> Current Work Package: `M13-R2-C2 RENDERER V3 IMPLEMENTED / FULL-PROFILE PERFORMANCE PASS / R2 RETRY NEXT`
+> Current Work Package: `M13-R2 IMPLEMENTED AND VERIFIED / FULL CPU VERTICAL SLICE PASS / BASE CLOSEOUT READY`
 >
 > Authorized Source Base: `CORE 510323af2050b521c3f34a42bb021dc1f2560c05 / TREE 25f4e573e76d9efc51f49d02d89460aa7947a919 / VERIFIED PRE-CORRECTIVE MAIN`
 >
@@ -30,7 +30,7 @@
 >
 > Historical ADR-0013 Acceptance Baseline: `CORE main 6d28a53f / TREE 369c3b14 / 851 PASS — FRONTEND main 5b36aac0 / TREE fd20b7d7 / 174 PASS + TYPECHECK + LINT + BUILD + TWO CHROMIUM GATES`
 >
-> Production Ready: `NO — M13-R2 REMAINS BLOCKED PENDING RETRY / NO PROVIDER, GPU, ADMISSION, PUBLICATION OR LIVE CANONICAL WRITE`
+> Production Ready: `NO — M13-R2 VERIFIED / BASE CLOSEOUT READY BUT NOT ACCEPTED / NO PROVIDER, GPU, ADMISSION, PUBLICATION OR LIVE CANONICAL WRITE`
 
 ---
 
@@ -61,7 +61,20 @@ complete eight-effect visual graph finished in 81.943 seconds. Historical render
 v1/v2 evidence remains readable and exactly replayable; new V3/V4/V5 writes require
 renderer v3, and version-bound runtime refs and artifact paths prevent v1/v2/v3
 collision or overwrite. Request, Result, runtime-evidence, Public API and SQLite
-schemas remain unchanged. M13-R2 remains blocked pending a fresh retry.
+schemas remain unchanged.
+
+The original-spec M13-R2 retry now passes on merged renderer v3. The authenticated
+generic non-K2 CPU vertical slice executed at 704×1280, 720 frames, 24 fps and 30
+seconds with 48 kHz stereo VIDEO/AUDIO/SUBTITLE/EFFECT tracks, all eight effects,
+PreviewCandidate, CompositionVersion, RenderManifest and two complete RenderCandidates.
+Both complete executions were bit-exact across file, decoded pixels, PCM, subtitle
+timing and authoritative digests; SQLite restart/replay and artifact tamper rejection
+also passed. The full acceptance completed in 3760.287 seconds with peak RSS 253,172
+KiB, 140,224 Preview bytes and 152,634 Render bytes. The CI micro vertical slice also
+passed in 491.360 seconds with peak RSS 261,996 KiB. Production source, Public API,
+Domain schema, SQLite schema and dependencies are unchanged. M13 backend capability is
+complete and base closeout is ready, but base closeout remains unaccepted pending the
+Project Lead's explicit decision.
 
 The earlier `ACS-M13-R1-COMPOSITION-RENDER-CANDIDATE` implementation remains immutable
 history. M13-R1A and M13-R1B are implemented as non-publishing deterministic CPU
@@ -155,15 +168,17 @@ M13_COMPOSITION_VERSION=IMPLEMENTED
 M13_RENDER_MANIFEST=IMPLEMENTED
 M13_RENDER_CANDIDATE=IMPLEMENTED_NON_PUBLISHING
 M13_R1=IMPLEMENTED_CPU_ONLY
-M13_R2=BLOCKED_PENDING_RETRY
+M13_R2=IMPLEMENTED_AND_VERIFIED
 M13_R2_FAILED_ACCEPTANCE_PRESERVED=true
 M13_R2_SECOND_FAILED_ACCEPTANCE_PRESERVED=true
 M13_MASKED_SURFACE_RENDERER_V2=IMPLEMENTED
 M13_MASKED_SURFACE_FULL_RESOLUTION_PERFORMANCE=PASS
 M13_FLAME_SMOKE_RENDERER_V3=IMPLEMENTED
 M13_FLAME_SMOKE_FULL_PROFILE_PERFORMANCE=PASS
-M13_R2_RETRY=NEXT
-M13_BASE_CLOSEOUT_READY=false
+M13_R2_RETRY=PASS
+M13_FULL_CPU_VERTICAL_SLICE=PASS
+M13_BASE_CLOSEOUT_READY=true
+M13_BASE_CLOSEOUT_ACCEPTED=false
 V5_FONT_AUTHORITY_CAPABILITY=IMPLEMENTED
 IDENTITY_REFERENCE_PROJECTION=AVAILABLE
 IDENTITY_REFERENCE_CURRENTNESS_REVALIDATION=AVAILABLE
@@ -174,7 +189,7 @@ CROSS_RESTART_BUNDLE_SHA256_EQUALITY_REQUIRED=false
 NEW_BUNDLE_IDENTITY_BINDING_AUTHORIZED=false
 IDENTITY_SEMANTIC_CURRENTNESS=EXACT_SEVEN_FIELD_DECISION_MATCH
 M13_E3_RESUME_AFTER_IDENTITY_PROJECTION=AUTHORIZED
-M13_BACKEND_CAPABILITY_COMPLETE=false
+M13_BACKEND_CAPABILITY_COMPLETE=true
 M13_EXPORT_CANDIDATE=PROHIBITED
 M13_EPISODE_MASTER=OUT_OF_SCOPE
 M13_EXPORT_ARTIFACT=OUT_OF_SCOPE
