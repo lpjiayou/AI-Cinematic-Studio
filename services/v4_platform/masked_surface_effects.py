@@ -60,7 +60,13 @@ LOCAL_EXPOSURE_REQUIREMENT_SCHEMA_VERSION = (
 MASKED_SURFACE_RENDERER_IDENTITY = (
     "v3.deterministic-masked-surface-ffmpeg"
 )
-MASKED_SURFACE_RENDERER_VERSION = "1"
+MASKED_SURFACE_RENDERER_VERSION_V1 = "1"
+MASKED_SURFACE_RENDERER_VERSION_V2 = "2"
+MASKED_SURFACE_RENDERER_VERSION_CURRENT = MASKED_SURFACE_RENDERER_VERSION_V2
+MASKED_SURFACE_RENDERER_READ_VERSIONS = frozenset(
+    {MASKED_SURFACE_RENDERER_VERSION_V1, MASKED_SURFACE_RENDERER_VERSION_V2}
+)
+MASKED_SURFACE_RENDERER_VERSION = MASKED_SURFACE_RENDERER_VERSION_CURRENT
 MASKED_SURFACE_PROVENANCE = "LOCAL_EVIDENCE"
 EFFECT_PREVIEW_V3_REQUEST_SCHEMA_VERSION = (
     "v4.m13-effect-preview-execution-request.v2"
@@ -1847,6 +1853,7 @@ def _resolve_flame_local_exposure_stage(
     _validate_effect_artifact_storage(
         resolved["artifactStorage"],
         artifact=artifact,
+        runtime_evidence=runtime,
         artifact_root=artifact_root,
     )
     exact = (
@@ -1976,15 +1983,27 @@ def _build_flame_smoke_v3_request(
     return sealed
 
 
-def _expected_output_storage_key(request: Mapping[str, Any]) -> str:
+def _expected_output_storage_key(
+    request: Mapping[str, Any],
+    *,
+    renderer_version: str = MASKED_SURFACE_RENDERER_VERSION_CURRENT,
+) -> str:
     workspace = sha256(str(request["workspaceRef"]).encode("utf-8")).hexdigest()[:20]
     run = sha256(str(request["productionRunRef"]).encode("utf-8")).hexdigest()[:20]
+    if renderer_version == MASKED_SURFACE_RENDERER_VERSION_V1:
+        filename = f"masked-surface-{request['payloadDigest']}.mp4"
+    elif renderer_version == MASKED_SURFACE_RENDERER_VERSION_V2:
+        filename = f"masked-surface-v2-{request['payloadDigest']}.mp4"
+    else:
+        raise MaskedSurfaceExecutionError(
+            "masked-surface artifact renderer version is unsupported"
+        )
     return str(
         PurePosixPath(
             workspace,
             run,
             "masked-surface",
-            f"masked-surface-{request['payloadDigest']}.mp4",
+            filename,
         )
     )
 
@@ -2070,7 +2089,7 @@ def _validate_v3_result(
     identity = result["ffmpegIdentity"]
     if (
         result["rendererIdentity"] != MASKED_SURFACE_RENDERER_IDENTITY
-        or result["rendererVersion"] != MASKED_SURFACE_RENDERER_VERSION
+        or result["rendererVersion"] != MASKED_SURFACE_RENDERER_VERSION_CURRENT
         or not isinstance(identity, str)
         or identity != identity.strip()
         or not 1 <= len(identity) <= 500
@@ -2235,7 +2254,7 @@ def validate_masked_surface_runtime_evidence(value: Any) -> dict[str, Any]:
         != MASKED_SURFACE_RUNTIME_EVIDENCE_SCHEMA_VERSION
         or result["effectMode"] not in EFFECT_MODES
         or result["rendererIdentity"] != MASKED_SURFACE_RENDERER_IDENTITY
-        or result["rendererVersion"] != MASKED_SURFACE_RENDERER_VERSION
+        or result["rendererVersion"] not in MASKED_SURFACE_RENDERER_READ_VERSIONS
         or not isinstance(identity, str)
         or identity != identity.strip()
         or not 1 <= len(identity) <= 500
@@ -2708,6 +2727,7 @@ def _validate_effect_artifact_storage(
     value: Any,
     *,
     artifact: Mapping[str, Any],
+    runtime_evidence: Mapping[str, Any],
     artifact_root: Path,
 ) -> dict[str, Any]:
     storage = _closed(
@@ -2725,17 +2745,31 @@ def _validate_effect_artifact_storage(
         raise MaskedSurfaceAssetResolutionError("artifactStorage is invalid") from exc
     output = artifact["outputDigest"]
     expected_probe = artifact["outputMediaProbe"]
+    storage_identity = {
+        "workspaceRef": artifact["workspaceRef"],
+        "productionRunRef": artifact["productionRunRef"],
+        "payloadDigest": artifact["v3ExecutionRequestDigest"],
+    }
+    renderer_version = runtime_evidence["rendererVersion"]
     expected_key = _expected_output_storage_key(
-        {
-            "workspaceRef": artifact["workspaceRef"],
-            "productionRunRef": artifact["productionRunRef"],
-            "payloadDigest": artifact["v3ExecutionRequestDigest"],
-        }
+        storage_identity,
+        renderer_version=renderer_version,
     )
+    declared_keys = {expected_key}
+    if renderer_version == MASKED_SURFACE_RENDERER_VERSION_V2:
+        # The frozen V5 dependency projection reconstructs the historical
+        # locator because storage paths are not part of the evidence DTO.
+        # Treat that value only as a compatibility alias and always measure
+        # the authoritative, version-bound v2 artifact below.
+        declared_keys.add(
+            _expected_output_storage_key(
+                storage_identity,
+                renderer_version=MASKED_SURFACE_RENDERER_VERSION_V1,
+            )
+        )
     expected = {
         "artifactEvidenceRef": artifact["artifactEvidenceRef"],
         "artifactEvidenceDigest": artifact["payloadDigest"],
-        "storageKey": expected_key,
         "fileDigest": output["fileDigest"],
         "pixelDigest": output["decodedFramePixelDigest"],
         "pixelDigestSpec": output["decodedFramePixelDigestSpec"],
@@ -2745,12 +2779,18 @@ def _validate_effect_artifact_storage(
         "frameRate": output["frameRate"],
         "pixelFormat": expected_probe["pixelFormat"],
     }
-    if any(storage[field] != expected_value for field, expected_value in expected.items()):
+    if (
+        storage["storageKey"] not in declared_keys
+        or any(
+            storage[field] != expected_value
+            for field, expected_value in expected.items()
+        )
+    ):
         raise MaskedSurfaceAssetResolutionError(
             "effect artifactStorage does not match evidence"
         )
     path = _server_file(
-        artifact_root, storage["storageKey"], label="effect artifactStorage"
+        artifact_root, expected_key, label="effect artifactStorage"
     )
     if path.stat().st_size != artifact["outputByteSize"]:
         raise MaskedSurfaceAssetResolutionError("effect artifact byte size is stale")
@@ -2881,7 +2921,10 @@ def _resolve_effect_stage(
             "effect stage does not use the exact preview baseVideo"
         )
     _validate_effect_artifact_storage(
-        resolved["artifactStorage"], artifact=artifact, artifact_root=artifact_root
+        resolved["artifactStorage"],
+        artifact=artifact,
+        runtime_evidence=runtime,
+        artifact_root=artifact_root,
     )
     if not is_e2:
         stage_request = _build_v3_request(
@@ -4028,6 +4071,10 @@ __all__ = [
     "MASKED_SURFACE_EXECUTION_REQUEST_SCHEMA_VERSION",
     "MASKED_SURFACE_RENDERER_IDENTITY",
     "MASKED_SURFACE_RENDERER_VERSION",
+    "MASKED_SURFACE_RENDERER_READ_VERSIONS",
+    "MASKED_SURFACE_RENDERER_VERSION_CURRENT",
+    "MASKED_SURFACE_RENDERER_VERSION_V1",
+    "MASKED_SURFACE_RENDERER_VERSION_V2",
     "MASKED_SURFACE_RUNTIME_EVIDENCE_SCHEMA_VERSION",
     "MASKED_SURFACE_V3_REQUEST_SCHEMA_VERSION",
     "MaskedSurfaceAssetResolutionError",

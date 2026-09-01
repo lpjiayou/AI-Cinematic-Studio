@@ -55,7 +55,8 @@ class FakeV3Executor:
         run = sha256(request["productionRunRef"].encode()).hexdigest()[:20]
         key = (
             f"{workspace}/{run}/masked-surface/"
-            f"masked-surface-{request['payloadDigest']}.mp4"
+            f"masked-surface-v{subject.MASKED_SURFACE_RENDERER_VERSION}-"
+            f"{request['payloadDigest']}.mp4"
         )
         path = self.root / key
         path.parent.mkdir(parents=True, exist_ok=True)
@@ -101,6 +102,8 @@ class FakeV3Executor:
             result["runtimeEvidenceDigest"] = "sha256:" + "0" * 64
         elif self.drift == "lineage":
             result["requirementDigest"] = "f" * 64
+        elif self.drift == "renderer-v1":
+            result["rendererVersion"] = subject.MASKED_SURFACE_RENDERER_VERSION_V1
         return result
 
     def compose_timeline_preview_v2(self, request: dict) -> dict:
@@ -489,10 +492,141 @@ class MaskedSurfaceV4ContractTests(unittest.TestCase):
             self._execute(FakeV3Executor(self.root), request=request)
 
     def test_rejects_v3_media_digest_runtime_and_lineage_drift(self) -> None:
-        for drift in ("frame-count", "pixel-digest", "runtime", "lineage"):
+        for drift in (
+            "frame-count",
+            "pixel-digest",
+            "runtime",
+            "lineage",
+            "renderer-v1",
+        ):
             with self.subTest(drift=drift):
                 with self.assertRaises(subject.MaskedSurfaceExecutionError):
                     self._execute(FakeV3Executor(self.root, drift=drift))
+
+    def test_runtime_reader_accepts_v1_v2_rejects_unknown_and_refs_do_not_collide(self) -> None:
+        evidence = self._execute(FakeV3Executor(self.root))
+        runtime_v2 = evidence["runtimeEvidence"]
+        self.assertEqual(
+            runtime_v2,
+            subject.validate_masked_surface_runtime_evidence(runtime_v2),
+        )
+        runtime_v1 = deepcopy(runtime_v2)
+        runtime_v1["rendererVersion"] = subject.MASKED_SURFACE_RENDERER_VERSION_V1
+        runtime_v1["runtimeEvidenceRef"] = (
+            "m13-masked-surface-runtime-evidence-"
+            + sha256(
+                canonical(
+                    {
+                        "v3ExecutionRequestDigest": runtime_v1[
+                            "v3ExecutionRequestDigest"
+                        ],
+                        "rendererIdentity": runtime_v1["rendererIdentity"],
+                        "rendererVersion": runtime_v1["rendererVersion"],
+                        "ffmpegIdentity": runtime_v1["ffmpegIdentity"],
+                    }
+                )
+            ).hexdigest()[:32]
+        )
+        runtime_v1 = seal(
+            {
+                key: value
+                for key, value in runtime_v1.items()
+                if key != "payloadDigest"
+            }
+        )
+        self.assertEqual(
+            runtime_v1,
+            subject.validate_masked_surface_runtime_evidence(runtime_v1),
+        )
+        self.assertNotEqual(
+            runtime_v1["runtimeEvidenceRef"], runtime_v2["runtimeEvidenceRef"]
+        )
+        unknown = deepcopy(runtime_v1)
+        unknown["rendererVersion"] = "3"
+        unknown["runtimeEvidenceRef"] = (
+            "m13-masked-surface-runtime-evidence-"
+            + sha256(
+                canonical(
+                    {
+                        "v3ExecutionRequestDigest": unknown[
+                            "v3ExecutionRequestDigest"
+                        ],
+                        "rendererIdentity": unknown["rendererIdentity"],
+                        "rendererVersion": unknown["rendererVersion"],
+                        "ffmpegIdentity": unknown["ffmpegIdentity"],
+                    }
+                )
+            ).hexdigest()[:32]
+        )
+        unknown = seal(
+            {
+                key: value
+                for key, value in unknown.items()
+                if key != "payloadDigest"
+            }
+        )
+        with self.assertRaises(subject.MaskedSurfaceExecutionError):
+            subject.validate_masked_surface_runtime_evidence(unknown)
+
+    def test_v2_dependency_alias_measures_only_version_bound_artifact(self) -> None:
+        fake = FakeV3Executor(self.root)
+        evidence = self._execute(fake)
+        assert fake.request is not None
+        artifact = evidence["artifactEvidence"]
+        runtime = evidence["runtimeEvidence"]
+        workspace = sha256(artifact["workspaceRef"].encode()).hexdigest()[:20]
+        run = sha256(artifact["productionRunRef"].encode()).hexdigest()[:20]
+        legacy_key = (
+            f"{workspace}/{run}/masked-surface/"
+            f"masked-surface-{artifact['v3ExecutionRequestDigest']}.mp4"
+        )
+        legacy_path = self.root / legacy_key
+        legacy_path.write_bytes(b"historical-v1-artifact-must-not-be-opened")
+        output = artifact["outputDigest"]
+        probe = artifact["outputMediaProbe"]
+        storage = {
+            "artifactEvidenceRef": artifact["artifactEvidenceRef"],
+            "artifactEvidenceDigest": artifact["payloadDigest"],
+            "storageKey": legacy_key,
+            "fileDigest": output["fileDigest"],
+            "pixelDigest": output["decodedFramePixelDigest"],
+            "pixelDigestSpec": output["decodedFramePixelDigestSpec"],
+            "width": output["width"],
+            "height": output["height"],
+            "frameCount": output["frameCount"],
+            "frameRate": output["frameRate"],
+            "pixelFormat": probe["pixelFormat"],
+        }
+        with mock.patch.object(
+            subject,
+            "decoded_frame_pixel_digest_metadata",
+            return_value={
+                "fileDigest": output["fileDigest"],
+                "decodedFramePixelDigest": output["decodedFramePixelDigest"],
+                "decodedFramePixelDigestSpec": output[
+                    "decodedFramePixelDigestSpec"
+                ],
+                "width": output["width"],
+                "height": output["height"],
+                "frameCount": output["frameCount"],
+            },
+        ) as measured:
+            self.assertEqual(
+                storage,
+                subject._validate_effect_artifact_storage(
+                    storage,
+                    artifact=artifact,
+                    runtime_evidence=runtime,
+                    artifact_root=self.root,
+                ),
+            )
+        measured_path = Path(measured.call_args.args[0])
+        self.assertIn("masked-surface-v2-", measured_path.name)
+        self.assertNotEqual(legacy_path, measured_path)
+        self.assertEqual(
+            b"historical-v1-artifact-must-not-be-opened",
+            legacy_path.read_bytes(),
+        )
 
     def test_combined_preview_v2_preserves_fixed_bindings_and_exact_cross_layer_constants(self) -> None:
         command = self._preview_command()

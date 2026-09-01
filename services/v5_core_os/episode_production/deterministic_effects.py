@@ -97,7 +97,13 @@ ASSET_ADMISSION_STATE = "NOT_ADMITTED"
 MASTER_STATE = "NOT_CREATED"
 EXPORT_STATE = "NOT_CREATED"
 MASKED_SURFACE_RENDERER_IDENTITY = "v3.deterministic-masked-surface-ffmpeg"
-MASKED_SURFACE_RENDERER_VERSION = "1"
+MASKED_SURFACE_RENDERER_VERSION_V1 = "1"
+MASKED_SURFACE_RENDERER_VERSION_V2 = "2"
+MASKED_SURFACE_RENDERER_VERSION_CURRENT = MASKED_SURFACE_RENDERER_VERSION_V2
+MASKED_SURFACE_RENDERER_READ_VERSIONS = frozenset(
+    {MASKED_SURFACE_RENDERER_VERSION_V1, MASKED_SURFACE_RENDERER_VERSION_V2}
+)
+MASKED_SURFACE_RENDERER_VERSION = MASKED_SURFACE_RENDERER_VERSION_CURRENT
 DETERMINISTIC_SMOKE_ALGORITHM_IDENTITY = "v3.deterministic-smoke-cpu"
 DETERMINISTIC_SMOKE_ALGORITHM_VERSION = "1"
 SMOKE_SOURCE_KINDS = frozenset(
@@ -2388,7 +2394,9 @@ def _artifact_evidence_ref(value: Mapping[str, Any]) -> str:
     )[:32]
 
 
-def _validate_runtime_evidence(value: Any) -> dict[str, Any]:
+def _validate_runtime_evidence(
+    value: Any, *, require_current_renderer: bool = False
+) -> dict[str, Any]:
     result = _verify_sealed(
         value, _RUNTIME_EVIDENCE_FIELDS, "MaskedSurfaceRuntimeEvidence"
     )
@@ -2414,9 +2422,14 @@ def _validate_runtime_evidence(value: Any) -> dict[str, Any]:
         raise DeterministicEffectContractError("effectMode is invalid")
     for field in ("rendererIdentity", "rendererVersion", "ffmpegIdentity"):
         _text(result[field], field)
+    accepted_versions = (
+        {MASKED_SURFACE_RENDERER_VERSION_CURRENT}
+        if require_current_renderer
+        else MASKED_SURFACE_RENDERER_READ_VERSIONS
+    )
     if (
         result["rendererIdentity"] != MASKED_SURFACE_RENDERER_IDENTITY
-        or result["rendererVersion"] != MASKED_SURFACE_RENDERER_VERSION
+        or result["rendererVersion"] not in accepted_versions
     ):
         raise DeterministicEffectContractError(
             "masked-surface renderer identity is invalid"
@@ -2586,6 +2599,7 @@ def validate_masked_surface_execution_evidence(
     runtime_evidence: MaskedSurfaceRuntimeEvidence | Mapping[str, Any],
     local_exposure_requirement: LocalExposureRequirement | None = None,
     local_exposure_result: "LocalExposureResult | None" = None,
+    require_current_renderer: bool = False,
 ) -> tuple[MaskedSurfaceArtifactEvidence, MaskedSurfaceRuntimeEvidence]:
     parsed_requirement = (
         parse_deterministic_effect_requirement(requirement)
@@ -2604,7 +2618,12 @@ def validate_masked_surface_execution_evidence(
         else artifact_evidence
     )
     parsed_runtime = (
-        MaskedSurfaceRuntimeEvidence.from_mapping(runtime_evidence)
+        MaskedSurfaceRuntimeEvidence._from_validated(
+            _validate_runtime_evidence(
+                runtime_evidence,
+                require_current_renderer=require_current_renderer,
+            )
+        )
         if isinstance(runtime_evidence, Mapping)
         else runtime_evidence
     )
@@ -2618,6 +2637,14 @@ def validate_masked_surface_execution_evidence(
     request_value = parsed_request.as_dict()
     artifact_value = parsed_artifact.as_dict()
     runtime_value = parsed_runtime.as_dict()
+    if (
+        require_current_renderer
+        and runtime_value["rendererVersion"]
+        != MASKED_SURFACE_RENDERER_VERSION_CURRENT
+    ):
+        raise DeterministicEffectContractError(
+            "new masked-surface evidence must use the current renderer"
+        )
     expected_common = {
         "workspaceRef": requirement_value["workspaceRef"],
         "productionRunRef": requirement_value["productionRunRef"],
@@ -3276,6 +3303,7 @@ def _validated_chain(
     result: DeterministicEffectResult | Mapping[str, Any],
     local_exposure_requirement: LocalExposureRequirement | None = None,
     local_exposure_result: LocalExposureResult | None = None,
+    require_current_renderer: bool = False,
 ) -> tuple[
     DeterministicEffectRequirement,
     DeterministicEffectExecutionRequest,
@@ -3310,6 +3338,7 @@ def _validated_chain(
         runtime_evidence=runtime_evidence,
         local_exposure_requirement=local_exposure_requirement,
         local_exposure_result=local_exposure_result,
+        require_current_renderer=require_current_renderer,
     )
     parsed_result = (
         parse_deterministic_effect_result(result)
@@ -3763,6 +3792,57 @@ def append_deterministic_effect_result_chain(
             execution_request=parsed_request,
         )
     )
+    historical_chain = _validated_chain(
+        requirement=parsed_requirement,
+        execution_request=parsed_request,
+        artifact_evidence=artifact_evidence,
+        runtime_evidence=runtime_evidence,
+        result=result,
+        local_exposure_requirement=exposure_requirement,
+        local_exposure_result=exposure_result,
+    )
+    historical_records = _chain_records(
+        requirement=historical_chain[0],
+        execution_request=historical_chain[1],
+        artifact_evidence=historical_chain[2],
+        runtime_evidence=historical_chain[3],
+        result=historical_chain[4],
+        idempotency_key=idempotency_key,
+        created_at=created_at,
+    )
+    existing_replay_records = tuple(
+        repository.get_record_by_idempotency_key(
+            record.workspaceRef,
+            record.productionRunRef,
+            record.idempotencyKey,
+        )
+        for record in historical_records
+    )
+    if all(item is not None for item in existing_replay_records):
+        _, replayed = repository.append_records(
+            historical_records,
+            expected_record_journal_head=expected_record_journal_head,
+        )
+        if not replayed:
+            raise DeterministicEffectJournalError(
+                "stored deterministic effect replay disappeared"
+            )
+        resolved = resolve_deterministic_effect_result_chain(
+            repository,
+            workspace_ref=historical_chain[0].workspace_ref,
+            production_run_ref=historical_chain[0].production_run_ref,
+            result_ref=historical_chain[4].result_ref,
+            result_digest=historical_chain[4].payload_digest,
+        )
+        if (
+            resolved.as_dict()
+            != ResolvedDeterministicEffectResultChain(*historical_chain).as_dict()
+        ):
+            raise DeterministicEffectJournalError(
+                "stored deterministic effect replay differs from the append"
+            )
+        return resolved, True
+
     chain = _validated_chain(
         requirement=parsed_requirement,
         execution_request=parsed_request,
@@ -3771,6 +3851,7 @@ def append_deterministic_effect_result_chain(
         result=result,
         local_exposure_requirement=exposure_requirement,
         local_exposure_result=exposure_result,
+        require_current_renderer=True,
     )
     records = _chain_records(
         requirement=chain[0],
@@ -3844,6 +3925,10 @@ __all__ = [
     "MASKED_SURFACE_RUNTIME_EVIDENCE_SCHEMA_VERSION",
     "MASKED_SURFACE_RENDERER_IDENTITY",
     "MASKED_SURFACE_RENDERER_VERSION",
+    "MASKED_SURFACE_RENDERER_READ_VERSIONS",
+    "MASKED_SURFACE_RENDERER_VERSION_CURRENT",
+    "MASKED_SURFACE_RENDERER_VERSION_V1",
+    "MASKED_SURFACE_RENDERER_VERSION_V2",
     "MASTER_STATE",
     "MaskedSurfaceArtifactEvidence",
     "MaskedSurfaceExecutionRequest",

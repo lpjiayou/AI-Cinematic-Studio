@@ -13,6 +13,7 @@ from services.v5_core_os.episode_production.deterministic_effects import (
     DETERMINISTIC_SMOKE_ALGORITHM_VERSION,
     FLAME_EXTINGUISH,
     MASKED_SURFACE_ARTIFACT_EVIDENCE_SCHEMA_VERSION,
+    MASKED_SURFACE_RENDERER_VERSION_CURRENT,
     MASKED_SURFACE_RUNTIME_EVIDENCE_SCHEMA_VERSION,
     SMOKE,
     DeterministicEffectContractError,
@@ -273,6 +274,7 @@ def _execution_evidence(
     local_requirement=None,
     local_result=None,
     ffmpeg_identity: str = "ffmpeg-7.1",
+    renderer_version: str = MASKED_SURFACE_RENDERER_VERSION_CURRENT,
 ) -> dict:
     requirement_value = requirement.as_dict()
     request_value = request.as_dict()
@@ -280,7 +282,7 @@ def _execution_evidence(
     runtime_identity = {
         "v3ExecutionRequestDigest": v3_digest,
         "rendererIdentity": "v3.deterministic-masked-surface-ffmpeg",
-        "rendererVersion": "1",
+        "rendererVersion": renderer_version,
         "ffmpegIdentity": ffmpeg_identity,
     }
     runtime = _seal(

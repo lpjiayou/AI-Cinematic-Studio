@@ -26,6 +26,13 @@ from services.v3_render_core.masked_surface import (
     DeterministicMaskedSurfaceExecutor,
     MASKED_SURFACE_EXECUTION_REQUEST_SCHEMA_VERSION,
     MASKED_SURFACE_RENDERER_IDENTITY,
+    MASKED_SURFACE_RENDERER_VERSION_CURRENT,
+    MASKED_SURFACE_RENDERER_VERSION_V1,
+    MASKED_SURFACE_RENDERER_VERSION_V2,
+    _filter_graph,
+    _filter_graph_v1,
+    _masked_surface_roi,
+    _masked_surface_v2_workload,
 )
 
 
@@ -53,6 +60,67 @@ def _seal(value: dict[str, Any]) -> dict[str, Any]:
 
 def _media_command(command: list[str]) -> None:
     subprocess.run(command, check=True, capture_output=True, timeout=60)
+
+
+def _rgba_frames(
+    root: Path,
+    *,
+    request: dict[str, Any] | None = None,
+    legacy: bool = False,
+) -> bytes:
+    command = [
+        "ffmpeg",
+        "-hide_banner",
+        "-loglevel",
+        "error",
+        "-xerror",
+        "-nostdin",
+        "-threads",
+        "1",
+        "-filter_threads",
+        "1",
+        "-filter_complex_threads",
+        "1",
+        "-sws_flags",
+        "bitexact+accurate_rnd+full_chroma_int",
+        "-hwaccel",
+        "none",
+        "-noautorotate",
+        "-i",
+        str(root / "inputs/base.mp4"),
+    ]
+    if request is not None:
+        command.extend(
+            [
+                "-loop",
+                "1",
+                "-framerate",
+                str(FRAME_RATE),
+                "-i",
+                str(root / "inputs/mask.png"),
+                "-filter_complex",
+                (_filter_graph_v1 if legacy else _filter_graph)(request),
+                "-map",
+                "[vout]",
+            ]
+        )
+    command.extend(
+        [
+            "-frames:v",
+            str(FRAME_COUNT),
+            "-pix_fmt",
+            "rgba",
+            "-f",
+            "rawvideo",
+            "pipe:1",
+        ]
+    )
+    return subprocess.run(
+        command,
+        check=True,
+        capture_output=True,
+        timeout=60,
+    ).stdout
 
 
 def _stage_inputs(root: Path) -> tuple[dict[str, Any], dict[str, Any]]:
@@ -606,8 +674,31 @@ class MaskedSurfaceV3IntegrationTests(unittest.TestCase):
             outputs: dict[str, dict[str, Any]] = {}
             for mode in ("SCRATCH_REVEAL", "LIGHT_SWEEP", "LOCAL_EXPOSURE"):
                 request = _request(base, mask, mode=mode)
+                if mode == "SCRATCH_REVEAL":
+                    workspace = sha256(request["workspaceRef"].encode()).hexdigest()[:20]
+                    run = sha256(request["productionRunRef"].encode()).hexdigest()[:20]
+                    legacy_path = (
+                        root
+                        / workspace
+                        / run
+                        / "masked-surface"
+                        / f"masked-surface-{request['payloadDigest']}.mp4"
+                    )
+                    legacy_path.parent.mkdir(parents=True, exist_ok=True)
+                    legacy_path.write_bytes(b"historical-v1-artifact")
                 result = executor.execute(request)
                 self.assertEqual(MASKED_SURFACE_RENDERER_IDENTITY, result["rendererIdentity"])
+                self.assertEqual(MASKED_SURFACE_RENDERER_VERSION_CURRENT, result["rendererVersion"])
+                self.assertIn(
+                    f"masked-surface-v2-{request['payloadDigest']}.mp4",
+                    result["outputStorageKey"],
+                )
+                if mode == "SCRATCH_REVEAL":
+                    self.assertEqual(b"historical-v1-artifact", legacy_path.read_bytes())
+                    self.assertNotEqual(
+                        str(legacy_path.relative_to(root)),
+                        result["outputStorageKey"],
+                    )
                 self.assertEqual(mode, result["effectMode"])
                 self.assertEqual(False, result["publicationAllowed"])
                 self.assertEqual(request["payloadDigest"], result["v3ExecutionRequestDigest"])
@@ -634,6 +725,163 @@ class MaskedSurfaceV3IntegrationTests(unittest.TestCase):
                 base["pixelDigest"],
                 outputs["SCRATCH_REVEAL"]["outputDigest"]["decodedFramePixelDigest"],
             )
+
+    def test_v2_temporal_roi_pixels_and_v1_effect_semantics_are_exact(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            base, mask = _stage_inputs(root)
+            request = _request(base, mask, mode="SCRATCH_REVEAL")
+            profile = _masked_surface_v2_workload(request)
+            self.assertEqual(((2, 5), (7, 10)), profile["activeIntervals"])
+            self.assertEqual(6, profile["activeFrameCount"])
+            self.assertFalse(profile["roi"]["fullFrame"])
+            self.assertEqual(
+                profile["activeFrameCount"]
+                * profile["roi"]["width"]
+                * profile["roi"]["height"],
+                profile["activeRoiPixelFrames"],
+            )
+
+            graph = _filter_graph(request)
+            self.assertEqual(2, graph.count("format=gbrp"))
+            self.assertEqual(2, graph.count("maskedmerge"))
+            self.assertEqual(2, graph.count("blend=all_mode="))
+            self.assertIn("trim=start_frame=0:end_frame=2", graph)
+            self.assertIn("trim=start_frame=5:end_frame=7", graph)
+            self.assertIn("trim=start_frame=10:end_frame=12", graph)
+
+            base_frames = _rgba_frames(root)
+            v2_frames = _rgba_frames(root, request=request)
+            frame_bytes = WIDTH * HEIGHT * 4
+            active_frames = {2, 3, 4, 7, 8, 9}
+            roi = _masked_surface_roi(request)
+            changed_inside_roi = 0
+            for frame in range(FRAME_COUNT):
+                start = frame * frame_bytes
+                end = start + frame_bytes
+                if frame not in active_frames:
+                    self.assertEqual(base_frames[start:end], v2_frames[start:end])
+                    continue
+                for y in range(HEIGHT):
+                    row_start = start + y * WIDTH * 4
+                    for x in range(WIDTH):
+                        pixel_start = row_start + x * 4
+                        pixel_end = pixel_start + 4
+                        changed = (
+                            base_frames[pixel_start:pixel_end]
+                            != v2_frames[pixel_start:pixel_end]
+                        )
+                        inside = (
+                            roi["x"] <= x < roi["x"] + roi["width"]
+                            and roi["y"] <= y < roi["y"] + roi["height"]
+                        )
+                        if changed and inside:
+                            changed_inside_roi += 1
+                        if not inside:
+                            self.assertFalse(changed)
+            self.assertGreater(changed_inside_roi, 0)
+
+            full_frame = deepcopy(request)
+            full_frame["position"] = {"xPermille": 0, "yPermille": 0}
+            full_frame["scale"] = {"xPermille": 1000, "yPermille": 1000}
+            for point in full_frame["trajectoryKeyframes"]:
+                point["xPermille"] = 0
+                point["yPermille"] = 0
+            full_frame_roi = _masked_surface_roi(full_frame)
+            self.assertTrue(full_frame_roi["fullFrame"])
+            self.assertEqual(
+                (0, 0, WIDTH, HEIGHT),
+                (
+                    full_frame_roi["x"],
+                    full_frame_roi["y"],
+                    full_frame_roi["width"],
+                    full_frame_roi["height"],
+                ),
+            )
+
+            zero_intensity = deepcopy(request)
+            for point in zero_intensity["intensityCurve"]:
+                point["valuePermille"] = 0
+            v1_active = _rgba_frames(root, request=request, legacy=True)
+            v1_control = _rgba_frames(root, request=zero_intensity, legacy=True)
+            v2_control = _rgba_frames(root, request=zero_intensity)
+            self.assertTrue(
+                all(
+                    active - control == current - current_control
+                    for active, control, current, current_control in zip(
+                        v1_active,
+                        v1_control,
+                        v2_frames,
+                        v2_control,
+                        strict=True,
+                    )
+                )
+            )
+            self.assertEqual(
+                {MASKED_SURFACE_RENDERER_VERSION_V1, MASKED_SURFACE_RENDERER_VERSION_V2},
+                {"1", MASKED_SURFACE_RENDERER_VERSION_CURRENT},
+            )
+
+    def test_v2_fixed_workload_budgets_reject_before_ffmpeg(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            base, mask = _stage_inputs(root)
+            request = _request(base, mask, mode="SCRATCH_REVEAL")
+            frame_count = 30_000
+            request["basePlate"]["frameCount"] = frame_count
+            request["output"]["frameCount"] = frame_count
+            request["frameRangeStartInclusive"] = 0
+            request["frameRangeEndExclusive"] = frame_count
+            request["explicitSchedule"] = [
+                {
+                    "startFrameInclusive": 0,
+                    "endFrameExclusive": frame_count,
+                    "enabled": True,
+                    "interpolation": "STEP",
+                }
+            ]
+            request["trajectoryKeyframes"] = [
+                {
+                    "frame": 0,
+                    "xPermille": 0,
+                    "yPermille": 0,
+                    "interpolation": "LINEAR",
+                },
+                {
+                    "frame": frame_count - 1,
+                    "xPermille": 0,
+                    "yPermille": 0,
+                    "interpolation": "STEP",
+                },
+            ]
+            request["intensityCurve"] = [
+                {"frame": 0, "valuePermille": 1000, "interpolation": "LINEAR"},
+                {
+                    "frame": frame_count - 1,
+                    "valuePermille": 1000,
+                    "interpolation": "STEP",
+                },
+            ]
+            request["exposureCurve"] = [
+                {"frame": 0, "valueMilliStops": 0, "interpolation": "LINEAR"},
+                {
+                    "frame": frame_count - 1,
+                    "valueMilliStops": 0,
+                    "interpolation": "STEP",
+                },
+            ]
+            request["position"] = {"xPermille": 0, "yPermille": 0}
+            request["scale"] = {"xPermille": 1000, "yPermille": 1000}
+            request = _seal(
+                {key: value for key, value in request.items() if key != "payloadDigest"}
+            )
+            with patch("services.v3_render_core.masked_surface.subprocess.run") as run:
+                with self.assertRaisesRegex(
+                    RenderArtifactError,
+                    "active ROI pixel-frame budget exceeded",
+                ):
+                    DeterministicMaskedSurfaceExecutor(root).execute(request)
+                run.assert_not_called()
 
     def test_closed_request_rejects_caller_filter_and_out_of_bounds_trajectory(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
