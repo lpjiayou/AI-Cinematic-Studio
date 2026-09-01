@@ -4,15 +4,15 @@
 >
 > Execution Mode: `AUTO-SEQUENTIAL / CONTRACT-FIRST / FAIL-CLOSED`
 >
-> Project Lead Authorization: `ACS-M13-R1-COMPOSITION-RENDER-CANDIDATE`
+> Project Lead Authorization: `ACS-M13-R2-C1-MASKED-SURFACE-V2-CROSS-LAYER-CORRECTIVE`
 >
-> Authorized Wave: `M13-R1A → M13-R1B → FRONTEND PIN / SERIAL ONLY`
+> Authorized Wave: `M13-R2-C1 CORE CORRECTIVE → FRONTEND PIN → M13-R2 RETRY / SERIAL ONLY`
 >
-> Current Task: `ACS-M13-R1-COMPOSITION-RENDER-CANDIDATE`
+> Current Task: `ACS-M13-R2-C1-MASKED-SURFACE-V2-CROSS-LAYER-CORRECTIVE`
 >
-> Current Work Package: `M13-R1 IMPLEMENTED CPU-ONLY / FRONTEND PIN NEXT / M12-C3/C4 ENVIRONMENT_HOLD`
+> Current Work Package: `M13-R2-C1 RENDERER V2 IMPLEMENTED / FULL-RESOLUTION PERFORMANCE PASS / R2 RETRY NEXT`
 >
-> Authorized Source Base: `CORE f6689516c3517f4954f505f41a11804d178afdc1 / TREE 76386aa55ba8949007d4406ccb85923a500e2518 / VERIFIED M13-E4 MERGE`
+> Authorized Source Base: `CORE c8f44f6b42e3bd873630faf85b49c6449b9d495d / TREE f6c62d1eaac38c07b29f59a98db73033735f8d0e / VERIFIED PRE-CORRECTIVE MAIN`
 >
 > M6 Authorization: `ACCEPTED SURFACES / K2-002 MUST CREATE DISTINCT SCOPE AND APPROVALS / NO K2-001 AUTHORITY INHERITANCE`
 >
@@ -20,7 +20,7 @@
 >
 > M12 Authorization: `RUNTIME G0 UNBLOCK AUTHORIZED NON-GPU / TWO ISOLATED RUNTIMES + ACYCLIC VOICE-CLONE LINEAGE / A100 NOT AUTHORIZED`
 >
-> M13 Authorization: `FULL BACKEND AUTHORIZED CPU-ONLY / EIGHT DETERMINISTIC EFFECTS + TIMELINE + PREVIEW/RENDER CANDIDATES`
+> M13 Authorization: `FULL BACKEND CPU-ONLY / R2-C1 MASKED-SURFACE V2 CORRECTIVE / NO PROVIDER OR GPU DISPATCH`
 >
 > M14–M15 Authorization: `IMPLEMENTATION NOT AUTHORIZED / EPISODEMASTER AND EXPORTARTIFACT REMAIN M15-EXCLUSIVE`
 >
@@ -30,20 +30,36 @@
 >
 > Historical ADR-0013 Acceptance Baseline: `CORE main 6d28a53f / TREE 369c3b14 / 851 PASS — FRONTEND main 5b36aac0 / TREE fd20b7d7 / 174 PASS + TYPECHECK + LINT + BUILD + TWO CHROMIUM GATES`
 >
-> Production Ready: `NO — M13-R1 IS IMPLEMENTED NON-PUBLISHING BUT M12 RUNTIME G0 AND M13 FULL BACKEND ARE NOT COMPLETE / NO PROVIDER, GPU, ADMISSION, PUBLICATION OR LIVE CANONICAL WRITE`
+> Production Ready: `NO — M13-R2 REMAINS BLOCKED PENDING RETRY / NO PROVIDER, GPU, ADMISSION, PUBLICATION OR LIVE CANONICAL WRITE`
 
 ---
 
 ## 0. 2026-09-01 current authority and transition
 
 The Project Lead, Architecture Owner and M13 Domain Owner authorize
-`ACS-M13-R1-COMPOSITION-RENDER-CANDIDATE`. This current overlay retains the accepted
-`ACS-M12-M13-ARCHITECTURE-CORRECTION-20260830` and ADR-0016/0017/0018 boundaries and
-authorizes only the serial M13-R1A immutable CompositionVersion/RenderManifest facts,
-M13-R1B non-publishing deterministic CPU RenderCandidate and Frontend pin update.
-M13-R1A and M13-R1B are now implemented; the Frontend pin update is next. It
-does not authorize a second Timeline/Composition/Render/Asset authority, Provider/GPU
-use, Asset Admission, publication, Master, Export or later milestones.
+`ACS-M13-R2-C1-MASKED-SURFACE-V2-CROSS-LAYER-CORRECTIVE`. This overlay supersedes the
+stopped narrow performance corrective only for the three named V3/V4/V5 masked-surface
+production files, their direct tests, required R1B/R2 regressions and this status
+section. It retains the accepted `ACS-M12-M13-ARCHITECTURE-CORRECTION-20260830` and
+ADR-0016/0017/0018 boundaries. It does not authorize a second
+Timeline/Composition/Render/Asset authority, Provider/GPU use, Asset Admission,
+publication, Master, Export or later milestones.
+
+The failed M13-R2 full-resolution acceptance is preserved on the temporary checkpoint
+branch and remains a failed historical result. Its 704×1280, 720-frame, 24-fps masked
+surface execution timed out at 300.108 seconds because the v1 filter graph interpreted
+the full frame for every frame. Renderer v2 now performs deterministic temporal sparse
+execution and conservative spatial ROI processing while retaining the 300-second hard
+timeout and the existing `libx264/crf=0/preset=medium/yuv420p/threads=1` policy. Final
+complete V3 runs finished in 22.659 and 19.683 seconds with identical decoded-pixel and
+file digests. Historical renderer v1 evidence remains readable and exactly replayable;
+new V3/V4/V5 writes require renderer v2, and version-bound runtime refs and artifact
+paths prevent v1/v2 collision or overwrite. Request, Result, runtime-evidence, Public
+API and SQLite schemas remain unchanged. M13-R2 remains blocked pending a fresh retry.
+
+The earlier `ACS-M13-R1-COMPOSITION-RENDER-CANDIDATE` implementation remains immutable
+history. M13-R1A and M13-R1B are implemented as non-publishing deterministic CPU
+capabilities; this corrective changes neither their authority nor their public shape.
 
 The stopped `ACS-M13-E3-CLOSEOUT-AFTER-FONT-AUTHORITY` result remains immutable history:
 M13-E3 was correctly blocked because canonical Identity reference projection and
@@ -133,7 +149,12 @@ M13_COMPOSITION_VERSION=IMPLEMENTED
 M13_RENDER_MANIFEST=IMPLEMENTED
 M13_RENDER_CANDIDATE=IMPLEMENTED_NON_PUBLISHING
 M13_R1=IMPLEMENTED_CPU_ONLY
-M13_R2=NEXT
+M13_R2=BLOCKED_PENDING_RETRY
+M13_R2_FAILED_ACCEPTANCE_PRESERVED=true
+M13_MASKED_SURFACE_RENDERER_V2=IMPLEMENTED
+M13_MASKED_SURFACE_FULL_RESOLUTION_PERFORMANCE=PASS
+M13_R2_RETRY=NEXT
+M13_BASE_CLOSEOUT_READY=false
 V5_FONT_AUTHORITY_CAPABILITY=IMPLEMENTED
 IDENTITY_REFERENCE_PROJECTION=AVAILABLE
 IDENTITY_REFERENCE_CURRENTNESS_REVALIDATION=AVAILABLE

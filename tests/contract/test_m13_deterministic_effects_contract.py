@@ -7,6 +7,8 @@ from pathlib import Path
 import tempfile
 import unittest
 
+from services.v5_core_os.episode_production import deterministic_effects as subject
+
 from services.v5_core_os.episode_production.deterministic_effects import (
     DECODED_FRAME_PIXEL_DIGEST_SPEC,
     DeterministicEffectContractError,
@@ -15,6 +17,7 @@ from services.v5_core_os.episode_production.deterministic_effects import (
     LIGHT_SWEEP,
     LOCAL_EXPOSURE,
     MASKED_SURFACE_ARTIFACT_EVIDENCE_SCHEMA_VERSION,
+    MASKED_SURFACE_RENDERER_VERSION_CURRENT,
     MASKED_SURFACE_RUNTIME_EVIDENCE_SCHEMA_VERSION,
     SCRATCH_REVEAL,
     LocalExposureRequirement,
@@ -127,14 +130,20 @@ def _command(effect_mode: str = SCRATCH_REVEAL) -> dict:
     }
 
 
-def _evidence(requirement, request, *, ffmpeg_identity: str = "ffmpeg-7.1") -> dict:
+def _evidence(
+    requirement,
+    request,
+    *,
+    ffmpeg_identity: str = "ffmpeg-7.1",
+    renderer_version: str = MASKED_SURFACE_RENDERER_VERSION_CURRENT,
+) -> dict:
     requirement_value = requirement.as_dict()
     request_value = request.as_dict()
     v3_digest = "8" * 64
     runtime_identity = {
         "v3ExecutionRequestDigest": v3_digest,
         "rendererIdentity": "v3.deterministic-masked-surface-ffmpeg",
-        "rendererVersion": "1",
+        "rendererVersion": renderer_version,
         "ffmpegIdentity": ffmpeg_identity,
     }
     runtime = _seal(
@@ -434,6 +443,130 @@ class DeterministicEffectsContractTests(unittest.TestCase):
         self.assertIs(type(artifact), MaskedSurfaceArtifactEvidence)
         self.assertIs(type(runtime), MaskedSurfaceRuntimeEvidence)
         self.assertFalse(runtime.as_dict()["gpuUsed"])
+
+    def test_runtime_reader_accepts_v1_v2_rejects_unknown_and_new_context_requires_v2(self) -> None:
+        requirement, request, evidence_v2 = self._chain()
+        evidence_v1 = _evidence(requirement, request, renderer_version="1")
+        parsed_v1 = MaskedSurfaceRuntimeEvidence.from_mapping(
+            evidence_v1["runtime"]
+        )
+        parsed_v2 = MaskedSurfaceRuntimeEvidence.from_mapping(
+            evidence_v2["runtime"]
+        )
+        self.assertEqual("1", parsed_v1.as_dict()["rendererVersion"])
+        self.assertEqual("2", parsed_v2.as_dict()["rendererVersion"])
+        self.assertNotEqual(
+            parsed_v1.as_dict()["runtimeEvidenceRef"],
+            parsed_v2.as_dict()["runtimeEvidenceRef"],
+        )
+        self.assertNotEqual(
+            evidence_v1["artifact"]["artifactEvidenceRef"],
+            evidence_v2["artifact"]["artifactEvidenceRef"],
+        )
+        with self.assertRaises(DeterministicEffectContractError):
+            validate_masked_surface_execution_evidence(
+                requirement=requirement,
+                execution_request=request,
+                artifact_evidence=evidence_v1["artifact"],
+                runtime_evidence=evidence_v1["runtime"],
+                require_current_renderer=True,
+            )
+        unknown = _evidence(requirement, request, renderer_version="3")
+        with self.assertRaises(DeterministicEffectContractError):
+            MaskedSurfaceRuntimeEvidence.from_mapping(unknown["runtime"])
+
+    def test_new_v1_append_rejects_but_historical_v1_exact_replay_is_unchanged(self) -> None:
+        requirement, request, _ = self._chain()
+        evidence = _evidence(requirement, request, renderer_version="1")
+        empty = InMemoryEpisodeProductionEvidenceAdapter()
+        with self.assertRaises(DeterministicEffectContractError):
+            append_deterministic_effect_result_chain(
+                empty,
+                requirement=requirement,
+                execution_request=request,
+                artifact_evidence=evidence["artifact"],
+                runtime_evidence=evidence["runtime"],
+                result=evidence["result"],
+                idempotency_key="historical-v1-chain",
+                created_at="2026-08-30T12:00:00Z",
+            )
+        self.assertEqual([], empty.list_records("workspace-e1", "run-e1"))
+
+        repository = InMemoryEpisodeProductionEvidenceAdapter()
+        chain = subject._validated_chain(
+            requirement=requirement,
+            execution_request=request,
+            artifact_evidence=evidence["artifact"],
+            runtime_evidence=evidence["runtime"],
+            result=evidence["result"],
+        )
+        records = subject._chain_records(
+            requirement=chain[0],
+            execution_request=chain[1],
+            artifact_evidence=chain[2],
+            runtime_evidence=chain[3],
+            result=chain[4],
+            idempotency_key="historical-v1-chain",
+            created_at="2026-08-30T12:00:00Z",
+        )
+        repository.append_records(records)
+        before = repository.list_records("workspace-e1", "run-e1")
+        replay, replayed = append_deterministic_effect_result_chain(
+            repository,
+            requirement=requirement,
+            execution_request=request,
+            artifact_evidence=evidence["artifact"],
+            runtime_evidence=evidence["runtime"],
+            result=evidence["result"],
+            idempotency_key="historical-v1-chain",
+            created_at="2026-08-30T12:00:00Z",
+        )
+        self.assertTrue(replayed)
+        self.assertEqual("1", replay.runtime_evidence.as_dict()["rendererVersion"])
+        self.assertEqual(before, repository.list_records("workspace-e1", "run-e1"))
+        self.assertEqual(evidence["result"].as_dict(), replay.result.as_dict())
+        self.assertEqual(
+            evidence["artifact"], replay.artifact_evidence.as_dict()
+        )
+
+    def test_sqlite_restart_reads_historical_v1_result_without_rewrite(self) -> None:
+        requirement, request, _ = self._chain()
+        evidence = _evidence(requirement, request, renderer_version="1")
+        chain = subject._validated_chain(
+            requirement=requirement,
+            execution_request=request,
+            artifact_evidence=evidence["artifact"],
+            runtime_evidence=evidence["runtime"],
+            result=evidence["result"],
+        )
+        records = subject._chain_records(
+            requirement=chain[0],
+            execution_request=chain[1],
+            artifact_evidence=chain[2],
+            runtime_evidence=chain[3],
+            result=chain[4],
+            idempotency_key="historical-v1-sqlite",
+            created_at="2026-08-30T12:00:00Z",
+        )
+        with tempfile.TemporaryDirectory() as temporary:
+            database = Path(temporary) / "evidence.sqlite3"
+            first = SqliteEpisodeProductionEvidenceAdapter(
+                database, initialize_if_missing=True
+            )
+            first.append_records(records)
+            second = SqliteEpisodeProductionEvidenceAdapter(
+                database, initialize_if_missing=False
+            )
+            resolved = resolve_deterministic_effect_result_chain(
+                second,
+                workspace_ref="workspace-e1",
+                production_run_ref="run-e1",
+                result_ref=evidence["result"].result_ref,
+                result_digest=evidence["result"].payload_digest,
+            )
+            self.assertEqual("1", resolved.runtime_evidence.as_dict()["rendererVersion"])
+            self.assertEqual(evidence["result"].as_dict(), resolved.result.as_dict())
+            self.assertEqual(5, len(second.list_records("workspace-e1", "run-e1")))
 
     def test_artifact_runtime_or_output_tamper_is_rejected(self) -> None:
         requirement, request, evidence = self._chain()

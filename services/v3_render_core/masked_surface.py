@@ -54,7 +54,26 @@ FLAME_SMOKE_EXECUTION_REQUEST_SCHEMA_VERSION = (
     "v4.m13-flame-smoke-execution-request.v1"
 )
 MASKED_SURFACE_RENDERER_IDENTITY = "v3.deterministic-masked-surface-ffmpeg"
-MASKED_SURFACE_RENDERER_VERSION = "1"
+MASKED_SURFACE_RENDERER_VERSION_V1 = "1"
+MASKED_SURFACE_RENDERER_VERSION_V2 = "2"
+MASKED_SURFACE_RENDERER_VERSION_CURRENT = MASKED_SURFACE_RENDERER_VERSION_V2
+MASKED_SURFACE_RENDERER_READ_VERSIONS = frozenset(
+    {MASKED_SURFACE_RENDERER_VERSION_V1, MASKED_SURFACE_RENDERER_VERSION_V2}
+)
+MASKED_SURFACE_RENDERER_VERSION = MASKED_SURFACE_RENDERER_VERSION_CURRENT
+MASKED_SURFACE_EXECUTION_PROFILE = "v2"
+MASKED_SURFACE_SUBPROCESS_TIMEOUT_SECONDS = 300
+MASKED_SURFACE_FILTER_THREAD_COUNT = 1
+MASKED_SURFACE_ENCODER_THREAD_COUNT = 1
+MASKED_SURFACE_ENCODER_PRESET = "medium"
+MASKED_SURFACE_MAX_OUTPUT_PIXEL_FRAMES = 1_600_000_000
+MASKED_SURFACE_MAX_ACTIVE_ROI_PIXEL_FRAMES = 64_000_000
+# Four pixels keep effect samples clear of swscale's chroma/RGB crop edge.
+# The processing ROI remains conservative and pixels beyond it stay untouched.
+MASKED_SURFACE_ROI_GUARD_PIXELS = 4
+MASKED_SURFACE_MAX_SCHEDULE_SEGMENTS = 4_096
+MASKED_SURFACE_MAX_CURVE_KEYFRAMES = 4_096
+MASKED_SURFACE_MAX_FILTER_GRAPH_COMPLEXITY = 65_536
 EFFECT_PREVIEW_EXECUTION_REQUEST_SCHEMA_VERSION = (
     "v4.m13-effect-preview-execution-request.v2"
 )
@@ -369,7 +388,11 @@ def _permille_point(value: object, *, label: str, minimum: int = 0) -> dict[str,
 
 
 def _validate_schedule(value: object, *, start: int, end: int) -> list[dict[str, Any]]:
-    if not isinstance(value, list) or not value:
+    if (
+        not isinstance(value, list)
+        or not value
+        or len(value) > MASKED_SURFACE_MAX_SCHEDULE_SEGMENTS
+    ):
         raise RenderArtifactError("masked-surface explicit schedule is invalid")
     result: list[dict[str, Any]] = []
     cursor = start
@@ -415,7 +438,11 @@ def _validate_keyframes(
     end: int,
     kind: str,
 ) -> list[dict[str, Any]]:
-    if not isinstance(value, list) or not value:
+    if (
+        not isinstance(value, list)
+        or not value
+        or len(value) > MASKED_SURFACE_MAX_CURVE_KEYFRAMES
+    ):
         raise RenderArtifactError(f"masked-surface {kind} is invalid")
     if kind == "trajectory":
         fields = {"frame", "xPermille", "yPermille", "interpolation"}
@@ -969,6 +996,7 @@ def _validate_request(value: Mapping[str, Any]) -> dict[str, Any]:
     request["position"] = position
     request["scale"] = scale
     request["perspective"] = perspective
+    _masked_surface_v2_workload(request)
     return request
 
 
@@ -1342,7 +1370,7 @@ def _scaled_dimension(dimension: int, permille: int) -> int:
     return max(1, dimension * permille // 1000)
 
 
-def _effect_stage_filters(
+def _effect_stage_filters_v1(
     request: Mapping[str, Any],
     *,
     input_label: str,
@@ -1450,6 +1478,403 @@ def _effect_stage_filters(
         f"[{prefix}baseout][{prefix}effect][{prefix}effectmask]"
         f"maskedmerge,format=yuv420p[{output_label}]"
     )
+    return filters, output_label
+
+
+def _filter_graph_v1(request: Mapping[str, Any]) -> str:
+    filters, output_label = _effect_stage_filters_v1(
+        request,
+        input_label="0:v",
+        mask_input_index=1,
+        prefix="effect0",
+    )
+    filters.append(f"[{output_label}]null[vout]")
+    return ";".join(filters)
+
+
+def _enabled_frame_intervals(
+    request: Mapping[str, Any],
+) -> tuple[tuple[int, int], ...]:
+    intervals: list[tuple[int, int]] = []
+    for record in request["explicitSchedule"]:
+        if not record["enabled"]:
+            continue
+        start = int(record["startFrameInclusive"])
+        end = int(record["endFrameExclusive"])
+        if intervals and start <= intervals[-1][1]:
+            intervals[-1] = (intervals[-1][0], max(intervals[-1][1], end))
+        else:
+            intervals.append((start, end))
+    return tuple(intervals)
+
+
+def _masked_surface_roi(request: Mapping[str, Any]) -> dict[str, int | bool]:
+    output = request["output"]
+    width = int(output["width"])
+    height = int(output["height"])
+    scale_width = _scaled_dimension(
+        width, int(request["scale"]["xPermille"])
+    )
+    scale_height = _scaled_dimension(
+        height, int(request["scale"]["yPermille"])
+    )
+    x_positions = [
+        width * int(item["xPermille"]) // 1000
+        for item in request["trajectoryKeyframes"]
+    ]
+    y_positions = [
+        height * int(item["yPermille"]) // 1000
+        for item in request["trajectoryKeyframes"]
+    ]
+    raw_x = max(0, min(x_positions) - MASKED_SURFACE_ROI_GUARD_PIXELS)
+    raw_y = max(0, min(y_positions) - MASKED_SURFACE_ROI_GUARD_PIXELS)
+    raw_end_x = min(
+        width,
+        max(x_positions) + scale_width + MASKED_SURFACE_ROI_GUARD_PIXELS,
+    )
+    raw_end_y = min(
+        height,
+        max(y_positions) + scale_height + MASKED_SURFACE_ROI_GUARD_PIXELS,
+    )
+
+    # yuv420p crop coordinates must be even.  Expand outward rather than
+    # rounding inward so the closed trajectory envelope cannot lose pixels.
+    x = raw_x - raw_x % 2
+    y = raw_y - raw_y % 2
+    end_x = min(width, raw_end_x + raw_end_x % 2)
+    end_y = min(height, raw_end_y + raw_end_y % 2)
+    roi_width = end_x - x
+    roi_height = end_y - y
+    if roi_width <= 0 or roi_height <= 0 or roi_width % 2 or roi_height % 2:
+        raise RenderArtifactError("masked-surface v2 ROI is invalid")
+    return {
+        "x": x,
+        "y": y,
+        "width": roi_width,
+        "height": roi_height,
+        "maskWidth": int(request["mask"]["width"]),
+        "maskHeight": int(request["mask"]["height"]),
+        "scaledMaskWidth": scale_width,
+        "scaledMaskHeight": scale_height,
+        "fullFrame": x == 0 and y == 0 and end_x == width and end_y == height,
+    }
+
+
+def _masked_surface_v2_workload(
+    request: Mapping[str, Any],
+) -> dict[str, Any]:
+    output = request["output"]
+    output_pixel_frames = (
+        int(output["width"])
+        * int(output["height"])
+        * int(output["frameCount"])
+    )
+    active_intervals = _enabled_frame_intervals(request)
+    active_frame_count = sum(end - start for start, end in active_intervals)
+    roi = _masked_surface_roi(request)
+    active_roi_pixel_frames = (
+        active_frame_count * int(roi["width"]) * int(roi["height"])
+    )
+    filter_graph_complexity = len(active_intervals) * (
+        len(request["trajectoryKeyframes"])
+        + len(request["intensityCurve"])
+        + len(request["exposureCurve"])
+        + len(request["perspective"]["quadPermille"])
+        + 16
+    )
+    if output_pixel_frames > MASKED_SURFACE_MAX_OUTPUT_PIXEL_FRAMES:
+        raise RenderArtifactError(
+            "masked-surface v2 output pixel-frame budget exceeded"
+        )
+    if active_roi_pixel_frames > MASKED_SURFACE_MAX_ACTIVE_ROI_PIXEL_FRAMES:
+        raise RenderArtifactError(
+            "masked-surface v2 active ROI pixel-frame budget exceeded"
+        )
+    if filter_graph_complexity > MASKED_SURFACE_MAX_FILTER_GRAPH_COMPLEXITY:
+        raise RenderArtifactError(
+            "masked-surface v2 filter graph complexity budget exceeded"
+        )
+    return {
+        "executionProfile": MASKED_SURFACE_EXECUTION_PROFILE,
+        "outputPixelFrames": output_pixel_frames,
+        "activeIntervals": active_intervals,
+        "activeFrameCount": active_frame_count,
+        "roi": roi,
+        "activeRoiPixelFrames": active_roi_pixel_frames,
+        "filterGraphComplexity": filter_graph_complexity,
+        "maxOutputPixelFrames": MASKED_SURFACE_MAX_OUTPUT_PIXEL_FRAMES,
+        "maxActiveRoiPixelFrames": (
+            MASKED_SURFACE_MAX_ACTIVE_ROI_PIXEL_FRAMES
+        ),
+        "maxFilterGraphComplexity": (
+            MASKED_SURFACE_MAX_FILTER_GRAPH_COMPLEXITY
+        ),
+    }
+
+
+def _timeline_segments(
+    frame_count: int, active_intervals: Sequence[tuple[int, int]]
+) -> tuple[tuple[int, int, bool], ...]:
+    segments: list[tuple[int, int, bool]] = []
+    cursor = 0
+    for start, end in active_intervals:
+        if cursor < start:
+            segments.append((cursor, start, False))
+        segments.append((start, end, True))
+        cursor = end
+    if cursor < frame_count:
+        segments.append((cursor, frame_count, False))
+    if not segments:
+        segments.append((0, frame_count, False))
+    return tuple(segments)
+
+
+def _active_roi_segment_filters(
+    request: Mapping[str, Any],
+    *,
+    input_label: str,
+    mask_label: str,
+    prefix: str,
+    start: int,
+    end: int,
+    roi: Mapping[str, Any],
+) -> tuple[list[str], str]:
+    output = request["output"]
+    width = int(output["width"])
+    height = int(output["height"])
+    frame_rate = int(output["frameRate"])
+    segment_frames = end - start
+    roi_x = int(roi["x"])
+    roi_y = int(roi["y"])
+    roi_width = int(roi["width"])
+    roi_height = int(roi["height"])
+    scale_width = int(roi["scaledMaskWidth"])
+    scale_height = int(roi["scaledMaskHeight"])
+    frame_n = f"n+{start}"
+    frame_N = f"N+{start}"
+    x_records = [
+        {**item, "pixel": width * int(item["xPermille"]) // 1000}
+        for item in request["trajectoryKeyframes"]
+    ]
+    y_records = [
+        {**item, "pixel": height * int(item["yPermille"]) // 1000}
+        for item in request["trajectoryKeyframes"]
+    ]
+    x_expression = _curve_expression(
+        x_records, "pixel", frame_variable=frame_n
+    )
+    y_expression = _curve_expression(
+        y_records, "pixel", frame_variable=frame_n
+    )
+    intensity_expression = _curve_expression(
+        request["intensityCurve"], "valuePermille", frame_variable=frame_N
+    )
+    exposure_expression = _curve_expression(
+        request["exposureCurve"], "valueMilliStops", frame_variable=frame_N
+    )
+    filters = [
+        (
+            f"[{input_label}]trim=start_frame={start}:end_frame={end},"
+            f"setpts=N,split=2[{prefix}full][{prefix}roisource]"
+        ),
+        (
+            f"[{prefix}roisource]crop={roi_width}:{roi_height}:{roi_x}:{roi_y},"
+            f"format=gbrp[{prefix}roirgb]"
+        ),
+    ]
+    mask_filters = (
+        f"[{mask_label}]trim=start_frame={start}:end_frame={end},setpts=N,"
+        f"format=gray,scale={scale_width}:{scale_height}:flags=neighbor:"
+        "in_range=full:out_range=full"
+    )
+    if request["perspective"]["mode"] == "FIXED_QUAD":
+        coordinates: list[int] = []
+        for point in request["perspective"]["quadPermille"]:
+            coordinates.extend(
+                (
+                    (scale_width - 1) * int(point["xPermille"]) // 1000,
+                    (scale_height - 1) * int(point["yPermille"]) // 1000,
+                )
+            )
+        mask_filters += ",perspective=" + ":".join(
+            [
+                f"x0={coordinates[0]}",
+                f"y0={coordinates[1]}",
+                f"x1={coordinates[2]}",
+                f"y1={coordinates[3]}",
+                f"x2={coordinates[4]}",
+                f"y2={coordinates[5]}",
+                f"x3={coordinates[6]}",
+                f"y3={coordinates[7]}",
+                "sense=destination",
+                "interpolation=linear",
+                "eval=init",
+            ]
+        )
+    mask_filters += f"[{prefix}maskgray]"
+    filters.extend(
+        [
+            mask_filters,
+            (
+                f"color=c=white@1:s={scale_width}x{scale_height}:r={frame_rate},"
+                f"trim=end_frame={segment_frames},settb=expr=1/{frame_rate},"
+                f"setpts=N,format=rgba[{prefix}white]"
+            ),
+            f"[{prefix}white][{prefix}maskgray]alphamerge[{prefix}masklocal]",
+            (
+                f"color=c=black@0:s={roi_width}x{roi_height}:r={frame_rate},"
+                f"trim=end_frame={segment_frames},settb=expr=1/{frame_rate},"
+                f"setpts=N,format=rgba[{prefix}canvas]"
+            ),
+            (
+                f"[{prefix}canvas][{prefix}masklocal]overlay="
+                f"x='({x_expression})-{roi_x}':y='({y_expression})-{roi_y}':"
+                "eval=frame:eof_action=repeat:shortest=1:format=auto"
+                f"[{prefix}maskcanvas]"
+            ),
+            (
+                f"[{prefix}maskcanvas]alphaextract,geq="
+                f"lum='clip(lum(X,Y)*({intensity_expression})/1000,0,255)'"
+                f"[{prefix}effectmask]"
+            ),
+        ]
+    )
+    blend_mode = request["blendMode"]
+    if blend_mode == "NORMAL":
+        filters.extend(
+            [
+                (
+                    f"[{prefix}roirgb]split=2"
+                    f"[{prefix}baseout][{prefix}exposuresrc]"
+                ),
+                (
+                    f"[{prefix}exposuresrc]geq="
+                    f"r='clip(r(X,Y)*pow(2,({exposure_expression})/1000),0,255)':"
+                    f"g='clip(g(X,Y)*pow(2,({exposure_expression})/1000),0,255)':"
+                    f"b='clip(b(X,Y)*pow(2,({exposure_expression})/1000),0,255)'"
+                    f"[{prefix}effect]"
+                ),
+            ]
+        )
+    else:
+        filters.extend(
+            [
+                (
+                    f"[{prefix}roirgb]split=3"
+                    f"[{prefix}baseout][{prefix}blendbase]"
+                    f"[{prefix}exposuresrc]"
+                ),
+                (
+                    f"[{prefix}exposuresrc]geq="
+                    f"r='clip(r(X,Y)*pow(2,({exposure_expression})/1000),0,255)':"
+                    f"g='clip(g(X,Y)*pow(2,({exposure_expression})/1000),0,255)':"
+                    f"b='clip(b(X,Y)*pow(2,({exposure_expression})/1000),0,255)'"
+                    f"[{prefix}exposed]"
+                ),
+                (
+                    f"[{prefix}blendbase][{prefix}exposed]"
+                    f"blend=all_mode={_BLEND_FILTERS[blend_mode]}"
+                    f"[{prefix}effect]"
+                ),
+            ]
+        )
+    output_label = f"{prefix}out"
+    filters.extend(
+        [
+            (
+                f"[{prefix}baseout][{prefix}effect][{prefix}effectmask]"
+                f"maskedmerge,format=yuv420p[{prefix}roiout]"
+            ),
+            (
+                f"[{prefix}full][{prefix}roiout]overlay=x={roi_x}:y={roi_y}:"
+                "eval=init:eof_action=pass:shortest=1:format=auto,"
+                f"format=yuv420p[{output_label}]"
+            ),
+        ]
+    )
+    return filters, output_label
+
+
+def _effect_stage_filters(
+    request: Mapping[str, Any],
+    *,
+    input_label: str,
+    mask_input_index: int,
+    prefix: str,
+) -> tuple[list[str], str]:
+    profile = _masked_surface_v2_workload(request)
+    output = request["output"]
+    frame_rate = int(output["frameRate"])
+    segments = _timeline_segments(
+        int(output["frameCount"]), profile["activeIntervals"]
+    )
+    filters: list[str] = []
+    segment_sources = [f"{prefix}segmentsource{index}" for index in range(len(segments))]
+    if len(segment_sources) == 1:
+        filters.append(
+            f"[{input_label}]settb=expr=1/{frame_rate},setpts=N"
+            f"[{segment_sources[0]}]"
+        )
+    else:
+        filters.append(
+            f"[{input_label}]settb=expr=1/{frame_rate},setpts=N,"
+            f"split={len(segment_sources)}"
+            + "".join(f"[{label}]" for label in segment_sources)
+        )
+
+    active_count = sum(1 for _start, _end, active in segments if active)
+    mask_sources = [f"{prefix}masksource{index}" for index in range(active_count)]
+    if active_count == 1:
+        filters.append(
+            f"[{mask_input_index}:v]settb=expr=1/{frame_rate},setpts=N"
+            f"[{mask_sources[0]}]"
+        )
+    elif active_count > 1:
+        filters.append(
+            f"[{mask_input_index}:v]settb=expr=1/{frame_rate},setpts=N,"
+            f"split={active_count}"
+            + "".join(f"[{label}]" for label in mask_sources)
+        )
+
+    segment_outputs: list[str] = []
+    active_index = 0
+    for index, ((start, end, active), source) in enumerate(
+        zip(segments, segment_sources, strict=True)
+    ):
+        if active:
+            stage_filters, segment_output = _active_roi_segment_filters(
+                request,
+                input_label=source,
+                mask_label=mask_sources[active_index],
+                prefix=f"{prefix}active{index}",
+                start=start,
+                end=end,
+                roi=profile["roi"],
+            )
+            filters.extend(stage_filters)
+            active_index += 1
+        else:
+            segment_output = f"{prefix}inactive{index}"
+            filters.append(
+                f"[{source}]trim=start_frame={start}:end_frame={end},"
+                f"setpts=N[{segment_output}]"
+            )
+        segment_outputs.append(segment_output)
+
+    output_label = f"{prefix}out"
+    if len(segment_outputs) == 1:
+        filters.append(
+            f"[{segment_outputs[0]}]format=yuv420p[{output_label}]"
+        )
+    else:
+        concat_label = f"{prefix}concat"
+        filters.append(
+            "".join(f"[{label}]" for label in segment_outputs)
+            + f"concat=n={len(segment_outputs)}:v=1:a=0[{concat_label}]"
+        )
+        filters.append(
+            f"[{concat_label}]format=yuv420p[{output_label}]"
+        )
     return filters, output_label
 
 
@@ -2937,7 +3362,7 @@ class DeterministicMaskedSurfaceExecutor:
                 request["productionRunRef"].encode("utf-8")
             ).hexdigest()[:20]
             directory = self.artifact_root / workspace_hash / run_hash / "masked-surface"
-            output_name = f"masked-surface-{request['payloadDigest']}.mp4"
+            output_name = f"masked-surface-v2-{request['payloadDigest']}.mp4"
             with _PinnedRegularFile(candidate, label="flame/smoke candidate") as pinned:
                 destination = _publish_timeline_output_v1(
                     root=self.artifact_root,
@@ -3035,11 +3460,11 @@ class DeterministicMaskedSurfaceExecutor:
                 "-xerror",
                 "-nostdin",
                 "-threads",
-                "1",
+                str(MASKED_SURFACE_FILTER_THREAD_COUNT),
                 "-filter_threads",
-                "1",
+                str(MASKED_SURFACE_FILTER_THREAD_COUNT),
                 "-filter_complex_threads",
-                "1",
+                str(MASKED_SURFACE_FILTER_THREAD_COUNT),
                 "-sws_flags",
                 "bitexact+accurate_rnd+full_chroma_int",
                 "-hwaccel",
@@ -3067,13 +3492,13 @@ class DeterministicMaskedSurfaceExecutor:
                 "-c:v",
                 "libx264",
                 "-preset",
-                "medium",
+                MASKED_SURFACE_ENCODER_PRESET,
                 "-crf",
                 "0",
                 "-pix_fmt",
                 "yuv420p",
                 "-threads:v",
-                "1",
+                str(MASKED_SURFACE_ENCODER_THREAD_COUNT),
                 "-x264-params",
                 "threads=1:lookahead_threads=1:sliced_threads=0:sync-lookahead=0:rc-lookahead=0:scenecut=0",
                 "-fflags",
@@ -3098,7 +3523,7 @@ class DeterministicMaskedSurfaceExecutor:
                     command,
                     check=True,
                     capture_output=True,
-                    timeout=300,
+                    timeout=MASKED_SURFACE_SUBPROCESS_TIMEOUT_SECONDS,
                     env=_fixed_environment(),
                     pass_fds=pass_fds,
                 )
@@ -3132,7 +3557,7 @@ class DeterministicMaskedSurfaceExecutor:
             workspace_hash = sha256(request["workspaceRef"].encode("utf-8")).hexdigest()[:20]
             run_hash = sha256(request["productionRunRef"].encode("utf-8")).hexdigest()[:20]
             directory = self.artifact_root / workspace_hash / run_hash / "masked-surface"
-            output_name = f"masked-surface-{request['payloadDigest']}.mp4"
+            output_name = f"masked-surface-v2-{request['payloadDigest']}.mp4"
             with _PinnedRegularFile(candidate, label="masked-surface candidate") as pinned:
                 destination = _publish_timeline_output_v1(
                     root=self.artifact_root,
@@ -3183,6 +3608,18 @@ __all__ = [
     "EFFECT_PREVIEW_RENDERER_VERSION_V5",
     "FLAME_SMOKE_EXECUTION_REQUEST_SCHEMA_VERSION",
     "MASKED_SURFACE_EXECUTION_REQUEST_SCHEMA_VERSION",
+    "MASKED_SURFACE_EXECUTION_PROFILE",
+    "MASKED_SURFACE_MAX_ACTIVE_ROI_PIXEL_FRAMES",
+    "MASKED_SURFACE_MAX_CURVE_KEYFRAMES",
+    "MASKED_SURFACE_MAX_FILTER_GRAPH_COMPLEXITY",
+    "MASKED_SURFACE_MAX_OUTPUT_PIXEL_FRAMES",
+    "MASKED_SURFACE_MAX_SCHEDULE_SEGMENTS",
     "MASKED_SURFACE_RENDERER_IDENTITY",
     "MASKED_SURFACE_RENDERER_VERSION",
+    "MASKED_SURFACE_RENDERER_READ_VERSIONS",
+    "MASKED_SURFACE_RENDERER_VERSION_CURRENT",
+    "MASKED_SURFACE_RENDERER_VERSION_V1",
+    "MASKED_SURFACE_RENDERER_VERSION_V2",
+    "MASKED_SURFACE_ROI_GUARD_PIXELS",
+    "MASKED_SURFACE_SUBPROCESS_TIMEOUT_SECONDS",
 ]
