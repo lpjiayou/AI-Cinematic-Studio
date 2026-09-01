@@ -1,0 +1,73 @@
+{
+  "schemaVersion": "test.m13-r2-failure-receipt.v1",
+  "taskId": "ACS-M13-R2-FULL-CPU-BACKEND-ACCEPTANCE",
+  "failedStage": "FLAME_SMOKE",
+  "authorityState": "TECHNICAL_EVIDENCE_ONLY",
+  "capturedAt": "2026-09-01T11:54:36Z",
+  "checkpointBaseCommit": "510323af2050b521c3f34a42bb021dc1f2560c05",
+  "checkpointBaseTree": "25f4e573e76d9efc51f49d02d89460aa7947a919",
+  "acceptanceHarnessCommit": "ce3f9218b2596887daf502344f8f7411011e833f",
+  "fixture": {
+    "kind": "GENERIC_NON_K2_TECHNICAL_FIXTURE",
+    "width": 704,
+    "height": 1280,
+    "frameCount": 720,
+    "frameRate": 24,
+    "durationSeconds": 30,
+    "audioSampleRate": 48000,
+    "audioChannels": 2,
+    "trackKinds": [
+      "VIDEO",
+      "AUDIO",
+      "SUBTITLE",
+      "EFFECT"
+    ],
+    "effectCount": 8
+  },
+  "execution": {
+    "testCase": "tests.integration.test_m13_r2_full_cpu_backend.M13R2FullCpuBackendIntegrationTests.test_generic_30_second_authenticated_full_render_is_bit_exact",
+    "maskedSurfaceRendererVersion": "2",
+    "subprocessTimeoutSeconds": 300,
+    "subprocessResult": "TIMEOUT",
+    "testWallSeconds": 389.455,
+    "shellWallSeconds": 389.786,
+    "testCount": 1,
+    "errorCount": 1
+  },
+  "rootCause": {
+    "classification": "FLAME_SMOKE_FULL_FRAME_INTERPRETED_FILTER_GRAPH",
+    "activeFrameRangeInclusive": [
+      0,
+      7
+    ],
+    "interpretedFrameRangeInclusive": [
+      0,
+      719
+    ],
+    "expensiveOperations": [
+      "gbrp",
+      "geq",
+      "blend",
+      "maskedmerge"
+    ]
+  },
+  "result": {
+    "session": "BLOCKED",
+    "blockReason": "M13_R2_PRODUCTION_CORRECTIVE_REQUIRED",
+    "m13R2": "FAIL",
+    "m13BackendCapabilityComplete": false,
+    "m13BaseCloseoutReady": false,
+    "productionSourceDiff": 0,
+    "publicApiDiff": 0,
+    "sqliteSchemaDiff": 0,
+    "dependencyDiff": 0,
+    "milestonePassStateWrites": 0,
+    "gpuOrProviderCalls": 0,
+    "assetAdmission": 0,
+    "liveCanonicalMutations": 0,
+    "publicationAllowed": false,
+    "temporaryArtifactsRetained": false,
+    "residualFfmpegProcesses": 0,
+    "residualFfprobeProcesses": 0
+  }
+}

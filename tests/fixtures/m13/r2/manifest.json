@@ -1,0 +1,88 @@
+{
+  "schemaVersion": "test.m13-r2-acceptance-manifest.v1",
+  "taskId": "ACS-M13-R2-FULL-CPU-BACKEND-ACCEPTANCE",
+  "executionMode": "ACCEPTANCE_ONLY_SINGLE_CORE_PR",
+  "labels": [
+    "TECHNICAL_FIXTURE_ONLY",
+    "NOT_LIVE_K2",
+    "NOT_ADMITTED",
+    "NOT_SELECTED",
+    "NOT_MASTER",
+    "NOT_EXPORT"
+  ],
+  "publicationAllowed": false,
+  "micro": {
+    "workspaceRef": "workspace-generic-r2",
+    "projectRef": "project-generic-r2",
+    "frameRate": 24,
+    "frameCount": 120,
+    "canvas": [64, 64],
+    "renderProfile": [160, 120],
+    "subtitleMode": "SIDECAR",
+    "compatibilityAdjustment": "Five one-second role stems require 120 exact 24-fps frames."
+  },
+  "full": {
+    "workspaceRef": "workspace-generic-r2",
+    "projectRef": "project-generic-r2",
+    "frameRate": 24,
+    "frameCount": 720,
+    "durationSeconds": 30,
+    "canvas": [704, 1280],
+    "executedRenderProfile": [704, 1280],
+    "declaredRenderProfiles": [
+      [704, 1280],
+      [720, 1280],
+      [1080, 1920]
+    ],
+    "videoCodec": "H264",
+    "audioCodec": "AAC",
+    "audioSampleRate": 48000,
+    "audioChannels": 2,
+    "subtitleMode": "BURN_IN"
+  },
+  "tracks": ["VIDEO", "AUDIO", "SUBTITLE", "EFFECT"],
+  "editingOperations": [
+    "SPLIT_CLIP",
+    "TRIM_CLIP",
+    "MOVE_CLIP",
+    "SET_TRANSITION",
+    "SET_SPEED",
+    "SET_TRANSFORM",
+    "SET_MASKS"
+  ],
+  "audioRoles": ["dialogue", "narration", "sfx", "ambience", "music"],
+  "audioFixtureLabels": [
+    "NOT_PRODUCTION_TTS",
+    "NOT_VOICE_CLONE",
+    "NOT_VOICE_IDENTITY_EVIDENCE",
+    "NOT_ADMITTED"
+  ],
+  "effects": [
+    "GLYPH_REVEAL",
+    "SCRATCH_REVEAL",
+    "LOCAL_EXPOSURE",
+    "FLAME_EXTINGUISH",
+    "SMOKE",
+    "NAMEPLATE_TEXT",
+    "FACE_MARK_COMPENSATION",
+    "DISTANCE_STATE_TRANSITION"
+  ],
+  "evidenceChain": [
+    "PreviewCandidate",
+    "TimelineVersion",
+    "CompositionVersion",
+    "RenderManifest",
+    "RenderCandidate"
+  ],
+  "forbiddenFullFixtureValues": [
+    "K2-002",
+    "EP01",
+    "SH02",
+    "SH15",
+    "SH18",
+    "裴昀",
+    "沈知微",
+    "贞",
+    "k2-technical-evidence"
+  ]
+}
