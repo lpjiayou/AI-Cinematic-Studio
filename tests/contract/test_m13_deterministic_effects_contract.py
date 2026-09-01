@@ -444,34 +444,52 @@ class DeterministicEffectsContractTests(unittest.TestCase):
         self.assertIs(type(runtime), MaskedSurfaceRuntimeEvidence)
         self.assertFalse(runtime.as_dict()["gpuUsed"])
 
-    def test_runtime_reader_accepts_v1_v2_rejects_unknown_and_new_context_requires_v2(self) -> None:
-        requirement, request, evidence_v2 = self._chain()
+    def test_runtime_reader_accepts_v1_v2_v3_and_new_context_requires_v3(self) -> None:
+        requirement, request, evidence_v3 = self._chain()
         evidence_v1 = _evidence(requirement, request, renderer_version="1")
+        evidence_v2 = _evidence(requirement, request, renderer_version="2")
         parsed_v1 = MaskedSurfaceRuntimeEvidence.from_mapping(
             evidence_v1["runtime"]
         )
         parsed_v2 = MaskedSurfaceRuntimeEvidence.from_mapping(
             evidence_v2["runtime"]
         )
+        parsed_v3 = MaskedSurfaceRuntimeEvidence.from_mapping(
+            evidence_v3["runtime"]
+        )
         self.assertEqual("1", parsed_v1.as_dict()["rendererVersion"])
         self.assertEqual("2", parsed_v2.as_dict()["rendererVersion"])
-        self.assertNotEqual(
-            parsed_v1.as_dict()["runtimeEvidenceRef"],
-            parsed_v2.as_dict()["runtimeEvidenceRef"],
+        self.assertEqual("3", parsed_v3.as_dict()["rendererVersion"])
+        self.assertEqual(
+            3,
+            len(
+                {
+                    parsed_v1.as_dict()["runtimeEvidenceRef"],
+                    parsed_v2.as_dict()["runtimeEvidenceRef"],
+                    parsed_v3.as_dict()["runtimeEvidenceRef"],
+                }
+            ),
         )
-        self.assertNotEqual(
-            evidence_v1["artifact"]["artifactEvidenceRef"],
-            evidence_v2["artifact"]["artifactEvidenceRef"],
+        self.assertEqual(
+            3,
+            len(
+                {
+                    evidence_v1["artifact"]["artifactEvidenceRef"],
+                    evidence_v2["artifact"]["artifactEvidenceRef"],
+                    evidence_v3["artifact"]["artifactEvidenceRef"],
+                }
+            ),
         )
-        with self.assertRaises(DeterministicEffectContractError):
-            validate_masked_surface_execution_evidence(
-                requirement=requirement,
-                execution_request=request,
-                artifact_evidence=evidence_v1["artifact"],
-                runtime_evidence=evidence_v1["runtime"],
-                require_current_renderer=True,
-            )
-        unknown = _evidence(requirement, request, renderer_version="3")
+        for historical in (evidence_v1, evidence_v2):
+            with self.assertRaises(DeterministicEffectContractError):
+                validate_masked_surface_execution_evidence(
+                    requirement=requirement,
+                    execution_request=request,
+                    artifact_evidence=historical["artifact"],
+                    runtime_evidence=historical["runtime"],
+                    require_current_renderer=True,
+                )
+        unknown = _evidence(requirement, request, renderer_version="4")
         with self.assertRaises(DeterministicEffectContractError):
             MaskedSurfaceRuntimeEvidence.from_mapping(unknown["runtime"])
 
@@ -528,6 +546,66 @@ class DeterministicEffectsContractTests(unittest.TestCase):
         self.assertEqual(
             evidence["artifact"], replay.artifact_evidence.as_dict()
         )
+
+    def test_new_v2_append_rejects_but_sqlite_historical_v2_replays_exactly(
+        self,
+    ) -> None:
+        requirement, request, _ = self._chain()
+        evidence = _evidence(requirement, request, renderer_version="2")
+        empty = InMemoryEpisodeProductionEvidenceAdapter()
+        with self.assertRaises(DeterministicEffectContractError):
+            append_deterministic_effect_result_chain(
+                empty,
+                requirement=requirement,
+                execution_request=request,
+                artifact_evidence=evidence["artifact"],
+                runtime_evidence=evidence["runtime"],
+                result=evidence["result"],
+                idempotency_key="historical-v2-chain",
+                created_at="2026-08-31T12:00:00Z",
+            )
+        self.assertEqual([], empty.list_records("workspace-e1", "run-e1"))
+
+        chain = subject._validated_chain(
+            requirement=requirement,
+            execution_request=request,
+            artifact_evidence=evidence["artifact"],
+            runtime_evidence=evidence["runtime"],
+            result=evidence["result"],
+        )
+        records = subject._chain_records(
+            requirement=chain[0],
+            execution_request=chain[1],
+            artifact_evidence=chain[2],
+            runtime_evidence=chain[3],
+            result=chain[4],
+            idempotency_key="historical-v2-chain",
+            created_at="2026-08-31T12:00:00Z",
+        )
+        with tempfile.TemporaryDirectory() as temporary:
+            database = Path(temporary) / "historical-v2.sqlite3"
+            first = SqliteEpisodeProductionEvidenceAdapter(
+                database, initialize_if_missing=True
+            )
+            first.append_records(records)
+            before = first.list_records("workspace-e1", "run-e1")
+            restarted = SqliteEpisodeProductionEvidenceAdapter(
+                database, initialize_if_missing=False
+            )
+            replay, replayed = append_deterministic_effect_result_chain(
+                restarted,
+                requirement=requirement,
+                execution_request=request,
+                artifact_evidence=evidence["artifact"],
+                runtime_evidence=evidence["runtime"],
+                result=evidence["result"],
+                idempotency_key="historical-v2-chain",
+                created_at="2026-08-31T12:00:00Z",
+            )
+            self.assertTrue(replayed)
+            self.assertEqual("2", replay.runtime_evidence.as_dict()["rendererVersion"])
+            self.assertEqual(before, restarted.list_records("workspace-e1", "run-e1"))
+            self.assertEqual(evidence["result"].as_dict(), replay.result.as_dict())
 
     def test_sqlite_restart_reads_historical_v1_result_without_rewrite(self) -> None:
         requirement, request, _ = self._chain()

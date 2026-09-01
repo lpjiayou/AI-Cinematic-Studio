@@ -62,9 +62,14 @@ MASKED_SURFACE_RENDERER_IDENTITY = (
 )
 MASKED_SURFACE_RENDERER_VERSION_V1 = "1"
 MASKED_SURFACE_RENDERER_VERSION_V2 = "2"
-MASKED_SURFACE_RENDERER_VERSION_CURRENT = MASKED_SURFACE_RENDERER_VERSION_V2
+MASKED_SURFACE_RENDERER_VERSION_V3 = "3"
+MASKED_SURFACE_RENDERER_VERSION_CURRENT = MASKED_SURFACE_RENDERER_VERSION_V3
 MASKED_SURFACE_RENDERER_READ_VERSIONS = frozenset(
-    {MASKED_SURFACE_RENDERER_VERSION_V1, MASKED_SURFACE_RENDERER_VERSION_V2}
+    {
+        MASKED_SURFACE_RENDERER_VERSION_V1,
+        MASKED_SURFACE_RENDERER_VERSION_V2,
+        MASKED_SURFACE_RENDERER_VERSION_V3,
+    }
 )
 MASKED_SURFACE_RENDERER_VERSION = MASKED_SURFACE_RENDERER_VERSION_CURRENT
 MASKED_SURFACE_PROVENANCE = "LOCAL_EVIDENCE"
@@ -1994,6 +1999,8 @@ def _expected_output_storage_key(
         filename = f"masked-surface-{request['payloadDigest']}.mp4"
     elif renderer_version == MASKED_SURFACE_RENDERER_VERSION_V2:
         filename = f"masked-surface-v2-{request['payloadDigest']}.mp4"
+    elif renderer_version == MASKED_SURFACE_RENDERER_VERSION_V3:
+        filename = f"masked-surface-v3-{request['payloadDigest']}.mp4"
     else:
         raise MaskedSurfaceExecutionError(
             "masked-surface artifact renderer version is unsupported"
@@ -2756,11 +2763,14 @@ def _validate_effect_artifact_storage(
         renderer_version=renderer_version,
     )
     declared_keys = {expected_key}
-    if renderer_version == MASKED_SURFACE_RENDERER_VERSION_V2:
+    if renderer_version in {
+        MASKED_SURFACE_RENDERER_VERSION_V2,
+        MASKED_SURFACE_RENDERER_VERSION_V3,
+    }:
         # The frozen V5 dependency projection reconstructs the historical
         # locator because storage paths are not part of the evidence DTO.
         # Treat that value only as a compatibility alias and always measure
-        # the authoritative, version-bound v2 artifact below.
+        # the authoritative, version-bound v2/v3 artifact below.
         declared_keys.add(
             _expected_output_storage_key(
                 storage_identity,
@@ -4075,6 +4085,7 @@ __all__ = [
     "MASKED_SURFACE_RENDERER_VERSION_CURRENT",
     "MASKED_SURFACE_RENDERER_VERSION_V1",
     "MASKED_SURFACE_RENDERER_VERSION_V2",
+    "MASKED_SURFACE_RENDERER_VERSION_V3",
     "MASKED_SURFACE_RUNTIME_EVIDENCE_SCHEMA_VERSION",
     "MASKED_SURFACE_V3_REQUEST_SCHEMA_VERSION",
     "MaskedSurfaceAssetResolutionError",

@@ -4,15 +4,15 @@
 >
 > Execution Mode: `AUTO-SEQUENTIAL / CONTRACT-FIRST / FAIL-CLOSED`
 >
-> Project Lead Authorization: `ACS-M13-R2-C1-MASKED-SURFACE-V2-CROSS-LAYER-CORRECTIVE`
+> Project Lead Authorization: `ACS-M13-R2-C2-FLAME-SMOKE-RENDERER-V3`
 >
-> Authorized Wave: `M13-R2-C1 CORE CORRECTIVE → FRONTEND PIN → M13-R2 RETRY / SERIAL ONLY`
+> Authorized Wave: `M13-R2-C2 CORE CORRECTIVE → FRONTEND PIN → M13-R2 RETRY / SERIAL ONLY`
 >
-> Current Task: `ACS-M13-R2-C1-MASKED-SURFACE-V2-CROSS-LAYER-CORRECTIVE`
+> Current Task: `ACS-M13-R2-C2-FLAME-SMOKE-RENDERER-V3`
 >
-> Current Work Package: `M13-R2-C1 RENDERER V2 IMPLEMENTED / FULL-RESOLUTION PERFORMANCE PASS / R2 RETRY NEXT`
+> Current Work Package: `M13-R2-C2 RENDERER V3 IMPLEMENTED / FULL-PROFILE PERFORMANCE PASS / R2 RETRY NEXT`
 >
-> Authorized Source Base: `CORE c8f44f6b42e3bd873630faf85b49c6449b9d495d / TREE f6c62d1eaac38c07b29f59a98db73033735f8d0e / VERIFIED PRE-CORRECTIVE MAIN`
+> Authorized Source Base: `CORE 510323af2050b521c3f34a42bb021dc1f2560c05 / TREE 25f4e573e76d9efc51f49d02d89460aa7947a919 / VERIFIED PRE-CORRECTIVE MAIN`
 >
 > M6 Authorization: `ACCEPTED SURFACES / K2-002 MUST CREATE DISTINCT SCOPE AND APPROVALS / NO K2-001 AUTHORITY INHERITANCE`
 >
@@ -20,7 +20,7 @@
 >
 > M12 Authorization: `RUNTIME G0 UNBLOCK AUTHORIZED NON-GPU / TWO ISOLATED RUNTIMES + ACYCLIC VOICE-CLONE LINEAGE / A100 NOT AUTHORIZED`
 >
-> M13 Authorization: `FULL BACKEND CPU-ONLY / R2-C1 MASKED-SURFACE V2 CORRECTIVE / NO PROVIDER OR GPU DISPATCH`
+> M13 Authorization: `FULL BACKEND CPU-ONLY / R2-C2 FLAME-SMOKE RENDERER V3 CORRECTIVE / NO PROVIDER OR GPU DISPATCH`
 >
 > M14–M15 Authorization: `IMPLEMENTATION NOT AUTHORIZED / EPISODEMASTER AND EXPORTARTIFACT REMAIN M15-EXCLUSIVE`
 >
@@ -37,25 +37,31 @@
 ## 0. 2026-09-01 current authority and transition
 
 The Project Lead, Architecture Owner and M13 Domain Owner authorize
-`ACS-M13-R2-C1-MASKED-SURFACE-V2-CROSS-LAYER-CORRECTIVE`. This overlay supersedes the
-stopped narrow performance corrective only for the three named V3/V4/V5 masked-surface
-production files, their direct tests, required R1B/R2 regressions and this status
-section. It retains the accepted `ACS-M12-M13-ARCHITECTURE-CORRECTION-20260830` and
+`ACS-M13-R2-C2-FLAME-SMOKE-RENDERER-V3`. This overlay supersedes the stopped second
+M13-R2 acceptance only for the three named V3/V4/V5 masked-surface production files,
+their direct tests, required E1/E2/E3/E4/R1B/R2 regressions and this status section. It
+retains the accepted `ACS-M12-M13-ARCHITECTURE-CORRECTION-20260830` and
 ADR-0016/0017/0018 boundaries. It does not authorize a second
 Timeline/Composition/Render/Asset authority, Provider/GPU use, Asset Admission,
 publication, Master, Export or later milestones.
 
-The failed M13-R2 full-resolution acceptance is preserved on the temporary checkpoint
-branch and remains a failed historical result. Its 704×1280, 720-frame, 24-fps masked
-surface execution timed out at 300.108 seconds because the v1 filter graph interpreted
-the full frame for every frame. Renderer v2 now performs deterministic temporal sparse
-execution and conservative spatial ROI processing while retaining the 300-second hard
-timeout and the existing `libx264/crf=0/preset=medium/yuv420p/threads=1` policy. Final
-complete V3 runs finished in 22.659 and 19.683 seconds with identical decoded-pixel and
-file digests. Historical renderer v1 evidence remains readable and exactly replayable;
-new V3/V4/V5 writes require renderer v2, and version-bound runtime refs and artifact
-paths prevent v1/v2 collision or overwrite. Request, Result, runtime-evidence, Public
-API and SQLite schemas remain unchanged. M13-R2 remains blocked pending a fresh retry.
+The second failed M13-R2 full-resolution acceptance is preserved on the temporary
+checkpoint branch and remains a failed historical result. Renderer v2 had corrected
+the first E1 masked-surface failure, but the next 704×1280, 720-frame, 24-fps retry
+timed out at the unchanged 300-second production boundary when Flame still interpreted
+its full-frame graph across all 720 frames; Smoke retained the same full-duration
+structure. Renderer v3 now performs
+deterministic temporal sparse execution for Flame and both pinned and procedural Smoke;
+the full fixture evaluates only F0–F7 and passes F8–F719 through unchanged. It retains
+the 300-second hard timeout and existing
+`libx264/crf=0/preset=medium/yuv420p/threads=1` policy. Full-profile Flame runs finished
+in 44.491 and 42.029 seconds, pinned Smoke in 18.962 and 16.916 seconds, and procedural
+Smoke in 19.722 and 17.685 seconds with repeatable decoded-pixel and file digests. The
+complete eight-effect visual graph finished in 81.943 seconds. Historical renderer
+v1/v2 evidence remains readable and exactly replayable; new V3/V4/V5 writes require
+renderer v3, and version-bound runtime refs and artifact paths prevent v1/v2/v3
+collision or overwrite. Request, Result, runtime-evidence, Public API and SQLite
+schemas remain unchanged. M13-R2 remains blocked pending a fresh retry.
 
 The earlier `ACS-M13-R1-COMPOSITION-RENDER-CANDIDATE` implementation remains immutable
 history. M13-R1A and M13-R1B are implemented as non-publishing deterministic CPU
@@ -151,8 +157,11 @@ M13_RENDER_CANDIDATE=IMPLEMENTED_NON_PUBLISHING
 M13_R1=IMPLEMENTED_CPU_ONLY
 M13_R2=BLOCKED_PENDING_RETRY
 M13_R2_FAILED_ACCEPTANCE_PRESERVED=true
+M13_R2_SECOND_FAILED_ACCEPTANCE_PRESERVED=true
 M13_MASKED_SURFACE_RENDERER_V2=IMPLEMENTED
 M13_MASKED_SURFACE_FULL_RESOLUTION_PERFORMANCE=PASS
+M13_FLAME_SMOKE_RENDERER_V3=IMPLEMENTED
+M13_FLAME_SMOKE_FULL_PROFILE_PERFORMANCE=PASS
 M13_R2_RETRY=NEXT
 M13_BASE_CLOSEOUT_READY=false
 V5_FONT_AUTHORITY_CAPABILITY=IMPLEMENTED

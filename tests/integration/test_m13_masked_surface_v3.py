@@ -29,6 +29,7 @@ from services.v3_render_core.masked_surface import (
     MASKED_SURFACE_RENDERER_VERSION_CURRENT,
     MASKED_SURFACE_RENDERER_VERSION_V1,
     MASKED_SURFACE_RENDERER_VERSION_V2,
+    MASKED_SURFACE_RENDERER_VERSION_V3,
     _filter_graph,
     _filter_graph_v1,
     _masked_surface_roi,
@@ -40,6 +41,9 @@ FRAME_RATE = 6
 FRAME_COUNT = 12
 WIDTH = 64
 HEIGHT = 48
+E1_V2_SCRATCH_REVEAL_PIXEL_DIGEST = (
+    "sha256:3393e65e857cae570f7ca51fcd291724fab3d412b845f4bf2d3183053f67cfd9"
+)
 
 
 def _canonical_json(value: dict[str, Any]) -> bytes:
@@ -624,6 +628,9 @@ class MaskedSurfaceV3IntegrationTests(unittest.TestCase):
     def test_combined_preview_boundary_matches_v4_exact_constants(self) -> None:
         from services.v3_render_core import masked_surface as v3
         from services.v4_platform import masked_surface_effects as v4
+        from services.v5_core_os.episode_production import (
+            deterministic_effects as v5,
+        )
 
         self.assertEqual(
             v4.EFFECT_PREVIEW_V3_REQUEST_SCHEMA_VERSION,
@@ -637,6 +644,20 @@ class MaskedSurfaceV3IntegrationTests(unittest.TestCase):
             set(v4._EFFECT_PREVIEW_V3_REQUEST_FIELDS),
             set(v3._EFFECT_PREVIEW_FIELDS),
         )
+        self.assertEqual(
+            {"1", "2", "3"},
+            set(v3.MASKED_SURFACE_RENDERER_READ_VERSIONS),
+        )
+        for boundary in (v3, v4, v5):
+            self.assertEqual("3", boundary.MASKED_SURFACE_RENDERER_VERSION_CURRENT)
+            self.assertEqual(
+                v3.MASKED_SURFACE_RENDERER_IDENTITY,
+                boundary.MASKED_SURFACE_RENDERER_IDENTITY,
+            )
+            self.assertEqual(
+                v3.MASKED_SURFACE_RENDERER_READ_VERSIONS,
+                boundary.MASKED_SURFACE_RENDERER_READ_VERSIONS,
+            )
 
     def test_combined_preview_replays_fixed_effect_glyph_order_then_audio_mux(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
@@ -690,7 +711,7 @@ class MaskedSurfaceV3IntegrationTests(unittest.TestCase):
                 self.assertEqual(MASKED_SURFACE_RENDERER_IDENTITY, result["rendererIdentity"])
                 self.assertEqual(MASKED_SURFACE_RENDERER_VERSION_CURRENT, result["rendererVersion"])
                 self.assertIn(
-                    f"masked-surface-v2-{request['payloadDigest']}.mp4",
+                    f"masked-surface-v3-{request['payloadDigest']}.mp4",
                     result["outputStorageKey"],
                 )
                 if mode == "SCRATCH_REVEAL":
@@ -725,8 +746,14 @@ class MaskedSurfaceV3IntegrationTests(unittest.TestCase):
                 base["pixelDigest"],
                 outputs["SCRATCH_REVEAL"]["outputDigest"]["decodedFramePixelDigest"],
             )
+            self.assertEqual(
+                E1_V2_SCRATCH_REVEAL_PIXEL_DIGEST,
+                outputs["SCRATCH_REVEAL"]["outputDigest"][
+                    "decodedFramePixelDigest"
+                ],
+            )
 
-    def test_v2_temporal_roi_pixels_and_v1_effect_semantics_are_exact(self) -> None:
+    def test_v3_temporal_roi_preserves_v2_pixels_and_v1_effect_semantics(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
             base, mask = _stage_inputs(root)
@@ -818,11 +845,15 @@ class MaskedSurfaceV3IntegrationTests(unittest.TestCase):
                 )
             )
             self.assertEqual(
-                {MASKED_SURFACE_RENDERER_VERSION_V1, MASKED_SURFACE_RENDERER_VERSION_V2},
-                {"1", MASKED_SURFACE_RENDERER_VERSION_CURRENT},
+                {
+                    MASKED_SURFACE_RENDERER_VERSION_V1,
+                    MASKED_SURFACE_RENDERER_VERSION_V2,
+                    MASKED_SURFACE_RENDERER_VERSION_V3,
+                },
+                {"1", "2", MASKED_SURFACE_RENDERER_VERSION_CURRENT},
             )
 
-    def test_v2_fixed_workload_budgets_reject_before_ffmpeg(self) -> None:
+    def test_v3_fixed_workload_budgets_reject_before_ffmpeg(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
             base, mask = _stage_inputs(root)

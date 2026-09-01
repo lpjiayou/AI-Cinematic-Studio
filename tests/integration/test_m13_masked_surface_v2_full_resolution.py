@@ -351,6 +351,11 @@ class MaskedSurfaceV2FullResolutionTests(unittest.TestCase):
             artifact_directory.mkdir(parents=True)
             legacy = artifact_directory / f"masked-surface-{request['payloadDigest']}.mp4"
             legacy.write_bytes(b"historical-v1-artifact")
+            legacy_v2 = (
+                artifact_directory
+                / f"masked-surface-v2-{request['payloadDigest']}.mp4"
+            )
+            legacy_v2.write_bytes(b"historical-v2-artifact")
 
             executor = DeterministicMaskedSurfaceExecutor(root)
             results: list[dict[str, Any]] = []
@@ -362,11 +367,11 @@ class MaskedSurfaceV2FullResolutionTests(unittest.TestCase):
             for duration in elapsed:
                 self.assertLessEqual(duration, PERFORMANCE_LIMIT_SECONDS)
             first, second = results
-            self.assertEqual("2", MASKED_SURFACE_RENDERER_VERSION_CURRENT)
-            self.assertEqual("2", first["rendererVersion"])
+            self.assertEqual("3", MASKED_SURFACE_RENDERER_VERSION_CURRENT)
+            self.assertEqual("3", first["rendererVersion"])
             self.assertEqual(first["outputStorageKey"], second["outputStorageKey"])
             self.assertIn(
-                f"masked-surface-v2-{request['payloadDigest']}.mp4",
+                f"masked-surface-v3-{request['payloadDigest']}.mp4",
                 first["outputStorageKey"],
             )
             self.assertEqual(
@@ -387,6 +392,12 @@ class MaskedSurfaceV2FullResolutionTests(unittest.TestCase):
                 ),
             )
             self.assertEqual(b"historical-v1-artifact", legacy.read_bytes())
+            self.assertEqual(
+                b"historical-v2-artifact", legacy_v2.read_bytes()
+            )
+            self.assertNotEqual(
+                str(legacy_v2.relative_to(root)), first["outputStorageKey"]
+            )
 
             output = root / first["outputStorageKey"]
             self.assertEqual(
