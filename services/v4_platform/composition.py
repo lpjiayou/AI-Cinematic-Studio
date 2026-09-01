@@ -2279,6 +2279,74 @@ class V4CompositionExecutor:
                 "V3 effect timeline preview composition failed"
             ) from exc
 
+    def render_candidate(
+        self,
+        execution_request: Mapping[str, Any],
+        *,
+        composition_version: Mapping[str, Any],
+        composition_command: Mapping[str, Any],
+        resolved_artifacts: Mapping[str, Any],
+        subtitle_cues: list[Mapping[str, Any]],
+        font_projection: Mapping[str, Any] | None,
+        font_required_text: str | None,
+    ) -> dict[str, Any]:
+        """Execute the sealed M13-R1B request through the existing CPU owner."""
+
+        from .render_candidate import (
+            RenderExecutionError,
+            V4RenderCandidateExecutor,
+        )
+
+        try:
+            return V4RenderCandidateExecutor(
+                self.artifact_root,
+                self,
+                font_asset_authority=self.font_asset_authority,
+            ).execute(
+                execution_request,
+                composition_version=composition_version,
+                composition_command=composition_command,
+                resolved_artifacts=resolved_artifacts,
+                subtitle_cues=subtitle_cues,
+                font_projection=font_projection,
+                font_required_text=font_required_text,
+            )
+        except RenderExecutionError as exc:
+            raise CompositionExecutionError(
+                "V3 deterministic RenderCandidate composition failed"
+            ) from exc
+
+    def inspect_render_candidate(
+        self,
+        *,
+        workspace_ref: str,
+        production_run_ref: str,
+        storage_binding_ref: str,
+        expected: Mapping[str, Any],
+    ) -> dict[str, Any]:
+        """Remeasure a published technical candidate before any read."""
+
+        from .render_candidate import (
+            RenderExecutionError,
+            V4RenderCandidateExecutor,
+        )
+
+        try:
+            return V4RenderCandidateExecutor(
+                self.artifact_root,
+                self,
+                font_asset_authority=self.font_asset_authority,
+            ).inspect(
+                workspace_ref=workspace_ref,
+                production_run_ref=production_run_ref,
+                storage_binding_ref=storage_binding_ref,
+                expected=expected,
+            )
+        except (RenderExecutionError, RenderArtifactError) as exc:
+            raise CompositionExecutionError(
+                "RenderCandidate artifact verification failed"
+            ) from exc
+
     def execute_flame_smoke(
         self,
         request: Mapping[str, Any],
