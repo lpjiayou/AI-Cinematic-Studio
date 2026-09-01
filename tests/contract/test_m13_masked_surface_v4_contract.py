@@ -104,6 +104,8 @@ class FakeV3Executor:
             result["requirementDigest"] = "f" * 64
         elif self.drift == "renderer-v1":
             result["rendererVersion"] = subject.MASKED_SURFACE_RENDERER_VERSION_V1
+        elif self.drift == "renderer-v2":
+            result["rendererVersion"] = subject.MASKED_SURFACE_RENDERER_VERSION_V2
         return result
 
     def compose_timeline_preview_v2(self, request: dict) -> dict:
@@ -498,82 +500,74 @@ class MaskedSurfaceV4ContractTests(unittest.TestCase):
             "runtime",
             "lineage",
             "renderer-v1",
+            "renderer-v2",
         ):
             with self.subTest(drift=drift):
                 with self.assertRaises(subject.MaskedSurfaceExecutionError):
                     self._execute(FakeV3Executor(self.root, drift=drift))
 
-    def test_runtime_reader_accepts_v1_v2_rejects_unknown_and_refs_do_not_collide(self) -> None:
+    def test_runtime_reader_accepts_v1_v2_v3_and_refs_do_not_collide(self) -> None:
         evidence = self._execute(FakeV3Executor(self.root))
-        runtime_v2 = evidence["runtimeEvidence"]
+        runtime_v3 = evidence["runtimeEvidence"]
         self.assertEqual(
-            runtime_v2,
-            subject.validate_masked_surface_runtime_evidence(runtime_v2),
+            runtime_v3,
+            subject.validate_masked_surface_runtime_evidence(runtime_v3),
         )
-        runtime_v1 = deepcopy(runtime_v2)
-        runtime_v1["rendererVersion"] = subject.MASKED_SURFACE_RENDERER_VERSION_V1
-        runtime_v1["runtimeEvidenceRef"] = (
-            "m13-masked-surface-runtime-evidence-"
-            + sha256(
-                canonical(
-                    {
-                        "v3ExecutionRequestDigest": runtime_v1[
-                            "v3ExecutionRequestDigest"
-                        ],
-                        "rendererIdentity": runtime_v1["rendererIdentity"],
-                        "rendererVersion": runtime_v1["rendererVersion"],
-                        "ffmpegIdentity": runtime_v1["ffmpegIdentity"],
-                    }
-                )
-            ).hexdigest()[:32]
-        )
-        runtime_v1 = seal(
-            {
-                key: value
-                for key, value in runtime_v1.items()
-                if key != "payloadDigest"
-            }
-        )
+        def with_version(version: str) -> dict:
+            runtime = deepcopy(runtime_v3)
+            runtime["rendererVersion"] = version
+            runtime["runtimeEvidenceRef"] = (
+                "m13-masked-surface-runtime-evidence-"
+                + sha256(
+                    canonical(
+                        {
+                            "v3ExecutionRequestDigest": runtime[
+                                "v3ExecutionRequestDigest"
+                            ],
+                            "rendererIdentity": runtime["rendererIdentity"],
+                            "rendererVersion": runtime["rendererVersion"],
+                            "ffmpegIdentity": runtime["ffmpegIdentity"],
+                        }
+                    )
+                ).hexdigest()[:32]
+            )
+            return seal(
+                {
+                    key: value
+                    for key, value in runtime.items()
+                    if key != "payloadDigest"
+                }
+            )
+
+        runtime_v1 = with_version(subject.MASKED_SURFACE_RENDERER_VERSION_V1)
+        runtime_v2 = with_version(subject.MASKED_SURFACE_RENDERER_VERSION_V2)
+        for runtime in (runtime_v1, runtime_v2):
+            self.assertEqual(
+                runtime,
+                subject.validate_masked_surface_runtime_evidence(runtime),
+            )
         self.assertEqual(
-            runtime_v1,
-            subject.validate_masked_surface_runtime_evidence(runtime_v1),
+            3,
+            len(
+                {
+                    runtime_v1["runtimeEvidenceRef"],
+                    runtime_v2["runtimeEvidenceRef"],
+                    runtime_v3["runtimeEvidenceRef"],
+                }
+            ),
         )
-        self.assertNotEqual(
-            runtime_v1["runtimeEvidenceRef"], runtime_v2["runtimeEvidenceRef"]
-        )
-        unknown = deepcopy(runtime_v1)
-        unknown["rendererVersion"] = "3"
-        unknown["runtimeEvidenceRef"] = (
-            "m13-masked-surface-runtime-evidence-"
-            + sha256(
-                canonical(
-                    {
-                        "v3ExecutionRequestDigest": unknown[
-                            "v3ExecutionRequestDigest"
-                        ],
-                        "rendererIdentity": unknown["rendererIdentity"],
-                        "rendererVersion": unknown["rendererVersion"],
-                        "ffmpegIdentity": unknown["ffmpegIdentity"],
-                    }
-                )
-            ).hexdigest()[:32]
-        )
-        unknown = seal(
-            {
-                key: value
-                for key, value in unknown.items()
-                if key != "payloadDigest"
-            }
-        )
+        unknown = with_version("4")
         with self.assertRaises(subject.MaskedSurfaceExecutionError):
             subject.validate_masked_surface_runtime_evidence(unknown)
 
-    def test_v2_dependency_alias_measures_only_version_bound_artifact(self) -> None:
+    def test_v2_v3_dependency_aliases_measure_only_version_bound_artifacts(
+        self,
+    ) -> None:
         fake = FakeV3Executor(self.root)
         evidence = self._execute(fake)
         assert fake.request is not None
         artifact = evidence["artifactEvidence"]
-        runtime = evidence["runtimeEvidence"]
+        runtime_v3 = evidence["runtimeEvidence"]
         workspace = sha256(artifact["workspaceRef"].encode()).hexdigest()[:20]
         run = sha256(artifact["productionRunRef"].encode()).hexdigest()[:20]
         legacy_key = (
@@ -597,32 +591,55 @@ class MaskedSurfaceV4ContractTests(unittest.TestCase):
             "frameRate": output["frameRate"],
             "pixelFormat": probe["pixelFormat"],
         }
-        with mock.patch.object(
-            subject,
-            "decoded_frame_pixel_digest_metadata",
-            return_value={
-                "fileDigest": output["fileDigest"],
-                "decodedFramePixelDigest": output["decodedFramePixelDigest"],
-                "decodedFramePixelDigestSpec": output[
-                    "decodedFramePixelDigestSpec"
-                ],
-                "width": output["width"],
-                "height": output["height"],
-                "frameCount": output["frameCount"],
-            },
-        ) as measured:
-            self.assertEqual(
-                storage,
-                subject._validate_effect_artifact_storage(
-                    storage,
-                    artifact=artifact,
-                    runtime_evidence=runtime,
-                    artifact_root=self.root,
-                ),
-            )
-        measured_path = Path(measured.call_args.args[0])
-        self.assertIn("masked-surface-v2-", measured_path.name)
-        self.assertNotEqual(legacy_path, measured_path)
+        identity = {
+            "workspaceRef": artifact["workspaceRef"],
+            "productionRunRef": artifact["productionRunRef"],
+            "payloadDigest": artifact["v3ExecutionRequestDigest"],
+        }
+        for version in (
+            subject.MASKED_SURFACE_RENDERER_VERSION_V2,
+            subject.MASKED_SURFACE_RENDERER_VERSION_V3,
+        ):
+            with self.subTest(renderer_version=version):
+                runtime = deepcopy(runtime_v3)
+                runtime["rendererVersion"] = version
+                expected_key = subject._expected_output_storage_key(
+                    identity, renderer_version=version
+                )
+                expected_path = self.root / expected_key
+                expected_path.parent.mkdir(parents=True, exist_ok=True)
+                expected_path.write_bytes(b"deterministic-masked-surface-output")
+                with mock.patch.object(
+                    subject,
+                    "decoded_frame_pixel_digest_metadata",
+                    return_value={
+                        "fileDigest": output["fileDigest"],
+                        "decodedFramePixelDigest": output[
+                            "decodedFramePixelDigest"
+                        ],
+                        "decodedFramePixelDigestSpec": output[
+                            "decodedFramePixelDigestSpec"
+                        ],
+                        "width": output["width"],
+                        "height": output["height"],
+                        "frameCount": output["frameCount"],
+                    },
+                ) as measured:
+                    self.assertEqual(
+                        storage,
+                        subject._validate_effect_artifact_storage(
+                            storage,
+                            artifact=artifact,
+                            runtime_evidence=runtime,
+                            artifact_root=self.root,
+                        ),
+                    )
+                measured_path = Path(measured.call_args.args[0])
+                self.assertEqual(expected_path, measured_path)
+                self.assertIn(
+                    f"masked-surface-v{version}-", measured_path.name
+                )
+                self.assertNotEqual(legacy_path, measured_path)
         self.assertEqual(
             b"historical-v1-artifact-must-not-be-opened",
             legacy_path.read_bytes(),

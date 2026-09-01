@@ -56,18 +56,24 @@ FLAME_SMOKE_EXECUTION_REQUEST_SCHEMA_VERSION = (
 MASKED_SURFACE_RENDERER_IDENTITY = "v3.deterministic-masked-surface-ffmpeg"
 MASKED_SURFACE_RENDERER_VERSION_V1 = "1"
 MASKED_SURFACE_RENDERER_VERSION_V2 = "2"
-MASKED_SURFACE_RENDERER_VERSION_CURRENT = MASKED_SURFACE_RENDERER_VERSION_V2
+MASKED_SURFACE_RENDERER_VERSION_V3 = "3"
+MASKED_SURFACE_RENDERER_VERSION_CURRENT = MASKED_SURFACE_RENDERER_VERSION_V3
 MASKED_SURFACE_RENDERER_READ_VERSIONS = frozenset(
-    {MASKED_SURFACE_RENDERER_VERSION_V1, MASKED_SURFACE_RENDERER_VERSION_V2}
+    {
+        MASKED_SURFACE_RENDERER_VERSION_V1,
+        MASKED_SURFACE_RENDERER_VERSION_V2,
+        MASKED_SURFACE_RENDERER_VERSION_V3,
+    }
 )
 MASKED_SURFACE_RENDERER_VERSION = MASKED_SURFACE_RENDERER_VERSION_CURRENT
-MASKED_SURFACE_EXECUTION_PROFILE = "v2"
+MASKED_SURFACE_EXECUTION_PROFILE = "v3"
 MASKED_SURFACE_SUBPROCESS_TIMEOUT_SECONDS = 300
 MASKED_SURFACE_FILTER_THREAD_COUNT = 1
 MASKED_SURFACE_ENCODER_THREAD_COUNT = 1
 MASKED_SURFACE_ENCODER_PRESET = "medium"
 MASKED_SURFACE_MAX_OUTPUT_PIXEL_FRAMES = 1_600_000_000
 MASKED_SURFACE_MAX_ACTIVE_ROI_PIXEL_FRAMES = 64_000_000
+MASKED_SURFACE_MAX_ACTIVE_FLAME_SMOKE_PIXEL_FRAMES = 64_000_000
 # Four pixels keep effect samples clear of swscale's chroma/RGB crop edge.
 # The processing ROI remains conservative and pixels beyond it stay untouched.
 MASKED_SURFACE_ROI_GUARD_PIXELS = 4
@@ -1941,35 +1947,270 @@ def _fixed_masked_composite_filters(
     return filters, output_label
 
 
-def _flame_stage_filters(
+def _merge_frame_intervals(
+    intervals: Sequence[tuple[int, int]],
+) -> tuple[tuple[int, int], ...]:
+    merged: list[tuple[int, int]] = []
+    for start, end in sorted(intervals):
+        if end <= start:
+            continue
+        if merged and start <= merged[-1][1]:
+            merged[-1] = (merged[-1][0], max(merged[-1][1], end))
+        else:
+            merged.append((start, end))
+    return tuple(merged)
+
+
+def _curve_potential_nonzero_intervals(
+    records: Sequence[Mapping[str, Any]],
+    value_field: str,
+    *,
+    zero_value: int,
+    start: int,
+    end: int,
+) -> tuple[tuple[int, int], ...]:
+    """Return intervals where a curve can produce a non-zero value.
+
+    A non-STEP transition remains active when either endpoint is non-zero.
+    This deliberately keeps the exact-zero endpoint in the active interval
+    when a future transition can become non-zero.  STEP zero spans, and final
+    zero tails with no later transition, are safe passthrough intervals.
+    """
+
+    intervals: list[tuple[int, int]] = []
+    for index, current in enumerate(records):
+        following = records[index + 1] if index + 1 < len(records) else None
+        segment_start = max(start, int(current["frame"]))
+        segment_end = min(
+            end,
+            int(following["frame"]) if following is not None else end,
+        )
+        if segment_end <= segment_start:
+            continue
+        values = [int(current[value_field])]
+        if following is not None and current["interpolation"] != "STEP":
+            values.append(int(following[value_field]))
+        if any(value != zero_value for value in values):
+            intervals.append((segment_start, segment_end))
+    return _merge_frame_intervals(intervals)
+
+
+def _intersect_frame_intervals(
+    left: Sequence[tuple[int, int]],
+    right: Sequence[tuple[int, int]],
+) -> tuple[tuple[int, int], ...]:
+    intersections: list[tuple[int, int]] = []
+    left_index = 0
+    right_index = 0
+    while left_index < len(left) and right_index < len(right):
+        start = max(left[left_index][0], right[right_index][0])
+        end = min(left[left_index][1], right[right_index][1])
+        if start < end:
+            intersections.append((start, end))
+        if left[left_index][1] <= right[right_index][1]:
+            left_index += 1
+        else:
+            right_index += 1
+    return _merge_frame_intervals(intersections)
+
+
+def _flame_smoke_active_intervals(
+    request: Mapping[str, Any],
+) -> tuple[tuple[int, int], ...]:
+    start = int(request["frameRangeStartInclusive"])
+    end = int(request["frameRangeEndExclusive"])
+    if request["effectMode"] == "FLAME_EXTINGUISH":
+        return ((start, end),)
+    opacity = _curve_potential_nonzero_intervals(
+        request["opacitySchedule"],
+        "valuePermille",
+        zero_value=0,
+        start=start,
+        end=end,
+    )
+    remaining_density = _curve_potential_nonzero_intervals(
+        request["dissipationCurve"],
+        "valuePermille",
+        zero_value=1000,
+        start=start,
+        end=end,
+    )
+    return _intersect_frame_intervals(opacity, remaining_density)
+
+
+def _flame_smoke_v3_workload(
+    request: Mapping[str, Any],
+) -> dict[str, Any]:
+    output = request["output"]
+    width = int(output["width"])
+    height = int(output["height"])
+    frame_count = int(output["frameCount"])
+    output_pixel_frames = width * height * frame_count
+    active_intervals = _flame_smoke_active_intervals(request)
+    active_frame_count = sum(end - start for start, end in active_intervals)
+    active_pixel_frames = width * height * active_frame_count
+    if request["effectMode"] == "FLAME_EXTINGUISH":
+        fact_count = sum(
+            len(request[field])
+            for field in ("stateSchedule", "brightnessCurve", "alphaCurve")
+        )
+    else:
+        fact_count = sum(
+            len(request[field])
+            for field in (
+                "opacitySchedule",
+                "positionKeyframes",
+                "scaleKeyframes",
+                "driftKeyframes",
+                "dissipationCurve",
+            )
+        )
+    temporal_segment_count = len(
+        _timeline_segments(frame_count, active_intervals)
+    )
+    filter_graph_complexity = (
+        max(1, len(active_intervals)) * (fact_count + 24)
+        + temporal_segment_count * 4
+    )
+    if output_pixel_frames > MASKED_SURFACE_MAX_OUTPUT_PIXEL_FRAMES:
+        raise RenderArtifactError(
+            "masked-surface v3 Flame/Smoke output pixel-frame budget exceeded"
+        )
+    if (
+        active_pixel_frames
+        > MASKED_SURFACE_MAX_ACTIVE_FLAME_SMOKE_PIXEL_FRAMES
+    ):
+        raise RenderArtifactError(
+            "masked-surface v3 Flame/Smoke active pixel-frame budget exceeded"
+        )
+    if len(active_intervals) > MASKED_SURFACE_MAX_SCHEDULE_SEGMENTS:
+        raise RenderArtifactError(
+            "masked-surface v3 Flame/Smoke active interval budget exceeded"
+        )
+    if filter_graph_complexity > MASKED_SURFACE_MAX_FILTER_GRAPH_COMPLEXITY:
+        raise RenderArtifactError(
+            "masked-surface v3 Flame/Smoke filter graph complexity budget exceeded"
+        )
+    return {
+        "executionProfile": MASKED_SURFACE_EXECUTION_PROFILE,
+        "outputPixelFrames": output_pixel_frames,
+        "activeIntervals": active_intervals,
+        "activeFrameCount": active_frame_count,
+        "activePixelFrames": active_pixel_frames,
+        "filterGraphComplexity": filter_graph_complexity,
+        "maxOutputPixelFrames": MASKED_SURFACE_MAX_OUTPUT_PIXEL_FRAMES,
+        "maxActivePixelFrames": (
+            MASKED_SURFACE_MAX_ACTIVE_FLAME_SMOKE_PIXEL_FRAMES
+        ),
+        "maxFilterGraphComplexity": (
+            MASKED_SURFACE_MAX_FILTER_GRAPH_COMPLEXITY
+        ),
+    }
+
+
+def _temporal_stage_sources(
+    *,
+    input_label: str,
+    frame_count: int,
+    frame_rate: int,
+    active_intervals: Sequence[tuple[int, int]],
+    prefix: str,
+) -> tuple[list[str], tuple[tuple[int, int, bool], ...], list[str]]:
+    segments = _timeline_segments(frame_count, active_intervals)
+    sources = [f"{prefix}segmentsource{index}" for index in range(len(segments))]
+    if len(sources) == 1:
+        filters = [
+            f"[{input_label}]settb=expr=1/{frame_rate},setpts=N[{sources[0]}]"
+        ]
+    else:
+        filters = [
+            f"[{input_label}]settb=expr=1/{frame_rate},setpts=N,"
+            f"split={len(sources)}"
+            + "".join(f"[{source}]" for source in sources)
+        ]
+    return filters, segments, sources
+
+
+def _temporal_auxiliary_sources(
+    *,
+    input_label: str,
+    frame_rate: int,
+    count: int,
+    prefix: str,
+) -> tuple[list[str], list[str]]:
+    if count == 0:
+        return [], []
+    sources = [f"{prefix}source{index}" for index in range(count)]
+    if count == 1:
+        return [
+            f"[{input_label}]settb=expr=1/{frame_rate},setpts=N[{sources[0]}]"
+        ], sources
+    return [
+        f"[{input_label}]settb=expr=1/{frame_rate},setpts=N,split={count}"
+        + "".join(f"[{source}]" for source in sources)
+    ], sources
+
+
+def _finish_temporal_stage(
+    filters: list[str], *, segment_outputs: Sequence[str], prefix: str
+) -> tuple[list[str], str]:
+    output_label = f"{prefix}out"
+    if len(segment_outputs) == 1:
+        filters.append(
+            f"[{segment_outputs[0]}]format=yuv420p[{output_label}]"
+        )
+    else:
+        concat_label = f"{prefix}concat"
+        filters.append(
+            "".join(f"[{label}]" for label in segment_outputs)
+            + f"concat=n={len(segment_outputs)}:v=1:a=0[{concat_label}]"
+        )
+        filters.append(f"[{concat_label}]format=yuv420p[{output_label}]")
+    return filters, output_label
+
+
+def _active_flame_segment_filters(
     request: Mapping[str, Any],
     *,
     input_label: str,
-    mask_input_index: int,
+    mask_label: str,
     prefix: str,
+    start: int,
+    end: int,
 ) -> tuple[list[str], str]:
     output = request["output"]
-    width = output["width"]
-    height = output["height"]
-    frame_rate = output["frameRate"]
-    brightness = _curve_expression(request["brightnessCurve"], "valuePermille")
-    alpha = _curve_expression(request["alphaCurve"], "valuePermille")
-    ember = _state_expression(request["stateSchedule"], "EMBER")
+    width = int(output["width"])
+    height = int(output["height"])
+    frame_rate = int(output["frameRate"])
+    global_frame = f"N+{start}"
+    brightness = _curve_expression(
+        request["brightnessCurve"],
+        "valuePermille",
+        frame_variable=global_frame,
+    )
+    alpha = _curve_expression(
+        request["alphaCurve"],
+        "valuePermille",
+        frame_variable=global_frame,
+    )
+    ember = _state_expression(
+        request["stateSchedule"], "EMBER", frame_variable=global_frame
+    )
     in_range = (
-        f"between(N,{request['frameRangeStartInclusive']},"
+        f"between({global_frame},{request['frameRangeStartInclusive']},"
         f"{request['frameRangeEndExclusive'] - 1})"
     )
     filters = [
         (
-            f"[{mask_input_index}:v]settb=expr=1/{frame_rate},setpts=N,"
+            f"[{mask_label}]trim=start_frame={start}:end_frame={end},setpts=N,"
             f"format=gray,scale={width}:{height}:flags=neighbor:"
             f"in_range=full:out_range=full,"
             f"geq=lum='clip(lum(X,Y)*({in_range})*(1000-({alpha}))/1000,0,255)'"
             f"[{prefix}mask]"
         ),
         (
-            f"[{input_label}]settb=expr=1/{frame_rate},setpts=N,format=gbrp,"
-            f"split=2[{prefix}base][{prefix}source]"
+            f"[{input_label}]trim=start_frame={start}:end_frame={end},setpts=N,"
+            f"format=gbrp,split=2[{prefix}base][{prefix}source]"
         ),
         (
             f"[{prefix}source]geq="
@@ -1978,6 +2219,190 @@ def _flame_stage_filters(
             f"b='clip(b(X,Y)*({brightness})/1000+8*({ember})*({alpha})/1000,0,255)'"
             f"[{prefix}effect]"
         ),
+    ]
+    composite, output_label = _fixed_masked_composite_filters(
+        input_label=f"{prefix}base",
+        effect_label=f"{prefix}effect",
+        mask_label=f"{prefix}mask",
+        blend_mode=request["blendMode"],
+        frame_rate=frame_rate,
+        prefix=prefix,
+    )
+    filters.extend(composite)
+    return filters, output_label
+
+
+def _flame_stage_filters(
+    request: Mapping[str, Any],
+    *,
+    input_label: str,
+    mask_input_index: int,
+    prefix: str,
+) -> tuple[list[str], str]:
+    output = request["output"]
+    frame_rate = int(output["frameRate"])
+    profile = _flame_smoke_v3_workload(request)
+    filters, segments, sources = _temporal_stage_sources(
+        input_label=input_label,
+        frame_count=int(output["frameCount"]),
+        frame_rate=frame_rate,
+        active_intervals=profile["activeIntervals"],
+        prefix=prefix,
+    )
+    active_count = sum(1 for _start, _end, active in segments if active)
+    mask_filters, mask_sources = _temporal_auxiliary_sources(
+        input_label=f"{mask_input_index}:v",
+        frame_rate=frame_rate,
+        count=active_count,
+        prefix=f"{prefix}mask",
+    )
+    filters.extend(mask_filters)
+    segment_outputs: list[str] = []
+    active_index = 0
+    for index, ((start, end, active), source) in enumerate(
+        zip(segments, sources, strict=True)
+    ):
+        if active:
+            stage_filters, segment_output = _active_flame_segment_filters(
+                request,
+                input_label=source,
+                mask_label=mask_sources[active_index],
+                prefix=f"{prefix}active{index}",
+                start=start,
+                end=end,
+            )
+            filters.extend(stage_filters)
+            active_index += 1
+        else:
+            segment_output = f"{prefix}inactive{index}"
+            filters.append(
+                f"[{source}]trim=start_frame={start}:end_frame={end},"
+                f"setpts=N[{segment_output}]"
+            )
+        segment_outputs.append(segment_output)
+    return _finish_temporal_stage(
+        filters, segment_outputs=segment_outputs, prefix=prefix
+    )
+
+
+def _active_smoke_segment_filters(
+    request: Mapping[str, Any],
+    *,
+    input_label: str,
+    smoke_label: str,
+    emission_label: str,
+    prefix: str,
+    start: int,
+    end: int,
+) -> tuple[list[str], str]:
+    output = request["output"]
+    width = int(output["width"])
+    height = int(output["height"])
+    frame_rate = int(output["frameRate"])
+    segment_frames = end - start
+    global_frame = f"N+{start}"
+    global_overlay_frame = f"n+{start}"
+    opacity = _curve_expression(
+        request["opacitySchedule"],
+        "valuePermille",
+        frame_variable=global_frame,
+    )
+    dissipation = _curve_expression(
+        request["dissipationCurve"],
+        "valuePermille",
+        frame_variable=global_frame,
+    )
+    position_x = _curve_expression(
+        request["positionKeyframes"],
+        "xPermille",
+        frame_variable=global_overlay_frame,
+    )
+    position_y = _curve_expression(
+        request["positionKeyframes"],
+        "yPermille",
+        frame_variable=global_overlay_frame,
+    )
+    drift_x = _curve_expression(
+        request["driftKeyframes"],
+        "xDeltaPermille",
+        frame_variable=global_overlay_frame,
+    )
+    drift_y = _curve_expression(
+        request["driftKeyframes"],
+        "yDeltaPermille",
+        frame_variable=global_overlay_frame,
+    )
+    scale_x = _curve_expression(
+        request["scaleKeyframes"],
+        "xPermille",
+        frame_variable=global_overlay_frame,
+    )
+    scale_y = _curve_expression(
+        request["scaleKeyframes"],
+        "yPermille",
+        frame_variable=global_overlay_frame,
+    )
+    scale_width = f"max(1,trunc({width}*({scale_x})/1000))"
+    scale_height = f"max(1,trunc({height}*({scale_y})/1000))"
+    x_expression = f"trunc({width}*(({position_x})+({drift_x}))/1000)"
+    y_expression = f"trunc({height}*(({position_y})+({drift_y}))/1000)"
+    active = (
+        f"between({global_frame},{request['frameRangeStartInclusive']},"
+        f"{request['frameRangeEndExclusive'] - 1})"
+    )
+    filters = [
+        (
+            f"[{input_label}]trim=start_frame={start}:end_frame={end},"
+            f"setpts=N[{prefix}base]"
+        ),
+        (
+            f"[{smoke_label}]trim=start_frame={start}:end_frame={end},setpts=N,"
+            f"format=gray,scale={_PROCEDURAL_SMOKE_TILE_WIDTH}:"
+            f"{_PROCEDURAL_SMOKE_TILE_HEIGHT}:flags=bilinear:eval=init,"
+            f"split=2[{prefix}texture][{prefix}density]"
+        ),
+        (
+            f"[{emission_label}]trim=start_frame={start}:end_frame={end},setpts=N,"
+            f"format=gray,scale={_PROCEDURAL_SMOKE_TILE_WIDTH}:"
+            f"{_PROCEDURAL_SMOKE_TILE_HEIGHT}:flags=bilinear:eval=init"
+            f"[{prefix}emission]"
+        ),
+        (
+            f"[{prefix}density][{prefix}emission]blend=all_mode=multiply,"
+            f"geq=lum='clip(lum(X,Y)*({active})*({opacity})*"
+            f"(1000-({dissipation}))/1000000,0,255)'[{prefix}alpha]"
+        ),
+        (
+            f"[{prefix}texture]geq=lum='clip(64+lum(X,Y)*3/4,0,255)',"
+            f"format=rgb24[{prefix}rgb]"
+        ),
+        (
+            f"color=c=black:s={_PROCEDURAL_SMOKE_TILE_WIDTH}x"
+            f"{_PROCEDURAL_SMOKE_TILE_HEIGHT}:r={frame_rate},"
+            f"trim=end_frame={segment_frames},setpts=N,"
+            f"format=rgb24[{prefix}localblack]"
+        ),
+        (
+            f"[{prefix}localblack][{prefix}rgb][{prefix}alpha]"
+            f"maskedmerge[{prefix}local0]"
+        ),
+        (
+            f"[{prefix}local0]scale=w='{scale_width}':h='{scale_height}':"
+            f"flags=bilinear:eval=frame[{prefix}local]"
+        ),
+        (
+            f"color=c=black:s={width}x{height}:r={frame_rate},"
+            f"trim=end_frame={segment_frames},setpts=N,"
+            f"format=rgb24[{prefix}canvas]"
+        ),
+        (
+            f"[{prefix}canvas][{prefix}local]overlay=x='{x_expression}':"
+            f"y='{y_expression}':eval=frame:eof_action=repeat:shortest=0:"
+            f"format=auto[{prefix}placed]"
+        ),
+        f"[{prefix}placed]split=2[{prefix}placedrgb][{prefix}placedalpha]",
+        f"[{prefix}placedrgb]format=gbrp[{prefix}effect]",
+        f"[{prefix}placedalpha]format=gray[{prefix}mask]",
     ]
     composite, output_label = _fixed_masked_composite_filters(
         input_label=f"{prefix}base",
@@ -2000,96 +2425,57 @@ def _smoke_stage_filters(
     prefix: str,
 ) -> tuple[list[str], str]:
     output = request["output"]
-    width = output["width"]
-    height = output["height"]
-    frame_rate = output["frameRate"]
-    opacity = _curve_expression(request["opacitySchedule"], "valuePermille")
-    dissipation = _curve_expression(
-        request["dissipationCurve"], "valuePermille"
-    )
-    position_x = _curve_expression(
-        request["positionKeyframes"], "xPermille", frame_variable="n"
-    )
-    position_y = _curve_expression(
-        request["positionKeyframes"], "yPermille", frame_variable="n"
-    )
-    drift_x = _curve_expression(
-        request["driftKeyframes"], "xDeltaPermille", frame_variable="n"
-    )
-    drift_y = _curve_expression(
-        request["driftKeyframes"], "yDeltaPermille", frame_variable="n"
-    )
-    scale_x = _curve_expression(
-        request["scaleKeyframes"], "xPermille", frame_variable="n"
-    )
-    scale_y = _curve_expression(
-        request["scaleKeyframes"], "yPermille", frame_variable="n"
-    )
-    scale_width = f"max(1,trunc({width}*({scale_x})/1000))"
-    scale_height = f"max(1,trunc({height}*({scale_y})/1000))"
-    x_expression = f"trunc({width}*(({position_x})+({drift_x}))/1000)"
-    y_expression = f"trunc({height}*(({position_y})+({drift_y}))/1000)"
-    active = (
-        f"between(N,{request['frameRangeStartInclusive']},"
-        f"{request['frameRangeEndExclusive'] - 1})"
-    )
-    filters = [
-        (
-            f"[{smoke_input_index}:v]settb=expr=1/{frame_rate},setpts=N,format=gray,"
-            f"scale={_PROCEDURAL_SMOKE_TILE_WIDTH}:{_PROCEDURAL_SMOKE_TILE_HEIGHT}:"
-            f"flags=bilinear:eval=init,"
-            f"split=2[{prefix}texture][{prefix}density]"
-        ),
-        (
-            f"[{emission_input_index}:v]settb=expr=1/{frame_rate},setpts=N,format=gray,"
-            f"scale={_PROCEDURAL_SMOKE_TILE_WIDTH}:{_PROCEDURAL_SMOKE_TILE_HEIGHT}:"
-            f"flags=bilinear:eval=init"
-            f"[{prefix}emission]"
-        ),
-        (
-            f"[{prefix}density][{prefix}emission]blend=all_mode=multiply,"
-            f"geq=lum='clip(lum(X,Y)*({active})*({opacity})*"
-            f"(1000-({dissipation}))/1000000,0,255)'[{prefix}alpha]"
-        ),
-        (
-            f"[{prefix}texture]geq=lum='clip(64+lum(X,Y)*3/4,0,255)',"
-            f"format=rgb24[{prefix}rgb]"
-        ),
-        (
-            f"color=c=black:s={_PROCEDURAL_SMOKE_TILE_WIDTH}x"
-            f"{_PROCEDURAL_SMOKE_TILE_HEIGHT}:r={frame_rate},"
-            f"format=rgb24[{prefix}localblack]"
-        ),
-        (
-            f"[{prefix}localblack][{prefix}rgb][{prefix}alpha]"
-            f"maskedmerge[{prefix}local0]"
-        ),
-        (
-            f"[{prefix}local0]scale=w='{scale_width}':h='{scale_height}':"
-            f"flags=bilinear:eval=frame[{prefix}local]"
-        ),
-        (
-            f"color=c=black:s={width}x{height}:r={frame_rate},"
-            f"format=rgb24[{prefix}canvas]"
-        ),
-        (
-            f"[{prefix}canvas][{prefix}local]overlay=x='{x_expression}':y='{y_expression}':"
-            f"eval=frame:eof_action=repeat:shortest=0:format=auto[{prefix}placed]"
-        ),
-        f"[{prefix}placed]split=2[{prefix}placedrgb][{prefix}placedalpha]",
-        f"[{prefix}placedrgb]format=gbrp[{prefix}effect]",
-        f"[{prefix}placedalpha]format=gray[{prefix}mask]",
-    ]
-    composite, output_label = _fixed_masked_composite_filters(
+    frame_rate = int(output["frameRate"])
+    profile = _flame_smoke_v3_workload(request)
+    filters, segments, sources = _temporal_stage_sources(
         input_label=input_label,
-        effect_label=f"{prefix}effect",
-        mask_label=f"{prefix}mask",
-        blend_mode=request["blendMode"],
+        frame_count=int(output["frameCount"]),
         frame_rate=frame_rate,
+        active_intervals=profile["activeIntervals"],
         prefix=prefix,
     )
-    filters.extend(composite)
-    return filters, output_label
+    active_count = sum(1 for _start, _end, active in segments if active)
+    smoke_filters, smoke_sources = _temporal_auxiliary_sources(
+        input_label=f"{smoke_input_index}:v",
+        frame_rate=frame_rate,
+        count=active_count,
+        prefix=f"{prefix}smoke",
+    )
+    emission_filters, emission_sources = _temporal_auxiliary_sources(
+        input_label=f"{emission_input_index}:v",
+        frame_rate=frame_rate,
+        count=active_count,
+        prefix=f"{prefix}emission",
+    )
+    filters.extend(smoke_filters)
+    filters.extend(emission_filters)
+    segment_outputs: list[str] = []
+    active_index = 0
+    for index, ((start, end, active), source) in enumerate(
+        zip(segments, sources, strict=True)
+    ):
+        if active:
+            stage_filters, segment_output = _active_smoke_segment_filters(
+                request,
+                input_label=source,
+                smoke_label=smoke_sources[active_index],
+                emission_label=emission_sources[active_index],
+                prefix=f"{prefix}active{index}",
+                start=start,
+                end=end,
+            )
+            filters.extend(stage_filters)
+            active_index += 1
+        else:
+            segment_output = f"{prefix}inactive{index}"
+            filters.append(
+                f"[{source}]trim=start_frame={start}:end_frame={end},"
+                f"setpts=N[{segment_output}]"
+            )
+        segment_outputs.append(segment_output)
+    return _finish_temporal_stage(
+        filters, segment_outputs=segment_outputs, prefix=prefix
+    )
 
 
 def _glyph_stage_filters(
@@ -2875,7 +3261,7 @@ class DeterministicMaskedSurfaceExecutor:
                     command,
                     check=True,
                     capture_output=True,
-                    timeout=300,
+                    timeout=MASKED_SURFACE_SUBPROCESS_TIMEOUT_SECONDS,
                     env=_fixed_environment(),
                     pass_fds=active_pass_fds(),
                 )
@@ -3084,6 +3470,7 @@ class DeterministicMaskedSurfaceExecutor:
     ) -> dict[str, Any]:
         """Execute one E2 graph without accepting a caller-authored graph."""
 
+        _flame_smoke_v3_workload(request)
         pass_fds = tuple(dict.fromkeys(ffmpeg.pass_fds + ffprobe.pass_fds))
         ffmpeg_identity = ffmpeg.version_identity()
         output = request["output"]
@@ -3291,13 +3678,13 @@ class DeterministicMaskedSurfaceExecutor:
                     "-c:v",
                     "libx264",
                     "-preset",
-                    "medium",
+                    MASKED_SURFACE_ENCODER_PRESET,
                     "-crf",
                     "0",
                     "-pix_fmt",
                     "yuv420p",
                     "-threads:v",
-                    "1",
+                    str(MASKED_SURFACE_ENCODER_THREAD_COUNT),
                     "-x264-params",
                     "threads=1:lookahead_threads=1:sliced_threads=0:sync-lookahead=0:rc-lookahead=0:scenecut=0",
                     "-fflags",
@@ -3323,7 +3710,7 @@ class DeterministicMaskedSurfaceExecutor:
                     command,
                     check=True,
                     capture_output=True,
-                    timeout=300,
+                    timeout=MASKED_SURFACE_SUBPROCESS_TIMEOUT_SECONDS,
                     env=_fixed_environment(),
                     pass_fds=pass_fds,
                 )
@@ -3362,7 +3749,7 @@ class DeterministicMaskedSurfaceExecutor:
                 request["productionRunRef"].encode("utf-8")
             ).hexdigest()[:20]
             directory = self.artifact_root / workspace_hash / run_hash / "masked-surface"
-            output_name = f"masked-surface-v2-{request['payloadDigest']}.mp4"
+            output_name = f"masked-surface-v3-{request['payloadDigest']}.mp4"
             with _PinnedRegularFile(candidate, label="flame/smoke candidate") as pinned:
                 destination = _publish_timeline_output_v1(
                     root=self.artifact_root,
@@ -3557,7 +3944,7 @@ class DeterministicMaskedSurfaceExecutor:
             workspace_hash = sha256(request["workspaceRef"].encode("utf-8")).hexdigest()[:20]
             run_hash = sha256(request["productionRunRef"].encode("utf-8")).hexdigest()[:20]
             directory = self.artifact_root / workspace_hash / run_hash / "masked-surface"
-            output_name = f"masked-surface-v2-{request['payloadDigest']}.mp4"
+            output_name = f"masked-surface-v3-{request['payloadDigest']}.mp4"
             with _PinnedRegularFile(candidate, label="masked-surface candidate") as pinned:
                 destination = _publish_timeline_output_v1(
                     root=self.artifact_root,
@@ -3610,6 +3997,7 @@ __all__ = [
     "MASKED_SURFACE_EXECUTION_REQUEST_SCHEMA_VERSION",
     "MASKED_SURFACE_EXECUTION_PROFILE",
     "MASKED_SURFACE_MAX_ACTIVE_ROI_PIXEL_FRAMES",
+    "MASKED_SURFACE_MAX_ACTIVE_FLAME_SMOKE_PIXEL_FRAMES",
     "MASKED_SURFACE_MAX_CURVE_KEYFRAMES",
     "MASKED_SURFACE_MAX_FILTER_GRAPH_COMPLEXITY",
     "MASKED_SURFACE_MAX_OUTPUT_PIXEL_FRAMES",
@@ -3620,6 +4008,7 @@ __all__ = [
     "MASKED_SURFACE_RENDERER_VERSION_CURRENT",
     "MASKED_SURFACE_RENDERER_VERSION_V1",
     "MASKED_SURFACE_RENDERER_VERSION_V2",
+    "MASKED_SURFACE_RENDERER_VERSION_V3",
     "MASKED_SURFACE_ROI_GUARD_PIXELS",
     "MASKED_SURFACE_SUBPROCESS_TIMEOUT_SECONDS",
 ]
