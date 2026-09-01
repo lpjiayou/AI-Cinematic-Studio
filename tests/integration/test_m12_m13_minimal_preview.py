@@ -30,6 +30,7 @@ from services.v4_platform.audio_validation import analyze_audio_artifact
 from services.v5_core_os.episode_production.audio_authority import (
     validate_ambience_asset_version,
     validate_dialogue_asset_version,
+    validate_music_asset_version,
     validate_sfx_asset_version,
 )
 from services.v5_core_os.episode_production.audio_timing import (
@@ -299,8 +300,8 @@ def _real_non_speech_audio_input(
     bundle: dict[str, Any],
     role: str,
 ) -> dict[str, Any]:
-    if role not in {"sfx", "ambience"}:
-        raise AssertionError("only deterministic non-speech roles are supported")
+    if role not in {"narration", "sfx", "ambience", "music"}:
+        raise AssertionError("unsupported deterministic technical audio role")
     original = bundle["sources"][role]
     original_asset = original["asset"]
     storage_key = original_asset["artifact"]["storageKey"]
@@ -368,12 +369,18 @@ def _real_non_speech_audio_input(
     )
     asset["provenance"] = _resealed(provenance)
     asset = _resealed(asset)
-    validator = (
-        validate_sfx_asset_version
-        if role == "sfx"
-        else validate_ambience_asset_version
-    )
-    asset_contract = validator(asset)
+    if role == "narration":
+        asset_contract = validate_dialogue_asset_version(
+            asset,
+            confirmed_voice_lock=bundle["confirmedVoiceLock"],
+            voice_asset_version=bundle["voiceAsset"],
+        )
+    elif role == "sfx":
+        asset_contract = validate_sfx_asset_version(asset)
+    elif role == "ambience":
+        asset_contract = validate_ambience_asset_version(asset)
+    else:
+        asset_contract = validate_music_asset_version(asset)
     timing = build_source_audio_timing_evidence(
         evidence,
         source_asset_version=asset_contract,

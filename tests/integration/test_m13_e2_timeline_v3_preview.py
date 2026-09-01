@@ -7,6 +7,7 @@ import tempfile
 import unittest
 
 from services.v3_render_core import decoded_frame_pixel_digest_metadata
+from services.v4_platform import probe_media
 from services.v4_platform.masked_surface_effects import (
     V4MaskedSurfaceEffectExecutor,
 )
@@ -72,6 +73,15 @@ def _append_e2_profile(
     workspace = inputs.run["workspaceRef"]
     run_ref = inputs.run["productionRunRef"]
     decoded = decoded_frame_pixel_digest_metadata(root / base["storageKey"])
+    media_probe = probe_media(root / base["storageKey"])
+    video_stream = next(
+        item for item in media_probe["streams"] if item["codec_type"] == "video"
+    )
+    frame_rate_numerator, frame_rate_denominator = (
+        int(item) for item in video_stream["avg_frame_rate"].split("/", 1)
+    )
+    if frame_rate_denominator != 1:
+        raise AssertionError("technical effect fixture requires integral FPS")
     resolved_base = {
         "assetVersionRef": base["assetVersionRef"],
         "assetVersionDigest": base["payloadDigest"],
@@ -79,10 +89,10 @@ def _append_e2_profile(
         "fileDigest": f"sha256:{base['sha256']}",
         "pixelDigest": decoded["decodedFramePixelDigest"],
         "pixelDigestSpec": decoded["decodedFramePixelDigestSpec"],
-        "width": 64,
-        "height": 64,
-        "frameCount": 49,
-        "frameRate": 24,
+        "width": decoded["width"],
+        "height": decoded["height"],
+        "frameCount": decoded["frameCount"],
+        "frameRate": frame_rate_numerator,
         "pixelFormat": "yuv420p",
     }
     executor = V4MaskedSurfaceEffectExecutor.from_artifact_root(root)
