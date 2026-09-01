@@ -31,6 +31,10 @@ COMPOSITION_TRACK_BINDING_SCHEMA_VERSION = (
     "v5.m13-composition-track-binding.v1"
 )
 RENDER_MANIFEST_SCHEMA_VERSION = "v5.m13-render-manifest.v1"
+RENDER_RUNTIME_EVIDENCE_SCHEMA_VERSION = "v5.m13-render-runtime-evidence.v1"
+RENDER_ARTIFACT_EVIDENCE_SCHEMA_VERSION = "v5.m13-render-artifact-evidence.v1"
+RENDER_RESULT_SCHEMA_VERSION = "v5.m13-render-result.v1"
+RENDER_CANDIDATE_SCHEMA_VERSION = "v5.m13-render-candidate.v1"
 COMPOSITION_PROVENANCE = "V5_K2_DELIVERY_SERVICE"
 SUBTITLE_TIMING_DIGEST_SPEC = "sha256/canonical-subtitle-timing-json/v1"
 
@@ -1079,6 +1083,599 @@ class RenderManifest(_ImmutableWireContract):
         return cls._from_validated(_validate_render_manifest_mapping(value))
 
 
+_SUBTITLE_CUE_FIELDS = frozenset(
+    {
+        "cueRef",
+        "clipRef",
+        "timelineStartFrameInclusive",
+        "timelineEndFrameExclusive",
+        "text",
+        "textDigest",
+        "language",
+        "wordTiming",
+    }
+)
+_SUBTITLE_WORD_FIELDS = frozenset(
+    {
+        "wordRef",
+        "timelineStartFrameInclusive",
+        "timelineEndFrameExclusive",
+        "text",
+        "textDigest",
+    }
+)
+
+
+def canonical_subtitle_timing(
+    value: Any,
+    *,
+    include_text: bool = True,
+) -> list[dict[str, Any]]:
+    """Validate and canonicalize the exact frame-addressed subtitle signal."""
+
+    if not isinstance(value, list):
+        raise RenderDomainContractError("subtitle cues must be a list")
+    cues: list[dict[str, Any]] = []
+    for index, item in enumerate(value):
+        cue = _closed(item, _SUBTITLE_CUE_FIELDS, f"subtitle cue[{index}]")
+        for field in ("cueRef", "clipRef"):
+            _ref(cue[field], field)
+        start = _integer(
+            cue["timelineStartFrameInclusive"],
+            "subtitle cue start frame",
+        )
+        end = _integer(
+            cue["timelineEndFrameExclusive"],
+            "subtitle cue end frame",
+            minimum=1,
+        )
+        if start >= end:
+            raise RenderDomainContractError("subtitle cue frame range is invalid")
+        text = cue["text"]
+        if not isinstance(text, str) or not text or text != text.strip():
+            raise RenderDomainContractError("subtitle cue text is invalid")
+        from hashlib import sha256
+
+        if cue["textDigest"] != sha256(text.encode("utf-8")).hexdigest():
+            raise RenderDomainStaleInputError("subtitle cue text digest is stale")
+        _ref(cue["language"], "subtitle language")
+        raw_words = cue["wordTiming"]
+        if not isinstance(raw_words, list):
+            raise RenderDomainContractError("subtitle wordTiming is invalid")
+        words: list[dict[str, Any]] = []
+        for word_index, raw_word in enumerate(raw_words):
+            word = _closed(
+                raw_word,
+                _SUBTITLE_WORD_FIELDS,
+                f"subtitle cue[{index}] word[{word_index}]",
+            )
+            _ref(word["wordRef"], "wordRef")
+            word_start = _integer(
+                word["timelineStartFrameInclusive"], "word start frame"
+            )
+            word_end = _integer(
+                word["timelineEndFrameExclusive"],
+                "word end frame",
+                minimum=1,
+            )
+            word_text = word["text"]
+            if (
+                word_start < start
+                or word_end > end
+                or word_start >= word_end
+                or not isinstance(word_text, str)
+                or not word_text
+                or word["textDigest"]
+                != sha256(word_text.encode("utf-8")).hexdigest()
+            ):
+                raise RenderDomainStaleInputError(
+                    "subtitle word timing authority is stale"
+                )
+            words.append(word)
+        if words != sorted(
+            words,
+            key=lambda word: (
+                word["timelineStartFrameInclusive"],
+                word["timelineEndFrameExclusive"],
+                word["wordRef"],
+            ),
+        ):
+            raise RenderDomainContractError("subtitle word timing is not canonical")
+        cue["wordTiming"] = words
+        cues.append(cue)
+    if cues != sorted(
+        cues,
+        key=lambda cue: (
+            cue["timelineStartFrameInclusive"],
+            cue["timelineEndFrameExclusive"],
+            cue["clipRef"],
+        ),
+    ):
+        raise RenderDomainContractError("subtitle cues are not canonical")
+    if include_text:
+        return cues
+    return [
+        {
+            **{key: deepcopy(item[key]) for key in item if key != "text"},
+            "wordTiming": [
+                {key: deepcopy(word[key]) for key in word if key != "text"}
+                for word in item["wordTiming"]
+            ],
+        }
+        for item in cues
+    ]
+
+
+def canonical_subtitle_timing_digest(value: Any) -> str:
+    return _digest(
+        {
+            "schemaVersion": "v5.m13-canonical-subtitle-timing.v1",
+            "cues": canonical_subtitle_timing(value, include_text=False),
+        }
+    )
+
+
+_RUNTIME_EVIDENCE_FIELDS = frozenset(
+    {
+        "schemaVersion",
+        "workspaceRef",
+        "productionRunRef",
+        "runtimeEvidenceRef",
+        "executionRequestRef",
+        "executionRequestDigest",
+        "rendererIdentity",
+        "rendererVersion",
+        "ffmpegBinaryDigest",
+        "ffprobeBinaryDigest",
+        "gpuUsed",
+        "providerUsed",
+        "publicationAllowed",
+        "createdAt",
+        "payloadDigest",
+    }
+)
+_RUNTIME_EVIDENCE_COMMAND_FIELDS = _RUNTIME_EVIDENCE_FIELDS - frozenset(
+    {"schemaVersion", "payloadDigest"}
+)
+
+
+def _validate_runtime_evidence_mapping(value: Any) -> dict[str, Any]:
+    result = _verify_sealed(
+        value, _RUNTIME_EVIDENCE_FIELDS, "RenderRuntimeEvidence"
+    )
+    if result["schemaVersion"] != RENDER_RUNTIME_EVIDENCE_SCHEMA_VERSION:
+        raise RenderDomainContractError("RenderRuntimeEvidence schema is unsupported")
+    for field in (
+        "workspaceRef",
+        "productionRunRef",
+        "runtimeEvidenceRef",
+        "executionRequestRef",
+        "rendererIdentity",
+        "rendererVersion",
+    ):
+        _ref(result[field], field)
+    for field in (
+        "executionRequestDigest",
+        "ffmpegBinaryDigest",
+        "ffprobeBinaryDigest",
+    ):
+        _digest_value(result[field], field)
+    if (
+        result["gpuUsed"] is not False
+        or result["providerUsed"] is not False
+        or result["publicationAllowed"] is not False
+    ):
+        raise RenderDomainContractError("RenderRuntimeEvidence authority is invalid")
+    _timestamp(result["createdAt"])
+    return result
+
+
+def build_render_runtime_evidence(command: Mapping[str, Any]) -> dict[str, Any]:
+    selected = _closed(
+        command,
+        _RUNTIME_EVIDENCE_COMMAND_FIELDS,
+        "RenderRuntimeEvidence command",
+    )
+    return _validate_runtime_evidence_mapping(
+        _seal(
+            {
+                "schemaVersion": RENDER_RUNTIME_EVIDENCE_SCHEMA_VERSION,
+                **selected,
+            }
+        )
+    )
+
+
+def validate_render_runtime_evidence(value: Any) -> "RenderRuntimeEvidence":
+    return RenderRuntimeEvidence.from_mapping(value)
+
+
+class RenderRuntimeEvidence(_ImmutableWireContract):
+    @classmethod
+    def from_mapping(cls, value: Any) -> "RenderRuntimeEvidence":
+        return cls._from_validated(_validate_runtime_evidence_mapping(value))
+
+
+_MEDIA_PROBE_FIELDS = frozenset(
+    {
+        "container",
+        "videoCodec",
+        "width",
+        "height",
+        "frameRate",
+        "frameCount",
+        "pixelFormat",
+        "colorMetadata",
+        "audioCodec",
+        "audioSampleRate",
+        "audioChannels",
+        "audioSampleCount",
+        "duration",
+    }
+)
+_MEDIA_PROBE_RATIONAL_FIELDS = frozenset({"numerator", "denominator"})
+_MEDIA_PROBE_DURATION_FIELDS = frozenset({"samples", "sampleRate"})
+_ARTIFACT_EVIDENCE_FIELDS = frozenset(
+    {
+        "schemaVersion",
+        "workspaceRef",
+        "productionRunRef",
+        "artifactEvidenceRef",
+        "executionRequestRef",
+        "executionRequestDigest",
+        "renderManifestRef",
+        "renderManifestDigest",
+        "runtimeEvidenceRef",
+        "runtimeEvidenceDigest",
+        "storageBindingRef",
+        "mediaType",
+        "byteSize",
+        "fileDigest",
+        "decodedFramePixelDigest",
+        "decodedFramePixelDigestSpec",
+        "pcmContentDigest",
+        "pcmContentDigestSpec",
+        "subtitleTimingDigest",
+        "subtitleTimingDigestSpec",
+        "mediaProbe",
+        "subtitleSidecar",
+        "publicationAllowed",
+        "createdAt",
+        "payloadDigest",
+    }
+)
+_ARTIFACT_EVIDENCE_COMMAND_FIELDS = _ARTIFACT_EVIDENCE_FIELDS - frozenset(
+    {"schemaVersion", "payloadDigest"}
+)
+_SIDECAR_FIELDS = frozenset(
+    {"mediaType", "byteSize", "fileDigest", "storageBindingRef"}
+)
+
+
+def _validate_media_probe(value: Any) -> dict[str, Any]:
+    result = _closed(value, _MEDIA_PROBE_FIELDS, "Render mediaProbe")
+    for field in ("container", "videoCodec", "pixelFormat", "audioCodec"):
+        _ref(result[field], f"mediaProbe.{field}")
+    for field in ("width", "height", "frameCount"):
+        _integer(result[field], f"mediaProbe.{field}", minimum=1)
+    _integer(result["audioSampleRate"], "audioSampleRate", minimum=1)
+    _integer(result["audioChannels"], "audioChannels", minimum=1)
+    _integer(result["audioSampleCount"], "audioSampleCount", minimum=1)
+    frame_rate = _closed(
+        result["frameRate"],
+        _MEDIA_PROBE_RATIONAL_FIELDS,
+        "mediaProbe.frameRate",
+    )
+    _integer(frame_rate["numerator"], "frameRate.numerator", minimum=1)
+    _integer(frame_rate["denominator"], "frameRate.denominator", minimum=1)
+    duration = _closed(
+        result["duration"],
+        _MEDIA_PROBE_DURATION_FIELDS,
+        "mediaProbe.duration",
+    )
+    _integer(duration["samples"], "duration.samples", minimum=1)
+    _integer(duration["sampleRate"], "duration.sampleRate", minimum=1)
+    result["colorMetadata"] = _validate_color_metadata(result["colorMetadata"])
+    result["frameRate"] = frame_rate
+    result["duration"] = duration
+    if (
+        result["container"] != "mp4"
+        or result["videoCodec"] != "h264"
+        or result["pixelFormat"] != "yuv420p"
+        or result["audioCodec"] != "aac"
+        or result["audioSampleRate"] != 48_000
+        or result["audioChannels"] != 2
+        or duration["sampleRate"] != result["audioSampleRate"]
+        or duration["samples"] != result["audioSampleCount"]
+    ):
+        raise RenderDomainContractError("Render mediaProbe is unsupported")
+    return result
+
+
+def _validate_artifact_evidence_mapping(value: Any) -> dict[str, Any]:
+    result = _verify_sealed(
+        value, _ARTIFACT_EVIDENCE_FIELDS, "RenderArtifactEvidence"
+    )
+    if result["schemaVersion"] != RENDER_ARTIFACT_EVIDENCE_SCHEMA_VERSION:
+        raise RenderDomainContractError("RenderArtifactEvidence schema is unsupported")
+    for field in (
+        "workspaceRef",
+        "productionRunRef",
+        "artifactEvidenceRef",
+        "executionRequestRef",
+        "renderManifestRef",
+        "runtimeEvidenceRef",
+        "storageBindingRef",
+        "mediaType",
+    ):
+        _ref(result[field], field)
+    for field in (
+        "executionRequestDigest",
+        "renderManifestDigest",
+        "runtimeEvidenceDigest",
+        "fileDigest",
+        "decodedFramePixelDigest",
+        "pcmContentDigest",
+        "subtitleTimingDigest",
+    ):
+        _digest_value(result[field], field)
+    _integer(result["byteSize"], "byteSize", minimum=1, maximum=4_000_000_000)
+    if result["decodedFramePixelDigestSpec"] != DECODED_FRAME_PIXEL_DIGEST_SPEC_V2:
+        raise RenderDomainContractError("decoded pixel digest spec is unsupported")
+    if result["pcmContentDigestSpec"] != PCM_CONTENT_DIGEST_SPEC:
+        raise RenderDomainContractError("PCM digest spec is unsupported")
+    if result["subtitleTimingDigestSpec"] != SUBTITLE_TIMING_DIGEST_SPEC:
+        raise RenderDomainContractError("subtitle timing digest spec is unsupported")
+    result["mediaProbe"] = _validate_media_probe(result["mediaProbe"])
+    sidecar = result["subtitleSidecar"]
+    if sidecar is not None:
+        sidecar = _closed(sidecar, _SIDECAR_FIELDS, "subtitleSidecar")
+        _ref(sidecar["mediaType"], "subtitleSidecar.mediaType")
+        _ref(sidecar["storageBindingRef"], "subtitleSidecar.storageBindingRef")
+        _integer(sidecar["byteSize"], "subtitleSidecar.byteSize", minimum=1)
+        _digest_value(sidecar["fileDigest"], "subtitleSidecar.fileDigest")
+        result["subtitleSidecar"] = sidecar
+    if result["publicationAllowed"] is not False:
+        raise RenderDomainContractError("RenderArtifactEvidence cannot publish")
+    _timestamp(result["createdAt"])
+    return result
+
+
+def build_render_artifact_evidence(command: Mapping[str, Any]) -> dict[str, Any]:
+    selected = _closed(
+        command,
+        _ARTIFACT_EVIDENCE_COMMAND_FIELDS,
+        "RenderArtifactEvidence command",
+    )
+    return _validate_artifact_evidence_mapping(
+        _seal(
+            {
+                "schemaVersion": RENDER_ARTIFACT_EVIDENCE_SCHEMA_VERSION,
+                **selected,
+            }
+        )
+    )
+
+
+def validate_render_artifact_evidence(value: Any) -> "RenderArtifactEvidence":
+    return RenderArtifactEvidence.from_mapping(value)
+
+
+class RenderArtifactEvidence(_ImmutableWireContract):
+    @classmethod
+    def from_mapping(cls, value: Any) -> "RenderArtifactEvidence":
+        return cls._from_validated(_validate_artifact_evidence_mapping(value))
+
+
+_RENDER_RESULT_FIELDS = frozenset(
+    {
+        "schemaVersion",
+        "workspaceRef",
+        "productionRunRef",
+        "renderResultRef",
+        "executionRequestRef",
+        "executionRequestDigest",
+        "renderManifestRef",
+        "renderManifestDigest",
+        "runtimeEvidenceRef",
+        "runtimeEvidenceDigest",
+        "artifactEvidenceRef",
+        "artifactEvidenceDigest",
+        "state",
+        "publicationAllowed",
+        "createdAt",
+        "payloadDigest",
+    }
+)
+_RENDER_RESULT_COMMAND_FIELDS = _RENDER_RESULT_FIELDS - frozenset(
+    {"schemaVersion", "payloadDigest"}
+)
+
+
+def _validate_render_result_mapping(value: Any) -> dict[str, Any]:
+    result = _verify_sealed(value, _RENDER_RESULT_FIELDS, "RenderResult")
+    if result["schemaVersion"] != RENDER_RESULT_SCHEMA_VERSION:
+        raise RenderDomainContractError("RenderResult schema is unsupported")
+    for field in (
+        "workspaceRef",
+        "productionRunRef",
+        "renderResultRef",
+        "executionRequestRef",
+        "renderManifestRef",
+        "runtimeEvidenceRef",
+        "artifactEvidenceRef",
+    ):
+        _ref(result[field], field)
+    for field in (
+        "executionRequestDigest",
+        "renderManifestDigest",
+        "runtimeEvidenceDigest",
+        "artifactEvidenceDigest",
+    ):
+        _digest_value(result[field], field)
+    if result["state"] != "SUCCEEDED" or result["publicationAllowed"] is not False:
+        raise RenderDomainContractError("RenderResult state is invalid")
+    _timestamp(result["createdAt"])
+    return result
+
+
+def build_render_result(command: Mapping[str, Any]) -> dict[str, Any]:
+    selected = _closed(command, _RENDER_RESULT_COMMAND_FIELDS, "RenderResult command")
+    return _validate_render_result_mapping(
+        _seal({"schemaVersion": RENDER_RESULT_SCHEMA_VERSION, **selected})
+    )
+
+
+def validate_render_result(value: Any) -> "RenderResult":
+    return RenderResult.from_mapping(value)
+
+
+class RenderResult(_ImmutableWireContract):
+    @classmethod
+    def from_mapping(cls, value: Any) -> "RenderResult":
+        return cls._from_validated(_validate_render_result_mapping(value))
+
+
+_RENDER_CANDIDATE_FIELDS = frozenset(
+    {
+        "schemaVersion",
+        "workspaceRef",
+        "productionRunRef",
+        "projectRef",
+        "seriesRef",
+        "episodeRef",
+        "renderCandidateRef",
+        "timelineVersionRef",
+        "timelineVersionDigest",
+        "compositionVersionRef",
+        "compositionVersionDigest",
+        "renderManifestRef",
+        "renderManifestDigest",
+        "executionRequestRef",
+        "executionRequestDigest",
+        "runtimeEvidenceRef",
+        "runtimeEvidenceDigest",
+        "artifactEvidenceRef",
+        "artifactEvidenceDigest",
+        "renderResultRef",
+        "renderResultDigest",
+        "renderProfileRef",
+        "storageBindingRef",
+        "mediaType",
+        "fileDigest",
+        "byteSize",
+        "decodedFramePixelDigest",
+        "decodedFramePixelDigestSpec",
+        "pcmContentDigest",
+        "pcmContentDigestSpec",
+        "subtitleTimingDigest",
+        "subtitleTimingDigestSpec",
+        "mediaProbe",
+        "rendererIdentity",
+        "rendererVersion",
+        "ffmpegBinaryDigest",
+        "ffprobeBinaryDigest",
+        "state",
+        "technicalValidationState",
+        "qcState",
+        "approvalState",
+        "assetAdmissionState",
+        "masterState",
+        "exportState",
+        "publicationAllowed",
+        "createdAt",
+        "payloadDigest",
+    }
+)
+_RENDER_CANDIDATE_COMMAND_FIELDS = _RENDER_CANDIDATE_FIELDS - frozenset(
+    {"schemaVersion", "payloadDigest"}
+)
+
+
+def _validate_render_candidate_mapping(value: Any) -> dict[str, Any]:
+    result = _verify_sealed(value, _RENDER_CANDIDATE_FIELDS, "RenderCandidate")
+    if result["schemaVersion"] != RENDER_CANDIDATE_SCHEMA_VERSION:
+        raise RenderDomainContractError("RenderCandidate schema is unsupported")
+    for field in (
+        "workspaceRef",
+        "productionRunRef",
+        "projectRef",
+        "seriesRef",
+        "episodeRef",
+        "renderCandidateRef",
+        "timelineVersionRef",
+        "compositionVersionRef",
+        "renderManifestRef",
+        "executionRequestRef",
+        "runtimeEvidenceRef",
+        "artifactEvidenceRef",
+        "renderResultRef",
+        "renderProfileRef",
+        "storageBindingRef",
+        "mediaType",
+        "rendererIdentity",
+        "rendererVersion",
+    ):
+        _ref(result[field], field)
+    for field in (
+        "timelineVersionDigest",
+        "compositionVersionDigest",
+        "renderManifestDigest",
+        "executionRequestDigest",
+        "runtimeEvidenceDigest",
+        "artifactEvidenceDigest",
+        "renderResultDigest",
+        "fileDigest",
+        "decodedFramePixelDigest",
+        "pcmContentDigest",
+        "subtitleTimingDigest",
+        "ffmpegBinaryDigest",
+        "ffprobeBinaryDigest",
+    ):
+        _digest_value(result[field], field)
+    _integer(result["byteSize"], "byteSize", minimum=1, maximum=4_000_000_000)
+    if (
+        result["decodedFramePixelDigestSpec"] != DECODED_FRAME_PIXEL_DIGEST_SPEC_V2
+        or result["pcmContentDigestSpec"] != PCM_CONTENT_DIGEST_SPEC
+        or result["subtitleTimingDigestSpec"] != SUBTITLE_TIMING_DIGEST_SPEC
+    ):
+        raise RenderDomainContractError("RenderCandidate digest spec is unsupported")
+    result["mediaProbe"] = _validate_media_probe(result["mediaProbe"])
+    required_states = {
+        "state": "RENDERED_CANDIDATE",
+        "technicalValidationState": "PASS",
+        "qcState": "NOT_RUN",
+        "approvalState": "NOT_REQUESTED",
+        "assetAdmissionState": "NOT_ADMITTED",
+        "masterState": "NOT_CREATED",
+        "exportState": "NOT_CREATED",
+        "publicationAllowed": False,
+    }
+    if any(result[field] != expected for field, expected in required_states.items()):
+        raise RenderDomainContractError("RenderCandidate lifecycle state is invalid")
+    _timestamp(result["createdAt"])
+    return result
+
+
+def build_render_candidate(command: Mapping[str, Any]) -> dict[str, Any]:
+    selected = _closed(
+        command, _RENDER_CANDIDATE_COMMAND_FIELDS, "RenderCandidate command"
+    )
+    return _validate_render_candidate_mapping(
+        _seal({"schemaVersion": RENDER_CANDIDATE_SCHEMA_VERSION, **selected})
+    )
+
+
+def validate_render_candidate(value: Any) -> "RenderCandidate":
+    return RenderCandidate.from_mapping(value)
+
+
+class RenderCandidate(_ImmutableWireContract):
+    @classmethod
+    def from_mapping(cls, value: Any) -> "RenderCandidate":
+        return cls._from_validated(_validate_render_candidate_mapping(value))
+
+
 def render_manifest_digest_specs() -> dict[str, Any]:
     return {
         "decodedFramePixelDigestSpec": DECODED_FRAME_PIXEL_DIGEST_SPEC_V2,
@@ -1097,22 +1694,40 @@ __all__ = [
     "Composition",
     "CompositionVersion",
     "RENDER_MANIFEST_SCHEMA_VERSION",
+    "RENDER_RUNTIME_EVIDENCE_SCHEMA_VERSION",
+    "RENDER_ARTIFACT_EVIDENCE_SCHEMA_VERSION",
+    "RENDER_RESULT_SCHEMA_VERSION",
+    "RENDER_CANDIDATE_SCHEMA_VERSION",
     "REQUIRED_EFFECT_KINDS",
     "RESIZE_MODES",
     "RenderDomainContractError",
     "RenderDomainStaleInputError",
     "RenderManifest",
+    "RenderRuntimeEvidence",
+    "RenderArtifactEvidence",
+    "RenderResult",
+    "RenderCandidate",
     "SUBTITLE_MODES",
     "SUBTITLE_TIMING_DIGEST_SPEC",
     "VIDEO_CODECS",
     "build_composition",
     "build_composition_version",
     "build_render_manifest",
+    "build_render_runtime_evidence",
+    "build_render_artifact_evidence",
+    "build_render_result",
+    "build_render_candidate",
+    "canonical_subtitle_timing",
+    "canonical_subtitle_timing_digest",
     "composition_plan_digests",
     "render_manifest_digest_specs",
     "seal_composition_track_binding",
     "validate_composition",
     "validate_composition_version",
     "validate_render_manifest",
+    "validate_render_runtime_evidence",
+    "validate_render_artifact_evidence",
+    "validate_render_result",
+    "validate_render_candidate",
     "validate_render_toolchain_identity",
 ]

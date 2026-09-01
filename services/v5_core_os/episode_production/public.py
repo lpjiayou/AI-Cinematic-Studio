@@ -716,6 +716,49 @@ class EpisodeProductionPublicBoundary:
             return _strip_effect_preview_details(result)
         return result
 
+    def create_render_candidate(
+        self, command: Mapping[str, Any]
+    ) -> dict[str, Any]:
+        return self._invoke_public_preview(
+            self.__delivery.create_render_candidate,
+            _require_timeline_run_cas(command),
+        )
+
+    def list_render_candidates(
+        self, workspace_ref: str, run_ref: str
+    ) -> dict[str, Any]:
+        return self._invoke_public_preview(
+            self.__delivery.list_render_candidates,
+            workspace_ref,
+            run_ref,
+        )
+
+    def get_render_candidate(
+        self,
+        workspace_ref: str,
+        run_ref: str,
+        render_candidate_ref: str,
+    ) -> dict[str, Any]:
+        return self._invoke_public_preview(
+            self.__delivery.get_render_candidate,
+            workspace_ref,
+            run_ref,
+            render_candidate_ref,
+        )
+
+    def get_render_candidate_content(
+        self,
+        workspace_ref: str,
+        run_ref: str,
+        render_candidate_ref: str,
+    ) -> dict[str, Any]:
+        return self._invoke(
+            self.__delivery.get_render_candidate_content,
+            workspace_ref,
+            run_ref,
+            render_candidate_ref,
+        )
+
     def create_timeline(self, command: Mapping[str, Any]) -> dict[str, Any]:
         return self._invoke_public_preview(
             self.__delivery.create_timeline,

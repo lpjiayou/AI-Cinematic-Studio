@@ -25,6 +25,13 @@ from services.v4_platform import (
     CompositionExecutionError,
     probe_media,
 )
+from services.v4_platform.render_candidate import (
+    build_render_execution_request,
+    composition_command_digest,
+    render_input_bindings_digest,
+    runtime_binding_digest,
+    validate_render_execution_request,
+)
 
 from .assets import (
     ASSET_PLAN_SCHEMA_VERSION as G4_ASSET_PLAN_SCHEMA_VERSION,
@@ -163,12 +170,22 @@ from .rendering import (
     build_composition,
     build_composition_version,
     build_render_manifest,
+    build_render_runtime_evidence,
+    build_render_artifact_evidence,
+    build_render_result,
+    build_render_candidate,
+    canonical_subtitle_timing,
+    canonical_subtitle_timing_digest,
     composition_plan_digests,
     render_manifest_digest_specs,
     seal_composition_track_binding,
     validate_composition,
     validate_composition_version,
     validate_render_manifest,
+    RenderRuntimeEvidence,
+    RenderArtifactEvidence,
+    RenderResult,
+    RenderCandidate,
     validate_render_toolchain_identity,
 )
 
@@ -233,6 +250,25 @@ class CompositionExecutionPort(Protocol):
         command: Mapping[str, Any],
         *,
         resolved_artifacts: Mapping[str, Any],
+    ) -> dict[str, Any]: ...
+    def render_candidate(
+        self,
+        execution_request: Mapping[str, Any],
+        *,
+        composition_version: Mapping[str, Any],
+        composition_command: Mapping[str, Any],
+        resolved_artifacts: Mapping[str, Any],
+        subtitle_cues: list[Mapping[str, Any]],
+        font_projection: Mapping[str, Any] | None,
+        font_required_text: str | None,
+    ) -> dict[str, Any]: ...
+    def inspect_render_candidate(
+        self,
+        *,
+        workspace_ref: str,
+        production_run_ref: str,
+        storage_binding_ref: str,
+        expected: Mapping[str, Any],
     ) -> dict[str, Any]: ...
     def execute_flame_smoke(
         self,
@@ -4952,12 +4988,15 @@ class K2DeliveryService:
 
     @staticmethod
     def _render_domain_record_idempotency_key(
-        client_key: str, slot: str
+        client_key: str,
+        slot: str,
+        *,
+        domain_stage: str = "m13-r1a-composition-render-manifest",
     ) -> str:
         return _digest(
             {
                 "clientIdempotencyKey": _idempotency_key(client_key),
-                "stage": "m13-r1a-composition-render-manifest",
+                "stage": _required_ref(domain_stage, "render domain stage"),
                 "slot": _required_ref(slot, "record slot"),
             }
         )
@@ -4975,6 +5014,7 @@ class K2DeliveryService:
         request_digest: str,
         created_at: str,
         payload: Mapping[str, Any],
+        domain_stage: str = "m13-r1a-composition-render-manifest",
     ) -> EvidenceRecord:
         canonical = _immutable_payload(payload, record_kind)
         return EvidenceRecord(
@@ -4984,7 +5024,7 @@ class K2DeliveryService:
             recordRef=_required_ref(record_ref, "recordRef"),
             recordVersion=_positive_version(record_version, "recordVersion"),
             idempotencyKey=K2DeliveryService._render_domain_record_idempotency_key(
-                client_key, slot
+                client_key, slot, domain_stage=domain_stage
             ),
             requestDigest=request_digest,
             createdAt=created_at,
@@ -5648,6 +5688,21 @@ class K2DeliveryService:
                 for field in self.render_toolchain_identity
             ):
                 raise StaleInputError("RenderManifest toolchain identity is stale")
+            if manifest["subtitleMode"] != "NONE":
+                subtitle_cues = self._render_subtitle_cues(
+                    context=context,
+                    layout=self._editing_preview_layout(
+                        restored_timeline,
+                        allow_video_edits=True,
+                    ),
+                )
+                if (
+                    manifest["subtitleTimingDigest"]
+                    != canonical_subtitle_timing_digest(subtitle_cues)
+                ):
+                    raise StaleInputError(
+                        "RenderManifest subtitle timing authority is stale"
+                    )
             if manifest["subtitleMode"] == "BURN_IN":
                 script_text = self._current_script_text_projection(context=context)
                 self._current_font_projection(
@@ -6040,11 +6095,16 @@ class K2DeliveryService:
                 replayed=True,
             )
 
-        timing_digest = (
-            None
-            if profile["subtitleMode"] == "NONE"
-            else composition_version["subtitlePlanDigest"]
-        )
+        timing_digest = None
+        if profile["subtitleMode"] != "NONE":
+            subtitle_cues = self._render_subtitle_cues(
+                context=context,
+                layout=self._editing_preview_layout(
+                    restored_timeline,
+                    allow_video_edits=True,
+                ),
+            )
+            timing_digest = canonical_subtitle_timing_digest(subtitle_cues)
         manifest = build_render_manifest(
             {
                 "workspaceRef": workspace,
@@ -6193,6 +6253,981 @@ class K2DeliveryService:
         if result["renderManifest"]["payloadDigest"] != render_manifest_digest:
             raise StaleInputError("RenderManifest digest is stale")
         return result
+
+    @staticmethod
+    def _render_candidate_record_envelope(
+        *,
+        record: Mapping[str, Any],
+        payload: Mapping[str, Any],
+        reference_field: str,
+        label: str,
+        workspace: str,
+        run_ref: str,
+    ) -> None:
+        if (
+            record.get("recordRef") != payload.get(reference_field)
+            or record.get("recordVersion") != 1
+            or record.get("createdAt") != payload.get("createdAt")
+            or record.get("payloadDigest") != payload.get("payloadDigest")
+            or payload.get("workspaceRef") != workspace
+            or payload.get("productionRunRef") != run_ref
+        ):
+            raise RepositoryUnavailableError(f"{label} evidence envelope is invalid")
+
+    def _restore_render_candidates(
+        self,
+        context: Mapping[str, Any],
+        *,
+        render_candidate_ref: str | None = None,
+    ) -> list[dict[str, Any]]:
+        """Restore and freshly remeasure every selected technical candidate."""
+
+        workspace = context["run"]["workspaceRef"]
+        run_ref = context["run"]["productionRunRef"]
+        snapshot = context["snapshot"]
+
+        def records(
+            kind: str,
+            wrapper,
+            reference_field: str,
+        ) -> dict[str, tuple[dict[str, Any], dict[str, Any]]]:
+            index: dict[str, tuple[dict[str, Any], dict[str, Any]]] = {}
+            for record, payload in self._render_domain_payload_records(
+                snapshot, record_kind=kind
+            ):
+                value = wrapper.from_mapping(payload).as_dict()
+                self._render_candidate_record_envelope(
+                    record=record,
+                    payload=value,
+                    reference_field=reference_field,
+                    label=kind,
+                    workspace=workspace,
+                    run_ref=run_ref,
+                )
+                reference = value[reference_field]
+                if reference in index:
+                    raise RepositoryUnavailableError(
+                        f"{kind} evidence identity is ambiguous"
+                    )
+                index[reference] = (record, value)
+            return index
+
+        runtimes = records(
+            "RenderRuntimeEvidence", RenderRuntimeEvidence, "runtimeEvidenceRef"
+        )
+        artifacts = records(
+            "RenderArtifactEvidence", RenderArtifactEvidence, "artifactEvidenceRef"
+        )
+        results = records("RenderResult", RenderResult, "renderResultRef")
+        candidates = records(
+            "RenderCandidate", RenderCandidate, "renderCandidateRef"
+        )
+        execution_requests: dict[str, tuple[dict[str, Any], dict[str, Any]]] = {}
+        for record, payload in self._render_domain_payload_records(
+            snapshot, record_kind="RenderExecutionRequest"
+        ):
+            try:
+                value = validate_render_execution_request(payload)
+            except Exception as exc:
+                raise RepositoryUnavailableError(
+                    "RenderExecutionRequest evidence is invalid"
+                ) from exc
+            reference = value["executionRequestRef"]
+            if (
+                record.get("recordRef") != reference
+                or record.get("recordVersion") != 1
+                or record.get("payloadDigest") != value["payloadDigest"]
+                or value["workspaceRef"] != workspace
+                or value["productionRunRef"] != run_ref
+                or reference in execution_requests
+            ):
+                raise RepositoryUnavailableError(
+                    "RenderExecutionRequest evidence envelope is invalid"
+                )
+            execution_requests[reference] = (record, value)
+        selected = [
+            value
+            for _, value in candidates.values()
+            if render_candidate_ref is None
+            or value["renderCandidateRef"] == render_candidate_ref
+        ]
+        if render_candidate_ref is not None and len(selected) != 1:
+            raise RecordNotFoundError("RenderCandidate was not found")
+        selected.sort(key=lambda item: (item["createdAt"], item["renderCandidateRef"]))
+        if self.composition is None or not callable(
+            getattr(self.composition, "inspect_render_candidate", None)
+        ):
+            if selected:
+                raise WorkerUnavailableError(
+                    "RenderCandidate verifier is not configured"
+                )
+            return []
+        restored: list[dict[str, Any]] = []
+        for candidate in selected:
+            domain = self._restore_render_domain(
+                context,
+                render_manifest_ref=candidate["renderManifestRef"],
+            )
+            manifest = domain["renderManifest"]
+            composition_version = domain["compositionVersion"]
+            timeline_version = domain["timeline"]["timelineVersion"].as_dict()
+            runtime_entry = runtimes.get(candidate["runtimeEvidenceRef"])
+            artifact_entry = artifacts.get(candidate["artifactEvidenceRef"])
+            result_entry = results.get(candidate["renderResultRef"])
+            request_entry = execution_requests.get(
+                candidate["executionRequestRef"]
+            )
+            if (
+                runtime_entry is None
+                or artifact_entry is None
+                or result_entry is None
+                or request_entry is None
+            ):
+                raise RepositoryUnavailableError(
+                    "RenderCandidate evidence closure is incomplete"
+                )
+            runtime = runtime_entry[1]
+            artifact = artifact_entry[1]
+            render_result = result_entry[1]
+            execution_request = request_entry[1]
+            if (
+                candidate["projectRef"] != context["run"]["projectRef"]
+                or candidate["seriesRef"] != context["run"]["seriesRef"]
+                or candidate["episodeRef"] != context["run"]["episodeRef"]
+                or candidate["timelineVersionRef"]
+                != timeline_version["timelineVersionRef"]
+                or candidate["timelineVersionDigest"]
+                != timeline_version["payloadDigest"]
+                or candidate["compositionVersionRef"]
+                != composition_version["compositionVersionRef"]
+                or candidate["compositionVersionDigest"]
+                != composition_version["payloadDigest"]
+                or candidate["renderManifestDigest"] != manifest["payloadDigest"]
+                or candidate["renderProfileRef"]
+                != manifest["outputProfile"]["profileRef"]
+                or candidate["executionRequestRef"]
+                != runtime["executionRequestRef"]
+                or candidate["executionRequestDigest"]
+                != runtime["executionRequestDigest"]
+                or candidate["executionRequestDigest"]
+                != execution_request["payloadDigest"]
+                or candidate["runtimeEvidenceDigest"] != runtime["payloadDigest"]
+                or candidate["artifactEvidenceDigest"] != artifact["payloadDigest"]
+                or candidate["renderResultDigest"] != render_result["payloadDigest"]
+                or render_result["executionRequestRef"]
+                != candidate["executionRequestRef"]
+                or render_result["executionRequestDigest"]
+                != candidate["executionRequestDigest"]
+                or render_result["renderManifestRef"]
+                != candidate["renderManifestRef"]
+                or render_result["renderManifestDigest"]
+                != candidate["renderManifestDigest"]
+                or render_result["runtimeEvidenceRef"]
+                != candidate["runtimeEvidenceRef"]
+                or render_result["runtimeEvidenceDigest"]
+                != candidate["runtimeEvidenceDigest"]
+                or render_result["artifactEvidenceRef"]
+                != candidate["artifactEvidenceRef"]
+                or render_result["artifactEvidenceDigest"]
+                != candidate["artifactEvidenceDigest"]
+            ):
+                raise StaleInputError("RenderCandidate lineage is stale")
+            artifact_pairs = {
+                "executionRequestRef": candidate["executionRequestRef"],
+                "executionRequestDigest": candidate["executionRequestDigest"],
+                "renderManifestRef": candidate["renderManifestRef"],
+                "renderManifestDigest": candidate["renderManifestDigest"],
+                "runtimeEvidenceRef": candidate["runtimeEvidenceRef"],
+                "runtimeEvidenceDigest": candidate["runtimeEvidenceDigest"],
+                "storageBindingRef": candidate["storageBindingRef"],
+                "mediaType": candidate["mediaType"],
+                "byteSize": candidate["byteSize"],
+                "fileDigest": candidate["fileDigest"],
+                "decodedFramePixelDigest": candidate[
+                    "decodedFramePixelDigest"
+                ],
+                "decodedFramePixelDigestSpec": candidate[
+                    "decodedFramePixelDigestSpec"
+                ],
+                "pcmContentDigest": candidate["pcmContentDigest"],
+                "pcmContentDigestSpec": candidate["pcmContentDigestSpec"],
+                "subtitleTimingDigest": candidate["subtitleTimingDigest"],
+                "subtitleTimingDigestSpec": candidate[
+                    "subtitleTimingDigestSpec"
+                ],
+                "mediaProbe": candidate["mediaProbe"],
+            }
+            if any(artifact.get(field) != value for field, value in artifact_pairs.items()):
+                raise StaleInputError("RenderCandidate artifact binding is stale")
+            if any(
+                candidate[field] != runtime[field]
+                for field in (
+                    "rendererIdentity",
+                    "rendererVersion",
+                    "ffmpegBinaryDigest",
+                    "ffprobeBinaryDigest",
+                )
+            ) or any(
+                candidate[field] != manifest[field]
+                for field in (
+                    "rendererIdentity",
+                    "rendererVersion",
+                    "ffmpegBinaryDigest",
+                    "ffprobeBinaryDigest",
+                )
+            ):
+                raise StaleInputError("RenderCandidate runtime identity is stale")
+            projection = self._editing_effect_preview_projection(
+                context=context,
+                restored=domain["timeline"],
+                allow_video_edits=True,
+            )
+            subtitle_cues = (
+                []
+                if manifest["subtitleMode"] == "NONE"
+                else self._render_subtitle_cues(
+                    context=context,
+                    layout=projection["layout"],
+                )
+            )
+            timing_digest = canonical_subtitle_timing_digest(subtitle_cues)
+            if candidate["subtitleTimingDigest"] != timing_digest:
+                raise StaleInputError("RenderCandidate subtitle timing is stale")
+            render_profile = {
+                field: deepcopy(manifest[field])
+                for field in (
+                    "outputProfile",
+                    "videoEncoding",
+                    "colorMetadata",
+                    "audioEncoding",
+                    "subtitleMode",
+                    "subtitleTimingDigest",
+                    "subtitleFontAssetVersionRef",
+                    "subtitleFontAssetVersionDigest",
+                    "rendererIdentity",
+                    "rendererVersion",
+                    "ffmpegBinaryDigest",
+                    "ffprobeBinaryDigest",
+                )
+            }
+            expected_execution_request = build_render_execution_request(
+                {
+                    "workspaceRef": workspace,
+                    "productionRunRef": run_ref,
+                    "executionRequestRef": candidate["executionRequestRef"],
+                    "timelineVersionRef": timeline_version[
+                        "timelineVersionRef"
+                    ],
+                    "timelineVersionDigest": timeline_version["payloadDigest"],
+                    "compositionVersionRef": composition_version[
+                        "compositionVersionRef"
+                    ],
+                    "compositionVersionDigest": composition_version[
+                        "payloadDigest"
+                    ],
+                    "renderManifestRef": manifest["renderManifestRef"],
+                    "renderManifestDigest": manifest["payloadDigest"],
+                    "allInputBindingsDigest": render_input_bindings_digest(
+                        composition_version=composition_version,
+                        composition_command=projection["compositionCommand"],
+                        subtitle_cues=subtitle_cues,
+                    ),
+                    "compositionCommandDigest": composition_command_digest(
+                        projection["compositionCommand"]
+                    ),
+                    "runtimeBindingDigest": runtime_binding_digest(
+                        render_profile
+                    ),
+                    "outputArtifactBindingRef": candidate[
+                        "storageBindingRef"
+                    ],
+                    "renderProfile": render_profile,
+                    "publicationAllowed": False,
+                }
+            )
+            if execution_request != expected_execution_request:
+                raise StaleInputError(
+                    "RenderCandidate sealed execution request is stale"
+                )
+            expected_artifact = {
+                **deepcopy(artifact),
+                "ffmpegBinaryDigest": candidate["ffmpegBinaryDigest"],
+                "ffprobeBinaryDigest": candidate["ffprobeBinaryDigest"],
+            }
+            try:
+                content = self.composition.inspect_render_candidate(
+                    workspace_ref=workspace,
+                    production_run_ref=run_ref,
+                    storage_binding_ref=candidate["storageBindingRef"],
+                    expected=expected_artifact,
+                )
+            except EpisodeProductionError:
+                raise
+            except Exception as exc:
+                raise ArtifactRejectedError(
+                    "RenderCandidate artifact verification failed"
+                ) from exc
+            restored.append(
+                {
+                    "executionRequest": deepcopy(execution_request),
+                    "renderCandidate": deepcopy(candidate),
+                    "runtimeEvidence": deepcopy(runtime),
+                    "artifactEvidence": deepcopy(artifact),
+                    "renderResult": deepcopy(render_result),
+                    "content": content,
+                }
+            )
+        return restored
+
+    @staticmethod
+    def _render_candidate_projection(
+        restored: Sequence[Mapping[str, Any]],
+        *,
+        evidence_revision: str,
+        replayed: bool,
+        detail: bool,
+    ) -> dict[str, Any]:
+        if detail:
+            if len(restored) != 1:
+                raise RecordNotFoundError("RenderCandidate was not found")
+            value = restored[0]
+            return {
+                "renderCandidate": deepcopy(value["renderCandidate"]),
+                "runtimeEvidence": deepcopy(value["runtimeEvidence"]),
+                "artifactEvidence": deepcopy(value["artifactEvidence"]),
+                "renderResult": deepcopy(value["renderResult"]),
+                "publicationAllowed": False,
+                "masterState": "NOT_CREATED",
+                "exportState": "NOT_CREATED",
+                "assetAdmissionState": "NOT_ADMITTED",
+                "evidenceRevision": evidence_revision,
+                "idempotentReplay": replayed,
+            }
+        return {
+            "renderCandidates": [
+                deepcopy(item["renderCandidate"]) for item in restored
+            ],
+            "publicationAllowed": False,
+            "masterState": "NOT_CREATED",
+            "exportState": "NOT_CREATED",
+            "assetAdmissionState": "NOT_ADMITTED",
+            "evidenceRevision": evidence_revision,
+            "idempotentReplay": replayed,
+        }
+
+    def create_render_candidate(self, command: Mapping[str, Any]) -> dict[str, Any]:
+        """Execute one exact manifest without admission, QC, approval or export."""
+
+        fields = {
+            "workspaceRef",
+            "productionRunRef",
+            "operationRef",
+            "idempotencyKey",
+            "expectedRunVersion",
+            "timelineVersionRef",
+            "timelineVersionDigest",
+            "compositionVersionRef",
+            "compositionVersionDigest",
+            "renderManifestRef",
+            "renderManifestDigest",
+        }
+        if not isinstance(command, Mapping) or set(command) != fields:
+            raise EpisodeProductionError(
+                "command fields do not match the M13-R1B contract"
+            )
+        workspace = _required_ref(command.get("workspaceRef"), "workspaceRef")
+        run_ref = _required_ref(
+            command.get("productionRunRef"), "productionRunRef"
+        )
+        operation_ref = _required_ref(command.get("operationRef"), "operationRef")
+        client_key = _idempotency_key(command.get("idempotencyKey"))
+        expected_run_version = _positive_version(
+            command.get("expectedRunVersion"), "expectedRunVersion"
+        )
+        references = {}
+        for field in (
+            "timelineVersionRef",
+            "compositionVersionRef",
+            "renderManifestRef",
+        ):
+            references[field] = _required_ref(command.get(field), field)
+        for field in (
+            "timelineVersionDigest",
+            "compositionVersionDigest",
+            "renderManifestDigest",
+        ):
+            value = command.get(field)
+            if not _is_sha256(value):
+                raise EpisodeProductionError(f"{field} is invalid")
+            references[field] = value
+        context = self._timeline_authority_context(
+            workspace,
+            run_ref,
+            expected_run_version=expected_run_version,
+        )
+        domain = self._restore_render_domain(
+            context,
+            render_manifest_ref=references["renderManifestRef"],
+        )
+        timeline_version = domain["timeline"]["timelineVersion"].as_dict()
+        composition_version = domain["compositionVersion"]
+        manifest = domain["renderManifest"]
+        if (
+            references["timelineVersionRef"]
+            != timeline_version["timelineVersionRef"]
+            or references["timelineVersionDigest"]
+            != timeline_version["payloadDigest"]
+            or references["compositionVersionRef"]
+            != composition_version["compositionVersionRef"]
+            or references["compositionVersionDigest"]
+            != composition_version["payloadDigest"]
+            or references["renderManifestDigest"] != manifest["payloadDigest"]
+        ):
+            raise StaleInputError("RenderCandidate exact input authority is stale")
+        request_digest = _digest(
+            {
+                "schemaVersion": "v5.m13-render-candidate-command.v1",
+                "workspaceRef": workspace,
+                "productionRunRef": run_ref,
+                "operationRef": operation_ref,
+                "idempotencyKey": client_key,
+                "expectedRunVersion": expected_run_version,
+                **references,
+                "runDigest": context["run"]["payloadDigest"],
+                "renderToolchainIdentity": self.render_toolchain_identity,
+            }
+        )
+        replay_key = self._render_domain_record_idempotency_key(
+            client_key,
+            "render-candidate",
+            domain_stage="m13-r1b-render-candidate",
+        )
+        replay = self.evidence.get_record_by_idempotency_key(
+            workspace, run_ref, replay_key
+        )
+        if replay is not None:
+            if (
+                replay.get("recordKind") != "RenderCandidate"
+                or replay.get("requestDigest") != request_digest
+            ):
+                raise IdempotencyConflictError(
+                    "M13-R1B idempotency content changed"
+                )
+            restored = self._restore_render_candidates(
+                context,
+                render_candidate_ref=replay.get("recordRef"),
+            )
+            return self._render_candidate_projection(
+                restored,
+                evidence_revision=context["snapshot"].revisionToken,
+                replayed=True,
+                detail=True,
+            )
+        if (
+            self.composition is None
+            or not callable(getattr(self.composition, "render_candidate", None))
+            or not callable(
+                getattr(self.composition, "inspect_render_candidate", None)
+            )
+        ):
+            raise WorkerUnavailableError("RenderCandidate executor is unavailable")
+        preview_projection = self._editing_effect_preview_projection(
+            context=context,
+            restored=domain["timeline"],
+            allow_video_edits=True,
+        )
+        subtitle_cues = (
+            []
+            if manifest["subtitleMode"] == "NONE"
+            else self._render_subtitle_cues(
+                context=context,
+                layout=preview_projection["layout"],
+            )
+        )
+        timing_digest = canonical_subtitle_timing_digest(subtitle_cues)
+        if (
+            manifest["subtitleMode"] != "NONE"
+            and manifest["subtitleTimingDigest"] != timing_digest
+        ):
+            raise StaleInputError("RenderManifest subtitle timing is stale")
+        font_projection = None
+        font_required_text = None
+        if manifest["subtitleMode"] == "BURN_IN":
+            font_required_text = self._current_script_text_projection(
+                context=context
+            )["resolvedText"]
+            font_projection = self._current_font_projection(
+                context=context,
+                asset_version_ref=manifest["subtitleFontAssetVersionRef"],
+                asset_version_digest=manifest[
+                    "subtitleFontAssetVersionDigest"
+                ],
+                required_text=font_required_text,
+            )
+        render_profile = {
+            field: deepcopy(manifest[field])
+            for field in (
+                "outputProfile",
+                "videoEncoding",
+                "colorMetadata",
+                "audioEncoding",
+                "subtitleMode",
+                "subtitleTimingDigest",
+                "subtitleFontAssetVersionRef",
+                "subtitleFontAssetVersionDigest",
+                "rendererIdentity",
+                "rendererVersion",
+                "ffmpegBinaryDigest",
+                "ffprobeBinaryDigest",
+            )
+        }
+        input_digest = render_input_bindings_digest(
+            composition_version=composition_version,
+            composition_command=preview_projection["compositionCommand"],
+            subtitle_cues=subtitle_cues,
+        )
+        execution_identity = {
+            "schemaVersion": "v4.m13-render-execution-identity.v1",
+            "workspaceRef": workspace,
+            "productionRunRef": run_ref,
+            "operationRef": operation_ref,
+            **references,
+            "allInputBindingsDigest": input_digest,
+            "compositionCommandDigest": composition_command_digest(
+                preview_projection["compositionCommand"]
+            ),
+            "runtimeBindingDigest": runtime_binding_digest(render_profile),
+            "renderProfile": render_profile,
+        }
+        execution_ref = "m13-render-execution-" + _digest(execution_identity)[:32]
+        storage_binding_ref = "m13-render-storage-" + _digest(
+            {
+                "executionRequestRef": execution_ref,
+                "renderManifestRef": manifest["renderManifestRef"],
+                "renderManifestDigest": manifest["payloadDigest"],
+            }
+        )[:32]
+        execution_request = build_render_execution_request(
+            {
+                "workspaceRef": workspace,
+                "productionRunRef": run_ref,
+                "executionRequestRef": execution_ref,
+                "timelineVersionRef": timeline_version["timelineVersionRef"],
+                "timelineVersionDigest": timeline_version["payloadDigest"],
+                "compositionVersionRef": composition_version[
+                    "compositionVersionRef"
+                ],
+                "compositionVersionDigest": composition_version["payloadDigest"],
+                "renderManifestRef": manifest["renderManifestRef"],
+                "renderManifestDigest": manifest["payloadDigest"],
+                "allInputBindingsDigest": input_digest,
+                "compositionCommandDigest": composition_command_digest(
+                    preview_projection["compositionCommand"]
+                ),
+                "runtimeBindingDigest": runtime_binding_digest(render_profile),
+                "outputArtifactBindingRef": storage_binding_ref,
+                "renderProfile": render_profile,
+                "publicationAllowed": False,
+            }
+        )
+        try:
+            execution = self.composition.render_candidate(
+                execution_request,
+                composition_version=composition_version,
+                composition_command=preview_projection["compositionCommand"],
+                resolved_artifacts=preview_projection["resolvedArtifacts"],
+                subtitle_cues=subtitle_cues,
+                font_projection=font_projection,
+                font_required_text=font_required_text,
+            )
+        except EpisodeProductionError:
+            raise
+        except Exception as exc:
+            raise ArtifactRejectedError(
+                "deterministic RenderCandidate execution failed"
+            ) from exc
+        expected_execution_fields = {
+            "schemaVersion": "v4.m13-render-execution-result.v1",
+            "executionRequestRef": execution_ref,
+            "executionRequestDigest": execution_request["payloadDigest"],
+            "outputArtifactBindingRef": storage_binding_ref,
+            "rendererIdentity": manifest["rendererIdentity"],
+            "rendererVersion": manifest["rendererVersion"],
+            "ffmpegBinaryDigest": manifest["ffmpegBinaryDigest"],
+            "ffprobeBinaryDigest": manifest["ffprobeBinaryDigest"],
+            "gpuUsed": False,
+            "providerUsed": False,
+            "publicationAllowed": False,
+        }
+        if not isinstance(execution, Mapping) or any(
+            execution.get(field) != value
+            for field, value in expected_execution_fields.items()
+        ):
+            raise ArtifactRejectedError("RenderCandidate execution result is stale")
+        if (
+            execution.get("subtitleTimingDigest") != timing_digest
+            or execution.get("subtitleTimingDigestSpec")
+            != manifest["subtitleTimingDigestSpec"]
+            or not isinstance(execution.get("outputMediaProbe"), Mapping)
+            or not isinstance(execution.get("outputByteSize"), int)
+            or execution["outputByteSize"] < 1
+        ):
+            raise ArtifactRejectedError("RenderCandidate content result is invalid")
+
+        # Close the render-to-journal race: every authority is freshly read
+        # again immediately before the append-only CAS.
+        fresh_context = self._timeline_authority_context(
+            workspace,
+            run_ref,
+            expected_run_version=expected_run_version,
+        )
+        fresh_domain = self._restore_render_domain(
+            fresh_context,
+            render_manifest_ref=manifest["renderManifestRef"],
+        )
+        fresh_preview_projection = self._editing_effect_preview_projection(
+            context=fresh_context,
+            restored=fresh_domain["timeline"],
+            allow_video_edits=True,
+        )
+        fresh_subtitle_cues = (
+            []
+            if manifest["subtitleMode"] == "NONE"
+            else self._render_subtitle_cues(
+                context=fresh_context,
+                layout=fresh_preview_projection["layout"],
+            )
+        )
+        fresh_font_projection = None
+        fresh_font_required_text = None
+        if manifest["subtitleMode"] == "BURN_IN":
+            fresh_font_required_text = self._current_script_text_projection(
+                context=fresh_context
+            )["resolvedText"]
+            fresh_font_projection = self._current_font_projection(
+                context=fresh_context,
+                asset_version_ref=manifest["subtitleFontAssetVersionRef"],
+                asset_version_digest=manifest[
+                    "subtitleFontAssetVersionDigest"
+                ],
+                required_text=fresh_font_required_text,
+            )
+        if (
+            fresh_domain["compositionVersion"] != composition_version
+            or fresh_domain["renderManifest"] != manifest
+            or fresh_preview_projection != preview_projection
+            or fresh_subtitle_cues != subtitle_cues
+            or fresh_font_projection != font_projection
+            or fresh_font_required_text != font_required_text
+        ):
+            raise StaleInputError("RenderCandidate authority changed during execution")
+        created_at = self._clock()
+        runtime_ref = "m13-render-runtime-" + _digest(
+            {
+                "executionRequestDigest": execution_request["payloadDigest"],
+                "ffmpegBinaryDigest": execution["ffmpegBinaryDigest"],
+                "ffprobeBinaryDigest": execution["ffprobeBinaryDigest"],
+            }
+        )[:32]
+        runtime = build_render_runtime_evidence(
+            {
+                "workspaceRef": workspace,
+                "productionRunRef": run_ref,
+                "runtimeEvidenceRef": runtime_ref,
+                "executionRequestRef": execution_ref,
+                "executionRequestDigest": execution_request["payloadDigest"],
+                "rendererIdentity": execution["rendererIdentity"],
+                "rendererVersion": execution["rendererVersion"],
+                "ffmpegBinaryDigest": execution["ffmpegBinaryDigest"],
+                "ffprobeBinaryDigest": execution["ffprobeBinaryDigest"],
+                "gpuUsed": False,
+                "providerUsed": False,
+                "publicationAllowed": False,
+                "createdAt": created_at,
+            }
+        )
+        artifact_ref = "m13-render-artifact-" + _digest(
+            {
+                "executionRequestDigest": execution_request["payloadDigest"],
+                "fileDigest": execution["fileDigest"],
+                "decodedFramePixelDigest": execution[
+                    "decodedFramePixelDigest"
+                ],
+                "pcmContentDigest": execution["pcmContentDigest"],
+                "subtitleTimingDigest": execution["subtitleTimingDigest"],
+            }
+        )[:32]
+        sidecar = execution.get("subtitleSidecar")
+        public_sidecar = (
+            None
+            if sidecar is None
+            else {
+                "mediaType": sidecar["mediaType"],
+                "byteSize": sidecar["byteSize"],
+                "fileDigest": sidecar["fileDigest"],
+                "storageBindingRef": storage_binding_ref + "-subtitle",
+            }
+        )
+        artifact = build_render_artifact_evidence(
+            {
+                "workspaceRef": workspace,
+                "productionRunRef": run_ref,
+                "artifactEvidenceRef": artifact_ref,
+                "executionRequestRef": execution_ref,
+                "executionRequestDigest": execution_request["payloadDigest"],
+                "renderManifestRef": manifest["renderManifestRef"],
+                "renderManifestDigest": manifest["payloadDigest"],
+                "runtimeEvidenceRef": runtime_ref,
+                "runtimeEvidenceDigest": runtime["payloadDigest"],
+                "storageBindingRef": storage_binding_ref,
+                "mediaType": "video/mp4",
+                "byteSize": execution["outputByteSize"],
+                "fileDigest": execution["fileDigest"],
+                "decodedFramePixelDigest": execution[
+                    "decodedFramePixelDigest"
+                ],
+                "decodedFramePixelDigestSpec": execution[
+                    "decodedFramePixelDigestSpec"
+                ],
+                "pcmContentDigest": execution["pcmContentDigest"],
+                "pcmContentDigestSpec": execution["pcmContentDigestSpec"],
+                "subtitleTimingDigest": execution["subtitleTimingDigest"],
+                "subtitleTimingDigestSpec": execution[
+                    "subtitleTimingDigestSpec"
+                ],
+                "mediaProbe": execution["outputMediaProbe"],
+                "subtitleSidecar": public_sidecar,
+                "publicationAllowed": False,
+                "createdAt": created_at,
+            }
+        )
+        try:
+            self.composition.inspect_render_candidate(
+                workspace_ref=workspace,
+                production_run_ref=run_ref,
+                storage_binding_ref=storage_binding_ref,
+                expected={
+                    **artifact,
+                    "ffmpegBinaryDigest": runtime["ffmpegBinaryDigest"],
+                    "ffprobeBinaryDigest": runtime["ffprobeBinaryDigest"],
+                },
+            )
+        except EpisodeProductionError:
+            raise
+        except Exception as exc:
+            raise ArtifactRejectedError(
+                "RenderCandidate artifact changed before evidence append"
+            ) from exc
+        result_ref = "m13-render-result-" + _digest(
+            {
+                "executionRequestDigest": execution_request["payloadDigest"],
+                "artifactEvidenceDigest": artifact["payloadDigest"],
+                "runtimeEvidenceDigest": runtime["payloadDigest"],
+            }
+        )[:32]
+        render_result = build_render_result(
+            {
+                "workspaceRef": workspace,
+                "productionRunRef": run_ref,
+                "renderResultRef": result_ref,
+                "executionRequestRef": execution_ref,
+                "executionRequestDigest": execution_request["payloadDigest"],
+                "renderManifestRef": manifest["renderManifestRef"],
+                "renderManifestDigest": manifest["payloadDigest"],
+                "runtimeEvidenceRef": runtime_ref,
+                "runtimeEvidenceDigest": runtime["payloadDigest"],
+                "artifactEvidenceRef": artifact_ref,
+                "artifactEvidenceDigest": artifact["payloadDigest"],
+                "state": "SUCCEEDED",
+                "publicationAllowed": False,
+                "createdAt": created_at,
+            }
+        )
+        candidate_ref = "m13-render-candidate-" + _digest(
+            {
+                "renderResultDigest": render_result["payloadDigest"],
+                "renderManifestDigest": manifest["payloadDigest"],
+            }
+        )[:32]
+        candidate = build_render_candidate(
+            {
+                "workspaceRef": workspace,
+                "productionRunRef": run_ref,
+                "projectRef": context["run"]["projectRef"],
+                "seriesRef": context["run"]["seriesRef"],
+                "episodeRef": context["run"]["episodeRef"],
+                "renderCandidateRef": candidate_ref,
+                "timelineVersionRef": timeline_version["timelineVersionRef"],
+                "timelineVersionDigest": timeline_version["payloadDigest"],
+                "compositionVersionRef": composition_version[
+                    "compositionVersionRef"
+                ],
+                "compositionVersionDigest": composition_version["payloadDigest"],
+                "renderManifestRef": manifest["renderManifestRef"],
+                "renderManifestDigest": manifest["payloadDigest"],
+                "executionRequestRef": execution_ref,
+                "executionRequestDigest": execution_request["payloadDigest"],
+                "runtimeEvidenceRef": runtime_ref,
+                "runtimeEvidenceDigest": runtime["payloadDigest"],
+                "artifactEvidenceRef": artifact_ref,
+                "artifactEvidenceDigest": artifact["payloadDigest"],
+                "renderResultRef": result_ref,
+                "renderResultDigest": render_result["payloadDigest"],
+                "renderProfileRef": manifest["outputProfile"]["profileRef"],
+                "storageBindingRef": storage_binding_ref,
+                "mediaType": "video/mp4",
+                "fileDigest": artifact["fileDigest"],
+                "byteSize": artifact["byteSize"],
+                "decodedFramePixelDigest": artifact[
+                    "decodedFramePixelDigest"
+                ],
+                "decodedFramePixelDigestSpec": artifact[
+                    "decodedFramePixelDigestSpec"
+                ],
+                "pcmContentDigest": artifact["pcmContentDigest"],
+                "pcmContentDigestSpec": artifact["pcmContentDigestSpec"],
+                "subtitleTimingDigest": artifact["subtitleTimingDigest"],
+                "subtitleTimingDigestSpec": artifact[
+                    "subtitleTimingDigestSpec"
+                ],
+                "mediaProbe": artifact["mediaProbe"],
+                "rendererIdentity": runtime["rendererIdentity"],
+                "rendererVersion": runtime["rendererVersion"],
+                "ffmpegBinaryDigest": runtime["ffmpegBinaryDigest"],
+                "ffprobeBinaryDigest": runtime["ffprobeBinaryDigest"],
+                "state": "RENDERED_CANDIDATE",
+                "technicalValidationState": "PASS",
+                "qcState": "NOT_RUN",
+                "approvalState": "NOT_REQUESTED",
+                "assetAdmissionState": "NOT_ADMITTED",
+                "masterState": "NOT_CREATED",
+                "exportState": "NOT_CREATED",
+                "publicationAllowed": False,
+                "createdAt": created_at,
+            }
+        )
+        record_payloads = (
+            (
+                "RenderExecutionRequest",
+                execution_ref,
+                "render-execution-request",
+                execution_request,
+            ),
+            ("RenderRuntimeEvidence", runtime_ref, "render-runtime", runtime),
+            ("RenderArtifactEvidence", artifact_ref, "render-artifact", artifact),
+            ("RenderResult", result_ref, "render-result", render_result),
+            ("RenderCandidate", candidate_ref, "render-candidate", candidate),
+        )
+        records = [
+            self._render_domain_evidence_record(
+                workspace=workspace,
+                run_ref=run_ref,
+                record_kind=kind,
+                record_ref=reference,
+                record_version=1,
+                client_key=client_key,
+                slot=slot,
+                request_digest=request_digest,
+                created_at=created_at,
+                payload=payload,
+                domain_stage="m13-r1b-render-candidate",
+            )
+            for kind, reference, slot, payload in record_payloads
+        ]
+        journal_head = self._stable_record_head(
+            workspace,
+            run_ref,
+            fresh_context["snapshot"].revisionToken,
+        )
+        self.evidence.append_records(
+            records,
+            expected_record_journal_head=journal_head,
+            expected_evidence_revision_token=fresh_context["snapshot"].revisionToken,
+        )
+        result_context = self._timeline_authority_context(
+            workspace,
+            run_ref,
+            expected_run_version=expected_run_version,
+        )
+        restored = self._restore_render_candidates(
+            result_context,
+            render_candidate_ref=candidate_ref,
+        )
+        return self._render_candidate_projection(
+            restored,
+            evidence_revision=result_context["snapshot"].revisionToken,
+            replayed=False,
+            detail=True,
+        )
+
+    def list_render_candidates(
+        self, workspace_ref: str, run_ref: str
+    ) -> dict[str, Any]:
+        workspace = _required_ref(workspace_ref, "workspaceRef")
+        production_run = _required_ref(run_ref, "productionRunRef")
+        context = self._timeline_authority_context(
+            workspace, production_run, expected_run_version=None
+        )
+        restored = self._restore_render_candidates(context)
+        return self._render_candidate_projection(
+            restored,
+            evidence_revision=context["snapshot"].revisionToken,
+            replayed=False,
+            detail=False,
+        )
+
+    def get_render_candidate(
+        self,
+        workspace_ref: str,
+        run_ref: str,
+        render_candidate_ref: str,
+    ) -> dict[str, Any]:
+        workspace = _required_ref(workspace_ref, "workspaceRef")
+        production_run = _required_ref(run_ref, "productionRunRef")
+        candidate_ref = _required_ref(
+            render_candidate_ref, "renderCandidateRef"
+        )
+        context = self._timeline_authority_context(
+            workspace, production_run, expected_run_version=None
+        )
+        restored = self._restore_render_candidates(
+            context, render_candidate_ref=candidate_ref
+        )
+        return self._render_candidate_projection(
+            restored,
+            evidence_revision=context["snapshot"].revisionToken,
+            replayed=False,
+            detail=True,
+        )
+
+    def get_render_candidate_content(
+        self,
+        workspace_ref: str,
+        run_ref: str,
+        render_candidate_ref: str,
+    ) -> dict[str, Any]:
+        workspace = _required_ref(workspace_ref, "workspaceRef")
+        production_run = _required_ref(run_ref, "productionRunRef")
+        candidate_ref = _required_ref(
+            render_candidate_ref, "renderCandidateRef"
+        )
+        context = self._timeline_authority_context(
+            workspace, production_run, expected_run_version=None
+        )
+        restored = self._restore_render_candidates(
+            context, render_candidate_ref=candidate_ref
+        )
+        if len(restored) != 1:
+            raise RecordNotFoundError("RenderCandidate was not found")
+        content = deepcopy(dict(restored[0]["content"]))
+        content.update(
+            {
+                "fileName": f"{candidate_ref}.mp4",
+                "contentDisposition": "inline",
+                "cacheControl": "no-store",
+            }
+        )
+        return content
 
     @staticmethod
     def _snapshot_record_payload(
@@ -8359,6 +9394,8 @@ class K2DeliveryService:
     @staticmethod
     def _editing_preview_layout(
         restored: Mapping[str, Any],
+        *,
+        allow_video_edits: bool = False,
     ) -> dict[str, Any]:
         version = restored["timelineVersion"].as_dict()
         tracks = {
@@ -8407,6 +9444,18 @@ class K2DeliveryService:
         for clip_kind, clips in active.items():
             for clip in clips:
                 transform = clip["transform"]
+                if allow_video_edits and clip_kind == "VIDEO":
+                    if (
+                        clip["maskBindings"]
+                        or clip["blendMode"] != "NORMAL"
+                        or transform["perspectiveMode"] != "NONE"
+                        or transform["perspectiveMatrix"] is not None
+                        or transform["perspectiveCorners"] is not None
+                    ):
+                        raise UpstreamNotReadyError(
+                            "editing Timeline video modifier is not supported by R1"
+                        )
+                    continue
                 if (
                     clip["transitionIn"] is not None
                     or clip["transitionOut"] is not None
@@ -8448,7 +9497,7 @@ class K2DeliveryService:
             if item["sourceBinding"].get("effectKind") == "GLYPH_REVEAL"
         ]
         if (
-            len(active["VIDEO"]) != 1
+            (not active["VIDEO"] if allow_video_edits else len(active["VIDEO"]) != 1)
             or not active["AUDIO"]
             or not active["SUBTITLE"]
             or len(glyphs) != 1
@@ -8501,6 +9550,7 @@ class K2DeliveryService:
         return {
             "timelineVersion": version,
             "video": active["VIDEO"][0],
+            "videoClips": active["VIDEO"],
             "audio": active["AUDIO"],
             "subtitles": active["SUBTITLE"],
             "deterministicEffects": deterministic,
@@ -8788,16 +9838,109 @@ class K2DeliveryService:
             "subtitleManifestDigest": digest,
         }
 
+    def _render_subtitle_cues(
+        self,
+        *,
+        context: Mapping[str, Any],
+        layout: Mapping[str, Any],
+    ) -> list[dict[str, Any]]:
+        """Project exact Script text into immutable frame-addressed cues."""
+
+        cues: list[dict[str, Any]] = []
+        for clip in layout["subtitles"]:
+            source = clip["sourceBinding"]
+            raw_cue = self._snapshot_record_payload(
+                context["snapshot"],
+                record_kind="AudioCue",
+                record_ref=source["audioCueRef"],
+            )
+            cue = raw_cue
+            subtitle = cue["subtitleTimingReference"]
+            text = subtitle["text"]
+            if (
+                cue["cueVersionRef"] != source["audioCueRef"]
+                or cue["payloadDigest"] != source["audioCueDigest"]
+                or cue["scriptVersionRef"] != source["scriptVersionRef"]
+                or cue["scriptVersionDigest"] != source["scriptVersionDigest"]
+                or subtitle["textRangeStart"] != source["textStart"]
+                or subtitle["textRangeEndExclusive"]
+                != source["textEndExclusive"]
+                or subtitle["textDigest"] != source["textDigest"]
+                or subtitle["language"] != source["language"]
+                or not text
+                or sha256(text.encode("utf-8")).hexdigest()
+                != source["textDigest"]
+            ):
+                raise StaleInputError("subtitle Script text authority is stale")
+            authority_words = {
+                item["wordRef"]: item for item in cue["wordTimings"]
+            }
+            words: list[dict[str, Any]] = []
+            for word in source["wordTiming"]:
+                authority_word = authority_words.get(word["wordRef"])
+                word_text = (
+                    authority_word.get("text")
+                    if isinstance(authority_word, Mapping)
+                    else None
+                )
+                if (
+                    not isinstance(authority_word, Mapping)
+                    or authority_word.get("textRangeStart")
+                    != word["textStart"]
+                    or authority_word.get("textRangeEndExclusive")
+                    != word["textEndExclusive"]
+                    or authority_word.get("textDigest") != word["textDigest"]
+                    or not isinstance(word_text, str)
+                    or not word_text
+                    or sha256(word_text.encode("utf-8")).hexdigest()
+                    != word["textDigest"]
+                ):
+                    raise StaleInputError("subtitle word text authority is stale")
+                words.append(
+                    {
+                        "wordRef": word["wordRef"],
+                        "timelineStartFrameInclusive": word[
+                            "timelineStartFrameInclusive"
+                        ],
+                        "timelineEndFrameExclusive": word[
+                            "timelineEndFrameExclusive"
+                        ],
+                        "text": word_text,
+                        "textDigest": word["textDigest"],
+                    }
+                )
+            cues.append(
+                {
+                    "cueRef": source["audioCueRef"],
+                    "clipRef": clip["clipRef"],
+                    "timelineStartFrameInclusive": clip[
+                        "timelineStartFrameInclusive"
+                    ],
+                    "timelineEndFrameExclusive": clip[
+                        "timelineEndFrameExclusive"
+                    ],
+                    "text": text,
+                    "textDigest": source["textDigest"],
+                    "language": source["language"],
+                    "wordTiming": words,
+                }
+            )
+        return canonical_subtitle_timing(cues)
+
     def _editing_effect_preview_projection(
         self,
         *,
         context: Mapping[str, Any],
         restored: Mapping[str, Any],
+        allow_video_edits: bool = False,
     ) -> dict[str, Any]:
         workspace = context["run"]["workspaceRef"]
         run_ref = context["run"]["productionRunRef"]
         snapshot = context["snapshot"]
-        layout = self._editing_preview_layout(restored)
+        layout = self._editing_preview_layout(
+            restored,
+            allow_video_edits=allow_video_edits,
+        )
         version = layout["timelineVersion"]
         references = self._editing_preview_input_refs(
             snapshot=snapshot, layout=layout
@@ -8810,16 +9953,31 @@ class K2DeliveryService:
         )
         base_asset = inputs["basePlateAssetVersion"]
         video_facts = deepcopy(inputs["baseVideoFacts"])
-        video_source = layout["video"]["sourceBinding"]
+        video_sources = [
+            clip["sourceBinding"] for clip in layout["videoClips"]
+        ]
         if (
-            video_source["assetVersionRef"] != base_asset["assetVersionRef"]
-            or video_source["assetVersionDigest"] != base_asset["payloadDigest"]
-            or video_source["sourceInFrameInclusive"] != 0
-            or video_source["sourceOutFrameExclusive"]
-            != video_facts["frameCount"]
-            or layout["video"]["timelineStartFrameInclusive"] != 0
-            or layout["video"]["timelineEndFrameExclusive"]
-            != version["durationFrames"]
+            any(
+                source["assetVersionRef"] != base_asset["assetVersionRef"]
+                or source["assetVersionDigest"] != base_asset["payloadDigest"]
+                or source["sourceInFrameInclusive"] < 0
+                or source["sourceOutFrameExclusive"]
+                > video_facts["frameCount"]
+                or source["sourceInFrameInclusive"]
+                >= source["sourceOutFrameExclusive"]
+                for source in video_sources
+            )
+            or (
+                not allow_video_edits
+                and (
+                    video_sources[0]["sourceInFrameInclusive"] != 0
+                    or video_sources[0]["sourceOutFrameExclusive"]
+                    != video_facts["frameCount"]
+                    or layout["video"]["timelineStartFrameInclusive"] != 0
+                    or layout["video"]["timelineEndFrameExclusive"]
+                    != version["durationFrames"]
+                )
+            )
             or version["durationFrames"] != video_facts["frameCount"]
             or version["canvasWidth"] != video_facts["width"]
             or version["canvasHeight"] != video_facts["height"]

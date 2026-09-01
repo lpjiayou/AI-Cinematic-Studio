@@ -10,7 +10,7 @@
 >
 > Current Task: `ACS-M13-R1-COMPOSITION-RENDER-CANDIDATE`
 >
-> Current Work Package: `M13-R1A IMPLEMENTED / M13-R1B NEXT / M12-C3/C4 ENVIRONMENT_HOLD`
+> Current Work Package: `M13-R1 IMPLEMENTED CPU-ONLY / FRONTEND PIN NEXT / M12-C3/C4 ENVIRONMENT_HOLD`
 >
 > Authorized Source Base: `CORE f6689516c3517f4954f505f41a11804d178afdc1 / TREE 76386aa55ba8949007d4406ccb85923a500e2518 / VERIFIED M13-E4 MERGE`
 >
@@ -30,7 +30,7 @@
 >
 > Historical ADR-0013 Acceptance Baseline: `CORE main 6d28a53f / TREE 369c3b14 / 851 PASS — FRONTEND main 5b36aac0 / TREE fd20b7d7 / 174 PASS + TYPECHECK + LINT + BUILD + TWO CHROMIUM GATES`
 >
-> Production Ready: `NO — ARCHITECTURE ACCEPTED BUT M12 RUNTIME G0 AND M13 FULL BACKEND ARE NOT COMPLETE / NO PROVIDER, GPU, ADMISSION, PUBLICATION OR LIVE CANONICAL WRITE`
+> Production Ready: `NO — M13-R1 IS IMPLEMENTED NON-PUBLISHING BUT M12 RUNTIME G0 AND M13 FULL BACKEND ARE NOT COMPLETE / NO PROVIDER, GPU, ADMISSION, PUBLICATION OR LIVE CANONICAL WRITE`
 
 ---
 
@@ -40,7 +40,8 @@ The Project Lead, Architecture Owner and M13 Domain Owner authorize
 `ACS-M13-R1-COMPOSITION-RENDER-CANDIDATE`. This current overlay retains the accepted
 `ACS-M12-M13-ARCHITECTURE-CORRECTION-20260830` and ADR-0016/0017/0018 boundaries and
 authorizes only the serial M13-R1A immutable CompositionVersion/RenderManifest facts,
-M13-R1B non-publishing deterministic CPU RenderCandidate and Frontend pin update. It
+M13-R1B non-publishing deterministic CPU RenderCandidate and Frontend pin update.
+M13-R1A and M13-R1B are now implemented; the Frontend pin update is next. It
 does not authorize a second Timeline/Composition/Render/Asset authority, Provider/GPU
 use, Asset Admission, publication, Master, Export or later milestones.
 
@@ -53,9 +54,13 @@ is independently implemented, verified and merged.
 The architecture checkpoint, M12-C1, M13-T1, M12-C2 and M13-E1/E2/E3/E4 predecessors
 are merged and remotely verified. M13-R1A adds one Composition root, immutable
 CompositionVersion successors and result-free RenderManifest records through the
-existing Episode Production evidence journal. It creates no RenderCandidate or public
-HTTP route and preserves historical Preview and TimelineVersion reads. M12-C3/C4 remain
-on `ENVIRONMENT_HOLD` because the persistent CPU build root is absent.
+existing Episode Production evidence journal. M13-R1B binds the exact TimelineVersion,
+CompositionVersion and RenderManifest to a sealed V4 execution request, V3 CPU render,
+fresh runtime/artifact evidence, RenderResult and non-publishing RenderCandidate. Its
+authenticated nested public API supports create/list/detail and inline content reads
+without exposing internal paths. Historical Preview and TimelineVersion reads remain
+unchanged. M12-C3/C4 remain on `ENVIRONMENT_HOLD` because the persistent CPU build root
+is absent.
 
 The merged prerequisite is a read-only `IdentityReferenceVersionProjection` owned by
 the existing K2 authority identity service and derived from the existing Episode
@@ -124,9 +129,11 @@ M13_E2=IMPLEMENTED_CPU_ONLY
 M13_E3=IMPLEMENTED_CPU_ONLY
 M13_E4=IMPLEMENTED_CPU_ONLY
 M13_DETERMINISTIC_POST_PRODUCTION_WIRED=8/8
-M13_R1A_COMPOSITION_VERSION=IMPLEMENTED
-M13_R1A_RENDER_MANIFEST=IMPLEMENTED
-M13_R1B=NEXT
+M13_COMPOSITION_VERSION=IMPLEMENTED
+M13_RENDER_MANIFEST=IMPLEMENTED
+M13_RENDER_CANDIDATE=IMPLEMENTED_NON_PUBLISHING
+M13_R1=IMPLEMENTED_CPU_ONLY
+M13_R2=NEXT
 V5_FONT_AUTHORITY_CAPABILITY=IMPLEMENTED
 IDENTITY_REFERENCE_PROJECTION=AVAILABLE
 IDENTITY_REFERENCE_CURRENTNESS_REVALIDATION=AVAILABLE
@@ -138,8 +145,6 @@ NEW_BUNDLE_IDENTITY_BINDING_AUTHORIZED=false
 IDENTITY_SEMANTIC_CURRENTNESS=EXACT_SEVEN_FIELD_DECISION_MATCH
 M13_E3_RESUME_AFTER_IDENTITY_PROJECTION=AUTHORIZED
 M13_BACKEND_CAPABILITY_COMPLETE=false
-M13_RENDER_CANDIDATE_STATE=NOT_IMPLEMENTED
-M13_RENDER_CANDIDATE=AUTHORIZED_NON_PUBLISHING
 M13_EXPORT_CANDIDATE=PROHIBITED
 M13_EPISODE_MASTER=OUT_OF_SCOPE
 M13_EXPORT_ARTIFACT=OUT_OF_SCOPE

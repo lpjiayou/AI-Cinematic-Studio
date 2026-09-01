@@ -144,6 +144,7 @@ EPISODE_PRODUCTION_SUBRESOURCES = {
     "timeline",
     "timeline-versions",
     "timeline-edits",
+    "render-candidates",
     "preview",
     "finalize",
     "delivery",
@@ -162,6 +163,19 @@ EPISODE_PRODUCTION_SUBRESOURCES = {
 }
 
 _TIMELINE_WRITE_RESOURCES = frozenset({"timeline", "timeline-edits"})
+_RENDER_CANDIDATE_WRITE_FIELDS = frozenset(
+    {
+        "operationRef",
+        "idempotencyKey",
+        "expectedRunVersion",
+        "timelineVersionRef",
+        "timelineVersionDigest",
+        "compositionVersionRef",
+        "compositionVersionDigest",
+        "renderManifestRef",
+        "renderManifestDigest",
+    }
+)
 _DETERMINISTIC_EFFECT_WRITE_RESOURCE = "deterministic-effects"
 _DETERMINISTIC_EFFECT_KINDS = frozenset(
     {
@@ -180,6 +194,7 @@ _DETERMINISTIC_EFFECT_FORBIDDEN_CLIENT_FIELDS = frozenset(
         "absolutepath",
         "actorref",
         "approvalref",
+        "argv",
         "canonicalmutations",
         "css",
         "environmentoverride",
@@ -223,12 +238,12 @@ _DETERMINISTIC_EFFECT_FORBIDDEN_CLIENT_FIELDS = frozenset(
         "rawidentityversion",
         "rawmaskassetversion",
         "rawrequirement",
+        "rawtimelineversion",
         "rawshotversion",
         "rawsubjectlayerassetversion",
         "rawtextsource",
         "resolvedtext",
         "resolvedtextdigest",
-        "rawtimelineversion",
         "rawvariantassetversion",
         "shellcommand",
         "storagebindingref",
@@ -295,6 +310,7 @@ _TIMELINE_FORBIDDEN_CLIENT_FIELDS = frozenset(
         "absolutepath",
         "actorref",
         "approvalref",
+        "argv",
         "assetversion",
         "audiocue",
         "canonicalmutations",
@@ -310,6 +326,7 @@ _TIMELINE_FORBIDDEN_CLIENT_FIELDS = frozenset(
         "rawassetversion",
         "rawaudiocue",
         "rawrequirement",
+        "rawtimelineversion",
         "requirement",
         "shellcommand",
         "sql",
@@ -531,6 +548,30 @@ def _episode_preview_content(path: str) -> str | None:
     return run_ref
 
 
+def _episode_render_candidate_path(
+    path: str,
+) -> tuple[str, str, bool] | None:
+    prefix = f"{PUBLIC_EPISODE_PRODUCTION_RUNS_ENDPOINT}/"
+    if not path.startswith(prefix):
+        return None
+    parts = path[len(prefix):].split("/")
+    if (
+        len(parts) not in {3, 4}
+        or parts[1] != "render-candidates"
+        or (len(parts) == 4 and parts[3] != "content")
+    ):
+        return None
+    run_ref, candidate_ref = unquote(parts[0]), unquote(parts[2])
+    if (
+        not run_ref
+        or not candidate_ref
+        or "/" in run_ref
+        or "/" in candidate_ref
+    ):
+        return None
+    return run_ref, candidate_ref, len(parts) == 4
+
+
 class CreatorRequestHandler(BaseHTTPRequestHandler):
     server_version = "CreatorCore/1.0"
 
@@ -706,6 +747,20 @@ class CreatorRequestHandler(BaseHTTPRequestHandler):
                     return
             if (
                 production_subresource is not None
+                and production_subresource[1] == "render-candidates"
+            ):
+                expected_run_version = payload.get("expectedRunVersion")
+                if (
+                    set(payload) != _RENDER_CANDIDATE_WRITE_FIELDS
+                    or isinstance(expected_run_version, bool)
+                    or not isinstance(expected_run_version, int)
+                    or expected_run_version < 1
+                    or _contains_forbidden_timeline_client_claim(payload)
+                ):
+                    self._send_application_error(400, "invalid_request")
+                    return
+            if (
+                production_subresource is not None
                 and production_subresource[1]
                 == _DETERMINISTIC_EFFECT_WRITE_RESOURCE
             ):
@@ -839,6 +894,11 @@ class CreatorRequestHandler(BaseHTTPRequestHandler):
                     result = self.episode_production_boundary.create_timeline(command)
                 elif resource == "timeline-edits":
                     result = self.episode_production_boundary.edit_timeline(command)
+                elif resource == "render-candidates":
+                    result = (
+                        self.episode_production_boundary
+                        .create_render_candidate(command)
+                    )
                 elif resource == "preview":
                     result = self.episode_production_boundary.compose_and_qc(command)
                 elif resource == "real-media-revision":
@@ -1047,6 +1107,28 @@ class CreatorRequestHandler(BaseHTTPRequestHandler):
                 )
                 return
             if requested_path.startswith(f"{PUBLIC_EPISODE_PRODUCTION_RUNS_ENDPOINT}/"):
+                render_candidate_path = _episode_render_candidate_path(
+                    requested_path
+                )
+                if render_candidate_path is not None:
+                    run_ref, candidate_ref, content = render_candidate_path
+                    if content:
+                        result = (
+                            self.episode_production_boundary
+                            .get_render_candidate_content(
+                                workspace_ref, run_ref, candidate_ref
+                            )
+                        )
+                        self._send_file({**result, "cacheControl": "no-store"})
+                    else:
+                        result = (
+                            self.episode_production_boundary
+                            .get_render_candidate(
+                                workspace_ref, run_ref, candidate_ref
+                            )
+                        )
+                        self._send_json(200, {"ok": True, **result})
+                    return
                 preview_run_ref = _episode_preview_content(requested_path)
                 if preview_run_ref is not None:
                     result = self.episode_production_boundary.get_preview_file(
@@ -1106,6 +1188,11 @@ class CreatorRequestHandler(BaseHTTPRequestHandler):
                     elif resource == "timeline-versions":
                         result = self.episode_production_boundary.get_timeline_versions(
                             workspace_ref, run_ref
+                        )
+                    elif resource == "render-candidates":
+                        result = (
+                            self.episode_production_boundary
+                            .list_render_candidates(workspace_ref, run_ref)
                         )
                     elif resource == "real-media-revision":
                         result = self.episode_production_boundary.get_real_media_revision(
@@ -1798,7 +1885,9 @@ class CreatorRequestHandler(BaseHTTPRequestHandler):
         self.send_header(
             "Content-Disposition", f'{disposition}; filename="{file_name}"'
         )
-        self.send_header("Cache-Control", "private, no-store")
+        self.send_header(
+            "Cache-Control", str(artifact.get("cacheControl", "private, no-store"))
+        )
         self.send_header("X-Content-Type-Options", "nosniff")
         self.end_headers()
         self.wfile.write(body)
