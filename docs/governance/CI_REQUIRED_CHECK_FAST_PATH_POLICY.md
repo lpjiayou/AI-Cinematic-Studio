@@ -192,7 +192,35 @@ tests/integration/test_*.py
 Only `FULL_SUITE` may enter the deterministic FFmpeg installation step. Existing
 tests are not deleted, excluded, reclassified as slow or weakened.
 
-## 8. Observability
+## 8. Full-suite Integration sharding
+
+For `FULL_SUITE`, all files matching `tests/integration/test_*.py` are distributed
+across four independent, non-required worker jobs. The fixed assignment is balanced
+from the latest successful monolithic Integration run (workflow run `33651680175`):
+48 files, 297 discovered tests and 1,565.727 seconds of test execution. Longest-first
+allocation of the measured files, with the remaining files weighted by discovered
+test count, produced estimated shard weights of 487.129, 356.578, 356.432 and
+356.560 seconds.
+
+The assignment lives in `scripts/run_ci_fast_path.py`. Before execution, every
+worker verifies that each currently discovered Integration test file occurs exactly
+once, that no assigned path is absent and that the sum of per-shard discovered tests
+equals complete discovery. Each worker then verifies its executed count, permits
+only the pre-existing authenticated full-render acceptance skip and fails if its
+execution wall time exceeds 1,200 seconds. No test assertion, fixture or discovery
+root changes.
+
+Each worker uses a separate GitHub-hosted runner and a shard-specific temporary
+directory. A worker checks for both `ffmpeg` and `ffprobe`, installs FFmpeg only when
+either command is absent, and records both versions plus setup duration. It also
+reports final media-process and listener counts.
+
+The only required Integration context is the final job named exactly
+`Integration Tests`. It uses `if: always()`, depends on the entire worker matrix and
+fails unless every worker succeeds. The four worker contexts are evidence only and
+are not branch-rule requirements. No required context is added or renamed.
+
+## 9. Observability
 
 Every required job reports:
 
@@ -218,7 +246,7 @@ FULL_SUITE_EXECUTED=false
 FFMPEG_INSTALL_EXECUTED=false
 ```
 
-## 9. Authority boundary
+## 10. Authority boundary
 
 This policy changes CI execution selection only. It changes no production source,
 Public API, DTO, SQLite schema, dependency, Frontend behavior or Core/Frontend pin.
