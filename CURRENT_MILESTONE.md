@@ -35,7 +35,9 @@ The six-dimensional, evidence-linked source is
 | M3 | Historical ScriptVersion v1 remains readable; the additive v2 successor now stores one exact server-resolved M6 consumer binding. |
 | M6 | The bounded Series Intelligence reader now supplies the immutable M3 binding and M7 currentness input; missing authority still fails closed. |
 | M7 | Generic immutable narrative validation, structured Findings, PASS/WARN/BLOCK, staleness and fail-closed M8 readiness are implemented on the existing evidence journal. |
-| M8–M11 | Only repository/K2 evidence exists, including an immutable M11 visual-QC failure; generic method planning and routing remain pending in the authorized serial wave. |
+| M8 | Additive Storyboard/CreativeShot v2 and five-class ActionExecutionBeat planning are implemented behind the current M7 READY gate on the existing evidence journal. |
+| M9 | Independent Visual/Audio/Postprocess requirements and closed dispositions are implemented as planning facts; they create no provider or media job. |
+| M10–M11 | Only repository/K2 evidence exists, including an immutable M11 visual-QC failure; generic method-aware input planning and fail-closed routing remain pending. |
 | M12 | Domain contracts and runtime protocols are merged; runtimes are not installed, Runtime G0 is not complete, and C3/C4 have not started. |
 | M13 | Base architecture, backend and deterministic CPU slice are complete and closeout is accepted; product capability is incomplete. |
 | M14–M19 | Implementation is not authorized; production and publication remain closed. |
@@ -82,17 +84,17 @@ A100_START_AUTHORIZED=false
 
 ARCHITECTURE_CHECKPOINT=ADR_0019_ACCEPTED_AND_MERGED
 AUTHORIZED_SEQUENCE=PR-B→PR-C→PR-D→PR-E→PR-F→FRONTEND_PIN
-COMPLETED_SEQUENCE=PR-A→PR-B
-AUTHORIZED_REMAINING_SEQUENCE=PR-C→PR-D→PR-E→PR-F→FRONTEND_PIN
+COMPLETED_SEQUENCE=PR-A→PR-B→PR-C
+AUTHORIZED_REMAINING_SEQUENCE=PR-D→PR-E→PR-F→FRONTEND_PIN
 
 M3_M6_CONSUMER_BINDING=IMPLEMENTED_BOUNDED
 M7_NARRATIVE_VALIDATION=IMPLEMENTED_BOUNDED
-M8_ACTION_EXECUTION_BEATS=AUTHORIZED_NOT_IMPLEMENTED
-M9_THREE_AXIS_REQUIREMENTS=AUTHORIZED_NOT_IMPLEMENTED
+M8_ACTION_EXECUTION_BEATS=IMPLEMENTED_BOUNDED
+M9_THREE_AXIS_REQUIREMENTS=IMPLEMENTED_BOUNDED
 M10_METHOD_AWARE_PLANNING=AUTHORIZED_NOT_IMPLEMENTED
 M11_METHOD_CAPABILITY_BOUNDARY=AUTHORIZED_NOT_IMPLEMENTED
 M9_M12_AUDIO_BRIDGE=AUTHORIZED_NOT_IMPLEMENTED
-NEXT_SERIAL_PR=PR-C_M8_M9_EXECUTION_METHOD_PLANNING
+NEXT_SERIAL_PR=PR-D_M10_M11_METHOD_AWARE_MEDIA_BOUNDARY
 ```
 
 The following merged governance facts remain true and continue to protect every PR
