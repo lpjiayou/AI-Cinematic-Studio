@@ -63,7 +63,13 @@ class ScriptStudioPublicBoundary:
         if reader is None:
             raise RuntimeError("M6 Episode baseline reader is unavailable")
         self.__m6_episode_baseline_reader = reader
-        self.__service.bind_m6_episode_baseline_reader(reader)
+        bind_service_reader = getattr(
+            self.__service,
+            "bind_m6_episode_baseline_reader",
+            None,
+        )
+        if callable(bind_service_reader):
+            bind_service_reader(reader)
 
     @staticmethod
     def _error(exc: ScriptStudioError) -> ScriptStudioPublicError:
