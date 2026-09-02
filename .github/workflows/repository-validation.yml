@@ -184,8 +184,89 @@ jobs:
         shell: bash
         run: python scripts/run_ci_fast_path.py run-job --job contract
 
+  integration-shards:
+    name: ${{ matrix.check_name }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - shard: shard-1
+            check_name: Integration Shard 1
+          - shard: shard-2
+            check_name: Integration Shard 2
+          - shard: shard-3
+            check_name: Integration Shard 3
+          - shard: shard-4
+            check_name: Integration Shard 4
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Classify repository change scope
+        shell: bash
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha || github.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          python3 scripts/run_ci_fast_path.py classify \
+            --event-name "$EVENT_NAME" \
+            --base-sha "$BASE_SHA" \
+            --head-sha "$HEAD_SHA"
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Record setup timing
+        shell: bash
+        run: python scripts/run_ci_fast_path.py mark-setup
+
+      - name: Prepare isolated shard workspace
+        shell: bash
+        env:
+          SHARD_ID: ${{ matrix.shard }}
+        run: |
+          shard_temp="${{ runner.temp }}/acs-integration-${SHARD_ID}"
+          mkdir -p "$shard_temp"
+          echo "TMPDIR=$shard_temp" >> "$GITHUB_ENV"
+          echo "TMP=$shard_temp" >> "$GITHUB_ENV"
+          echo "TEMP=$shard_temp" >> "$GITHUB_ENV"
+          echo "INTEGRATION_SHARD_TEMP=$shard_temp"
+
+      - name: Ensure deterministic media runtime for full suite
+        if: env.CI_SCOPE == 'FULL_SUITE'
+        shell: bash
+        run: |
+          started="$(date +%s)"
+          installed=false
+          if ! command -v ffmpeg >/dev/null 2>&1 || ! command -v ffprobe >/dev/null 2>&1; then
+            sudo apt-get update
+            sudo apt-get install -y ffmpeg
+            installed=true
+          fi
+          ffmpeg -version
+          ffprobe -version
+          finished="$(date +%s)"
+          echo "RUNTIME_INSTALL_SECONDS=$((finished - started))" >> "$GITHUB_ENV"
+          echo "FFMPEG_INSTALL_EXECUTED=$installed" >> "$GITHUB_ENV"
+
+      - name: Run complete assigned Integration shard
+        shell: bash
+        env:
+          SHARD_ID: ${{ matrix.shard }}
+        run: python scripts/run_ci_fast_path.py run-integration-shard --shard "$SHARD_ID"
+
   integration-tests:
     name: Integration Tests
+    if: always()
+    needs:
+      - integration-shards
     runs-on: ubuntu-latest
     steps:
       - name: Check out repository
@@ -214,23 +295,10 @@ jobs:
         shell: bash
         run: python scripts/run_ci_fast_path.py mark-setup
 
-      - name: Install deterministic media runtime for full suite
-        if: env.CI_SCOPE == 'FULL_SUITE'
+      - name: Aggregate Integration worker results
         shell: bash
+        env:
+          WORKERS_RESULT: ${{ needs.integration-shards.result }}
         run: |
-          started="$(date +%s)"
-          installed=false
-          if ! command -v ffmpeg >/dev/null 2>&1; then
-            sudo apt-get update
-            sudo apt-get install -y ffmpeg
-            installed=true
-          fi
-          ffmpeg -version
-          ffprobe -version
-          finished="$(date +%s)"
-          echo "RUNTIME_INSTALL_SECONDS=$((finished - started))" >> "$GITHUB_ENV"
-          echo "FFMPEG_INSTALL_EXECUTED=$installed" >> "$GITHUB_ENV"
-
-      - name: Run Integration Tests required check
-        shell: bash
-        run: python scripts/run_ci_fast_path.py run-job --job integration
+          python scripts/run_ci_fast_path.py aggregate-integration \
+            --workers-result "$WORKERS_RESULT"
