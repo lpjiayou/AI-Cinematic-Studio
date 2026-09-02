@@ -49,6 +49,18 @@ jobs:
         shell: bash
         run: python scripts/validate_doc_links.py
 
+      - name: Validate document registry coverage
+        shell: bash
+        run: python scripts/validate_document_registry.py
+
+      - name: Validate current-state projection
+        shell: bash
+        run: python scripts/validate_current_state.py
+
+      - name: Validate document supersession and indexing
+        shell: bash
+        run: python scripts/validate_document_supersession.py
+
   unit-tests:
     name: Unit Tests
     runs-on: ubuntu-latest

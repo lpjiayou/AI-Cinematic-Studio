@@ -30,6 +30,24 @@
   },
   "documents": [
     {
+      "path": ".github/pull_request_template.md",
+      "repository": "Core",
+      "documentClass": "NORMATIVE_CONTRACT",
+      "status": "ACTIVE",
+      "owner": "Documentation Governance Owner",
+      "authoritativeFor": [
+        "contract or governance boundary within the document's explicit scope"
+      ],
+      "supersedes": [],
+      "supersededBy": [],
+      "currentStateClaimsAllowed": false,
+      "historicalMutationPolicy": "UPDATE_WITH_AUTHORIZED_CONTRACT_CHANGE",
+      "lastReviewedBaseline": "a455c8e76427d53d75bb7f15259b9875d9768914",
+      "lastReviewedAt": "2026-09-02",
+      "linkedFromIndex": true,
+      "notes": "Authority is limited to the document's declared scope and subordinate to Accepted ADRs."
+    },
+    {
       "path": "AGENTS.md",
       "repository": "Core",
       "documentClass": "NORMATIVE_CONTRACT",
