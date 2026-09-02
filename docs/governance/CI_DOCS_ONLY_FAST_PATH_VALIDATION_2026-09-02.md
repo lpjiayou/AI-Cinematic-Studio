@@ -1,6 +1,6 @@
 # Documentation-Only Required-Check Fast-Path Validation
 
-Status: `VALIDATION IN PROGRESS / EVIDENCE CAPTURE`
+Status: `VALIDATED / DOCS_ONLY / EVIDENCE-BASED`
 
 Date: `2026-09-02`
 
@@ -53,30 +53,45 @@ FRONTEND_PIN_CHANGED=false
 
 ## 4. Required-check evidence
 
-This section deliberately remains pending until GitHub Actions observes the pull
-request. A pending result is not a formal pass.
+GitHub Actions observed the initial evidence-capture tree of Core PR-D2 #53:
+
+```text
+EVIDENCE_CAPTURE_HEAD=ea753c4727279359f803516e75b08da01af3519b
+EVIDENCE_CAPTURE_TREE=95d616c52b627e1afc4368460c6f98fddf38bf72
+EVIDENCE_CAPTURE_WORKFLOW_RUN=33620842337
+```
+
+The job wall times below are calculated from each job's GitHub `started_at` to
+`completed_at`. They exclude runner queue time.
 
 | Required context | Conclusion | Job wall time |
 | --- | --- | ---: |
-| Markdown | `PENDING` | `PENDING` |
-| Documentation Links | `PENDING` | `PENDING` |
-| Unit Tests | `PENDING` | `PENDING` |
-| Contract Tests | `PENDING` | `PENDING` |
-| Integration Tests | `PENDING` | `PENDING` |
+| Markdown | `SUCCESS` | `9 seconds` |
+| Documentation Links | `SUCCESS` | `12 seconds` |
+| Unit Tests | `SUCCESS_DOCS_FAST_PATH` | `13 seconds` |
+| Contract Tests | `SUCCESS_DOCS_FAST_PATH` | `12 seconds` |
+| Integration Tests | `SUCCESS_DOCS_FAST_PATH` | `12 seconds` |
 
 ```text
-VALIDATION_STATE=IN_PROGRESS
-CI_SCOPE=AWAITING_OBSERVATION
-DOCS_ONLY_REQUIRED_CHECKS=AWAITING_OBSERVATION
-DOCS_ONLY_INTEGRATION_JOB_SECONDS=AWAITING_OBSERVATION
-DOCS_ONLY_TOTAL_REQUIRED_CHECK_WINDOW_SECONDS=AWAITING_OBSERVATION
-FULL_SUITE_EXECUTED=AWAITING_OBSERVATION
-FFMPEG_INSTALL_EXECUTED=AWAITING_OBSERVATION
+VALIDATION_STATE=PASS
+CI_SCOPE=DOCS_ONLY
+DOCS_ONLY_REQUIRED_CHECKS=5_SUCCESS
+DOCS_ONLY_INTEGRATION_JOB_SECONDS=12
+DOCS_ONLY_TOTAL_REQUIRED_CHECK_WINDOW_SECONDS=13
+FULL_SUITE_EXECUTED=false
+FFMPEG_INSTALL_EXECUTED=false
 ```
 
-Queue delay is excluded from job wall time. The required-check window will be
-calculated from the earliest required-job `started_at` to the latest required-job
-`completed_at`.
+All five jobs started at `2026-09-02T10:42:28Z`; the last completed at
+`2026-09-02T10:42:41Z`. The three test jobs' full-suite media-runtime step had the
+step-level conclusion `skipped`, while every required job concluded `success`.
+Decoded logs contained no `apt-get`, `ffmpeg -version` or full-suite discovery
+marker. Every job reported `DOCS_ONLY_FAST_PATH=PASS`,
+`FULL_SUITE_EXECUTED=false` and `FFMPEG_INSTALL_EXECUTED=false`.
+
+This evidence amendment changes only this allowlisted document. Its final tree must
+also complete all five required checks before squash merge; that final result is a
+merge gate and does not rewrite the immutable evidence-capture facts above.
 
 ## 5. Authority boundary
 
