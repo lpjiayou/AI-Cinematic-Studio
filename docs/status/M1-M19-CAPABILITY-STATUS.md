@@ -1,0 +1,97 @@
+# M1–M19 Capability Status
+
+Status: `CURRENT / SIX-DIMENSIONAL / FAIL-CLOSED`
+
+Reviewed: `2026-09-02`
+
+## 1. Reading rules
+
+This matrix deliberately avoids a single `COMPLETE` flag. Architecture, backend,
+runtime, Frontend, product and production can advance independently. `UNVERIFIED`
+means the frozen repositories do not contain enough auditable evidence for a stronger
+claim; it must not be inferred from roadmap prose.
+
+Repository implementation evidence does not establish a live provider, GPU, human
+Approval or publication fact. Project-specific K2 evidence does not prove a general
+milestone product. The immutable M13 behavior tag applies only to the accepted M13 base
+backend.
+
+## 2. Six-dimensional matrix
+
+| Milestone | ARCHITECTURE_STATUS | BACKEND_STATUS | RUNTIME_STATUS | FRONTEND_STATUS | PRODUCT_STATUS | PRODUCTION_STATUS |
+| --- | --- | --- | --- | --- | --- | --- |
+| M1 | `BASELINE_DEFINED` | `IMPLEMENTED` | `REPOSITORY_VERIFIED` | `CONNECTED_BASELINE` | `IMPLEMENTED_BOUNDED` | `UNVERIFIED` |
+| M2 | `BASELINE_DEFINED` | `IMPLEMENTED` | `REPOSITORY_VERIFIED` | `CONNECTED_BASELINE` | `IMPLEMENTED_BOUNDED` | `UNVERIFIED` |
+| M3 | `BASELINE_DEFINED` | `IMPLEMENTED` | `REPOSITORY_VERIFIED` | `CONNECTED_BASELINE` | `IMPLEMENTED_BOUNDED` | `UNVERIFIED` |
+| M4 | `BASELINE_DEFINED` | `IMPLEMENTED` | `REPOSITORY_VERIFIED` | `CONNECTED_BASELINE` | `IMPLEMENTED_BOUNDED` | `UNVERIFIED` |
+| M5 | `BASELINE_DEFINED` | `IMPLEMENTED` | `REPOSITORY_VERIFIED` | `CONNECTED_BASELINE` | `IMPLEMENTED_BOUNDED` | `UNVERIFIED` |
+| M6 | `ACCEPTED` | `IMPLEMENTED_BOUNDED` | `LOCAL_SQLITE_VERIFIED` | `ACCEPTED_FAIL_CLOSED_BOUNDARY` | `BOUNDED_ACCEPTED` | `NOT_AUTHORIZED` |
+| M7 | `K2_SCOPE_ACCEPTED_ONLY` | `PARTIAL_REPOSITORY_CAPABILITY` | `LOCAL_EVIDENCE_ONLY` | `CONNECTED_MAPPING_ONLY` | `NOT_COMPLETE` | `NOT_AUTHORIZED` |
+| M8 | `K2_SCOPE_ACCEPTED_ONLY` | `PARTIAL_REPOSITORY_CAPABILITY` | `LOCAL_EVIDENCE_ONLY` | `CONNECTED_MAPPING_ONLY` | `NOT_COMPLETE` | `NOT_AUTHORIZED` |
+| M9 | `K2_SCOPE_ACCEPTED_ONLY` | `PARTIAL_REPOSITORY_CAPABILITY` | `LOCAL_EVIDENCE_ONLY` | `CONNECTED_MAPPING_ONLY` | `NOT_COMPLETE` | `NOT_AUTHORIZED` |
+| M10 | `K2_SCOPE_ACCEPTED_ONLY` | `PROJECT_SPECIFIC_EVIDENCE` | `HISTORICAL_LOCAL_EVIDENCE` | `MAPPING_ONLY` | `NOT_COMPLETE` | `NOT_AUTHORIZED` |
+| M11 | `K2_SCOPE_ACCEPTED_ONLY` | `PROJECT_SPECIFIC_EVIDENCE` | `HISTORICAL_LOCAL_EVIDENCE` | `MAPPING_ONLY` | `FAILED_HISTORICAL_VISUAL_QC` | `NOT_ACCEPTED` |
+| M12 | `ACCEPTED` | `DOMAIN_AND_RUNTIME_PROTOCOL_MERGED` | `NOT_INSTALLED_G0_NOT_COMPLETE` | `UNVERIFIED` | `NOT_COMPLETE` | `NOT_AUTHORIZED` |
+| M13 | `BASE_ACCEPTED` | `BASE_BACKEND_COMPLETE` | `DETERMINISTIC_CPU_VERIFIED` | `PIN_ONLY_PRODUCT_SURFACE_INCOMPLETE` | `NOT_COMPLETE` | `NOT_AUTHORIZED` |
+| M14 | `PLANNED_AND_BOUNDARY_CONSTRAINED` | `NOT_AUTHORIZED` | `NOT_STARTED` | `UNVERIFIED` | `NOT_COMPLETE` | `NOT_AUTHORIZED` |
+| M15 | `PLANNED_AND_BOUNDARY_CONSTRAINED` | `NOT_AUTHORIZED` | `NOT_STARTED` | `UNVERIFIED` | `NOT_COMPLETE` | `NOT_AUTHORIZED` |
+| M16 | `PLANNED_MASTER_ONLY` | `NOT_AUTHORIZED` | `NOT_STARTED` | `UNVERIFIED` | `NOT_COMPLETE` | `NOT_AUTHORIZED` |
+| M17 | `PLANNED_MASTER_ONLY` | `NOT_AUTHORIZED` | `NOT_STARTED` | `UNVERIFIED` | `NOT_COMPLETE` | `NOT_AUTHORIZED` |
+| M18 | `PLANNED_MASTER_ONLY` | `NOT_AUTHORIZED` | `NOT_STARTED` | `UNVERIFIED` | `NOT_COMPLETE` | `NOT_AUTHORIZED` |
+| M19 | `PLANNED_MASTER_ONLY` | `NOT_AUTHORIZED` | `NOT_STARTED` | `UNVERIFIED` | `NOT_COMPLETE` | `NOT_AUTHORIZED` |
+
+## 3. Evidence, blockers and next legal task
+
+`PR=UNVERIFIED` below is intentional where early repository history records a commit
+but not a uniquely provable pull-request number.
+
+| M | Accepted ADR / architecture source | Implementation PR | Merge commit | Behavior tag | Test / acceptance evidence | Current blocker | Next legal task |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| M1 | [`ADR-0002`](../../governance/ADR-0002-v5-lifecycle-integrity-boundary.md) for lifecycle; milestone-specific ADR `UNVERIFIED` | `PR=UNVERIFIED` | `8bf3dc42323007202b083663125e0c31f8e93802` AI Director | none dedicated | `4191a379c77339d4735018f68c600db238f3cba7` repository UI verification | live production evidence absent | separately authorize production-readiness proof if required |
+| M2 | [`ADR-0002`](../../governance/ADR-0002-v5-lifecycle-integrity-boundary.md); milestone-specific ADR `UNVERIFIED` | `PR=UNVERIFIED` | `f0fd38ab22a41e00bac3e1e39e9667625b62de15` Series/Episode | none dedicated | current required suite plus immutable repository history; dedicated acceptance `UNVERIFIED` | live production evidence absent | separately authorize production-readiness proof if required |
+| M3 | [`ADR-0002`](../../governance/ADR-0002-v5-lifecycle-integrity-boundary.md); milestone-specific ADR `UNVERIFIED` | `PR=UNVERIFIED` | `e50921e8fe0872a78f62e09aa08da79631e6f9bc` and `cc39a0b2e13c98a2e946ba8166764873a4be277d` | none dedicated | candidate validation captured by the merge history; dedicated acceptance `UNVERIFIED` | live production evidence absent | separately authorize production-readiness proof if required |
+| M4 | System Master Plan; milestone-specific Accepted ADR `UNVERIFIED` | `PR=UNVERIFIED` | `4ec5de7273076d3b4f66272b6a4f0e3eecd89073` | none dedicated | current required suite; milestone-specific acceptance `UNVERIFIED` | live production evidence absent | separately authorize production-readiness proof if required |
+| M5 | System Master Plan; milestone-specific Accepted ADR `UNVERIFIED` | `PR=UNVERIFIED` | `8c3e4271662e1e02e963618ade3c29d6e9f91e89` | none dedicated | current required suite; milestone-specific acceptance `UNVERIFIED` | live production evidence absent | separately authorize production-readiness proof if required |
+| M6 | [`ADR-0003`](../../governance/ADR-0003-m6-series-intelligence-baseline.md), [`ADR-0004`](../../governance/ADR-0004-m6-series-intelligence-durable-sqlite-boundary.md), [`ADR-0005`](../../governance/ADR-0005-m6-series-intelligence-consumer-boundary.md) | `PR=UNVERIFIED` for early history | `5976263f92f7f9cbe9c091719eccb036ee8c0c2d` main convergence | none dedicated | `20207e7f2d2123468698f453c70ce725a293976a` owner acceptance | external scope/identity authority can be absent and must fail closed | new bounded work requires explicit Project Lead authorization |
+| M7 | [`ADR-0008`](../../governance/ADR-0008-k2-single-episode-production-closure.md) for exact K2 slice only | `PR=UNVERIFIED` | `9aec2a478d3b13a5d3b55e6cd97527800f09ad2b` K2 roots | none dedicated | `8d9ce52166cec27d2fefaa86548016130babdfff` K2 G0–G7 merge evidence | evidence is project-specific and not general product completion | authorize a distinct general-product scope before implementation |
+| M8 | [`ADR-0008`](../../governance/ADR-0008-k2-single-episode-production-closure.md) for exact K2 slice only | `PR=UNVERIFIED` | `885245146cb497710fbaa616e0b16b1413f119dd` executable shot graph | none dedicated | K2 chain tests at `8d9ce52166cec27d2fefaa86548016130babdfff` | no general approved Storyboard/Shot product proof | authorize a distinct general-product scope before implementation |
+| M9 | [`ADR-0008`](../../governance/ADR-0008-k2-single-episode-production-closure.md) for exact K2 slice only | `PR=UNVERIFIED` | `2841526a7d505b2fca7722a24392dc48d0558283` media requirements | none dedicated | K2 chain tests at `8d9ce52166cec27d2fefaa86548016130babdfff` | no general rights-cleared Asset Intelligence product proof | authorize a distinct general-product scope before implementation |
+| M10 | [`ADR-0011`](../../governance/ADR-0011-k2-internal-self-hosted-p1.md), [`ADR-0012`](../../governance/ADR-0012-k2-internal-image-first-real-media-revision.md) in K2 scope | `PR=UNVERIFIED` | `448be50d1c9341f4f21a57def0257dd80d082684` exact image admission | none dedicated | `bc4de6894a5b48dc3b98ef7465518cf108554384` historical closeout | project-specific historical evidence; no general provider/rights authority | new project must establish fresh authority and admission |
+| M11 | [`ADR-0012`](../../governance/ADR-0012-k2-internal-image-first-real-media-revision.md), amended by [`ADR-0013`](../../governance/ADR-0013-k2-control-plane-convergence.md) | `PR=UNVERIFIED` | `f93f9d3b5e9ae181b09120b9bc219f2df16c3b54` video candidates | none dedicated | `9efc5b93657f89c34d84a8e34a65227a36d1942d` immutable visual-QC failure | visual QC failed; no production acceptance | preserve failure; any retry needs new scope and authority |
+| M12 | [`ADR-0015`](../../governance/ADR-0015-m12-isolated-audio-runtime-and-acyclic-voice-clone-lineage.md) | `#20`, `#21`, `#24`–`#27`, `#30`, `#32`, `#34` | `0386cd6da5fd434a0d525c7ec004ceb98d824b3e` runtime protocols | none dedicated | required checks on merged protocol/C1/C2 work; runtime G0 explicitly not complete | persistent CPU build roots absent; runtimes not installed | `LOCAL_WSL2_HANDOFF_AND_M12_C3_PREFLIGHT` after this governance wave; C3 still requires authorization |
+| M13 | [`ADR-0016`](../../governance/ADR-0016-m13-timeline-render-candidate-and-deterministic-post-boundary.md), [`ADR-0017`](../../governance/ADR-0017-canonical-static-resource-assets-and-font-license-boundary.md), [`ADR-0018`](../../governance/ADR-0018-canonical-identity-reference-version-projection-and-runtime-currentness-boundary.md) | `#23`, `#29`, `#31`, `#33`, `#35`, `#36`, `#41`, `#42`, `#48` plus bounded R1/R2 checkpoints | `a455c8e76427d53d75bb7f15259b9875d9768914` closeout | `m13-base-backend-v1` object `b2d086b622bdb5456f6af325e458aa3771e43e80` | `783b981b9c0e0ee3e400692fe556b00867b45f41` CPU vertical slice and `#48` acceptance | Frontend product surface, extension catalog, M14/M15 and publication incomplete/not authorized | separate Extension G0 authorization only after current governance; no implicit start |
+| M14 | System Master Plan plus M13 endpoint constraints in [`ADR-0016`](../../governance/ADR-0016-m13-timeline-render-candidate-and-deterministic-post-boundary.md) | none | none | none | none | implementation not authorized; human Approval boundary absent | Project Lead architecture/work-package authorization |
+| M15 | System Master Plan plus exclusive Master/Export boundary in [`ADR-0016`](../../governance/ADR-0016-m13-timeline-render-candidate-and-deterministic-post-boundary.md) | none | none | none | none | implementation not authorized; M14 acceptance absent | Project Lead architecture/work-package authorization after M14 |
+| M16 | System Master Plan; Accepted ADR `UNVERIFIED` | none | none | none | none | M15/P9 and Gate A/B/C prerequisites absent | no legal implementation task currently authorized |
+| M17 | System Master Plan; Accepted ADR `UNVERIFIED` | none | none | none | none | earlier milestone and authority prerequisites absent | no legal implementation task currently authorized |
+| M18 | System Master Plan; Accepted ADR `UNVERIFIED` | none | none | none | none | earlier milestone and authority prerequisites absent | no legal implementation task currently authorized |
+| M19 | System Master Plan; Accepted ADR `UNVERIFIED` | none | none | none | none | earlier milestone and authority prerequisites absent | no legal implementation task currently authorized |
+
+## 4. Required M12 projection
+
+```text
+M12_DOMAIN_CONTRACT=MERGED
+M12_RUNTIME_PROTOCOL=MERGED
+M12_RUNTIME_INSTALLED=false
+M12_RUNTIME_G0=NOT_COMPLETE
+M12_FRONTEND=UNVERIFIED
+M12_PRODUCT=NOT_COMPLETE
+M12_PRODUCTION=NOT_AUTHORIZED
+M12_G0_3_STATE=ENVIRONMENT_HOLD
+M12_C3_READY_TO_START=false
+A100_START_AUTHORIZED=false
+```
+
+## 5. Required M13 projection
+
+```text
+M13_BASE_ARCHITECTURE=ACCEPTED
+M13_BASE_BACKEND=COMPLETE
+M13_BASE_RUNTIME_CPU=VERIFIED
+M13_BASE_CLOSEOUT=ACCEPTED
+M13_FRONTEND_PRODUCT_SURFACE=INCOMPLETE
+M13_EXTENSION_CATALOG=NOT_AUTHORIZED
+M13_M14_M15_INTEGRATION=NOT_AUTHORIZED
+M13_PUBLICATION=NOT_AUTHORIZED
+M13_PRODUCT_CAPABILITY_COMPLETE=false
+```

@@ -26,16 +26,16 @@ and historical evidence cannot authorize current execution.
 | --- | ---: | --- |
 | `ACCEPTED_DECISION` | 18 | no |
 | `NORMATIVE_ARCHITECTURE` | 14 | no |
-| `NORMATIVE_CONTRACT` | 26 | no |
+| `NORMATIVE_CONTRACT` | 27 | no |
 | `CURRENT_STATUS` | 2 | yes |
-| `CAPABILITY_MATRIX` | 0 | yes |
+| `CAPABILITY_MATRIX` | 1 | yes |
 | `OPERATIONAL_RUNBOOK` | 17 | no |
 | `IMPLEMENTATION_EVIDENCE` | 20 | no |
-| `HISTORICAL_EVIDENCE` | 32 | no |
+| `HISTORICAL_EVIDENCE` | 33 | no |
 | `SUPERSEDED` | 9 | no |
 | `DRAFT` | 3 | no |
 | `DEPRECATED` | 0 | no |
-| `GENERATED_REFERENCE` | 14 | no |
+| `GENERATED_REFERENCE` | 15 | no |
 
 ## ACCEPTED_DECISION
 
@@ -109,19 +109,20 @@ and historical evidence cannot authorize current execution.
 | [`governance/AI_CINEMATIC_STUDIO_DELIVERY_GOVERNANCE_PACKAGE_V1.md`](../../governance/AI_CINEMATIC_STUDIO_DELIVERY_GOVERNANCE_PACKAGE_V1.md) | `ACTIVE` | Architecture Owner / Documentation Governance Owner |
 | [`governance/ARCHITECTURE_CHANGE_PROCESS.md`](../../governance/ARCHITECTURE_CHANGE_PROCESS.md) | `ACTIVE` | Architecture Owner / Documentation Governance Owner |
 | [`governance/ARCHITECTURE_GUARD.md`](../../governance/ARCHITECTURE_GUARD.md) | `ACTIVE` | Architecture Owner / Documentation Governance Owner |
+| [`governance/RISK_REGISTER.md`](../../governance/RISK_REGISTER.md) | `ACTIVE` | Architecture Owner / Documentation Governance Owner |
 
 ## CURRENT_STATUS
 
 | Document | Status | Owner |
 | --- | --- | --- |
 | [`CURRENT_MILESTONE.md`](../../CURRENT_MILESTONE.md) | `CURRENT` | Project Lead / Documentation Governance Owner |
-| [`governance/RISK_REGISTER.md`](../../governance/RISK_REGISTER.md) | `CURRENT` | Architecture Owner / Documentation Governance Owner |
+| [`docs/status/CROSS_REPOSITORY_BASELINE.md`](../status/CROSS_REPOSITORY_BASELINE.md) | `CURRENT` | Documentation Governance Owner |
 
 ## CAPABILITY_MATRIX
 
 | Document | Status | Owner |
 | --- | --- | --- |
-| _None_ | — | — |
+| [`docs/status/M1-M19-CAPABILITY-STATUS.md`](../status/M1-M19-CAPABILITY-STATUS.md) | `CURRENT` | Documentation Governance Owner |
 
 ## OPERATIONAL_RUNBOOK
 
@@ -174,6 +175,7 @@ and historical evidence cannot authorize current execution.
 
 | Document | Status | Owner |
 | --- | --- | --- |
+| [`CURRENT_MILESTONE_HISTORY_THROUGH_2026-09-02.md`](../../CURRENT_MILESTONE_HISTORY_THROUGH_2026-09-02.md) | `HISTORICAL` | Documentation Governance Owner |
 | [`docs/12-release/baseline-asset-acceptance-decision-record.md`](../12-release/baseline-asset-acceptance-decision-record.md) | `HISTORICAL` | Release Owner |
 | [`docs/12-release/baseline-v0.1.0-candidate-manifest.md`](../12-release/baseline-v0.1.0-candidate-manifest.md) | `HISTORICAL` | Release Owner |
 | [`docs/12-release/investor-readiness-acceptance-record.md`](../12-release/investor-readiness-acceptance-record.md) | `HISTORICAL` | Release Owner |
@@ -251,6 +253,7 @@ and historical evidence cannot authorize current execution.
 | [`docs/README.md`](../README.md) | `REFERENCE` | Documentation Governance Owner |
 | [`docs/governance/DOCUMENT_AUTHORITY_MAP.md`](DOCUMENT_AUTHORITY_MAP.md) | `REFERENCE` | Architecture Owner / Documentation Governance Owner |
 | [`docs/governance/DOCUMENT_REGISTRY.json`](DOCUMENT_REGISTRY.json) | `REFERENCE` | Architecture Owner / Documentation Governance Owner |
+| [`docs/governance/DOCUMENT_SUPERSESSION_MAP.md`](DOCUMENT_SUPERSESSION_MAP.md) | `REFERENCE` | Architecture Owner / Documentation Governance Owner |
 | [`tests/README.md`](../../tests/README.md) | `REFERENCE` | Verification Owner |
 | [`tests/fixtures/v5_fonts/README.md`](../../tests/fixtures/v5_fonts/README.md) | `REFERENCE` | Verification Owner |
 

@@ -7,6 +7,14 @@
 风险条目本身不授权业务实现、数据库设计或里程碑扩展，具体缓解权限仍由当前
 Source-of-Truth、Accepted ADR 与明确工作包共同决定。
 
+The current capability projection is maintained in
+[`M1-M19-CAPABILITY-STATUS.md`](../docs/status/M1-M19-CAPABILITY-STATUS.md) and
+[`CURRENT_MILESTONE.md`](../CURRENT_MILESTONE.md). Each risk row below is a dated risk
+review record. A row's earlier words such as `PENDING`, `NOT STARTED` or “implementation
+pending” retain their meaning at its `最近复核日期`; they do not override later merged
+evidence or grant current execution authority. This documentation consolidation does
+not silently close or accept any risk.
+
 风险登记不等于风险已被接受。所有开放风险都必须有责任人、缓解措施和复核状态；风险接受必须由具备相应权限的责任人明确批准。
 
 ## 2. 字段定义
