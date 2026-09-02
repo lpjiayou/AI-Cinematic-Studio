@@ -17,6 +17,7 @@ from uuid import uuid4
 
 SCRIPT_SCHEMA_VERSION = "v5.script.v1"
 SCRIPT_VERSION_SCHEMA_VERSION = "creator.script-studio.script-version.v1"
+SCRIPT_VERSION_SCHEMA_VERSION_V2 = "creator.script-studio.script-version.v2"
 SCRIPT_ACCEPTANCE_SCHEMA_VERSION = "v5.script-acceptance.v1"
 SCRIPT_ACCEPTANCE_SUBJECT_SCHEMA_VERSION = "v5.script-acceptance-subject.v1"
 STORYBOARD_BOOTSTRAP_SCHEMA_VERSION = "creator.storyboard.bootstrap-input.v1"
@@ -52,6 +53,36 @@ _SCRIPT_CHANGE_KINDS = {
     "ai-scene-rewrite",
     "reviewed-import",
 }
+_M6_CONSUMER_BINDING_FIELDS = (
+    "workspaceRef",
+    "projectRef",
+    "seriesRef",
+    "episodeRef",
+    "seriesPlanVersionRef",
+    "seriesPlanVersionDigest",
+    "m6BaselineSnapshotRef",
+    "m6BaselineCanonicalDigest",
+    "activationRevision",
+    "seriesBibleVersionRef",
+    "seriesBibleVersionDigest",
+    "characterContinuityVersionRef",
+    "characterContinuityVersionDigest",
+)
+_CLIENT_FORBIDDEN_M6_FIELDS = frozenset(
+    {
+        "m6ConsumerBinding",
+        "seriesPlanVersionRef",
+        "seriesPlanVersionDigest",
+        "m6BaselineSnapshotRef",
+        "m6BaselineCanonicalDigest",
+        "activationRevision",
+        "seriesBibleVersionRef",
+        "seriesBibleVersionDigest",
+        "characterContinuityVersionRef",
+        "characterContinuityVersionDigest",
+        "payloadDigest",
+    }
+)
 
 
 class ScriptStudioError(ValueError):
@@ -84,6 +115,14 @@ class TrustedApprovalRequiredError(ScriptStudioError):
 
 class RepositoryWriteError(ScriptStudioError):
     code = "application_error"
+
+
+class M6ConsumerReadError(ScriptStudioError):
+    """Preserve an upstream M6 fail-closed code at the Script boundary."""
+
+    def __init__(self, code: str) -> None:
+        super().__init__(code)
+        self.code = code
 
 
 class UpstreamReader(Protocol):
@@ -134,6 +173,69 @@ def _canonical_digest(value: Any) -> str:
     except (TypeError, ValueError) as exc:
         raise ScriptStudioError("value cannot be canonicalized") from exc
     return hashlib.sha256(encoded).hexdigest()
+
+
+def _reject_client_m6_fields(value: Any, *, path: str = "command") -> None:
+    if isinstance(value, Mapping):
+        forbidden = sorted(set(value).intersection(_CLIENT_FORBIDDEN_M6_FIELDS))
+        if forbidden:
+            raise ScriptStudioError(
+                f"{path} contains server-owned M6 field {forbidden[0]}"
+            )
+        for field, item in value.items():
+            _reject_client_m6_fields(item, path=f"{path}.{field}")
+    elif isinstance(value, list):
+        for index, item in enumerate(value):
+            _reject_client_m6_fields(item, path=f"{path}[{index}]")
+
+
+def normalize_m6_consumer_binding(value: Any) -> dict[str, Any]:
+    """Validate the closed Script-owned projection of one active M6 baseline."""
+
+    expected = {*_M6_CONSUMER_BINDING_FIELDS, "payloadDigest"}
+    if not isinstance(value, Mapping) or set(value) != expected:
+        raise ScriptStudioError("m6ConsumerBinding fields are invalid")
+    normalized: dict[str, Any] = {}
+    for field in _M6_CONSUMER_BINDING_FIELDS:
+        raw = value.get(field)
+        if field == "activationRevision":
+            normalized[field] = _positive_int(raw, field)
+        elif field.endswith("Digest"):
+            normalized[field] = _sha256_digest(raw, field)
+        else:
+            normalized[field] = _required_ref(raw, field)
+    normalized["payloadDigest"] = _sha256_digest(
+        value.get("payloadDigest"), "payloadDigest"
+    )
+    if normalized["payloadDigest"] != _canonical_digest(
+        {field: normalized[field] for field in _M6_CONSUMER_BINDING_FIELDS}
+    ):
+        raise ScriptStudioError("m6ConsumerBinding payloadDigest is invalid")
+    return normalized
+
+
+def build_m6_consumer_binding(
+    baseline: Any,
+    *,
+    workspace_ref: str,
+    project_ref: str,
+    series_ref: str,
+    episode_ref: str,
+) -> dict[str, Any]:
+    if not isinstance(baseline, Mapping) or baseline.get("compatibility") != "CURRENT":
+        raise ScriptStudioError("current M6 Episode baseline is required")
+    expected_scope = (workspace_ref, project_ref, series_ref, episode_ref)
+    actual_scope = tuple(
+        baseline.get(field)
+        for field in ("workspaceRef", "projectRef", "seriesRef", "episodeRef")
+    )
+    if actual_scope != expected_scope:
+        raise ScopeMismatchError("M6 Episode baseline scope does not match Script")
+    payload = {
+        field: baseline.get(field) for field in _M6_CONSUMER_BINDING_FIELDS
+    }
+    payload["payloadDigest"] = _canonical_digest(payload)
+    return normalize_m6_consumer_binding(payload)
 
 
 def _positive_int(value: Any, field: str, *, maximum: int = 100_000) -> int:
@@ -321,6 +423,7 @@ def _normalize_content(
 def _normalize_persisted_content(
     value: Any,
     *,
+    schema_version: str,
     reviewed_import: bool,
 ) -> dict[str, Any]:
     """Fail closed when immutable ScriptVersion content no longer matches storage shape."""
@@ -328,6 +431,10 @@ def _normalize_persisted_content(
     expected = set(_SCRIPT_CONTENT_FIELDS)
     if reviewed_import:
         expected.add("importProvenance")
+    if schema_version == SCRIPT_VERSION_SCHEMA_VERSION_V2:
+        expected.add("m6ConsumerBinding")
+    elif schema_version != SCRIPT_VERSION_SCHEMA_VERSION:
+        raise RepositoryWriteError("persisted ScriptVersion schema is invalid")
     if not isinstance(value, Mapping) or set(value) != expected:
         raise RepositoryWriteError("persisted ScriptVersion content is invalid")
 
@@ -418,6 +525,15 @@ def _normalize_persisted_content(
         raise RepositoryWriteError("persisted ScriptVersion content is not normalized")
     if reviewed_import:
         normalized["importProvenance"] = value["importProvenance"]
+    if schema_version == SCRIPT_VERSION_SCHEMA_VERSION_V2:
+        try:
+            normalized["m6ConsumerBinding"] = normalize_m6_consumer_binding(
+                value["m6ConsumerBinding"]
+            )
+        except ScriptStudioError as exc:
+            raise RepositoryWriteError(
+                "persisted ScriptVersion M6 binding is invalid"
+            ) from exc
     return normalized
 
 
@@ -1410,8 +1526,81 @@ class ScriptStudioService:
         self.acceptance_authority = (
             acceptance_authority or RejectingScriptAcceptanceAuthority()
         )
+        self._m6_episode_baseline_reader = None
         self._ref_factory = ref_factory or (lambda prefix: f"{prefix}-{uuid4().hex}")
         self._clock = clock
+
+    def bind_m6_episode_baseline_reader(self, reader: Any) -> None:
+        if self._m6_episode_baseline_reader is not None:
+            raise RuntimeError("M6 Episode baseline reader is already bound")
+        if reader is None or not callable(
+            getattr(reader, "get_active_episode_baseline", None)
+        ):
+            raise RuntimeError("M6 Episode baseline reader is unavailable")
+        self._m6_episode_baseline_reader = reader
+
+    def resolve_current_m6_consumer_context(
+        self,
+        workspace_ref: str,
+        project_ref: str,
+        series_ref: str,
+        episode_ref: str,
+    ) -> dict[str, Any]:
+        workspace = _required_ref(workspace_ref, "workspaceRef")
+        project = _required_ref(project_ref, "projectRef")
+        series = _required_ref(series_ref, "seriesRef")
+        episode = _required_ref(episode_ref, "episodeRef")
+        if self._m6_episode_baseline_reader is None:
+            raise M6ConsumerReadError("m6_consumer_authority_unavailable")
+        try:
+            baseline = self._m6_episode_baseline_reader.get_active_episode_baseline(
+                workspace, project, series, episode
+            )
+        except Exception as exc:
+            code = str(getattr(exc, "code", ""))
+            allowed = {
+                "m6_baseline_not_available",
+                "m6_episode_mapping_unavailable",
+                "m6_baseline_stale",
+                "m6_lineage_mismatch",
+                "m6_consumer_authority_unavailable",
+            }
+            raise M6ConsumerReadError(
+                code if code in allowed else "m6_consumer_internal_error"
+            ) from None
+        binding = build_m6_consumer_binding(
+            baseline,
+            workspace_ref=workspace,
+            project_ref=project,
+            series_ref=series,
+            episode_ref=episode,
+        )
+        facts = baseline.get("applicableFacts")
+        if not isinstance(facts, Mapping):
+            raise M6ConsumerReadError("m6_lineage_mismatch")
+        return {
+            "m6ConsumerBinding": binding,
+            "applicableFacts": json.loads(
+                json.dumps(
+                    facts,
+                    ensure_ascii=False,
+                    sort_keys=True,
+                    separators=(",", ":"),
+                    allow_nan=False,
+                )
+            ),
+        }
+
+    def resolve_current_m6_consumer_binding(
+        self,
+        workspace_ref: str,
+        project_ref: str,
+        series_ref: str,
+        episode_ref: str,
+    ) -> dict[str, Any]:
+        return self.resolve_current_m6_consumer_context(
+            workspace_ref, project_ref, series_ref, episode_ref
+        )["m6ConsumerBinding"]
 
     @staticmethod
     def _script_mapping(record: ScriptRecord) -> dict[str, Any]:
@@ -1432,7 +1621,10 @@ class ScriptStudioService:
     @staticmethod
     def _version_mapping(record: ScriptVersionRecord) -> dict[str, Any]:
         try:
-            if record.schemaVersion != SCRIPT_VERSION_SCHEMA_VERSION:
+            if record.schemaVersion not in {
+                SCRIPT_VERSION_SCHEMA_VERSION,
+                SCRIPT_VERSION_SCHEMA_VERSION_V2,
+            }:
                 raise ScriptStudioError("ScriptVersion schemaVersion is invalid")
             for field in (
                 "workspaceRef",
@@ -1477,6 +1669,7 @@ class ScriptStudioService:
             ) from exc
         content = _normalize_persisted_content(
             stored_content,
+            schema_version=record.schemaVersion,
             reviewed_import=record.changeKind == "reviewed-import",
         )
         provenance = content.get("importProvenance")
@@ -1567,6 +1760,8 @@ class ScriptStudioService:
         projection = {field: content[field] for field in _SCRIPT_CONTENT_FIELDS}
         if record.changeKind == "reviewed-import":
             projection["importProvenance"] = provenance
+        if record.schemaVersion == SCRIPT_VERSION_SCHEMA_VERSION_V2:
+            projection["m6ConsumerBinding"] = content["m6ConsumerBinding"]
         # Record-owned identity and scope are applied last and cannot be
         # overridden by contentJson, even if storage is externally corrupted.
         projection.update(
@@ -1654,9 +1849,15 @@ class ScriptStudioService:
     def create_version(self, value: Mapping[str, Any]) -> dict[str, Any]:
         if not isinstance(value, Mapping):
             raise ScriptStudioError("version input must be an object")
+        _reject_client_m6_fields(value)
         workspace = _required_ref(value.get("workspaceRef"), "workspaceRef")
         series = _required_ref(value.get("seriesRef"), "seriesRef")
         episode = _required_ref(value.get("episodeRef"), "episodeRef")
+        project = (
+            _required_ref(value.get("projectRef"), "projectRef")
+            if value.get("projectRef") is not None
+            else None
+        )
         change_kind = _required_text(value.get("changeKind"), "changeKind", limit=40)
         if change_kind not in _SCRIPT_CHANGE_KINDS:
             raise ScriptStudioError("changeKind is invalid")
@@ -1696,10 +1897,21 @@ class ScriptStudioService:
                 bootstrap=bootstrap,
                 ref_factory=self._ref_factory,
             )
+            schema_version = SCRIPT_VERSION_SCHEMA_VERSION
+            if project is not None:
+                content["m6ConsumerBinding"] = (
+                    self.resolve_current_m6_consumer_binding(
+                        workspace, project, series, episode
+                    )
+                )
+                schema_version = SCRIPT_VERSION_SCHEMA_VERSION_V2
             if import_provenance is not None:
                 import_provenance["canonicalScriptContentDigest"] = hashlib.sha256(
                     json.dumps(
-                        content,
+                        {
+                            field: content[field]
+                            for field in _SCRIPT_CONTENT_FIELDS
+                        },
                         ensure_ascii=False,
                         sort_keys=True,
                         separators=(",", ":"),
@@ -1730,7 +1942,7 @@ class ScriptStudioService:
                 1,
             )
             version = ScriptVersionRecord(
-                SCRIPT_VERSION_SCHEMA_VERSION,
+                schema_version,
                 workspace,
                 series,
                 episode,
@@ -1766,6 +1978,18 @@ class ScriptStudioService:
                 script_ref=existing.scriptRef,
                 bootstrap=bootstrap,
             )
+            parent_binding = parent_mapping.get("m6ConsumerBinding")
+            if parent_binding is not None and project is None:
+                raise ScriptStudioError(
+                    "projectRef is required when deriving an M6-bound ScriptVersion"
+                )
+            if (
+                parent_binding is not None
+                and parent_binding.get("projectRef") != project
+            ):
+                raise ScopeMismatchError(
+                    "projectRef does not match the M6-bound Script lineage"
+                )
             version_records = self.repository.list_versions(
                 workspace, existing.scriptRef
             )
@@ -1808,10 +2032,18 @@ class ScriptStudioService:
                 ref_factory=self._ref_factory,
                 existing_scene_refs=refs,
             )
+            schema_version = SCRIPT_VERSION_SCHEMA_VERSION
+            if project is not None:
+                content["m6ConsumerBinding"] = (
+                    self.resolve_current_m6_consumer_binding(
+                        workspace, project, series, episode
+                    )
+                )
+                schema_version = SCRIPT_VERSION_SCHEMA_VERSION_V2
             next_number = max(version_numbers) + 1
             version_ref = self._ref_factory("script-version")
             version = ScriptVersionRecord(
-                SCRIPT_VERSION_SCHEMA_VERSION,
+                schema_version,
                 workspace,
                 series,
                 episode,

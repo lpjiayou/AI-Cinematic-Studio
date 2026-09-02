@@ -63,9 +63,27 @@ class ScriptStudioPublicBoundary:
         if reader is None:
             raise RuntimeError("M6 Episode baseline reader is unavailable")
         self.__m6_episode_baseline_reader = reader
+        bind_service_reader = getattr(
+            self.__service,
+            "bind_m6_episode_baseline_reader",
+            None,
+        )
+        if callable(bind_service_reader):
+            bind_service_reader(reader)
 
     @staticmethod
     def _error(exc: ScriptStudioError) -> ScriptStudioPublicError:
+        if exc.code in {
+            "m6_baseline_not_available",
+            "m6_episode_mapping_unavailable",
+        }:
+            return ScriptStudioPublicError(exc.code, 404)
+        if exc.code in {"m6_baseline_stale", "m6_lineage_mismatch"}:
+            return ScriptStudioPublicError(exc.code, 409)
+        if exc.code == "m6_consumer_authority_unavailable":
+            return ScriptStudioPublicError(exc.code, 403)
+        if exc.code == "m6_consumer_internal_error":
+            return ScriptStudioPublicError(exc.code, 500)
         if isinstance(exc, RecordNotFoundError):
             return ScriptStudioPublicError(exc.code, 404)
         if isinstance(exc, (DuplicateRecordError, VersionConflictError, ScriptNotConfirmedError)):
@@ -121,6 +139,64 @@ class ScriptStudioPublicBoundary:
             ) from None
         except Exception:
             raise ScriptStudioPublicError("m6_consumer_internal_error", 500) from None
+
+    def resolve_current_m6_consumer_binding(
+        self,
+        workspace_ref: str,
+        project_ref: str,
+        series_ref: str,
+        episode_ref: str,
+    ) -> dict[str, Any]:
+        if self.__lifecycle_state is None:
+            return self._invoke(
+                self.__service.resolve_current_m6_consumer_binding,
+                workspace_ref,
+                project_ref,
+                series_ref,
+                episode_ref,
+            )
+        try:
+            with self.__lifecycle_state.read_snapshot():
+                return self._invoke(
+                    self.__service.resolve_current_m6_consumer_binding,
+                    workspace_ref,
+                    project_ref,
+                    series_ref,
+                    episode_ref,
+                )
+        except LifecycleIntegrityError:
+            raise ScriptStudioPublicError(
+                "m6_consumer_authority_unavailable", 503
+            ) from None
+
+    def resolve_current_m6_consumer_context(
+        self,
+        workspace_ref: str,
+        project_ref: str,
+        series_ref: str,
+        episode_ref: str,
+    ) -> dict[str, Any]:
+        if self.__lifecycle_state is None:
+            return self._invoke(
+                self.__service.resolve_current_m6_consumer_context,
+                workspace_ref,
+                project_ref,
+                series_ref,
+                episode_ref,
+            )
+        try:
+            with self.__lifecycle_state.read_snapshot():
+                return self._invoke(
+                    self.__service.resolve_current_m6_consumer_context,
+                    workspace_ref,
+                    project_ref,
+                    series_ref,
+                    episode_ref,
+                )
+        except LifecycleIntegrityError:
+            raise ScriptStudioPublicError(
+                "m6_consumer_authority_unavailable", 503
+            ) from None
 
     def create_version(self, command: Mapping[str, Any]) -> dict[str, Any]:
         if self.__lifecycle_coordinator is None:

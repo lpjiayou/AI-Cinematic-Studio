@@ -26,6 +26,7 @@ ROOTS_READY = "ROOTS_READY"
 ALLOWED_EVIDENCE_RECORD_KINDS = frozenset(
     {
         "Candidate",
+        "ConsistencyValidationVersion",
         "TechnicalValidation",
         "SemanticVisualQCDecision",
         "HumanSelectionDecision",
