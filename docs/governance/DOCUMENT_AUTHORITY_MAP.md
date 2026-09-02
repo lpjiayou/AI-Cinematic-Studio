@@ -26,7 +26,7 @@ and historical evidence cannot authorize current execution.
 | --- | ---: | --- |
 | `ACCEPTED_DECISION` | 18 | no |
 | `NORMATIVE_ARCHITECTURE` | 14 | no |
-| `NORMATIVE_CONTRACT` | 28 | no |
+| `NORMATIVE_CONTRACT` | 29 | no |
 | `CURRENT_STATUS` | 2 | yes |
 | `CAPABILITY_MATRIX` | 1 | yes |
 | `OPERATIONAL_RUNBOOK` | 17 | no |
@@ -106,6 +106,7 @@ and historical evidence cannot authorize current execution.
 | [`docs/04-interface-contract/v5-v4-contract.md`](../04-interface-contract/v5-v4-contract.md) | `ACTIVE` | Public Contract Owner |
 | [`docs/14-application-design/application-command-contract.md`](../14-application-design/application-command-contract.md) | `ACTIVE` | Application Owner |
 | [`docs/14-application-design/internal-content-lab-ui-scope.md`](../14-application-design/internal-content-lab-ui-scope.md) | `ACTIVE` | Application Owner |
+| [`docs/governance/CI_REQUIRED_CHECK_FAST_PATH_POLICY.md`](CI_REQUIRED_CHECK_FAST_PATH_POLICY.md) | `ACTIVE` | Architecture Owner / Documentation Governance Owner |
 | [`docs/governance/DOCUMENTATION_GOVERNANCE_POLICY.md`](DOCUMENTATION_GOVERNANCE_POLICY.md) | `ACTIVE` | Architecture Owner / Documentation Governance Owner |
 | [`governance/AI_CINEMATIC_STUDIO_DELIVERY_GOVERNANCE_PACKAGE_V1.md`](../../governance/AI_CINEMATIC_STUDIO_DELIVERY_GOVERNANCE_PACKAGE_V1.md) | `ACTIVE` | Architecture Owner / Documentation Governance Owner |
 | [`governance/ARCHITECTURE_CHANGE_PROCESS.md`](../../governance/ARCHITECTURE_CHANGE_PROCESS.md) | `ACTIVE` | Architecture Owner / Documentation Governance Owner |

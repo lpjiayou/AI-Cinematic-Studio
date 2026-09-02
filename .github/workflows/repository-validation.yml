@@ -4,9 +4,6 @@ on:
   pull_request:
     branches:
       - main
-  push:
-    branches:
-      - main
   workflow_dispatch:
 
 permissions:
@@ -23,15 +20,33 @@ jobs:
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Classify repository change scope
+        shell: bash
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha || github.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          python3 scripts/run_ci_fast_path.py classify \
+            --event-name "$EVENT_NAME" \
+            --base-sha "$BASE_SHA" \
+            --head-sha "$HEAD_SHA"
 
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.12"
 
-      - name: Validate tracked Markdown files
+      - name: Record setup timing
         shell: bash
-        run: python scripts/validate_markdown.py
+        run: python scripts/run_ci_fast_path.py mark-setup
+
+      - name: Run Markdown governance validation
+        shell: bash
+        run: python scripts/run_ci_fast_path.py run-job --job markdown
 
   documentation-links:
     name: Documentation Links
@@ -39,27 +54,33 @@ jobs:
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Classify repository change scope
+        shell: bash
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha || github.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          python3 scripts/run_ci_fast_path.py classify \
+            --event-name "$EVENT_NAME" \
+            --base-sha "$BASE_SHA" \
+            --head-sha "$HEAD_SHA"
 
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.12"
 
-      - name: Validate local documentation links
+      - name: Record setup timing
         shell: bash
-        run: python scripts/validate_doc_links.py
+        run: python scripts/run_ci_fast_path.py mark-setup
 
-      - name: Validate document registry coverage
+      - name: Run documentation-link governance validation
         shell: bash
-        run: python scripts/validate_document_registry.py
-
-      - name: Validate current-state projection
-        shell: bash
-        run: python scripts/validate_current_state.py
-
-      - name: Validate document supersession and indexing
-        shell: bash
-        run: python scripts/validate_document_supersession.py
+        run: python scripts/run_ci_fast_path.py run-job --job documentation-links
 
   unit-tests:
     name: Unit Tests
@@ -67,42 +88,50 @@ jobs:
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Classify repository change scope
+        shell: bash
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha || github.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          python3 scripts/run_ci_fast_path.py classify \
+            --event-name "$EVENT_NAME" \
+            --base-sha "$BASE_SHA" \
+            --head-sha "$HEAD_SHA"
 
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.12"
 
-      - name: Install deterministic media runtime
+      - name: Record setup timing
+        shell: bash
+        run: python scripts/run_ci_fast_path.py mark-setup
+
+      - name: Install deterministic media runtime for full suite
+        if: env.CI_SCOPE == 'FULL_SUITE'
         shell: bash
         run: |
-          command -v ffmpeg || (sudo apt-get update && sudo apt-get install -y ffmpeg)
+          started="$(date +%s)"
+          installed=false
+          if ! command -v ffmpeg >/dev/null 2>&1; then
+            sudo apt-get update
+            sudo apt-get install -y ffmpeg
+            installed=true
+          fi
           ffmpeg -version
           ffprobe -version
+          finished="$(date +%s)"
+          echo "RUNTIME_INSTALL_SECONDS=$((finished - started))" >> "$GITHUB_ENV"
+          echo "FFMPEG_INSTALL_EXECUTED=$installed" >> "$GITHUB_ENV"
 
-      - name: Run unit tests
+      - name: Run Unit Tests required check
         shell: bash
-        run: |
-          python - <<'PY'
-          from pathlib import Path
-          import unittest
-
-          start_directory = Path("tests/unit")
-          if not start_directory.is_dir():
-              raise SystemExit("tests/unit does not exist in the repository checkout.")
-
-          suite = unittest.defaultTestLoader.discover(
-              str(start_directory),
-              pattern="test_*.py",
-          )
-          count = suite.countTestCases()
-          if count == 0:
-              raise SystemExit("No unit tests were discovered; validation cannot pass.")
-
-          print(f"Discovered {count} unit tests.")
-          result = unittest.TextTestRunner(verbosity=1).run(suite)
-          raise SystemExit(0 if result.wasSuccessful() else 1)
-          PY
+        run: python scripts/run_ci_fast_path.py run-job --job unit
 
   contract-tests:
     name: Contract Tests
@@ -110,42 +139,50 @@ jobs:
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Classify repository change scope
+        shell: bash
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha || github.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          python3 scripts/run_ci_fast_path.py classify \
+            --event-name "$EVENT_NAME" \
+            --base-sha "$BASE_SHA" \
+            --head-sha "$HEAD_SHA"
 
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.12"
 
-      - name: Install deterministic media runtime
+      - name: Record setup timing
+        shell: bash
+        run: python scripts/run_ci_fast_path.py mark-setup
+
+      - name: Install deterministic media runtime for full suite
+        if: env.CI_SCOPE == 'FULL_SUITE'
         shell: bash
         run: |
-          command -v ffmpeg || (sudo apt-get update && sudo apt-get install -y ffmpeg)
+          started="$(date +%s)"
+          installed=false
+          if ! command -v ffmpeg >/dev/null 2>&1; then
+            sudo apt-get update
+            sudo apt-get install -y ffmpeg
+            installed=true
+          fi
           ffmpeg -version
           ffprobe -version
+          finished="$(date +%s)"
+          echo "RUNTIME_INSTALL_SECONDS=$((finished - started))" >> "$GITHUB_ENV"
+          echo "FFMPEG_INSTALL_EXECUTED=$installed" >> "$GITHUB_ENV"
 
-      - name: Run contract tests
+      - name: Run Contract Tests required check
         shell: bash
-        run: |
-          python - <<'PY'
-          from pathlib import Path
-          import unittest
-
-          start_directory = Path("tests/contract")
-          if not start_directory.is_dir():
-              raise SystemExit("tests/contract does not exist in the repository checkout.")
-
-          suite = unittest.defaultTestLoader.discover(
-              str(start_directory),
-              pattern="test_*.py",
-          )
-          count = suite.countTestCases()
-          if count == 0:
-              raise SystemExit("No contract tests were discovered; validation cannot pass.")
-
-          print(f"Discovered {count} contract tests.")
-          result = unittest.TextTestRunner(verbosity=1).run(suite)
-          raise SystemExit(0 if result.wasSuccessful() else 1)
-          PY
+        run: python scripts/run_ci_fast_path.py run-job --job contract
 
   integration-tests:
     name: Integration Tests
@@ -153,39 +190,47 @@ jobs:
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Classify repository change scope
+        shell: bash
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha || github.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          python3 scripts/run_ci_fast_path.py classify \
+            --event-name "$EVENT_NAME" \
+            --base-sha "$BASE_SHA" \
+            --head-sha "$HEAD_SHA"
 
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.12"
 
-      - name: Install deterministic media runtime
+      - name: Record setup timing
+        shell: bash
+        run: python scripts/run_ci_fast_path.py mark-setup
+
+      - name: Install deterministic media runtime for full suite
+        if: env.CI_SCOPE == 'FULL_SUITE'
         shell: bash
         run: |
-          command -v ffmpeg || (sudo apt-get update && sudo apt-get install -y ffmpeg)
+          started="$(date +%s)"
+          installed=false
+          if ! command -v ffmpeg >/dev/null 2>&1; then
+            sudo apt-get update
+            sudo apt-get install -y ffmpeg
+            installed=true
+          fi
           ffmpeg -version
           ffprobe -version
+          finished="$(date +%s)"
+          echo "RUNTIME_INSTALL_SECONDS=$((finished - started))" >> "$GITHUB_ENV"
+          echo "FFMPEG_INSTALL_EXECUTED=$installed" >> "$GITHUB_ENV"
 
-      - name: Run integration tests
+      - name: Run Integration Tests required check
         shell: bash
-        run: |
-          python - <<'PY'
-          from pathlib import Path
-          import unittest
-
-          start_directory = Path("tests/integration")
-          if not start_directory.is_dir():
-              raise SystemExit("tests/integration does not exist in the repository checkout.")
-
-          suite = unittest.defaultTestLoader.discover(
-              str(start_directory),
-              pattern="test_*.py",
-          )
-          count = suite.countTestCases()
-          if count == 0:
-              raise SystemExit("No integration tests were discovered; validation cannot pass.")
-
-          print(f"Discovered {count} integration tests.")
-          result = unittest.TextTestRunner(verbosity=1).run(suite)
-          raise SystemExit(0 if result.wasSuccessful() else 1)
-          PY
+        run: python scripts/run_ci_fast_path.py run-job --job integration
