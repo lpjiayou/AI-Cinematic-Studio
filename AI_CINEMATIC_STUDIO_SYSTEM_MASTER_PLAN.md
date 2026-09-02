@@ -2,17 +2,17 @@
 
 > Document: `AI_CINEMATIC_STUDIO_SYSTEM_MASTER_PLAN.md`
 >
-> Status: `SYSTEM MASTER GOVERNANCE BASELINE / M13 BASE BACKEND CLOSEOUT ACCEPTED / PRODUCT INCOMPLETE / LIVE PRODUCTION AND PUBLICATION CLOSED`
+> Status: `SYSTEM MASTER GOVERNANCE BASELINE / ADR-0019 UPSTREAM METHOD CLOSURE ACCEPTED / M13 BASE BACKEND CLOSEOUT ACCEPTED / PRODUCT INCOMPLETE / LIVE PRODUCTION AND PUBLICATION CLOSED`
 >
-> Version: `v1.5`
+> Version: `v1.6`
 >
 > Date: `2026-09-02`
 >
-> Revision: `ACS-DOCUMENTATION-GOVERNANCE-STATUS-CONSOLIDATION-20260902`
+> Revision: `ACS-M3-M11-UPSTREAM-METHOD-CLOSURE`
 >
-> Architecture Decisions: `ADR-0001 / Accepted`; `ADR-0005 — M6 Consumer Boundary / Accepted as architecture only`; `ADR-0006 — V5 Text Generation Capability Boundary / Accepted for bounded G1`; `ADR-0014 — K2-001 archived and K2-002 non-GPU preproduction active / Accepted`; `ADR-0015 — M12 Isolated Audio Runtime and Acyclic Voice-Clone Lineage / Accepted`; `ADR-0016 — M13 Timeline, Render Candidate and Deterministic Post Boundary / Accepted`; `ADR-0017 — Canonical Static Resource Assets and Font License Boundary / Accepted`; `ADR-0018 — Canonical Identity Reference Version Projection and Runtime Currentness Boundary / Accepted`
+> Architecture Decisions: `ADR-0001 / Accepted`; `ADR-0005 — M6 Consumer Boundary / Accepted as architecture only`; `ADR-0006 — V5 Text Generation Capability Boundary / Accepted for bounded G1`; `ADR-0014 — K2-001 archived and K2-002 non-GPU preproduction active / Accepted`; `ADR-0015 — M12 Isolated Audio Runtime and Acyclic Voice-Clone Lineage / Accepted`; `ADR-0016 — M13 Timeline, Render Candidate and Deterministic Post Boundary / Accepted`; `ADR-0017 — Canonical Static Resource Assets and Font License Boundary / Accepted`; `ADR-0018 — Canonical Identity Reference Version Projection and Runtime Currentness Boundary / Accepted`; `ADR-0019 — Upstream Execution Method and Requirement Routing / Accepted`
 >
-> Current Exact-Scope Governance: [Current Milestone](CURRENT_MILESTONE.md); [ADR-0015](governance/ADR-0015-m12-isolated-audio-runtime-and-acyclic-voice-clone-lineage.md); [ADR-0016](governance/ADR-0016-m13-timeline-render-candidate-and-deterministic-post-boundary.md); [ADR-0017](governance/ADR-0017-canonical-static-resource-assets-and-font-license-boundary.md); [ADR-0018](governance/ADR-0018-canonical-identity-reference-version-projection-and-runtime-currentness-boundary.md)
+> Current Exact-Scope Governance: [Current Milestone](CURRENT_MILESTONE.md); [ADR-0015](governance/ADR-0015-m12-isolated-audio-runtime-and-acyclic-voice-clone-lineage.md); [ADR-0016](governance/ADR-0016-m13-timeline-render-candidate-and-deterministic-post-boundary.md); [ADR-0017](governance/ADR-0017-canonical-static-resource-assets-and-font-license-boundary.md); [ADR-0018](governance/ADR-0018-canonical-identity-reference-version-projection-and-runtime-currentness-boundary.md); [ADR-0019](governance/ADR-0019-upstream-execution-method-and-requirement-routing.md)
 >
 > Scope: AI Cinematic Studio 全系统产品、Domain、生产链、技术分层、研发顺序与验收基线
 >
@@ -752,6 +752,10 @@ Script
 
 历史版本不可变。
 
+在 ADR-0019 生效后的新建或 rewrite 中，只要 M6 影响了 ScriptVersion，服务端必须
+把 exact current `M6EpisodeBaselineInput` 固化为不可变 `M6ConsumerBinding`。
+客户端不得自报 binding；历史 v1 不回填，M6 漂移只会使旧 binding stale。
+
 ---
 
 ## Step 10 — Consistency Validation
@@ -780,6 +784,10 @@ WARN
 BLOCK
 ```
 
+M7 拥有不可变 ValidationVersion、结构化 Finding、staleness 和 M8 readiness。
+只有 current `PASS → READY_FOR_M8` 可以进入 M8；WARN 保持
+`NOT_READY_PENDING_DISPOSITION`，本轮不提供自动 waiver。
+
 ---
 
 ## Step 11 — Storyboard
@@ -791,6 +799,11 @@ Storyboard
 ```
 
 Storyboard 把剧本转成影视镜头计划。
+
+每个 additive v2 CreativeShot 还必须用 `actionExecutionBeats[]` 把精确 Script
+source span 分类为 `STATIC_HOLD`、`MICRO_MOTION`、`CONTACT_ACTION`、
+`GAIT_LOCOMOTION` 或 `DETERMINISTIC_EVENT`。Camera movement 与 actor action
+保持独立。
 
 ---
 
@@ -827,6 +840,10 @@ Lighting：夜景
 Prop：油灯
 ```
 
+M9 v2 不再把每个 Shot 无条件转换为一条视频和一条音频请求，而是输出相互正交的
+`VisualExecutionRequirements[]`、`AudioRequirements[]` 与
+`PostprocessRequirements[]`。
+
 ---
 
 ## Step 14 — Asset Match / Generation
@@ -840,6 +857,10 @@ Asset Matching
 ├── Existing AssetVersion → Reuse
 └── Missing → Generation Request
 ```
+
+M10 必须按视觉方法规划 static plate、single anchor、contact conditioning、
+pose/trajectory conditioning 或 deterministic event-free base inputs；缺失时返回
+blocker，不改变方法，也不把 K2 exact-four 作为通用合同。
 
 ---
 
@@ -862,6 +883,10 @@ Shot
 ```
 
 Audio 与 Video 是并行能力。
+
+M11 当前 Wan adapter 只支持 `MICRO_MOTION + SINGLE_ANCHOR_I2V`。Contact 与 Gait
+能力未安装时必须返回 `CAPABILITY_UNAVAILABLE`，不得 fallback。M12 只消费显式
+M9 AudioRequirement，不以 M11 为通用前置依赖。
 
 ---
 
@@ -2429,7 +2454,7 @@ Status:
 
 Status:
 
-`NOT STARTED`
+`ARCHITECTURE ACCEPTED BY ADR-0019 / BOUNDED IMPLEMENTATION AUTHORIZED / NOT IMPLEMENTED`
 
 目标：
 
@@ -2455,13 +2480,16 @@ Corrected Script
 - Story / Script / Bible UI connection；
 - M8 Storyboard readiness。
 
+ADR-0019 首版固定 Finding category、PASS/WARN/BLOCK、staleness 与
+`PASS → READY_FOR_M8`；WARN waiver 不在当前实施波。
+
 ---
 
 ## M8 — Storyboard + Creative Shot Domain
 
 Status:
 
-`NOT STARTED`
+`ARCHITECTURE ACCEPTED BY ADR-0019 / BOUNDED IMPLEMENTATION AUTHORIZED / NOT IMPLEMENTED`
 
 完成：
 
@@ -2476,7 +2504,10 @@ Status:
 - character state binding；
 - scene binding；
 - asset requirements；
-- audio intent。
+- audio intent；
+- additive `actionExecutionBeats[]`；
+- closed `executionClass`；
+- exact Script source span 与 frame coverage。
 
 不实现最终 Render Shot Graph。
 
@@ -2486,7 +2517,7 @@ Status:
 
 Status:
 
-`NOT STARTED`
+`ARCHITECTURE ACCEPTED BY ADR-0019 / BOUNDED IMPLEMENTATION AUTHORIZED / NOT IMPLEMENTED`
 
 完成：
 
@@ -2497,7 +2528,10 @@ Status:
 - Asset Registry connection；
 - provenance；
 - Rights linkage；
-- Series shared asset pool。
+- Series shared asset pool；
+- Visual / Audio / Postprocess 三轴 requirements；
+- method planning 与 provider dispatch 分离；
+- 显式 AudioRequirement → M12 bridge。
 
 ---
 
@@ -2505,7 +2539,7 @@ Status:
 
 Status:
 
-`NOT STARTED`
+`ARCHITECTURE ACCEPTED BY ADR-0019 / BOUNDED METHOD-PLANNING IMPLEMENTATION AUTHORIZED / NOT IMPLEMENTED`
 
 完成：
 
@@ -2516,7 +2550,8 @@ Status:
 - character consistency；
 - scene consistency；
 - image versioning；
-- Shot binding。
+- Shot binding；
+- static/single-anchor/contact/pose-trajectory/deterministic-base 方法感知输入规划。
 
 ---
 
@@ -2524,7 +2559,7 @@ Status:
 
 Status:
 
-`NOT STARTED`
+`ARCHITECTURE ACCEPTED BY ADR-0019 / BOUNDED ROUTING IMPLEMENTATION AUTHORIZED / CONTACT AND GAIT RUNTIMES NOT INSTALLED`
 
 完成：
 
@@ -2536,13 +2571,16 @@ Status:
 - local regeneration；
 - failure handling。
 
+当前 Wan 只允许 `MICRO_MOTION + SINGLE_ANCHOR_I2V`；Contact、Gait 与
+deterministic-event fallback 被禁止。
+
 ---
 
 ## M12 — Audio Production
 
 Status:
 
-`PARTIAL — DOMAIN CONTRACTS AND ISOLATED RUNTIME PROTOCOLS MERGED / RUNTIMES NOT INSTALLED / RUNTIME G0 NOT COMPLETE / C3-C4 NOT STARTED`
+`PARTIAL — DOMAIN CONTRACTS AND ISOLATED RUNTIME PROTOCOLS MERGED / EXPLICIT M9 AUDIO BRIDGE AUTHORIZED NOT IMPLEMENTED / RUNTIMES NOT INSTALLED / RUNTIME G0 NOT COMPLETE / C3-C4 NOT STARTED`
 
 完成：
 
@@ -3063,7 +3101,32 @@ STOP。
 
 # 62. Current System State
 
-## 62.1 Current architecture overlay — 2026-08-30
+## 62.1 Current architecture overlay — through 2026-09-02
+
+The 2026-09-02 additive architecture checkpoint
+[`ADR-0019`](governance/ADR-0019-upstream-execution-method-and-requirement-routing.md)
+and its
+[`normative contract`](architecture/M3_M11_UPSTREAM_METHOD_CLOSURE_CONTRACT.md)
+freeze the generic upstream chain before M12-C3/C4. New M6-influenced ScriptVersions
+gain a server-resolved immutable M6ConsumerBinding; M7 owns structured validation and
+currentness; M8 owns source-bound ActionExecutionBeats; M9 emits orthogonal Visual,
+Audio and Postprocess requirements; M10 plans method-specific inputs; M11 uses Wan only
+for micro-motion/single-anchor I2V and reports Contact/Gait as unavailable; M12 consumes
+explicit AudioRequirements independently of M11; deterministic events remain M13-owned.
+
+This decision authorizes the strict serial implementation wave only. It creates no
+implementation completion fact, new authority or runtime installation, and keeps:
+
+```text
+AUTHORIZED_SEQUENCE=PR-B→PR-C→PR-D→PR-E→PR-F→FRONTEND_PIN
+M12_RUNTIME_G0=NOT_COMPLETE
+M12_C3_READY_TO_START=false
+A100_START_AUTHORIZED=false
+GPU_OR_PROVIDER_CALLS=0
+ASSET_ADMISSION=0
+LIVE_CANONICAL_MUTATIONS=0
+PUBLICATION_ALLOWED=false
+```
 
 The 2026-08-31 additive architecture checkpoint
 [`ADR-0018`](governance/ADR-0018-canonical-identity-reference-version-projection-and-runtime-currentness-boundary.md)
@@ -3549,17 +3612,19 @@ Story Projection
 ↓
 Script / ScriptVersion
 ↓
+M6ConsumerBinding
+↓
 Consistency Validation
 ↓
 Storyboard
 ↓
-Shot
+Creative Shot / ActionExecutionBeat
 ↓
-Asset Requirement
+Visual / Audio / Postprocess Requirements
 ↓
-Asset / AssetVersion
+Method-aware Asset / Conditioning Plan
 ↓
-Video + Audio
+Video + Audio Production
 ↓
 Timeline
 ↓

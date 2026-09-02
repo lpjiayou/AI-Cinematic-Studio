@@ -62,16 +62,38 @@ M13_PUBLICATION=NOT_AUTHORIZED
 M13_PRODUCT_CAPABILITY_COMPLETE=false
 ```
 
-## 3. Current authorization and blockers
+## 3. Current authorization and execution wave
 
-The active authorization is repository-validation governance only:
+The documentation-governance wave is complete and its required-check fast path is
+available. The active Project Lead authorization is the upstream execution-method
+closure accepted in
+[`ADR-0019`](governance/ADR-0019-upstream-execution-method-and-requirement-routing.md)
+and specified by
+[`M3_M11_UPSTREAM_METHOD_CLOSURE_CONTRACT.md`](architecture/M3_M11_UPSTREAM_METHOD_CLOSURE_CONTRACT.md):
 
 ```text
-ACTIVE_TASK=ACS-DOCUMENTATION-GOVERNANCE-PR-D-AND-DOCS-ONLY-CI-FAST-PATH
-DOCS_ONLY=true
+ACTIVE_TASK=ACS-M3-M11-UPSTREAM-METHOD-CLOSURE
+EXECUTION_MODE=AUTO-SEQUENTIAL_BOUNDED_SERIAL
 GPU_REQUIRED=false
+PROVIDER_CALLS_ALLOWED=false
 A100_START_AUTHORIZED=false
 
+ARCHITECTURE_CHECKPOINT=ADR_0019_ACCEPTED_MERGE_REQUIRED_BEFORE_IMPLEMENTATION
+AUTHORIZED_SEQUENCE=PR-B→PR-C→PR-D→PR-E→PR-F→FRONTEND_PIN
+
+M3_M6_CONSUMER_BINDING=AUTHORIZED_NOT_IMPLEMENTED
+M7_NARRATIVE_VALIDATION=AUTHORIZED_NOT_IMPLEMENTED
+M8_ACTION_EXECUTION_BEATS=AUTHORIZED_NOT_IMPLEMENTED
+M9_THREE_AXIS_REQUIREMENTS=AUTHORIZED_NOT_IMPLEMENTED
+M10_METHOD_AWARE_PLANNING=AUTHORIZED_NOT_IMPLEMENTED
+M11_METHOD_CAPABILITY_BOUNDARY=AUTHORIZED_NOT_IMPLEMENTED
+M9_M12_AUDIO_BRIDGE=AUTHORIZED_NOT_IMPLEMENTED
+```
+
+The following merged governance facts remain true and continue to protect every PR
+in this wave:
+
+```text
 DOCUMENT_GOVERNANCE_VALIDATION=IMPLEMENTED
 DOCS_ONLY_CI_FAST_PATH=IMPLEMENTED
 REQUIRED_CHECK_CONTEXTS=5_UNCHANGED
@@ -79,21 +101,38 @@ PROTECTED_CHANGE_FULL_SUITE=ENFORCED
 POST_MERGE_DUPLICATE_FULL_CI=REMOVED
 ```
 
-The M12 runtime remains blocked by the absent persistent CPU build environment:
+The PRs are strictly serial. A later PR may start only after the prior PR is merged,
+all five required checks succeed, `origin/main` is re-fetched, the worktree is clean
+and no concurrent scope conflict exists. PR-F may modify tests/fixtures only.
+
+The M12 runtime remains incomplete. The future C3/C4 target host decision is recorded,
+but no host or GPU action is authorized in this wave:
 
 ```text
-PERSISTENT_CPU_BUILD_ROOT=/data/k2-runtime-artifacts/m12/g0
-PERSISTENT_CPU_BUILD_ROOT_PRESENT=false
-BLOCK_REASON=PERSISTENT_CPU_BUILD_ARTIFACT_ROOT_UNAVAILABLE
+M12_C3_C4_TARGET_HOST=A100_CODE_SERVER_BUILD_HOST
+M12_RUNTIME_G0=NOT_COMPLETE
+M12_C3_READY_TO_START=false
+A100_START_AUTHORIZED=false
+A100_GPU_EXECUTION_AUTHORIZED=false
 ```
 
-The next legal product task after this documentation-governance wave is:
+After the full upstream wave and final read-only closeout, the next legal task is:
 
 ```text
-NEXT_TASK=LOCAL_WSL2_HANDOFF_AND_M12_C3_PREFLIGHT
+NEXT_TASK=ACS-M12-C3-C4-A100-BUILD-HOST-PREFLIGHT
 ```
 
-That identifier is a handoff/preflight boundary, not authorization to execute M12-C3.
+That identifier is a preflight boundary, not authorization to start the host, install
+a runtime, use a GPU or execute M12-C3/C4.
+
+The previous governance validator token is retained only for compatibility with the
+already-merged docs-only fast-path checker; it is superseded by the active and next
+task fields above and grants no execution authority:
+
+```text
+SUPERSEDED_VALIDATOR_NEXT_TASK=LOCAL_WSL2_HANDOFF_AND_M12_C3_PREFLIGHT
+SUPERSEDED_VALIDATOR_TOKEN_GRANTS_AUTHORITY=false
+```
 
 ## 4. Explicit prohibitions
 
@@ -110,6 +149,25 @@ PUBLICATION_ALLOWED=false
 M14_M15_IMPLEMENTATION=NOT_AUTHORIZED
 EPISODE_MASTER_CREATED=0
 EXPORT_ARTIFACT_CREATED=0
+
+GPU_OR_PROVIDER_CALLS=0
+COMFYUI_START_COUNT=0
+PROMPT_POST_COUNT=0
+ASSET_ADMISSION=0
+LIVE_CANONICAL_MUTATIONS=0
+```
+
+Additional architecture guards for this wave are:
+
+```text
+SECOND_SCRIPT_AUTHORITY_CREATED=false
+SECOND_M6_AUTHORITY_CREATED=false
+SECOND_IDENTITY_AUTHORITY_CREATED=false
+SECOND_SHOT_AUTHORITY_CREATED=false
+SECOND_ASSET_AUTHORITY_CREATED=false
+SECOND_MEDIA_QUEUE_CREATED=false
+SIDECAR_DATABASE_CREATED=false
+K2_HARDCODED_PRODUCTION_BRANCHES=0
 ```
 
 `RenderCandidate` is non-publishing and is not `EpisodeMaster` or `ExportArtifact`.
