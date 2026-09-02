@@ -32,6 +32,9 @@ M11_VIDEO_SUCCESSOR_REQUEST_SCHEMA_VERSION = (
 )
 M11_VIDEO_CAPABILITY = "self-hosted-wan22-image-to-video-v1"
 M11_VIDEO_PROVENANCE = "SELF_HOSTED_AI_GENERATED"
+METHOD_AWARE_VIDEO_REQUEST_SCHEMA_VERSION = (
+    "v5.method-aware-video-generation-request.v1"
+)
 
 
 _PROBE_MEDIA_CACHE: dict[tuple[str, int], dict[str, Any]] = {}
@@ -362,6 +365,158 @@ def _validate_m11_video_request(request: Mapping[str, Any]) -> None:
         raise MediaJobError("invalid exact M11 video generation request")
 
 
+def _validate_method_aware_video_request(request: Mapping[str, Any]) -> None:
+    """Accept only the closed MICRO_MOTION/SINGLE_ANCHOR queue contract.
+
+    This validator authorizes a durable queue reservation.  It deliberately
+    accepts no prompt or provider-selection payload and does not execute the
+    configured adapter.
+    """
+
+    fields = {
+        "schemaVersion",
+        "workspaceRef",
+        "projectRef",
+        "seriesRef",
+        "episodeRef",
+        "productionRunRef",
+        "generationRequestRef",
+        "generationRequestVersionRef",
+        "version",
+        "methodAwareInputPlanVersionRef",
+        "methodAwareInputPlanDigest",
+        "executionMethodPlanVersionRef",
+        "executionMethodPlanDigest",
+        "visualExecutionRequirementRef",
+        "visualExecutionRequirementDigest",
+        "creativeShotVersionRef",
+        "creativeShotVersionDigest",
+        "beatRef",
+        "beatDigest",
+        "executionClass",
+        "executionMethod",
+        "sourceImageAssetRef",
+        "sourceImageAssetVersionRef",
+        "sourceImageAssetVersionDigest",
+        "sourceImageContentDigest",
+        "sourceImageMediaType",
+        "cameraInstruction",
+        "sourceAction",
+        "frameRange",
+        "adapterCapability",
+        "executionMode",
+        "executionAuthorizationState",
+        "requestedProvenance",
+        "selectionRequired",
+        "publicationAllowed",
+        "createdAt",
+        "payloadDigest",
+    }
+    camera = request.get("cameraInstruction")
+    action = request.get("sourceAction")
+    span = action.get("sourceSpan") if isinstance(action, Mapping) else None
+    frame_range = request.get("frameRange")
+    if (
+        not isinstance(request, Mapping)
+        or set(request) != fields
+        or request.get("schemaVersion")
+        != METHOD_AWARE_VIDEO_REQUEST_SCHEMA_VERSION
+        or _digest({k: v for k, v in request.items() if k != "payloadDigest"})
+        != request.get("payloadDigest")
+        or request.get("version") != 1
+        or isinstance(request.get("version"), bool)
+        or request.get("executionClass") != "MICRO_MOTION"
+        or request.get("executionMethod") != "SINGLE_ANCHOR_I2V"
+        or request.get("adapterCapability") != M11_VIDEO_CAPABILITY
+        or request.get("executionMode") != "INTERNAL_SELF_HOSTED"
+        or request.get("executionAuthorizationState")
+        != "QUEUED_NOT_EXECUTED"
+        or request.get("requestedProvenance") != M11_VIDEO_PROVENANCE
+        or request.get("selectionRequired") is not True
+        or request.get("publicationAllowed") is not False
+        or request.get("sourceImageMediaType") not in {"image/png", "image/jpeg"}
+        or not all(
+            isinstance(request.get(field), str) and request[field]
+            for field in (
+                "workspaceRef",
+                "projectRef",
+                "seriesRef",
+                "episodeRef",
+                "productionRunRef",
+                "generationRequestRef",
+                "generationRequestVersionRef",
+                "methodAwareInputPlanVersionRef",
+                "executionMethodPlanVersionRef",
+                "visualExecutionRequirementRef",
+                "creativeShotVersionRef",
+                "beatRef",
+                "sourceImageAssetRef",
+                "sourceImageAssetVersionRef",
+                "createdAt",
+            )
+        )
+        or not all(
+            _hex_digest(request.get(field))
+            for field in (
+                "payloadDigest",
+                "methodAwareInputPlanDigest",
+                "executionMethodPlanDigest",
+                "visualExecutionRequirementDigest",
+                "creativeShotVersionDigest",
+                "beatDigest",
+                "sourceImageAssetVersionDigest",
+                "sourceImageContentDigest",
+            )
+        )
+        or not isinstance(camera, Mapping)
+        or set(camera) != {"framing", "movement"}
+        or not all(
+            isinstance(camera.get(field), str)
+            and camera[field].strip()
+            and len(camera[field]) <= 160
+            for field in ("framing", "movement")
+        )
+        or not isinstance(action, Mapping)
+        or set(action) != {"sourceSpan", "sourceTextDigest"}
+        or not _hex_digest(action.get("sourceTextDigest"))
+        or not isinstance(span, Mapping)
+        or set(span)
+        != {
+            "scriptSceneRef",
+            "sourceField",
+            "sourceIndex",
+            "startOffsetInclusive",
+            "endOffsetExclusive",
+        }
+        or not isinstance(span.get("scriptSceneRef"), str)
+        or not span["scriptSceneRef"]
+        or span.get("sourceField")
+        not in {"ACTION", "DIALOGUE", "NARRATION", "SUBTITLE_TEXT"}
+        or any(
+            isinstance(span.get(field), bool)
+            or not isinstance(span.get(field), int)
+            for field in (
+                "sourceIndex",
+                "startOffsetInclusive",
+                "endOffsetExclusive",
+            )
+        )
+        or span["sourceIndex"] < 0
+        or not 0 <= span["startOffsetInclusive"] < span["endOffsetExclusive"]
+        or not isinstance(frame_range, Mapping)
+        or set(frame_range) != {"startFrameInclusive", "endFrameExclusive"}
+        or any(
+            isinstance(frame_range.get(field), bool)
+            or not isinstance(frame_range.get(field), int)
+            for field in ("startFrameInclusive", "endFrameExclusive")
+        )
+        or not 0
+        <= frame_range["startFrameInclusive"]
+        < frame_range["endFrameExclusive"]
+    ):
+        raise MediaJobError("invalid method-aware M11 video request")
+
+
 def _file_digest_and_size(path: Path) -> tuple[str, int]:
     digest = sha256()
     size = 0
@@ -411,6 +566,13 @@ def _format_time(value: datetime) -> str:
 
 
 def _validate_request(request: Mapping[str, Any]) -> None:
+    if (
+        isinstance(request, Mapping)
+        and request.get("schemaVersion")
+        == METHOD_AWARE_VIDEO_REQUEST_SCHEMA_VERSION
+    ):
+        _validate_method_aware_video_request(request)
+        return
     if (
         isinstance(request, Mapping)
         and request.get("schemaVersion")

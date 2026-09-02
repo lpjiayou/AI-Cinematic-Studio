@@ -101,6 +101,7 @@ from .narrative_validation import (
     NarrativeValidationProfileRegistry,
 )
 from .execution_method_planning import M8M9ExecutionMethodPlanningService
+from .method_aware_media import M10M11MethodAwareMediaService
 from .state_projection import K2ProductionStateProjectionService
 from .voice import (
     InMemoryVoiceLockAdapter,
@@ -374,6 +375,7 @@ class EpisodeProductionPublicBoundary:
         real_media_revision: K2RealMediaRevisionService,
         voice_profile_lineage: K2VoiceProfileLineageService | None = None,
         execution_method_planning: M8M9ExecutionMethodPlanningService | None = None,
+        method_aware_media: M10M11MethodAwareMediaService | None = None,
     ) -> None:
         self.__service = service
         self.__narrative_validation = narrative_validation
@@ -389,6 +391,7 @@ class EpisodeProductionPublicBoundary:
         self.__real_media_revision = real_media_revision
         self.__voice_profile_lineage = voice_profile_lineage
         self.__execution_method_planning = execution_method_planning
+        self.__method_aware_media = method_aware_media
         self.__dynamic_media_preflight = K2DynamicMediaPreflightService(shot_graph)
         self.__candidate_review = real_media_revision.candidate_review
         self.__state_projection = real_media_revision.state_projection
@@ -569,6 +572,63 @@ class EpisodeProductionPublicBoundary:
             episode_ref,
             production_run_ref,
             execution_method_plan_version_ref,
+        )
+
+    def _method_aware_media_service(self) -> M10M11MethodAwareMediaService:
+        if self.__method_aware_media is None:
+            raise EpisodeProductionPublicError("episode_production_unavailable", 503)
+        return self.__method_aware_media
+
+    def create_method_aware_input_plan(
+        self, command: Mapping[str, Any]
+    ) -> dict[str, Any]:
+        return self._invoke(
+            self._method_aware_media_service().create_input_plan, command
+        )
+
+    def get_method_aware_input_plan(
+        self,
+        workspace_ref: str,
+        project_ref: str,
+        series_ref: str,
+        episode_ref: str,
+        production_run_ref: str,
+        method_aware_input_plan_version_ref: str | None = None,
+    ) -> dict[str, Any]:
+        return self._invoke(
+            self._method_aware_media_service().get_input_plan,
+            workspace_ref,
+            project_ref,
+            series_ref,
+            episode_ref,
+            production_run_ref,
+            method_aware_input_plan_version_ref,
+        )
+
+    def route_method_aware_videos(
+        self, command: Mapping[str, Any]
+    ) -> dict[str, Any]:
+        return self._invoke(
+            self._method_aware_media_service().route_video_methods, command
+        )
+
+    def get_method_aware_video_route(
+        self,
+        workspace_ref: str,
+        project_ref: str,
+        series_ref: str,
+        episode_ref: str,
+        production_run_ref: str,
+        video_method_route_version_ref: str | None = None,
+    ) -> dict[str, Any]:
+        return self._invoke(
+            self._method_aware_media_service().get_video_method_route,
+            workspace_ref,
+            project_ref,
+            series_ref,
+            episode_ref,
+            production_run_ref,
+            video_method_route_version_ref,
         )
 
     def authorize_and_lock(self, command: Mapping[str, Any]) -> dict[str, Any]:
@@ -1141,6 +1201,7 @@ def _services(
     EpisodeProductionService,
     M7NarrativeValidationService,
     M8M9ExecutionMethodPlanningService,
+    M10M11MethodAwareMediaService,
     K2AuthorityIdentityService,
     K2ProductionPolicyService,
     K2ProviderExperimentService,
@@ -1266,17 +1327,26 @@ def _services(
         ref_factory=selected_ref_factory,
         clock=selected_clock,
     )
+    candidate_review = K2MediaCandidateReviewService(
+        service,
+        evidence_repository,
+        clock=selected_clock,
+        selection_authority=media_selection_approval_authority,
+    )
     real_media_revision = K2RealMediaRevisionService(
         shot_graph,
         evidence_repository,
         real_image_candidate_evidence,
         real_video_candidate_evidence,
-        K2MediaCandidateReviewService(
-            service,
-            evidence_repository,
-            clock=selected_clock,
-            selection_authority=media_selection_approval_authority,
-        ),
+        candidate_review,
+        ref_factory=selected_ref_factory,
+        clock=selected_clock,
+    )
+    method_aware_media = M10M11MethodAwareMediaService(
+        execution_method_planning,
+        evidence_repository,
+        candidate_review,
+        media.execution,
         ref_factory=selected_ref_factory,
         clock=selected_clock,
     )
@@ -1311,6 +1381,7 @@ def _services(
         service,
         narrative_validation,
         execution_method_planning,
+        method_aware_media,
         authority_identity,
         production_policy,
         provider_experiments,
@@ -1353,6 +1424,7 @@ def create_in_memory_boundary(
         service,
         narrative_validation,
         execution_method_planning,
+        method_aware_media,
         authority_identity,
         production_policy,
         provider_experiments,
@@ -1407,6 +1479,7 @@ def create_in_memory_boundary(
         real_media_revision,
         voice_profile_lineage,
         execution_method_planning,
+        method_aware_media,
     )
 
 
@@ -1464,6 +1537,7 @@ def create_local_development_boundary(
         service,
         narrative_validation,
         execution_method_planning,
+        method_aware_media,
         authority_identity,
         production_policy,
         provider_experiments,
@@ -1530,6 +1604,7 @@ def create_local_development_boundary(
         real_media_revision,
         voice_profile_lineage,
         execution_method_planning,
+        method_aware_media,
     )
 
 
