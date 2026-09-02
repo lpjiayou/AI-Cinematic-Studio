@@ -39,7 +39,7 @@ The six-dimensional, evidence-linked source is
 | M9 | Independent Visual/Audio/Postprocess requirements and closed dispositions are implemented as planning facts; they create no provider or media job. |
 | M10 | Generic method-aware input requirements now resolve only current admitted AssetVersions through the existing candidate/QC/selection/admission chain; historical K2 exact-four behavior is unchanged. |
 | M11 | A closed method registry queues only MICRO_MOTION/SINGLE_ANCHOR_I2V on the existing coordinator; Contact/Gait are capability-unavailable, static media bypasses video and deterministic events remain on the M13 path. |
-| M12 | Domain contracts and runtime protocols are merged; runtimes are not installed, Runtime G0 is not complete, and C3/C4 have not started. |
+| M12 | The explicit M9 AudioRequirement bridge now emits only typed, lineage-bound request facts on the existing evidence journal; runtimes remain uninstalled, Runtime G0 is not complete, and C3/C4 have not started. |
 | M13 | Base architecture, backend and deterministic CPU slice are complete and closeout is accepted; product capability is incomplete. |
 | M14–M19 | Implementation is not authorized; production and publication remain closed. |
 
@@ -48,10 +48,12 @@ The decisive M12/M13 state is:
 ```text
 M12_DOMAIN_CONTRACT=MERGED
 M12_RUNTIME_PROTOCOL=MERGED
+M9_M12_EXPLICIT_AUDIO_BRIDGE=IMPLEMENTED_BOUNDED_FAIL_CLOSED
 M12_RUNTIME_INSTALLED=false
 M12_RUNTIME_G0=NOT_COMPLETE
 M12_G0_3_STATE=ENVIRONMENT_HOLD
 M12_FRONTEND=UNVERIFIED
+CREATOR_CAPABILITY_ADAPTER_SCHEMA=V1_COMPATIBLE
 M12_PRODUCT=NOT_COMPLETE
 M12_PRODUCTION=NOT_AUTHORIZED
 M12_C3_READY_TO_START=false
@@ -60,6 +62,7 @@ M13_BASE_ARCHITECTURE=ACCEPTED
 M13_BASE_BACKEND=COMPLETE
 M13_BASE_RUNTIME_CPU=VERIFIED
 M13_BASE_CLOSEOUT=ACCEPTED
+M13_RENDER_CANDIDATE_RESOURCE_PROJECTED=true
 M13_FRONTEND_PRODUCT_SURFACE=INCOMPLETE
 M13_EXTENSION_CATALOG=NOT_AUTHORIZED
 M13_M14_M15_INTEGRATION=NOT_AUTHORIZED
@@ -85,8 +88,8 @@ A100_START_AUTHORIZED=false
 
 ARCHITECTURE_CHECKPOINT=ADR_0019_ACCEPTED_AND_MERGED
 AUTHORIZED_SEQUENCE=PR-B→PR-C→PR-D→PR-E→PR-F→FRONTEND_PIN
-COMPLETED_SEQUENCE=PR-A→PR-B→PR-C→PR-D
-AUTHORIZED_REMAINING_SEQUENCE=PR-E→PR-F→FRONTEND_PIN
+COMPLETED_SEQUENCE=PR-A→PR-B→PR-C→PR-D→PR-E
+AUTHORIZED_REMAINING_SEQUENCE=PR-F→FRONTEND_PIN
 
 M3_M6_CONSUMER_BINDING=IMPLEMENTED_BOUNDED
 M7_NARRATIVE_VALIDATION=IMPLEMENTED_BOUNDED
@@ -94,8 +97,10 @@ M8_ACTION_EXECUTION_BEATS=IMPLEMENTED_BOUNDED
 M9_THREE_AXIS_REQUIREMENTS=IMPLEMENTED_BOUNDED
 M10_METHOD_AWARE_PLANNING=IMPLEMENTED_BOUNDED
 M11_METHOD_CAPABILITY_BOUNDARY=IMPLEMENTED_FAIL_CLOSED
-M9_M12_AUDIO_BRIDGE=AUTHORIZED_NOT_IMPLEMENTED
-NEXT_SERIAL_PR=PR-E_M9_M12_EXPLICIT_AUDIO_REQUIREMENT_BRIDGE
+M9_M12_AUDIO_BRIDGE=IMPLEMENTED_BOUNDED_FAIL_CLOSED
+M12_AUDIO_REQUEST_RUNTIME_DISPATCH=NOT_AUTHORIZED
+CREATOR_CAPABILITY_PROJECTION=V1_CLOSED_STATE_TRUTH_CORRECTED
+NEXT_SERIAL_PR=PR-F_GENERIC_ACCEPTANCE_ONLY
 ```
 
 The following merged governance facts remain true and continue to protect every PR
@@ -192,7 +197,4 @@ HISTORICAL_SECTION_SHA256=5e05b68e83ed55f90b342aee627001a7bbf66cf59f92e510627017
 HISTORICAL_DOCUMENT_GRANTS_CURRENT_AUTHORITY=false
 HISTORICAL_PATH_NOT_EXECUTION_AUTHORITY=true
 ```
-
-Historical uses of “current”, “next”, “authorized” or local paths retain their original
-checkpoint meaning and do not override this projection, an Accepted ADR or a current
-Project Lead authorization.
+Historical uses of “current”, “next”, “authorized” or local paths retain their original checkpoint meaning and do not override this projection, an Accepted ADR or a current Project Lead authorization.

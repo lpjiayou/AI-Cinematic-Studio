@@ -28,7 +28,7 @@ Commercial Frontend → Frontend Experience Adapter → /creator/api/v1
 | M10 | `/episode-production-runs/{runRef}/dynamic-media-preflight`, `/real-media-revision`, `/real-image-candidates`, `/semantic-visual-qc`, `/media-selection`, `/real-image-admission`, `/real-image-successor-admission`, `/real-image-selection`, `/state-projection`, `/production-readiness` | bounded K2 V5 zero-write image preflight plus legacy image candidate, review, authority-backed admission and projection services |
 | M11 | `/episode-production-runs/{runRef}/real-video-revision`, `/real-video-candidates`, `/semantic-visual-qc`, `/media-selection`, `/real-video-admission`, `/state-projection`, `/provider-experiments`, `/media` | bounded K2 V5 exact start-image video candidate, review and admission services over V4 |
 | M12 | `/episode-production-runs/{runRef}/production-readiness`, `/media` | bounded K2 V5 media service; live audio remains blocked |
-| M13–M14 | `/episode-production-runs/{runRef}/preview`, `/finalize` | bounded K2 V5 delivery service over V4/V3 |
+| M13–M14 | `/episode-production-runs/{runRef}/render-candidates`, `/preview`, `/finalize` | bounded V5 RenderCandidate/delivery services over the accepted M13 base backend and V4/V3 execution boundaries |
 | M15 | `/episode-production-runs/{runRef}/delivery`, preview/export content | bounded K2 V5 delivery authority |
 | M16–M19 | `/capabilities` status only | not open at the current gate |
 
@@ -352,6 +352,20 @@ must migrate their write payload before deploying against this contract.
 - `not_open`: implementation is not authorized or not present.
 - `disconnected`: an Experience Adapter runtime state; Core itself never reports this
   as a capability implementation state.
+
+The v1 projection keeps this state enum unchanged. M12 remains
+`production_policy_required` and lists the explicit M9 AudioRequirement plus
+`M12_runtime_g0_not_complete`; it does not use generic M11 completion as a hard
+dependency. M13 remains `local_evidence_only`, publishes the existing
+`episode-production-runs/render-candidates` resource, and separately lists base
+backend presence (`M13_base_backend_present`), incomplete product surface
+(`M13_product_surface_incomplete`) and unauthorized Extension G0
+(`M13_extension_g0_not_authorized`). None of those facts means M12 or M13 is
+production-ready.
+
+The M9→M12 bridge is an accepted V5 application boundary, not a new browser mutation
+route in this contract. Its public DTO strips storage locators, and the capability
+projection does not expose its evidence journal or add a second audio authority.
 
 ## Compatibility
 

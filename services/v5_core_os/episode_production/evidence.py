@@ -30,6 +30,7 @@ ALLOWED_EVIDENCE_RECORD_KINDS = frozenset(
         "ExecutionMethodPlanVersion",
         "MethodAwareInputPlanVersion",
         "VideoMethodRouteVersion",
+        "AudioRequirementRouteVersion",
         "TechnicalValidation",
         "SemanticVisualQCDecision",
         "HumanSelectionDecision",

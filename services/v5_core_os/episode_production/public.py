@@ -102,6 +102,7 @@ from .narrative_validation import (
 )
 from .execution_method_planning import M8M9ExecutionMethodPlanningService
 from .method_aware_media import M10M11MethodAwareMediaService
+from .explicit_audio_bridge import M9M12ExplicitAudioBridgeService
 from .state_projection import K2ProductionStateProjectionService
 from .voice import (
     InMemoryVoiceLockAdapter,
@@ -376,6 +377,7 @@ class EpisodeProductionPublicBoundary:
         voice_profile_lineage: K2VoiceProfileLineageService | None = None,
         execution_method_planning: M8M9ExecutionMethodPlanningService | None = None,
         method_aware_media: M10M11MethodAwareMediaService | None = None,
+        explicit_audio_bridge: M9M12ExplicitAudioBridgeService | None = None,
     ) -> None:
         self.__service = service
         self.__narrative_validation = narrative_validation
@@ -392,6 +394,7 @@ class EpisodeProductionPublicBoundary:
         self.__voice_profile_lineage = voice_profile_lineage
         self.__execution_method_planning = execution_method_planning
         self.__method_aware_media = method_aware_media
+        self.__explicit_audio_bridge = explicit_audio_bridge
         self.__dynamic_media_preflight = K2DynamicMediaPreflightService(shot_graph)
         self.__candidate_review = real_media_revision.candidate_review
         self.__state_projection = real_media_revision.state_projection
@@ -630,6 +633,43 @@ class EpisodeProductionPublicBoundary:
             production_run_ref,
             video_method_route_version_ref,
         )
+
+    def _explicit_audio_bridge_service(
+        self,
+    ) -> M9M12ExplicitAudioBridgeService:
+        if self.__explicit_audio_bridge is None:
+            raise EpisodeProductionPublicError(
+                "episode_production_unavailable", 503
+            )
+        return self.__explicit_audio_bridge
+
+    def create_explicit_audio_generation_request(
+        self, command: Mapping[str, Any]
+    ) -> dict[str, Any]:
+        result = self._invoke(
+            self._explicit_audio_bridge_service().create_route, command
+        )
+        return _strip_internal_media_locators(result)
+
+    def get_explicit_audio_requirement_route(
+        self,
+        workspace_ref: str,
+        project_ref: str,
+        series_ref: str,
+        episode_ref: str,
+        production_run_ref: str,
+        audio_requirement_route_version_ref: str | None = None,
+    ) -> dict[str, Any]:
+        result = self._invoke(
+            self._explicit_audio_bridge_service().get_route,
+            workspace_ref,
+            project_ref,
+            series_ref,
+            episode_ref,
+            production_run_ref,
+            audio_requirement_route_version_ref,
+        )
+        return _strip_internal_media_locators(result)
 
     def authorize_and_lock(self, command: Mapping[str, Any]) -> dict[str, Any]:
         return self._invoke(self.__authority_identity.authorize_and_lock, command)
@@ -1202,6 +1242,7 @@ def _services(
     M7NarrativeValidationService,
     M8M9ExecutionMethodPlanningService,
     M10M11MethodAwareMediaService,
+    M9M12ExplicitAudioBridgeService,
     K2AuthorityIdentityService,
     K2ProductionPolicyService,
     K2ProviderExperimentService,
@@ -1311,6 +1352,14 @@ def _services(
         shot_graph,
         voice_locks,
     )
+    explicit_audio_bridge = M9M12ExplicitAudioBridgeService(
+        execution_method_planning,
+        evidence_repository,
+        voice_locks,
+        voice_profile_lineage,
+        ref_factory=selected_ref_factory,
+        clock=selected_clock,
+    )
     provider_experiments = K2ProviderExperimentService(
         assets,
         production_policy,
@@ -1382,6 +1431,7 @@ def _services(
         narrative_validation,
         execution_method_planning,
         method_aware_media,
+        explicit_audio_bridge,
         authority_identity,
         production_policy,
         provider_experiments,
@@ -1425,6 +1475,7 @@ def create_in_memory_boundary(
         narrative_validation,
         execution_method_planning,
         method_aware_media,
+        explicit_audio_bridge,
         authority_identity,
         production_policy,
         provider_experiments,
@@ -1480,6 +1531,7 @@ def create_in_memory_boundary(
         voice_profile_lineage,
         execution_method_planning,
         method_aware_media,
+        explicit_audio_bridge,
     )
 
 
@@ -1538,6 +1590,7 @@ def create_local_development_boundary(
         narrative_validation,
         execution_method_planning,
         method_aware_media,
+        explicit_audio_bridge,
         authority_identity,
         production_policy,
         provider_experiments,
@@ -1605,6 +1658,7 @@ def create_local_development_boundary(
         voice_profile_lineage,
         execution_method_planning,
         method_aware_media,
+        explicit_audio_bridge,
     )
 
 

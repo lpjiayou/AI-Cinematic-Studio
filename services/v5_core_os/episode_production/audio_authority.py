@@ -12,6 +12,7 @@ from __future__ import annotations
 from copy import deepcopy
 from dataclasses import dataclass
 from datetime import datetime
+from hashlib import sha256
 import json
 from pathlib import PurePosixPath
 import re
@@ -40,6 +41,7 @@ from .voice import (
 
 
 AUDIO_GENERATION_REQUEST_SCHEMA_VERSION = "v5.audio-generation-request.v1"
+AUDIO_GENERATION_REQUEST_V2_SCHEMA_VERSION = "v5.audio-generation-request.v2"
 CONSENT_GRANT_SCHEMA_VERSION = "v5.audio-consent-grant-version.v1"
 AUDIO_RIGHTS_BINDING_SCHEMA_VERSION = "v5.audio-rights-binding.v1"
 AUDIO_PROVENANCE_SCHEMA_VERSION = "v5.audio-provenance.v1"
@@ -357,6 +359,50 @@ _GENERATION_REQUEST_FIELDS = frozenset(
         "payloadDigest",
     }
 )
+_M9_AUDIO_BINDING_BASE_FIELDS = frozenset(
+    {
+        "audioRequirementRef",
+        "audioRequirementDigest",
+        "executionMethodPlanVersionRef",
+        "executionMethodPlanDigest",
+        "scriptVersionRef",
+        "scriptVersionDigest",
+        "creativeShotVersionRef",
+        "creativeShotVersionDigest",
+        "audioRole",
+        "timingReference",
+    }
+)
+_M9_SOURCE_SPAN_FIELDS = frozenset(
+    {
+        "scriptSceneRef",
+        "sourceField",
+        "sourceIndex",
+        "startOffsetInclusive",
+        "endOffsetExclusive",
+    }
+)
+_M9_TIMING_REFERENCE_FIELDS = frozenset(
+    {"startFrameInclusive", "endFrameExclusive"}
+)
+_M9_CLONE_LINEAGE_FIELDS = frozenset(
+    {
+        "consentGrantRef",
+        "consentGrantVersionRef",
+        "consentGrantVersionDigest",
+        "voiceLockVersionRef",
+        "voiceLockVersionDigest",
+        "voiceProfileRef",
+        "voiceProfileVersionRef",
+        "voiceProfileVersionDigest",
+    }
+)
+_M9_AUDIO_ROLE_BY_REQUEST_KIND = {
+    "DIALOGUE_SYNTHESIS": "dialogue",
+    "NARRATION_SYNTHESIS": "narration",
+    "SFX_GENERATION": "sfx",
+    "AMBIENCE_GENERATION": "ambience",
+}
 
 
 class AudioDomainTypeMismatchError(EpisodeProductionError):
@@ -2301,6 +2347,245 @@ def _request_spec(
     return result
 
 
+def _m9_generation_request_fields(value: Any) -> frozenset[str]:
+    if not isinstance(value, Mapping):
+        raise EpisodeProductionError("AudioGenerationRequest is invalid")
+    kind = value.get("requestKind")
+    fields = set(_GENERATION_REQUEST_FIELDS | _M9_AUDIO_BINDING_BASE_FIELDS)
+    if kind in {"DIALOGUE_SYNTHESIS", "NARRATION_SYNTHESIS"}:
+        fields.update({"sourceSpan", "sourceTextDigest"})
+    if kind == "DIALOGUE_SYNTHESIS":
+        fields.add("speakerCharacterRef")
+    if "voiceLineage" in value:
+        fields.add("voiceLineage")
+    return frozenset(fields)
+
+
+def _m9_voice_asset_mapping(value: Any) -> Mapping[str, Any] | None:
+    if type(value) is VoiceAssetVersion:
+        return value.as_dict()
+    if isinstance(value, Mapping):
+        return value
+    return None
+
+
+def _validate_m9_audio_binding(
+    result: Mapping[str, Any],
+    *,
+    audio_requirement: Any = None,
+    execution_method_plan: Any = None,
+    voice_asset_version: Any = None,
+) -> None:
+    expected_role = _M9_AUDIO_ROLE_BY_REQUEST_KIND.get(result["requestKind"])
+    if expected_role is None or result["audioRole"] != expected_role:
+        raise AudioDomainTypeMismatchError(
+            "M9-bound AudioGenerationRequest role is invalid"
+        )
+    for field in (
+        "audioRequirementRef",
+        "executionMethodPlanVersionRef",
+        "scriptVersionRef",
+        "creativeShotVersionRef",
+    ):
+        _required_ref(result[field], field)
+    for field in (
+        "audioRequirementDigest",
+        "executionMethodPlanDigest",
+        "scriptVersionDigest",
+        "creativeShotVersionDigest",
+    ):
+        _sha256(result[field], field)
+    if (
+        result["assetRequirementRef"] != result["audioRequirementRef"]
+        or result["assetRequirementDigest"] != result["audioRequirementDigest"]
+    ):
+        raise StaleInputError(
+            "AudioGenerationRequest M9 requirement binding is stale"
+        )
+
+    timing = _exact(
+        result["timingReference"],
+        _M9_TIMING_REFERENCE_FIELDS,
+        "timingReference",
+    )
+    start = timing["startFrameInclusive"]
+    end = timing["endFrameExclusive"]
+    if (
+        isinstance(start, bool)
+        or not isinstance(start, int)
+        or start < 0
+        or isinstance(end, bool)
+        or not isinstance(end, int)
+        or end <= start
+    ):
+        raise EpisodeProductionError("timingReference is invalid")
+
+    speech = expected_role in {"dialogue", "narration"}
+    if speech:
+        span = _exact(
+            result["sourceSpan"], _M9_SOURCE_SPAN_FIELDS, "sourceSpan"
+        )
+        for field in ("scriptSceneRef", "sourceField"):
+            _required_ref(span[field], f"sourceSpan.{field}")
+        source_index = span["sourceIndex"]
+        span_start = span["startOffsetInclusive"]
+        span_end = span["endOffsetExclusive"]
+        if (
+            span["sourceField"]
+            != ("DIALOGUE" if expected_role == "dialogue" else "NARRATION")
+            or isinstance(source_index, bool)
+            or not isinstance(source_index, int)
+            or source_index < 0
+            or isinstance(span_start, bool)
+            or not isinstance(span_start, int)
+            or span_start < 0
+            or isinstance(span_end, bool)
+            or not isinstance(span_end, int)
+            or span_end <= span_start
+        ):
+            raise EpisodeProductionError("sourceSpan is invalid")
+        _sha256(result["sourceTextDigest"], "sourceTextDigest")
+        request_spec = result["requestSpec"]
+        if (
+            request_spec["scriptVersionRef"] != result["scriptVersionRef"]
+            or request_spec["scriptVersionDigest"]
+            != result["scriptVersionDigest"]
+            or sha256(
+                request_spec["normalizedSpeechParameters"]["text"].encode(
+                    "utf-8"
+                )
+            ).hexdigest()
+            != result["sourceTextDigest"]
+        ):
+            raise StaleInputError(
+                "AudioGenerationRequest source authority is stale"
+            )
+    if expected_role == "dialogue":
+        _required_ref(result["speakerCharacterRef"], "speakerCharacterRef")
+
+    selected_voice = _m9_voice_asset_mapping(voice_asset_version)
+    clone_requested = (
+        speech
+        and isinstance(selected_voice, Mapping)
+        and selected_voice.get("schemaVersion")
+        == VOICE_ASSET_VERSION_V2_SCHEMA_VERSION
+    )
+    lineage = result.get("voiceLineage")
+    if clone_requested:
+        lineage = _exact(
+            lineage, _M9_CLONE_LINEAGE_FIELDS, "voiceLineage"
+        )
+        for field in (
+            "consentGrantRef",
+            "consentGrantVersionRef",
+            "voiceLockVersionRef",
+            "voiceProfileRef",
+            "voiceProfileVersionRef",
+        ):
+            _required_ref(lineage[field], f"voiceLineage.{field}")
+        for field in (
+            "consentGrantVersionDigest",
+            "voiceLockVersionDigest",
+            "voiceProfileVersionDigest",
+        ):
+            _sha256(lineage[field], f"voiceLineage.{field}")
+        expected_lineage = {
+            "consentGrantRef": selected_voice["consentGrantRef"],
+            "consentGrantVersionRef": selected_voice[
+                "consentGrantVersionRef"
+            ],
+            "consentGrantVersionDigest": selected_voice[
+                "consentGrantVersionDigest"
+            ],
+            "voiceLockVersionRef": selected_voice["voiceLockVersionRef"],
+            "voiceLockVersionDigest": selected_voice[
+                "voiceLockVersionDigest"
+            ],
+            "voiceProfileRef": selected_voice["voiceProfileRef"],
+            "voiceProfileVersionRef": selected_voice[
+                "voiceProfileVersionRef"
+            ],
+            "voiceProfileVersionDigest": selected_voice[
+                "voiceProfileVersionDigest"
+            ],
+        }
+        if lineage != expected_lineage:
+            raise StaleInputError("clone request voice lineage is stale")
+    elif lineage is not None:
+        raise AudioDomainTypeMismatchError(
+            "non-clone AudioGenerationRequest cannot claim clone lineage"
+        )
+
+    if audio_requirement is not None:
+        if not isinstance(audio_requirement, Mapping):
+            raise EpisodeProductionError("AudioRequirement is invalid")
+        expected_type = {
+            "dialogue": "DIALOGUE",
+            "narration": "NARRATION",
+            "sfx": "SFX",
+            "ambience": "AMBIENCE",
+        }[expected_role]
+        comparisons = {
+            "audioRequirementRef": audio_requirement.get(
+                "audioRequirementRef"
+            ),
+            "audioRequirementDigest": audio_requirement.get("payloadDigest"),
+            "scriptVersionRef": audio_requirement.get("scriptVersionRef"),
+            "scriptVersionDigest": audio_requirement.get("scriptVersionDigest"),
+            "creativeShotVersionRef": audio_requirement.get(
+                "creativeShotVersionRef"
+            ),
+            "creativeShotVersionDigest": audio_requirement.get(
+                "creativeShotVersionDigest"
+            ),
+            "timingReference": audio_requirement.get("timingReference"),
+        }
+        if (
+            audio_requirement.get("audioType") != expected_type
+            or any(result[field] != expected for field, expected in comparisons.items())
+        ):
+            raise StaleInputError("AudioRequirement binding is stale")
+        if speech and (
+            result["sourceSpan"] != audio_requirement.get("sourceSpan")
+            or result["sourceTextDigest"]
+            != audio_requirement.get("sourceTextDigest")
+        ):
+            raise StaleInputError("AudioRequirement source binding is stale")
+        if expected_role == "dialogue" and result[
+            "speakerCharacterRef"
+        ] != audio_requirement.get("speakerCharacterRef"):
+            raise StaleInputError("AudioRequirement speaker binding is stale")
+
+    if execution_method_plan is not None:
+        if not isinstance(execution_method_plan, Mapping):
+            raise EpisodeProductionError("ExecutionMethodPlanVersion is invalid")
+        if (
+            result["executionMethodPlanVersionRef"]
+            != execution_method_plan.get("executionMethodPlanVersionRef")
+            or result["executionMethodPlanDigest"]
+            != execution_method_plan.get("payloadDigest")
+            or not any(
+                isinstance(item, Mapping)
+                and item.get("audioRequirementRef")
+                == result["audioRequirementRef"]
+                and item.get("payloadDigest")
+                == result["audioRequirementDigest"]
+                for item in execution_method_plan.get("audioRequirements", [])
+            )
+            or not any(
+                isinstance(item, Mapping)
+                and item.get("creativeShotVersionRef")
+                == result["creativeShotVersionRef"]
+                and item.get("payloadDigest")
+                == result["creativeShotVersionDigest"]
+                for item in execution_method_plan.get(
+                    "creativeShotVersions", []
+                )
+            )
+        ):
+            raise StaleInputError("ExecutionMethodPlanVersion binding is stale")
+
+
 def _validate_audio_generation_request(
     value: Any,
     *,
@@ -2313,7 +2598,49 @@ def _validate_audio_generation_request(
     source_recording_binding: Any = None,
     current_voice_profile_authority: Any = None,
     require_current_authority: bool = False,
+    audio_requirement: Any = None,
+    execution_method_plan: Any = None,
 ) -> dict[str, Any]:
+    if (
+        isinstance(value, Mapping)
+        and value.get("schemaVersion")
+        == AUDIO_GENERATION_REQUEST_V2_SCHEMA_VERSION
+    ):
+        result = _verify_sealed(
+            value,
+            _m9_generation_request_fields(value),
+            "AudioGenerationRequest v2",
+        )
+        legacy = {
+            field: deepcopy(result[field])
+            for field in _GENERATION_REQUEST_FIELDS
+            if field not in {"schemaVersion", "payloadDigest"}
+        }
+        legacy = _seal(
+            {
+                "schemaVersion": AUDIO_GENERATION_REQUEST_SCHEMA_VERSION,
+                **legacy,
+            }
+        )
+        _validate_audio_generation_request(
+            legacy,
+            confirmed_voice_lock=confirmed_voice_lock,
+            voice_asset_version=voice_asset_version,
+            consent_grant=consent_grant,
+            evaluated_at=evaluated_at,
+            voice_profile_version=voice_profile_version,
+            consent_grant_version=consent_grant_version,
+            source_recording_binding=source_recording_binding,
+            current_voice_profile_authority=current_voice_profile_authority,
+            require_current_authority=require_current_authority,
+        )
+        _validate_m9_audio_binding(
+            result,
+            audio_requirement=audio_requirement,
+            execution_method_plan=execution_method_plan,
+            voice_asset_version=voice_asset_version,
+        )
+        return result
     result = _verify_sealed(
         value, _GENERATION_REQUEST_FIELDS, "AudioGenerationRequest"
     )
@@ -2484,6 +2811,8 @@ def validate_audio_generation_request(
     source_recording_binding: Any = None,
     current_voice_profile_authority: Any = None,
     require_current_authority: bool = False,
+    audio_requirement: Any = None,
+    execution_method_plan: Any = None,
 ) -> "AudioGenerationRequest":
     return AudioGenerationRequest.from_mapping(
         value,
@@ -2496,6 +2825,8 @@ def validate_audio_generation_request(
         source_recording_binding=source_recording_binding,
         current_voice_profile_authority=current_voice_profile_authority,
         require_current_authority=require_current_authority,
+        audio_requirement=audio_requirement,
+        execution_method_plan=execution_method_plan,
     )
 
 
@@ -2565,6 +2896,133 @@ def build_audio_generation_request(
         source_recording_binding=source_recording_binding,
         current_voice_profile_authority=current_voice_profile_authority,
         require_current_authority=True,
+    ).as_dict()
+
+
+def build_m9_audio_generation_request(
+    command: Mapping[str, Any],
+    *,
+    audio_requirement: Mapping[str, Any],
+    execution_method_plan: Mapping[str, Any],
+    confirmed_voice_lock: Any = None,
+    voice_asset_version: Any = None,
+    consent_grant: Any = None,
+    evaluated_at: str | None = None,
+    voice_profile_version: Any = None,
+    consent_grant_version: Any = None,
+    source_recording_binding: Any = None,
+    current_voice_profile_authority: Any = None,
+) -> dict[str, Any]:
+    """Build an additive request bound to one current explicit M9 requirement.
+
+    ``command`` is the existing v1 command shape.  All M9 fields are derived
+    from the already validated requirement and plan; callers cannot submit or
+    override source spans, speaker identity, timing or upstream digests.
+    """
+
+    if not isinstance(audio_requirement, Mapping) or not isinstance(
+        execution_method_plan, Mapping
+    ):
+        raise EpisodeProductionError("M9 audio request authority is invalid")
+    audio_type = audio_requirement.get("audioType")
+    expected_kind = {
+        "DIALOGUE": "DIALOGUE_SYNTHESIS",
+        "NARRATION": "NARRATION_SYNTHESIS",
+        "SFX": "SFX_GENERATION",
+        "AMBIENCE": "AMBIENCE_GENERATION",
+    }.get(audio_type)
+    if expected_kind is None or command.get("requestKind") != expected_kind:
+        raise AudioDomainTypeMismatchError(
+            "AudioRequirement cannot create this AudioGenerationRequest"
+        )
+    base = build_audio_generation_request(
+        command,
+        confirmed_voice_lock=confirmed_voice_lock,
+        voice_asset_version=voice_asset_version,
+        consent_grant=consent_grant,
+        evaluated_at=evaluated_at,
+        voice_profile_version=voice_profile_version,
+        consent_grant_version=consent_grant_version,
+        source_recording_binding=source_recording_binding,
+        current_voice_profile_authority=current_voice_profile_authority,
+    )
+    result = {
+        key: deepcopy(value)
+        for key, value in base.items()
+        if key not in {"schemaVersion", "payloadDigest"}
+    }
+    result.update(
+        {
+            "schemaVersion": AUDIO_GENERATION_REQUEST_V2_SCHEMA_VERSION,
+            "audioRequirementRef": audio_requirement["audioRequirementRef"],
+            "audioRequirementDigest": audio_requirement["payloadDigest"],
+            "executionMethodPlanVersionRef": execution_method_plan[
+                "executionMethodPlanVersionRef"
+            ],
+            "executionMethodPlanDigest": execution_method_plan["payloadDigest"],
+            "scriptVersionRef": audio_requirement["scriptVersionRef"],
+            "scriptVersionDigest": audio_requirement["scriptVersionDigest"],
+            "creativeShotVersionRef": audio_requirement[
+                "creativeShotVersionRef"
+            ],
+            "creativeShotVersionDigest": audio_requirement[
+                "creativeShotVersionDigest"
+            ],
+            "audioRole": str(audio_type).lower(),
+            "timingReference": deepcopy(audio_requirement["timingReference"]),
+        }
+    )
+    if audio_type in {"DIALOGUE", "NARRATION"}:
+        result["sourceSpan"] = deepcopy(audio_requirement["sourceSpan"])
+        result["sourceTextDigest"] = audio_requirement["sourceTextDigest"]
+    if audio_type == "DIALOGUE":
+        result["speakerCharacterRef"] = audio_requirement[
+            "speakerCharacterRef"
+        ]
+    selected_voice = _m9_voice_asset_mapping(voice_asset_version)
+    if (
+        isinstance(selected_voice, Mapping)
+        and selected_voice.get("schemaVersion")
+        == VOICE_ASSET_VERSION_V2_SCHEMA_VERSION
+    ):
+        result["voiceLineage"] = {
+            "consentGrantRef": selected_voice["consentGrantRef"],
+            "consentGrantVersionRef": selected_voice[
+                "consentGrantVersionRef"
+            ],
+            "consentGrantVersionDigest": selected_voice[
+                "consentGrantVersionDigest"
+            ],
+            "voiceLockVersionRef": selected_voice["voiceLockVersionRef"],
+            "voiceLockVersionDigest": selected_voice[
+                "voiceLockVersionDigest"
+            ],
+            "voiceProfileRef": selected_voice["voiceProfileRef"],
+            "voiceProfileVersionRef": selected_voice[
+                "voiceProfileVersionRef"
+            ],
+            "voiceProfileVersionDigest": selected_voice[
+                "voiceProfileVersionDigest"
+            ],
+        }
+    sealed = _seal(result)
+    return validate_audio_generation_request(
+        sealed,
+        confirmed_voice_lock=confirmed_voice_lock,
+        voice_asset_version=voice_asset_version,
+        consent_grant=consent_grant,
+        evaluated_at=evaluated_at,
+        voice_profile_version=voice_profile_version,
+        consent_grant_version=consent_grant_version,
+        source_recording_binding=source_recording_binding,
+        current_voice_profile_authority=current_voice_profile_authority,
+        require_current_authority=(
+            isinstance(selected_voice, Mapping)
+            and selected_voice.get("schemaVersion")
+            == VOICE_ASSET_VERSION_V2_SCHEMA_VERSION
+        ),
+        audio_requirement=audio_requirement,
+        execution_method_plan=execution_method_plan,
     ).as_dict()
 
 
@@ -2882,6 +3340,7 @@ __all__ = [
     "AMBIENCE_ASSET_VERSION_SCHEMA_VERSION",
     "AUDIO_ASSET_VERSION_TYPES",
     "AUDIO_GENERATION_REQUEST_SCHEMA_VERSION",
+    "AUDIO_GENERATION_REQUEST_V2_SCHEMA_VERSION",
     "AUDIO_PROVENANCE_SCHEMA_VERSION",
     "AUDIO_REQUESTED_PROVENANCE_SCHEMA_VERSION",
     "AUDIO_RIGHTS_BINDING_SCHEMA_VERSION",
@@ -2908,6 +3367,7 @@ __all__ = [
     "VoiceAssetVersion",
     "build_ambience_asset_version",
     "build_audio_generation_request",
+    "build_m9_audio_generation_request",
     "build_audio_provenance",
     "build_clone_dialogue_asset_version",
     "build_clone_voice_asset_version",
