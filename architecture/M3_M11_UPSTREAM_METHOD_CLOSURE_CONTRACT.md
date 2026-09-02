@@ -372,6 +372,21 @@ VoiceLock or Consent drift fails closed. AudioCue binds the request/output plus 
 closed timing reference suitable for M13 Timeline. No legacy sine-media write is
 permitted. M11 completion is not an input precondition.
 
+### 10.1 Additive bridge and runtime compatibility
+
+The bridge uses additive `v5.audio-generation-request.v2` envelopes and records the
+zero-or-one routing decision as `AudioRequirementRouteVersion` on the existing
+Episode Production evidence journal. It must not add a table, database, media queue
+or execution adapter. The nested pre-asset `audioCueTimingBinding` pins the M9 frame
+range and request digest; it does not fabricate the post-generation `AudioCue`, source
+sample timing or final M13 Timeline placement.
+
+The existing V4 audio runtime protocol continues to accept only
+`v5.audio-generation-request.v1`. A v2 bridge fact is therefore non-dispatchable until
+a separately authorized M12 runtime boundary re-reads current authority and performs
+an accepted protocol projection. PR-E itself may create no runtime request, process,
+provider call or legacy media write.
+
 ## 11. Capability projection compatibility
 
 The Creator projection continues to accept only:

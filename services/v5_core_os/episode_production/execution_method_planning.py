@@ -1822,3 +1822,86 @@ class M8M9ExecutionMethodPlanningService:
                 "current execution method plan is required"
             )
         return plan
+
+    def resolve_current_audio_requirement(
+        self,
+        workspace_ref: str,
+        project_ref: str,
+        series_ref: str,
+        episode_ref: str,
+        production_run_ref: str,
+        execution_method_plan_version_ref: str,
+        audio_requirement_ref: str,
+    ) -> dict[str, Any]:
+        """Resolve one current M9 audio requirement and its authoritative text.
+
+        The returned ``sourceText`` is present only for speech requirements and
+        is sliced from the freshly re-read confirmed ScriptVersion.  Callers do
+        not provide source text, speaker identity, timing or requirement
+        digests to this boundary.
+        """
+
+        plan = self.require_current_plan(
+            workspace_ref,
+            project_ref,
+            series_ref,
+            episode_ref,
+            production_run_ref,
+            execution_method_plan_version_ref,
+        )
+        selected_ref = _required_ref(
+            audio_requirement_ref, "audioRequirementRef"
+        )
+        requirement = next(
+            (
+                item
+                for item in plan["audioRequirements"]
+                if item["audioRequirementRef"] == selected_ref
+            ),
+            None,
+        )
+        if requirement is None:
+            raise RecordNotFoundError("AudioRequirement was not found")
+
+        source_text: str | None = None
+        if requirement["audioType"] in {"DIALOGUE", "NARRATION"}:
+            scope = {
+                "workspaceRef": _required_ref(workspace_ref, "workspaceRef"),
+                "projectRef": _required_ref(project_ref, "projectRef"),
+                "seriesRef": _required_ref(series_ref, "seriesRef"),
+                "episodeRef": _required_ref(episode_ref, "episodeRef"),
+            }
+            resolution = self._current_resolution(
+                scope,
+                _required_ref(production_run_ref, "productionRunRef"),
+                plan["consistencyValidationVersionRef"],
+            )
+            sources = _source_index(resolution["scriptVersion"])
+            span = self._validate_stored_source_span(
+                requirement["sourceSpan"],
+                requirement["sourceTextDigest"],
+                sources=sources,
+                expected_field=requirement["audioType"],
+            )
+            source = sources.get(
+                (
+                    span["scriptSceneRef"],
+                    span["sourceField"],
+                    span["sourceIndex"],
+                )
+            )
+            if source is None:
+                raise RepositoryUnavailableError(
+                    "AudioRequirement source text is unavailable"
+                )
+            source_text = source.text[
+                span["startOffsetInclusive"] : span["endOffsetExclusive"]
+            ]
+            if _text_digest(source_text) != requirement["sourceTextDigest"]:
+                raise StaleInputError("AudioRequirement source text changed")
+
+        return {
+            "executionMethodPlan": deepcopy(dict(plan)),
+            "audioRequirement": deepcopy(dict(requirement)),
+            "sourceText": source_text,
+        }

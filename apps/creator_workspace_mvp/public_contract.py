@@ -173,7 +173,11 @@ CAPABILITY_PROJECTION: Final = (
     {
         "id": "M12", "name": "Audio Production", "state": "production_policy_required",
         "publicResources": ["episode-production-runs/production-readiness", "episode-production-runs/media"],
-        "requirements": ["M11", "rights_manifest", "live_audio_provider"],
+        "requirements": [
+            "M9_explicit_audio_requirement",
+            "rights_manifest",
+            "M12_runtime_g0_not_complete",
+        ],
     },
     {
         "id": "M13", "name": "Timeline + Composition + Render", "state": "local_evidence_only",
@@ -182,9 +186,16 @@ CAPABILITY_PROJECTION: Final = (
             "episode-production-runs/timeline",
             "episode-production-runs/timeline-versions",
             "episode-production-runs/timeline-edits",
+            "episode-production-runs/render-candidates",
             "episode-production-runs/preview",
         ],
-        "requirements": ["M11", "M12"],
+        "requirements": [
+            "M11_method_outputs",
+            "M12_explicit_audio_outputs_when_present",
+            "M13_base_backend_present",
+            "M13_product_surface_incomplete",
+            "M13_extension_g0_not_authorized",
+        ],
     },
     {
         "id": "M14", "name": "Preview + QC + Approval + Local Regeneration", "state": "local_evidence_only",
