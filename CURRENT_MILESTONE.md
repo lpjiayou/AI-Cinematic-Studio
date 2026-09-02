@@ -64,13 +64,19 @@ M13_PRODUCT_CAPABILITY_COMPLETE=false
 
 ## 3. Current authorization and blockers
 
-The active authorization is documentation governance only:
+The active authorization is repository-validation governance only:
 
 ```text
-ACTIVE_TASK=ACS-DOCUMENTATION-GOVERNANCE-FULL-AUDIT-AND-CONSOLIDATION
+ACTIVE_TASK=ACS-DOCUMENTATION-GOVERNANCE-PR-D-AND-DOCS-ONLY-CI-FAST-PATH
 DOCS_ONLY=true
 GPU_REQUIRED=false
 A100_START_AUTHORIZED=false
+
+DOCUMENT_GOVERNANCE_VALIDATION=IMPLEMENTED
+DOCS_ONLY_CI_FAST_PATH=IMPLEMENTED
+REQUIRED_CHECK_CONTEXTS=5_UNCHANGED
+PROTECTED_CHANGE_FULL_SUITE=ENFORCED
+POST_MERGE_DUPLICATE_FULL_CI=REMOVED
 ```
 
 The M12 runtime remains blocked by the absent persistent CPU build environment:

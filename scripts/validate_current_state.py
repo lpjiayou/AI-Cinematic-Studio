@@ -36,6 +36,13 @@ REQUIRED_CURRENT = {
     "PUBLICATION_ALLOWED": "false",
     "NEXT_TASK": "LOCAL_WSL2_HANDOFF_AND_M12_C3_PREFLIGHT",
 }
+REQUIRED_CI_GOVERNANCE = {
+    "DOCUMENT_GOVERNANCE_VALIDATION": "IMPLEMENTED",
+    "DOCS_ONLY_CI_FAST_PATH": "IMPLEMENTED",
+    "REQUIRED_CHECK_CONTEXTS": "5_UNCHANGED",
+    "PROTECTED_CHANGE_FULL_SUITE": "ENFORCED",
+    "POST_MERGE_DUPLICATE_FULL_CI": "REMOVED",
+}
 MATRIX_DIMENSIONS = {
     "ARCHITECTURE_STATUS",
     "BACKEND_STATUS",
@@ -75,6 +82,8 @@ def main() -> None:
     for key, value in REQUIRED_BASELINE_VALUES.items():
         require_pair(baseline_text, key, value, BASELINE, errors)
     for key, value in REQUIRED_CURRENT.items():
+        require_pair(current_text, key, value, CURRENT, errors)
+    for key, value in REQUIRED_CI_GOVERNANCE.items():
         require_pair(current_text, key, value, CURRENT, errors)
 
     for forbidden in (
