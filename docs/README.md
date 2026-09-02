@@ -94,6 +94,7 @@ deliberately isolated and do not authorize current execution.
 
 ## OPERATIONAL_RUNBOOK
 
+- [`docs/governance/CI_WAITING_RUNBOOK.md`](governance/CI_WAITING_RUNBOOK.md) — `ACTIVE`
 - [`docs/08-compute/k2-comfyui-wan22-operator-runbook.md`](08-compute/k2-comfyui-wan22-operator-runbook.md) — `ACTIVE`
 - [`docs/11-testing/release-validation.md`](11-testing/release-validation.md) — `ACTIVE`
 - [`docs/11-testing/test-evidence-standard.md`](11-testing/test-evidence-standard.md) — `ACTIVE`
@@ -114,6 +115,7 @@ deliberately isolated and do not authorize current execution.
 
 ## IMPLEMENTATION_EVIDENCE
 
+- [`docs/archive/AGENTS_ARCHIVE_MIGRATION_MANIFEST.json`](archive/AGENTS_ARCHIVE_MIGRATION_MANIFEST.json) — `RECORDED`
 - [`design-qa.md`](../design-qa.md) — `RECORDED`
 - [`docs/04-interface-contract/v5-v3-vertical-slice-review.md`](04-interface-contract/v5-v3-vertical-slice-review.md) — `RECORDED`
 - [`docs/14-application-design/REFERENCE_VIDEO_CAPABILITY_AND_WORKSPACE_MERGED_BASELINE.md`](14-application-design/REFERENCE_VIDEO_CAPABILITY_AND_WORKSPACE_MERGED_BASELINE.md) — `RECORDED`
@@ -138,6 +140,7 @@ deliberately isolated and do not authorize current execution.
 ## HISTORICAL_EVIDENCE
 
 - [`CURRENT_MILESTONE_HISTORY_THROUGH_2026-09-02.md`](../CURRENT_MILESTONE_HISTORY_THROUGH_2026-09-02.md) — `HISTORICAL`
+- [`docs/archive/AGENTS_HISTORICAL_EXECUTION_RECORDS_THROUGH_2026-09-03.md`](archive/AGENTS_HISTORICAL_EXECUTION_RECORDS_THROUGH_2026-09-03.md) — `HISTORICAL`
 - [`docs/12-release/baseline-asset-acceptance-decision-record.md`](12-release/baseline-asset-acceptance-decision-record.md) — `HISTORICAL`
 - [`docs/12-release/baseline-v0.1.0-candidate-manifest.md`](12-release/baseline-v0.1.0-candidate-manifest.md) — `HISTORICAL`
 - [`docs/12-release/investor-readiness-acceptance-record.md`](12-release/investor-readiness-acceptance-record.md) — `HISTORICAL`
@@ -213,6 +216,6 @@ _No documents currently classified in this category._
 
 ## Inventory boundary
 
-This index contains 164 Core documents reviewed at `3be1a31962e7af2a21bfcce2d0666cd37193d48b` on
-`2026-09-02`. See the registry for owners, supersession edges, mutation policy
+This index contains 167 Core documents reviewed at `7feca3b2a4cbacdf2d50e4ccacb0d9f357249de0` on
+`2026-09-03`. See the registry for owners, supersession edges, mutation policy
 and scope notes.

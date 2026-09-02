@@ -29,9 +29,9 @@ and historical evidence cannot authorize current execution.
 | `NORMATIVE_CONTRACT` | 31 | no |
 | `CURRENT_STATUS` | 2 | yes |
 | `CAPABILITY_MATRIX` | 1 | yes |
-| `OPERATIONAL_RUNBOOK` | 17 | no |
-| `IMPLEMENTATION_EVIDENCE` | 20 | no |
-| `HISTORICAL_EVIDENCE` | 33 | no |
+| `OPERATIONAL_RUNBOOK` | 18 | no |
+| `IMPLEMENTATION_EVIDENCE` | 21 | no |
+| `HISTORICAL_EVIDENCE` | 34 | no |
 | `SUPERSEDED` | 9 | no |
 | `DRAFT` | 3 | no |
 | `DEPRECATED` | 0 | no |
@@ -133,6 +133,7 @@ and historical evidence cannot authorize current execution.
 
 | Document | Status | Owner |
 | --- | --- | --- |
+| [`docs/governance/CI_WAITING_RUNBOOK.md`](CI_WAITING_RUNBOOK.md) | `ACTIVE` | Repository Governance Owner / CI Governance Owner |
 | [`docs/08-compute/k2-comfyui-wan22-operator-runbook.md`](../08-compute/k2-comfyui-wan22-operator-runbook.md) | `ACTIVE` | Runtime Owner |
 | [`docs/11-testing/release-validation.md`](../11-testing/release-validation.md) | `ACTIVE` | Verification Owner |
 | [`docs/11-testing/test-evidence-standard.md`](../11-testing/test-evidence-standard.md) | `ACTIVE` | Verification Owner |
@@ -155,6 +156,7 @@ and historical evidence cannot authorize current execution.
 
 | Document | Status | Owner |
 | --- | --- | --- |
+| [`docs/archive/AGENTS_ARCHIVE_MIGRATION_MANIFEST.json`](../archive/AGENTS_ARCHIVE_MIGRATION_MANIFEST.json) | `RECORDED` | Repository Governance Owner / CI Governance Owner |
 | [`design-qa.md`](../../design-qa.md) | `RECORDED` | Documentation Governance Owner |
 | [`docs/04-interface-contract/v5-v3-vertical-slice-review.md`](../04-interface-contract/v5-v3-vertical-slice-review.md) | `RECORDED` | Public Contract Owner |
 | [`docs/14-application-design/REFERENCE_VIDEO_CAPABILITY_AND_WORKSPACE_MERGED_BASELINE.md`](../14-application-design/REFERENCE_VIDEO_CAPABILITY_AND_WORKSPACE_MERGED_BASELINE.md) | `RECORDED` | Application Owner |
@@ -181,6 +183,7 @@ and historical evidence cannot authorize current execution.
 | Document | Status | Owner |
 | --- | --- | --- |
 | [`CURRENT_MILESTONE_HISTORY_THROUGH_2026-09-02.md`](../../CURRENT_MILESTONE_HISTORY_THROUGH_2026-09-02.md) | `HISTORICAL` | Documentation Governance Owner |
+| [`docs/archive/AGENTS_HISTORICAL_EXECUTION_RECORDS_THROUGH_2026-09-03.md`](../archive/AGENTS_HISTORICAL_EXECUTION_RECORDS_THROUGH_2026-09-03.md) | `HISTORICAL` | Documentation Governance Owner |
 | [`docs/12-release/baseline-asset-acceptance-decision-record.md`](../12-release/baseline-asset-acceptance-decision-record.md) | `HISTORICAL` | Release Owner |
 | [`docs/12-release/baseline-v0.1.0-candidate-manifest.md`](../12-release/baseline-v0.1.0-candidate-manifest.md) | `HISTORICAL` | Release Owner |
 | [`docs/12-release/investor-readiness-acceptance-record.md`](../12-release/investor-readiness-acceptance-record.md) | `HISTORICAL` | Release Owner |

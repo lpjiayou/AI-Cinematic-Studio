@@ -1,28 +1,58 @@
 # Cross-Repository Behavior Baseline
 
-Status: `CURRENT / IMMUTABLE BEHAVIOR BASELINE`
+Status: `CURRENT / UPSTREAM METHOD CLOSURE VERIFIED`
 
-Reviewed: `2026-09-02`
+Reviewed: `2026-09-03`
 
-## 1. Frozen values
+## 1. Current repository and behavior values
 
 ```text
-CORE_MAIN=a455c8e76427d53d75bb7f15259b9875d9768914
-CORE_TREE=d92159d5c3c5d3896d1fe9e56b896413277fe4e8
+CORE_MAIN=7feca3b2a4cbacdf2d50e4ccacb0d9f357249de0
+CORE_TREE=3a8f76dc805c772ab80bd6a33f1a737fb1fb6c31
+CORE_BEHAVIOR_MAIN=5c9ea7fe6993eddb7a492b2ae8f6bd8c2d5ae326
+CORE_BEHAVIOR_TREE=de6d43a16f97c1e34dc536336d05b0174d9aab39
+
+FRONTEND_MAIN=d9f25165061988a5d7edb101aa881b0bc6f40bed
+FRONTEND_TREE=a72d63ff37914096ae6114993c9bed2cfb14cf1c
+FRONTEND_PIN_CORE_SHA=5c9ea7fe6993eddb7a492b2ae8f6bd8c2d5ae326
+FRONTEND_PIN_CORE_TREE=de6d43a16f97c1e34dc536336d05b0174d9aab39
+FRONTEND_PIN_MATCHES_CORE_BEHAVIOR=true
+
 M13_BASE_TAG=m13-base-backend-v1
 M13_BASE_TAG_OBJECT=b2d086b622bdb5456f6af325e458aa3771e43e80
 M13_BASE_TAG_TARGET=a455c8e76427d53d75bb7f15259b9875d9768914
-FRONTEND_MAIN=a0be9edc91437bf0e7c5dd14883e656e750b3aee
-FRONTEND_TREE=c25b9e3744d561c93fed26d0a07e59a1915a6071
 ```
 
-`CORE_MAIN` and `FRONTEND_MAIN` above name the frozen behavior snapshots, not a promise
-that documentation-only governance merges leave the branch refs at those commits.
+`CORE_MAIN` records the final merged upstream-method implementation baseline.
+`CORE_BEHAVIOR_MAIN` is the production-behavior commit pinned by Frontend. Core PR
+#59 is tests/fixtures only, so the pin intentionally targets PR #58. Documentation-
+only and CI-only merges may advance the branch without moving either behavior pin.
 
-## 2. Tag semantics
+## 2. Closed upstream wave
 
-`m13-base-backend-v1` is an annotated tag object. Its object and peeled commit must
-remain exactly as shown above.
+```text
+UPSTREAM_METHOD_CLOSURE=PASS
+GENERIC_NON_K2_VERTICAL_SLICE=PASS
+M3_M6_CONSUMER_BINDING=IMPLEMENTED
+M7_NARRATIVE_VALIDATION=IMPLEMENTED_BOUNDED
+M8_ACTION_EXECUTION_BEATS=IMPLEMENTED
+M8_EXECUTION_CLASS=IMPLEMENTED
+M9_THREE_AXIS_REQUIREMENTS=IMPLEMENTED
+M10_METHOD_AWARE_PLANNING=IMPLEMENTED
+M11_METHOD_CAPABILITY_BOUNDARY=IMPLEMENTED
+M9_M12_AUDIO_BRIDGE=IMPLEMENTED
+M11_CONTACT_RUNTIME=NOT_INSTALLED
+M11_GAIT_RUNTIME=NOT_INSTALLED
+```
+
+Frontend PR #24 validated the unchanged five-state capability adapter and both real
+browser gates against the exact Core behavior tree. This pin proves compatibility,
+not complete M12/M13 product surfaces or production readiness.
+
+## 3. Immutable M13 tag
+
+`m13-base-backend-v1` is an annotated tag. Its tag object and peeled commit must
+remain exactly as recorded above.
 
 ```text
 M13_BASE_TAG_IMMUTABLE=true
@@ -31,24 +61,28 @@ M13_BASE_CLOSEOUT_ACCEPTED=true
 M13_PRODUCT_CAPABILITY_COMPLETE=false
 ```
 
-Documentation work may advance `main`; it must not move, recreate or replace the tag.
-The tag proves the accepted M13 base backend behavior only. It does not prove Frontend
-product-surface completion, M14 QC/Approval, M15 Master/Export or publication.
+The tag proves the accepted M13 base backend only. It does not prove Frontend product
+completion, M14 QC/Approval, M15 Master/Export or publication.
 
-## 3. Frontend pin semantics
+## 4. Preserved predecessor snapshots
 
-The Frontend baseline pins a tested Core behavior commit/tree for cross-repository CI.
-A pin-only Frontend change means compatibility was revalidated against that Core
-behavior. It does not implement a Timeline Studio, Effect Inspector, RenderCandidate
-review product, M12 audio UI, M14/M15 integration or publication.
+The following values preserve the earlier M13 closeout and pre-pin Frontend snapshots
+for the already-merged documentation validator. They are historical compatibility
+facts, not current branch refs:
 
-The governance wave must not modify `CORE_PIN_SHA` or `CORE_PIN_TREE`. A later pin move
-requires its own authorized compatibility task and evidence.
+```text
+M13_FROZEN_CORE_MAIN=a455c8e76427d53d75bb7f15259b9875d9768914
+M13_FROZEN_CORE_TREE=d92159d5c3c5d3896d1fe9e56b896413277fe4e8
+PRE_PIN_FRONTEND_MAIN=a0be9edc91437bf0e7c5dd14883e656e750b3aee
+PRE_PIN_FRONTEND_TREE=c25b9e3744d561c93fed26d0a07e59a1915a6071
+```
 
-## 4. Closed execution boundaries
+## 5. Closed execution boundaries
 
 ```text
 M12_RUNTIME_G0=NOT_COMPLETE
+M12_C3_PREREQUISITE_UPSTREAM=PASS
+M12_C3_READY_TO_REQUEST_AUTHORIZATION=true
 M12_C3_READY_TO_START=false
 M13_EXTENSION_G0_AUTHORIZED=false
 A100_START_AUTHORIZED=false
@@ -57,5 +91,6 @@ PROVIDER_CALLS_ALLOWED=false
 PUBLICATION_ALLOWED=false
 ```
 
-The next legal project boundary after documentation governance is
-`LOCAL_WSL2_HANDOFF_AND_M12_C3_PREFLIGHT`; it is not C3 execution authority.
+The next legal boundary is
+`ACS-M12-C3-C4-A100-BUILD-HOST-PREFLIGHT`. Its name does not authorize starting the
+host, installing a runtime, using a GPU, calling a Provider or entering C3/C4.

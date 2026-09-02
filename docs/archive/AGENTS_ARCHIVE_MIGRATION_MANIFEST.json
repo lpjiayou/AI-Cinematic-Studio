@@ -1,0 +1,399 @@
+{
+  "schemaVersion": 1,
+  "migrationId": "ACS-UPSTREAM-CLOSEOUT-AGENTS-CI-WAITING-AND-INTEGRATION-SHARDING",
+  "migratedAt": "2026-09-03",
+  "sourcePath": "AGENTS.md",
+  "archivePath": "docs/archive/AGENTS_HISTORICAL_EXECUTION_RECORDS_THROUGH_2026-09-03.md",
+  "sourceFileSha256": "06454656acefc9b784e8ef118805eb7e1883f86b5fa670da33179d1664022f43",
+  "archivePayloadSha256": "06454656acefc9b784e8ef118805eb7e1883f86b5fa670da33179d1664022f43",
+  "archiveFileSha256": "f9dfab9fb3adb51991d4e7717b2c5d6c4bb53ad21ecb6e6d25a5379bf7575565",
+  "sourceByteCount": 50419,
+  "archivePayloadByteCount": 50419,
+  "archiveFileByteCount": 50819,
+  "sourceLineCount": 1909,
+  "archivePayloadLineCount": 1909,
+  "archiveFileLineCount": 1923,
+  "blockCount": 47,
+  "integrity": {
+    "ARCHIVED_CONTENT_LOSS_COUNT": 0,
+    "MOVED_BLOCK_SHA256_MATCH": "PASS"
+  },
+  "blocks": [
+    {
+      "sourceHeading": "# AI Cinematic Studio — Codex Agent Rules",
+      "sourceContentSha256": "4522c611bec94f0ba09273d3aea0be78d0269e8f486cb174999a5793f7d1a18d",
+      "archivePath": "docs/archive/AGENTS_HISTORICAL_EXECUTION_RECORDS_THROUGH_2026-09-03.md",
+      "archiveContentSha256": "4522c611bec94f0ba09273d3aea0be78d0269e8f486cb174999a5793f7d1a18d",
+      "byteCount": 317,
+      "lineCount": 13
+    },
+    {
+      "sourceHeading": "# 1. Role",
+      "sourceContentSha256": "e826f5b2b88475aa8a674201660a68c4ac3eb992c9fae13fd0a3a281ee9f36ae",
+      "archivePath": "docs/archive/AGENTS_HISTORICAL_EXECUTION_RECORDS_THROUGH_2026-09-03.md",
+      "archiveContentSha256": "e826f5b2b88475aa8a674201660a68c4ac3eb992c9fae13fd0a3a281ee9f36ae",
+      "byteCount": 1053,
+      "lineCount": 49
+    },
+    {
+      "sourceHeading": "# 2. Source-of-Truth Hierarchy",
+      "sourceContentSha256": "5fc9cd08fb4eaacc32165a6892118f8928648b3b554301de4733f753c0533f77",
+      "archivePath": "docs/archive/AGENTS_HISTORICAL_EXECUTION_RECORDS_THROUGH_2026-09-03.md",
+      "archiveContentSha256": "5fc9cd08fb4eaacc32165a6892118f8928648b3b554301de4733f753c0533f77",
+      "byteCount": 874,
+      "lineCount": 28
+    },
+    {
+      "sourceHeading": "# 3. Product Definition",
+      "sourceContentSha256": "ec6a2b07f4b3715b344e5432e584fb98cb60ec31132c83bc1d4ce4451ee016f0",
+      "archivePath": "docs/archive/AGENTS_HISTORICAL_EXECUTION_RECORDS_THROUGH_2026-09-03.md",
+      "archiveContentSha256": "ec6a2b07f4b3715b344e5432e584fb98cb60ec31132c83bc1d4ce4451ee016f0",
+      "byteCount": 425,
+      "lineCount": 21
+    },
+    {
+      "sourceHeading": "# 4. Project First",
+      "sourceContentSha256": "247ab573d58cb15027bdab111a5e7d56b1bc0b4b98ce5bce0f6ff57af6ba274c",
+      "archivePath": "docs/archive/AGENTS_HISTORICAL_EXECUTION_RECORDS_THROUGH_2026-09-03.md",
+      "archiveContentSha256": "247ab573d58cb15027bdab111a5e7d56b1bc0b4b98ce5bce0f6ff57af6ba274c",
+      "byteCount": 607,
+      "lineCount": 42
+    },
+    {
+      "sourceHeading": "# 5. Long-Term Production Spine",
+      "sourceContentSha256": "8f7fe323a44387d1a30390a765712ccb440a8132c19c90b2a99025cd0ad43a45",
+      "archivePath": "docs/archive/AGENTS_HISTORICAL_EXECUTION_RECORDS_THROUGH_2026-09-03.md",
+      "archiveContentSha256": "8f7fe323a44387d1a30390a765712ccb440a8132c19c90b2a99025cd0ad43a45",
+      "byteCount": 787,
+      "lineCount": 36
+    },
+    {
+      "sourceHeading": "# 6. Core Integration Principle",
+      "sourceContentSha256": "21002be6ae04166ccbd26d022847df6541939c6d80b1a7ac1a8a62a3d30cf804",
+      "archivePath": "docs/archive/AGENTS_HISTORICAL_EXECUTION_RECORDS_THROUGH_2026-09-03.md",
+      "archiveContentSha256": "21002be6ae04166ccbd26d022847df6541939c6d80b1a7ac1a8a62a3d30cf804",
+      "byteCount": 511,
+      "lineCount": 27
+    },
+    {
+      "sourceHeading": "# 7. Data Lineage Rule",
+      "sourceContentSha256": "6ad0aa33674d632b7852b1286e60ceb41b847766aea125f591c4bdf41a0366b7",
+      "archivePath": "docs/archive/AGENTS_HISTORICAL_EXECUTION_RECORDS_THROUGH_2026-09-03.md",
+      "archiveContentSha256": "6ad0aa33674d632b7852b1286e60ceb41b847766aea125f591c4bdf41a0366b7",
+      "byteCount": 1180,
+      "lineCount": 49
+    },
+    {
+      "sourceHeading": "# 8. Vertical Closure",
+      "sourceContentSha256": "a0ee2b4341bf59142083d9e2ca69ce8868f9e6461b05dcdb713904518ab50ece",
+      "archivePath": "docs/archive/AGENTS_HISTORICAL_EXECUTION_RECORDS_THROUGH_2026-09-03.md",
+      "archiveContentSha256": "a0ee2b4341bf59142083d9e2ca69ce8868f9e6461b05dcdb713904518ab50ece",
+      "byteCount": 417,
+      "lineCount": 27
+    },
+    {
+      "sourceHeading": "# 9. Current Roadmap",
+      "sourceContentSha256": "ac73f8d88f817cb28a0a6b3d7a489bd62ba2f6e729e025a51573d68284bfef1c",
+      "archivePath": "docs/archive/AGENTS_HISTORICAL_EXECUTION_RECORDS_THROUGH_2026-09-03.md",
+      "archiveContentSha256": "ac73f8d88f817cb28a0a6b3d7a489bd62ba2f6e729e025a51573d68284bfef1c",
+      "byteCount": 18984,
+      "lineCount": 372
+    },
+    {
+      "sourceHeading": "# 10. Architecture Direction — V2.3",
+      "sourceContentSha256": "a51e5ea87f3345335cd97dfbefbf50ab20a2e093134a9ffe69bc65eed73b3bcf",
+      "archivePath": "docs/archive/AGENTS_HISTORICAL_EXECUTION_RECORDS_THROUGH_2026-09-03.md",
+      "archiveContentSha256": "a51e5ea87f3345335cd97dfbefbf50ab20a2e093134a9ffe69bc65eed73b3bcf",
+      "byteCount": 870,
+      "lineCount": 47
+    },
+    {
+      "sourceHeading": "# 11. V5 Core OS Ownership",
+      "sourceContentSha256": "7ea7b962bb534dff9354a73eae8c2ee2f62da99e0c2753d35c677c68a2c0acdf",
+      "archivePath": "docs/archive/AGENTS_HISTORICAL_EXECUTION_RECORDS_THROUGH_2026-09-03.md",
+      "archiveContentSha256": "7ea7b962bb534dff9354a73eae8c2ee2f62da99e0c2753d35c677c68a2c0acdf",
+      "byteCount": 981,
+      "lineCount": 37
+    },
+    {
+      "sourceHeading": "# 12. V4 Platform Ownership",
+      "sourceContentSha256": "97c9a43cedddbd9b75d273507a7b9c4290d920ec7aad2b8cbf395aa6cfddfb7d",
+      "archivePath": "docs/archive/AGENTS_HISTORICAL_EXECUTION_RECORDS_THROUGH_2026-09-03.md",
+      "archiveContentSha256": "97c9a43cedddbd9b75d273507a7b9c4290d920ec7aad2b8cbf395aa6cfddfb7d",
+      "byteCount": 706,
+      "lineCount": 46
+    },
+    {
+      "sourceHeading": "# 13. V3 Render Ownership",
+      "sourceContentSha256": "4b84b8da6734cc210fc0934f3b99896f6fe935944b36c85c032bb0e62694ef4b",
+      "archivePath": "docs/archive/AGENTS_HISTORICAL_EXECUTION_RECORDS_THROUGH_2026-09-03.md",
+      "archiveContentSha256": "4b84b8da6734cc210fc0934f3b99896f6fe935944b36c85c032bb0e62694ef4b",
+      "byteCount": 533,
+      "lineCount": 29
+    },
+    {
+      "sourceHeading": "# 14. Provider Rule",
+      "sourceContentSha256": "0e61172de647fcb5156fa432cef2617117dab06db624bc2b2c95ce6357d6300c",
+      "archivePath": "docs/archive/AGENTS_HISTORICAL_EXECUTION_RECORDS_THROUGH_2026-09-03.md",
+      "archiveContentSha256": "0e61172de647fcb5156fa432cef2617117dab06db624bc2b2c95ce6357d6300c",
+      "byteCount": 508,
+      "lineCount": 27
+    },
+    {
+      "sourceHeading": "# 15. DeepSeek Rule",
+      "sourceContentSha256": "447ac9d5f17b47c6e111b2754c4a0052c2434d336a5f36332a9d5c3477103ab8",
+      "archivePath": "docs/archive/AGENTS_HISTORICAL_EXECUTION_RECORDS_THROUGH_2026-09-03.md",
+      "archiveContentSha256": "447ac9d5f17b47c6e111b2754c4a0052c2434d336a5f36332a9d5c3477103ab8",
+      "byteCount": 660,
+      "lineCount": 38
+    },
+    {
+      "sourceHeading": "# 16. Candidate vs Domain Fact",
+      "sourceContentSha256": "a2e2eb158ff42a867d3336d3710c9370a3f513fdbef0d044af1810e39e72eaa5",
+      "archivePath": "docs/archive/AGENTS_HISTORICAL_EXECUTION_RECORDS_THROUGH_2026-09-03.md",
+      "archiveContentSha256": "a2e2eb158ff42a867d3336d3710c9370a3f513fdbef0d044af1810e39e72eaa5",
+      "byteCount": 494,
+      "lineCount": 50
+    },
+    {
+      "sourceHeading": "# 17. Versioning Rule",
+      "sourceContentSha256": "780f30a5b599135eab1359647202df2e0dee0b22e4182474a2c2f1f98c8a3284",
+      "archivePath": "docs/archive/AGENTS_HISTORICAL_EXECUTION_RECORDS_THROUGH_2026-09-03.md",
+      "archiveContentSha256": "780f30a5b599135eab1359647202df2e0dee0b22e4182474a2c2f1f98c8a3284",
+      "byteCount": 592,
+      "lineCount": 33
+    },
+    {
+      "sourceHeading": "# 18. Validation Staleness",
+      "sourceContentSha256": "62dd2c6d58775dbd21a2576ad20ff0d4ba1ae7a6769c50828ca06f4d07dbfc5c",
+      "archivePath": "docs/archive/AGENTS_HISTORICAL_EXECUTION_RECORDS_THROUGH_2026-09-03.md",
+      "archiveContentSha256": "62dd2c6d58775dbd21a2576ad20ff0d4ba1ae7a6769c50828ca06f4d07dbfc5c",
+      "byteCount": 311,
+      "lineCount": 24
+    },
+    {
+      "sourceHeading": "# 19. UI Architecture Authority",
+      "sourceContentSha256": "d29b52f4c9db0ba594998041b7d8e877ec8c763f77b78ca440900dd93e69c6a1",
+      "archivePath": "docs/archive/AGENTS_HISTORICAL_EXECUTION_RECORDS_THROUGH_2026-09-03.md",
+      "archiveContentSha256": "d29b52f4c9db0ba594998041b7d8e877ec8c763f77b78ca440900dd93e69c6a1",
+      "byteCount": 742,
+      "lineCount": 24
+    },
+    {
+      "sourceHeading": "# 20. One Creator UI Rule",
+      "sourceContentSha256": "5831fd0a84e51173abc6e732101d2c73d9305e2b09bc6a1f2bed33a9de196c4e",
+      "archivePath": "docs/archive/AGENTS_HISTORICAL_EXECUTION_RECORDS_THROUGH_2026-09-03.md",
+      "archiveContentSha256": "5831fd0a84e51173abc6e732101d2c73d9305e2b09bc6a1f2bed33a9de196c4e",
+      "byteCount": 2056,
+      "lineCount": 60
+    },
+    {
+      "sourceHeading": "# 21. Global UI Navigation Freeze",
+      "sourceContentSha256": "1466c85cff3f75f65d0b9913abba559e3e63aae9c2c753b81e66cd321d8d2d98",
+      "archivePath": "docs/archive/AGENTS_HISTORICAL_EXECUTION_RECORDS_THROUGH_2026-09-03.md",
+      "archiveContentSha256": "1466c85cff3f75f65d0b9913abba559e3e63aae9c2c753b81e66cd321d8d2d98",
+      "byteCount": 474,
+      "lineCount": 30
+    },
+    {
+      "sourceHeading": "# 22. Project Workspace IA Freeze",
+      "sourceContentSha256": "d7285313b8d9f496e242254ca6ee6f13adb101f0caf5481b9502f3f9a33893c3",
+      "archivePath": "docs/archive/AGENTS_HISTORICAL_EXECUTION_RECORDS_THROUGH_2026-09-03.md",
+      "archiveContentSha256": "d7285313b8d9f496e242254ca6ee6f13adb101f0caf5481b9502f3f9a33893c3",
+      "byteCount": 582,
+      "lineCount": 59
+    },
+    {
+      "sourceHeading": "# 23. UI Shell vs Real Capability",
+      "sourceContentSha256": "c5f2a593b62ba8835b02c225a04cd5e3fbbdf98e6e5d5325b5aaa04a3bba2c45",
+      "archivePath": "docs/archive/AGENTS_HISTORICAL_EXECUTION_RECORDS_THROUGH_2026-09-03.md",
+      "archiveContentSha256": "c5f2a593b62ba8835b02c225a04cd5e3fbbdf98e6e5d5325b5aaa04a3bba2c45",
+      "byteCount": 656,
+      "lineCount": 42
+    },
+    {
+      "sourceHeading": "# 24. Chinese-First UI Rule",
+      "sourceContentSha256": "d4a92d032f5bb9897213b9f560a4a986332aade18f19a4b5a2aead742505d90d",
+      "archivePath": "docs/archive/AGENTS_HISTORICAL_EXECUTION_RECORDS_THROUGH_2026-09-03.md",
+      "archiveContentSha256": "d4a92d032f5bb9897213b9f560a4a986332aade18f19a4b5a2aead742505d90d",
+      "byteCount": 387,
+      "lineCount": 25
+    },
+    {
+      "sourceHeading": "# 25. Persistence Rule",
+      "sourceContentSha256": "5d0814950ea61c0b3a04023432eab22a21c2df2bf3d7fcc0867a6369a623a141",
+      "archivePath": "docs/archive/AGENTS_HISTORICAL_EXECUTION_RECORDS_THROUGH_2026-09-03.md",
+      "archiveContentSha256": "5d0814950ea61c0b3a04023432eab22a21c2df2bf3d7fcc0867a6369a623a141",
+      "byteCount": 536,
+      "lineCount": 28
+    },
+    {
+      "sourceHeading": "# 26. Deletion / Lifecycle Safety",
+      "sourceContentSha256": "98f392507f8350b7cfb11d53eb39e4d34ff0cdfabe6f7e1ec5ddbb97ad5a8df7",
+      "archivePath": "docs/archive/AGENTS_HISTORICAL_EXECUTION_RECORDS_THROUGH_2026-09-03.md",
+      "archiveContentSha256": "98f392507f8350b7cfb11d53eb39e4d34ff0cdfabe6f7e1ec5ddbb97ad5a8df7",
+      "byteCount": 577,
+      "lineCount": 24
+    },
+    {
+      "sourceHeading": "# 27. Human Confirmation",
+      "sourceContentSha256": "12f9690a629080861bf142740ea676c5576aa7207bbdaf220504e8dabe4289c6",
+      "archivePath": "docs/archive/AGENTS_HISTORICAL_EXECUTION_RECORDS_THROUGH_2026-09-03.md",
+      "archiveContentSha256": "12f9690a629080861bf142740ea676c5576aa7207bbdaf220504e8dabe4289c6",
+      "byteCount": 253,
+      "lineCount": 20
+    },
+    {
+      "sourceHeading": "# 28. Integration Gate",
+      "sourceContentSha256": "b19a298c29c7fe689ce9035b8ce20483598ee8f3bb98e45f823a054ebe97be47",
+      "archivePath": "docs/archive/AGENTS_HISTORICAL_EXECUTION_RECORDS_THROUGH_2026-09-03.md",
+      "archiveContentSha256": "b19a298c29c7fe689ce9035b8ce20483598ee8f3bb98e45f823a054ebe97be47",
+      "byteCount": 253,
+      "lineCount": 22
+    },
+    {
+      "sourceHeading": "# 29. Production Spine Integrity Gate",
+      "sourceContentSha256": "e3bd912385b9266a2dcabfae16f4b5e98b0ea1717d4db69505fa8e8a113f0deb",
+      "archivePath": "docs/archive/AGENTS_HISTORICAL_EXECUTION_RECORDS_THROUGH_2026-09-03.md",
+      "archiveContentSha256": "e3bd912385b9266a2dcabfae16f4b5e98b0ea1717d4db69505fa8e8a113f0deb",
+      "byteCount": 341,
+      "lineCount": 14
+    },
+    {
+      "sourceHeading": "# 30. Scope Control",
+      "sourceContentSha256": "d676b43dc311beb0e3d01466b2f69af229e59b227ff66a9efdf9a0df8562c694",
+      "archivePath": "docs/archive/AGENTS_HISTORICAL_EXECUTION_RECORDS_THROUGH_2026-09-03.md",
+      "archiveContentSha256": "d676b43dc311beb0e3d01466b2f69af229e59b227ff66a9efdf9a0df8562c694",
+      "byteCount": 351,
+      "lineCount": 15
+    },
+    {
+      "sourceHeading": "# 31. Audit Rule",
+      "sourceContentSha256": "eeefc0cf137c9316122859ab5566ade955cbff86dba841c6f33852948153bdec",
+      "archivePath": "docs/archive/AGENTS_HISTORICAL_EXECUTION_RECORDS_THROUGH_2026-09-03.md",
+      "archiveContentSha256": "eeefc0cf137c9316122859ab5566ade955cbff86dba841c6f33852948153bdec",
+      "byteCount": 382,
+      "lineCount": 20
+    },
+    {
+      "sourceHeading": "# 32. Test Rule",
+      "sourceContentSha256": "72b5924cb6bc858d1e0fe9120c023cf451084c810d0ca8c41a298a3e77c3a18f",
+      "archivePath": "docs/archive/AGENTS_HISTORICAL_EXECUTION_RECORDS_THROUGH_2026-09-03.md",
+      "archiveContentSha256": "72b5924cb6bc858d1e0fe9120c023cf451084c810d0ca8c41a298a3e77c3a18f",
+      "byteCount": 2830,
+      "lineCount": 77
+    },
+    {
+      "sourceHeading": "# 33. Browser / Live Gate",
+      "sourceContentSha256": "7474b9b9c9d1dfb4e6f09ff7656dc80012ea5970e358a923ac4ec2140cba76e8",
+      "archivePath": "docs/archive/AGENTS_HISTORICAL_EXECUTION_RECORDS_THROUGH_2026-09-03.md",
+      "archiveContentSha256": "7474b9b9c9d1dfb4e6f09ff7656dc80012ea5970e358a923ac4ec2140cba76e8",
+      "byteCount": 1442,
+      "lineCount": 57
+    },
+    {
+      "sourceHeading": "# 34. Runtime Identity Gate",
+      "sourceContentSha256": "a6b135e380bbb4faef1ff3fa8e9db7b176cf2f0d5214901e93e8f9dc7d2c1745",
+      "archivePath": "docs/archive/AGENTS_HISTORICAL_EXECUTION_RECORDS_THROUGH_2026-09-03.md",
+      "archiveContentSha256": "a6b135e380bbb4faef1ff3fa8e9db7b176cf2f0d5214901e93e8f9dc7d2c1745",
+      "byteCount": 419,
+      "lineCount": 22
+    },
+    {
+      "sourceHeading": "# 35. Canonical Workspace Rule",
+      "sourceContentSha256": "c8af51834dbeb6b11f4338262ac76eaa45306938108603b5ab10246b5242600a",
+      "archivePath": "docs/archive/AGENTS_HISTORICAL_EXECUTION_RECORDS_THROUGH_2026-09-03.md",
+      "archiveContentSha256": "c8af51834dbeb6b11f4338262ac76eaa45306938108603b5ab10246b5242600a",
+      "byteCount": 517,
+      "lineCount": 22
+    },
+    {
+      "sourceHeading": "# 36. Git Hard Gate",
+      "sourceContentSha256": "5b6df9f23a404183d64350772a8787f910768952c31af709bbe08f4124eda4d7",
+      "archivePath": "docs/archive/AGENTS_HISTORICAL_EXECUTION_RECORDS_THROUGH_2026-09-03.md",
+      "archiveContentSha256": "5b6df9f23a404183d64350772a8787f910768952c31af709bbe08f4124eda4d7",
+      "byteCount": 1709,
+      "lineCount": 74
+    },
+    {
+      "sourceHeading": "# 37. Secret Policy",
+      "sourceContentSha256": "82fa0f16e2f620fa628d6955433ba54f4b8629dcf606ac9e49310e68fb3cb9a2",
+      "archivePath": "docs/archive/AGENTS_HISTORICAL_EXECUTION_RECORDS_THROUGH_2026-09-03.md",
+      "archiveContentSha256": "82fa0f16e2f620fa628d6955433ba54f4b8629dcf606ac9e49310e68fb3cb9a2",
+      "byteCount": 362,
+      "lineCount": 20
+    },
+    {
+      "sourceHeading": "# 38. Clean Workspace Rule",
+      "sourceContentSha256": "8e9c405ed2b1fbed580e120b66a819ecef19d40019b0c8c1832a197f79346bc4",
+      "archivePath": "docs/archive/AGENTS_HISTORICAL_EXECUTION_RECORDS_THROUGH_2026-09-03.md",
+      "archiveContentSha256": "8e9c405ed2b1fbed580e120b66a819ecef19d40019b0c8c1832a197f79346bc4",
+      "byteCount": 363,
+      "lineCount": 18
+    },
+    {
+      "sourceHeading": "# 39. Current Execution Authority",
+      "sourceContentSha256": "5ba299740be044e16aacd81f4db187b5010336e3c40c547859571be49a897c58",
+      "archivePath": "docs/archive/AGENTS_HISTORICAL_EXECUTION_RECORDS_THROUGH_2026-09-03.md",
+      "archiveContentSha256": "5ba299740be044e16aacd81f4db187b5010336e3c40c547859571be49a897c58",
+      "byteCount": 422,
+      "lineCount": 24
+    },
+    {
+      "sourceHeading": "# 40. Execution Modes",
+      "sourceContentSha256": "2fc7f93d5949229c479bba00a126d6913c4fdf6408b62599567f6b294db5e01b",
+      "archivePath": "docs/archive/AGENTS_HISTORICAL_EXECUTION_RECORDS_THROUGH_2026-09-03.md",
+      "archiveContentSha256": "2fc7f93d5949229c479bba00a126d6913c4fdf6408b62599567f6b294db5e01b",
+      "byteCount": 1012,
+      "lineCount": 47
+    },
+    {
+      "sourceHeading": "# 41. Automatic Transition Hard Gate",
+      "sourceContentSha256": "5b7f23ce977efd36dc4be8ab07347f67af1670b88740428a5223e1e6722cd543",
+      "archivePath": "docs/archive/AGENTS_HISTORICAL_EXECUTION_RECORDS_THROUGH_2026-09-03.md",
+      "archiveContentSha256": "5b7f23ce977efd36dc4be8ab07347f67af1670b88740428a5223e1e6722cd543",
+      "byteCount": 685,
+      "lineCount": 28
+    },
+    {
+      "sourceHeading": "# 42. Automatic Transition Does Not Equal Final Acceptance",
+      "sourceContentSha256": "2d4aedd1c74ca907f89b184738b4dfeedad0ee42a1032548b12f4a4421f69225",
+      "archivePath": "docs/archive/AGENTS_HISTORICAL_EXECUTION_RECORDS_THROUGH_2026-09-03.md",
+      "archiveContentSha256": "2d4aedd1c74ca907f89b184738b4dfeedad0ee42a1032548b12f4a4421f69225",
+      "byteCount": 415,
+      "lineCount": 22
+    },
+    {
+      "sourceHeading": "# 43. Stop Conditions",
+      "sourceContentSha256": "039fc7775741c8c340c5172db02387ced2b10dfaeb1bc7911a56d8aa49542bc5",
+      "archivePath": "docs/archive/AGENTS_HISTORICAL_EXECUTION_RECORDS_THROUGH_2026-09-03.md",
+      "archiveContentSha256": "039fc7775741c8c340c5172db02387ced2b10dfaeb1bc7911a56d8aa49542bc5",
+      "byteCount": 721,
+      "lineCount": 22
+    },
+    {
+      "sourceHeading": "# 44. Milestone Completion Report",
+      "sourceContentSha256": "0849dcb9687f3f49167eba921a4c84b891372a8950aafb5fac27bbc502b8c404",
+      "archivePath": "docs/archive/AGENTS_HISTORICAL_EXECUTION_RECORDS_THROUGH_2026-09-03.md",
+      "archiveContentSha256": "0849dcb9687f3f49167eba921a4c84b891372a8950aafb5fac27bbc502b8c404",
+      "byteCount": 589,
+      "lineCount": 63
+    },
+    {
+      "sourceHeading": "# 45. Final Rule",
+      "sourceContentSha256": "4d73b4a48bcabc9ec2835cc001b69b51c3ce8f451722029cf206baee33f8c242",
+      "archivePath": "docs/archive/AGENTS_HISTORICAL_EXECUTION_RECORDS_THROUGH_2026-09-03.md",
+      "archiveContentSha256": "4d73b4a48bcabc9ec2835cc001b69b51c3ce8f451722029cf206baee33f8c242",
+      "byteCount": 514,
+      "lineCount": 34
+    },
+    {
+      "sourceHeading": "# End of AGENTS.md",
+      "sourceContentSha256": "b4daf166f64a17ae0e1748a6b69fd8a84316634ddc8675c1a63c8ef42b252045",
+      "archivePath": "docs/archive/AGENTS_HISTORICAL_EXECUTION_RECORDS_THROUGH_2026-09-03.md",
+      "archiveContentSha256": "b4daf166f64a17ae0e1748a6b69fd8a84316634ddc8675c1a63c8ef42b252045",
+      "byteCount": 19,
+      "lineCount": 1
+    }
+  ]
+}
