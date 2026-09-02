@@ -142,9 +142,9 @@ Supersession is directional and explicit:
   older historical decision disappeared;
 - versioned evidence remains readable and is never overwritten in place.
 
-The consolidated graph will be published as `DOCUMENT_SUPERSESSION_MAP.md` during
-current-state consolidation. Until then, the registry is the machine-readable source
-for known relationships.
+The consolidated graph is published in
+[`DOCUMENT_SUPERSESSION_MAP.md`](DOCUMENT_SUPERSESSION_MAP.md). The registry remains
+the machine-readable source for known relationships.
 
 ## 8. Pull-request document impact
 

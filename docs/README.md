@@ -76,15 +76,16 @@ deliberately isolated and do not authorize current execution.
 - [`governance/AI_CINEMATIC_STUDIO_DELIVERY_GOVERNANCE_PACKAGE_V1.md`](../governance/AI_CINEMATIC_STUDIO_DELIVERY_GOVERNANCE_PACKAGE_V1.md) — `ACTIVE`
 - [`governance/ARCHITECTURE_CHANGE_PROCESS.md`](../governance/ARCHITECTURE_CHANGE_PROCESS.md) — `ACTIVE`
 - [`governance/ARCHITECTURE_GUARD.md`](../governance/ARCHITECTURE_GUARD.md) — `ACTIVE`
+- [`governance/RISK_REGISTER.md`](../governance/RISK_REGISTER.md) — `ACTIVE`
 
 ## CURRENT_STATUS
 
 - [`CURRENT_MILESTONE.md`](../CURRENT_MILESTONE.md) — `CURRENT`
-- [`governance/RISK_REGISTER.md`](../governance/RISK_REGISTER.md) — `CURRENT`
+- [`docs/status/CROSS_REPOSITORY_BASELINE.md`](status/CROSS_REPOSITORY_BASELINE.md) — `CURRENT`
 
 ## CAPABILITY_MATRIX
 
-_No documents currently classified in this category._
+- [`docs/status/M1-M19-CAPABILITY-STATUS.md`](status/M1-M19-CAPABILITY-STATUS.md) — `CURRENT`
 
 ## OPERATIONAL_RUNBOOK
 
@@ -131,6 +132,7 @@ _No documents currently classified in this category._
 
 ## HISTORICAL_EVIDENCE
 
+- [`CURRENT_MILESTONE_HISTORY_THROUGH_2026-09-02.md`](../CURRENT_MILESTONE_HISTORY_THROUGH_2026-09-02.md) — `HISTORICAL`
 - [`docs/12-release/baseline-asset-acceptance-decision-record.md`](12-release/baseline-asset-acceptance-decision-record.md) — `HISTORICAL`
 - [`docs/12-release/baseline-v0.1.0-candidate-manifest.md`](12-release/baseline-v0.1.0-candidate-manifest.md) — `HISTORICAL`
 - [`docs/12-release/investor-readiness-acceptance-record.md`](12-release/investor-readiness-acceptance-record.md) — `HISTORICAL`
@@ -200,11 +202,12 @@ _No documents currently classified in this category._
 - [`docs/README.md`](README.md) — `REFERENCE`
 - [`docs/governance/DOCUMENT_AUTHORITY_MAP.md`](governance/DOCUMENT_AUTHORITY_MAP.md) — `REFERENCE`
 - [`docs/governance/DOCUMENT_REGISTRY.json`](governance/DOCUMENT_REGISTRY.json) — `REFERENCE`
+- [`docs/governance/DOCUMENT_SUPERSESSION_MAP.md`](governance/DOCUMENT_SUPERSESSION_MAP.md) — `REFERENCE`
 - [`tests/README.md`](../tests/README.md) — `REFERENCE`
 - [`tests/fixtures/v5_fonts/README.md`](../tests/fixtures/v5_fonts/README.md) — `REFERENCE`
 
 ## Inventory boundary
 
-This index contains 155 Core documents reviewed at `a455c8e76427d53d75bb7f15259b9875d9768914` on
+This index contains 159 Core documents reviewed at `a455c8e76427d53d75bb7f15259b9875d9768914` on
 `2026-09-02`. See the registry for owners, supersession edges, mutation policy
 and scope notes.

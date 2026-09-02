@@ -102,6 +102,24 @@
       "notes": "Current claims require merged evidence and may not override Accepted ADRs."
     },
     {
+      "path": "CURRENT_MILESTONE_HISTORY_THROUGH_2026-09-02.md",
+      "repository": "Core",
+      "documentClass": "HISTORICAL_EVIDENCE",
+      "status": "HISTORICAL",
+      "owner": "Documentation Governance Owner",
+      "authoritativeFor": [
+        "immutable historical evidence only"
+      ],
+      "supersedes": [],
+      "supersededBy": [],
+      "currentStateClaimsAllowed": false,
+      "historicalMutationPolicy": "IMMUTABLE_EXCEPT_METADATA_AND_LINK_REPAIR",
+      "lastReviewedBaseline": "a455c8e76427d53d75bb7f15259b9875d9768914",
+      "lastReviewedAt": "2026-09-02",
+      "linkedFromIndex": true,
+      "notes": "Does not grant current execution authority. HISTORICAL_PATH_NOT_EXECUTION_AUTHORITY=true"
+    },
+    {
       "path": "README.md",
       "repository": "Core",
       "documentClass": "GENERATED_REFERENCE",
@@ -1551,6 +1569,60 @@
       "notes": "Navigation/reference only; resolve authority through the linked source documents."
     },
     {
+      "path": "docs/governance/DOCUMENT_SUPERSESSION_MAP.md",
+      "repository": "Core",
+      "documentClass": "GENERATED_REFERENCE",
+      "status": "REFERENCE",
+      "owner": "Architecture Owner / Documentation Governance Owner",
+      "authoritativeFor": [
+        "navigation or machine-readable reference only"
+      ],
+      "supersedes": [],
+      "supersededBy": [],
+      "currentStateClaimsAllowed": false,
+      "historicalMutationPolicy": "REGENERATE_FROM_REVIEWED_INVENTORY",
+      "lastReviewedBaseline": "a455c8e76427d53d75bb7f15259b9875d9768914",
+      "lastReviewedAt": "2026-09-02",
+      "linkedFromIndex": true,
+      "notes": "Navigation/reference only; resolve authority through the linked source documents."
+    },
+    {
+      "path": "docs/status/CROSS_REPOSITORY_BASELINE.md",
+      "repository": "Core",
+      "documentClass": "CURRENT_STATUS",
+      "status": "CURRENT",
+      "owner": "Documentation Governance Owner",
+      "authoritativeFor": [
+        "evidence-backed current status projection"
+      ],
+      "supersedes": [],
+      "supersededBy": [],
+      "currentStateClaimsAllowed": true,
+      "historicalMutationPolicy": "UPDATE_FROM_MERGED_EVIDENCE_ONLY",
+      "lastReviewedBaseline": "a455c8e76427d53d75bb7f15259b9875d9768914",
+      "lastReviewedAt": "2026-09-02",
+      "linkedFromIndex": true,
+      "notes": "Current claims require merged evidence and may not override Accepted ADRs."
+    },
+    {
+      "path": "docs/status/M1-M19-CAPABILITY-STATUS.md",
+      "repository": "Core",
+      "documentClass": "CAPABILITY_MATRIX",
+      "status": "CURRENT",
+      "owner": "Documentation Governance Owner",
+      "authoritativeFor": [
+        "dimensioned current capability status"
+      ],
+      "supersedes": [],
+      "supersededBy": [],
+      "currentStateClaimsAllowed": true,
+      "historicalMutationPolicy": "UPDATE_FROM_MERGED_EVIDENCE_ONLY",
+      "lastReviewedBaseline": "a455c8e76427d53d75bb7f15259b9875d9768914",
+      "lastReviewedAt": "2026-09-02",
+      "linkedFromIndex": true,
+      "notes": "Authority is limited to the document's declared scope and subordinate to Accepted ADRs."
+    },
+    {
       "path": "experiments/ccv-r1/CHARACTER_CONSISTENCY_VALIDATION_REPORT_R1.md",
       "repository": "Core",
       "documentClass": "IMPLEMENTATION_EVIDENCE",
@@ -2712,20 +2784,20 @@
     {
       "path": "governance/RISK_REGISTER.md",
       "repository": "Core",
-      "documentClass": "CURRENT_STATUS",
-      "status": "CURRENT",
+      "documentClass": "NORMATIVE_CONTRACT",
+      "status": "ACTIVE",
       "owner": "Architecture Owner / Documentation Governance Owner",
       "authoritativeFor": [
-        "evidence-backed current status projection"
+        "contract or governance boundary within the document's explicit scope"
       ],
       "supersedes": [],
       "supersededBy": [],
-      "currentStateClaimsAllowed": true,
-      "historicalMutationPolicy": "UPDATE_FROM_MERGED_EVIDENCE_ONLY",
+      "currentStateClaimsAllowed": false,
+      "historicalMutationPolicy": "UPDATE_WITH_AUTHORIZED_CONTRACT_CHANGE",
       "lastReviewedBaseline": "a455c8e76427d53d75bb7f15259b9875d9768914",
       "lastReviewedAt": "2026-09-02",
       "linkedFromIndex": true,
-      "notes": "Current claims require merged evidence and may not override Accepted ADRs."
+      "notes": "Authority is limited to the document's declared scope and subordinate to Accepted ADRs."
     },
     {
       "path": "tests/README.md",

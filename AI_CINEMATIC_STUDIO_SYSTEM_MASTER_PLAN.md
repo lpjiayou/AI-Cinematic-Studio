@@ -2,13 +2,13 @@
 
 > Document: `AI_CINEMATIC_STUDIO_SYSTEM_MASTER_PLAN.md`
 >
-> Status: `SYSTEM MASTER GOVERNANCE BASELINE / M12-M13 ARCHITECTURE CORRECTION ACCEPTED / LIVE PRODUCTION AND PUBLICATION CLOSED`
+> Status: `SYSTEM MASTER GOVERNANCE BASELINE / M13 BASE BACKEND CLOSEOUT ACCEPTED / PRODUCT INCOMPLETE / LIVE PRODUCTION AND PUBLICATION CLOSED`
 >
-> Version: `v1.4`
+> Version: `v1.5`
 >
-> Date: `2026-08-30`
+> Date: `2026-09-02`
 >
-> Revision: `ACS-M12-M13-ARCHITECTURE-CORRECTION-20260830`
+> Revision: `ACS-DOCUMENTATION-GOVERNANCE-STATUS-CONSOLIDATION-20260902`
 >
 > Architecture Decisions: `ADR-0001 / Accepted`; `ADR-0005 — M6 Consumer Boundary / Accepted as architecture only`; `ADR-0006 — V5 Text Generation Capability Boundary / Accepted for bounded G1`; `ADR-0014 — K2-001 archived and K2-002 non-GPU preproduction active / Accepted`; `ADR-0015 — M12 Isolated Audio Runtime and Acyclic Voice-Clone Lineage / Accepted`; `ADR-0016 — M13 Timeline, Render Candidate and Deterministic Post Boundary / Accepted`; `ADR-0017 — Canonical Static Resource Assets and Font License Boundary / Accepted`; `ADR-0018 — Canonical Identity Reference Version Projection and Runtime Currentness Boundary / Accepted`
 >
@@ -2542,7 +2542,7 @@ Status:
 
 Status:
 
-`NOT STARTED`
+`PARTIAL — DOMAIN CONTRACTS AND ISOLATED RUNTIME PROTOCOLS MERGED / RUNTIMES NOT INSTALLED / RUNTIME G0 NOT COMPLETE / C3-C4 NOT STARTED`
 
 完成：
 
@@ -2567,7 +2567,7 @@ Audio 与 Video 并行。普通固定声音 TTS 不得冒充声音克隆。
 
 Status:
 
-`NOT STARTED`
+`BASE BACKEND COMPLETE AND CLOSEOUT ACCEPTED / DETERMINISTIC CPU SLICE VERIFIED / FRONTEND PRODUCT SURFACE INCOMPLETE / EXTENSION G0 NOT AUTHORIZED / NOT PUBLISHABLE`
 
 完成：
 
