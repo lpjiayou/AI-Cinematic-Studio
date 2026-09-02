@@ -24,9 +24,9 @@ and historical evidence cannot authorize current execution.
 
 | Class | Count | Current-state claims allowed |
 | --- | ---: | --- |
-| `ACCEPTED_DECISION` | 18 | no |
+| `ACCEPTED_DECISION` | 19 | no |
 | `NORMATIVE_ARCHITECTURE` | 14 | no |
-| `NORMATIVE_CONTRACT` | 30 | no |
+| `NORMATIVE_CONTRACT` | 31 | no |
 | `CURRENT_STATUS` | 2 | yes |
 | `CAPABILITY_MATRIX` | 1 | yes |
 | `OPERATIONAL_RUNBOOK` | 17 | no |
@@ -59,6 +59,7 @@ and historical evidence cannot authorize current execution.
 | [`governance/ADR-0016-m13-timeline-render-candidate-and-deterministic-post-boundary.md`](../../governance/ADR-0016-m13-timeline-render-candidate-and-deterministic-post-boundary.md) | `ACCEPTED` | Architecture Owner / Documentation Governance Owner |
 | [`governance/ADR-0017-canonical-static-resource-assets-and-font-license-boundary.md`](../../governance/ADR-0017-canonical-static-resource-assets-and-font-license-boundary.md) | `ACCEPTED` | Architecture Owner / Documentation Governance Owner |
 | [`governance/ADR-0018-canonical-identity-reference-version-projection-and-runtime-currentness-boundary.md`](../../governance/ADR-0018-canonical-identity-reference-version-projection-and-runtime-currentness-boundary.md) | `ACCEPTED` | Architecture Owner / Documentation Governance Owner |
+| [`governance/ADR-0019-upstream-execution-method-and-requirement-routing.md`](../../governance/ADR-0019-upstream-execution-method-and-requirement-routing.md) | `ACCEPTED` | Architecture Owner / M3-M12 Domain Owners |
 
 ## NORMATIVE_ARCHITECTURE
 
@@ -90,6 +91,7 @@ and historical evidence cannot authorize current execution.
 | [`architecture/K2_GOLDEN_EPISODE_PRODUCTION_CONTRACT.md`](../../architecture/K2_GOLDEN_EPISODE_PRODUCTION_CONTRACT.md) | `ACTIVE` | Architecture Owner |
 | [`architecture/K2_INTERNAL_IMAGE_FIRST_REAL_MEDIA_REVISION_CONTRACT.md`](../../architecture/K2_INTERNAL_IMAGE_FIRST_REAL_MEDIA_REVISION_CONTRACT.md) | `ACTIVE` | Architecture Owner |
 | [`architecture/K2_INTERNAL_SELF_HOSTED_P1_CONTRACT.md`](../../architecture/K2_INTERNAL_SELF_HOSTED_P1_CONTRACT.md) | `ACTIVE` | Architecture Owner |
+| [`architecture/M3_M11_UPSTREAM_METHOD_CLOSURE_CONTRACT.md`](../../architecture/M3_M11_UPSTREAM_METHOD_CLOSURE_CONTRACT.md) | `ACTIVE` | Architecture Owner / M3-M12 Domain Owners |
 | [`architecture/M6_SERIES_INTELLIGENCE_CONSUMER_CONTRACT.md`](../../architecture/M6_SERIES_INTELLIGENCE_CONSUMER_CONTRACT.md) | `ACTIVE` | Architecture Owner |
 | [`architecture/M6_SERIES_INTELLIGENCE_DOMAIN_CONTRACT.md`](../../architecture/M6_SERIES_INTELLIGENCE_DOMAIN_CONTRACT.md) | `ACTIVE` | Architecture Owner |
 | [`architecture/M6_SERIES_INTELLIGENCE_SQLITE_CONTRACT.md`](../../architecture/M6_SERIES_INTELLIGENCE_SQLITE_CONTRACT.md) | `ACTIVE` | Architecture Owner |

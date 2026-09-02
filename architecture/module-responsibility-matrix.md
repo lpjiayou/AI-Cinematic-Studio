@@ -10,8 +10,8 @@ Accepted ADR、获批任务和明确公开契约后才可加入；目录存在�
 | 责任域 | 位置 | 主要责任 | 可公开的资产 | 不承担的责任 | 当前状态 |
 | --- | --- | --- | --- | --- | --- |
 | Creator Application | `apps/creator_workspace_mvp/` | Creator Server、公开 HTTP/API、Application orchestration 与 composition entry | Public HTTP/API、Application command/query/DTO/error contract | V5 authoritative facts、V4 Provider execution、对 V4/V3/Compute 的直接生产依赖 | 运行中；`R-CORE-ARCH-001` 的直接 V4 依赖偏差已由 G1-R1 纠正并完成 owner acceptance |
-| V5 Core OS | `services/v5_core_os/` | authoritative production facts、公开 capability boundary、版本/血缘及适用治理语义；拥有 ADR-0015 单向声音克隆血缘与 ADR-0016 唯一 Timeline/TimelineVersion 权威及持久化 | V5 public contracts；包括 ADR-0006 Text Generation、ADR-0015 M12 lineage 与 ADR-0016 M13 Timeline/RenderCandidate domain contracts | Provider adapter、V4 execution ownership、V3 render execution、Application presentation/HTTP | 运行中；M12 domain/runtime protocol 与 M13 base backend 已合入，M12 Runtime G0 未完成，M13 产品能力仍不完整 |
-| V4 Platform | `services/v4_platform/` | AI/Provider execution boundary、公开 `TextGenerationPort`、隔离音频运行时的 closed-process execution boundary 与 M13 sealed deterministic-post orchestration | provider-neutral V4 execution contracts、封闭执行请求与结果证据 | V5 Domain Fact、Timeline/RenderCandidate authority、Application workflow、HTTP/UI、ML 包直接导入或运行时内部实现 | 运行中；M12 隔离 runtime protocol 与 M13 base sealed orchestration 已合入；Provider/GPU、M12 runtime install 与 Extension G0 均未授权完成 |
+| V5 Core OS | `services/v5_core_os/` | authoritative production facts、公开 capability boundary、版本/血缘及适用治理语义；拥有 ADR-0015 单向声音克隆血缘、ADR-0016 唯一 Timeline/TimelineVersion 权威，以及 ADR-0019 的 Script/M6、M7–M12 上游方法事实 | V5 public contracts；包括 ADR-0006 Text Generation、ADR-0015 M12 lineage、ADR-0016 M13 Timeline/RenderCandidate 与 ADR-0019 upstream-method contracts | Provider adapter、V4 execution ownership、V3 render execution、Application presentation/HTTP；不得建立第二 Script/M6/Identity/Shot/Asset/Timeline authority | 运行中；ADR-0019 架构已接受但行为实施尚未开始；M12 Runtime G0 未完成，M13 产品能力仍不完整 |
+| V4 Platform | `services/v4_platform/` | AI/Provider execution boundary、公开 `TextGenerationPort`、隔离音频运行时的 closed-process execution boundary、现有 MediaJobCoordinator 与 M13 sealed deterministic-post orchestration | provider-neutral V4 execution contracts、关闭式方法 capability/routing 与结果证据 | V5 Domain Fact、Timeline/RenderCandidate authority、Application workflow、HTTP/UI、ML 包直接导入或运行时内部实现；不得为 Contact/Gait 使用 Wan fallback | 运行中；ADR-0019 只授权后续 fail-closed routing；Contact/Gait runtime、Provider/GPU、M12 runtime install 与 Extension G0 均未完成或未授权 |
 | V3 Render Core | `services/v3_render_core/` | deterministic audiovisual composition/render，以及 M13 CPU/FFmpeg deterministic-post execution | V3 public render contracts、确定性执行结果与 artifact evidence | V5 creative/Timeline facts、RenderCandidate persistence、Application workflow、EpisodeMaster、ExportArtifact 或 publication authority | 运行中；M13 八项 deterministic post、renderer v3 与完整 CPU vertical slice 已验证；不产生 Master/Export/publication authority |
 | 共享能力 | `packages/` | 经验证、稳定且不承载产品工作流的复用能力 | 版本化包接口、类型与工具 | 应用专属流程、服务私有逻辑 | 按获批任务启用 |
 | 平台基础设施 | `infrastructure/` | 构建、部署和运行环境声明 | 环境契约、资源声明、策略 | 业务规则、领域模型 | 基线已建立 |
@@ -33,6 +33,23 @@ ADR-0015 与 ADR-0016 保持同一相邻依赖方向：V5 持有事实与血缘�
 closed/sealed execution request 并编排独立进程，V3 只执行确定性合成与渲染。
 这两份 Accepted ADR 仍是实现边界；上表仅陈述已有合入证据，不把未安装的
 M12 runtime、未实现的 Frontend 产品面或未授权的 M13 Extension 视为已交付。
+
+ADR-0019 在同一分层内冻结以下领域 Owner，不创建新顶层模块或持久化 authority：
+
+| Owner | 拥有 | 明确不拥有 |
+| --- | --- | --- |
+| M3 | ScriptVersion 与不可变 M6ConsumerBinding | M6 baseline、M7 verdict |
+| M6 | SeriesBible、CharacterContinuity、M6BaselineSnapshot | ScriptVersion、Identity authority |
+| M7 | ConsistencyValidationVersion、Finding、staleness、M8 readiness | Script rewrite、human Approval |
+| M8 | StoryboardVersion、CreativeShotVersion、ActionExecutionBeat | provider dispatch、V3 render graph |
+| M9 | Visual/Audio/Postprocess Requirements 与 disposition | Candidate/Admission、media execution |
+| M10 | image/conditioning Asset input planning | 第二 AssetVersion 或 Candidate chain |
+| M11 | video method selection/execution | deterministic post、audio、fallback policy override |
+| M12 | explicit AudioRequirement consumption、audio production 与 AudioCue | 通用 M11 前置条件、legacy sine writes |
+| M13 | Timeline、deterministic post、composition 与 non-publishing render | M11 generative action、Master/Export/publication |
+
+`M6EpisodeBaselineInput` 与 `IdentityReferenceVersionProjection` 是两个独立、只读、
+精确摘要绑定的输入。前者不保存 Identity facts；后者不成为 M6、M3 或 M7 authority。
 
 G1-R1 已关闭原 `apps/` 直接依赖 V4 的架构偏差。历史偏差记录仍保留，但不得
 作为新实现先例。

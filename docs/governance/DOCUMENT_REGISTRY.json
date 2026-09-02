@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "repository": "Core",
-  "reviewedBaseline": "a455c8e76427d53d75bb7f15259b9875d9768914",
+  "reviewedBaseline": "3be1a31962e7af2a21bfcce2d0666cd37193d48b",
   "reviewedAt": "2026-09-02",
   "documentClasses": [
     "ACCEPTED_DECISION",
@@ -265,6 +265,24 @@
       "lastReviewedAt": "2026-09-02",
       "linkedFromIndex": true,
       "notes": "Does not grant current execution authority. HISTORICAL_PATH_NOT_EXECUTION_AUTHORITY=true"
+    },
+    {
+      "path": "architecture/M3_M11_UPSTREAM_METHOD_CLOSURE_CONTRACT.md",
+      "repository": "Core",
+      "documentClass": "NORMATIVE_CONTRACT",
+      "status": "ACTIVE",
+      "owner": "Architecture Owner / M3-M12 Domain Owners",
+      "authoritativeFor": [
+        "M3-M11 upstream execution-method closure and M9-M12 requirement routing contract"
+      ],
+      "supersedes": [],
+      "supersededBy": [],
+      "currentStateClaimsAllowed": false,
+      "historicalMutationPolicy": "UPDATE_WITH_AUTHORIZED_CONTRACT_CHANGE",
+      "lastReviewedBaseline": "3be1a31962e7af2a21bfcce2d0666cd37193d48b",
+      "lastReviewedAt": "2026-09-02",
+      "linkedFromIndex": true,
+      "notes": "Freezes owner, schema, routing, replay, and no-fallback boundaries accepted by ADR-0019."
     },
     {
       "path": "architecture/M6_SERIES_INTELLIGENCE_CONSUMER_CONTRACT.md",
@@ -2494,6 +2512,24 @@
       "lastReviewedAt": "2026-09-02",
       "linkedFromIndex": true,
       "notes": "Authority is limited to the document's declared scope and subordinate to Accepted ADRs."
+    },
+    {
+      "path": "governance/ADR-0019-upstream-execution-method-and-requirement-routing.md",
+      "repository": "Core",
+      "documentClass": "ACCEPTED_DECISION",
+      "status": "ACCEPTED",
+      "owner": "Architecture Owner / M3-M12 Domain Owners",
+      "authoritativeFor": [
+        "upstream execution-method closure and requirement-routing architecture decision"
+      ],
+      "supersedes": [],
+      "supersededBy": [],
+      "currentStateClaimsAllowed": false,
+      "historicalMutationPolicy": "AMEND_OR_SUPERSEDE_BY_ACCEPTED_ADR_ONLY",
+      "lastReviewedBaseline": "3be1a31962e7af2a21bfcce2d0666cd37193d48b",
+      "lastReviewedAt": "2026-09-02",
+      "linkedFromIndex": true,
+      "notes": "Extends compatible accepted boundaries without superseding ADR-0005, ADR-0015, or ADR-0016."
     },
     {
       "path": "governance/ADR_TEMPLATE.md",

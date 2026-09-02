@@ -30,6 +30,7 @@ deliberately isolated and do not authorize current execution.
 - [`governance/ADR-0016-m13-timeline-render-candidate-and-deterministic-post-boundary.md`](../governance/ADR-0016-m13-timeline-render-candidate-and-deterministic-post-boundary.md) — `ACCEPTED`
 - [`governance/ADR-0017-canonical-static-resource-assets-and-font-license-boundary.md`](../governance/ADR-0017-canonical-static-resource-assets-and-font-license-boundary.md) — `ACCEPTED`
 - [`governance/ADR-0018-canonical-identity-reference-version-projection-and-runtime-currentness-boundary.md`](../governance/ADR-0018-canonical-identity-reference-version-projection-and-runtime-currentness-boundary.md) — `ACCEPTED`
+- [`governance/ADR-0019-upstream-execution-method-and-requirement-routing.md`](../governance/ADR-0019-upstream-execution-method-and-requirement-routing.md) — `ACCEPTED`
 
 ## NORMATIVE_ARCHITECTURE
 
@@ -57,6 +58,7 @@ deliberately isolated and do not authorize current execution.
 - [`architecture/K2_GOLDEN_EPISODE_PRODUCTION_CONTRACT.md`](../architecture/K2_GOLDEN_EPISODE_PRODUCTION_CONTRACT.md) — `ACTIVE`
 - [`architecture/K2_INTERNAL_IMAGE_FIRST_REAL_MEDIA_REVISION_CONTRACT.md`](../architecture/K2_INTERNAL_IMAGE_FIRST_REAL_MEDIA_REVISION_CONTRACT.md) — `ACTIVE`
 - [`architecture/K2_INTERNAL_SELF_HOSTED_P1_CONTRACT.md`](../architecture/K2_INTERNAL_SELF_HOSTED_P1_CONTRACT.md) — `ACTIVE`
+- [`architecture/M3_M11_UPSTREAM_METHOD_CLOSURE_CONTRACT.md`](../architecture/M3_M11_UPSTREAM_METHOD_CLOSURE_CONTRACT.md) — `ACTIVE`
 - [`architecture/M6_SERIES_INTELLIGENCE_CONSUMER_CONTRACT.md`](../architecture/M6_SERIES_INTELLIGENCE_CONSUMER_CONTRACT.md) — `ACTIVE`
 - [`architecture/M6_SERIES_INTELLIGENCE_DOMAIN_CONTRACT.md`](../architecture/M6_SERIES_INTELLIGENCE_DOMAIN_CONTRACT.md) — `ACTIVE`
 - [`architecture/M6_SERIES_INTELLIGENCE_SQLITE_CONTRACT.md`](../architecture/M6_SERIES_INTELLIGENCE_SQLITE_CONTRACT.md) — `ACTIVE`
@@ -211,6 +213,6 @@ _No documents currently classified in this category._
 
 ## Inventory boundary
 
-This index contains 162 Core documents reviewed at `a455c8e76427d53d75bb7f15259b9875d9768914` on
+This index contains 164 Core documents reviewed at `3be1a31962e7af2a21bfcce2d0666cd37193d48b` on
 `2026-09-02`. See the registry for owners, supersession edges, mutation policy
 and scope notes.

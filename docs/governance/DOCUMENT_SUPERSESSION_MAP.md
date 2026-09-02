@@ -12,6 +12,10 @@ edges remain in [`DOCUMENT_REGISTRY.json`](DOCUMENT_REGISTRY.json).
   successor's declared scope.
 - `AMENDS_SCOPE` preserves the earlier Accepted ADR and changes only the explicitly
   stated current application.
+- `EXTENDS_SCOPE` preserves the earlier Accepted ADR and adds a compatible,
+  explicitly bounded downstream contract.
+- `REINFORCES_SCOPE` records a later decision that restates an existing boundary
+  without replacing or amending it.
 - `ARCHIVES` preserves evidence and closes it for further current execution.
 - A predecessor remains readable and must never be rewritten to match its successor.
 
@@ -22,8 +26,11 @@ edges remain in [`DOCUMENT_REGISTRY.json`](DOCUMENT_REGISTRY.json).
 | [`ADR-0009`](../../governance/ADR-0009-k2-publishable-media-production.md) | `AMENDS_SCOPE` | [`ADR-0011`](../../governance/ADR-0011-k2-internal-self-hosted-p1.md) | ADR-0011 controls the exact internal self-hosted P1 execution scope. |
 | [`ADR-0009`](../../governance/ADR-0009-k2-publishable-media-production.md) | `ARCHIVES` | [`ADR-0014`](../../governance/ADR-0014-k2-001-archive-k2-002-changan-start.md) | K2-001 is historical; K2-002 begins as a separate non-GPU project scope. |
 | [`ADR-0012`](../../governance/ADR-0012-k2-internal-image-first-real-media-revision.md) | `AMENDS_SCOPE` | [`ADR-0013`](../../governance/ADR-0013-k2-control-plane-convergence.md) | ADR-0013 governs the accepted control-plane convergence corrections. |
+| [`ADR-0005`](../../governance/ADR-0005-m6-series-intelligence-consumer-boundary.md) | `EXTENDS_SCOPE` | [`ADR-0019`](../../governance/ADR-0019-upstream-execution-method-and-requirement-routing.md) | ADR-0019 adds the explicit M3-owned binding and M7 consumer-readiness contract without replacing the existing M6 read boundary. |
+| [`ADR-0015`](../../governance/ADR-0015-m12-isolated-audio-runtime-and-acyclic-voice-clone-lineage.md) | `EXTENDS_SCOPE` | [`ADR-0019`](../../governance/ADR-0019-upstream-execution-method-and-requirement-routing.md) | ADR-0019 adds the M9-to-M12 `AudioRequirement` routing bridge while preserving M12 runtime and lineage isolation. |
+| [`ADR-0016`](../../governance/ADR-0016-m13-timeline-render-candidate-and-deterministic-post-boundary.md) | `REINFORCES_SCOPE` | [`ADR-0019`](../../governance/ADR-0019-upstream-execution-method-and-requirement-routing.md) | ADR-0019 keeps deterministic events and effects in M13 and does not move them into M11 generation planning. |
 
-All six documents remain `ACCEPTED_DECISION`; scope amendment does not delete an
+All referenced ADRs remain `ACCEPTED_DECISION`; a relationship does not delete an
 Accepted ADR or turn it into ordinary historical prose.
 
 ## 3. Total document replacements
