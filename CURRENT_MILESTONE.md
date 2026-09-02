@@ -2,17 +2,17 @@
 
 > Document: `CURRENT_MILESTONE.md`
 >
-> Execution Mode: `AUTO-SEQUENTIAL / CONTRACT-FIRST / FAIL-CLOSED`
+> Execution Mode: `MANUAL / DOCS-ONLY / FAIL-CLOSED`
 >
-> Project Lead Authorization: `ACS-M13-R2-C2-FLAME-SMOKE-RENDERER-V3`
+> Project Lead Authorization: `ACS-M13-BASE-BACKEND-CLOSEOUT-ACCEPTANCE-20260902`
 >
-> Authorized Wave: `M13-R2-C2 CORE CORRECTIVE → FRONTEND PIN → M13-R2 RETRY / SERIAL ONLY`
+> Authorized Wave: `M13 BASE BACKEND CLOSEOUT STATUS → ANNOTATED TAG → STOP`
 >
-> Current Task: `ACS-M13-R2-C2-FLAME-SMOKE-RENDERER-V3`
+> Current Task: `ACS-M13-BASE-BACKEND-CLOSEOUT-ACCEPTANCE-20260902`
 >
-> Current Work Package: `M13-R2 IMPLEMENTED AND VERIFIED / FULL CPU VERTICAL SLICE PASS / BASE CLOSEOUT READY`
+> Current Work Package: `M13 BASE BACKEND CLOSEOUT ACCEPTED / EXTENSION G0 PENDING SEPARATE AUTHORIZATION`
 >
-> Authorized Source Base: `CORE 510323af2050b521c3f34a42bb021dc1f2560c05 / TREE 25f4e573e76d9efc51f49d02d89460aa7947a919 / VERIFIED PRE-CORRECTIVE MAIN`
+> Authorized Source Base: `CORE 783b981b9c0e0ee3e400692fe556b00867b45f41 / TREE e9a118c42ac73f23e4dc2c6114030a387dbdb14c / M13 R2 IMPLEMENTATION AND VERIFICATION BASELINE`
 >
 > M6 Authorization: `ACCEPTED SURFACES / K2-002 MUST CREATE DISTINCT SCOPE AND APPROVALS / NO K2-001 AUTHORITY INHERITANCE`
 >
@@ -20,7 +20,7 @@
 >
 > M12 Authorization: `RUNTIME G0 UNBLOCK AUTHORIZED NON-GPU / TWO ISOLATED RUNTIMES + ACYCLIC VOICE-CLONE LINEAGE / A100 NOT AUTHORIZED`
 >
-> M13 Authorization: `FULL BACKEND CPU-ONLY / R2-C2 FLAME-SMOKE RENDERER V3 CORRECTIVE / NO PROVIDER OR GPU DISPATCH`
+> M13 Authorization: `BASE BACKEND CLOSEOUT ACCEPTED / PRODUCT CAPABILITY INCOMPLETE / EXTENSION G0 NOT AUTHORIZED / NO PROVIDER OR GPU DISPATCH`
 >
 > M14–M15 Authorization: `IMPLEMENTATION NOT AUTHORIZED / EPISODEMASTER AND EXPORTARTIFACT REMAIN M15-EXCLUSIVE`
 >
@@ -30,23 +30,39 @@
 >
 > Historical ADR-0013 Acceptance Baseline: `CORE main 6d28a53f / TREE 369c3b14 / 851 PASS — FRONTEND main 5b36aac0 / TREE fd20b7d7 / 174 PASS + TYPECHECK + LINT + BUILD + TWO CHROMIUM GATES`
 >
-> Production Ready: `NO — M13-R2 VERIFIED / BASE CLOSEOUT READY BUT NOT ACCEPTED / NO PROVIDER, GPU, ADMISSION, PUBLICATION OR LIVE CANONICAL WRITE`
+> Production Ready: `NO — M13 BASE BACKEND CLOSEOUT ACCEPTED / PRODUCT CAPABILITY INCOMPLETE / NO PROVIDER, GPU, ADMISSION, PUBLICATION OR LIVE CANONICAL WRITE`
 
 ---
 
-## 0. 2026-09-01 current authority and transition
+## 0. 2026-09-02 M13 base backend closeout acceptance
 
-The Project Lead, Architecture Owner and M13 Domain Owner authorize
-`ACS-M13-R2-C2-FLAME-SMOKE-RENDERER-V3`. This overlay supersedes the stopped second
-M13-R2 acceptance only for the three named V3/V4/V5 masked-surface production files,
-their direct tests, required E1/E2/E3/E4/R1B/R2 regressions and this status section. It
-retains the accepted `ACS-M12-M13-ARCHITECTURE-CORRECTION-20260830` and
-ADR-0016/0017/0018 boundaries. It does not authorize a second
+The Project Lead, Architecture Owner and M13 Domain Owner formally accept the M13 base
+backend closeout under
+`ACS-M13-BASE-BACKEND-CLOSEOUT-ACCEPTANCE-20260902`. The accepted implementation and
+verification baseline is Core
+`783b981b9c0e0ee3e400692fe556b00867b45f41`, tree
+`e9a118c42ac73f23e4dc2c6114030a387dbdb14c`. The unchanged Frontend behavioral baseline
+is `a0be9edc91437bf0e7c5dd14883e656e750b3aee`, tree
+`c25b9e3744d561c93fed26d0a07e59a1915a6071`. The temporary M13-R2 Flame/Smoke checkpoint
+branch has been deleted. This closeout has `DOC_IMPACT=STATUS` and changes no production code,
+Public API, schema, dependency or Frontend pin.
+
+This acceptance is strictly the M13 base backend closeout. It does not complete the
+Frontend Timeline Studio, Effect Inspector, RenderCandidate Review UI, M14 QC, or M15
+Master/Export, and it does not authorize publication. M13 product capability therefore
+remains incomplete. Extension technical prerequisites are met, but Extension G0 is only
+the next pending separately authorized gate; neither Extension G0 nor Extension
+implementation is authorized by this decision. After the docs-only closeout merge and
+annotated tag, execution stops.
+
+The accepted `ACS-M12-M13-ARCHITECTURE-CORRECTION-20260830` and ADR-0016/0017/0018
+boundaries remain unchanged. This acceptance does not authorize a second
 Timeline/Composition/Render/Asset authority, Provider/GPU use, Asset Admission,
 publication, Master, Export or later milestones.
 
-The second failed M13-R2 full-resolution acceptance is preserved on the temporary
-checkpoint branch and remains a failed historical result. Renderer v2 had corrected
+The second failed M13-R2 full-resolution acceptance remains a failed historical result;
+its temporary remote Flame/Smoke checkpoint branch was deleted after the verified retry merged.
+Renderer v2 had corrected
 the first E1 masked-surface failure, but the next 704×1280, 720-frame, 24-fps retry
 timed out at the unchanged 300-second production boundary when Flame still interpreted
 its full-frame graph across all 720 frames; Smoke retained the same full-duration
@@ -73,8 +89,7 @@ also passed. The full acceptance completed in 3760.287 seconds with peak RSS 253
 KiB, 140,224 Preview bytes and 152,634 Render bytes. The CI micro vertical slice also
 passed in 491.360 seconds with peak RSS 261,996 KiB. Production source, Public API,
 Domain schema, SQLite schema and dependencies are unchanged. M13 backend capability is
-complete and base closeout is ready, but base closeout remains unaccepted pending the
-Project Lead's explicit decision.
+complete, base closeout is ready, and this decision formally accepts that base closeout.
 
 The earlier `ACS-M13-R1-COMPOSITION-RENDER-CANDIDATE` implementation remains immutable
 history. M13-R1A and M13-R1B are implemented as non-publishing deterministic CPU
@@ -141,6 +156,14 @@ RenderManifest. It creates no ExportCandidate, EpisodeMaster or ExportArtifact.
 The current authority state is:
 
 ```text
+DECISION_REF=ACS-M13-BASE-BACKEND-CLOSEOUT-ACCEPTANCE-20260902
+DOC_IMPACT=STATUS
+REMOTE_CHECKPOINT_BRANCH_DELETE=PASS
+CORE_BASELINE=783b981b9c0e0ee3e400692fe556b00867b45f41
+CORE_BASELINE_TREE=e9a118c42ac73f23e4dc2c6114030a387dbdb14c
+FRONTEND_BEHAVIORAL_BASELINE=a0be9edc91437bf0e7c5dd14883e656e750b3aee
+FRONTEND_BEHAVIORAL_TREE=c25b9e3744d561c93fed26d0a07e59a1915a6071
+
 ARCHITECTURE_CHECKPOINT=MERGED
 
 M12_C1=MERGED
@@ -178,7 +201,12 @@ M13_FLAME_SMOKE_FULL_PROFILE_PERFORMANCE=PASS
 M13_R2_RETRY=PASS
 M13_FULL_CPU_VERTICAL_SLICE=PASS
 M13_BASE_CLOSEOUT_READY=true
-M13_BASE_CLOSEOUT_ACCEPTED=false
+M13_BASE_CLOSEOUT_ACCEPTED=true
+M13_PRODUCT_CAPABILITY_COMPLETE=false
+M13_EXTENSION_TECHNICAL_PREREQUISITES_MET=true
+M13_EXTENSION_G0=NEXT_PENDING_SEPARATE_AUTHORIZATION
+M13_EXTENSION_G0_AUTHORIZED=false
+M13_EXTENSION_IMPLEMENTATION_AUTHORIZED=false
 V5_FONT_AUTHORITY_CAPABILITY=IMPLEMENTED
 IDENTITY_REFERENCE_PROJECTION=AVAILABLE
 IDENTITY_REFERENCE_CURRENTNESS_REVALIDATION=AVAILABLE
@@ -195,6 +223,8 @@ M13_EPISODE_MASTER=OUT_OF_SCOPE
 M13_EXPORT_ARTIFACT=OUT_OF_SCOPE
 
 M14_M15_IMPLEMENTATION=NOT_AUTHORIZED
+EPISODE_MASTER_CREATED=0
+EXPORT_ARTIFACT_CREATED=0
 A100_START_AUTHORIZED=false
 GPU_CALLS_ALLOWED=false
 PROVIDER_CALLS_ALLOWED=false
@@ -316,10 +346,11 @@ append and V4 dispatch remain blocked/not integrated. Any future continuation mu
 Public API → V5 → V4 → Compute spine and must not create a K2-002-specific database or
 AssetVersion authority.
 
-Within section 0, the
-`ACS-V5-IDENTITY-REFERENCE-PROJECTION-AND-M13-E3-UNBLOCK` overlay governs current
-execution while retaining the accepted `ACS-M12-M13-ARCHITECTURE-CORRECTION-20260830`
-architecture boundary.
+Within section 0,
+`ACS-M13-BASE-BACKEND-CLOSEOUT-ACCEPTANCE-20260902` governs the current docs-only
+closeout while retaining the accepted `ACS-M12-M13-ARCHITECTURE-CORRECTION-20260830`
+architecture boundary. It authorizes only this status PR and the post-merge annotated
+tag, followed by stop; it does not authorize Extension G0 implementation.
 The retained K2 prose is factual live-production background and grants no input or
 execution authority for this work package. Sections 0A–16 below are dated historical
 snapshots or inherited specifications. Their “current”, “next action”, “pending”,
