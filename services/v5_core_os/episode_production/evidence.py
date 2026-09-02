@@ -28,6 +28,8 @@ ALLOWED_EVIDENCE_RECORD_KINDS = frozenset(
         "Candidate",
         "ConsistencyValidationVersion",
         "ExecutionMethodPlanVersion",
+        "MethodAwareInputPlanVersion",
+        "VideoMethodRouteVersion",
         "TechnicalValidation",
         "SemanticVisualQCDecision",
         "HumanSelectionDecision",

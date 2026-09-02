@@ -62,6 +62,10 @@ class MediaExecutionPort(Protocol):
 class RejectingMediaExecution:
     artifact_root = Path("/")
 
+    def dispatch(self, *args: Any, **kwargs: Any) -> tuple[dict[str, Any], bool]:
+        del args, kwargs
+        raise V4MediaJobError("media worker is not configured")
+
     def execute_batch(self, *args: Any, **kwargs: Any) -> list[dict[str, Any]]:
         del args, kwargs
         raise V4MediaJobError("media worker is not configured")
