@@ -1515,6 +1515,24 @@
       "notes": "Navigation/reference only; resolve authority through the linked source documents."
     },
     {
+      "path": "docs/governance/CI_DOCS_ONLY_FAST_PATH_VALIDATION_2026-09-02.md",
+      "repository": "Core",
+      "documentClass": "NORMATIVE_CONTRACT",
+      "status": "ACTIVE",
+      "owner": "Architecture Owner / Documentation Governance Owner",
+      "authoritativeFor": [
+        "contract or governance boundary within the document's explicit scope"
+      ],
+      "supersedes": [],
+      "supersededBy": [],
+      "currentStateClaimsAllowed": false,
+      "historicalMutationPolicy": "UPDATE_WITH_AUTHORIZED_CONTRACT_CHANGE",
+      "lastReviewedBaseline": "a455c8e76427d53d75bb7f15259b9875d9768914",
+      "lastReviewedAt": "2026-09-02",
+      "linkedFromIndex": true,
+      "notes": "Authority is limited to the document's declared scope and subordinate to Accepted ADRs."
+    },
+    {
       "path": "docs/governance/CI_REQUIRED_CHECK_FAST_PATH_POLICY.md",
       "repository": "Core",
       "documentClass": "NORMATIVE_CONTRACT",

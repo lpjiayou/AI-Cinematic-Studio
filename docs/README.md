@@ -73,6 +73,7 @@ deliberately isolated and do not authorize current execution.
 - [`docs/04-interface-contract/v5-v4-contract.md`](04-interface-contract/v5-v4-contract.md) — `ACTIVE`
 - [`docs/14-application-design/application-command-contract.md`](14-application-design/application-command-contract.md) — `ACTIVE`
 - [`docs/14-application-design/internal-content-lab-ui-scope.md`](14-application-design/internal-content-lab-ui-scope.md) — `ACTIVE`
+- [`docs/governance/CI_DOCS_ONLY_FAST_PATH_VALIDATION_2026-09-02.md`](governance/CI_DOCS_ONLY_FAST_PATH_VALIDATION_2026-09-02.md) — `ACTIVE`
 - [`docs/governance/CI_REQUIRED_CHECK_FAST_PATH_POLICY.md`](governance/CI_REQUIRED_CHECK_FAST_PATH_POLICY.md) — `ACTIVE`
 - [`docs/governance/DOCUMENTATION_GOVERNANCE_POLICY.md`](governance/DOCUMENTATION_GOVERNANCE_POLICY.md) — `ACTIVE`
 - [`governance/AI_CINEMATIC_STUDIO_DELIVERY_GOVERNANCE_PACKAGE_V1.md`](../governance/AI_CINEMATIC_STUDIO_DELIVERY_GOVERNANCE_PACKAGE_V1.md) — `ACTIVE`
@@ -210,6 +211,6 @@ _No documents currently classified in this category._
 
 ## Inventory boundary
 
-This index contains 161 Core documents reviewed at `a455c8e76427d53d75bb7f15259b9875d9768914` on
+This index contains 162 Core documents reviewed at `a455c8e76427d53d75bb7f15259b9875d9768914` on
 `2026-09-02`. See the registry for owners, supersession edges, mutation policy
 and scope notes.
