@@ -1,0 +1,146 @@
+{
+  "workspaceRef": "workspace-generic-upstream",
+  "contentProfileRef": "content-profile-generic-upstream",
+  "projectRef": "project-generic-upstream",
+  "seriesRef": "series-generic-upstream",
+  "episodeRef": "episode-generic-upstream",
+  "series": {
+    "title": "Signal Garden",
+    "description": "A generic single-episode technical production fixture"
+  },
+  "project": {
+    "title": "Signal Garden Production",
+    "description": "Method-aware upstream closure without project-specific branches"
+  },
+  "episode": {
+    "title": "The Quiet Relay"
+  },
+  "scriptContent": {
+    "title": "The Quiet Relay",
+    "logline": "Two field engineers preserve a failing beacon through deliberate, traceable actions.",
+    "synopsis": "Ari and Mina stabilize an isolated relay, cross a marked service lane, and record its recovery.",
+    "targetDurationSec": 30,
+    "scenes": [
+      {
+        "sceneNumber": 1,
+        "heading": "Relay Garden - Control Deck",
+        "location": "Relay Garden",
+        "timeOfDay": "Dawn",
+        "characters": ["Ari Vale", "Mina Sol"],
+        "action": "Ari steadies the relay housing while Mina seats the final connector and the status glyph illuminates.",
+        "dialogue": [
+          {
+            "speaker": "Mina Sol",
+            "text": "The relay is stable; hold this position.",
+            "emotion": "focused"
+          }
+        ],
+        "narration": ["The garden answers with a low electrical hum."],
+        "subtitleText": ["Relay stable"],
+        "estimatedDurationSec": 15,
+        "scenePurpose": "Establish the repair and its deterministic visual confirmation.",
+        "continuityNotes": ["The amber connector remains seated."],
+        "productionNotes": ["Neutral daylight and a fixed control deck."]
+      },
+      {
+        "sceneNumber": 2,
+        "heading": "Relay Garden - Service Lane",
+        "location": "Relay Garden",
+        "timeOfDay": "Dawn",
+        "characters": ["Ari Vale", "Mina Sol"],
+        "action": "Ari walks the marked lane while Mina observes the steady beacon from the control deck.",
+        "dialogue": [],
+        "narration": [],
+        "subtitleText": ["System steady"],
+        "estimatedDurationSec": 15,
+        "scenePurpose": "Confirm stable operation after the repair.",
+        "continuityNotes": ["The lane markers and beacon state remain unchanged."],
+        "productionNotes": ["Use a locked wide composition."]
+      }
+    ]
+  },
+  "seriesBibleContent": {
+    "worldRules": [
+      {
+        "worldRuleRef": "world-rule-relay-evidence",
+        "statement": "A relay state is trusted only when its recorded indicator is stable."
+      }
+    ],
+    "glossaryTerms": [
+      {
+        "glossaryTermRef": "term-relay-glyph",
+        "term": "status glyph",
+        "definition": "A deterministic indicator rendered from relay telemetry."
+      }
+    ],
+    "locations": [
+      {
+        "locationRef": "location-relay-garden",
+        "name": "Relay Garden"
+      }
+    ],
+    "factions": [
+      {
+        "factionRef": "faction-field-engineers",
+        "name": "Field Engineers"
+      }
+    ],
+    "props": [
+      {
+        "propRef": "prop-relay-connector",
+        "name": "Amber Connector"
+      }
+    ],
+    "timelineEvents": [
+      {
+        "timelineEventRef": "event-relay-recovery",
+        "summary": "The relay returns to a stable state.",
+        "locationRef": "location-relay-garden",
+        "factionRefs": ["faction-field-engineers"],
+        "propRefs": ["prop-relay-connector"]
+      }
+    ],
+    "visualConstraints": [
+      {
+        "visualConstraintRef": "visual-relay-amber",
+        "rule": "The active status glyph is amber and spatially fixed."
+      }
+    ],
+    "prohibitedNarrativePatterns": [
+      {
+        "prohibitedNarrativePatternRef": "ban-unrecorded-recovery",
+        "rule": "A recovered relay must retain a traceable indicator record."
+      }
+    ]
+  },
+  "characters": [
+    {
+      "characterRef": "character-ari",
+      "name": "Ari Vale",
+      "background": "A field engineer responsible for relay mechanics.",
+      "motivation": "Restore the relay without losing evidence.",
+      "belief": "A repair is complete only when it can be verified.",
+      "conflict": "The relay housing is unstable during the repair.",
+      "goal": "Hold the housing and verify the recovered state.",
+      "personality": "Methodical and calm.",
+      "behaviorRules": ["Secure equipment before moving."],
+      "dialogueRules": ["Use concise operational language."],
+      "forbiddenBehavior": ["Do not claim an unverified repair."],
+      "visualIdentityRules": ["Blue field jacket and silver tool band."]
+    },
+    {
+      "characterRef": "character-mina",
+      "name": "Mina Sol",
+      "background": "A systems engineer responsible for relay telemetry.",
+      "motivation": "Preserve a trustworthy recovery record.",
+      "belief": "Telemetry and observation must agree.",
+      "conflict": "The final connector must be seated while the housing moves.",
+      "goal": "Seat the connector and confirm the status glyph.",
+      "personality": "Focused and precise.",
+      "behaviorRules": ["Confirm the indicator before releasing the housing."],
+      "dialogueRules": ["State observable facts."],
+      "forbiddenBehavior": ["Do not bypass the telemetry record."],
+      "visualIdentityRules": ["Gray field jacket and amber wrist display."]
+    }
+  ]
+}
