@@ -1,0 +1,2839 @@
+{
+  "schemaVersion": 1,
+  "repository": "Core",
+  "reviewedBaseline": "a455c8e76427d53d75bb7f15259b9875d9768914",
+  "reviewedAt": "2026-09-02",
+  "documentClasses": [
+    "ACCEPTED_DECISION",
+    "NORMATIVE_ARCHITECTURE",
+    "NORMATIVE_CONTRACT",
+    "CURRENT_STATUS",
+    "CAPABILITY_MATRIX",
+    "OPERATIONAL_RUNBOOK",
+    "IMPLEMENTATION_EVIDENCE",
+    "HISTORICAL_EVIDENCE",
+    "SUPERSEDED",
+    "DRAFT",
+    "DEPRECATED",
+    "GENERATED_REFERENCE"
+  ],
+  "inventoryRules": {
+    "included": [
+      "tracked Markdown, MDX and RST",
+      "documentary TXT",
+      "repository guidance and templates",
+      "documentary JSON manifests"
+    ],
+    "excluded": [
+      "dependencies, build output, caches, generated media, binaries, models and test output"
+    ]
+  },
+  "documents": [
+    {
+      "path": "AGENTS.md",
+      "repository": "Core",
+      "documentClass": "NORMATIVE_CONTRACT",
+      "status": "ACTIVE",
+      "owner": "Documentation Governance Owner",
+      "authoritativeFor": [
+        "contract or governance boundary within the document's explicit scope"
+      ],
+      "supersedes": [],
+      "supersededBy": [],
+      "currentStateClaimsAllowed": false,
+      "historicalMutationPolicy": "UPDATE_WITH_AUTHORIZED_CONTRACT_CHANGE",
+      "lastReviewedBaseline": "a455c8e76427d53d75bb7f15259b9875d9768914",
+      "lastReviewedAt": "2026-09-02",
+      "linkedFromIndex": true,
+      "notes": "Authority is limited to the document's declared scope and subordinate to Accepted ADRs."
+    },
+    {
+      "path": "AI_CINEMATIC_STUDIO_SYSTEM_MASTER_PLAN.md",
+      "repository": "Core",
+      "documentClass": "NORMATIVE_ARCHITECTURE",
+      "status": "ACTIVE",
+      "owner": "Architecture Owner",
+      "authoritativeFor": [
+        "architecture description subordinate to Accepted ADRs"
+      ],
+      "supersedes": [],
+      "supersededBy": [],
+      "currentStateClaimsAllowed": false,
+      "historicalMutationPolicy": "UPDATE_WITH_AUTHORIZED_ARCHITECTURE_CHANGE",
+      "lastReviewedBaseline": "a455c8e76427d53d75bb7f15259b9875d9768914",
+      "lastReviewedAt": "2026-09-02",
+      "linkedFromIndex": true,
+      "notes": "Authority is limited to the document's declared scope and subordinate to Accepted ADRs."
+    },
+    {
+      "path": "AI_CINEMATIC_STUDIO_UI_MASTER_PLAN.md",
+      "repository": "Core",
+      "documentClass": "NORMATIVE_ARCHITECTURE",
+      "status": "ACTIVE",
+      "owner": "Architecture Owner",
+      "authoritativeFor": [
+        "architecture description subordinate to Accepted ADRs"
+      ],
+      "supersedes": [],
+      "supersededBy": [],
+      "currentStateClaimsAllowed": false,
+      "historicalMutationPolicy": "UPDATE_WITH_AUTHORIZED_ARCHITECTURE_CHANGE",
+      "lastReviewedBaseline": "a455c8e76427d53d75bb7f15259b9875d9768914",
+      "lastReviewedAt": "2026-09-02",
+      "linkedFromIndex": true,
+      "notes": "Authority is limited to the document's declared scope and subordinate to Accepted ADRs."
+    },
+    {
+      "path": "CURRENT_MILESTONE.md",
+      "repository": "Core",
+      "documentClass": "CURRENT_STATUS",
+      "status": "CURRENT",
+      "owner": "Project Lead / Documentation Governance Owner",
+      "authoritativeFor": [
+        "evidence-backed current status projection"
+      ],
+      "supersedes": [],
+      "supersededBy": [],
+      "currentStateClaimsAllowed": true,
+      "historicalMutationPolicy": "UPDATE_FROM_MERGED_EVIDENCE_ONLY",
+      "lastReviewedBaseline": "a455c8e76427d53d75bb7f15259b9875d9768914",
+      "lastReviewedAt": "2026-09-02",
+      "linkedFromIndex": true,
+      "notes": "Current claims require merged evidence and may not override Accepted ADRs."
+    },
+    {
+      "path": "README.md",
+      "repository": "Core",
+      "documentClass": "GENERATED_REFERENCE",
+      "status": "REFERENCE",
+      "owner": "Project Lead / Documentation Governance Owner",
+      "authoritativeFor": [
+        "navigation or machine-readable reference only"
+      ],
+      "supersedes": [],
+      "supersededBy": [],
+      "currentStateClaimsAllowed": false,
+      "historicalMutationPolicy": "REGENERATE_FROM_REVIEWED_INVENTORY",
+      "lastReviewedBaseline": "a455c8e76427d53d75bb7f15259b9875d9768914",
+      "lastReviewedAt": "2026-09-02",
+      "linkedFromIndex": true,
+      "notes": "Navigation/reference only; resolve authority through the linked source documents."
+    },
+    {
+      "path": "architecture/CREATOR_PUBLIC_API_AUTHENTICATION_AND_WORKSPACE_ISOLATION_CONTRACT.md",
+      "repository": "Core",
+      "documentClass": "NORMATIVE_CONTRACT",
+      "status": "ACTIVE",
+      "owner": "Architecture Owner",
+      "authoritativeFor": [
+        "contract or governance boundary within the document's explicit scope"
+      ],
+      "supersedes": [],
+      "supersededBy": [],
+      "currentStateClaimsAllowed": false,
+      "historicalMutationPolicy": "UPDATE_WITH_AUTHORIZED_CONTRACT_CHANGE",
+      "lastReviewedBaseline": "a455c8e76427d53d75bb7f15259b9875d9768914",
+      "lastReviewedAt": "2026-09-02",
+      "linkedFromIndex": true,
+      "notes": "Authority is limited to the document's declared scope and subordinate to Accepted ADRs."
+    },
+    {
+      "path": "architecture/K2_CANONICAL_LINEAGE_BOOTSTRAP_CONTRACT.md",
+      "repository": "Core",
+      "documentClass": "NORMATIVE_CONTRACT",
+      "status": "ACTIVE",
+      "owner": "Architecture Owner",
+      "authoritativeFor": [
+        "contract or governance boundary within the document's explicit scope"
+      ],
+      "supersedes": [],
+      "supersededBy": [],
+      "currentStateClaimsAllowed": false,
+      "historicalMutationPolicy": "UPDATE_WITH_AUTHORIZED_CONTRACT_CHANGE",
+      "lastReviewedBaseline": "a455c8e76427d53d75bb7f15259b9875d9768914",
+      "lastReviewedAt": "2026-09-02",
+      "linkedFromIndex": true,
+      "notes": "Authority is limited to the document's declared scope and subordinate to Accepted ADRs."
+    },
+    {
+      "path": "architecture/K2_GOLDEN_EPISODE_PRODUCTION_CONTRACT.md",
+      "repository": "Core",
+      "documentClass": "NORMATIVE_CONTRACT",
+      "status": "ACTIVE",
+      "owner": "Architecture Owner",
+      "authoritativeFor": [
+        "contract or governance boundary within the document's explicit scope"
+      ],
+      "supersedes": [],
+      "supersededBy": [],
+      "currentStateClaimsAllowed": false,
+      "historicalMutationPolicy": "UPDATE_WITH_AUTHORIZED_CONTRACT_CHANGE",
+      "lastReviewedBaseline": "a455c8e76427d53d75bb7f15259b9875d9768914",
+      "lastReviewedAt": "2026-09-02",
+      "linkedFromIndex": true,
+      "notes": "Authority is limited to the document's declared scope and subordinate to Accepted ADRs."
+    },
+    {
+      "path": "architecture/K2_INTERNAL_IMAGE_FIRST_REAL_MEDIA_REVISION_CONTRACT.md",
+      "repository": "Core",
+      "documentClass": "NORMATIVE_CONTRACT",
+      "status": "ACTIVE",
+      "owner": "Architecture Owner",
+      "authoritativeFor": [
+        "contract or governance boundary within the document's explicit scope"
+      ],
+      "supersedes": [],
+      "supersededBy": [],
+      "currentStateClaimsAllowed": false,
+      "historicalMutationPolicy": "UPDATE_WITH_AUTHORIZED_CONTRACT_CHANGE",
+      "lastReviewedBaseline": "a455c8e76427d53d75bb7f15259b9875d9768914",
+      "lastReviewedAt": "2026-09-02",
+      "linkedFromIndex": true,
+      "notes": "Authority is limited to the document's declared scope and subordinate to Accepted ADRs."
+    },
+    {
+      "path": "architecture/K2_INTERNAL_SELF_HOSTED_P1_CONTRACT.md",
+      "repository": "Core",
+      "documentClass": "NORMATIVE_CONTRACT",
+      "status": "ACTIVE",
+      "owner": "Architecture Owner",
+      "authoritativeFor": [
+        "contract or governance boundary within the document's explicit scope"
+      ],
+      "supersedes": [
+        "architecture/K2_PUBLISHABLE_MEDIA_PRODUCTION_CONTRACT.md"
+      ],
+      "supersededBy": [],
+      "currentStateClaimsAllowed": false,
+      "historicalMutationPolicy": "UPDATE_WITH_AUTHORIZED_CONTRACT_CHANGE",
+      "lastReviewedBaseline": "a455c8e76427d53d75bb7f15259b9875d9768914",
+      "lastReviewedAt": "2026-09-02",
+      "linkedFromIndex": true,
+      "notes": "Authority is limited to the document's declared scope and subordinate to Accepted ADRs."
+    },
+    {
+      "path": "architecture/K2_PUBLISHABLE_MEDIA_PRODUCTION_CONTRACT.md",
+      "repository": "Core",
+      "documentClass": "SUPERSEDED",
+      "status": "SUPERSEDED",
+      "owner": "Architecture Owner",
+      "authoritativeFor": [],
+      "supersedes": [],
+      "supersededBy": [
+        "architecture/K2_INTERNAL_SELF_HOSTED_P1_CONTRACT.md",
+        "governance/ADR-0014-k2-001-archive-k2-002-changan-start.md"
+      ],
+      "currentStateClaimsAllowed": false,
+      "historicalMutationPolicy": "IMMUTABLE_EXCEPT_METADATA_AND_LINK_REPAIR",
+      "lastReviewedBaseline": "a455c8e76427d53d75bb7f15259b9875d9768914",
+      "lastReviewedAt": "2026-09-02",
+      "linkedFromIndex": true,
+      "notes": "Does not grant current execution authority. HISTORICAL_PATH_NOT_EXECUTION_AUTHORITY=true"
+    },
+    {
+      "path": "architecture/M6_SERIES_INTELLIGENCE_CONSUMER_CONTRACT.md",
+      "repository": "Core",
+      "documentClass": "NORMATIVE_CONTRACT",
+      "status": "ACTIVE",
+      "owner": "Architecture Owner",
+      "authoritativeFor": [
+        "contract or governance boundary within the document's explicit scope"
+      ],
+      "supersedes": [],
+      "supersededBy": [],
+      "currentStateClaimsAllowed": false,
+      "historicalMutationPolicy": "UPDATE_WITH_AUTHORIZED_CONTRACT_CHANGE",
+      "lastReviewedBaseline": "a455c8e76427d53d75bb7f15259b9875d9768914",
+      "lastReviewedAt": "2026-09-02",
+      "linkedFromIndex": true,
+      "notes": "Authority is limited to the document's declared scope and subordinate to Accepted ADRs."
+    },
+    {
+      "path": "architecture/M6_SERIES_INTELLIGENCE_DOMAIN_CONTRACT.md",
+      "repository": "Core",
+      "documentClass": "NORMATIVE_CONTRACT",
+      "status": "ACTIVE",
+      "owner": "Architecture Owner",
+      "authoritativeFor": [
+        "contract or governance boundary within the document's explicit scope"
+      ],
+      "supersedes": [],
+      "supersededBy": [],
+      "currentStateClaimsAllowed": false,
+      "historicalMutationPolicy": "UPDATE_WITH_AUTHORIZED_CONTRACT_CHANGE",
+      "lastReviewedBaseline": "a455c8e76427d53d75bb7f15259b9875d9768914",
+      "lastReviewedAt": "2026-09-02",
+      "linkedFromIndex": true,
+      "notes": "Authority is limited to the document's declared scope and subordinate to Accepted ADRs."
+    },
+    {
+      "path": "architecture/M6_SERIES_INTELLIGENCE_SQLITE_CONTRACT.md",
+      "repository": "Core",
+      "documentClass": "NORMATIVE_CONTRACT",
+      "status": "ACTIVE",
+      "owner": "Architecture Owner",
+      "authoritativeFor": [
+        "contract or governance boundary within the document's explicit scope"
+      ],
+      "supersedes": [],
+      "supersededBy": [],
+      "currentStateClaimsAllowed": false,
+      "historicalMutationPolicy": "UPDATE_WITH_AUTHORIZED_CONTRACT_CHANGE",
+      "lastReviewedBaseline": "a455c8e76427d53d75bb7f15259b9875d9768914",
+      "lastReviewedAt": "2026-09-02",
+      "linkedFromIndex": true,
+      "notes": "Authority is limited to the document's declared scope and subordinate to Accepted ADRs."
+    },
+    {
+      "path": "architecture/V5_TEXT_GENERATION_CAPABILITY_CONTRACT.md",
+      "repository": "Core",
+      "documentClass": "NORMATIVE_CONTRACT",
+      "status": "ACTIVE",
+      "owner": "Architecture Owner",
+      "authoritativeFor": [
+        "contract or governance boundary within the document's explicit scope"
+      ],
+      "supersedes": [],
+      "supersededBy": [],
+      "currentStateClaimsAllowed": false,
+      "historicalMutationPolicy": "UPDATE_WITH_AUTHORIZED_CONTRACT_CHANGE",
+      "lastReviewedBaseline": "a455c8e76427d53d75bb7f15259b9875d9768914",
+      "lastReviewedAt": "2026-09-02",
+      "linkedFromIndex": true,
+      "notes": "Authority is limited to the document's declared scope and subordinate to Accepted ADRs."
+    },
+    {
+      "path": "architecture/dependency-map.md",
+      "repository": "Core",
+      "documentClass": "NORMATIVE_ARCHITECTURE",
+      "status": "ACTIVE",
+      "owner": "Architecture Owner",
+      "authoritativeFor": [
+        "architecture description subordinate to Accepted ADRs"
+      ],
+      "supersedes": [],
+      "supersededBy": [],
+      "currentStateClaimsAllowed": false,
+      "historicalMutationPolicy": "UPDATE_WITH_AUTHORIZED_ARCHITECTURE_CHANGE",
+      "lastReviewedBaseline": "a455c8e76427d53d75bb7f15259b9875d9768914",
+      "lastReviewedAt": "2026-09-02",
+      "linkedFromIndex": true,
+      "notes": "Authority is limited to the document's declared scope and subordinate to Accepted ADRs."
+    },
+    {
+      "path": "architecture/dependency-rules.md",
+      "repository": "Core",
+      "documentClass": "NORMATIVE_ARCHITECTURE",
+      "status": "ACTIVE",
+      "owner": "Architecture Owner",
+      "authoritativeFor": [
+        "architecture description subordinate to Accepted ADRs"
+      ],
+      "supersedes": [],
+      "supersededBy": [],
+      "currentStateClaimsAllowed": false,
+      "historicalMutationPolicy": "UPDATE_WITH_AUTHORIZED_ARCHITECTURE_CHANGE",
+      "lastReviewedBaseline": "a455c8e76427d53d75bb7f15259b9875d9768914",
+      "lastReviewedAt": "2026-09-02",
+      "linkedFromIndex": true,
+      "notes": "Authority is limited to the document's declared scope and subordinate to Accepted ADRs."
+    },
+    {
+      "path": "architecture/layer-boundaries.md",
+      "repository": "Core",
+      "documentClass": "NORMATIVE_ARCHITECTURE",
+      "status": "ACTIVE",
+      "owner": "Architecture Owner",
+      "authoritativeFor": [
+        "architecture description subordinate to Accepted ADRs"
+      ],
+      "supersedes": [],
+      "supersededBy": [],
+      "currentStateClaimsAllowed": false,
+      "historicalMutationPolicy": "UPDATE_WITH_AUTHORIZED_ARCHITECTURE_CHANGE",
+      "lastReviewedBaseline": "a455c8e76427d53d75bb7f15259b9875d9768914",
+      "lastReviewedAt": "2026-09-02",
+      "linkedFromIndex": true,
+      "notes": "Authority is limited to the document's declared scope and subordinate to Accepted ADRs."
+    },
+    {
+      "path": "architecture/module-responsibility-matrix.md",
+      "repository": "Core",
+      "documentClass": "NORMATIVE_ARCHITECTURE",
+      "status": "ACTIVE",
+      "owner": "Architecture Owner",
+      "authoritativeFor": [
+        "architecture description subordinate to Accepted ADRs"
+      ],
+      "supersedes": [],
+      "supersededBy": [],
+      "currentStateClaimsAllowed": false,
+      "historicalMutationPolicy": "UPDATE_WITH_AUTHORIZED_ARCHITECTURE_CHANGE",
+      "lastReviewedBaseline": "a455c8e76427d53d75bb7f15259b9875d9768914",
+      "lastReviewedAt": "2026-09-02",
+      "linkedFromIndex": true,
+      "notes": "Authority is limited to the document's declared scope and subordinate to Accepted ADRs."
+    },
+    {
+      "path": "architecture/system-context.md",
+      "repository": "Core",
+      "documentClass": "NORMATIVE_ARCHITECTURE",
+      "status": "ACTIVE",
+      "owner": "Architecture Owner",
+      "authoritativeFor": [
+        "architecture description subordinate to Accepted ADRs"
+      ],
+      "supersedes": [],
+      "supersededBy": [],
+      "currentStateClaimsAllowed": false,
+      "historicalMutationPolicy": "UPDATE_WITH_AUTHORIZED_ARCHITECTURE_CHANGE",
+      "lastReviewedBaseline": "a455c8e76427d53d75bb7f15259b9875d9768914",
+      "lastReviewedAt": "2026-09-02",
+      "linkedFromIndex": true,
+      "notes": "Authority is limited to the document's declared scope and subordinate to Accepted ADRs."
+    },
+    {
+      "path": "architecture/system-overview.md",
+      "repository": "Core",
+      "documentClass": "NORMATIVE_ARCHITECTURE",
+      "status": "ACTIVE",
+      "owner": "Architecture Owner",
+      "authoritativeFor": [
+        "architecture description subordinate to Accepted ADRs"
+      ],
+      "supersedes": [],
+      "supersededBy": [],
+      "currentStateClaimsAllowed": false,
+      "historicalMutationPolicy": "UPDATE_WITH_AUTHORIZED_ARCHITECTURE_CHANGE",
+      "lastReviewedBaseline": "a455c8e76427d53d75bb7f15259b9875d9768914",
+      "lastReviewedAt": "2026-09-02",
+      "linkedFromIndex": true,
+      "notes": "Authority is limited to the document's declared scope and subordinate to Accepted ADRs."
+    },
+    {
+      "path": "architecture/technology-stack-decision.md",
+      "repository": "Core",
+      "documentClass": "DRAFT",
+      "status": "DRAFT",
+      "owner": "Architecture Owner",
+      "authoritativeFor": [],
+      "supersedes": [],
+      "supersededBy": [],
+      "currentStateClaimsAllowed": false,
+      "historicalMutationPolicy": "EDITABLE_UNTIL_ACCEPTED_OR_WITHDRAWN",
+      "lastReviewedBaseline": "a455c8e76427d53d75bb7f15259b9875d9768914",
+      "lastReviewedAt": "2026-09-02",
+      "linkedFromIndex": true,
+      "notes": "Non-authoritative until separately accepted."
+    },
+    {
+      "path": "design-qa.md",
+      "repository": "Core",
+      "documentClass": "IMPLEMENTATION_EVIDENCE",
+      "status": "RECORDED",
+      "owner": "Documentation Governance Owner",
+      "authoritativeFor": [
+        "bounded implementation or verification evidence only"
+      ],
+      "supersedes": [],
+      "supersededBy": [],
+      "currentStateClaimsAllowed": false,
+      "historicalMutationPolicy": "IMMUTABLE_EXCEPT_METADATA_AND_LINK_REPAIR",
+      "lastReviewedBaseline": "a455c8e76427d53d75bb7f15259b9875d9768914",
+      "lastReviewedAt": "2026-09-02",
+      "linkedFromIndex": true,
+      "notes": "Does not grant current execution authority. HISTORICAL_PATH_NOT_EXECUTION_AUTHORITY=true"
+    },
+    {
+      "path": "docs/03-data-design/README.md",
+      "repository": "Core",
+      "documentClass": "GENERATED_REFERENCE",
+      "status": "REFERENCE",
+      "owner": "Data Architecture Owner",
+      "authoritativeFor": [
+        "navigation or machine-readable reference only"
+      ],
+      "supersedes": [],
+      "supersededBy": [],
+      "currentStateClaimsAllowed": false,
+      "historicalMutationPolicy": "REGENERATE_FROM_REVIEWED_INVENTORY",
+      "lastReviewedBaseline": "a455c8e76427d53d75bb7f15259b9875d9768914",
+      "lastReviewedAt": "2026-09-02",
+      "linkedFromIndex": true,
+      "notes": "Navigation/reference only; resolve authority through the linked source documents."
+    },
+    {
+      "path": "docs/03-data-design/asset-lifecycle.md",
+      "repository": "Core",
+      "documentClass": "NORMATIVE_CONTRACT",
+      "status": "ACTIVE",
+      "owner": "Data Architecture Owner",
+      "authoritativeFor": [
+        "contract or governance boundary within the document's explicit scope"
+      ],
+      "supersedes": [],
+      "supersededBy": [],
+      "currentStateClaimsAllowed": false,
+      "historicalMutationPolicy": "UPDATE_WITH_AUTHORIZED_CONTRACT_CHANGE",
+      "lastReviewedBaseline": "a455c8e76427d53d75bb7f15259b9875d9768914",
+      "lastReviewedAt": "2026-09-02",
+      "linkedFromIndex": true,
+      "notes": "Authority is limited to the document's declared scope and subordinate to Accepted ADRs."
+    },
+    {
+      "path": "docs/03-data-design/data-consistency-rules.md",
+      "repository": "Core",
+      "documentClass": "NORMATIVE_CONTRACT",
+      "status": "ACTIVE",
+      "owner": "Data Architecture Owner",
+      "authoritativeFor": [
+        "contract or governance boundary within the document's explicit scope"
+      ],
+      "supersedes": [],
+      "supersededBy": [],
+      "currentStateClaimsAllowed": false,
+      "historicalMutationPolicy": "UPDATE_WITH_AUTHORIZED_CONTRACT_CHANGE",
+      "lastReviewedBaseline": "a455c8e76427d53d75bb7f15259b9875d9768914",
+      "lastReviewedAt": "2026-09-02",
+      "linkedFromIndex": true,
+      "notes": "Authority is limited to the document's declared scope and subordinate to Accepted ADRs."
+    },
+    {
+      "path": "docs/03-data-design/data-domain-model.md",
+      "repository": "Core",
+      "documentClass": "NORMATIVE_ARCHITECTURE",
+      "status": "ACTIVE",
+      "owner": "Data Architecture Owner",
+      "authoritativeFor": [
+        "architecture description subordinate to Accepted ADRs"
+      ],
+      "supersedes": [],
+      "supersededBy": [],
+      "currentStateClaimsAllowed": false,
+      "historicalMutationPolicy": "UPDATE_WITH_AUTHORIZED_ARCHITECTURE_CHANGE",
+      "lastReviewedBaseline": "a455c8e76427d53d75bb7f15259b9875d9768914",
+      "lastReviewedAt": "2026-09-02",
+      "linkedFromIndex": true,
+      "notes": "Authority is limited to the document's declared scope and subordinate to Accepted ADRs."
+    },
+    {
+      "path": "docs/03-data-design/data-ownership.md",
+      "repository": "Core",
+      "documentClass": "NORMATIVE_ARCHITECTURE",
+      "status": "ACTIVE",
+      "owner": "Data Architecture Owner",
+      "authoritativeFor": [
+        "architecture description subordinate to Accepted ADRs"
+      ],
+      "supersedes": [],
+      "supersededBy": [],
+      "currentStateClaimsAllowed": false,
+      "historicalMutationPolicy": "UPDATE_WITH_AUTHORIZED_ARCHITECTURE_CHANGE",
+      "lastReviewedBaseline": "a455c8e76427d53d75bb7f15259b9875d9768914",
+      "lastReviewedAt": "2026-09-02",
+      "linkedFromIndex": true,
+      "notes": "Authority is limited to the document's declared scope and subordinate to Accepted ADRs."
+    },
+    {
+      "path": "docs/03-data-design/data-storage-abstraction.md",
+      "repository": "Core",
+      "documentClass": "NORMATIVE_CONTRACT",
+      "status": "ACTIVE",
+      "owner": "Data Architecture Owner",
+      "authoritativeFor": [
+        "contract or governance boundary within the document's explicit scope"
+      ],
+      "supersedes": [],
+      "supersededBy": [],
+      "currentStateClaimsAllowed": false,
+      "historicalMutationPolicy": "UPDATE_WITH_AUTHORIZED_CONTRACT_CHANGE",
+      "lastReviewedBaseline": "a455c8e76427d53d75bb7f15259b9875d9768914",
+      "lastReviewedAt": "2026-09-02",
+      "linkedFromIndex": true,
+      "notes": "Authority is limited to the document's declared scope and subordinate to Accepted ADRs."
+    },
+    {
+      "path": "docs/04-interface-contract/README.md",
+      "repository": "Core",
+      "documentClass": "GENERATED_REFERENCE",
+      "status": "REFERENCE",
+      "owner": "Public Contract Owner",
+      "authoritativeFor": [
+        "navigation or machine-readable reference only"
+      ],
+      "supersedes": [],
+      "supersededBy": [],
+      "currentStateClaimsAllowed": false,
+      "historicalMutationPolicy": "REGENERATE_FROM_REVIEWED_INVENTORY",
+      "lastReviewedBaseline": "a455c8e76427d53d75bb7f15259b9875d9768914",
+      "lastReviewedAt": "2026-09-02",
+      "linkedFromIndex": true,
+      "notes": "Navigation/reference only; resolve authority through the linked source documents."
+    },
+    {
+      "path": "docs/04-interface-contract/application-v5-contract.md",
+      "repository": "Core",
+      "documentClass": "NORMATIVE_CONTRACT",
+      "status": "ACTIVE",
+      "owner": "Public Contract Owner",
+      "authoritativeFor": [
+        "contract or governance boundary within the document's explicit scope"
+      ],
+      "supersedes": [],
+      "supersededBy": [],
+      "currentStateClaimsAllowed": false,
+      "historicalMutationPolicy": "UPDATE_WITH_AUTHORIZED_CONTRACT_CHANGE",
+      "lastReviewedBaseline": "a455c8e76427d53d75bb7f15259b9875d9768914",
+      "lastReviewedAt": "2026-09-02",
+      "linkedFromIndex": true,
+      "notes": "Authority is limited to the document's declared scope and subordinate to Accepted ADRs."
+    },
+    {
+      "path": "docs/04-interface-contract/creator-public-http-v1.md",
+      "repository": "Core",
+      "documentClass": "NORMATIVE_CONTRACT",
+      "status": "ACTIVE",
+      "owner": "Public Contract Owner",
+      "authoritativeFor": [
+        "contract or governance boundary within the document's explicit scope"
+      ],
+      "supersedes": [],
+      "supersededBy": [],
+      "currentStateClaimsAllowed": false,
+      "historicalMutationPolicy": "UPDATE_WITH_AUTHORIZED_CONTRACT_CHANGE",
+      "lastReviewedBaseline": "a455c8e76427d53d75bb7f15259b9875d9768914",
+      "lastReviewedAt": "2026-09-02",
+      "linkedFromIndex": true,
+      "notes": "Authority is limited to the document's declared scope and subordinate to Accepted ADRs."
+    },
+    {
+      "path": "docs/04-interface-contract/error-code-standard.md",
+      "repository": "Core",
+      "documentClass": "NORMATIVE_CONTRACT",
+      "status": "ACTIVE",
+      "owner": "Public Contract Owner",
+      "authoritativeFor": [
+        "contract or governance boundary within the document's explicit scope"
+      ],
+      "supersedes": [],
+      "supersededBy": [],
+      "currentStateClaimsAllowed": false,
+      "historicalMutationPolicy": "UPDATE_WITH_AUTHORIZED_CONTRACT_CHANGE",
+      "lastReviewedBaseline": "a455c8e76427d53d75bb7f15259b9875d9768914",
+      "lastReviewedAt": "2026-09-02",
+      "linkedFromIndex": true,
+      "notes": "Authority is limited to the document's declared scope and subordinate to Accepted ADRs."
+    },
+    {
+      "path": "docs/04-interface-contract/event-contract.md",
+      "repository": "Core",
+      "documentClass": "NORMATIVE_CONTRACT",
+      "status": "ACTIVE",
+      "owner": "Public Contract Owner",
+      "authoritativeFor": [
+        "contract or governance boundary within the document's explicit scope"
+      ],
+      "supersedes": [],
+      "supersededBy": [],
+      "currentStateClaimsAllowed": false,
+      "historicalMutationPolicy": "UPDATE_WITH_AUTHORIZED_CONTRACT_CHANGE",
+      "lastReviewedBaseline": "a455c8e76427d53d75bb7f15259b9875d9768914",
+      "lastReviewedAt": "2026-09-02",
+      "linkedFromIndex": true,
+      "notes": "Authority is limited to the document's declared scope and subordinate to Accepted ADRs."
+    },
+    {
+      "path": "docs/04-interface-contract/v3-compute-contract.md",
+      "repository": "Core",
+      "documentClass": "NORMATIVE_CONTRACT",
+      "status": "ACTIVE",
+      "owner": "Public Contract Owner",
+      "authoritativeFor": [
+        "contract or governance boundary within the document's explicit scope"
+      ],
+      "supersedes": [],
+      "supersededBy": [],
+      "currentStateClaimsAllowed": false,
+      "historicalMutationPolicy": "UPDATE_WITH_AUTHORIZED_CONTRACT_CHANGE",
+      "lastReviewedBaseline": "a455c8e76427d53d75bb7f15259b9875d9768914",
+      "lastReviewedAt": "2026-09-02",
+      "linkedFromIndex": true,
+      "notes": "Authority is limited to the document's declared scope and subordinate to Accepted ADRs."
+    },
+    {
+      "path": "docs/04-interface-contract/v4-v3-contract.md",
+      "repository": "Core",
+      "documentClass": "NORMATIVE_CONTRACT",
+      "status": "ACTIVE",
+      "owner": "Public Contract Owner",
+      "authoritativeFor": [
+        "contract or governance boundary within the document's explicit scope"
+      ],
+      "supersedes": [],
+      "supersededBy": [],
+      "currentStateClaimsAllowed": false,
+      "historicalMutationPolicy": "UPDATE_WITH_AUTHORIZED_CONTRACT_CHANGE",
+      "lastReviewedBaseline": "a455c8e76427d53d75bb7f15259b9875d9768914",
+      "lastReviewedAt": "2026-09-02",
+      "linkedFromIndex": true,
+      "notes": "Authority is limited to the document's declared scope and subordinate to Accepted ADRs."
+    },
+    {
+      "path": "docs/04-interface-contract/v5-v3-vertical-slice-review.md",
+      "repository": "Core",
+      "documentClass": "IMPLEMENTATION_EVIDENCE",
+      "status": "RECORDED",
+      "owner": "Public Contract Owner",
+      "authoritativeFor": [
+        "bounded implementation or verification evidence only"
+      ],
+      "supersedes": [],
+      "supersededBy": [],
+      "currentStateClaimsAllowed": false,
+      "historicalMutationPolicy": "IMMUTABLE_EXCEPT_METADATA_AND_LINK_REPAIR",
+      "lastReviewedBaseline": "a455c8e76427d53d75bb7f15259b9875d9768914",
+      "lastReviewedAt": "2026-09-02",
+      "linkedFromIndex": true,
+      "notes": "Does not grant current execution authority. HISTORICAL_PATH_NOT_EXECUTION_AUTHORITY=true"
+    },
+    {
+      "path": "docs/04-interface-contract/v5-v4-contract.md",
+      "repository": "Core",
+      "documentClass": "NORMATIVE_CONTRACT",
+      "status": "ACTIVE",
+      "owner": "Public Contract Owner",
+      "authoritativeFor": [
+        "contract or governance boundary within the document's explicit scope"
+      ],
+      "supersedes": [],
+      "supersededBy": [],
+      "currentStateClaimsAllowed": false,
+      "historicalMutationPolicy": "UPDATE_WITH_AUTHORIZED_CONTRACT_CHANGE",
+      "lastReviewedBaseline": "a455c8e76427d53d75bb7f15259b9875d9768914",
+      "lastReviewedAt": "2026-09-02",
+      "linkedFromIndex": true,
+      "notes": "Authority is limited to the document's declared scope and subordinate to Accepted ADRs."
+    },
+    {
+      "path": "docs/07-v3-render-core/README.md",
+      "repository": "Core",
+      "documentClass": "GENERATED_REFERENCE",
+      "status": "REFERENCE",
+      "owner": "Runtime Owner",
+      "authoritativeFor": [
+        "navigation or machine-readable reference only"
+      ],
+      "supersedes": [],
+      "supersededBy": [],
+      "currentStateClaimsAllowed": false,
+      "historicalMutationPolicy": "REGENERATE_FROM_REVIEWED_INVENTORY",
+      "lastReviewedBaseline": "a455c8e76427d53d75bb7f15259b9875d9768914",
+      "lastReviewedAt": "2026-09-02",
+      "linkedFromIndex": true,
+      "notes": "Navigation/reference only; resolve authority through the linked source documents."
+    },
+    {
+      "path": "docs/07-v3-render-core/render-core-boundary.md",
+      "repository": "Core",
+      "documentClass": "NORMATIVE_ARCHITECTURE",
+      "status": "ACTIVE",
+      "owner": "Runtime Owner",
+      "authoritativeFor": [
+        "architecture description subordinate to Accepted ADRs"
+      ],
+      "supersedes": [],
+      "supersededBy": [],
+      "currentStateClaimsAllowed": false,
+      "historicalMutationPolicy": "UPDATE_WITH_AUTHORIZED_ARCHITECTURE_CHANGE",
+      "lastReviewedBaseline": "a455c8e76427d53d75bb7f15259b9875d9768914",
+      "lastReviewedAt": "2026-09-02",
+      "linkedFromIndex": true,
+      "notes": "Authority is limited to the document's declared scope and subordinate to Accepted ADRs."
+    },
+    {
+      "path": "docs/08-compute/k2-comfyui-wan22-operator-runbook.md",
+      "repository": "Core",
+      "documentClass": "OPERATIONAL_RUNBOOK",
+      "status": "ACTIVE",
+      "owner": "Runtime Owner",
+      "authoritativeFor": [
+        "bounded operator procedure and its declared preconditions"
+      ],
+      "supersedes": [],
+      "supersededBy": [],
+      "currentStateClaimsAllowed": false,
+      "historicalMutationPolicy": "UPDATE_WITH_REPRODUCIBLE_PRECONDITION_REVIEW",
+      "lastReviewedBaseline": "a455c8e76427d53d75bb7f15259b9875d9768914",
+      "lastReviewedAt": "2026-09-02",
+      "linkedFromIndex": true,
+      "notes": "Authority is limited to the document's declared scope and subordinate to Accepted ADRs."
+    },
+    {
+      "path": "docs/11-testing/README.md",
+      "repository": "Core",
+      "documentClass": "GENERATED_REFERENCE",
+      "status": "REFERENCE",
+      "owner": "Verification Owner",
+      "authoritativeFor": [
+        "navigation or machine-readable reference only"
+      ],
+      "supersedes": [],
+      "supersededBy": [],
+      "currentStateClaimsAllowed": false,
+      "historicalMutationPolicy": "REGENERATE_FROM_REVIEWED_INVENTORY",
+      "lastReviewedBaseline": "a455c8e76427d53d75bb7f15259b9875d9768914",
+      "lastReviewedAt": "2026-09-02",
+      "linkedFromIndex": true,
+      "notes": "Navigation/reference only; resolve authority through the linked source documents."
+    },
+    {
+      "path": "docs/11-testing/release-validation.md",
+      "repository": "Core",
+      "documentClass": "OPERATIONAL_RUNBOOK",
+      "status": "ACTIVE",
+      "owner": "Verification Owner",
+      "authoritativeFor": [
+        "bounded operator procedure and its declared preconditions"
+      ],
+      "supersedes": [],
+      "supersededBy": [],
+      "currentStateClaimsAllowed": false,
+      "historicalMutationPolicy": "UPDATE_WITH_REPRODUCIBLE_PRECONDITION_REVIEW",
+      "lastReviewedBaseline": "a455c8e76427d53d75bb7f15259b9875d9768914",
+      "lastReviewedAt": "2026-09-02",
+      "linkedFromIndex": true,
+      "notes": "Authority is limited to the document's declared scope and subordinate to Accepted ADRs."
+    },
+    {
+      "path": "docs/11-testing/test-evidence-standard.md",
+      "repository": "Core",
+      "documentClass": "OPERATIONAL_RUNBOOK",
+      "status": "ACTIVE",
+      "owner": "Verification Owner",
+      "authoritativeFor": [
+        "bounded operator procedure and its declared preconditions"
+      ],
+      "supersedes": [],
+      "supersededBy": [],
+      "currentStateClaimsAllowed": false,
+      "historicalMutationPolicy": "UPDATE_WITH_REPRODUCIBLE_PRECONDITION_REVIEW",
+      "lastReviewedBaseline": "a455c8e76427d53d75bb7f15259b9875d9768914",
+      "lastReviewedAt": "2026-09-02",
+      "linkedFromIndex": true,
+      "notes": "Authority is limited to the document's declared scope and subordinate to Accepted ADRs."
+    },
+    {
+      "path": "docs/11-testing/test-levels.md",
+      "repository": "Core",
+      "documentClass": "OPERATIONAL_RUNBOOK",
+      "status": "ACTIVE",
+      "owner": "Verification Owner",
+      "authoritativeFor": [
+        "bounded operator procedure and its declared preconditions"
+      ],
+      "supersedes": [],
+      "supersededBy": [],
+      "currentStateClaimsAllowed": false,
+      "historicalMutationPolicy": "UPDATE_WITH_REPRODUCIBLE_PRECONDITION_REVIEW",
+      "lastReviewedBaseline": "a455c8e76427d53d75bb7f15259b9875d9768914",
+      "lastReviewedAt": "2026-09-02",
+      "linkedFromIndex": true,
+      "notes": "Authority is limited to the document's declared scope and subordinate to Accepted ADRs."
+    },
+    {
+      "path": "docs/11-testing/testing-strategy.md",
+      "repository": "Core",
+      "documentClass": "OPERATIONAL_RUNBOOK",
+      "status": "ACTIVE",
+      "owner": "Verification Owner",
+      "authoritativeFor": [
+        "bounded operator procedure and its declared preconditions"
+      ],
+      "supersedes": [],
+      "supersededBy": [],
+      "currentStateClaimsAllowed": false,
+      "historicalMutationPolicy": "UPDATE_WITH_REPRODUCIBLE_PRECONDITION_REVIEW",
+      "lastReviewedBaseline": "a455c8e76427d53d75bb7f15259b9875d9768914",
+      "lastReviewedAt": "2026-09-02",
+      "linkedFromIndex": true,
+      "notes": "Authority is limited to the document's declared scope and subordinate to Accepted ADRs."
+    },
+    {
+      "path": "docs/11-testing/verification-gates.md",
+      "repository": "Core",
+      "documentClass": "OPERATIONAL_RUNBOOK",
+      "status": "ACTIVE",
+      "owner": "Verification Owner",
+      "authoritativeFor": [
+        "bounded operator procedure and its declared preconditions"
+      ],
+      "supersedes": [],
+      "supersededBy": [],
+      "currentStateClaimsAllowed": false,
+      "historicalMutationPolicy": "UPDATE_WITH_REPRODUCIBLE_PRECONDITION_REVIEW",
+      "lastReviewedBaseline": "a455c8e76427d53d75bb7f15259b9875d9768914",
+      "lastReviewedAt": "2026-09-02",
+      "linkedFromIndex": true,
+      "notes": "Authority is limited to the document's declared scope and subordinate to Accepted ADRs."
+    },
+    {
+      "path": "docs/12-release/baseline-asset-acceptance-decision-record.md",
+      "repository": "Core",
+      "documentClass": "HISTORICAL_EVIDENCE",
+      "status": "HISTORICAL",
+      "owner": "Release Owner",
+      "authoritativeFor": [
+        "immutable historical evidence only"
+      ],
+      "supersedes": [],
+      "supersededBy": [],
+      "currentStateClaimsAllowed": false,
+      "historicalMutationPolicy": "IMMUTABLE_EXCEPT_METADATA_AND_LINK_REPAIR",
+      "lastReviewedBaseline": "a455c8e76427d53d75bb7f15259b9875d9768914",
+      "lastReviewedAt": "2026-09-02",
+      "linkedFromIndex": true,
+      "notes": "Does not grant current execution authority. HISTORICAL_PATH_NOT_EXECUTION_AUTHORITY=true"
+    },
+    {
+      "path": "docs/12-release/baseline-v0.1.0-candidate-manifest.md",
+      "repository": "Core",
+      "documentClass": "HISTORICAL_EVIDENCE",
+      "status": "HISTORICAL",
+      "owner": "Release Owner",
+      "authoritativeFor": [
+        "immutable historical evidence only"
+      ],
+      "supersedes": [],
+      "supersededBy": [],
+      "currentStateClaimsAllowed": false,
+      "historicalMutationPolicy": "IMMUTABLE_EXCEPT_METADATA_AND_LINK_REPAIR",
+      "lastReviewedBaseline": "a455c8e76427d53d75bb7f15259b9875d9768914",
+      "lastReviewedAt": "2026-09-02",
+      "linkedFromIndex": true,
+      "notes": "Does not grant current execution authority. HISTORICAL_PATH_NOT_EXECUTION_AUTHORITY=true"
+    },
+    {
+      "path": "docs/12-release/investor-readiness-acceptance-record.md",
+      "repository": "Core",
+      "documentClass": "HISTORICAL_EVIDENCE",
+      "status": "HISTORICAL",
+      "owner": "Release Owner",
+      "authoritativeFor": [
+        "immutable historical evidence only"
+      ],
+      "supersedes": [],
+      "supersededBy": [],
+      "currentStateClaimsAllowed": false,
+      "historicalMutationPolicy": "IMMUTABLE_EXCEPT_METADATA_AND_LINK_REPAIR",
+      "lastReviewedBaseline": "a455c8e76427d53d75bb7f15259b9875d9768914",
+      "lastReviewedAt": "2026-09-02",
+      "linkedFromIndex": true,
+      "notes": "Does not grant current execution authority. HISTORICAL_PATH_NOT_EXECUTION_AUTHORITY=true"
+    },
+    {
+      "path": "docs/12-release/phase-0-exit-record.md",
+      "repository": "Core",
+      "documentClass": "HISTORICAL_EVIDENCE",
+      "status": "HISTORICAL",
+      "owner": "Release Owner",
+      "authoritativeFor": [
+        "immutable historical evidence only"
+      ],
+      "supersedes": [],
+      "supersededBy": [],
+      "currentStateClaimsAllowed": false,
+      "historicalMutationPolicy": "IMMUTABLE_EXCEPT_METADATA_AND_LINK_REPAIR",
+      "lastReviewedBaseline": "a455c8e76427d53d75bb7f15259b9875d9768914",
+      "lastReviewedAt": "2026-09-02",
+      "linkedFromIndex": true,
+      "notes": "Does not grant current execution authority. HISTORICAL_PATH_NOT_EXECUTION_AUTHORITY=true"
+    },
+    {
+      "path": "docs/12-release/phase-1-execution-authorization.md",
+      "repository": "Core",
+      "documentClass": "HISTORICAL_EVIDENCE",
+      "status": "HISTORICAL",
+      "owner": "Release Owner",
+      "authoritativeFor": [
+        "immutable historical evidence only"
+      ],
+      "supersedes": [],
+      "supersededBy": [],
+      "currentStateClaimsAllowed": false,
+      "historicalMutationPolicy": "IMMUTABLE_EXCEPT_METADATA_AND_LINK_REPAIR",
+      "lastReviewedBaseline": "a455c8e76427d53d75bb7f15259b9875d9768914",
+      "lastReviewedAt": "2026-09-02",
+      "linkedFromIndex": true,
+      "notes": "Does not grant current execution authority. HISTORICAL_PATH_NOT_EXECUTION_AUTHORITY=true"
+    },
+    {
+      "path": "docs/12-release/phase-1-production-validation-plan.md",
+      "repository": "Core",
+      "documentClass": "HISTORICAL_EVIDENCE",
+      "status": "HISTORICAL",
+      "owner": "Release Owner",
+      "authoritativeFor": [
+        "immutable historical evidence only"
+      ],
+      "supersedes": [],
+      "supersededBy": [],
+      "currentStateClaimsAllowed": false,
+      "historicalMutationPolicy": "IMMUTABLE_EXCEPT_METADATA_AND_LINK_REPAIR",
+      "lastReviewedBaseline": "a455c8e76427d53d75bb7f15259b9875d9768914",
+      "lastReviewedAt": "2026-09-02",
+      "linkedFromIndex": true,
+      "notes": "Does not grant current execution authority. HISTORICAL_PATH_NOT_EXECUTION_AUTHORITY=true"
+    },
+    {
+      "path": "docs/12-release/phase-1-responsibility-assignment.md",
+      "repository": "Core",
+      "documentClass": "HISTORICAL_EVIDENCE",
+      "status": "HISTORICAL",
+      "owner": "Release Owner",
+      "authoritativeFor": [
+        "immutable historical evidence only"
+      ],
+      "supersedes": [],
+      "supersededBy": [],
+      "currentStateClaimsAllowed": false,
+      "historicalMutationPolicy": "IMMUTABLE_EXCEPT_METADATA_AND_LINK_REPAIR",
+      "lastReviewedBaseline": "a455c8e76427d53d75bb7f15259b9875d9768914",
+      "lastReviewedAt": "2026-09-02",
+      "linkedFromIndex": true,
+      "notes": "Does not grant current execution authority. HISTORICAL_PATH_NOT_EXECUTION_AUTHORITY=true"
+    },
+    {
+      "path": "docs/12-release/phase-1-scope-approval.md",
+      "repository": "Core",
+      "documentClass": "HISTORICAL_EVIDENCE",
+      "status": "HISTORICAL",
+      "owner": "Release Owner",
+      "authoritativeFor": [
+        "immutable historical evidence only"
+      ],
+      "supersedes": [],
+      "supersededBy": [],
+      "currentStateClaimsAllowed": false,
+      "historicalMutationPolicy": "IMMUTABLE_EXCEPT_METADATA_AND_LINK_REPAIR",
+      "lastReviewedBaseline": "a455c8e76427d53d75bb7f15259b9875d9768914",
+      "lastReviewedAt": "2026-09-02",
+      "linkedFromIndex": true,
+      "notes": "Does not grant current execution authority. HISTORICAL_PATH_NOT_EXECUTION_AUTHORITY=true"
+    },
+    {
+      "path": "docs/12-release/phase-1-vertical-slice-authorization.md",
+      "repository": "Core",
+      "documentClass": "HISTORICAL_EVIDENCE",
+      "status": "HISTORICAL",
+      "owner": "Release Owner",
+      "authoritativeFor": [
+        "immutable historical evidence only"
+      ],
+      "supersedes": [],
+      "supersededBy": [],
+      "currentStateClaimsAllowed": false,
+      "historicalMutationPolicy": "IMMUTABLE_EXCEPT_METADATA_AND_LINK_REPAIR",
+      "lastReviewedBaseline": "a455c8e76427d53d75bb7f15259b9875d9768914",
+      "lastReviewedAt": "2026-09-02",
+      "linkedFromIndex": true,
+      "notes": "Does not grant current execution authority. HISTORICAL_PATH_NOT_EXECUTION_AUTHORITY=true"
+    },
+    {
+      "path": "docs/14-application-design/README.md",
+      "repository": "Core",
+      "documentClass": "GENERATED_REFERENCE",
+      "status": "REFERENCE",
+      "owner": "Application Owner",
+      "authoritativeFor": [
+        "navigation or machine-readable reference only"
+      ],
+      "supersedes": [],
+      "supersededBy": [],
+      "currentStateClaimsAllowed": false,
+      "historicalMutationPolicy": "REGENERATE_FROM_REVIEWED_INVENTORY",
+      "lastReviewedBaseline": "a455c8e76427d53d75bb7f15259b9875d9768914",
+      "lastReviewedAt": "2026-09-02",
+      "linkedFromIndex": true,
+      "notes": "Navigation/reference only; resolve authority through the linked source documents."
+    },
+    {
+      "path": "docs/14-application-design/REFERENCE_VIDEO_CAPABILITY_AND_WORKSPACE_MERGED_BASELINE.md",
+      "repository": "Core",
+      "documentClass": "IMPLEMENTATION_EVIDENCE",
+      "status": "RECORDED",
+      "owner": "Application Owner",
+      "authoritativeFor": [
+        "bounded implementation or verification evidence only"
+      ],
+      "supersedes": [],
+      "supersededBy": [],
+      "currentStateClaimsAllowed": false,
+      "historicalMutationPolicy": "IMMUTABLE_EXCEPT_METADATA_AND_LINK_REPAIR",
+      "lastReviewedBaseline": "a455c8e76427d53d75bb7f15259b9875d9768914",
+      "lastReviewedAt": "2026-09-02",
+      "linkedFromIndex": true,
+      "notes": "Does not grant current execution authority. HISTORICAL_PATH_NOT_EXECUTION_AUTHORITY=true"
+    },
+    {
+      "path": "docs/14-application-design/application-command-contract.md",
+      "repository": "Core",
+      "documentClass": "NORMATIVE_CONTRACT",
+      "status": "ACTIVE",
+      "owner": "Application Owner",
+      "authoritativeFor": [
+        "contract or governance boundary within the document's explicit scope"
+      ],
+      "supersedes": [],
+      "supersededBy": [],
+      "currentStateClaimsAllowed": false,
+      "historicalMutationPolicy": "UPDATE_WITH_AUTHORIZED_CONTRACT_CHANGE",
+      "lastReviewedBaseline": "a455c8e76427d53d75bb7f15259b9875d9768914",
+      "lastReviewedAt": "2026-09-02",
+      "linkedFromIndex": true,
+      "notes": "Authority is limited to the document's declared scope and subordinate to Accepted ADRs."
+    },
+    {
+      "path": "docs/14-application-design/application-layer-overview.md",
+      "repository": "Core",
+      "documentClass": "NORMATIVE_ARCHITECTURE",
+      "status": "ACTIVE",
+      "owner": "Application Owner",
+      "authoritativeFor": [
+        "architecture description subordinate to Accepted ADRs"
+      ],
+      "supersedes": [],
+      "supersededBy": [],
+      "currentStateClaimsAllowed": false,
+      "historicalMutationPolicy": "UPDATE_WITH_AUTHORIZED_ARCHITECTURE_CHANGE",
+      "lastReviewedBaseline": "a455c8e76427d53d75bb7f15259b9875d9768914",
+      "lastReviewedAt": "2026-09-02",
+      "linkedFromIndex": true,
+      "notes": "Authority is limited to the document's declared scope and subordinate to Accepted ADRs."
+    },
+    {
+      "path": "docs/14-application-design/internal-content-lab-ui-scope.md",
+      "repository": "Core",
+      "documentClass": "NORMATIVE_CONTRACT",
+      "status": "ACTIVE",
+      "owner": "Application Owner",
+      "authoritativeFor": [
+        "contract or governance boundary within the document's explicit scope"
+      ],
+      "supersedes": [],
+      "supersededBy": [],
+      "currentStateClaimsAllowed": false,
+      "historicalMutationPolicy": "UPDATE_WITH_AUTHORIZED_CONTRACT_CHANGE",
+      "lastReviewedBaseline": "a455c8e76427d53d75bb7f15259b9875d9768914",
+      "lastReviewedAt": "2026-09-02",
+      "linkedFromIndex": true,
+      "notes": "Authority is limited to the document's declared scope and subordinate to Accepted ADRs."
+    },
+    {
+      "path": "docs/14-application-design/ui-domain-mapping.md",
+      "repository": "Core",
+      "documentClass": "NORMATIVE_ARCHITECTURE",
+      "status": "ACTIVE",
+      "owner": "Application Owner",
+      "authoritativeFor": [
+        "architecture description subordinate to Accepted ADRs"
+      ],
+      "supersedes": [],
+      "supersededBy": [],
+      "currentStateClaimsAllowed": false,
+      "historicalMutationPolicy": "UPDATE_WITH_AUTHORIZED_ARCHITECTURE_CHANGE",
+      "lastReviewedBaseline": "a455c8e76427d53d75bb7f15259b9875d9768914",
+      "lastReviewedAt": "2026-09-02",
+      "linkedFromIndex": true,
+      "notes": "Authority is limited to the document's declared scope and subordinate to Accepted ADRs."
+    },
+    {
+      "path": "docs/14-application-design/user-flow-mapping.md",
+      "repository": "Core",
+      "documentClass": "NORMATIVE_ARCHITECTURE",
+      "status": "ACTIVE",
+      "owner": "Application Owner",
+      "authoritativeFor": [
+        "architecture description subordinate to Accepted ADRs"
+      ],
+      "supersedes": [],
+      "supersededBy": [],
+      "currentStateClaimsAllowed": false,
+      "historicalMutationPolicy": "UPDATE_WITH_AUTHORIZED_ARCHITECTURE_CHANGE",
+      "lastReviewedBaseline": "a455c8e76427d53d75bb7f15259b9875d9768914",
+      "lastReviewedAt": "2026-09-02",
+      "linkedFromIndex": true,
+      "notes": "Authority is limited to the document's declared scope and subordinate to Accepted ADRs."
+    },
+    {
+      "path": "docs/15-investor-readiness/README.md",
+      "repository": "Core",
+      "documentClass": "GENERATED_REFERENCE",
+      "status": "REFERENCE",
+      "owner": "Project Lead",
+      "authoritativeFor": [
+        "navigation or machine-readable reference only"
+      ],
+      "supersedes": [],
+      "supersededBy": [],
+      "currentStateClaimsAllowed": false,
+      "historicalMutationPolicy": "REGENERATE_FROM_REVIEWED_INVENTORY",
+      "lastReviewedBaseline": "a455c8e76427d53d75bb7f15259b9875d9768914",
+      "lastReviewedAt": "2026-09-02",
+      "linkedFromIndex": true,
+      "notes": "Navigation/reference only; resolve authority through the linked source documents."
+    },
+    {
+      "path": "docs/15-investor-readiness/milestones/M001-v5-identity-engine-foundation.md",
+      "repository": "Core",
+      "documentClass": "HISTORICAL_EVIDENCE",
+      "status": "HISTORICAL",
+      "owner": "Project Lead",
+      "authoritativeFor": [
+        "immutable historical evidence only"
+      ],
+      "supersedes": [],
+      "supersededBy": [],
+      "currentStateClaimsAllowed": false,
+      "historicalMutationPolicy": "IMMUTABLE_EXCEPT_METADATA_AND_LINK_REPAIR",
+      "lastReviewedBaseline": "a455c8e76427d53d75bb7f15259b9875d9768914",
+      "lastReviewedAt": "2026-09-02",
+      "linkedFromIndex": true,
+      "notes": "Does not grant current execution authority. HISTORICAL_PATH_NOT_EXECUTION_AUTHORITY=true"
+    },
+    {
+      "path": "docs/15-investor-readiness/milestones/M002-v5-project-engine-foundation.md",
+      "repository": "Core",
+      "documentClass": "HISTORICAL_EVIDENCE",
+      "status": "HISTORICAL",
+      "owner": "Project Lead",
+      "authoritativeFor": [
+        "immutable historical evidence only"
+      ],
+      "supersedes": [],
+      "supersededBy": [],
+      "currentStateClaimsAllowed": false,
+      "historicalMutationPolicy": "IMMUTABLE_EXCEPT_METADATA_AND_LINK_REPAIR",
+      "lastReviewedBaseline": "a455c8e76427d53d75bb7f15259b9875d9768914",
+      "lastReviewedAt": "2026-09-02",
+      "linkedFromIndex": true,
+      "notes": "Does not grant current execution authority. HISTORICAL_PATH_NOT_EXECUTION_AUTHORITY=true"
+    },
+    {
+      "path": "docs/15-investor-readiness/milestones/M003-v5-asset-registry-foundation.md",
+      "repository": "Core",
+      "documentClass": "HISTORICAL_EVIDENCE",
+      "status": "HISTORICAL",
+      "owner": "Project Lead",
+      "authoritativeFor": [
+        "immutable historical evidence only"
+      ],
+      "supersedes": [],
+      "supersededBy": [],
+      "currentStateClaimsAllowed": false,
+      "historicalMutationPolicy": "IMMUTABLE_EXCEPT_METADATA_AND_LINK_REPAIR",
+      "lastReviewedBaseline": "a455c8e76427d53d75bb7f15259b9875d9768914",
+      "lastReviewedAt": "2026-09-02",
+      "linkedFromIndex": true,
+      "notes": "Does not grant current execution authority. HISTORICAL_PATH_NOT_EXECUTION_AUTHORITY=true"
+    },
+    {
+      "path": "docs/15-investor-readiness/milestones/M004-v5-project-asset-relationship-foundation.md",
+      "repository": "Core",
+      "documentClass": "HISTORICAL_EVIDENCE",
+      "status": "HISTORICAL",
+      "owner": "Project Lead",
+      "authoritativeFor": [
+        "immutable historical evidence only"
+      ],
+      "supersedes": [],
+      "supersededBy": [],
+      "currentStateClaimsAllowed": false,
+      "historicalMutationPolicy": "IMMUTABLE_EXCEPT_METADATA_AND_LINK_REPAIR",
+      "lastReviewedBaseline": "a455c8e76427d53d75bb7f15259b9875d9768914",
+      "lastReviewedAt": "2026-09-02",
+      "linkedFromIndex": true,
+      "notes": "Does not grant current execution authority. HISTORICAL_PATH_NOT_EXECUTION_AUTHORITY=true"
+    },
+    {
+      "path": "docs/16-k2-production/K2-001-HISTORICAL-VALIDATION-ARCHIVE.md",
+      "repository": "Core",
+      "documentClass": "HISTORICAL_EVIDENCE",
+      "status": "HISTORICAL",
+      "owner": "K2 Domain Owner",
+      "authoritativeFor": [
+        "immutable historical evidence only"
+      ],
+      "supersedes": [
+        "docs/16-k2-production/K2-001-PREPRODUCTION-CANDIDATE.md"
+      ],
+      "supersededBy": [],
+      "currentStateClaimsAllowed": false,
+      "historicalMutationPolicy": "IMMUTABLE_EXCEPT_METADATA_AND_LINK_REPAIR",
+      "lastReviewedBaseline": "a455c8e76427d53d75bb7f15259b9875d9768914",
+      "lastReviewedAt": "2026-09-02",
+      "linkedFromIndex": true,
+      "notes": "Does not grant current execution authority. HISTORICAL_PATH_NOT_EXECUTION_AUTHORITY=true"
+    },
+    {
+      "path": "docs/16-k2-production/K2-001-PREPRODUCTION-CANDIDATE.md",
+      "repository": "Core",
+      "documentClass": "SUPERSEDED",
+      "status": "SUPERSEDED",
+      "owner": "K2 Domain Owner",
+      "authoritativeFor": [],
+      "supersedes": [],
+      "supersededBy": [
+        "docs/16-k2-production/K2-001-HISTORICAL-VALIDATION-ARCHIVE.md"
+      ],
+      "currentStateClaimsAllowed": false,
+      "historicalMutationPolicy": "IMMUTABLE_EXCEPT_METADATA_AND_LINK_REPAIR",
+      "lastReviewedBaseline": "a455c8e76427d53d75bb7f15259b9875d9768914",
+      "lastReviewedAt": "2026-09-02",
+      "linkedFromIndex": true,
+      "notes": "Does not grant current execution authority. HISTORICAL_PATH_NOT_EXECUTION_AUTHORITY=true"
+    },
+    {
+      "path": "docs/16-k2-production/K2-G2-AUTHORITY-PREPARATION-RUNBOOK.md",
+      "repository": "Core",
+      "documentClass": "OPERATIONAL_RUNBOOK",
+      "status": "ACTIVE",
+      "owner": "K2 Domain Owner",
+      "authoritativeFor": [
+        "bounded operator procedure and its declared preconditions"
+      ],
+      "supersedes": [],
+      "supersededBy": [],
+      "currentStateClaimsAllowed": false,
+      "historicalMutationPolicy": "UPDATE_WITH_REPRODUCIBLE_PRECONDITION_REVIEW",
+      "lastReviewedBaseline": "a455c8e76427d53d75bb7f15259b9875d9768914",
+      "lastReviewedAt": "2026-09-02",
+      "linkedFromIndex": true,
+      "notes": "Authority is limited to the document's declared scope and subordinate to Accepted ADRs."
+    },
+    {
+      "path": "docs/16-k2-production/K2-INTERNAL-SELF-HOSTED-P1-RUNBOOK.md",
+      "repository": "Core",
+      "documentClass": "OPERATIONAL_RUNBOOK",
+      "status": "ACTIVE",
+      "owner": "K2 Domain Owner",
+      "authoritativeFor": [
+        "bounded operator procedure and its declared preconditions"
+      ],
+      "supersedes": [
+        "docs/16-k2-production/K2-P1-PREBOOT-TO-LIVE-RUNBOOK.md"
+      ],
+      "supersededBy": [],
+      "currentStateClaimsAllowed": false,
+      "historicalMutationPolicy": "UPDATE_WITH_REPRODUCIBLE_PRECONDITION_REVIEW",
+      "lastReviewedBaseline": "a455c8e76427d53d75bb7f15259b9875d9768914",
+      "lastReviewedAt": "2026-09-02",
+      "linkedFromIndex": true,
+      "notes": "Authority is limited to the document's declared scope and subordinate to Accepted ADRs."
+    },
+    {
+      "path": "docs/16-k2-production/K2-P1-PREBOOT-TO-LIVE-RUNBOOK.md",
+      "repository": "Core",
+      "documentClass": "SUPERSEDED",
+      "status": "SUPERSEDED",
+      "owner": "K2 Domain Owner",
+      "authoritativeFor": [],
+      "supersedes": [],
+      "supersededBy": [
+        "docs/16-k2-production/K2-INTERNAL-SELF-HOSTED-P1-RUNBOOK.md"
+      ],
+      "currentStateClaimsAllowed": false,
+      "historicalMutationPolicy": "IMMUTABLE_EXCEPT_METADATA_AND_LINK_REPAIR",
+      "lastReviewedBaseline": "a455c8e76427d53d75bb7f15259b9875d9768914",
+      "lastReviewedAt": "2026-09-02",
+      "linkedFromIndex": true,
+      "notes": "Does not grant current execution authority. HISTORICAL_PATH_NOT_EXECUTION_AUTHORITY=true"
+    },
+    {
+      "path": "docs/16-k2-production/README.md",
+      "repository": "Core",
+      "documentClass": "GENERATED_REFERENCE",
+      "status": "REFERENCE",
+      "owner": "K2 Domain Owner",
+      "authoritativeFor": [
+        "navigation or machine-readable reference only"
+      ],
+      "supersedes": [],
+      "supersededBy": [],
+      "currentStateClaimsAllowed": false,
+      "historicalMutationPolicy": "REGENERATE_FROM_REVIEWED_INVENTORY",
+      "lastReviewedBaseline": "a455c8e76427d53d75bb7f15259b9875d9768914",
+      "lastReviewedAt": "2026-09-02",
+      "linkedFromIndex": true,
+      "notes": "Navigation/reference only; resolve authority through the linked source documents."
+    },
+    {
+      "path": "docs/16-k2-production/k2-002-changan/K2-002-CHANGAN-SERIES-AND-EP01-03-v1.3.md",
+      "repository": "Core",
+      "documentClass": "SUPERSEDED",
+      "status": "SUPERSEDED",
+      "owner": "K2 Domain Owner",
+      "authoritativeFor": [],
+      "supersedes": [],
+      "supersededBy": [
+        "docs/16-k2-production/k2-002-changan/K2-002-CHANGAN-SERIES-AND-EP01-03-v1.4.md"
+      ],
+      "currentStateClaimsAllowed": false,
+      "historicalMutationPolicy": "IMMUTABLE_EXCEPT_METADATA_AND_LINK_REPAIR",
+      "lastReviewedBaseline": "a455c8e76427d53d75bb7f15259b9875d9768914",
+      "lastReviewedAt": "2026-09-02",
+      "linkedFromIndex": true,
+      "notes": "Does not grant current execution authority. HISTORICAL_PATH_NOT_EXECUTION_AUTHORITY=true"
+    },
+    {
+      "path": "docs/16-k2-production/k2-002-changan/K2-002-CHANGAN-SERIES-AND-EP01-03-v1.4.md",
+      "repository": "Core",
+      "documentClass": "HISTORICAL_EVIDENCE",
+      "status": "HISTORICAL",
+      "owner": "K2 Domain Owner",
+      "authoritativeFor": [
+        "immutable historical evidence only"
+      ],
+      "supersedes": [
+        "docs/16-k2-production/k2-002-changan/K2-002-CHANGAN-SERIES-AND-EP01-03-v1.3.md",
+        "docs/16-k2-production/k2-002-changan/source/K2-002-CHANGAN-SOURCE-v1.2.md",
+        "docs/16-k2-production/k2-002-changan/source/K2-002-CHANGAN-UPLOADED-OWNER-REVISION-v1.4.md"
+      ],
+      "supersededBy": [],
+      "currentStateClaimsAllowed": false,
+      "historicalMutationPolicy": "IMMUTABLE_EXCEPT_METADATA_AND_LINK_REPAIR",
+      "lastReviewedBaseline": "a455c8e76427d53d75bb7f15259b9875d9768914",
+      "lastReviewedAt": "2026-09-02",
+      "linkedFromIndex": true,
+      "notes": "Does not grant current execution authority. HISTORICAL_PATH_NOT_EXECUTION_AUTHORITY=true"
+    },
+    {
+      "path": "docs/16-k2-production/k2-002-changan/README.md",
+      "repository": "Core",
+      "documentClass": "GENERATED_REFERENCE",
+      "status": "REFERENCE",
+      "owner": "K2 Domain Owner",
+      "authoritativeFor": [
+        "navigation or machine-readable reference only"
+      ],
+      "supersedes": [],
+      "supersededBy": [],
+      "currentStateClaimsAllowed": false,
+      "historicalMutationPolicy": "REGENERATE_FROM_REVIEWED_INVENTORY",
+      "lastReviewedBaseline": "a455c8e76427d53d75bb7f15259b9875d9768914",
+      "lastReviewedAt": "2026-09-02",
+      "linkedFromIndex": true,
+      "notes": "Navigation/reference only; resolve authority through the linked source documents."
+    },
+    {
+      "path": "docs/16-k2-production/k2-002-changan/source/K2-002-CHANGAN-SOURCE-v1.2.md",
+      "repository": "Core",
+      "documentClass": "SUPERSEDED",
+      "status": "SUPERSEDED",
+      "owner": "K2 Domain Owner",
+      "authoritativeFor": [],
+      "supersedes": [],
+      "supersededBy": [
+        "docs/16-k2-production/k2-002-changan/K2-002-CHANGAN-SERIES-AND-EP01-03-v1.4.md"
+      ],
+      "currentStateClaimsAllowed": false,
+      "historicalMutationPolicy": "IMMUTABLE_EXCEPT_METADATA_AND_LINK_REPAIR",
+      "lastReviewedBaseline": "a455c8e76427d53d75bb7f15259b9875d9768914",
+      "lastReviewedAt": "2026-09-02",
+      "linkedFromIndex": true,
+      "notes": "Does not grant current execution authority. HISTORICAL_PATH_NOT_EXECUTION_AUTHORITY=true"
+    },
+    {
+      "path": "docs/16-k2-production/k2-002-changan/source/K2-002-CHANGAN-UPLOADED-OWNER-REVISION-v1.4.md",
+      "repository": "Core",
+      "documentClass": "SUPERSEDED",
+      "status": "SUPERSEDED",
+      "owner": "K2 Domain Owner",
+      "authoritativeFor": [],
+      "supersedes": [],
+      "supersededBy": [
+        "docs/16-k2-production/k2-002-changan/K2-002-CHANGAN-SERIES-AND-EP01-03-v1.4.md"
+      ],
+      "currentStateClaimsAllowed": false,
+      "historicalMutationPolicy": "IMMUTABLE_EXCEPT_METADATA_AND_LINK_REPAIR",
+      "lastReviewedBaseline": "a455c8e76427d53d75bb7f15259b9875d9768914",
+      "lastReviewedAt": "2026-09-02",
+      "linkedFromIndex": true,
+      "notes": "Does not grant current execution authority. HISTORICAL_PATH_NOT_EXECUTION_AUTHORITY=true"
+    },
+    {
+      "path": "docs/README.md",
+      "repository": "Core",
+      "documentClass": "GENERATED_REFERENCE",
+      "status": "REFERENCE",
+      "owner": "Documentation Governance Owner",
+      "authoritativeFor": [
+        "navigation or machine-readable reference only"
+      ],
+      "supersedes": [],
+      "supersededBy": [],
+      "currentStateClaimsAllowed": false,
+      "historicalMutationPolicy": "REGENERATE_FROM_REVIEWED_INVENTORY",
+      "lastReviewedBaseline": "a455c8e76427d53d75bb7f15259b9875d9768914",
+      "lastReviewedAt": "2026-09-02",
+      "linkedFromIndex": true,
+      "notes": "Navigation/reference only; resolve authority through the linked source documents."
+    },
+    {
+      "path": "docs/governance/DOCUMENTATION_GOVERNANCE_POLICY.md",
+      "repository": "Core",
+      "documentClass": "NORMATIVE_CONTRACT",
+      "status": "ACTIVE",
+      "owner": "Architecture Owner / Documentation Governance Owner",
+      "authoritativeFor": [
+        "contract or governance boundary within the document's explicit scope"
+      ],
+      "supersedes": [],
+      "supersededBy": [],
+      "currentStateClaimsAllowed": false,
+      "historicalMutationPolicy": "UPDATE_WITH_AUTHORIZED_CONTRACT_CHANGE",
+      "lastReviewedBaseline": "a455c8e76427d53d75bb7f15259b9875d9768914",
+      "lastReviewedAt": "2026-09-02",
+      "linkedFromIndex": true,
+      "notes": "Authority is limited to the document's declared scope and subordinate to Accepted ADRs."
+    },
+    {
+      "path": "docs/governance/DOCUMENT_AUDIT_REPORT_2026-09-02.md",
+      "repository": "Core",
+      "documentClass": "HISTORICAL_EVIDENCE",
+      "status": "HISTORICAL",
+      "owner": "Architecture Owner / Documentation Governance Owner",
+      "authoritativeFor": [
+        "immutable historical evidence only"
+      ],
+      "supersedes": [],
+      "supersededBy": [],
+      "currentStateClaimsAllowed": false,
+      "historicalMutationPolicy": "IMMUTABLE_EXCEPT_METADATA_AND_LINK_REPAIR",
+      "lastReviewedBaseline": "a455c8e76427d53d75bb7f15259b9875d9768914",
+      "lastReviewedAt": "2026-09-02",
+      "linkedFromIndex": true,
+      "notes": "Does not grant current execution authority. HISTORICAL_PATH_NOT_EXECUTION_AUTHORITY=true"
+    },
+    {
+      "path": "docs/governance/DOCUMENT_AUTHORITY_MAP.md",
+      "repository": "Core",
+      "documentClass": "GENERATED_REFERENCE",
+      "status": "REFERENCE",
+      "owner": "Architecture Owner / Documentation Governance Owner",
+      "authoritativeFor": [
+        "navigation or machine-readable reference only"
+      ],
+      "supersedes": [],
+      "supersededBy": [],
+      "currentStateClaimsAllowed": false,
+      "historicalMutationPolicy": "REGENERATE_FROM_REVIEWED_INVENTORY",
+      "lastReviewedBaseline": "a455c8e76427d53d75bb7f15259b9875d9768914",
+      "lastReviewedAt": "2026-09-02",
+      "linkedFromIndex": true,
+      "notes": "Navigation/reference only; resolve authority through the linked source documents."
+    },
+    {
+      "path": "docs/governance/DOCUMENT_REGISTRY.json",
+      "repository": "Core",
+      "documentClass": "GENERATED_REFERENCE",
+      "status": "REFERENCE",
+      "owner": "Architecture Owner / Documentation Governance Owner",
+      "authoritativeFor": [
+        "navigation or machine-readable reference only"
+      ],
+      "supersedes": [],
+      "supersededBy": [],
+      "currentStateClaimsAllowed": false,
+      "historicalMutationPolicy": "REGENERATE_FROM_REVIEWED_INVENTORY",
+      "lastReviewedBaseline": "a455c8e76427d53d75bb7f15259b9875d9768914",
+      "lastReviewedAt": "2026-09-02",
+      "linkedFromIndex": true,
+      "notes": "Navigation/reference only; resolve authority through the linked source documents."
+    },
+    {
+      "path": "experiments/ccv-r1/CHARACTER_CONSISTENCY_VALIDATION_REPORT_R1.md",
+      "repository": "Core",
+      "documentClass": "IMPLEMENTATION_EVIDENCE",
+      "status": "RECORDED",
+      "owner": "Experiment Owner",
+      "authoritativeFor": [
+        "bounded implementation or verification evidence only"
+      ],
+      "supersedes": [],
+      "supersededBy": [],
+      "currentStateClaimsAllowed": false,
+      "historicalMutationPolicy": "IMMUTABLE_EXCEPT_METADATA_AND_LINK_REPAIR",
+      "lastReviewedBaseline": "a455c8e76427d53d75bb7f15259b9875d9768914",
+      "lastReviewedAt": "2026-09-02",
+      "linkedFromIndex": true,
+      "notes": "Does not grant current execution authority. HISTORICAL_PATH_NOT_EXECUTION_AUTHORITY=true"
+    },
+    {
+      "path": "experiments/ccv-r1/README.md",
+      "repository": "Core",
+      "documentClass": "IMPLEMENTATION_EVIDENCE",
+      "status": "RECORDED",
+      "owner": "Experiment Owner",
+      "authoritativeFor": [
+        "bounded implementation or verification evidence only"
+      ],
+      "supersedes": [],
+      "supersededBy": [],
+      "currentStateClaimsAllowed": false,
+      "historicalMutationPolicy": "IMMUTABLE_EXCEPT_METADATA_AND_LINK_REPAIR",
+      "lastReviewedBaseline": "a455c8e76427d53d75bb7f15259b9875d9768914",
+      "lastReviewedAt": "2026-09-02",
+      "linkedFromIndex": true,
+      "notes": "Does not grant current execution authority. HISTORICAL_PATH_NOT_EXECUTION_AUTHORITY=true"
+    },
+    {
+      "path": "experiments/ccv-r1/evidence/README.md",
+      "repository": "Core",
+      "documentClass": "IMPLEMENTATION_EVIDENCE",
+      "status": "RECORDED",
+      "owner": "Experiment Owner",
+      "authoritativeFor": [
+        "bounded implementation or verification evidence only"
+      ],
+      "supersedes": [],
+      "supersededBy": [],
+      "currentStateClaimsAllowed": false,
+      "historicalMutationPolicy": "IMMUTABLE_EXCEPT_METADATA_AND_LINK_REPAIR",
+      "lastReviewedBaseline": "a455c8e76427d53d75bb7f15259b9875d9768914",
+      "lastReviewedAt": "2026-09-02",
+      "linkedFromIndex": true,
+      "notes": "Does not grant current execution authority. HISTORICAL_PATH_NOT_EXECUTION_AUTHORITY=true"
+    },
+    {
+      "path": "experiments/ccv-r1/experiment-manifest.pending.json",
+      "repository": "Core",
+      "documentClass": "DRAFT",
+      "status": "DRAFT",
+      "owner": "Experiment Owner",
+      "authoritativeFor": [],
+      "supersedes": [],
+      "supersededBy": [],
+      "currentStateClaimsAllowed": false,
+      "historicalMutationPolicy": "EDITABLE_UNTIL_ACCEPTED_OR_WITHDRAWN",
+      "lastReviewedBaseline": "a455c8e76427d53d75bb7f15259b9875d9768914",
+      "lastReviewedAt": "2026-09-02",
+      "linkedFromIndex": true,
+      "notes": "Non-authoritative until separately accepted."
+    },
+    {
+      "path": "experiments/ccv-r1/experiment-manifest.schema.json",
+      "repository": "Core",
+      "documentClass": "IMPLEMENTATION_EVIDENCE",
+      "status": "RECORDED",
+      "owner": "Experiment Owner",
+      "authoritativeFor": [
+        "bounded implementation or verification evidence only"
+      ],
+      "supersedes": [],
+      "supersededBy": [],
+      "currentStateClaimsAllowed": false,
+      "historicalMutationPolicy": "IMMUTABLE_EXCEPT_METADATA_AND_LINK_REPAIR",
+      "lastReviewedBaseline": "a455c8e76427d53d75bb7f15259b9875d9768914",
+      "lastReviewedAt": "2026-09-02",
+      "linkedFromIndex": true,
+      "notes": "Does not grant current execution authority. HISTORICAL_PATH_NOT_EXECUTION_AUTHORITY=true"
+    },
+    {
+      "path": "experiments/ccv-r1/workflows/README.md",
+      "repository": "Core",
+      "documentClass": "IMPLEMENTATION_EVIDENCE",
+      "status": "RECORDED",
+      "owner": "Experiment Owner",
+      "authoritativeFor": [
+        "bounded implementation or verification evidence only"
+      ],
+      "supersedes": [],
+      "supersededBy": [],
+      "currentStateClaimsAllowed": false,
+      "historicalMutationPolicy": "IMMUTABLE_EXCEPT_METADATA_AND_LINK_REPAIR",
+      "lastReviewedBaseline": "a455c8e76427d53d75bb7f15259b9875d9768914",
+      "lastReviewedAt": "2026-09-02",
+      "linkedFromIndex": true,
+      "notes": "Does not grant current execution authority. HISTORICAL_PATH_NOT_EXECUTION_AUTHORITY=true"
+    },
+    {
+      "path": "experiments/k2-001-canonical-bootstrap/README.md",
+      "repository": "Core",
+      "documentClass": "IMPLEMENTATION_EVIDENCE",
+      "status": "RECORDED",
+      "owner": "Experiment Owner",
+      "authoritativeFor": [
+        "bounded implementation or verification evidence only"
+      ],
+      "supersedes": [],
+      "supersededBy": [],
+      "currentStateClaimsAllowed": false,
+      "historicalMutationPolicy": "IMMUTABLE_EXCEPT_METADATA_AND_LINK_REPAIR",
+      "lastReviewedBaseline": "a455c8e76427d53d75bb7f15259b9875d9768914",
+      "lastReviewedAt": "2026-09-02",
+      "linkedFromIndex": true,
+      "notes": "Does not grant current execution authority. HISTORICAL_PATH_NOT_EXECUTION_AUTHORITY=true"
+    },
+    {
+      "path": "experiments/k2-001-m6-draft/README.md",
+      "repository": "Core",
+      "documentClass": "IMPLEMENTATION_EVIDENCE",
+      "status": "RECORDED",
+      "owner": "Experiment Owner",
+      "authoritativeFor": [
+        "bounded implementation or verification evidence only"
+      ],
+      "supersedes": [],
+      "supersededBy": [],
+      "currentStateClaimsAllowed": false,
+      "historicalMutationPolicy": "IMMUTABLE_EXCEPT_METADATA_AND_LINK_REPAIR",
+      "lastReviewedBaseline": "a455c8e76427d53d75bb7f15259b9875d9768914",
+      "lastReviewedAt": "2026-09-02",
+      "linkedFromIndex": true,
+      "notes": "Does not grant current execution authority. HISTORICAL_PATH_NOT_EXECUTION_AUTHORITY=true"
+    },
+    {
+      "path": "experiments/k2-001-preboot/README.md",
+      "repository": "Core",
+      "documentClass": "IMPLEMENTATION_EVIDENCE",
+      "status": "RECORDED",
+      "owner": "Experiment Owner",
+      "authoritativeFor": [
+        "bounded implementation or verification evidence only"
+      ],
+      "supersedes": [],
+      "supersededBy": [],
+      "currentStateClaimsAllowed": false,
+      "historicalMutationPolicy": "IMMUTABLE_EXCEPT_METADATA_AND_LINK_REPAIR",
+      "lastReviewedBaseline": "a455c8e76427d53d75bb7f15259b9875d9768914",
+      "lastReviewedAt": "2026-09-02",
+      "linkedFromIndex": true,
+      "notes": "Does not grant current execution authority. HISTORICAL_PATH_NOT_EXECUTION_AUTHORITY=true"
+    },
+    {
+      "path": "experiments/k2-002-changan-preproduction/README.md",
+      "repository": "Core",
+      "documentClass": "IMPLEMENTATION_EVIDENCE",
+      "status": "RECORDED",
+      "owner": "Experiment Owner",
+      "authoritativeFor": [
+        "bounded implementation or verification evidence only"
+      ],
+      "supersedes": [],
+      "supersededBy": [],
+      "currentStateClaimsAllowed": false,
+      "historicalMutationPolicy": "IMMUTABLE_EXCEPT_METADATA_AND_LINK_REPAIR",
+      "lastReviewedBaseline": "a455c8e76427d53d75bb7f15259b9875d9768914",
+      "lastReviewedAt": "2026-09-02",
+      "linkedFromIndex": true,
+      "notes": "Does not grant current execution authority. HISTORICAL_PATH_NOT_EXECUTION_AUTHORITY=true"
+    },
+    {
+      "path": "experiments/k2-002-ep01-i2v-v2/README.md",
+      "repository": "Core",
+      "documentClass": "IMPLEMENTATION_EVIDENCE",
+      "status": "RECORDED",
+      "owner": "Experiment Owner",
+      "authoritativeFor": [
+        "bounded implementation or verification evidence only"
+      ],
+      "supersedes": [],
+      "supersededBy": [],
+      "currentStateClaimsAllowed": false,
+      "historicalMutationPolicy": "IMMUTABLE_EXCEPT_METADATA_AND_LINK_REPAIR",
+      "lastReviewedBaseline": "a455c8e76427d53d75bb7f15259b9875d9768914",
+      "lastReviewedAt": "2026-09-02",
+      "linkedFromIndex": true,
+      "notes": "Does not grant current execution authority. HISTORICAL_PATH_NOT_EXECUTION_AUTHORITY=true"
+    },
+    {
+      "path": "experiments/k2-002-ep01-i2v-v2/anchor_manifest.json",
+      "repository": "Core",
+      "documentClass": "IMPLEMENTATION_EVIDENCE",
+      "status": "RECORDED",
+      "owner": "Experiment Owner",
+      "authoritativeFor": [
+        "bounded implementation or verification evidence only"
+      ],
+      "supersedes": [],
+      "supersededBy": [],
+      "currentStateClaimsAllowed": false,
+      "historicalMutationPolicy": "IMMUTABLE_EXCEPT_METADATA_AND_LINK_REPAIR",
+      "lastReviewedBaseline": "a455c8e76427d53d75bb7f15259b9875d9768914",
+      "lastReviewedAt": "2026-09-02",
+      "linkedFromIndex": true,
+      "notes": "Does not grant current execution authority. HISTORICAL_PATH_NOT_EXECUTION_AUTHORITY=true"
+    },
+    {
+      "path": "experiments/k2-002-ep01-i2v-v2/archive_manifest.json",
+      "repository": "Core",
+      "documentClass": "IMPLEMENTATION_EVIDENCE",
+      "status": "RECORDED",
+      "owner": "Experiment Owner",
+      "authoritativeFor": [
+        "bounded implementation or verification evidence only"
+      ],
+      "supersedes": [],
+      "supersededBy": [],
+      "currentStateClaimsAllowed": false,
+      "historicalMutationPolicy": "IMMUTABLE_EXCEPT_METADATA_AND_LINK_REPAIR",
+      "lastReviewedBaseline": "a455c8e76427d53d75bb7f15259b9875d9768914",
+      "lastReviewedAt": "2026-09-02",
+      "linkedFromIndex": true,
+      "notes": "Does not grant current execution authority. HISTORICAL_PATH_NOT_EXECUTION_AUTHORITY=true"
+    },
+    {
+      "path": "experiments/k2-002-ep01-i2v/RUNBOOK.md",
+      "repository": "Core",
+      "documentClass": "OPERATIONAL_RUNBOOK",
+      "status": "ACTIVE",
+      "owner": "Experiment Owner",
+      "authoritativeFor": [
+        "bounded operator procedure and its declared preconditions"
+      ],
+      "supersedes": [],
+      "supersededBy": [],
+      "currentStateClaimsAllowed": false,
+      "historicalMutationPolicy": "UPDATE_WITH_REPRODUCIBLE_PRECONDITION_REVIEW",
+      "lastReviewedBaseline": "a455c8e76427d53d75bb7f15259b9875d9768914",
+      "lastReviewedAt": "2026-09-02",
+      "linkedFromIndex": true,
+      "notes": "Authority is limited to the document's declared scope and subordinate to Accepted ADRs."
+    },
+    {
+      "path": "governance/ACS-ARCH-R1-V5-TEXT-GENERATION-G0.md",
+      "repository": "Core",
+      "documentClass": "HISTORICAL_EVIDENCE",
+      "status": "HISTORICAL",
+      "owner": "Architecture Owner / Documentation Governance Owner",
+      "authoritativeFor": [
+        "immutable historical evidence only"
+      ],
+      "supersedes": [],
+      "supersededBy": [],
+      "currentStateClaimsAllowed": false,
+      "historicalMutationPolicy": "IMMUTABLE_EXCEPT_METADATA_AND_LINK_REPAIR",
+      "lastReviewedBaseline": "a455c8e76427d53d75bb7f15259b9875d9768914",
+      "lastReviewedAt": "2026-09-02",
+      "linkedFromIndex": true,
+      "notes": "Does not grant current execution authority. HISTORICAL_PATH_NOT_EXECUTION_AUTHORITY=true"
+    },
+    {
+      "path": "governance/ACS-ARCH-R1-V5-TEXT-GENERATION-G1-R1-AUTHORIZATION.md",
+      "repository": "Core",
+      "documentClass": "HISTORICAL_EVIDENCE",
+      "status": "HISTORICAL",
+      "owner": "Architecture Owner / Documentation Governance Owner",
+      "authoritativeFor": [
+        "immutable historical evidence only"
+      ],
+      "supersedes": [],
+      "supersededBy": [],
+      "currentStateClaimsAllowed": false,
+      "historicalMutationPolicy": "IMMUTABLE_EXCEPT_METADATA_AND_LINK_REPAIR",
+      "lastReviewedBaseline": "a455c8e76427d53d75bb7f15259b9875d9768914",
+      "lastReviewedAt": "2026-09-02",
+      "linkedFromIndex": true,
+      "notes": "Does not grant current execution authority. HISTORICAL_PATH_NOT_EXECUTION_AUTHORITY=true"
+    },
+    {
+      "path": "governance/ACS-ARCH-R1-V5-TEXT-GENERATION-G1-R1-CLOSEOUT-M6-P3-G0-OWNER-REVIEW.md",
+      "repository": "Core",
+      "documentClass": "HISTORICAL_EVIDENCE",
+      "status": "HISTORICAL",
+      "owner": "Architecture Owner / Documentation Governance Owner",
+      "authoritativeFor": [
+        "immutable historical evidence only"
+      ],
+      "supersedes": [],
+      "supersededBy": [],
+      "currentStateClaimsAllowed": false,
+      "historicalMutationPolicy": "IMMUTABLE_EXCEPT_METADATA_AND_LINK_REPAIR",
+      "lastReviewedBaseline": "a455c8e76427d53d75bb7f15259b9875d9768914",
+      "lastReviewedAt": "2026-09-02",
+      "linkedFromIndex": true,
+      "notes": "Does not grant current execution authority. HISTORICAL_PATH_NOT_EXECUTION_AUTHORITY=true"
+    },
+    {
+      "path": "governance/ACS-CCV-R1-EVIDENCE-HARDENING.md",
+      "repository": "Core",
+      "documentClass": "HISTORICAL_EVIDENCE",
+      "status": "HISTORICAL",
+      "owner": "Architecture Owner / Documentation Governance Owner",
+      "authoritativeFor": [
+        "immutable historical evidence only"
+      ],
+      "supersedes": [],
+      "supersededBy": [],
+      "currentStateClaimsAllowed": false,
+      "historicalMutationPolicy": "IMMUTABLE_EXCEPT_METADATA_AND_LINK_REPAIR",
+      "lastReviewedBaseline": "a455c8e76427d53d75bb7f15259b9875d9768914",
+      "lastReviewedAt": "2026-09-02",
+      "linkedFromIndex": true,
+      "notes": "Does not grant current execution authority. HISTORICAL_PATH_NOT_EXECUTION_AUTHORITY=true"
+    },
+    {
+      "path": "governance/ACS-GOV-POST-M6-P3-G1-CLOSEOUT.md",
+      "repository": "Core",
+      "documentClass": "HISTORICAL_EVIDENCE",
+      "status": "HISTORICAL",
+      "owner": "Architecture Owner / Documentation Governance Owner",
+      "authoritativeFor": [
+        "immutable historical evidence only"
+      ],
+      "supersedes": [],
+      "supersededBy": [],
+      "currentStateClaimsAllowed": false,
+      "historicalMutationPolicy": "IMMUTABLE_EXCEPT_METADATA_AND_LINK_REPAIR",
+      "lastReviewedBaseline": "a455c8e76427d53d75bb7f15259b9875d9768914",
+      "lastReviewedAt": "2026-09-02",
+      "linkedFromIndex": true,
+      "notes": "Does not grant current execution authority. HISTORICAL_PATH_NOT_EXECUTION_AUTHORITY=true"
+    },
+    {
+      "path": "governance/ACS-K2-002-NON-GPU-PREPRODUCTION-REBASELINE.md",
+      "repository": "Core",
+      "documentClass": "HISTORICAL_EVIDENCE",
+      "status": "HISTORICAL",
+      "owner": "Architecture Owner / Documentation Governance Owner",
+      "authoritativeFor": [
+        "immutable historical evidence only"
+      ],
+      "supersedes": [],
+      "supersededBy": [],
+      "currentStateClaimsAllowed": false,
+      "historicalMutationPolicy": "IMMUTABLE_EXCEPT_METADATA_AND_LINK_REPAIR",
+      "lastReviewedBaseline": "a455c8e76427d53d75bb7f15259b9875d9768914",
+      "lastReviewedAt": "2026-09-02",
+      "linkedFromIndex": true,
+      "notes": "Does not grant current execution authority. HISTORICAL_PATH_NOT_EXECUTION_AUTHORITY=true"
+    },
+    {
+      "path": "governance/ACS-K2-002-SCRIPT-V1-4-ACCEPTANCE-AND-EP01-IMPLEMENTATION.md",
+      "repository": "Core",
+      "documentClass": "HISTORICAL_EVIDENCE",
+      "status": "HISTORICAL",
+      "owner": "Architecture Owner / Documentation Governance Owner",
+      "authoritativeFor": [
+        "immutable historical evidence only"
+      ],
+      "supersedes": [],
+      "supersededBy": [],
+      "currentStateClaimsAllowed": false,
+      "historicalMutationPolicy": "IMMUTABLE_EXCEPT_METADATA_AND_LINK_REPAIR",
+      "lastReviewedBaseline": "a455c8e76427d53d75bb7f15259b9875d9768914",
+      "lastReviewedAt": "2026-09-02",
+      "linkedFromIndex": true,
+      "notes": "Does not grant current execution authority. HISTORICAL_PATH_NOT_EXECUTION_AUTHORITY=true"
+    },
+    {
+      "path": "governance/ACS-K2-002-SCRIPT-V1-4-EXACT-DIGEST-REBASELINE.md",
+      "repository": "Core",
+      "documentClass": "HISTORICAL_EVIDENCE",
+      "status": "HISTORICAL",
+      "owner": "Architecture Owner / Documentation Governance Owner",
+      "authoritativeFor": [
+        "immutable historical evidence only"
+      ],
+      "supersedes": [],
+      "supersededBy": [],
+      "currentStateClaimsAllowed": false,
+      "historicalMutationPolicy": "IMMUTABLE_EXCEPT_METADATA_AND_LINK_REPAIR",
+      "lastReviewedBaseline": "a455c8e76427d53d75bb7f15259b9875d9768914",
+      "lastReviewedAt": "2026-09-02",
+      "linkedFromIndex": true,
+      "notes": "Does not grant current execution authority. HISTORICAL_PATH_NOT_EXECUTION_AUTHORITY=true"
+    },
+    {
+      "path": "governance/ACS-M6-P0-P1-R2-CLOSEOUT-G2-M6-P2-AUTHORIZATION.md",
+      "repository": "Core",
+      "documentClass": "HISTORICAL_EVIDENCE",
+      "status": "HISTORICAL",
+      "owner": "Architecture Owner / Documentation Governance Owner",
+      "authoritativeFor": [
+        "immutable historical evidence only"
+      ],
+      "supersedes": [],
+      "supersededBy": [],
+      "currentStateClaimsAllowed": false,
+      "historicalMutationPolicy": "IMMUTABLE_EXCEPT_METADATA_AND_LINK_REPAIR",
+      "lastReviewedBaseline": "a455c8e76427d53d75bb7f15259b9875d9768914",
+      "lastReviewedAt": "2026-09-02",
+      "linkedFromIndex": true,
+      "notes": "Does not grant current execution authority. HISTORICAL_PATH_NOT_EXECUTION_AUTHORITY=true"
+    },
+    {
+      "path": "governance/ACS-M6-P2-G1-CLOSEOUT-G3-M6-P3-G0.md",
+      "repository": "Core",
+      "documentClass": "HISTORICAL_EVIDENCE",
+      "status": "HISTORICAL",
+      "owner": "Architecture Owner / Documentation Governance Owner",
+      "authoritativeFor": [
+        "immutable historical evidence only"
+      ],
+      "supersedes": [],
+      "supersededBy": [],
+      "currentStateClaimsAllowed": false,
+      "historicalMutationPolicy": "IMMUTABLE_EXCEPT_METADATA_AND_LINK_REPAIR",
+      "lastReviewedBaseline": "a455c8e76427d53d75bb7f15259b9875d9768914",
+      "lastReviewedAt": "2026-09-02",
+      "linkedFromIndex": true,
+      "notes": "Does not grant current execution authority. HISTORICAL_PATH_NOT_EXECUTION_AUTHORITY=true"
+    },
+    {
+      "path": "governance/ACS-M6-P3-B1-EPISODE-PLAN-ITEM-BINDING.md",
+      "repository": "Core",
+      "documentClass": "HISTORICAL_EVIDENCE",
+      "status": "HISTORICAL",
+      "owner": "Architecture Owner / Documentation Governance Owner",
+      "authoritativeFor": [
+        "immutable historical evidence only"
+      ],
+      "supersedes": [],
+      "supersededBy": [],
+      "currentStateClaimsAllowed": false,
+      "historicalMutationPolicy": "IMMUTABLE_EXCEPT_METADATA_AND_LINK_REPAIR",
+      "lastReviewedBaseline": "a455c8e76427d53d75bb7f15259b9875d9768914",
+      "lastReviewedAt": "2026-09-02",
+      "linkedFromIndex": true,
+      "notes": "Does not grant current execution authority. HISTORICAL_PATH_NOT_EXECUTION_AUTHORITY=true"
+    },
+    {
+      "path": "governance/ACS-M6-P3-G0-OWNER-ACCEPTANCE.md",
+      "repository": "Core",
+      "documentClass": "HISTORICAL_EVIDENCE",
+      "status": "HISTORICAL",
+      "owner": "Architecture Owner / Documentation Governance Owner",
+      "authoritativeFor": [
+        "immutable historical evidence only"
+      ],
+      "supersedes": [],
+      "supersededBy": [],
+      "currentStateClaimsAllowed": false,
+      "historicalMutationPolicy": "IMMUTABLE_EXCEPT_METADATA_AND_LINK_REPAIR",
+      "lastReviewedBaseline": "a455c8e76427d53d75bb7f15259b9875d9768914",
+      "lastReviewedAt": "2026-09-02",
+      "linkedFromIndex": true,
+      "notes": "Does not grant current execution authority. HISTORICAL_PATH_NOT_EXECUTION_AUTHORITY=true"
+    },
+    {
+      "path": "governance/ACS-M6-P3-G1-EPISODE-BASELINE-CONSUMER.md",
+      "repository": "Core",
+      "documentClass": "HISTORICAL_EVIDENCE",
+      "status": "HISTORICAL",
+      "owner": "Architecture Owner / Documentation Governance Owner",
+      "authoritativeFor": [
+        "immutable historical evidence only"
+      ],
+      "supersedes": [],
+      "supersededBy": [],
+      "currentStateClaimsAllowed": false,
+      "historicalMutationPolicy": "IMMUTABLE_EXCEPT_METADATA_AND_LINK_REPAIR",
+      "lastReviewedBaseline": "a455c8e76427d53d75bb7f15259b9875d9768914",
+      "lastReviewedAt": "2026-09-02",
+      "linkedFromIndex": true,
+      "notes": "Does not grant current execution authority. HISTORICAL_PATH_NOT_EXECUTION_AUTHORITY=true"
+    },
+    {
+      "path": "governance/ADR-0001-separate-commercial-experience-layer-from-core-creator-runtime.md",
+      "repository": "Core",
+      "documentClass": "ACCEPTED_DECISION",
+      "status": "ACCEPTED",
+      "owner": "Architecture Owner / Documentation Governance Owner",
+      "authoritativeFor": [
+        "durable architecture decision within the document's explicit scope"
+      ],
+      "supersedes": [],
+      "supersededBy": [],
+      "currentStateClaimsAllowed": false,
+      "historicalMutationPolicy": "AMEND_OR_SUPERSEDE_BY_ACCEPTED_ADR_ONLY",
+      "lastReviewedBaseline": "a455c8e76427d53d75bb7f15259b9875d9768914",
+      "lastReviewedAt": "2026-09-02",
+      "linkedFromIndex": true,
+      "notes": "Authority is limited to the document's declared scope and subordinate to Accepted ADRs."
+    },
+    {
+      "path": "governance/ADR-0002-v5-lifecycle-integrity-boundary.md",
+      "repository": "Core",
+      "documentClass": "ACCEPTED_DECISION",
+      "status": "ACCEPTED",
+      "owner": "Architecture Owner / Documentation Governance Owner",
+      "authoritativeFor": [
+        "durable architecture decision within the document's explicit scope"
+      ],
+      "supersedes": [],
+      "supersededBy": [],
+      "currentStateClaimsAllowed": false,
+      "historicalMutationPolicy": "AMEND_OR_SUPERSEDE_BY_ACCEPTED_ADR_ONLY",
+      "lastReviewedBaseline": "a455c8e76427d53d75bb7f15259b9875d9768914",
+      "lastReviewedAt": "2026-09-02",
+      "linkedFromIndex": true,
+      "notes": "Authority is limited to the document's declared scope and subordinate to Accepted ADRs."
+    },
+    {
+      "path": "governance/ADR-0003-m6-series-intelligence-baseline.md",
+      "repository": "Core",
+      "documentClass": "ACCEPTED_DECISION",
+      "status": "ACCEPTED",
+      "owner": "Architecture Owner / Documentation Governance Owner",
+      "authoritativeFor": [
+        "durable architecture decision within the document's explicit scope"
+      ],
+      "supersedes": [],
+      "supersededBy": [],
+      "currentStateClaimsAllowed": false,
+      "historicalMutationPolicy": "AMEND_OR_SUPERSEDE_BY_ACCEPTED_ADR_ONLY",
+      "lastReviewedBaseline": "a455c8e76427d53d75bb7f15259b9875d9768914",
+      "lastReviewedAt": "2026-09-02",
+      "linkedFromIndex": true,
+      "notes": "Authority is limited to the document's declared scope and subordinate to Accepted ADRs."
+    },
+    {
+      "path": "governance/ADR-0004-m6-series-intelligence-durable-sqlite-boundary.md",
+      "repository": "Core",
+      "documentClass": "ACCEPTED_DECISION",
+      "status": "ACCEPTED",
+      "owner": "Architecture Owner / Documentation Governance Owner",
+      "authoritativeFor": [
+        "durable architecture decision within the document's explicit scope"
+      ],
+      "supersedes": [],
+      "supersededBy": [],
+      "currentStateClaimsAllowed": false,
+      "historicalMutationPolicy": "AMEND_OR_SUPERSEDE_BY_ACCEPTED_ADR_ONLY",
+      "lastReviewedBaseline": "a455c8e76427d53d75bb7f15259b9875d9768914",
+      "lastReviewedAt": "2026-09-02",
+      "linkedFromIndex": true,
+      "notes": "Authority is limited to the document's declared scope and subordinate to Accepted ADRs."
+    },
+    {
+      "path": "governance/ADR-0005-m6-series-intelligence-consumer-boundary.md",
+      "repository": "Core",
+      "documentClass": "ACCEPTED_DECISION",
+      "status": "ACCEPTED",
+      "owner": "Architecture Owner / Documentation Governance Owner",
+      "authoritativeFor": [
+        "durable architecture decision within the document's explicit scope"
+      ],
+      "supersedes": [],
+      "supersededBy": [],
+      "currentStateClaimsAllowed": false,
+      "historicalMutationPolicy": "AMEND_OR_SUPERSEDE_BY_ACCEPTED_ADR_ONLY",
+      "lastReviewedBaseline": "a455c8e76427d53d75bb7f15259b9875d9768914",
+      "lastReviewedAt": "2026-09-02",
+      "linkedFromIndex": true,
+      "notes": "Authority is limited to the document's declared scope and subordinate to Accepted ADRs."
+    },
+    {
+      "path": "governance/ADR-0006-v5-text-generation-capability-boundary.md",
+      "repository": "Core",
+      "documentClass": "ACCEPTED_DECISION",
+      "status": "ACCEPTED",
+      "owner": "Architecture Owner / Documentation Governance Owner",
+      "authoritativeFor": [
+        "durable architecture decision within the document's explicit scope"
+      ],
+      "supersedes": [],
+      "supersededBy": [],
+      "currentStateClaimsAllowed": false,
+      "historicalMutationPolicy": "AMEND_OR_SUPERSEDE_BY_ACCEPTED_ADR_ONLY",
+      "lastReviewedBaseline": "a455c8e76427d53d75bb7f15259b9875d9768914",
+      "lastReviewedAt": "2026-09-02",
+      "linkedFromIndex": true,
+      "notes": "Authority is limited to the document's declared scope and subordinate to Accepted ADRs."
+    },
+    {
+      "path": "governance/ADR-0007-creator-public-api-authentication-and-workspace-isolation.md",
+      "repository": "Core",
+      "documentClass": "ACCEPTED_DECISION",
+      "status": "ACCEPTED",
+      "owner": "Architecture Owner / Documentation Governance Owner",
+      "authoritativeFor": [
+        "durable architecture decision within the document's explicit scope"
+      ],
+      "supersedes": [],
+      "supersededBy": [],
+      "currentStateClaimsAllowed": false,
+      "historicalMutationPolicy": "AMEND_OR_SUPERSEDE_BY_ACCEPTED_ADR_ONLY",
+      "lastReviewedBaseline": "a455c8e76427d53d75bb7f15259b9875d9768914",
+      "lastReviewedAt": "2026-09-02",
+      "linkedFromIndex": true,
+      "notes": "Authority is limited to the document's declared scope and subordinate to Accepted ADRs."
+    },
+    {
+      "path": "governance/ADR-0008-k2-single-episode-production-closure.md",
+      "repository": "Core",
+      "documentClass": "ACCEPTED_DECISION",
+      "status": "ACCEPTED",
+      "owner": "Architecture Owner / Documentation Governance Owner",
+      "authoritativeFor": [
+        "durable architecture decision within the document's explicit scope"
+      ],
+      "supersedes": [],
+      "supersededBy": [],
+      "currentStateClaimsAllowed": false,
+      "historicalMutationPolicy": "AMEND_OR_SUPERSEDE_BY_ACCEPTED_ADR_ONLY",
+      "lastReviewedBaseline": "a455c8e76427d53d75bb7f15259b9875d9768914",
+      "lastReviewedAt": "2026-09-02",
+      "linkedFromIndex": true,
+      "notes": "Authority is limited to the document's declared scope and subordinate to Accepted ADRs."
+    },
+    {
+      "path": "governance/ADR-0009-k2-publishable-media-production.md",
+      "repository": "Core",
+      "documentClass": "ACCEPTED_DECISION",
+      "status": "ACCEPTED",
+      "owner": "Architecture Owner / Documentation Governance Owner",
+      "authoritativeFor": [
+        "durable architecture decision within the document's explicit scope"
+      ],
+      "supersedes": [],
+      "supersededBy": [
+        "governance/ADR-0011-k2-internal-self-hosted-p1.md",
+        "governance/ADR-0014-k2-001-archive-k2-002-changan-start.md"
+      ],
+      "currentStateClaimsAllowed": false,
+      "historicalMutationPolicy": "AMEND_OR_SUPERSEDE_BY_ACCEPTED_ADR_ONLY",
+      "lastReviewedBaseline": "a455c8e76427d53d75bb7f15259b9875d9768914",
+      "lastReviewedAt": "2026-09-02",
+      "linkedFromIndex": true,
+      "notes": "Accepted decision remains historical architecture authority in its original scope; later ADRs amend or narrow current application."
+    },
+    {
+      "path": "governance/ADR-0010-k2-canonical-lineage-bootstrap.md",
+      "repository": "Core",
+      "documentClass": "ACCEPTED_DECISION",
+      "status": "ACCEPTED",
+      "owner": "Architecture Owner / Documentation Governance Owner",
+      "authoritativeFor": [
+        "durable architecture decision within the document's explicit scope"
+      ],
+      "supersedes": [],
+      "supersededBy": [],
+      "currentStateClaimsAllowed": false,
+      "historicalMutationPolicy": "AMEND_OR_SUPERSEDE_BY_ACCEPTED_ADR_ONLY",
+      "lastReviewedBaseline": "a455c8e76427d53d75bb7f15259b9875d9768914",
+      "lastReviewedAt": "2026-09-02",
+      "linkedFromIndex": true,
+      "notes": "Authority is limited to the document's declared scope and subordinate to Accepted ADRs."
+    },
+    {
+      "path": "governance/ADR-0011-k2-internal-self-hosted-p1.md",
+      "repository": "Core",
+      "documentClass": "ACCEPTED_DECISION",
+      "status": "ACCEPTED",
+      "owner": "Architecture Owner / Documentation Governance Owner",
+      "authoritativeFor": [
+        "durable architecture decision within the document's explicit scope"
+      ],
+      "supersedes": [
+        "governance/K2_P1_PREBOOT_OFFLINE_PACKAGE.md",
+        "governance/K2_PUBLISHABLE_P0_EXTERNAL_HOLD.md"
+      ],
+      "supersededBy": [],
+      "currentStateClaimsAllowed": false,
+      "historicalMutationPolicy": "AMEND_OR_SUPERSEDE_BY_ACCEPTED_ADR_ONLY",
+      "lastReviewedBaseline": "a455c8e76427d53d75bb7f15259b9875d9768914",
+      "lastReviewedAt": "2026-09-02",
+      "linkedFromIndex": true,
+      "notes": "Authority is limited to the document's declared scope and subordinate to Accepted ADRs."
+    },
+    {
+      "path": "governance/ADR-0012-k2-internal-image-first-real-media-revision.md",
+      "repository": "Core",
+      "documentClass": "ACCEPTED_DECISION",
+      "status": "ACCEPTED",
+      "owner": "Architecture Owner / Documentation Governance Owner",
+      "authoritativeFor": [
+        "durable architecture decision within the document's explicit scope"
+      ],
+      "supersedes": [],
+      "supersededBy": [
+        "governance/ADR-0013-k2-control-plane-convergence.md"
+      ],
+      "currentStateClaimsAllowed": false,
+      "historicalMutationPolicy": "AMEND_OR_SUPERSEDE_BY_ACCEPTED_ADR_ONLY",
+      "lastReviewedBaseline": "a455c8e76427d53d75bb7f15259b9875d9768914",
+      "lastReviewedAt": "2026-09-02",
+      "linkedFromIndex": true,
+      "notes": "Accepted decision remains historical architecture authority in its original scope; later ADRs amend or narrow current application."
+    },
+    {
+      "path": "governance/ADR-0013-k2-control-plane-convergence.md",
+      "repository": "Core",
+      "documentClass": "ACCEPTED_DECISION",
+      "status": "ACCEPTED",
+      "owner": "Architecture Owner / Documentation Governance Owner",
+      "authoritativeFor": [
+        "durable architecture decision within the document's explicit scope"
+      ],
+      "supersedes": [],
+      "supersededBy": [],
+      "currentStateClaimsAllowed": false,
+      "historicalMutationPolicy": "AMEND_OR_SUPERSEDE_BY_ACCEPTED_ADR_ONLY",
+      "lastReviewedBaseline": "a455c8e76427d53d75bb7f15259b9875d9768914",
+      "lastReviewedAt": "2026-09-02",
+      "linkedFromIndex": true,
+      "notes": "Authority is limited to the document's declared scope and subordinate to Accepted ADRs."
+    },
+    {
+      "path": "governance/ADR-0014-k2-001-archive-k2-002-changan-start.md",
+      "repository": "Core",
+      "documentClass": "ACCEPTED_DECISION",
+      "status": "ACCEPTED",
+      "owner": "Architecture Owner / Documentation Governance Owner",
+      "authoritativeFor": [
+        "durable architecture decision within the document's explicit scope"
+      ],
+      "supersedes": [
+        "architecture/K2_PUBLISHABLE_MEDIA_PRODUCTION_CONTRACT.md",
+        "governance/K2_PUBLISHABLE_PRODUCTION_EXECUTION_PACKAGE.md"
+      ],
+      "supersededBy": [],
+      "currentStateClaimsAllowed": false,
+      "historicalMutationPolicy": "AMEND_OR_SUPERSEDE_BY_ACCEPTED_ADR_ONLY",
+      "lastReviewedBaseline": "a455c8e76427d53d75bb7f15259b9875d9768914",
+      "lastReviewedAt": "2026-09-02",
+      "linkedFromIndex": true,
+      "notes": "Authority is limited to the document's declared scope and subordinate to Accepted ADRs."
+    },
+    {
+      "path": "governance/ADR-0015-m12-isolated-audio-runtime-and-acyclic-voice-clone-lineage.md",
+      "repository": "Core",
+      "documentClass": "ACCEPTED_DECISION",
+      "status": "ACCEPTED",
+      "owner": "Architecture Owner / Documentation Governance Owner",
+      "authoritativeFor": [
+        "durable architecture decision within the document's explicit scope"
+      ],
+      "supersedes": [],
+      "supersededBy": [],
+      "currentStateClaimsAllowed": false,
+      "historicalMutationPolicy": "AMEND_OR_SUPERSEDE_BY_ACCEPTED_ADR_ONLY",
+      "lastReviewedBaseline": "a455c8e76427d53d75bb7f15259b9875d9768914",
+      "lastReviewedAt": "2026-09-02",
+      "linkedFromIndex": true,
+      "notes": "Authority is limited to the document's declared scope and subordinate to Accepted ADRs."
+    },
+    {
+      "path": "governance/ADR-0016-m13-timeline-render-candidate-and-deterministic-post-boundary.md",
+      "repository": "Core",
+      "documentClass": "ACCEPTED_DECISION",
+      "status": "ACCEPTED",
+      "owner": "Architecture Owner / Documentation Governance Owner",
+      "authoritativeFor": [
+        "durable architecture decision within the document's explicit scope"
+      ],
+      "supersedes": [],
+      "supersededBy": [],
+      "currentStateClaimsAllowed": false,
+      "historicalMutationPolicy": "AMEND_OR_SUPERSEDE_BY_ACCEPTED_ADR_ONLY",
+      "lastReviewedBaseline": "a455c8e76427d53d75bb7f15259b9875d9768914",
+      "lastReviewedAt": "2026-09-02",
+      "linkedFromIndex": true,
+      "notes": "Authority is limited to the document's declared scope and subordinate to Accepted ADRs."
+    },
+    {
+      "path": "governance/ADR-0017-canonical-static-resource-assets-and-font-license-boundary.md",
+      "repository": "Core",
+      "documentClass": "ACCEPTED_DECISION",
+      "status": "ACCEPTED",
+      "owner": "Architecture Owner / Documentation Governance Owner",
+      "authoritativeFor": [
+        "durable architecture decision within the document's explicit scope"
+      ],
+      "supersedes": [],
+      "supersededBy": [],
+      "currentStateClaimsAllowed": false,
+      "historicalMutationPolicy": "AMEND_OR_SUPERSEDE_BY_ACCEPTED_ADR_ONLY",
+      "lastReviewedBaseline": "a455c8e76427d53d75bb7f15259b9875d9768914",
+      "lastReviewedAt": "2026-09-02",
+      "linkedFromIndex": true,
+      "notes": "Authority is limited to the document's declared scope and subordinate to Accepted ADRs."
+    },
+    {
+      "path": "governance/ADR-0018-canonical-identity-reference-version-projection-and-runtime-currentness-boundary.md",
+      "repository": "Core",
+      "documentClass": "ACCEPTED_DECISION",
+      "status": "ACCEPTED",
+      "owner": "Architecture Owner / Documentation Governance Owner",
+      "authoritativeFor": [
+        "durable architecture decision within the document's explicit scope"
+      ],
+      "supersedes": [],
+      "supersededBy": [],
+      "currentStateClaimsAllowed": false,
+      "historicalMutationPolicy": "AMEND_OR_SUPERSEDE_BY_ACCEPTED_ADR_ONLY",
+      "lastReviewedBaseline": "a455c8e76427d53d75bb7f15259b9875d9768914",
+      "lastReviewedAt": "2026-09-02",
+      "linkedFromIndex": true,
+      "notes": "Authority is limited to the document's declared scope and subordinate to Accepted ADRs."
+    },
+    {
+      "path": "governance/ADR_TEMPLATE.md",
+      "repository": "Core",
+      "documentClass": "DRAFT",
+      "status": "DRAFT",
+      "owner": "Architecture Owner / Documentation Governance Owner",
+      "authoritativeFor": [],
+      "supersedes": [],
+      "supersededBy": [],
+      "currentStateClaimsAllowed": false,
+      "historicalMutationPolicy": "EDITABLE_UNTIL_ACCEPTED_OR_WITHDRAWN",
+      "lastReviewedBaseline": "a455c8e76427d53d75bb7f15259b9875d9768914",
+      "lastReviewedAt": "2026-09-02",
+      "linkedFromIndex": true,
+      "notes": "Non-authoritative until separately accepted."
+    },
+    {
+      "path": "governance/AI_CINEMATIC_STUDIO_DELIVERY_GOVERNANCE_PACKAGE_V1.md",
+      "repository": "Core",
+      "documentClass": "NORMATIVE_CONTRACT",
+      "status": "ACTIVE",
+      "owner": "Architecture Owner / Documentation Governance Owner",
+      "authoritativeFor": [
+        "contract or governance boundary within the document's explicit scope"
+      ],
+      "supersedes": [],
+      "supersededBy": [],
+      "currentStateClaimsAllowed": false,
+      "historicalMutationPolicy": "UPDATE_WITH_AUTHORIZED_CONTRACT_CHANGE",
+      "lastReviewedBaseline": "a455c8e76427d53d75bb7f15259b9875d9768914",
+      "lastReviewedAt": "2026-09-02",
+      "linkedFromIndex": true,
+      "notes": "Authority is limited to the document's declared scope and subordinate to Accepted ADRs."
+    },
+    {
+      "path": "governance/AI_CINEMATIC_STUDIO_STAGE_ASSET_INVENTORY_2026-08-21.md",
+      "repository": "Core",
+      "documentClass": "IMPLEMENTATION_EVIDENCE",
+      "status": "RECORDED",
+      "owner": "Architecture Owner / Documentation Governance Owner",
+      "authoritativeFor": [
+        "bounded implementation or verification evidence only"
+      ],
+      "supersedes": [],
+      "supersededBy": [],
+      "currentStateClaimsAllowed": false,
+      "historicalMutationPolicy": "IMMUTABLE_EXCEPT_METADATA_AND_LINK_REPAIR",
+      "lastReviewedBaseline": "a455c8e76427d53d75bb7f15259b9875d9768914",
+      "lastReviewedAt": "2026-09-02",
+      "linkedFromIndex": true,
+      "notes": "Does not grant current execution authority. HISTORICAL_PATH_NOT_EXECUTION_AUTHORITY=true"
+    },
+    {
+      "path": "governance/ARCHITECTURE_CHANGE_PROCESS.md",
+      "repository": "Core",
+      "documentClass": "NORMATIVE_CONTRACT",
+      "status": "ACTIVE",
+      "owner": "Architecture Owner / Documentation Governance Owner",
+      "authoritativeFor": [
+        "contract or governance boundary within the document's explicit scope"
+      ],
+      "supersedes": [],
+      "supersededBy": [],
+      "currentStateClaimsAllowed": false,
+      "historicalMutationPolicy": "UPDATE_WITH_AUTHORIZED_CONTRACT_CHANGE",
+      "lastReviewedBaseline": "a455c8e76427d53d75bb7f15259b9875d9768914",
+      "lastReviewedAt": "2026-09-02",
+      "linkedFromIndex": true,
+      "notes": "Authority is limited to the document's declared scope and subordinate to Accepted ADRs."
+    },
+    {
+      "path": "governance/ARCHITECTURE_GUARD.md",
+      "repository": "Core",
+      "documentClass": "NORMATIVE_CONTRACT",
+      "status": "ACTIVE",
+      "owner": "Architecture Owner / Documentation Governance Owner",
+      "authoritativeFor": [
+        "contract or governance boundary within the document's explicit scope"
+      ],
+      "supersedes": [],
+      "supersededBy": [],
+      "currentStateClaimsAllowed": false,
+      "historicalMutationPolicy": "UPDATE_WITH_AUTHORIZED_CONTRACT_CHANGE",
+      "lastReviewedBaseline": "a455c8e76427d53d75bb7f15259b9875d9768914",
+      "lastReviewedAt": "2026-09-02",
+      "linkedFromIndex": true,
+      "notes": "Authority is limited to the document's declared scope and subordinate to Accepted ADRs."
+    },
+    {
+      "path": "governance/BASELINE_RELEASE_PROCESS.md",
+      "repository": "Core",
+      "documentClass": "OPERATIONAL_RUNBOOK",
+      "status": "ACTIVE",
+      "owner": "Architecture Owner / Documentation Governance Owner",
+      "authoritativeFor": [
+        "bounded operator procedure and its declared preconditions"
+      ],
+      "supersedes": [],
+      "supersededBy": [],
+      "currentStateClaimsAllowed": false,
+      "historicalMutationPolicy": "UPDATE_WITH_REPRODUCIBLE_PRECONDITION_REVIEW",
+      "lastReviewedBaseline": "a455c8e76427d53d75bb7f15259b9875d9768914",
+      "lastReviewedAt": "2026-09-02",
+      "linkedFromIndex": true,
+      "notes": "Authority is limited to the document's declared scope and subordinate to Accepted ADRs."
+    },
+    {
+      "path": "governance/BRANCH_PROTECTION.md",
+      "repository": "Core",
+      "documentClass": "OPERATIONAL_RUNBOOK",
+      "status": "ACTIVE",
+      "owner": "Architecture Owner / Documentation Governance Owner",
+      "authoritativeFor": [
+        "bounded operator procedure and its declared preconditions"
+      ],
+      "supersedes": [],
+      "supersededBy": [],
+      "currentStateClaimsAllowed": false,
+      "historicalMutationPolicy": "UPDATE_WITH_REPRODUCIBLE_PRECONDITION_REVIEW",
+      "lastReviewedBaseline": "a455c8e76427d53d75bb7f15259b9875d9768914",
+      "lastReviewedAt": "2026-09-02",
+      "linkedFromIndex": true,
+      "notes": "Authority is limited to the document's declared scope and subordinate to Accepted ADRs."
+    },
+    {
+      "path": "governance/BRANCH_STRATEGY.md",
+      "repository": "Core",
+      "documentClass": "OPERATIONAL_RUNBOOK",
+      "status": "ACTIVE",
+      "owner": "Architecture Owner / Documentation Governance Owner",
+      "authoritativeFor": [
+        "bounded operator procedure and its declared preconditions"
+      ],
+      "supersedes": [],
+      "supersededBy": [],
+      "currentStateClaimsAllowed": false,
+      "historicalMutationPolicy": "UPDATE_WITH_REPRODUCIBLE_PRECONDITION_REVIEW",
+      "lastReviewedBaseline": "a455c8e76427d53d75bb7f15259b9875d9768914",
+      "lastReviewedAt": "2026-09-02",
+      "linkedFromIndex": true,
+      "notes": "Authority is limited to the document's declared scope and subordinate to Accepted ADRs."
+    },
+    {
+      "path": "governance/CODE_REVIEW_RULES.md",
+      "repository": "Core",
+      "documentClass": "OPERATIONAL_RUNBOOK",
+      "status": "ACTIVE",
+      "owner": "Architecture Owner / Documentation Governance Owner",
+      "authoritativeFor": [
+        "bounded operator procedure and its declared preconditions"
+      ],
+      "supersedes": [],
+      "supersededBy": [],
+      "currentStateClaimsAllowed": false,
+      "historicalMutationPolicy": "UPDATE_WITH_REPRODUCIBLE_PRECONDITION_REVIEW",
+      "lastReviewedBaseline": "a455c8e76427d53d75bb7f15259b9875d9768914",
+      "lastReviewedAt": "2026-09-02",
+      "linkedFromIndex": true,
+      "notes": "Authority is limited to the document's declared scope and subordinate to Accepted ADRs."
+    },
+    {
+      "path": "governance/COMMIT_CONVENTION.md",
+      "repository": "Core",
+      "documentClass": "OPERATIONAL_RUNBOOK",
+      "status": "ACTIVE",
+      "owner": "Architecture Owner / Documentation Governance Owner",
+      "authoritativeFor": [
+        "bounded operator procedure and its declared preconditions"
+      ],
+      "supersedes": [],
+      "supersededBy": [],
+      "currentStateClaimsAllowed": false,
+      "historicalMutationPolicy": "UPDATE_WITH_REPRODUCIBLE_PRECONDITION_REVIEW",
+      "lastReviewedBaseline": "a455c8e76427d53d75bb7f15259b9875d9768914",
+      "lastReviewedAt": "2026-09-02",
+      "linkedFromIndex": true,
+      "notes": "Authority is limited to the document's declared scope and subordinate to Accepted ADRs."
+    },
+    {
+      "path": "governance/DEFINITION_OF_DONE.md",
+      "repository": "Core",
+      "documentClass": "OPERATIONAL_RUNBOOK",
+      "status": "ACTIVE",
+      "owner": "Architecture Owner / Documentation Governance Owner",
+      "authoritativeFor": [
+        "bounded operator procedure and its declared preconditions"
+      ],
+      "supersedes": [],
+      "supersededBy": [],
+      "currentStateClaimsAllowed": false,
+      "historicalMutationPolicy": "UPDATE_WITH_REPRODUCIBLE_PRECONDITION_REVIEW",
+      "lastReviewedBaseline": "a455c8e76427d53d75bb7f15259b9875d9768914",
+      "lastReviewedAt": "2026-09-02",
+      "linkedFromIndex": true,
+      "notes": "Authority is limited to the document's declared scope and subordinate to Accepted ADRs."
+    },
+    {
+      "path": "governance/DEVELOPMENT_RULES.md",
+      "repository": "Core",
+      "documentClass": "OPERATIONAL_RUNBOOK",
+      "status": "ACTIVE",
+      "owner": "Architecture Owner / Documentation Governance Owner",
+      "authoritativeFor": [
+        "bounded operator procedure and its declared preconditions"
+      ],
+      "supersedes": [],
+      "supersededBy": [],
+      "currentStateClaimsAllowed": false,
+      "historicalMutationPolicy": "UPDATE_WITH_REPRODUCIBLE_PRECONDITION_REVIEW",
+      "lastReviewedBaseline": "a455c8e76427d53d75bb7f15259b9875d9768914",
+      "lastReviewedAt": "2026-09-02",
+      "linkedFromIndex": true,
+      "notes": "Authority is limited to the document's declared scope and subordinate to Accepted ADRs."
+    },
+    {
+      "path": "governance/GIT_WORKFLOW.md",
+      "repository": "Core",
+      "documentClass": "OPERATIONAL_RUNBOOK",
+      "status": "ACTIVE",
+      "owner": "Architecture Owner / Documentation Governance Owner",
+      "authoritativeFor": [
+        "bounded operator procedure and its declared preconditions"
+      ],
+      "supersedes": [],
+      "supersededBy": [],
+      "currentStateClaimsAllowed": false,
+      "historicalMutationPolicy": "UPDATE_WITH_REPRODUCIBLE_PRECONDITION_REVIEW",
+      "lastReviewedBaseline": "a455c8e76427d53d75bb7f15259b9875d9768914",
+      "lastReviewedAt": "2026-09-02",
+      "linkedFromIndex": true,
+      "notes": "Authority is limited to the document's declared scope and subordinate to Accepted ADRs."
+    },
+    {
+      "path": "governance/K2_001_ADR_0013_MAIN_CLOSEOUT_2026-08-25.md",
+      "repository": "Core",
+      "documentClass": "HISTORICAL_EVIDENCE",
+      "status": "HISTORICAL",
+      "owner": "Architecture Owner / Documentation Governance Owner",
+      "authoritativeFor": [
+        "immutable historical evidence only"
+      ],
+      "supersedes": [],
+      "supersededBy": [],
+      "currentStateClaimsAllowed": false,
+      "historicalMutationPolicy": "IMMUTABLE_EXCEPT_METADATA_AND_LINK_REPAIR",
+      "lastReviewedBaseline": "a455c8e76427d53d75bb7f15259b9875d9768914",
+      "lastReviewedAt": "2026-09-02",
+      "linkedFromIndex": true,
+      "notes": "Does not grant current execution authority. HISTORICAL_PATH_NOT_EXECUTION_AUTHORITY=true"
+    },
+    {
+      "path": "governance/K2_CANONICAL_LINEAGE_G1_HOST_CLOSEOUT_2026-08-21.md",
+      "repository": "Core",
+      "documentClass": "HISTORICAL_EVIDENCE",
+      "status": "HISTORICAL",
+      "owner": "Architecture Owner / Documentation Governance Owner",
+      "authoritativeFor": [
+        "immutable historical evidence only"
+      ],
+      "supersedes": [],
+      "supersededBy": [],
+      "currentStateClaimsAllowed": false,
+      "historicalMutationPolicy": "IMMUTABLE_EXCEPT_METADATA_AND_LINK_REPAIR",
+      "lastReviewedBaseline": "a455c8e76427d53d75bb7f15259b9875d9768914",
+      "lastReviewedAt": "2026-09-02",
+      "linkedFromIndex": true,
+      "notes": "Does not grant current execution authority. HISTORICAL_PATH_NOT_EXECUTION_AUTHORITY=true"
+    },
+    {
+      "path": "governance/K2_P1_PREBOOT_OFFLINE_PACKAGE.md",
+      "repository": "Core",
+      "documentClass": "SUPERSEDED",
+      "status": "SUPERSEDED",
+      "owner": "Architecture Owner / Documentation Governance Owner",
+      "authoritativeFor": [],
+      "supersedes": [],
+      "supersededBy": [
+        "governance/ADR-0011-k2-internal-self-hosted-p1.md"
+      ],
+      "currentStateClaimsAllowed": false,
+      "historicalMutationPolicy": "IMMUTABLE_EXCEPT_METADATA_AND_LINK_REPAIR",
+      "lastReviewedBaseline": "a455c8e76427d53d75bb7f15259b9875d9768914",
+      "lastReviewedAt": "2026-09-02",
+      "linkedFromIndex": true,
+      "notes": "Does not grant current execution authority. HISTORICAL_PATH_NOT_EXECUTION_AUTHORITY=true"
+    },
+    {
+      "path": "governance/K2_PUBLISHABLE_P0_EXTERNAL_HOLD.md",
+      "repository": "Core",
+      "documentClass": "SUPERSEDED",
+      "status": "SUPERSEDED",
+      "owner": "Architecture Owner / Documentation Governance Owner",
+      "authoritativeFor": [],
+      "supersedes": [],
+      "supersededBy": [
+        "governance/ADR-0011-k2-internal-self-hosted-p1.md"
+      ],
+      "currentStateClaimsAllowed": false,
+      "historicalMutationPolicy": "IMMUTABLE_EXCEPT_METADATA_AND_LINK_REPAIR",
+      "lastReviewedBaseline": "a455c8e76427d53d75bb7f15259b9875d9768914",
+      "lastReviewedAt": "2026-09-02",
+      "linkedFromIndex": true,
+      "notes": "Does not grant current execution authority. HISTORICAL_PATH_NOT_EXECUTION_AUTHORITY=true"
+    },
+    {
+      "path": "governance/K2_PUBLISHABLE_PRODUCTION_EXECUTION_PACKAGE.md",
+      "repository": "Core",
+      "documentClass": "SUPERSEDED",
+      "status": "SUPERSEDED",
+      "owner": "Architecture Owner / Documentation Governance Owner",
+      "authoritativeFor": [],
+      "supersedes": [],
+      "supersededBy": [
+        "governance/ADR-0014-k2-001-archive-k2-002-changan-start.md"
+      ],
+      "currentStateClaimsAllowed": false,
+      "historicalMutationPolicy": "IMMUTABLE_EXCEPT_METADATA_AND_LINK_REPAIR",
+      "lastReviewedBaseline": "a455c8e76427d53d75bb7f15259b9875d9768914",
+      "lastReviewedAt": "2026-09-02",
+      "linkedFromIndex": true,
+      "notes": "Does not grant current execution authority. HISTORICAL_PATH_NOT_EXECUTION_AUTHORITY=true"
+    },
+    {
+      "path": "governance/PRE-M6-RB1.3-CLOSEOUT-M6-P0-P1-AUTHORIZATION.md",
+      "repository": "Core",
+      "documentClass": "HISTORICAL_EVIDENCE",
+      "status": "HISTORICAL",
+      "owner": "Architecture Owner / Documentation Governance Owner",
+      "authoritativeFor": [
+        "immutable historical evidence only"
+      ],
+      "supersedes": [],
+      "supersededBy": [],
+      "currentStateClaimsAllowed": false,
+      "historicalMutationPolicy": "IMMUTABLE_EXCEPT_METADATA_AND_LINK_REPAIR",
+      "lastReviewedBaseline": "a455c8e76427d53d75bb7f15259b9875d9768914",
+      "lastReviewedAt": "2026-09-02",
+      "linkedFromIndex": true,
+      "notes": "Does not grant current execution authority. HISTORICAL_PATH_NOT_EXECUTION_AUTHORITY=true"
+    },
+    {
+      "path": "governance/RISK_REGISTER.md",
+      "repository": "Core",
+      "documentClass": "CURRENT_STATUS",
+      "status": "CURRENT",
+      "owner": "Architecture Owner / Documentation Governance Owner",
+      "authoritativeFor": [
+        "evidence-backed current status projection"
+      ],
+      "supersedes": [],
+      "supersededBy": [],
+      "currentStateClaimsAllowed": true,
+      "historicalMutationPolicy": "UPDATE_FROM_MERGED_EVIDENCE_ONLY",
+      "lastReviewedBaseline": "a455c8e76427d53d75bb7f15259b9875d9768914",
+      "lastReviewedAt": "2026-09-02",
+      "linkedFromIndex": true,
+      "notes": "Current claims require merged evidence and may not override Accepted ADRs."
+    },
+    {
+      "path": "tests/README.md",
+      "repository": "Core",
+      "documentClass": "GENERATED_REFERENCE",
+      "status": "REFERENCE",
+      "owner": "Verification Owner",
+      "authoritativeFor": [
+        "navigation or machine-readable reference only"
+      ],
+      "supersedes": [],
+      "supersededBy": [],
+      "currentStateClaimsAllowed": false,
+      "historicalMutationPolicy": "REGENERATE_FROM_REVIEWED_INVENTORY",
+      "lastReviewedBaseline": "a455c8e76427d53d75bb7f15259b9875d9768914",
+      "lastReviewedAt": "2026-09-02",
+      "linkedFromIndex": true,
+      "notes": "Navigation/reference only; resolve authority through the linked source documents."
+    },
+    {
+      "path": "tests/fixtures/m13/e2/manifest.json",
+      "repository": "Core",
+      "documentClass": "IMPLEMENTATION_EVIDENCE",
+      "status": "RECORDED",
+      "owner": "Verification Owner",
+      "authoritativeFor": [
+        "bounded implementation or verification evidence only"
+      ],
+      "supersedes": [],
+      "supersededBy": [],
+      "currentStateClaimsAllowed": false,
+      "historicalMutationPolicy": "IMMUTABLE_EXCEPT_METADATA_AND_LINK_REPAIR",
+      "lastReviewedBaseline": "a455c8e76427d53d75bb7f15259b9875d9768914",
+      "lastReviewedAt": "2026-09-02",
+      "linkedFromIndex": true,
+      "notes": "Does not grant current execution authority. HISTORICAL_PATH_NOT_EXECUTION_AUTHORITY=true"
+    },
+    {
+      "path": "tests/fixtures/m13/r2/manifest.json",
+      "repository": "Core",
+      "documentClass": "IMPLEMENTATION_EVIDENCE",
+      "status": "RECORDED",
+      "owner": "Verification Owner",
+      "authoritativeFor": [
+        "bounded implementation or verification evidence only"
+      ],
+      "supersedes": [],
+      "supersededBy": [],
+      "currentStateClaimsAllowed": false,
+      "historicalMutationPolicy": "IMMUTABLE_EXCEPT_METADATA_AND_LINK_REPAIR",
+      "lastReviewedBaseline": "a455c8e76427d53d75bb7f15259b9875d9768914",
+      "lastReviewedAt": "2026-09-02",
+      "linkedFromIndex": true,
+      "notes": "Does not grant current execution authority. HISTORICAL_PATH_NOT_EXECUTION_AUTHORITY=true"
+    },
+    {
+      "path": "tests/fixtures/m13/zhen/source_manifest.json",
+      "repository": "Core",
+      "documentClass": "IMPLEMENTATION_EVIDENCE",
+      "status": "RECORDED",
+      "owner": "Verification Owner",
+      "authoritativeFor": [
+        "bounded implementation or verification evidence only"
+      ],
+      "supersedes": [],
+      "supersededBy": [],
+      "currentStateClaimsAllowed": false,
+      "historicalMutationPolicy": "IMMUTABLE_EXCEPT_METADATA_AND_LINK_REPAIR",
+      "lastReviewedBaseline": "a455c8e76427d53d75bb7f15259b9875d9768914",
+      "lastReviewedAt": "2026-09-02",
+      "linkedFromIndex": true,
+      "notes": "Does not grant current execution authority. HISTORICAL_PATH_NOT_EXECUTION_AUTHORITY=true"
+    },
+    {
+      "path": "tests/fixtures/v5_fonts/OFL.txt",
+      "repository": "Core",
+      "documentClass": "IMPLEMENTATION_EVIDENCE",
+      "status": "RECORDED",
+      "owner": "Verification Owner",
+      "authoritativeFor": [
+        "bounded implementation or verification evidence only"
+      ],
+      "supersedes": [],
+      "supersededBy": [],
+      "currentStateClaimsAllowed": false,
+      "historicalMutationPolicy": "IMMUTABLE_EXCEPT_METADATA_AND_LINK_REPAIR",
+      "lastReviewedBaseline": "a455c8e76427d53d75bb7f15259b9875d9768914",
+      "lastReviewedAt": "2026-09-02",
+      "linkedFromIndex": true,
+      "notes": "Does not grant current execution authority. HISTORICAL_PATH_NOT_EXECUTION_AUTHORITY=true"
+    },
+    {
+      "path": "tests/fixtures/v5_fonts/README.md",
+      "repository": "Core",
+      "documentClass": "GENERATED_REFERENCE",
+      "status": "REFERENCE",
+      "owner": "Verification Owner",
+      "authoritativeFor": [
+        "navigation or machine-readable reference only"
+      ],
+      "supersedes": [],
+      "supersededBy": [],
+      "currentStateClaimsAllowed": false,
+      "historicalMutationPolicy": "REGENERATE_FROM_REVIEWED_INVENTORY",
+      "lastReviewedBaseline": "a455c8e76427d53d75bb7f15259b9875d9768914",
+      "lastReviewedAt": "2026-09-02",
+      "linkedFromIndex": true,
+      "notes": "Navigation/reference only; resolve authority through the linked source documents."
+    }
+  ]
+}
