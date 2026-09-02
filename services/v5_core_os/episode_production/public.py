@@ -100,6 +100,7 @@ from .narrative_validation import (
     M7NarrativeValidationService,
     NarrativeValidationProfileRegistry,
 )
+from .execution_method_planning import M8M9ExecutionMethodPlanningService
 from .state_projection import K2ProductionStateProjectionService
 from .voice import (
     InMemoryVoiceLockAdapter,
@@ -372,6 +373,7 @@ class EpisodeProductionPublicBoundary:
         delivery: K2DeliveryService,
         real_media_revision: K2RealMediaRevisionService,
         voice_profile_lineage: K2VoiceProfileLineageService | None = None,
+        execution_method_planning: M8M9ExecutionMethodPlanningService | None = None,
     ) -> None:
         self.__service = service
         self.__narrative_validation = narrative_validation
@@ -386,6 +388,7 @@ class EpisodeProductionPublicBoundary:
         self.__delivery = delivery
         self.__real_media_revision = real_media_revision
         self.__voice_profile_lineage = voice_profile_lineage
+        self.__execution_method_planning = execution_method_planning
         self.__dynamic_media_preflight = K2DynamicMediaPreflightService(shot_graph)
         self.__candidate_review = real_media_revision.candidate_review
         self.__state_projection = real_media_revision.state_projection
@@ -514,6 +517,58 @@ class EpisodeProductionPublicBoundary:
             episode_ref,
             production_run_ref,
             consistency_validation_version_ref,
+        )
+
+    def _execution_method_planning_service(
+        self,
+    ) -> M8M9ExecutionMethodPlanningService:
+        if self.__execution_method_planning is None:
+            raise EpisodeProductionPublicError("episode_production_unavailable", 503)
+        return self.__execution_method_planning
+
+    def create_execution_method_plan(
+        self, command: Mapping[str, Any]
+    ) -> dict[str, Any]:
+        return self._invoke(
+            self._execution_method_planning_service().create_plan, command
+        )
+
+    def get_execution_method_plan(
+        self,
+        workspace_ref: str,
+        project_ref: str,
+        series_ref: str,
+        episode_ref: str,
+        production_run_ref: str,
+        execution_method_plan_version_ref: str | None = None,
+    ) -> dict[str, Any]:
+        return self._invoke(
+            self._execution_method_planning_service().get_plan,
+            workspace_ref,
+            project_ref,
+            series_ref,
+            episode_ref,
+            production_run_ref,
+            execution_method_plan_version_ref,
+        )
+
+    def require_current_execution_method_plan(
+        self,
+        workspace_ref: str,
+        project_ref: str,
+        series_ref: str,
+        episode_ref: str,
+        production_run_ref: str,
+        execution_method_plan_version_ref: str,
+    ) -> dict[str, Any]:
+        return self._invoke(
+            self._execution_method_planning_service().require_current_plan,
+            workspace_ref,
+            project_ref,
+            series_ref,
+            episode_ref,
+            production_run_ref,
+            execution_method_plan_version_ref,
         )
 
     def authorize_and_lock(self, command: Mapping[str, Any]) -> dict[str, Any]:
@@ -1085,6 +1140,7 @@ def _services(
 ) -> tuple[
     EpisodeProductionService,
     M7NarrativeValidationService,
+    M8M9ExecutionMethodPlanningService,
     K2AuthorityIdentityService,
     K2ProductionPolicyService,
     K2ProviderExperimentService,
@@ -1132,6 +1188,14 @@ def _services(
         evidence_repository,
         script_reader=script_studio_boundary,
         profiles=narrative_validation_profiles,
+        ref_factory=selected_ref_factory,
+        clock=selected_clock,
+    )
+    execution_method_planning = M8M9ExecutionMethodPlanningService(
+        service,
+        evidence_repository,
+        narrative_validation=narrative_validation,
+        script_reader=script_studio_boundary,
         ref_factory=selected_ref_factory,
         clock=selected_clock,
     )
@@ -1246,6 +1310,7 @@ def _services(
     return (
         service,
         narrative_validation,
+        execution_method_planning,
         authority_identity,
         production_policy,
         provider_experiments,
@@ -1287,6 +1352,7 @@ def create_in_memory_boundary(
     (
         service,
         narrative_validation,
+        execution_method_planning,
         authority_identity,
         production_policy,
         provider_experiments,
@@ -1340,6 +1406,7 @@ def create_in_memory_boundary(
         delivery,
         real_media_revision,
         voice_profile_lineage,
+        execution_method_planning,
     )
 
 
@@ -1396,6 +1463,7 @@ def create_local_development_boundary(
     (
         service,
         narrative_validation,
+        execution_method_planning,
         authority_identity,
         production_policy,
         provider_experiments,
@@ -1461,6 +1529,7 @@ def create_local_development_boundary(
         delivery,
         real_media_revision,
         voice_profile_lineage,
+        execution_method_planning,
     )
 
 
