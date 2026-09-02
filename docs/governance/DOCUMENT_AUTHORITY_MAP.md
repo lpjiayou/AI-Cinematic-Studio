@@ -26,7 +26,7 @@ and historical evidence cannot authorize current execution.
 | --- | ---: | --- |
 | `ACCEPTED_DECISION` | 18 | no |
 | `NORMATIVE_ARCHITECTURE` | 14 | no |
-| `NORMATIVE_CONTRACT` | 27 | no |
+| `NORMATIVE_CONTRACT` | 28 | no |
 | `CURRENT_STATUS` | 2 | yes |
 | `CAPABILITY_MATRIX` | 1 | yes |
 | `OPERATIONAL_RUNBOOK` | 17 | no |
@@ -83,6 +83,7 @@ and historical evidence cannot authorize current execution.
 
 | Document | Status | Owner |
 | --- | --- | --- |
+| [`.github/pull_request_template.md`](../../.github/pull_request_template.md) | `ACTIVE` | Documentation Governance Owner |
 | [`AGENTS.md`](../../AGENTS.md) | `ACTIVE` | Documentation Governance Owner |
 | [`architecture/CREATOR_PUBLIC_API_AUTHENTICATION_AND_WORKSPACE_ISOLATION_CONTRACT.md`](../../architecture/CREATOR_PUBLIC_API_AUTHENTICATION_AND_WORKSPACE_ISOLATION_CONTRACT.md) | `ACTIVE` | Architecture Owner |
 | [`architecture/K2_CANONICAL_LINEAGE_BOOTSTRAP_CONTRACT.md`](../../architecture/K2_CANONICAL_LINEAGE_BOOTSTRAP_CONTRACT.md) | `ACTIVE` | Architecture Owner |

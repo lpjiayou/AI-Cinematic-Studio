@@ -50,6 +50,7 @@ deliberately isolated and do not authorize current execution.
 
 ## NORMATIVE_CONTRACT
 
+- [`.github/pull_request_template.md`](../.github/pull_request_template.md) — `ACTIVE`
 - [`AGENTS.md`](../AGENTS.md) — `ACTIVE`
 - [`architecture/CREATOR_PUBLIC_API_AUTHENTICATION_AND_WORKSPACE_ISOLATION_CONTRACT.md`](../architecture/CREATOR_PUBLIC_API_AUTHENTICATION_AND_WORKSPACE_ISOLATION_CONTRACT.md) — `ACTIVE`
 - [`architecture/K2_CANONICAL_LINEAGE_BOOTSTRAP_CONTRACT.md`](../architecture/K2_CANONICAL_LINEAGE_BOOTSTRAP_CONTRACT.md) — `ACTIVE`
@@ -208,6 +209,6 @@ _No documents currently classified in this category._
 
 ## Inventory boundary
 
-This index contains 159 Core documents reviewed at `a455c8e76427d53d75bb7f15259b9875d9768914` on
+This index contains 160 Core documents reviewed at `a455c8e76427d53d75bb7f15259b9875d9768914` on
 `2026-09-02`. See the registry for owners, supersession edges, mutation policy
 and scope notes.
