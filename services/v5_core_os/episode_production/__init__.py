@@ -14,6 +14,14 @@ from .foundation import (
     InMemoryEpisodeProductionAdapter,
     SqliteEpisodeProductionAdapter,
 )
+from .narrative_validation import (
+    DEFAULT_VALIDATION_PROFILE_REF,
+    DEFAULT_VALIDATION_PROFILE_VERSION,
+    FINDING_CATEGORIES,
+    NarrativeValidationProfile,
+    NarrativeValidationProfileRegistry,
+    NarrativeValidationRule,
+)
 from .public import (
     EpisodeProductionPublicBoundary,
     EpisodeProductionPublicError,

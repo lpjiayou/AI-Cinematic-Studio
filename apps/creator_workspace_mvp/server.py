@@ -664,13 +664,17 @@ class CreatorRequestHandler(BaseHTTPRequestHandler):
                 )
                 return
             if requested_path == PUBLIC_SCRIPT_REVIEWED_IMPORT_ENDPOINT:
-                if set(payload) != {
+                reviewed_import_fields = {
                     "seriesRef",
                     "episodeRef",
                     "uploadedSourceByteDigest",
                     "normalizedSourceDocumentDigest",
                     "reviewedDocumentDigest",
                     "content",
+                }
+                if frozenset(payload) not in {
+                    frozenset(reviewed_import_fields),
+                    frozenset({*reviewed_import_fields, "projectRef"}),
                 }:
                     self._send_application_error(400, "invalid_request")
                     return
@@ -1640,11 +1644,14 @@ class CreatorRequestHandler(BaseHTTPRequestHandler):
 
     @staticmethod
     def _script_scope(payload: MappingLike) -> MappingLike:
-        return {
+        scope = {
             "workspaceRef": payload.get("workspaceRef"),
             "seriesRef": payload.get("seriesRef"),
             "episodeRef": payload.get("episodeRef"),
         }
+        if payload.get("projectRef") is not None:
+            scope["projectRef"] = payload.get("projectRef")
+        return scope
 
     def _handle_creator_post(self, path: str, payload: MappingLike) -> None:
         try:

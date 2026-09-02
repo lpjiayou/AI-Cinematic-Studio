@@ -31,9 +31,11 @@ The six-dimensional, evidence-linked source is
 
 | Range | Current high-level state |
 | --- | --- |
-| M1–M5 | Bounded Core and connected Frontend capabilities exist; live production readiness remains unverified. |
-| M6 | Accepted and implemented bounded Series Intelligence boundary; missing external authority continues to fail closed. |
-| M7–M11 | Repository/K2 evidence exists, including an immutable M11 visual-QC failure; this is not general product or live-production completion. |
+| M1–M2, M4–M5 | Bounded Core and connected Frontend capabilities exist; live production readiness remains unverified. |
+| M3 | Historical ScriptVersion v1 remains readable; the additive v2 successor now stores one exact server-resolved M6 consumer binding. |
+| M6 | The bounded Series Intelligence reader now supplies the immutable M3 binding and M7 currentness input; missing authority still fails closed. |
+| M7 | Generic immutable narrative validation, structured Findings, PASS/WARN/BLOCK, staleness and fail-closed M8 readiness are implemented on the existing evidence journal. |
+| M8–M11 | Only repository/K2 evidence exists, including an immutable M11 visual-QC failure; generic method planning and routing remain pending in the authorized serial wave. |
 | M12 | Domain contracts and runtime protocols are merged; runtimes are not installed, Runtime G0 is not complete, and C3/C4 have not started. |
 | M13 | Base architecture, backend and deterministic CPU slice are complete and closeout is accepted; product capability is incomplete. |
 | M14–M19 | Implementation is not authorized; production and publication remain closed. |
@@ -78,16 +80,19 @@ GPU_REQUIRED=false
 PROVIDER_CALLS_ALLOWED=false
 A100_START_AUTHORIZED=false
 
-ARCHITECTURE_CHECKPOINT=ADR_0019_ACCEPTED_MERGE_REQUIRED_BEFORE_IMPLEMENTATION
+ARCHITECTURE_CHECKPOINT=ADR_0019_ACCEPTED_AND_MERGED
 AUTHORIZED_SEQUENCE=PR-B→PR-C→PR-D→PR-E→PR-F→FRONTEND_PIN
+COMPLETED_SEQUENCE=PR-A→PR-B
+AUTHORIZED_REMAINING_SEQUENCE=PR-C→PR-D→PR-E→PR-F→FRONTEND_PIN
 
-M3_M6_CONSUMER_BINDING=AUTHORIZED_NOT_IMPLEMENTED
-M7_NARRATIVE_VALIDATION=AUTHORIZED_NOT_IMPLEMENTED
+M3_M6_CONSUMER_BINDING=IMPLEMENTED_BOUNDED
+M7_NARRATIVE_VALIDATION=IMPLEMENTED_BOUNDED
 M8_ACTION_EXECUTION_BEATS=AUTHORIZED_NOT_IMPLEMENTED
 M9_THREE_AXIS_REQUIREMENTS=AUTHORIZED_NOT_IMPLEMENTED
 M10_METHOD_AWARE_PLANNING=AUTHORIZED_NOT_IMPLEMENTED
 M11_METHOD_CAPABILITY_BOUNDARY=AUTHORIZED_NOT_IMPLEMENTED
 M9_M12_AUDIO_BRIDGE=AUTHORIZED_NOT_IMPLEMENTED
+NEXT_SERIAL_PR=PR-C_M8_M9_EXECUTION_METHOD_PLANNING
 ```
 
 The following merged governance facts remain true and continue to protect every PR

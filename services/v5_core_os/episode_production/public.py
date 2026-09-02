@@ -96,6 +96,10 @@ from .media_candidate_review import (
     K2MediaCandidateReviewService,
     MediaSelectionApprovalRequiredError,
 )
+from .narrative_validation import (
+    M7NarrativeValidationService,
+    NarrativeValidationProfileRegistry,
+)
 from .state_projection import K2ProductionStateProjectionService
 from .voice import (
     InMemoryVoiceLockAdapter,
@@ -356,6 +360,7 @@ class EpisodeProductionPublicBoundary:
     def __init__(
         self,
         service: EpisodeProductionService,
+        narrative_validation: M7NarrativeValidationService,
         authority_identity: K2AuthorityIdentityService,
         production_policy: K2ProductionPolicyService,
         provider_experiments: K2ProviderExperimentService,
@@ -369,6 +374,7 @@ class EpisodeProductionPublicBoundary:
         voice_profile_lineage: K2VoiceProfileLineageService | None = None,
     ) -> None:
         self.__service = service
+        self.__narrative_validation = narrative_validation
         self.__authority_identity = authority_identity
         self.__production_policy = production_policy
         self.__provider_experiments = provider_experiments
@@ -464,6 +470,51 @@ class EpisodeProductionPublicBoundary:
     def list_runs(self, workspace_ref: str) -> list[dict[str, Any]]:
         runs = self._invoke(self.__service.list_runs, workspace_ref)
         return [self._invoke(self.__authority_identity.project_run, run) for run in runs]
+
+    def create_narrative_validation(
+        self, command: Mapping[str, Any]
+    ) -> dict[str, Any]:
+        return self._invoke(
+            self.__narrative_validation.create_validation, command
+        )
+
+    def get_narrative_validation(
+        self,
+        workspace_ref: str,
+        project_ref: str,
+        series_ref: str,
+        episode_ref: str,
+        production_run_ref: str,
+        consistency_validation_version_ref: str | None = None,
+    ) -> dict[str, Any]:
+        return self._invoke(
+            self.__narrative_validation.get_validation,
+            workspace_ref,
+            project_ref,
+            series_ref,
+            episode_ref,
+            production_run_ref,
+            consistency_validation_version_ref,
+        )
+
+    def require_m8_ready_validation(
+        self,
+        workspace_ref: str,
+        project_ref: str,
+        series_ref: str,
+        episode_ref: str,
+        production_run_ref: str,
+        consistency_validation_version_ref: str,
+    ) -> dict[str, Any]:
+        return self._invoke(
+            self.__narrative_validation.require_m8_ready_validation,
+            workspace_ref,
+            project_ref,
+            series_ref,
+            episode_ref,
+            production_run_ref,
+            consistency_validation_version_ref,
+        )
 
     def authorize_and_lock(self, command: Mapping[str, Any]) -> dict[str, Any]:
         return self._invoke(self.__authority_identity.authorize_and_lock, command)
@@ -1028,10 +1079,12 @@ def _services(
     media_selection_approval_authority=None,
     glyph_inspection_adapter=None,
     font_asset_authority=None,
+    narrative_validation_profiles: NarrativeValidationProfileRegistry | None = None,
     ref_factory=None,
     clock=None,
 ) -> tuple[
     EpisodeProductionService,
+    M7NarrativeValidationService,
     K2AuthorityIdentityService,
     K2ProductionPolicyService,
     K2ProviderExperimentService,
@@ -1071,6 +1124,14 @@ def _services(
         series_reader=series_episode_boundary,
         planning_reader=series_planning_boundary,
         script_reader=script_studio_boundary,
+        ref_factory=selected_ref_factory,
+        clock=selected_clock,
+    )
+    narrative_validation = M7NarrativeValidationService(
+        service,
+        evidence_repository,
+        script_reader=script_studio_boundary,
+        profiles=narrative_validation_profiles,
         ref_factory=selected_ref_factory,
         clock=selected_clock,
     )
@@ -1184,6 +1245,7 @@ def _services(
     )
     return (
         service,
+        narrative_validation,
         authority_identity,
         production_policy,
         provider_experiments,
@@ -1218,11 +1280,13 @@ def create_in_memory_boundary(
     media_selection_approval_authority=None,
     glyph_inspection_adapter=None,
     font_asset_authority=None,
+    narrative_validation_profiles: NarrativeValidationProfileRegistry | None = None,
     ref_factory=None,
     clock=None,
 ) -> EpisodeProductionPublicBoundary:
     (
         service,
+        narrative_validation,
         authority_identity,
         production_policy,
         provider_experiments,
@@ -1258,11 +1322,13 @@ def create_in_memory_boundary(
         media_selection_approval_authority=media_selection_approval_authority,
         glyph_inspection_adapter=glyph_inspection_adapter,
         font_asset_authority=font_asset_authority,
+        narrative_validation_profiles=narrative_validation_profiles,
         ref_factory=ref_factory,
         clock=clock,
     )
     return EpisodeProductionPublicBoundary(
         service,
+        narrative_validation,
         authority_identity,
         production_policy,
         provider_experiments,
@@ -1302,6 +1368,7 @@ def create_local_development_boundary(
     media_selection_approval_authority=None,
     glyph_inspection_adapter=None,
     font_asset_authority=None,
+    narrative_validation_profiles: NarrativeValidationProfileRegistry | None = None,
     ref_factory=None,
     clock=None,
     initialize_if_missing: bool = True,
@@ -1328,6 +1395,7 @@ def create_local_development_boundary(
     )
     (
         service,
+        narrative_validation,
         authority_identity,
         production_policy,
         provider_experiments,
@@ -1375,11 +1443,13 @@ def create_local_development_boundary(
         media_selection_approval_authority=media_selection_approval_authority,
         glyph_inspection_adapter=glyph_inspection_adapter,
         font_asset_authority=font_asset_authority,
+        narrative_validation_profiles=narrative_validation_profiles,
         ref_factory=ref_factory,
         clock=clock,
     )
     return EpisodeProductionPublicBoundary(
         service,
+        narrative_validation,
         authority_identity,
         production_policy,
         provider_experiments,
