@@ -1,4 +1,8 @@
-"""G5 V5 admission of V4-executed immutable K2 media artifacts."""
+"""Read/replay compatibility for immutable legacy K2 G5 evidence.
+
+Historic GenerationResult v1, AssetVersion v1 and MediaManifest v1 facts stay
+fully readable.  New worker dispatch and G5 evidence writes are closed.
+"""
 
 from __future__ import annotations
 
@@ -15,7 +19,7 @@ from services.v4_platform import (
 
 from .assets import K2AssetPipelineService
 from .audio import reject_speech_synthesis_in_legacy_media
-from .evidence import EpisodeProductionEvidenceRepository, EvidenceFact, GateAppend
+from .evidence import EpisodeProductionEvidenceRepository
 from .foundation import (
     EpisodeProductionError,
     IdempotencyConflictError,
@@ -30,6 +34,7 @@ from .shot_graph import require_legacy_executable_graph
 
 
 MEDIA_EXECUTION_GATE = "G5_MEDIA_EXECUTION"
+LEGACY_K2_G5_COMPATIBILITY_V1 = "LEGACY_K2_G5_COMPATIBILITY_V1"
 GENERATION_RESULT_SCHEMA_VERSION = "v5.generation-result.v1"
 ASSET_VERSION_SCHEMA_VERSION = "v5.asset-version.v1"
 MEDIA_MANIFEST_SCHEMA_VERSION = "v5.media-manifest.v1"
@@ -42,6 +47,10 @@ class WorkerUnavailableError(EpisodeProductionError):
 
 class ArtifactRejectedError(EpisodeProductionError):
     code = "artifact_verification_failed"
+
+
+class LegacyMediaExecutionWriteDisabledError(EpisodeProductionError):
+    code = "legacy_media_execution_write_disabled"
 
 
 class MediaExecutionPort(Protocol):
@@ -171,6 +180,18 @@ class K2MediaExecutionService:
         workspace = _required_ref(command.get("workspaceRef"), "workspaceRef")
         run_ref = _required_ref(command.get("productionRunRef"), "productionRunRef")
         client_key = _idempotency_key(command.get("idempotencyKey"))
+        # Resolve an already-written gate before touching the legacy worker
+        # path.  With no historic G5 gate, even a completed G4 cannot be filled
+        # in after the method-aware public cutover.
+        self.assets.shot_graph.root_service.get_run(workspace, run_ref)
+        existing_gate = self.evidence.get_gate(
+            workspace, run_ref, MEDIA_EXECUTION_GATE
+        )
+        if existing_gate is None:
+            raise LegacyMediaExecutionWriteDisabledError(
+                "legacy G5 media-execution writes are disabled"
+            )
+
         verified = self.assets.verify_asset_plan_current(workspace, run_ref)
         root = verified["root"]
         graph = verified["executableShotGraph"]
@@ -192,192 +213,17 @@ class K2MediaExecutionService:
                 "admissionId": ADMISSION_ID,
             }
         )
-        existing_gate = self.evidence.get_gate(
-            workspace, run_ref, MEDIA_EXECUTION_GATE
-        )
-        if existing_gate is not None:
-            if (
-                existing_gate.get("idempotencyKey") != gate_key
-                or existing_gate.get("requestDigest") != request_digest
-            ):
-                raise IdempotencyConflictError("G5 media command conflicts")
-            return {
-                **self._bundle(existing_gate),
-                "jobs": self.list_jobs(workspace, run_ref),
-                "idempotentReplay": True,
-            }
-        try:
-            jobs = self.execution.execute_batch(
-                workspace,
-                run_ref,
-                requests,
-                batch_idempotency_key=client_key,
-            )
-        except V4ArtifactVerificationError as exc:
-            raise ArtifactRejectedError("V4 worker rejected its artifact") from exc
-        except V4MediaJobError as exc:
-            raise WorkerUnavailableError("V4 worker did not complete") from exc
-        if len(jobs) != len(requests):
-            raise WorkerUnavailableError("V4 returned an incomplete media batch")
-        jobs_by_request = {
-            job.get("request", {}).get("generationRequestRef"): job for job in jobs
+        if (
+            existing_gate.get("idempotencyKey") != gate_key
+            or existing_gate.get("rootPayloadDigest") != root["payloadDigest"]
+            or existing_gate.get("requestDigest") != request_digest
+        ):
+            raise IdempotencyConflictError("G5 media command conflicts")
+        return {
+            **self._bundle(existing_gate),
+            "jobs": self.list_jobs(workspace, run_ref),
+            "idempotentReplay": True,
         }
-        if len(jobs_by_request) != len(requests):
-            raise ArtifactRejectedError("V4 returned duplicate media handoffs")
-        now = self._clock()
-        results: list[dict[str, Any]] = []
-        asset_versions: list[dict[str, Any]] = []
-        for ordinal, request in enumerate(requests, start=1):
-            job = jobs_by_request.get(request["generationRequestRef"])
-            if not isinstance(job, Mapping):
-                raise ArtifactRejectedError("V4 media handoff is missing")
-            artifact, _ = self._verify_handoff(job, request)
-            attempts = job.get("attempts")
-            if not isinstance(attempts, list) or not attempts:
-                raise ArtifactRejectedError("V4 attempt evidence is missing")
-            accepted_attempt = attempts[-1]
-            if accepted_attempt.get("state") != "SUCCEEDED":
-                raise ArtifactRejectedError("V4 accepted attempt is not successful")
-            result = _sealed(
-                {
-                    "schemaVersion": GENERATION_RESULT_SCHEMA_VERSION,
-                    "workspaceRef": workspace,
-                    "productionRunRef": run_ref,
-                    "generationResultRef": _required_ref(
-                        self._ref_factory("generation-result"), "generationResultRef"
-                    ),
-                    "version": 1,
-                    "ordinal": ordinal,
-                    "generationRequestRef": request["generationRequestRef"],
-                    "generationRequestVersionRef": request[
-                        "generationRequestVersionRef"
-                    ],
-                    "generationRequestDigest": request["payloadDigest"],
-                    "jobRef": job["jobRef"],
-                    "attemptRef": accepted_attempt["attemptRef"],
-                    "attemptNumber": accepted_attempt["attemptNumber"],
-                    "adapterIdentity": artifact["adapterIdentity"],
-                    "parameters": deepcopy(request["parameters"]),
-                    "mediaKind": request["mediaKind"],
-                    "mediaType": request["mediaType"],
-                    "artifactSha256": artifact["sha256"],
-                    "artifactByteSize": artifact["byteSize"],
-                    "probe": deepcopy(artifact["probe"]),
-                    "state": "VERIFIED",
-                    "provenance": "LOCAL_EVIDENCE",
-                    "rightsState": "LOCAL_EVIDENCE_ONLY",
-                    "gpuUsed": False,
-                    "publicationAllowed": False,
-                    "createdBy": ADMISSION_ID,
-                    "createdAt": now,
-                }
-            )
-            asset_version = _sealed(
-                {
-                    "schemaVersion": ASSET_VERSION_SCHEMA_VERSION,
-                    "workspaceRef": workspace,
-                    "productionRunRef": run_ref,
-                    "assetRef": _required_ref(
-                        self._ref_factory("generated-asset"), "assetRef"
-                    ),
-                    "assetVersionRef": _required_ref(
-                        self._ref_factory("generated-asset-version"),
-                        "assetVersionRef",
-                    ),
-                    "version": 1,
-                    "ordinal": ordinal,
-                    "assetRequirementRef": request["assetRequirementRef"],
-                    "generationRequestRef": request["generationRequestRef"],
-                    "generationRequestVersionRef": request[
-                        "generationRequestVersionRef"
-                    ],
-                    "generationRequestDigest": request["payloadDigest"],
-                    "generationResultRef": result["generationResultRef"],
-                    "generationResultDigest": result["payloadDigest"],
-                    "creativeShotRef": request["creativeShotRef"],
-                    "creativeShotVersionRef": request["creativeShotVersionRef"],
-                    "creativeShotDigest": request["creativeShotDigest"],
-                    "mediaKind": request["mediaKind"],
-                    "mediaType": request["mediaType"],
-                    "storageKey": artifact["storageKey"],
-                    "byteSize": artifact["byteSize"],
-                    "sha256": artifact["sha256"],
-                    "probe": deepcopy(artifact["probe"]),
-                    "adapterIdentity": artifact["adapterIdentity"],
-                    "provenance": "LOCAL_EVIDENCE",
-                    "rightsState": "LOCAL_EVIDENCE_ONLY",
-                    "state": "REGISTERED",
-                    "publicationAllowed": False,
-                    "createdBy": ADMISSION_ID,
-                    "createdAt": now,
-                }
-            )
-            results.append(result)
-            asset_versions.append(asset_version)
-        manifest = _sealed(
-            {
-                "schemaVersion": MEDIA_MANIFEST_SCHEMA_VERSION,
-                "workspaceRef": workspace,
-                "productionRunRef": run_ref,
-                "mediaManifestRef": _required_ref(
-                    self._ref_factory("media-manifest"), "mediaManifestRef"
-                ),
-                "version": 1,
-                "rootPayloadDigest": root["payloadDigest"],
-                "executableShotGraphVersionRef": graph[
-                    "executableShotGraphVersionRef"
-                ],
-                "executableShotGraphDigest": graph["payloadDigest"],
-                "assetResolutionManifestRef": asset_manifest[
-                    "assetResolutionManifestRef"
-                ],
-                "assetResolutionManifestDigest": asset_manifest["payloadDigest"],
-                "generationResultRefs": [item["generationResultRef"] for item in results],
-                "assetVersionRefs": [item["assetVersionRef"] for item in asset_versions],
-                "summary": {
-                    "requested": len(requests),
-                    "verifiedResults": len(results),
-                    "registeredAssets": len(asset_versions),
-                    "videoAssets": sum(item["mediaKind"] == "video" for item in asset_versions),
-                    "audioAssets": sum(item["mediaKind"] == "audio" for item in asset_versions),
-                    "failed": 0,
-                },
-                "state": "MEDIA_VERIFIED",
-                "executionScope": "SINGLE_EPISODE",
-                "provenance": "LOCAL_EVIDENCE",
-                "gpuUsed": False,
-                "publicationAllowed": False,
-                "createdBy": ADMISSION_ID,
-                "createdAt": now,
-            }
-        )
-        facts = tuple(
-            EvidenceFact(
-                f"GenerationResult:{item['ordinal']:04d}", item["generationResultRef"],
-                1, item, item["payloadDigest"]
-            )
-            for item in results
-        ) + tuple(
-            EvidenceFact(
-                f"AssetVersion:{item['ordinal']:04d}", item["assetVersionRef"],
-                1, item, item["payloadDigest"]
-            )
-            for item in asset_versions
-        ) + (
-            EvidenceFact(
-                "MediaManifest", manifest["mediaManifestRef"], 1, manifest,
-                manifest["payloadDigest"]
-            ),
-        )
-        gate, replay = self.evidence.append_gate(
-            GateAppend(
-                workspace, run_ref, MEDIA_EXECUTION_GATE,
-                gate_key,
-                root["payloadDigest"], request_digest, "ASSETS_READY", "MEDIA_READY",
-                now, facts,
-            )
-        )
-        return {**self._bundle(gate), "jobs": self.list_jobs(workspace, run_ref), "idempotentReplay": replay}
 
     @staticmethod
     def _bundle(gate: Mapping[str, Any]) -> dict[str, Any]:

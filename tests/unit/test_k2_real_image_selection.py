@@ -39,6 +39,7 @@ from tests.unit.test_episode_production_k2 import (
     run_command,
     seed_k2_roots,
 )
+from tests.support.legacy_k2_history import seed_legacy_g4, seed_legacy_g5
 from tests.stub_ffmpeg_adapter import StubFfmpegAdapter
 
 
@@ -174,8 +175,8 @@ def _golden_media_fixture() -> _GoldenMediaFixture:
     run = boundary.create_run(run_command(project, series, episode))
     boundary.authorize_and_lock(g2_command(run))
     boundary.compile_shot_graph(g3_command(run))
-    boundary.resolve_assets(g4_command(run))
-    media = boundary.execute_media(g5_command(run))
+    seed_legacy_g4(boundary, g4_command(run))
+    media = seed_legacy_g5(boundary, g5_command(run))
     preview = boundary.compose_and_qc(g6_preview_command(run))
     _SHARED_GOLDEN_MEDIA_FIXTURE = _GoldenMediaFixture(
         directory=directory,
@@ -244,8 +245,8 @@ class K2RealImageSelectionTests(unittest.TestCase):
         )
         self.boundary.authorize_and_lock(g2_command(self.run))
         self.boundary.compile_shot_graph(g3_command(self.run))
-        self.boundary.resolve_assets(g4_command(self.run))
-        self.boundary.execute_media(g5_command(self.run))
+        seed_legacy_g4(self.boundary, g4_command(self.run))
+        seed_legacy_g5(self.boundary, g5_command(self.run))
         preview_source = golden_copy_root / golden.preview_storage_key
         preview_destination = artifact_root / golden.preview_storage_key
         preview_destination.parent.mkdir(parents=True, exist_ok=True)

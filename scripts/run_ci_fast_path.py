@@ -86,6 +86,7 @@ INTEGRATION_SHARDS: dict[str, tuple[str, ...]] = {
         "tests/integration/test_creator_canonical_registration_http.py",
         "tests/integration/test_creator_episode_production_k2.py",
         "tests/integration/test_creator_explicit_audio_bridge_m9_m12.py",
+        "tests/integration/test_creator_method_aware_cutover_http.py",
         "tests/integration/test_creator_series_intelligence_sqlite_p2.py",
         "tests/integration/test_generic_upstream_method_closure.py",
         "tests/integration/test_m12_voice_profile_lineage_sqlite.py",

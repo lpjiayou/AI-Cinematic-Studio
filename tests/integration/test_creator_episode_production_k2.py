@@ -27,6 +27,7 @@ from services.v4_platform import (
     V4CompositionExecutor,
 )
 from services.v5_core_os.text_generation.testing import FakeTextGenerationCapability
+from tests.support.legacy_k2_history import seed_legacy_g4, seed_legacy_g5
 from tests.unit.test_episode_production_k2 import (
     WORKSPACE,
     activate_k2_m6_baseline,
@@ -53,6 +54,17 @@ DEFAULT_HTTP_TIMEOUT_SECONDS = 5
 MEDIA_HTTP_TIMEOUT_SECONDS = 30
 
 
+class CountingDeterministicLocalFfmpegAdapter(
+    DeterministicLocalFfmpegAdapter
+):
+    def __init__(self):
+        self.generate_call_count = 0
+
+    def generate(self, media_request, candidate_path):
+        self.generate_call_count += 1
+        return super().generate(media_request, candidate_path)
+
+
 class CreatorEpisodeProductionK2HttpTests(unittest.TestCase):
     def setUp(self):
         self.artifacts = tempfile.TemporaryDirectory()
@@ -67,9 +79,10 @@ class CreatorEpisodeProductionK2HttpTests(unittest.TestCase):
         activate_k2_m6_baseline(
             self.assembly, self.project, self.series
         )
+        self.media_adapter = CountingDeterministicLocalFfmpegAdapter()
         self.media_execution = MediaJobCoordinator(
             InMemoryMediaJobAdapter(),
-            DeterministicLocalFfmpegAdapter(),
+            self.media_adapter,
             Path(self.artifacts.name),
             ref_factory=self.refs,
             clock=lambda: "2026-08-17T01:00:00Z",
@@ -157,6 +170,50 @@ class CreatorEpisodeProductionK2HttpTests(unittest.TestCase):
         )
         with request.urlopen(req, timeout=timeout) as response:
             return response.status, response.headers, response.read()
+
+    def legacy_evidence_state(self, run):
+        evidence = (
+            self.production
+            ._EpisodeProductionPublicBoundary__assets
+            .evidence
+        )
+        snapshot = evidence.read_snapshot(WORKSPACE, run["productionRunRef"])
+        facts = tuple(
+            fact
+            for gate in snapshot.gates
+            for fact in gate.get("facts", [])
+        )
+        return {
+            "state": snapshot.currentState,
+            "gateCount": len(snapshot.gates),
+            "gateFactCount": len(facts),
+            "recordCount": len(snapshot.records),
+            "generationRequestFactCount": sum(
+                str(fact.get("factKind", "")).startswith(
+                    "GenerationRequest:"
+                )
+                for fact in facts
+            ),
+            "assetVersionFactCount": sum(
+                str(fact.get("factKind", "")).startswith("AssetVersion:")
+                for fact in facts
+            ),
+            "revisionToken": snapshot.revisionToken,
+        }
+
+    def artifact_file_state(self):
+        root = Path(self.artifacts.name)
+        return tuple(
+            sorted(
+                (
+                    str(path.relative_to(root)),
+                    path.stat().st_size,
+                    path.stat().st_mtime_ns,
+                )
+                for path in root.rglob("*")
+                if path.is_file()
+            )
+        )
 
     def test_public_run_create_replay_list_and_detail(self):
         public_command = {
@@ -463,14 +520,42 @@ class CreatorEpisodeProductionK2HttpTests(unittest.TestCase):
             key: value for key, value in g4_command(run).items()
             if key not in {"workspaceRef", "productionRunRef"}
         }
+        before_rejection = self.legacy_evidence_state(run)
+        # EXPECT_NEW_WRITE_REJECT_409
+        with self.assertRaises(error.HTTPError) as rejected:
+            self.post(f"{base}/assets", command)
+        self.assertEqual(rejected.exception.code, 409)
+        rejected_payload = json.loads(
+            rejected.exception.read().decode("utf-8")
+        )
+        self.assertEqual(
+            rejected_payload["error"]["code"],
+            "legacy_asset_resolution_write_disabled",
+        )
+        self.assertEqual(self.legacy_evidence_state(run), before_rejection)
+        self.assertEqual(
+            before_rejection["generationRequestFactCount"], 0
+        )
+
+        history = seed_legacy_g4(self.production, g4_command(run))
+        self.assertFalse(history["idempotentReplay"])
+        before_replay = self.legacy_evidence_state(run)
+        self.assertEqual(before_replay["generationRequestFactCount"], 8)
+
+        # EXACT_REPLAY_AFTER_TEST_ONLY_HISTORY_SEED
         status, result = self.post(f"{base}/assets", command)
-        self.assertEqual(status, 201)
+        self.assertEqual(status, 200)
+        self.assertTrue(result["idempotentReplay"])
         self.assertEqual(result["state"], "ASSETS_READY")
         self.assertEqual(len(result["generationRequests"]), 8)
         self.assertTrue(all(
             item["providerSelection"] == "UNSELECTED"
             for item in result["generationRequests"]
         ))
+        self.assertFalse(
+            result["assetResolutionManifest"]["publicationAllowed"]
+        )
+        self.assertEqual(self.legacy_evidence_state(run), before_replay)
         status, restored = self.get(f"{base}/assets")
         self.assertEqual(status, 200)
         self.assertEqual(
@@ -577,9 +662,8 @@ class CreatorEpisodeProductionK2HttpTests(unittest.TestCase):
         for resource, command in (
             ("authority-identity", g2_command(run)),
             ("shot-graph", g3_command(run)),
-            ("assets", g4_command(run)),
         ):
-            _, result = self.post(
+            self.post(
                 f"{base}/{resource}",
                 {
                     key: value
@@ -587,7 +671,7 @@ class CreatorEpisodeProductionK2HttpTests(unittest.TestCase):
                     if key not in {"workspaceRef", "productionRunRef"}
                 },
             )
-        assets = result
+        assets = seed_legacy_g4(self.production, g4_command(run))
         source = next(
             item
             for item in assets["generationRequests"]
@@ -640,7 +724,6 @@ class CreatorEpisodeProductionK2HttpTests(unittest.TestCase):
         for resource, command in (
             ("authority-identity", g2_command(run)),
             ("shot-graph", g3_command(run)),
-            ("assets", g4_command(run)),
         ):
             self.post(
                 f"{base}/{resource}",
@@ -651,16 +734,73 @@ class CreatorEpisodeProductionK2HttpTests(unittest.TestCase):
             key: value for key, value in g5_command(run).items()
             if key not in {"workspaceRef", "productionRunRef"}
         }
+        before_rejection = self.legacy_evidence_state(run)
+        rejection_jobs = self.media_execution.list_jobs(
+            WORKSPACE, run["productionRunRef"]
+        )
+        rejection_artifacts = self.artifact_file_state()
+        rejection_worker_calls = self.media_adapter.generate_call_count
+        # EXPECT_NEW_WRITE_REJECT_409
+        with self.assertRaises(error.HTTPError) as rejected:
+            self.post(
+                f"{base}/media",
+                command,
+                timeout=MEDIA_HTTP_TIMEOUT_SECONDS,
+            )
+        self.assertEqual(rejected.exception.code, 409)
+        rejected_payload = json.loads(
+            rejected.exception.read().decode("utf-8")
+        )
+        self.assertEqual(
+            rejected_payload["error"]["code"],
+            "legacy_media_execution_write_disabled",
+        )
+        self.assertEqual(self.legacy_evidence_state(run), before_rejection)
+        self.assertEqual(
+            self.media_execution.list_jobs(
+                WORKSPACE, run["productionRunRef"]
+            ),
+            rejection_jobs,
+        )
+        self.assertEqual(self.artifact_file_state(), rejection_artifacts)
+        self.assertEqual(
+            self.media_adapter.generate_call_count, rejection_worker_calls
+        )
+
+        seed_legacy_g4(self.production, g4_command(run))
+        history = seed_legacy_g5(self.production, g5_command(run))
+        self.assertFalse(history["idempotentReplay"])
+        before_replay = self.legacy_evidence_state(run)
+        replay_jobs = self.media_execution.list_jobs(
+            WORKSPACE, run["productionRunRef"]
+        )
+        replay_artifacts = self.artifact_file_state()
+        replay_worker_calls = self.media_adapter.generate_call_count
+        self.assertEqual(before_replay["assetVersionFactCount"], 8)
+
+        # EXACT_REPLAY_AFTER_TEST_ONLY_HISTORY_SEED
         status, result = self.post(
             f"{base}/media",
             command,
             timeout=MEDIA_HTTP_TIMEOUT_SECONDS,
         )
-        self.assertEqual(status, 201)
+        self.assertEqual(status, 200)
+        self.assertTrue(result["idempotentReplay"])
         self.assertEqual(result["state"], "MEDIA_READY")
         self.assertEqual(len(result["assetVersions"]), 8)
         self.assertNotIn("internalPath", json.dumps(result, ensure_ascii=False))
         self.assertTrue(all(job["gpuUsed"] is False for job in result["jobs"]))
+        self.assertEqual(self.legacy_evidence_state(run), before_replay)
+        self.assertEqual(
+            self.media_execution.list_jobs(
+                WORKSPACE, run["productionRunRef"]
+            ),
+            replay_jobs,
+        )
+        self.assertEqual(self.artifact_file_state(), replay_artifacts)
+        self.assertEqual(
+            self.media_adapter.generate_call_count, replay_worker_calls
+        )
         status, restored = self.get(f"{base}/media")
         self.assertEqual(status, 200)
         self.assertEqual(
@@ -683,19 +823,14 @@ class CreatorEpisodeProductionK2HttpTests(unittest.TestCase):
         for resource, command in (
             ("authority-identity", g2_command(run)),
             ("shot-graph", g3_command(run)),
-            ("assets", g4_command(run)),
-            ("media", g5_command(run)),
         ):
             self.post(
                 f"{base}/{resource}",
                 {key: value for key, value in command.items()
                  if key not in {"workspaceRef", "productionRunRef"}},
-                timeout=(
-                    MEDIA_HTTP_TIMEOUT_SECONDS
-                    if resource == "media"
-                    else DEFAULT_HTTP_TIMEOUT_SECONDS
-                ),
             )
+        seed_legacy_g4(self.production, g4_command(run))
+        seed_legacy_g5(self.production, g5_command(run))
         preview_command = {
             key: value for key, value in g6_preview_command(run).items()
             if key not in {"workspaceRef", "productionRunRef"}
@@ -776,9 +911,6 @@ class CreatorEpisodeProductionK2HttpTests(unittest.TestCase):
         for resource, command in (
             ("authority-identity", g2_command(run)),
             ("shot-graph", g3_command(run)),
-            ("assets", g4_command(run)),
-            ("media", g5_command(run)),
-            ("preview", g6_preview_command(run)),
         ):
             self.post(
                 f"{base}/{resource}",
@@ -787,12 +919,18 @@ class CreatorEpisodeProductionK2HttpTests(unittest.TestCase):
                     for key, value in command.items()
                     if key not in {"workspaceRef", "productionRunRef"}
                 },
-                timeout=(
-                    MEDIA_HTTP_TIMEOUT_SECONDS
-                    if resource in {"media", "preview"}
-                    else DEFAULT_HTTP_TIMEOUT_SECONDS
-                ),
             )
+        seed_legacy_g4(self.production, g4_command(run))
+        seed_legacy_g5(self.production, g5_command(run))
+        self.post(
+            f"{base}/preview",
+            {
+                key: value
+                for key, value in g6_preview_command(run).items()
+                if key not in {"workspaceRef", "productionRunRef"}
+            },
+            timeout=MEDIA_HTTP_TIMEOUT_SECONDS,
+        )
         endpoint = f"{base}/real-media-revision"
         status, planned = self.post(
             endpoint, {"idempotencyKey": "http-m10-image-plan-v1"}

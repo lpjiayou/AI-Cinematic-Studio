@@ -21,6 +21,7 @@ from tests.unit.test_episode_production_k2 import (
     run_command,
     seed_k2_roots,
 )
+from tests.support.legacy_k2_history import seed_legacy_g4
 
 
 class MutableClock:
@@ -42,7 +43,7 @@ def one_request():
     run = boundary.create_run(run_command(project, series, episode))
     boundary.authorize_and_lock(g2_command(run))
     boundary.compile_shot_graph(g3_command(run))
-    plan = boundary.resolve_assets(g4_command(run))
+    plan = seed_legacy_g4(boundary, g4_command(run))
     return refs, run, plan["generationRequests"][0]
 
 

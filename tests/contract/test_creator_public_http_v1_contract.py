@@ -97,6 +97,36 @@ class CreatorPublicHttpV1ContractTests(unittest.TestCase):
             capabilities["M13"]["requirements"],
         )
 
+    def test_method_aware_resources_replace_legacy_write_projection(self):
+        capabilities = {
+            item["id"]: item
+            for item in public_contract.capability_payload()["capabilities"]
+        }
+        self.assertIn(
+            "episode-production-runs/execution-method-plan",
+            capabilities["M8"]["publicResources"],
+        )
+        self.assertIn(
+            "episode-production-runs/method-aware-input-plan",
+            capabilities["M10"]["publicResources"],
+        )
+        self.assertIn(
+            "episode-production-runs/method-aware-video-route",
+            capabilities["M11"]["publicResources"],
+        )
+        self.assertIn(
+            "episode-production-runs/explicit-audio-requirement-route",
+            capabilities["M12"]["publicResources"],
+        )
+        self.assertNotIn(
+            "episode-production-runs/assets",
+            capabilities["M9"]["publicResources"],
+        )
+        self.assertNotIn(
+            "episode-production-runs/media",
+            capabilities["M11"]["publicResources"],
+        )
+
     def test_m10_m11_publish_only_the_typed_media_review_chain(self):
         capabilities = {
             item["id"]: item

@@ -48,6 +48,12 @@ M10_METHOD_AWARE_PLANNING=IMPLEMENTED
 M11_METHOD_CAPABILITY_BOUNDARY=IMPLEMENTED
 M9_M12_AUDIO_BRIDGE=IMPLEMENTED
 
+K2_METHOD_AWARE_PUBLIC_CUTOVER=PASS
+LEGACY_G4_NEW_WRITES=DISABLED
+LEGACY_G5_NEW_WRITES=DISABLED
+LEGACY_G4_G5_READ_REPLAY=SUPPORTED
+K2_002_METHOD_AWARE_SUCCESSOR_REQUIRED=true
+
 M11_CONTACT_RUNTIME=NOT_INSTALLED
 M11_GAIT_RUNTIME=NOT_INSTALLED
 ```
@@ -66,7 +72,8 @@ The merged sequence is:
 
 Historical v1 facts remain readable. Contact and Gait are explicitly unavailable
 instead of falling back to Wan. Runtime installation, live production and publication
-are not implied by this closure.
+are not implied by this closure. Future K2-002 production must create an additive
+method-aware successor; it may not reinterpret or upgrade historic G4/G5 facts.
 
 ## 3. M12 and M13 boundary
 
@@ -90,7 +97,7 @@ M12_C3_PREREQUISITE_UPSTREAM=PASS
 M12_C3_READY_TO_REQUEST_AUTHORIZATION=false
 M12_C3_READY_TO_START=false
 M12_C3_C4_TARGET_HOST=A100_CODE_SERVER_BUILD_HOST
-M12_C3_PREIMPLEMENTATION_BLOCKER=K2_METHOD_AWARE_PUBLIC_CUTOVER_PENDING
+M12_C3_PREIMPLEMENTATION_BLOCKER=A100_BUILD_HOST_INFRASTRUCTURE_REMEDIATION_PENDING
 
 M13_BASE_ARCHITECTURE=ACCEPTED
 M13_BASE_BACKEND=COMPLETE
@@ -161,11 +168,11 @@ K2_HARDCODED_PRODUCTION_BRANCHES=0
 ## 6. Next legal task
 
 ```text
-NEXT_TASK=ACS-K2-METHOD-AWARE-PUBLIC-CUTOVER-AND-LEGACY-G4-G5-WRITE-FREEZE
+NEXT_TASK=ACS-M12-A100-BUILD-HOST-INFRASTRUCTURE-REMEDIATION-AND-REFLIGHT
 ```
 
-This task must separately freeze the legacy G4/G5 write path and does not authorize
-M12-C3/C4, another A100 start, GPU/Provider calls, admission or publication.
+That task requires separate authorization. It does not authorize M12-C3/C4, an A100
+start, GPU/Provider calls, admission or publication.
 
 The compatibility token below remains only because the already-merged docs-only
 validator recognizes the earlier name. It grants no current authority:

@@ -1,6 +1,6 @@
 # Creator Public HTTP/API v1
 
-Status: `XR1 FROZEN / AUTH-W1 SECURITY AMENDMENT / ADR-0013 CONTROL PLANE / ADR-0014 K2-002 PREFLIGHT + SCRIPT ACCEPTANCE AMENDMENT`
+Status: `XR1 FROZEN / AUTH-W1 / ADR-0013 CONTROL PLANE / ADR-0019 METHOD-AWARE CUTOVER`
 
 This contract is the only browser-facing Core HTTP surface for the separate Commercial
 Frontend. Existing `/creator/internal/*` endpoints remain compatibility-only and must
@@ -23,11 +23,10 @@ Commercial Frontend → Frontend Experience Adapter → /creator/api/v1
 | M4 | `/projects`, `/project-contexts`, `/canonical-registrations`, `/canonical-registrations/preflight` | Project Context plus V5 canonical registration boundary |
 | M5 | `/series-planning-workspaces`, `/series-plan-*` | Series Planning + Series Director boundaries |
 | M6 | `/series-intelligence-workspaces`, `/series-intelligence/*` | accepted Series Intelligence public boundary |
-| M7–M8 | `/episode-production-runs/{runRef}/shot-graph` | bounded K2 V5 legacy executable-graph service plus v2 local-draft compatibility transport |
-| M9 | `/episode-production-runs/{runRef}/assets` | bounded K2 V5 Asset Pipeline service |
-| M10 | `/episode-production-runs/{runRef}/dynamic-media-preflight`, `/real-media-revision`, `/real-image-candidates`, `/semantic-visual-qc`, `/media-selection`, `/real-image-admission`, `/real-image-successor-admission`, `/real-image-selection`, `/state-projection`, `/production-readiness` | bounded K2 V5 zero-write image preflight plus legacy image candidate, review, authority-backed admission and projection services |
-| M11 | `/episode-production-runs/{runRef}/real-video-revision`, `/real-video-candidates`, `/semantic-visual-qc`, `/media-selection`, `/real-video-admission`, `/state-projection`, `/provider-experiments`, `/media` | bounded K2 V5 exact start-image video candidate, review and admission services over V4 |
-| M12 | `/episode-production-runs/{runRef}/production-readiness`, `/media` | bounded K2 V5 media service; live audio remains blocked |
+| M7–M9 | `/episode-production-runs/{runRef}/shot-graph`, `/execution-method-plan` | current M7 validation plus source-bound M8 action beats and server-derived M9 three-axis requirements |
+| M10 | `/episode-production-runs/{runRef}/method-aware-input-plan`, `/dynamic-media-preflight`, `/real-media-revision`, `/real-image-candidates`, `/semantic-visual-qc`, `/media-selection`, `/real-image-admission`, `/real-image-successor-admission`, `/real-image-selection`, `/state-projection`, `/production-readiness` | current-plan input resolution over the one canonical AssetVersion stream, plus the existing typed media control plane |
+| M11 | `/episode-production-runs/{runRef}/method-aware-video-route`, `/real-video-revision`, `/real-video-candidates`, `/semantic-visual-qc`, `/media-selection`, `/real-video-admission`, `/state-projection`, `/provider-experiments` | closed method routing; only Micro Motion can reserve the existing single-anchor queue, while Contact and Gait fail closed |
+| M12 | `/episode-production-runs/{runRef}/explicit-audio-requirement-route`, `/production-readiness` | explicit M9 AudioRequirement routing; Runtime G0 remains incomplete |
 | M13–M14 | `/episode-production-runs/{runRef}/render-candidates`, `/preview`, `/finalize` | bounded V5 RenderCandidate/delivery services over the accepted M13 base backend and V4/V3 execution boundaries |
 | M15 | `/episode-production-runs/{runRef}/delivery`, preview/export content | bounded K2 V5 delivery authority |
 | M16–M19 | `/capabilities` status only | not open at the current gate |
@@ -50,6 +49,50 @@ specific confirmation route. The Experience Adapter must preserve
 response. The M1 candidate response also carries the Core-issued opaque
 `sourcePlanRef` and `sourcePlanVersion`; browser code must return those exact values on
 confirmation and must not mint or infer a source-plan reference.
+
+## ADR-0019 method-aware production planning
+
+The four closed resources are:
+
+```text
+execution-method-plan
+method-aware-input-plan
+method-aware-video-route
+explicit-audio-requirement-route
+```
+
+Authentication supplies `workspaceRef`, and the resource path supplies
+`productionRunRef`. All commands also carry `projectRef`, `seriesRef`, `episodeRef`
+and `idempotencyKey`. The first command accepts the latest current
+`consistencyValidationVersionRef` and a complete source-bound M8 Shot/ActionBeat
+plan. An `executionClass` is valid only inside that original, source-span-validated
+ActionExecutionBeat fact; it is never accepted as a top-level or downstream
+override. Core maps every class to its one closed `executionMethod` and derives the
+Visual, Audio and Postprocess requirements.
+
+`method-aware-input-plan` accepts only reference-level asset bindings without an
+asset digest or method claim. Core resolves the latest current ExecutionMethodPlan
+and the exact canonical AssetVersion digest from the existing evidence journal.
+`method-aware-video-route` accepts no plan, method, adapter or Provider selection;
+Core resolves the latest current M10 plan and the immutable capability registry.
+`explicit-audio-requirement-route` accepts one M9 `audioRequirementRef` and, only
+when required, opaque `rightsBindingRef` and `voiceAssetVersionRef`. Core loads the
+exact records and all digests server-side. `SILENCE` accepts neither ref and creates
+no generation request.
+
+No method-aware request may carry `executionMethod`, an execution-class override,
+adapter capability/identity, Provider, local path, storage key, authority digest,
+`publicationAllowed` or fallback policy. Public responses strip internal storage,
+raw RightsBinding, voice snapshots and requested authority provenance. GET selects
+the latest version by default and accepts an optional opaque `versionRef` query.
+
+Legacy `/assets` and `/media` remain routable only for immutable history. POST is
+an exact replay query: it succeeds only when the matching G4/G5 gate already exists
+and its idempotency key and current input digests agree. It appends no facts and
+performs no worker or artifact write. With no historic gate it returns respectively
+`409 / legacy_asset_resolution_write_disabled` or
+`409 / legacy_media_execution_write_disabled`. Historic v1 facts and GET readers
+are unchanged; new runs cannot fall back to this path.
 
 ### Human-authored reviewed Script import
 

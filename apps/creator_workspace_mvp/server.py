@@ -50,6 +50,11 @@ from apps.creator_workspace_mvp.public_contract import (
     PUBLIC_CANONICAL_REGISTRATION_PREFLIGHT_ENDPOINT,
     PUBLIC_EPISODES_ENDPOINT,
     PUBLIC_EPISODE_PRODUCTION_RUNS_ENDPOINT,
+    PUBLIC_EXECUTION_METHOD_PLAN_RESOURCE,
+    PUBLIC_EXPLICIT_AUDIO_REQUIREMENT_ROUTE_RESOURCE,
+    PUBLIC_METHOD_AWARE_INPUT_PLAN_RESOURCE,
+    PUBLIC_METHOD_AWARE_RESOURCES,
+    PUBLIC_METHOD_AWARE_VIDEO_ROUTE_RESOURCE,
     PUBLIC_M6_BASELINE_ACTIVATE_ENDPOINT,
     PUBLIC_M6_BIBLE_CANDIDATE_ENDPOINT,
     PUBLIC_M6_BIBLE_CONFIRM_ENDPOINT,
@@ -160,7 +165,101 @@ EPISODE_PRODUCTION_SUBRESOURCES = {
     "media-selection",
     "real-video-admission",
     "state-projection",
+    PUBLIC_EXECUTION_METHOD_PLAN_RESOURCE,
+    PUBLIC_METHOD_AWARE_INPUT_PLAN_RESOURCE,
+    PUBLIC_METHOD_AWARE_VIDEO_ROUTE_RESOURCE,
+    PUBLIC_EXPLICIT_AUDIO_REQUIREMENT_ROUTE_RESOURCE,
 }
+
+_METHOD_AWARE_WRITE_RESOURCES = PUBLIC_METHOD_AWARE_RESOURCES
+_METHOD_AWARE_SCOPE_FIELDS = frozenset(
+    {"projectRef", "seriesRef", "episodeRef", "idempotencyKey"}
+)
+_METHOD_AWARE_FORBIDDEN_CLIENT_FIELDS = frozenset(
+    {
+        "adaptercapability",
+        "adapteridentity",
+        "authoritydigest",
+        "executionmethod",
+        "fallbackpolicy",
+        "fallbackused",
+        "publicationallowed",
+        "rightsbinding",
+        "voiceassetversion",
+    }
+)
+
+
+def _contains_forbidden_method_aware_claim(
+    value: Any, path: tuple[Any, ...] = ()
+) -> bool:
+    if isinstance(value, Mapping):
+        for field, item in value.items():
+            normalized = str(field).replace("_", "").replace("-", "").lower()
+            field_path = (*path, field)
+            execution_class_source_fact = (
+                len(field_path) == 5
+                and field_path[0] == "shots"
+                and isinstance(field_path[1], int)
+                and field_path[2] == "actionExecutionBeats"
+                and isinstance(field_path[3], int)
+                and field_path[4] == "executionClass"
+            )
+            if (
+                normalized in _METHOD_AWARE_FORBIDDEN_CLIENT_FIELDS
+                or (normalized == "executionclass" and not execution_class_source_fact)
+                or "provider" in normalized
+                or normalized.endswith("storagekey")
+                or normalized.endswith("path")
+                or _contains_forbidden_method_aware_claim(item, field_path)
+            ):
+                return True
+        return False
+    if isinstance(value, (list, tuple)):
+        return any(
+            _contains_forbidden_method_aware_claim(item, (*path, index))
+            for index, item in enumerate(value)
+        )
+    return False
+
+
+def _valid_method_aware_public_command(resource: str, payload: Mapping[str, Any]) -> bool:
+    if resource == PUBLIC_EXECUTION_METHOD_PLAN_RESOURCE:
+        fields = _METHOD_AWARE_SCOPE_FIELDS | {
+            "consistencyValidationVersionRef",
+            "shots",
+        }
+        return set(payload) == fields and not _contains_forbidden_method_aware_claim(
+            payload
+        )
+    if resource == PUBLIC_METHOD_AWARE_INPUT_PLAN_RESOURCE:
+        bindings = payload.get("assetBindings")
+        binding_fields = {
+            "visualExecutionRequirementRef",
+            "inputRequirementKey",
+            "inputRole",
+            "assetVersionRef",
+        }
+        return (
+            set(payload) == (_METHOD_AWARE_SCOPE_FIELDS | {"assetBindings"})
+            and isinstance(bindings, list)
+            and all(
+                isinstance(item, Mapping) and set(item) == binding_fields
+                for item in bindings
+            )
+            and not _contains_forbidden_method_aware_claim(payload)
+        )
+    if resource == PUBLIC_METHOD_AWARE_VIDEO_ROUTE_RESOURCE:
+        return set(payload) == _METHOD_AWARE_SCOPE_FIELDS and not (
+            _contains_forbidden_method_aware_claim(payload)
+        )
+    if resource == PUBLIC_EXPLICIT_AUDIO_REQUIREMENT_ROUTE_RESOURCE:
+        required = _METHOD_AWARE_SCOPE_FIELDS | {"audioRequirementRef"}
+        allowed = required | {"rightsBindingRef", "voiceAssetVersionRef"}
+        return required.issubset(payload) and set(payload).issubset(allowed) and not (
+            _contains_forbidden_method_aware_claim(payload)
+        )
+    return False
 
 _TIMELINE_WRITE_RESOURCES = frozenset({"timeline", "timeline-edits"})
 _RENDER_CANDIDATE_WRITE_FIELDS = frozenset(
@@ -720,6 +819,15 @@ class CreatorRequestHandler(BaseHTTPRequestHandler):
                 return
             if (
                 production_subresource is not None
+                and production_subresource[1] in _METHOD_AWARE_WRITE_RESOURCES
+                and not _valid_method_aware_public_command(
+                    production_subresource[1], payload
+                )
+            ):
+                self._send_application_error(400, "invalid_request")
+                return
+            if (
+                production_subresource is not None
                 and production_subresource[1] in _TIMELINE_WRITE_RESOURCES
             ):
                 resource = production_subresource[1]
@@ -889,6 +997,26 @@ class CreatorRequestHandler(BaseHTTPRequestHandler):
                     result = self.episode_production_boundary.resolve_assets(command)
                 elif resource == "media":
                     result = self.episode_production_boundary.execute_media(command)
+                elif resource == "execution-method-plan":
+                    result = (
+                        self.episode_production_boundary
+                        .create_public_execution_method_plan(command)
+                    )
+                elif resource == "method-aware-input-plan":
+                    result = (
+                        self.episode_production_boundary
+                        .create_public_method_aware_input_plan(command)
+                    )
+                elif resource == "method-aware-video-route":
+                    result = (
+                        self.episode_production_boundary
+                        .create_public_method_aware_video_route(command)
+                    )
+                elif resource == "explicit-audio-requirement-route":
+                    result = (
+                        self.episode_production_boundary
+                        .create_public_explicit_audio_requirement_route(command)
+                    )
                 elif resource == "deterministic-effects":
                     result = (
                         self.episode_production_boundary
@@ -1179,6 +1307,54 @@ class CreatorRequestHandler(BaseHTTPRequestHandler):
                     elif resource == "media":
                         result = self.episode_production_boundary.get_media_bundle(
                             workspace_ref, run_ref
+                        )
+                    elif resource == "execution-method-plan":
+                        result = (
+                            self.episode_production_boundary
+                            .get_public_execution_method_plan(
+                                workspace_ref,
+                                query.get("projectRef", [""])[0],
+                                series_ref,
+                                episode_ref,
+                                run_ref,
+                                query.get("versionRef", [None])[0],
+                            )
+                        )
+                    elif resource == "method-aware-input-plan":
+                        result = (
+                            self.episode_production_boundary
+                            .get_public_method_aware_input_plan(
+                                workspace_ref,
+                                query.get("projectRef", [""])[0],
+                                series_ref,
+                                episode_ref,
+                                run_ref,
+                                query.get("versionRef", [None])[0],
+                            )
+                        )
+                    elif resource == "method-aware-video-route":
+                        result = (
+                            self.episode_production_boundary
+                            .get_public_method_aware_video_route(
+                                workspace_ref,
+                                query.get("projectRef", [""])[0],
+                                series_ref,
+                                episode_ref,
+                                run_ref,
+                                query.get("versionRef", [None])[0],
+                            )
+                        )
+                    elif resource == "explicit-audio-requirement-route":
+                        result = (
+                            self.episode_production_boundary
+                            .get_public_explicit_audio_requirement_route(
+                                workspace_ref,
+                                query.get("projectRef", [""])[0],
+                                series_ref,
+                                episode_ref,
+                                run_ref,
+                                query.get("versionRef", [None])[0],
+                            )
                         )
                     elif resource == "deterministic-effects":
                         result = (
@@ -1748,6 +1924,8 @@ class CreatorRequestHandler(BaseHTTPRequestHandler):
             "lifecycle_unavailable": "内容生命周期服务暂时不可用。",
             "upstream_not_confirmed": "请先确认系列规划、集数绑定和剧本版本。",
             "execution_not_authorized": "当前镜头结构仅供预检，尚未获得媒体执行授权。",
+            "legacy_asset_resolution_write_disabled": "旧版 G4 仅支持历史读取与精确重放。",
+            "legacy_media_execution_write_disabled": "旧版 G5 仅支持历史读取与精确重放。",
             "authority_required": "请先连接并完成 M6 权威与身份参考授权。",
             "invalid_state_transition": "当前制作状态不能执行该操作，请刷新后重试。",
             "stale_input": "上游权威版本已变化，请重新建立本次单集制作链。",

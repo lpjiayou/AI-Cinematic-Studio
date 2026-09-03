@@ -55,6 +55,20 @@ PUBLIC_M6_BASELINE_ACTIVATE_ENDPOINT: Final = f"{PUBLIC_API_PREFIX}/series-intel
 PUBLIC_EPISODE_PRODUCTION_RUNS_ENDPOINT: Final = (
     f"{PUBLIC_API_PREFIX}/episode-production-runs"
 )
+PUBLIC_EXECUTION_METHOD_PLAN_RESOURCE: Final = "execution-method-plan"
+PUBLIC_METHOD_AWARE_INPUT_PLAN_RESOURCE: Final = "method-aware-input-plan"
+PUBLIC_METHOD_AWARE_VIDEO_ROUTE_RESOURCE: Final = "method-aware-video-route"
+PUBLIC_EXPLICIT_AUDIO_REQUIREMENT_ROUTE_RESOURCE: Final = (
+    "explicit-audio-requirement-route"
+)
+PUBLIC_METHOD_AWARE_RESOURCES: Final = frozenset(
+    {
+        PUBLIC_EXECUTION_METHOD_PLAN_RESOURCE,
+        PUBLIC_METHOD_AWARE_INPUT_PLAN_RESOURCE,
+        PUBLIC_METHOD_AWARE_VIDEO_ROUTE_RESOURCE,
+        PUBLIC_EXPLICIT_AUDIO_REQUIREMENT_ROUTE_RESOURCE,
+    }
+)
 
 
 CAPABILITY_PROJECTION: Final = (
@@ -128,11 +142,14 @@ CAPABILITY_PROJECTION: Final = (
     },
     {
         "id": "M8", "name": "Storyboard + Creative Shot Domain", "state": "local_evidence_only",
-        "publicResources": ["episode-production-runs/shot-graph"], "requirements": ["M7"],
+        "publicResources": [
+            "episode-production-runs/shot-graph",
+            "episode-production-runs/execution-method-plan",
+        ], "requirements": ["M7"],
     },
     {
         "id": "M9", "name": "Asset Requirement + Asset Intelligence", "state": "local_evidence_only",
-        "publicResources": ["episode-production-runs/assets"], "requirements": ["M8"],
+        "publicResources": ["episode-production-runs/execution-method-plan"], "requirements": ["M8"],
     },
     {
         "id": "M10", "name": "Image Generation", "state": "local_evidence_only",
@@ -147,6 +164,7 @@ CAPABILITY_PROJECTION: Final = (
             "episode-production-runs/semantic-visual-qc",
             "episode-production-runs/media-selection",
             "episode-production-runs/state-projection",
+            "episode-production-runs/method-aware-input-plan",
         ],
         "requirements": [
             "M9",
@@ -160,7 +178,7 @@ CAPABILITY_PROJECTION: Final = (
         "publicResources": [
             "episode-production-runs/production-readiness",
             "episode-production-runs/provider-experiments",
-            "episode-production-runs/media",
+            "episode-production-runs/method-aware-video-route",
             "episode-production-runs/real-video-revision",
             "episode-production-runs/real-video-candidates",
             "episode-production-runs/semantic-visual-qc",
@@ -172,7 +190,10 @@ CAPABILITY_PROJECTION: Final = (
     },
     {
         "id": "M12", "name": "Audio Production", "state": "production_policy_required",
-        "publicResources": ["episode-production-runs/production-readiness", "episode-production-runs/media"],
+        "publicResources": [
+            "episode-production-runs/production-readiness",
+            "episode-production-runs/explicit-audio-requirement-route",
+        ],
         "requirements": [
             "M9_explicit_audio_requirement",
             "rights_manifest",
