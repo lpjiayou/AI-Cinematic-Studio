@@ -110,7 +110,7 @@ def _public(stub: _DeliveryStub) -> EpisodeProductionPublicBoundary:
 
 class M13E4PublicApiContractTests(unittest.TestCase):
     def test_reuses_the_single_existing_route_and_adds_one_closed_kind(self):
-        self.assertEqual(len(EPISODE_PRODUCTION_SUBRESOURCES), 26)
+        self.assertEqual(len(EPISODE_PRODUCTION_SUBRESOURCES), 30)
         self.assertIn("deterministic-effects", EPISODE_PRODUCTION_SUBRESOURCES)
         self.assertIn(EFFECT_KIND, _DETERMINISTIC_EFFECT_KINDS)
         self.assertNotIn("distance", EPISODE_PRODUCTION_SUBRESOURCES)

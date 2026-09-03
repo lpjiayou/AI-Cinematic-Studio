@@ -25,7 +25,10 @@ from .authority import (
     RejectingIdentityReferenceAuthority,
     RejectingIdentityReferenceCurrentReader,
 )
-from .assets import K2AssetPipelineService
+from .assets import (
+    K2AssetPipelineService,
+    LegacyAssetResolutionWriteDisabledError,
+)
 from .audio import K2AudioProductionService
 from .evidence import (
     InMemoryEpisodeProductionEvidenceAdapter,
@@ -46,12 +49,14 @@ from .foundation import (
     SqliteEpisodeProductionAdapter,
     StaleInputError,
     UpstreamNotReadyError,
+    _required_ref,
     _utc_now,
 )
 from .shot_graph import K2ShotGraphService, ValidationFailedError
 from .media import (
     ArtifactRejectedError,
     K2MediaExecutionService,
+    LegacyMediaExecutionWriteDisabledError,
     RejectingMediaExecution,
     WorkerUnavailableError,
 )
@@ -228,6 +233,16 @@ _PRIVATE_DETERMINISTIC_EFFECT_FIELDS = frozenset(
     }
 )
 
+_PRIVATE_METHOD_AWARE_RESPONSE_FIELDS = frozenset(
+    {
+        "authoritystate",
+        "requestedprovenance",
+        "rightsbinding",
+        "sourcerefs",
+        "voiceassetversionsnapshot",
+    }
+)
+
 
 def _is_internal_media_locator(field: Any) -> bool:
     if not isinstance(field, str):
@@ -253,6 +268,27 @@ def _strip_internal_media_locators(value: Any) -> Any:
         return [_strip_internal_media_locators(item) for item in value]
     if isinstance(value, tuple):
         return tuple(_strip_internal_media_locators(item) for item in value)
+    return value
+
+
+def _strip_method_aware_private_details(value: Any) -> Any:
+    """Return a public planning DTO without raw authority or storage data."""
+
+    if isinstance(value, Mapping):
+        return {
+            key: _strip_method_aware_private_details(item)
+            for key, item in value.items()
+            if not _is_internal_media_locator(key)
+            and (
+                not isinstance(key, str)
+                or key.replace("_", "").replace("-", "").lower()
+                not in _PRIVATE_METHOD_AWARE_RESPONSE_FIELDS
+            )
+        }
+    if isinstance(value, list):
+        return [_strip_method_aware_private_details(item) for item in value]
+    if isinstance(value, tuple):
+        return tuple(_strip_method_aware_private_details(item) for item in value)
     return value
 
 
@@ -413,6 +449,14 @@ class EpisodeProductionPublicBoundary:
             return EpisodeProductionPublicError(exc.code, 403)
         if isinstance(exc, ExecutionNotAuthorizedError):
             return EpisodeProductionPublicError(exc.code, 409)
+        if isinstance(
+            exc,
+            (
+                LegacyAssetResolutionWriteDisabledError,
+                LegacyMediaExecutionWriteDisabledError,
+            ),
+        ):
+            return EpisodeProductionPublicError(exc.code, 409)
         if isinstance(exc, MediaSelectionApprovalRequiredError):
             return EpisodeProductionPublicError(exc.code, 403)
         if isinstance(exc, ApprovalRejectedError):
@@ -467,6 +511,78 @@ class EpisodeProductionPublicBoundary:
         return _strip_private_preview_details(
             self._invoke(operation, *args, **kwargs)
         )
+
+    @staticmethod
+    def _require_public_command(
+        command: Mapping[str, Any],
+        required: frozenset[str],
+        optional: frozenset[str] = frozenset(),
+    ) -> dict[str, Any]:
+        if (
+            not isinstance(command, Mapping)
+            or not required.issubset(command)
+            or not set(command).issubset(required | optional)
+        ):
+            raise EpisodeProductionError(
+                "command fields do not match the public method-aware contract"
+            )
+        return dict(command)
+
+    def _current_execution_method_plan_for_public(
+        self, command: Mapping[str, Any]
+    ) -> dict[str, Any]:
+        plan = self._execution_method_planning_service().get_plan(
+            command["workspaceRef"],
+            command["projectRef"],
+            command["seriesRef"],
+            command["episodeRef"],
+            command["productionRunRef"],
+        )
+        if plan.get("currentness") != "CURRENT":
+            raise ExecutionNotAuthorizedError(
+                "current execution method plan is required"
+            )
+        return plan
+
+    def _current_method_aware_input_plan_for_public(
+        self, command: Mapping[str, Any]
+    ) -> dict[str, Any]:
+        plan = self._method_aware_media_service().get_input_plan(
+            command["workspaceRef"],
+            command["projectRef"],
+            command["seriesRef"],
+            command["episodeRef"],
+            command["productionRunRef"],
+        )
+        if plan.get("currentness") != "CURRENT":
+            raise ExecutionNotAuthorizedError(
+                "current method-aware input plan is required"
+            )
+        return plan
+
+    @staticmethod
+    def _record_payload_by_ref(
+        repository,
+        workspace_ref: str,
+        run_ref: str,
+        record_kind: str,
+        record_ref: Any,
+    ) -> dict[str, Any]:
+        ref = _required_ref(record_ref, f"{record_kind}Ref")
+        matches = []
+        for record in repository.list_records(
+            workspace_ref, run_ref, record_kind=record_kind
+        ):
+            payload = record.get("payload")
+            if (
+                record.get("recordRef") == ref
+                and isinstance(payload, Mapping)
+                and payload.get("payloadDigest") == record.get("payloadDigest")
+            ):
+                matches.append(dict(payload))
+        if len(matches) != 1:
+            raise RecordNotFoundError(f"{record_kind} was not found")
+        return matches[0]
 
     def create_run(self, command: Mapping[str, Any]) -> dict[str, Any]:
         run = self._invoke(self.__service.create_run, command)
@@ -539,6 +655,26 @@ class EpisodeProductionPublicBoundary:
             self._execution_method_planning_service().create_plan, command
         )
 
+    def create_public_execution_method_plan(
+        self, command: Mapping[str, Any]
+    ) -> dict[str, Any]:
+        required = frozenset(
+            {
+                "workspaceRef",
+                "projectRef",
+                "seriesRef",
+                "episodeRef",
+                "productionRunRef",
+                "consistencyValidationVersionRef",
+                "shots",
+                "idempotencyKey",
+            }
+        )
+        value = self._invoke(self._require_public_command, command, required)
+        return _strip_method_aware_private_details(
+            self.create_execution_method_plan(value)
+        )
+
     def get_execution_method_plan(
         self,
         workspace_ref: str,
@@ -556,6 +692,26 @@ class EpisodeProductionPublicBoundary:
             episode_ref,
             production_run_ref,
             execution_method_plan_version_ref,
+        )
+
+    def get_public_execution_method_plan(
+        self,
+        workspace_ref: str,
+        project_ref: str,
+        series_ref: str,
+        episode_ref: str,
+        production_run_ref: str,
+        execution_method_plan_version_ref: str | None = None,
+    ) -> dict[str, Any]:
+        return _strip_method_aware_private_details(
+            self.get_execution_method_plan(
+                workspace_ref,
+                project_ref,
+                series_ref,
+                episode_ref,
+                production_run_ref,
+                execution_method_plan_version_ref,
+            )
         )
 
     def require_current_execution_method_plan(
@@ -589,6 +745,64 @@ class EpisodeProductionPublicBoundary:
             self._method_aware_media_service().create_input_plan, command
         )
 
+    def create_public_method_aware_input_plan(
+        self, command: Mapping[str, Any]
+    ) -> dict[str, Any]:
+        required = frozenset(
+            {
+                "workspaceRef",
+                "projectRef",
+                "seriesRef",
+                "episodeRef",
+                "productionRunRef",
+                "assetBindings",
+                "idempotencyKey",
+            }
+        )
+
+        def operation() -> dict[str, Any]:
+            value = self._require_public_command(command, required)
+            plan = self._current_execution_method_plan_for_public(value)
+            raw_bindings = value["assetBindings"]
+            if not isinstance(raw_bindings, list):
+                raise EpisodeProductionError("assetBindings are invalid")
+            repository = self._method_aware_media_service().evidence_repository
+            bindings = []
+            binding_fields = {
+                "visualExecutionRequirementRef",
+                "inputRequirementKey",
+                "inputRole",
+                "assetVersionRef",
+            }
+            for raw in raw_bindings:
+                if not isinstance(raw, Mapping) or set(raw) != binding_fields:
+                    raise EpisodeProductionError("asset binding fields are invalid")
+                asset = self._record_payload_by_ref(
+                    repository,
+                    value["workspaceRef"],
+                    value["productionRunRef"],
+                    "AssetVersion",
+                    raw.get("assetVersionRef"),
+                )
+                bindings.append(
+                    {
+                        **dict(raw),
+                        "assetVersionDigest": asset["payloadDigest"],
+                    }
+                )
+            result = self._method_aware_media_service().create_input_plan(
+                {
+                    **value,
+                    "executionMethodPlanVersionRef": plan[
+                        "executionMethodPlanVersionRef"
+                    ],
+                    "assetBindings": bindings,
+                }
+            )
+            return _strip_method_aware_private_details(result)
+
+        return self._invoke(operation)
+
     def get_method_aware_input_plan(
         self,
         workspace_ref: str,
@@ -608,12 +822,61 @@ class EpisodeProductionPublicBoundary:
             method_aware_input_plan_version_ref,
         )
 
+    def get_public_method_aware_input_plan(
+        self,
+        workspace_ref: str,
+        project_ref: str,
+        series_ref: str,
+        episode_ref: str,
+        production_run_ref: str,
+        method_aware_input_plan_version_ref: str | None = None,
+    ) -> dict[str, Any]:
+        return _strip_method_aware_private_details(
+            self.get_method_aware_input_plan(
+                workspace_ref,
+                project_ref,
+                series_ref,
+                episode_ref,
+                production_run_ref,
+                method_aware_input_plan_version_ref,
+            )
+        )
+
     def route_method_aware_videos(
         self, command: Mapping[str, Any]
     ) -> dict[str, Any]:
         return self._invoke(
             self._method_aware_media_service().route_video_methods, command
         )
+
+    def create_public_method_aware_video_route(
+        self, command: Mapping[str, Any]
+    ) -> dict[str, Any]:
+        required = frozenset(
+            {
+                "workspaceRef",
+                "projectRef",
+                "seriesRef",
+                "episodeRef",
+                "productionRunRef",
+                "idempotencyKey",
+            }
+        )
+
+        def operation() -> dict[str, Any]:
+            value = self._require_public_command(command, required)
+            plan = self._current_method_aware_input_plan_for_public(value)
+            result = self._method_aware_media_service().route_video_methods(
+                {
+                    **value,
+                    "methodAwareInputPlanVersionRef": plan[
+                        "methodAwareInputPlanVersionRef"
+                    ],
+                }
+            )
+            return _strip_method_aware_private_details(result)
+
+        return self._invoke(operation)
 
     def get_method_aware_video_route(
         self,
@@ -634,6 +897,26 @@ class EpisodeProductionPublicBoundary:
             video_method_route_version_ref,
         )
 
+    def get_public_method_aware_video_route(
+        self,
+        workspace_ref: str,
+        project_ref: str,
+        series_ref: str,
+        episode_ref: str,
+        production_run_ref: str,
+        video_method_route_version_ref: str | None = None,
+    ) -> dict[str, Any]:
+        return _strip_method_aware_private_details(
+            self.get_method_aware_video_route(
+                workspace_ref,
+                project_ref,
+                series_ref,
+                episode_ref,
+                production_run_ref,
+                video_method_route_version_ref,
+            )
+        )
+
     def _explicit_audio_bridge_service(
         self,
     ) -> M9M12ExplicitAudioBridgeService:
@@ -650,6 +933,78 @@ class EpisodeProductionPublicBoundary:
             self._explicit_audio_bridge_service().create_route, command
         )
         return _strip_internal_media_locators(result)
+
+    def create_public_explicit_audio_requirement_route(
+        self, command: Mapping[str, Any]
+    ) -> dict[str, Any]:
+        required = frozenset(
+            {
+                "workspaceRef",
+                "projectRef",
+                "seriesRef",
+                "episodeRef",
+                "productionRunRef",
+                "audioRequirementRef",
+                "idempotencyKey",
+            }
+        )
+        optional = frozenset({"rightsBindingRef", "voiceAssetVersionRef"})
+
+        def operation() -> dict[str, Any]:
+            value = self._require_public_command(command, required, optional)
+            plan = self._current_execution_method_plan_for_public(value)
+            repository = self._explicit_audio_bridge_service().evidence_repository
+            resolved = self._execution_method_planning_service().resolve_current_audio_requirement(
+                value["workspaceRef"],
+                value["projectRef"],
+                value["seriesRef"],
+                value["episodeRef"],
+                value["productionRunRef"],
+                plan["executionMethodPlanVersionRef"],
+                value["audioRequirementRef"],
+            )
+            audio_type = resolved["audioRequirement"]["audioType"]
+            bridge_command = {
+                field: value[field]
+                for field in (
+                    "workspaceRef",
+                    "projectRef",
+                    "seriesRef",
+                    "episodeRef",
+                    "productionRunRef",
+                    "audioRequirementRef",
+                    "idempotencyKey",
+                )
+            }
+            bridge_command["executionMethodPlanVersionRef"] = plan[
+                "executionMethodPlanVersionRef"
+            ]
+            if audio_type not in {"SILENCE", "MUSIC"}:
+                bridge_command["rightsBinding"] = self._record_payload_by_ref(
+                    repository,
+                    value["workspaceRef"],
+                    value["productionRunRef"],
+                    "RightsBinding",
+                    value.get("rightsBindingRef"),
+                )
+            if audio_type in {"DIALOGUE", "NARRATION"}:
+                bridge_command["voiceAssetVersion"] = self._record_payload_by_ref(
+                    repository,
+                    value["workspaceRef"],
+                    value["productionRunRef"],
+                    "AssetVersion",
+                    value.get("voiceAssetVersionRef"),
+                )
+            elif "voiceAssetVersionRef" in value:
+                raise EpisodeProductionError(
+                    "non-speech requirement cannot select a voice"
+                )
+            result = self._explicit_audio_bridge_service().create_route(
+                bridge_command
+            )
+            return _strip_method_aware_private_details(result)
+
+        return self._invoke(operation)
 
     def get_explicit_audio_requirement_route(
         self,
@@ -670,6 +1025,26 @@ class EpisodeProductionPublicBoundary:
             audio_requirement_route_version_ref,
         )
         return _strip_internal_media_locators(result)
+
+    def get_public_explicit_audio_requirement_route(
+        self,
+        workspace_ref: str,
+        project_ref: str,
+        series_ref: str,
+        episode_ref: str,
+        production_run_ref: str,
+        audio_requirement_route_version_ref: str | None = None,
+    ) -> dict[str, Any]:
+        return _strip_method_aware_private_details(
+            self.get_explicit_audio_requirement_route(
+                workspace_ref,
+                project_ref,
+                series_ref,
+                episode_ref,
+                production_run_ref,
+                audio_requirement_route_version_ref,
+            )
+        )
 
     def authorize_and_lock(self, command: Mapping[str, Any]) -> dict[str, Any]:
         return self._invoke(self.__authority_identity.authorize_and_lock, command)

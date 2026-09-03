@@ -1,13 +1,19 @@
-"""G4 V5 asset requirements and provider-neutral media generation requests."""
+"""Read/replay compatibility for immutable legacy K2 G4 evidence.
+
+New G4 writes are permanently closed.  The builders and validators in this
+module remain only so historic ``v1`` facts can be verified without changing
+their schema or meaning.
+"""
 
 from __future__ import annotations
 
 from copy import deepcopy
 from typing import Any, Callable, Mapping
 
-from .evidence import EpisodeProductionEvidenceRepository, EvidenceFact, GateAppend
+from .evidence import EpisodeProductionEvidenceRepository
 from .foundation import (
     EpisodeProductionError,
+    IdempotencyConflictError,
     RepositoryUnavailableError,
     StaleInputError,
     UpstreamNotReadyError,
@@ -23,10 +29,15 @@ from .shot_graph import (
 
 
 ASSET_RESOLUTION_GATE = "G4_ASSET_RESOLUTION"
+LEGACY_K2_G4_COMPATIBILITY_V1 = "LEGACY_K2_G4_COMPATIBILITY_V1"
 ASSET_REQUIREMENT_SCHEMA_VERSION = "v5.asset-requirement.v1"
 GENERATION_REQUEST_SCHEMA_VERSION = "v5.generation-request.v1"
 ASSET_PLAN_SCHEMA_VERSION = "v5.asset-resolution-manifest.v1"
 RESOLVER_ID = "v5.k2.asset-resolver.v1"
+
+
+class LegacyAssetResolutionWriteDisabledError(EpisodeProductionError):
+    code = "legacy_asset_resolution_write_disabled"
 
 
 def _sealed(payload: Mapping[str, Any]) -> dict[str, Any]:
@@ -331,64 +342,22 @@ class K2AssetPipelineService:
             command.get("productionRunRef"), "productionRunRef"
         )
         client_key = _idempotency_key(command.get("idempotencyKey"))
+        # The cutover retains the exact historic command as a read/replay
+        # capability, but it must never allocate refs or enter the legacy
+        # unconditional video+audio builders for a new run.
+        self.shot_graph.root_service.get_run(workspace, run_ref)
+        existing_gate = self.evidence.get_gate(
+            workspace, run_ref, ASSET_RESOLUTION_GATE
+        )
+        if existing_gate is None:
+            raise LegacyAssetResolutionWriteDisabledError(
+                "legacy G4 asset-resolution writes are disabled"
+            )
+
         verified = self.shot_graph.verify_shot_graph_current(workspace, run_ref)
         root = verified["root"]
         graph = verified["executableShotGraph"]
-        shots = verified["creativeShotVersions"]
         require_legacy_executable_graph(graph)
-        created_at = self._clock()
-        authority_requirements = self._authority_requirements(
-            workspace=workspace,
-            run_ref=run_ref,
-            graph=graph,
-            shots=shots,
-            created_at=created_at,
-        )
-        media_requirements, requests = self._media_requirements_and_requests(
-            workspace=workspace,
-            run_ref=run_ref,
-            graph=graph,
-            shots=shots,
-            first_ordinal=len(authority_requirements) + 1,
-            created_at=created_at,
-        )
-        requirements = authority_requirements + media_requirements
-        self._validate_plan(graph, requirements, requests)
-        manifest = _sealed(
-            {
-                "schemaVersion": ASSET_PLAN_SCHEMA_VERSION,
-                "workspaceRef": workspace,
-                "productionRunRef": run_ref,
-                "assetResolutionManifestRef": _required_ref(
-                    self._ref_factory("asset-resolution-manifest"),
-                    "assetResolutionManifestRef",
-                ),
-                "version": 1,
-                "rootPayloadDigest": root["payloadDigest"],
-                "executableShotGraphVersionRef": graph[
-                    "executableShotGraphVersionRef"
-                ],
-                "executableShotGraphDigest": graph["payloadDigest"],
-                "assetRequirementRefs": [
-                    item["assetRequirementRef"] for item in requirements
-                ],
-                "generationRequestRefs": [
-                    item["generationRequestRef"] for item in requests
-                ],
-                "summary": {
-                    "requirements": len(requirements),
-                    "resolvedAuthority": len(authority_requirements),
-                    "generationRequested": len(media_requirements),
-                    "blocked": 0,
-                    "generationRequests": len(requests),
-                },
-                "state": "READY_FOR_V4_DISPATCH",
-                "provenance": "LOCAL_EVIDENCE",
-                "publicationAllowed": False,
-                "createdBy": RESOLVER_ID,
-                "createdAt": created_at,
-            }
-        )
         request_digest = _digest(
             {
                 "clientIdempotencyKey": client_key,
@@ -397,48 +366,16 @@ class K2AssetPipelineService:
                 "resolverId": RESOLVER_ID,
             }
         )
-        facts = tuple(
-            EvidenceFact(
-                f"AssetRequirement:{item['ordinal']:04d}",
-                item["assetRequirementRef"],
-                1,
-                item,
-                item["payloadDigest"],
-            )
-            for item in requirements
-        ) + tuple(
-            EvidenceFact(
-                f"GenerationRequest:{item['ordinal']:04d}",
-                item["generationRequestVersionRef"],
-                1,
-                item,
-                item["payloadDigest"],
-            )
-            for item in requests
-        ) + (
-            EvidenceFact(
-                "AssetResolutionManifest",
-                manifest["assetResolutionManifestRef"],
-                1,
-                manifest,
-                manifest["payloadDigest"],
-            ),
+        gate_key = _digest(
+            {"clientIdempotencyKey": client_key, "stage": "assets"}
         )
-        gate, replay = self.evidence.append_gate(
-            GateAppend(
-                workspace,
-                run_ref,
-                ASSET_RESOLUTION_GATE,
-                _digest({"clientIdempotencyKey": client_key, "stage": "assets"}),
-                root["payloadDigest"],
-                request_digest,
-                "SHOTS_COMPILED",
-                "ASSETS_READY",
-                created_at,
-                facts,
-            )
-        )
-        return {**self._bundle(gate), "idempotentReplay": replay}
+        if (
+            existing_gate.get("idempotencyKey") != gate_key
+            or existing_gate.get("rootPayloadDigest") != root["payloadDigest"]
+            or existing_gate.get("requestDigest") != request_digest
+        ):
+            raise IdempotencyConflictError("G4 asset command conflicts")
+        return {**self._bundle(existing_gate), "idempotentReplay": True}
 
     @staticmethod
     def _bundle(gate: Mapping[str, Any]) -> dict[str, Any]:

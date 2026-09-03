@@ -25,6 +25,7 @@ from tests.unit.test_episode_production_k2 import (
     run_command,
     seed_k2_roots,
 )
+from tests.support.legacy_k2_history import seed_legacy_g4
 from tests.unit.test_k2_production_policy import (
     NOW,
     TestProviderPolicyAuthority,
@@ -203,7 +204,7 @@ class K2ProviderExperimentTests(unittest.TestCase):
         if record_policy:
             boundary.record_production_policy(policy_command(run, identity))
         boundary.compile_shot_graph(g3_command(run))
-        assets = boundary.resolve_assets(g4_command(run))
+        assets = seed_legacy_g4(boundary, g4_command(run))
         source = next(
             request
             for request in assets["generationRequests"]

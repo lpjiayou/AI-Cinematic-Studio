@@ -26,6 +26,7 @@ from services.v5_core_os.series_intelligence import M6Scope, VerifiedApproval
 from services.v5_core_os.series_intelligence.errors import AuthorityUnavailableError
 from tests.unit.test_ai_director_phase1 import valid_brief, valid_plan
 from tests.unit.test_series_planning_m5 import valid_candidate
+from tests.support.legacy_k2_history import seed_legacy_g4, seed_legacy_g5
 
 
 WORKSPACE = "workspace-k2"
@@ -1045,8 +1046,8 @@ class EpisodeProductionG4AssetResolutionTests(unittest.TestCase):
         self.boundary.authorize_and_lock(g2_command(self.run))
         self.boundary.compile_shot_graph(g3_command(self.run))
 
-    def test_resolves_all_authority_requirements_and_emits_provider_neutral_requests(self):
-        result = self.boundary.resolve_assets(g4_command(self.run))
+    def test_historical_plan_remains_readable_without_new_writes(self):
+        result = seed_legacy_g4(self.boundary, g4_command(self.run))
         manifest = result["assetResolutionManifest"]
         requirements = result["assetRequirements"]
         requests = result["generationRequests"]
@@ -1091,8 +1092,8 @@ class EpisodeProductionG4AssetResolutionTests(unittest.TestCase):
         self.assertEqual(projected["state"], "ASSETS_READY")
         self.assertEqual(projected["completedGates"][-1], "G4_ASSET_RESOLUTION")
 
-    def test_replay_is_stable_and_g4_cannot_skip_g3(self):
-        first = self.boundary.resolve_assets(g4_command(self.run))
+    def test_replay_is_stable_and_new_g4_write_is_disabled(self):
+        first = seed_legacy_g4(self.boundary, g4_command(self.run))
         replay = self.boundary.resolve_assets(g4_command(self.run))
         self.assertTrue(replay["idempotentReplay"])
         self.assertEqual(replay["assetResolutionManifest"], first["assetResolutionManifest"])
@@ -1112,11 +1113,11 @@ class EpisodeProductionG4AssetResolutionTests(unittest.TestCase):
             boundary.resolve_assets(g4_command(run))
         self.assertEqual(
             (caught.exception.status, caught.exception.code),
-            (409, "upstream_not_confirmed"),
+            (409, "legacy_asset_resolution_write_disabled"),
         )
 
     def test_g4_plan_is_workspace_isolated(self):
-        self.boundary.resolve_assets(g4_command(self.run))
+        seed_legacy_g4(self.boundary, g4_command(self.run))
         with self.assertRaises(EpisodeProductionPublicError) as caught:
             self.boundary.get_asset_plan(
                 "workspace-other", self.run["productionRunRef"]
@@ -1160,13 +1161,13 @@ class EpisodeProductionG5MediaExecutionTests(unittest.TestCase):
         )
         self.boundary.authorize_and_lock(g2_command(self.run))
         self.boundary.compile_shot_graph(g3_command(self.run))
-        self.boundary.resolve_assets(g4_command(self.run))
+        seed_legacy_g4(self.boundary, g4_command(self.run))
 
     def tearDown(self):
         self.directory.cleanup()
 
     def test_executes_real_local_media_and_registers_verified_immutable_assets(self):
-        result = self.boundary.execute_media(g5_command(self.run))
+        result = seed_legacy_g5(self.boundary, g5_command(self.run))
         self.assertEqual(result["state"], "MEDIA_READY")
         self.assertFalse(result["idempotentReplay"])
         self.assertEqual(result["mediaManifest"]["summary"], {
@@ -1231,7 +1232,8 @@ class EpisodeProductionG5MediaExecutionTests(unittest.TestCase):
         boundary.compile_shot_graph(
             g3_command(run, idempotencyKey="g5-unconfigured-g3")
         )
-        boundary.resolve_assets(
+        seed_legacy_g4(
+            boundary,
             g4_command(run, idempotencyKey="g5-unconfigured-g4")
         )
         with self.assertRaises(EpisodeProductionPublicError) as caught:
@@ -1240,7 +1242,7 @@ class EpisodeProductionG5MediaExecutionTests(unittest.TestCase):
             )
         self.assertEqual(
             (caught.exception.status, caught.exception.code),
-            (503, "worker_unavailable"),
+            (409, "legacy_media_execution_write_disabled"),
         )
 
 
@@ -1285,8 +1287,8 @@ class EpisodeProductionG6DeliveryTests(unittest.TestCase):
         self.assertEqual(self.run["productionRunRef"], expected_run_ref)
         self.boundary.authorize_and_lock(g2_command(self.run))
         self.boundary.compile_shot_graph(g3_command(self.run))
-        self.boundary.resolve_assets(g4_command(self.run))
-        self.boundary.execute_media(g5_command(self.run))
+        seed_legacy_g4(self.boundary, g4_command(self.run))
+        seed_legacy_g5(self.boundary, g5_command(self.run))
 
     def tearDown(self):
         self.directory.cleanup()
@@ -1438,10 +1440,12 @@ class EpisodeProductionG6DeliveryTests(unittest.TestCase):
         first.compile_shot_graph(
             g3_command(run, idempotencyKey="g6-durable-shots")
         )
-        first.resolve_assets(
+        seed_legacy_g4(
+            first,
             g4_command(run, idempotencyKey="g6-durable-assets")
         )
-        first.execute_media(
+        seed_legacy_g5(
+            first,
             g5_command(run, idempotencyKey="g6-durable-media")
         )
         first.compose_and_qc(

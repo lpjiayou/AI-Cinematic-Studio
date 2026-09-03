@@ -527,7 +527,7 @@ class M13E2DeterministicEffectsHttpTests(unittest.TestCase):
                 )
 
     def test_e3_socket_rejects_server_claims_and_redacts_post_get(self) -> None:
-        self.assertEqual(len(EPISODE_PRODUCTION_SUBRESOURCES), 26)
+        self.assertEqual(len(EPISODE_PRODUCTION_SUBRESOURCES), 30)
         self.assertIn(
             "deterministic-effects", EPISODE_PRODUCTION_SUBRESOURCES
         )

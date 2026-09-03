@@ -67,6 +67,7 @@ from tests.unit.test_episode_production_k2 import (
     run_command,
     seed_k2_roots,
 )
+from tests.support.legacy_k2_history import seed_legacy_g4, seed_legacy_g5
 
 
 _V1_GOLDEN_DIGESTS = {
@@ -562,10 +563,12 @@ class M13E1TimelineEffectBindingSqliteTests(unittest.TestCase):
             boundary.compile_shot_graph(
                 g3_command(run, idempotencyKey="m13-e1-timeline-g3")
             )
-            boundary.resolve_assets(
+            seed_legacy_g4(
+                boundary,
                 g4_command(run, idempotencyKey="m13-e1-timeline-g4")
             )
-            media = boundary.execute_media(
+            media = seed_legacy_g5(
+                boundary,
                 g5_command(run, idempotencyKey="m13-e1-timeline-g5")
             )
             base = next(

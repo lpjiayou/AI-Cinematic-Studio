@@ -27,6 +27,7 @@ from tests.unit.test_episode_production_k2 import (
     run_command,
     seed_k2_roots,
 )
+from tests.support.legacy_k2_history import seed_legacy_g4, seed_legacy_g5
 
 
 class K2RealImagePlanTests(unittest.TestCase):
@@ -67,8 +68,8 @@ class K2RealImagePlanTests(unittest.TestCase):
         )
         self.boundary.authorize_and_lock(g2_command(self.run))
         self.boundary.compile_shot_graph(g3_command(self.run))
-        self.boundary.resolve_assets(g4_command(self.run))
-        self.boundary.execute_media(g5_command(self.run))
+        seed_legacy_g4(self.boundary, g4_command(self.run))
+        seed_legacy_g5(self.boundary, g5_command(self.run))
         self.boundary.compose_and_qc(g6_preview_command(self.run))
 
     def tearDown(self):

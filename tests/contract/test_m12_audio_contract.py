@@ -19,7 +19,10 @@ from services.v5_core_os.episode_production.foundation import (
 from services.v5_core_os.episode_production.evidence import (
     InMemoryEpisodeProductionEvidenceAdapter,
 )
-from services.v5_core_os.episode_production.media import K2MediaExecutionService
+from services.v5_core_os.episode_production.media import (
+    K2MediaExecutionService,
+    LegacyMediaExecutionWriteDisabledError,
+)
 
 
 WORKSPACE = "workspace-m12"
@@ -502,8 +505,17 @@ class M12AudioContractTests(unittest.TestCase):
                 ]
             )
 
-    def test_legacy_g5_rejects_tts_before_worker_or_canonical_write(self):
+    def test_legacy_g5_rejects_all_new_work_before_worker_or_canonical_write(self):
+        class Root:
+            def get_run(self, workspace_ref, run_ref):
+                return {"workspaceRef": workspace_ref, "productionRunRef": run_ref}
+
+        class ShotGraph:
+            root_service = Root()
+
         class Assets:
+            shot_graph = ShotGraph()
+
             def verify_asset_plan_current(self, workspace_ref, run_ref):
                 self.scope = (workspace_ref, run_ref)
                 return {
@@ -540,9 +552,7 @@ class M12AudioContractTests(unittest.TestCase):
             ref_factory=lambda prefix: f"{prefix}-1",
             clock=lambda: "2026-08-29T00:00:03Z",
         )
-        with patch(
-            "services.v5_core_os.episode_production.media.require_legacy_executable_graph"
-        ), self.assertRaises(EpisodeProductionError):
+        with self.assertRaises(LegacyMediaExecutionWriteDisabledError):
             service.execute_media(
                 {
                     "workspaceRef": WORKSPACE,
