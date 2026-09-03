@@ -1,6 +1,6 @@
 # Document Supersession Map
 
-Status: `GENERATED_REFERENCE / REVIEWED 2026-09-03`
+Status: `GENERATED_REFERENCE / REVIEWED 2026-09-04`
 
 This map makes existing replacement and amendment relationships discoverable. It does
 not rewrite predecessor content or create architecture authority. Machine-readable
@@ -35,7 +35,19 @@ edges remain in [`DOCUMENT_REGISTRY.json`](DOCUMENT_REGISTRY.json).
 All referenced ADRs remain `ACCEPTED_DECISION`; a relationship does not delete an
 Accepted ADR or turn it into ordinary historical prose.
 
-## 3. Total document replacements
+## 3. Non-superseding M12 build-host records
+
+[`M12_C3_DEDICATED_LINUX_CPU_BUILD_HOST_SPECIFICATION.md`](../../architecture/M12_C3_DEDICATED_LINUX_CPU_BUILD_HOST_SPECIFICATION.md)
+implements the host-selection boundary of ADR-0015 and ADR-0020. It neither amends
+nor supersedes either Accepted ADR. Its primary registry class is `CURRENT_STATUS`;
+`ARCHITECTURE_SPECIFICATION` is a secondary characteristic.
+
+[`M12_C3_WSL2_CPU_BUILD_HOST_PREFLIGHT_2026-09-04.md`](../status/M12_C3_WSL2_CPU_BUILD_HOST_PREFLIGHT_2026-09-04.md)
+is immutable failed-candidate evidence. It does not supersede the specification or
+the ADRs, and it is not current execution authority. These implementation and
+evidence relationships therefore add no supersession edge.
+
+## 4. Total document replacements
 
 | Superseded document | Successor |
 | --- | --- |
@@ -50,21 +62,21 @@ Accepted ADR or turn it into ordinary historical prose.
 | [`K2_PUBLISHABLE_PRODUCTION_EXECUTION_PACKAGE.md`](../../governance/K2_PUBLISHABLE_PRODUCTION_EXECUTION_PACKAGE.md) | [`ADR-0014`](../../governance/ADR-0014-k2-001-archive-k2-002-changan-start.md) |
 | [`M12_A100_BUILD_HOST_PREFLIGHT_2026-09-03.md`](../status/M12_A100_BUILD_HOST_PREFLIGHT_2026-09-03.md) | [`M12_A100_BUILD_HOST_REFLIGHT_2026-09-03.md`](../status/M12_A100_BUILD_HOST_REFLIGHT_2026-09-03.md) as the current host-status checkpoint; the preflight remains immutable historical evidence |
 
-## 4. Current-state history separation
+## 5. Current-state history separation
 
 [`CURRENT_MILESTONE.md`](../../CURRENT_MILESTONE.md) is the only concise current-state
 projection. The former `## 0A.` through EOF is preserved byte-for-byte in
 [`CURRENT_MILESTONE_HISTORY_THROUGH_2026-09-02.md`](../../CURRENT_MILESTONE_HISTORY_THROUGH_2026-09-02.md).
 The archive does not grant current authority and is not a competing current document.
 
-## 5. Cross-repository relationships
+## 6. Cross-repository relationships
 
 Frontend `FRONTEND_GLOBAL_SHELL_REMEDIATION_CONTRACT_REV3.md` supersedes Rev2.
 Frontend `FE-G0-R1_FRONTEND_GLOBAL_SHELL_ROUTE_GOVERNANCE.md` supersedes the original
 FE-G0 document for implementation. Frontend PR-C records those edges in its own
 registry; Core does not pretend to own their semantics.
 
-## 6. Unclassified relationships
+## 7. Unclassified relationships
 
 ```text
 UNCLASSIFIED_SUPERSESSION_COUNT=0

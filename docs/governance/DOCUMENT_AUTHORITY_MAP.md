@@ -27,11 +27,11 @@ and historical evidence cannot authorize current execution.
 | `ACCEPTED_DECISION` | 20 | no |
 | `NORMATIVE_ARCHITECTURE` | 14 | no |
 | `NORMATIVE_CONTRACT` | 31 | no |
-| `CURRENT_STATUS` | 3 | yes |
+| `CURRENT_STATUS` | 4 | yes |
 | `CAPABILITY_MATRIX` | 1 | yes |
 | `OPERATIONAL_RUNBOOK` | 18 | no |
 | `IMPLEMENTATION_EVIDENCE` | 21 | no |
-| `HISTORICAL_EVIDENCE` | 35 | no |
+| `HISTORICAL_EVIDENCE` | 36 | no |
 | `SUPERSEDED` | 9 | no |
 | `DRAFT` | 3 | no |
 | `DEPRECATED` | 0 | no |
@@ -122,7 +122,9 @@ and historical evidence cannot authorize current execution.
 | Document | Status | Owner |
 | --- | --- | --- |
 | [`CURRENT_MILESTONE.md`](../../CURRENT_MILESTONE.md) | `CURRENT` | Project Lead / Documentation Governance Owner |
+| [`architecture/M12_C3_DEDICATED_LINUX_CPU_BUILD_HOST_SPECIFICATION.md`](../../architecture/M12_C3_DEDICATED_LINUX_CPU_BUILD_HOST_SPECIFICATION.md) | `CURRENT` | Project Lead / Architecture Owner / Infrastructure Owner / Repository Governance Owner / M12 Domain Owner |
 | [`docs/status/CROSS_REPOSITORY_BASELINE.md`](../status/CROSS_REPOSITORY_BASELINE.md) | `CURRENT` | Documentation Governance Owner |
+| [`docs/status/M12_A100_BUILD_HOST_REFLIGHT_2026-09-03.md`](../status/M12_A100_BUILD_HOST_REFLIGHT_2026-09-03.md) | `CURRENT` | Project Lead / Infrastructure Owner / Architecture Owner / M12 Domain Owner |
 
 ## CAPABILITY_MATRIX
 
@@ -185,6 +187,8 @@ and historical evidence cannot authorize current execution.
 | --- | --- | --- |
 | [`CURRENT_MILESTONE_HISTORY_THROUGH_2026-09-02.md`](../../CURRENT_MILESTONE_HISTORY_THROUGH_2026-09-02.md) | `HISTORICAL` | Documentation Governance Owner |
 | [`docs/archive/AGENTS_HISTORICAL_EXECUTION_RECORDS_THROUGH_2026-09-03.md`](../archive/AGENTS_HISTORICAL_EXECUTION_RECORDS_THROUGH_2026-09-03.md) | `HISTORICAL` | Documentation Governance Owner |
+| [`docs/status/M12_A100_BUILD_HOST_PREFLIGHT_2026-09-03.md`](../status/M12_A100_BUILD_HOST_PREFLIGHT_2026-09-03.md) | `HISTORICAL` | Project Lead / Repository Governance Owner / M12 Domain Owner |
+| [`docs/status/M12_C3_WSL2_CPU_BUILD_HOST_PREFLIGHT_2026-09-04.md`](../status/M12_C3_WSL2_CPU_BUILD_HOST_PREFLIGHT_2026-09-04.md) | `HISTORICAL` | Project Lead / Architecture Owner / Infrastructure Owner / M12 Domain Owner |
 | [`docs/12-release/baseline-asset-acceptance-decision-record.md`](../12-release/baseline-asset-acceptance-decision-record.md) | `HISTORICAL` | Release Owner |
 | [`docs/12-release/baseline-v0.1.0-candidate-manifest.md`](../12-release/baseline-v0.1.0-candidate-manifest.md) | `HISTORICAL` | Release Owner |
 | [`docs/12-release/investor-readiness-acceptance-record.md`](../12-release/investor-readiness-acceptance-record.md) | `HISTORICAL` | Release Owner |

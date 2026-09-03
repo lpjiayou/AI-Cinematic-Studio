@@ -2,7 +2,7 @@
 
 Status: `CURRENT / METHOD-AWARE PUBLIC CUTOVER VERIFIED`
 
-Reviewed: `2026-09-03`
+Reviewed: `2026-09-04`
 
 ## 1. Current repository and behavior values
 
@@ -138,8 +138,13 @@ A100_C4_HARD_OFFLINE_ISOLATION_REQUIRED=true
 A100_C4_OFFLINE_ISOLATION_CURRENTLY_PROVEN=false
 M12_A100_BUILD_HOST_REFLIGHT=FAIL
 M12_A100_BUILD_HOST_REFLIGHT_EVIDENCE_SHA256=93c1c96dc3d852581857d1f213d158f03063cc6da47379dc7a24774be8dea1ce
+WSL2_CPU_BUILD_HOST_PREFLIGHT=FAIL
+WSL2_CANDIDATE_DISPOSITION=REJECTED_FOR_CURRENT_M12_C3_WAVE
+WSL2_FAILURE_EVIDENCE_SHA256=801e4e8cd44e5cf7dd2072c411808f624e9b2be214c8fb4b4faa8884469dd7ed
+M12_C3_PHYSICAL_HOST_CANDIDATE_CLASS=DEDICATED_LINUX_CPU_VM
+M12_C3_HOST_SELECTED=NONE
 M12_RUNTIME_G0=NOT_COMPLETE
-M12_G0_3_STATE=CPU_BUILD_HOST_SELECTION_HOLD
+M12_G0_3_STATE=DEDICATED_CPU_VM_SELECTION_HOLD
 M12_C3_READY_TO_REQUEST_AUTHORIZATION=false
 M12_C3_READY_TO_START=false
 M12_C3_AUTHORIZED=false
@@ -153,9 +158,11 @@ A100_GPU_EXECUTION_AUTHORIZED=false
 GPU_CALLS_ALLOWED=false
 PROVIDER_CALLS_ALLOWED=false
 PUBLICATION_ALLOWED=false
-NEXT_TASK=ACS-M12-C3-CPU-BUILD-HOST-SELECTION-AND-PREFLIGHT
+NEXT_TASK=ACS-M12-C3-DEDICATED-LINUX-CPU-VM-PROVIDER-SELECTION-AND-PREFLIGHT
 ```
 
-The next task may select and preflight a non-A100 Linux x86_64 CPU Build Host only
-after separate authorization. It does not authorize C3, C4, A100 start, public
-downloads, runtime installation, GPU/Provider use, admission or publication.
+The WSL2 candidate failed the current wave after its one network-remediation attempt;
+its partial technical successes remain historical evidence and do not permanently ban
+WSL2. The next task may compare providers, select and preflight one dedicated non-A100
+Linux x86_64 CPU VM only after separate authorization. It does not authorize purchase,
+C3, C4, A100, downloads, installation, GPU/Provider use, admission or publication.

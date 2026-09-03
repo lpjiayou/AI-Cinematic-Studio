@@ -87,6 +87,7 @@ deliberately isolated and do not authorize current execution.
 ## CURRENT_STATUS
 
 - [`CURRENT_MILESTONE.md`](../CURRENT_MILESTONE.md) — `CURRENT`
+- [`architecture/M12_C3_DEDICATED_LINUX_CPU_BUILD_HOST_SPECIFICATION.md`](../architecture/M12_C3_DEDICATED_LINUX_CPU_BUILD_HOST_SPECIFICATION.md) — `CURRENT`
 - [`docs/status/CROSS_REPOSITORY_BASELINE.md`](status/CROSS_REPOSITORY_BASELINE.md) — `CURRENT`
 - [`docs/status/M12_A100_BUILD_HOST_REFLIGHT_2026-09-03.md`](status/M12_A100_BUILD_HOST_REFLIGHT_2026-09-03.md) — `CURRENT`
 
@@ -144,6 +145,7 @@ deliberately isolated and do not authorize current execution.
 - [`CURRENT_MILESTONE_HISTORY_THROUGH_2026-09-02.md`](../CURRENT_MILESTONE_HISTORY_THROUGH_2026-09-02.md) — `HISTORICAL`
 - [`docs/archive/AGENTS_HISTORICAL_EXECUTION_RECORDS_THROUGH_2026-09-03.md`](archive/AGENTS_HISTORICAL_EXECUTION_RECORDS_THROUGH_2026-09-03.md) — `HISTORICAL`
 - [`docs/status/M12_A100_BUILD_HOST_PREFLIGHT_2026-09-03.md`](status/M12_A100_BUILD_HOST_PREFLIGHT_2026-09-03.md) — `HISTORICAL`
+- [`docs/status/M12_C3_WSL2_CPU_BUILD_HOST_PREFLIGHT_2026-09-04.md`](status/M12_C3_WSL2_CPU_BUILD_HOST_PREFLIGHT_2026-09-04.md) — `HISTORICAL`
 - [`docs/12-release/baseline-asset-acceptance-decision-record.md`](12-release/baseline-asset-acceptance-decision-record.md) — `HISTORICAL`
 - [`docs/12-release/baseline-v0.1.0-candidate-manifest.md`](12-release/baseline-v0.1.0-candidate-manifest.md) — `HISTORICAL`
 - [`docs/12-release/investor-readiness-acceptance-record.md`](12-release/investor-readiness-acceptance-record.md) — `HISTORICAL`
