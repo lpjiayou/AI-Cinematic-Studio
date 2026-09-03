@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "repository": "Core",
-  "reviewedBaseline": "b109ba6c625cac20eac798f4b2528c63f0b7c42e",
+  "reviewedBaseline": "65cc8898b8c3b0ba660900c350f248f85a424f3e",
   "reviewedAt": "2026-09-03",
   "documentClasses": [
     "ACCEPTED_DECISION",
@@ -78,8 +78,8 @@
       "supersededBy": [],
       "currentStateClaimsAllowed": false,
       "historicalMutationPolicy": "UPDATE_WITH_AUTHORIZED_ARCHITECTURE_CHANGE",
-      "lastReviewedBaseline": "a455c8e76427d53d75bb7f15259b9875d9768914",
-      "lastReviewedAt": "2026-09-02",
+      "lastReviewedBaseline": "65cc8898b8c3b0ba660900c350f248f85a424f3e",
+      "lastReviewedAt": "2026-09-03",
       "linkedFromIndex": true,
       "notes": "Authority is limited to the document's declared scope and subordinate to Accepted ADRs."
     },
@@ -114,7 +114,7 @@
       "supersededBy": [],
       "currentStateClaimsAllowed": true,
       "historicalMutationPolicy": "UPDATE_FROM_MERGED_EVIDENCE_ONLY",
-      "lastReviewedBaseline": "b109ba6c625cac20eac798f4b2528c63f0b7c42e",
+      "lastReviewedBaseline": "65cc8898b8c3b0ba660900c350f248f85a424f3e",
       "lastReviewedAt": "2026-09-03",
       "linkedFromIndex": true,
       "notes": "Current claims require merged evidence and may not override Accepted ADRs."
@@ -423,8 +423,8 @@
       "supersededBy": [],
       "currentStateClaimsAllowed": false,
       "historicalMutationPolicy": "UPDATE_WITH_AUTHORIZED_ARCHITECTURE_CHANGE",
-      "lastReviewedBaseline": "a455c8e76427d53d75bb7f15259b9875d9768914",
-      "lastReviewedAt": "2026-09-02",
+      "lastReviewedBaseline": "65cc8898b8c3b0ba660900c350f248f85a424f3e",
+      "lastReviewedAt": "2026-09-03",
       "linkedFromIndex": true,
       "notes": "Authority is limited to the document's declared scope and subordinate to Accepted ADRs."
     },
@@ -1527,7 +1527,7 @@
       "supersededBy": [],
       "currentStateClaimsAllowed": false,
       "historicalMutationPolicy": "REGENERATE_FROM_REVIEWED_INVENTORY",
-      "lastReviewedBaseline": "b109ba6c625cac20eac798f4b2528c63f0b7c42e",
+      "lastReviewedBaseline": "65cc8898b8c3b0ba660900c350f248f85a424f3e",
       "lastReviewedAt": "2026-09-03",
       "linkedFromIndex": true,
       "notes": "Navigation/reference only; resolve authority through the linked source documents."
@@ -1671,8 +1671,8 @@
       "supersededBy": [],
       "currentStateClaimsAllowed": false,
       "historicalMutationPolicy": "REGENERATE_FROM_REVIEWED_INVENTORY",
-      "lastReviewedBaseline": "a455c8e76427d53d75bb7f15259b9875d9768914",
-      "lastReviewedAt": "2026-09-02",
+      "lastReviewedBaseline": "65cc8898b8c3b0ba660900c350f248f85a424f3e",
+      "lastReviewedAt": "2026-09-03",
       "linkedFromIndex": true,
       "notes": "Navigation/reference only; resolve authority through the linked source documents."
     },
@@ -1689,7 +1689,7 @@
       "supersededBy": [],
       "currentStateClaimsAllowed": false,
       "historicalMutationPolicy": "REGENERATE_FROM_REVIEWED_INVENTORY",
-      "lastReviewedBaseline": "b109ba6c625cac20eac798f4b2528c63f0b7c42e",
+      "lastReviewedBaseline": "65cc8898b8c3b0ba660900c350f248f85a424f3e",
       "lastReviewedAt": "2026-09-03",
       "linkedFromIndex": true,
       "notes": "Navigation/reference only; resolve authority through the linked source documents."
@@ -1707,7 +1707,7 @@
       "supersededBy": [],
       "currentStateClaimsAllowed": false,
       "historicalMutationPolicy": "REGENERATE_FROM_REVIEWED_INVENTORY",
-      "lastReviewedBaseline": "b109ba6c625cac20eac798f4b2528c63f0b7c42e",
+      "lastReviewedBaseline": "65cc8898b8c3b0ba660900c350f248f85a424f3e",
       "lastReviewedAt": "2026-09-03",
       "linkedFromIndex": true,
       "notes": "Navigation/reference only; resolve authority through the linked source documents."
@@ -1725,7 +1725,7 @@
       "supersededBy": [],
       "currentStateClaimsAllowed": true,
       "historicalMutationPolicy": "UPDATE_FROM_MERGED_EVIDENCE_ONLY",
-      "lastReviewedBaseline": "aba10bebfa4d6184c6151b24befff9100e6bc70a",
+      "lastReviewedBaseline": "65cc8898b8c3b0ba660900c350f248f85a424f3e",
       "lastReviewedAt": "2026-09-03",
       "linkedFromIndex": true,
       "notes": "Current claims require merged evidence and may not override Accepted ADRs."
@@ -1783,7 +1783,7 @@
       "supersededBy": [],
       "currentStateClaimsAllowed": true,
       "historicalMutationPolicy": "UPDATE_FROM_MERGED_EVIDENCE_ONLY",
-      "lastReviewedBaseline": "b109ba6c625cac20eac798f4b2528c63f0b7c42e",
+      "lastReviewedBaseline": "65cc8898b8c3b0ba660900c350f248f85a424f3e",
       "lastReviewedAt": "2026-09-03",
       "linkedFromIndex": true,
       "notes": "Authority is limited to the document's declared scope and subordinate to Accepted ADRs."
@@ -2548,10 +2548,10 @@
       "supersededBy": [],
       "currentStateClaimsAllowed": false,
       "historicalMutationPolicy": "AMEND_OR_SUPERSEDE_BY_ACCEPTED_ADR_ONLY",
-      "lastReviewedBaseline": "a455c8e76427d53d75bb7f15259b9875d9768914",
-      "lastReviewedAt": "2026-09-02",
+      "lastReviewedBaseline": "65cc8898b8c3b0ba660900c350f248f85a424f3e",
+      "lastReviewedAt": "2026-09-03",
       "linkedFromIndex": true,
-      "notes": "Authority is limited to the document's declared scope and subordinate to Accepted ADRs."
+      "notes": "ADR-0015 remains Accepted and controlling for non-A100 C3 and A100 closed-input consumption; ADR-0020 reinforces this scope without total supersession."
     },
     {
       "path": "governance/ADR-0016-m13-timeline-render-candidate-and-deterministic-post-boundary.md",
@@ -2620,10 +2620,28 @@
       "supersededBy": [],
       "currentStateClaimsAllowed": false,
       "historicalMutationPolicy": "AMEND_OR_SUPERSEDE_BY_ACCEPTED_ADR_ONLY",
-      "lastReviewedBaseline": "3be1a31962e7af2a21bfcce2d0666cd37193d48b",
-      "lastReviewedAt": "2026-09-02",
+      "lastReviewedBaseline": "65cc8898b8c3b0ba660900c350f248f85a424f3e",
+      "lastReviewedAt": "2026-09-03",
       "linkedFromIndex": true,
-      "notes": "Extends compatible accepted boundaries without superseding ADR-0005, ADR-0015, or ADR-0016."
+      "notes": "ADR-0019 remains Accepted; ADR-0020 partially supersedes only section 10 and Migration Plan item 8's A100 C3 assumption. Other decisions remain controlling."
+    },
+    {
+      "path": "governance/ADR-0020-m12-cpu-build-host-and-a100-offline-consumer.md",
+      "repository": "Core",
+      "documentClass": "ACCEPTED_DECISION",
+      "status": "ACCEPTED",
+      "owner": "Project Lead / Architecture Owner / Infrastructure Owner / M12 Domain Owner",
+      "authoritativeFor": [
+        "M12 C3 non-A100 CPU build, A100 offline C4 consumption and separately authorized Runtime G0 architecture boundary"
+      ],
+      "supersedes": [],
+      "supersededBy": [],
+      "currentStateClaimsAllowed": false,
+      "historicalMutationPolicy": "AMEND_OR_SUPERSEDE_BY_ACCEPTED_ADR_ONLY",
+      "lastReviewedBaseline": "65cc8898b8c3b0ba660900c350f248f85a424f3e",
+      "lastReviewedAt": "2026-09-03",
+      "linkedFromIndex": true,
+      "notes": "Preserves ADR-0015 sections 3 and 4 and partially supersedes only ADR-0019 section 10 and Migration Plan item 8's A100 C3 assumption."
     },
     {
       "path": "governance/ADR_TEMPLATE.md",
@@ -2978,8 +2996,8 @@
       "supersededBy": [],
       "currentStateClaimsAllowed": false,
       "historicalMutationPolicy": "UPDATE_WITH_AUTHORIZED_CONTRACT_CHANGE",
-      "lastReviewedBaseline": "a455c8e76427d53d75bb7f15259b9875d9768914",
-      "lastReviewedAt": "2026-09-02",
+      "lastReviewedBaseline": "65cc8898b8c3b0ba660900c350f248f85a424f3e",
+      "lastReviewedAt": "2026-09-03",
       "linkedFromIndex": true,
       "notes": "Authority is limited to the document's declared scope and subordinate to Accepted ADRs."
     },

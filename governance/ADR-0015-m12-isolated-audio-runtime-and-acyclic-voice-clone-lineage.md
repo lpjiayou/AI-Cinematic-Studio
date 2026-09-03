@@ -9,12 +9,13 @@
 | Status | `Accepted` |
 | 作者 | AI Cinematic Studio Architecture Checkpoint |
 | 创建日期 | `2026-08-30` |
-| 最后更新日期 | `2026-08-30` |
+| 最后更新日期 | `2026-09-03` |
 | 审批人 | Project Lead / Architecture Owner / M12 Domain Owner |
 | Decision Ref | `ACS-M12-M13-ARCHITECTURE-CORRECTION-20260830` |
 | 关联事项 | M12 Runtime G0；M12 voice-clone lineage；System Master Plan；Current Milestone；Risk Register |
 | Supersedes | 无；Decision Ref 取代冲突的 `ACS-M12-RUNTIME-G0-UNBLOCK-AND-M13-BACKEND-COMPLETION` 原始实现授权 |
 | Superseded by | 无 |
+| Reinforced by | [`ADR-0020`](ADR-0020-m12-cpu-build-host-and-a100-offline-consumer.md)；保留本 ADR 第 3、4 节为 controlling boundary |
 
 ## ADR ID
 
@@ -326,3 +327,4 @@ Source-of-Truth 和当时最新无冲突 main；不得扩展到这些明确关�
 | 日期 | 修改人 | 变更内容 | 审批依据 |
 | --- | --- | --- | --- |
 | `2026-08-30` | AI Cinematic Studio Architecture Checkpoint | 创建并接受 ADR-0015；冻结 M12 隔离运行时、无环声音克隆血缘、持久 CPU 构建环境和 A100 边界 | `ACS-M12-M13-ARCHITECTURE-CORRECTION-20260830` |
+| `2026-09-03` | AI Cinematic Studio Architecture Checkpoint | 仅增加 ADR-0020 双向关系 metadata/link；第 3、4 节继续控制非 A100 C3 与 A100 closed-input consumer 边界，Decision 正文未改写 | `ACS-M12-BUILD-HOST-ARCHITECTURE-CORRECTION-OPTION-A` |

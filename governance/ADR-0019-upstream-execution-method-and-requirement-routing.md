@@ -8,12 +8,13 @@
 | Title | Upstream Execution Method and Requirement Routing |
 | Status | `Accepted` |
 | 创建日期 | `2026-09-02` |
-| 最后更新日期 | `2026-09-02` |
+| 最后更新日期 | `2026-09-03` |
 | 审批人 | Project Lead / Architecture Owner / M3–M12 Domain Owners |
 | Decision Ref | `ACS-M3-M11-UPSTREAM-METHOD-CLOSURE` |
 | Extends | `ADR-0005`, `ADR-0015`, `ADR-0016`；不替代其既有决定 |
 | Supersedes | 无 |
 | Superseded by | 无 |
+| Scope amended by | [`ADR-0020`](ADR-0020-m12-cpu-build-host-and-a100-offline-consumer.md)；仅第 10 节与 Migration Plan 第 8 项的 A100 C3 假设被局部 supersede |
 
 ## ADR ID
 
@@ -470,3 +471,4 @@ publication 必须为零。后续业务实现权限来自本 Accepted ADR 与 Pr
 | 日期 | 修改人 | 变更内容 | 审批依据 |
 | --- | --- | --- | --- |
 | `2026-09-02` | Architecture Checkpoint | 创建并接受 ADR-0019，冻结 M3–M12 上游方法闭合与串行实施波次 | `ACS-M3-M11-UPSTREAM-METHOD-CLOSURE` |
+| `2026-09-03` | Architecture Checkpoint | 仅增加 ADR-0020 双向关系 metadata/link；第 10 节及 Migration Plan 第 8 项的 A100 C3 假设被局部 supersede，其余 Decision 保持 Accepted | `ACS-M12-BUILD-HOST-ARCHITECTURE-CORRECTION-OPTION-A` |
