@@ -87,6 +87,7 @@ deliberately isolated and do not authorize current execution.
 
 - [`CURRENT_MILESTONE.md`](../CURRENT_MILESTONE.md) — `CURRENT`
 - [`docs/status/CROSS_REPOSITORY_BASELINE.md`](status/CROSS_REPOSITORY_BASELINE.md) — `CURRENT`
+- [`docs/status/M12_A100_BUILD_HOST_PREFLIGHT_2026-09-03.md`](status/M12_A100_BUILD_HOST_PREFLIGHT_2026-09-03.md) — `CURRENT`
 
 ## CAPABILITY_MATRIX
 
