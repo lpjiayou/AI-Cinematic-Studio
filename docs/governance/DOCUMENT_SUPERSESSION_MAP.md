@@ -1,6 +1,6 @@
 # Document Supersession Map
 
-Status: `GENERATED_REFERENCE / REVIEWED 2026-09-02`
+Status: `GENERATED_REFERENCE / REVIEWED 2026-09-03`
 
 This map makes existing replacement and amendment relationships discoverable. It does
 not rewrite predecessor content or create architecture authority. Machine-readable
@@ -27,7 +27,7 @@ edges remain in [`DOCUMENT_REGISTRY.json`](DOCUMENT_REGISTRY.json).
 | [`ADR-0009`](../../governance/ADR-0009-k2-publishable-media-production.md) | `ARCHIVES` | [`ADR-0014`](../../governance/ADR-0014-k2-001-archive-k2-002-changan-start.md) | K2-001 is historical; K2-002 begins as a separate non-GPU project scope. |
 | [`ADR-0012`](../../governance/ADR-0012-k2-internal-image-first-real-media-revision.md) | `AMENDS_SCOPE` | [`ADR-0013`](../../governance/ADR-0013-k2-control-plane-convergence.md) | ADR-0013 governs the accepted control-plane convergence corrections. |
 | [`ADR-0005`](../../governance/ADR-0005-m6-series-intelligence-consumer-boundary.md) | `EXTENDS_SCOPE` | [`ADR-0019`](../../governance/ADR-0019-upstream-execution-method-and-requirement-routing.md) | ADR-0019 adds the explicit M3-owned binding and M7 consumer-readiness contract without replacing the existing M6 read boundary. |
-| [`ADR-0015`](../../governance/ADR-0015-m12-isolated-audio-runtime-and-acyclic-voice-clone-lineage.md) | `EXTENDS_SCOPE` | [`ADR-0019`](../../governance/ADR-0019-upstream-execution-method-and-requirement-routing.md) | ADR-0019 adds the M9-to-M12 `AudioRequirement` routing bridge while preserving M12 runtime and lineage isolation. |
+| [`ADR-0015`](../../governance/ADR-0015-m12-isolated-audio-runtime-and-acyclic-voice-clone-lineage.md) | `EXTENDS_SCOPE` | [`ADR-0019`](../../governance/ADR-0019-upstream-execution-method-and-requirement-routing.md) | ADR-0019 adds the M9-to-M12 `AudioRequirement` routing bridge, but its A100 build-host clause conflicts with ADR-0015's non-A100 C3 requirement; neither ADR supersedes the other, so C3 is held for architecture correction. |
 | [`ADR-0016`](../../governance/ADR-0016-m13-timeline-render-candidate-and-deterministic-post-boundary.md) | `REINFORCES_SCOPE` | [`ADR-0019`](../../governance/ADR-0019-upstream-execution-method-and-requirement-routing.md) | ADR-0019 keeps deterministic events and effects in M13 and does not move them into M11 generation planning. |
 
 All referenced ADRs remain `ACCEPTED_DECISION`; a relationship does not delete an
@@ -46,6 +46,7 @@ Accepted ADR or turn it into ordinary historical prose.
 | [`K2_P1_PREBOOT_OFFLINE_PACKAGE.md`](../../governance/K2_P1_PREBOOT_OFFLINE_PACKAGE.md) | [`ADR-0011`](../../governance/ADR-0011-k2-internal-self-hosted-p1.md) |
 | [`K2_PUBLISHABLE_P0_EXTERNAL_HOLD.md`](../../governance/K2_PUBLISHABLE_P0_EXTERNAL_HOLD.md) | [`ADR-0011`](../../governance/ADR-0011-k2-internal-self-hosted-p1.md) |
 | [`K2_PUBLISHABLE_PRODUCTION_EXECUTION_PACKAGE.md`](../../governance/K2_PUBLISHABLE_PRODUCTION_EXECUTION_PACKAGE.md) | [`ADR-0014`](../../governance/ADR-0014-k2-001-archive-k2-002-changan-start.md) |
+| [`M12_A100_BUILD_HOST_PREFLIGHT_2026-09-03.md`](../status/M12_A100_BUILD_HOST_PREFLIGHT_2026-09-03.md) | [`M12_A100_BUILD_HOST_REFLIGHT_2026-09-03.md`](../status/M12_A100_BUILD_HOST_REFLIGHT_2026-09-03.md) as the current host-status checkpoint; the preflight remains immutable historical evidence |
 
 ## 4. Current-state history separation
 

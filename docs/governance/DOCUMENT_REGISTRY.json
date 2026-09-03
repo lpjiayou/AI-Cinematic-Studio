@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "repository": "Core",
-  "reviewedBaseline": "aba10bebfa4d6184c6151b24befff9100e6bc70a",
+  "reviewedBaseline": "b109ba6c625cac20eac798f4b2528c63f0b7c42e",
   "reviewedAt": "2026-09-03",
   "documentClasses": [
     "ACCEPTED_DECISION",
@@ -114,7 +114,7 @@
       "supersededBy": [],
       "currentStateClaimsAllowed": true,
       "historicalMutationPolicy": "UPDATE_FROM_MERGED_EVIDENCE_ONLY",
-      "lastReviewedBaseline": "aba10bebfa4d6184c6151b24befff9100e6bc70a",
+      "lastReviewedBaseline": "b109ba6c625cac20eac798f4b2528c63f0b7c42e",
       "lastReviewedAt": "2026-09-03",
       "linkedFromIndex": true,
       "notes": "Current claims require merged evidence and may not override Accepted ADRs."
@@ -1527,7 +1527,7 @@
       "supersededBy": [],
       "currentStateClaimsAllowed": false,
       "historicalMutationPolicy": "REGENERATE_FROM_REVIEWED_INVENTORY",
-      "lastReviewedBaseline": "1c7b9aa25d0ee6724fc6c7c743195d4797c1bdca",
+      "lastReviewedBaseline": "b109ba6c625cac20eac798f4b2528c63f0b7c42e",
       "lastReviewedAt": "2026-09-03",
       "linkedFromIndex": true,
       "notes": "Navigation/reference only; resolve authority through the linked source documents."
@@ -1689,7 +1689,7 @@
       "supersededBy": [],
       "currentStateClaimsAllowed": false,
       "historicalMutationPolicy": "REGENERATE_FROM_REVIEWED_INVENTORY",
-      "lastReviewedBaseline": "aba10bebfa4d6184c6151b24befff9100e6bc70a",
+      "lastReviewedBaseline": "b109ba6c625cac20eac798f4b2528c63f0b7c42e",
       "lastReviewedAt": "2026-09-03",
       "linkedFromIndex": true,
       "notes": "Navigation/reference only; resolve authority through the linked source documents."
@@ -1707,8 +1707,8 @@
       "supersededBy": [],
       "currentStateClaimsAllowed": false,
       "historicalMutationPolicy": "REGENERATE_FROM_REVIEWED_INVENTORY",
-      "lastReviewedBaseline": "a455c8e76427d53d75bb7f15259b9875d9768914",
-      "lastReviewedAt": "2026-09-02",
+      "lastReviewedBaseline": "b109ba6c625cac20eac798f4b2528c63f0b7c42e",
+      "lastReviewedAt": "2026-09-03",
       "linkedFromIndex": true,
       "notes": "Navigation/reference only; resolve authority through the linked source documents."
     },
@@ -1733,20 +1733,42 @@
     {
       "path": "docs/status/M12_A100_BUILD_HOST_PREFLIGHT_2026-09-03.md",
       "repository": "Core",
-      "documentClass": "CURRENT_STATUS",
-      "status": "CURRENT",
+      "documentClass": "HISTORICAL_EVIDENCE",
+      "status": "HISTORICAL",
       "owner": "Project Lead / Repository Governance Owner / M12 Domain Owner",
       "authoritativeFor": [
-        "evidence-backed M12 A100 build-host preflight status and fail-closed blockers"
+        "historical M12 A100 build-host preflight evidence only"
       ],
       "supersedes": [],
+      "supersededBy": [
+        "docs/status/M12_A100_BUILD_HOST_REFLIGHT_2026-09-03.md"
+      ],
+      "currentStateClaimsAllowed": false,
+      "historicalMutationPolicy": "IMMUTABLE_EXCEPT_METADATA_AND_LINK_REPAIR",
+      "lastReviewedBaseline": "b109ba6c625cac20eac798f4b2528c63f0b7c42e",
+      "lastReviewedAt": "2026-09-03",
+      "linkedFromIndex": true,
+      "notes": "Replaced as current status by the later failed reflight checkpoint; it grants no current execution authority. HISTORICAL_PATH_NOT_EXECUTION_AUTHORITY=true"
+    },
+    {
+      "path": "docs/status/M12_A100_BUILD_HOST_REFLIGHT_2026-09-03.md",
+      "repository": "Core",
+      "documentClass": "CURRENT_STATUS",
+      "status": "CURRENT",
+      "owner": "Project Lead / Infrastructure Owner / Architecture Owner / M12 Domain Owner",
+      "authoritativeFor": [
+        "evidence-backed M12 A100 build-host reflight failure, blockers and accepted architecture conflict projection"
+      ],
+      "supersedes": [
+        "docs/status/M12_A100_BUILD_HOST_PREFLIGHT_2026-09-03.md"
+      ],
       "supersededBy": [],
       "currentStateClaimsAllowed": true,
       "historicalMutationPolicy": "UPDATE_FROM_MERGED_EVIDENCE_ONLY",
-      "lastReviewedBaseline": "1c7b9aa25d0ee6724fc6c7c743195d4797c1bdca",
+      "lastReviewedBaseline": "b109ba6c625cac20eac798f4b2528c63f0b7c42e",
       "lastReviewedAt": "2026-09-03",
       "linkedFromIndex": true,
-      "notes": "Current claims are limited to the secret-free preflight conclusion and do not authorize M12-C3/C4, GPU execution or publication."
+      "notes": "Reports the failed reflight and ADR-0015/ADR-0019 conflict without amending either Accepted ADR or authorizing M12-C3/C4."
     },
     {
       "path": "docs/status/M1-M19-CAPABILITY-STATUS.md",
@@ -1761,7 +1783,7 @@
       "supersededBy": [],
       "currentStateClaimsAllowed": true,
       "historicalMutationPolicy": "UPDATE_FROM_MERGED_EVIDENCE_ONLY",
-      "lastReviewedBaseline": "aba10bebfa4d6184c6151b24befff9100e6bc70a",
+      "lastReviewedBaseline": "b109ba6c625cac20eac798f4b2528c63f0b7c42e",
       "lastReviewedAt": "2026-09-03",
       "linkedFromIndex": true,
       "notes": "Authority is limited to the document's declared scope and subordinate to Accepted ADRs."

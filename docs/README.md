@@ -87,7 +87,7 @@ deliberately isolated and do not authorize current execution.
 
 - [`CURRENT_MILESTONE.md`](../CURRENT_MILESTONE.md) — `CURRENT`
 - [`docs/status/CROSS_REPOSITORY_BASELINE.md`](status/CROSS_REPOSITORY_BASELINE.md) — `CURRENT`
-- [`docs/status/M12_A100_BUILD_HOST_PREFLIGHT_2026-09-03.md`](status/M12_A100_BUILD_HOST_PREFLIGHT_2026-09-03.md) — `CURRENT`
+- [`docs/status/M12_A100_BUILD_HOST_REFLIGHT_2026-09-03.md`](status/M12_A100_BUILD_HOST_REFLIGHT_2026-09-03.md) — `CURRENT`
 
 ## CAPABILITY_MATRIX
 
@@ -142,6 +142,7 @@ deliberately isolated and do not authorize current execution.
 
 - [`CURRENT_MILESTONE_HISTORY_THROUGH_2026-09-02.md`](../CURRENT_MILESTONE_HISTORY_THROUGH_2026-09-02.md) — `HISTORICAL`
 - [`docs/archive/AGENTS_HISTORICAL_EXECUTION_RECORDS_THROUGH_2026-09-03.md`](archive/AGENTS_HISTORICAL_EXECUTION_RECORDS_THROUGH_2026-09-03.md) — `HISTORICAL`
+- [`docs/status/M12_A100_BUILD_HOST_PREFLIGHT_2026-09-03.md`](status/M12_A100_BUILD_HOST_PREFLIGHT_2026-09-03.md) — `HISTORICAL`
 - [`docs/12-release/baseline-asset-acceptance-decision-record.md`](12-release/baseline-asset-acceptance-decision-record.md) — `HISTORICAL`
 - [`docs/12-release/baseline-v0.1.0-candidate-manifest.md`](12-release/baseline-v0.1.0-candidate-manifest.md) — `HISTORICAL`
 - [`docs/12-release/investor-readiness-acceptance-record.md`](12-release/investor-readiness-acceptance-record.md) — `HISTORICAL`
@@ -217,6 +218,6 @@ _No documents currently classified in this category._
 
 ## Inventory boundary
 
-This index contains 167 Core documents reviewed at `7feca3b2a4cbacdf2d50e4ccacb0d9f357249de0` on
+This index contains 169 Core documents reviewed at `b109ba6c625cac20eac798f4b2528c63f0b7c42e` on
 `2026-09-03`. See the registry for owners, supersession edges, mutation policy
 and scope notes.
