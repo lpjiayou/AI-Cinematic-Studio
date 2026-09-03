@@ -31,6 +31,7 @@ deliberately isolated and do not authorize current execution.
 - [`governance/ADR-0017-canonical-static-resource-assets-and-font-license-boundary.md`](../governance/ADR-0017-canonical-static-resource-assets-and-font-license-boundary.md) — `ACCEPTED`
 - [`governance/ADR-0018-canonical-identity-reference-version-projection-and-runtime-currentness-boundary.md`](../governance/ADR-0018-canonical-identity-reference-version-projection-and-runtime-currentness-boundary.md) — `ACCEPTED`
 - [`governance/ADR-0019-upstream-execution-method-and-requirement-routing.md`](../governance/ADR-0019-upstream-execution-method-and-requirement-routing.md) — `ACCEPTED`
+- [`governance/ADR-0020-m12-cpu-build-host-and-a100-offline-consumer.md`](../governance/ADR-0020-m12-cpu-build-host-and-a100-offline-consumer.md) — `ACCEPTED`
 
 ## NORMATIVE_ARCHITECTURE
 

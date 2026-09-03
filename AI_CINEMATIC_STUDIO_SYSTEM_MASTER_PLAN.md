@@ -1300,6 +1300,13 @@ dependency lock、wheelhouse、模型目录和 runtime executable；不得安装
 [ADR-0015](governance/ADR-0015-m12-isolated-audio-runtime-and-acyclic-voice-clone-lineage.md)
 冻结。
 
+[ADR-0020](governance/ADR-0020-m12-cpu-build-host-and-a100-offline-consumer.md)
+进一步冻结主机职责：M12-C3 只在非 A100 Linux x86_64 CPU Build Host 完成供应链
+闭包与 clean offline install test；M12-C4 只允许 A100 在 hard-offline 条件下消费已封闭
+制品；真实 GPU Runtime G0 必须在 C3/C4 完成后另行授权。ADR-0020 保留 ADR-0015
+第 3、4 节，并只局部 supersede ADR-0019 第 10 节及 Migration Plan 第 8 项中的 A100
+C3 假设。具体 CPU 主机、版本和传输机制尚未选择。
+
 包括：
 
 - Voice Identity；
@@ -2580,7 +2587,7 @@ deterministic-event fallback 被禁止。
 
 Status:
 
-`PARTIAL — DOMAIN CONTRACTS AND ISOLATED RUNTIME PROTOCOLS MERGED / EXPLICIT M9 AUDIO BRIDGE AUTHORIZED NOT IMPLEMENTED / RUNTIMES NOT INSTALLED / RUNTIME G0 NOT COMPLETE / C3-C4 NOT STARTED`
+`PARTIAL — ADR-0015/0020 BUILD BOUNDARY ACCEPTED / EXPLICIT M9 AUDIO BRIDGE IMPLEMENTED / RUNTIMES NOT INSTALLED / CPU BUILD HOST SELECTION HOLD / C3-C4-G0 NOT AUTHORIZED`
 
 完成：
 
@@ -2598,6 +2605,17 @@ Status:
 - Shot / Script linkage。
 
 Audio 与 Video 并行。普通固定声音 TTS 不得冒充声音克隆。
+
+当前主机职责为：
+
+```text
+M12_C3_HOST_CLASS=NON_A100_LINUX_X86_64_CPU_BUILD_HOST
+M12_C4_HOST_CLASS=A100_OFFLINE_CONSUMER
+M12_RUNTIME_G0_HOST_CLASS=A100_GPU_RUNTIME
+M12_G0_3_STATE=CPU_BUILD_HOST_SELECTION_HOLD
+```
+
+这些是架构边界，不是主机选择、运行时安装或执行完成证据。
 
 ---
 
@@ -3101,7 +3119,29 @@ STOP。
 
 # 62. Current System State
 
-## 62.1 Current architecture overlay — through 2026-09-02
+## 62.1 Current architecture overlay — through 2026-09-03
+
+The 2026-09-03 architecture correction
+[`ADR-0020`](governance/ADR-0020-m12-cpu-build-host-and-a100-offline-consumer.md)
+preserves ADR-0015 as the controlling M12 build boundary and partially supersedes
+only ADR-0019 section 10 and Migration Plan item 8 where they assumed A100 could host
+C3. C3 now requires a non-A100 Linux x86_64 CPU Build Host; C4 is hard-offline A100
+consumption of digest-verified closed bundles; GPU Runtime G0 remains separately
+authorized. No physical CPU host, platform, version set or transfer mechanism is
+selected by this decision.
+
+```text
+ARCHITECTURE_AUTHORITY_CONFLICT=false
+M12_BUILD_HOST_ARCHITECTURE_CORRECTION=ACCEPTED
+M12_C3_HOST_CLASS=NON_A100_LINUX_X86_64_CPU_BUILD_HOST
+M12_C4_HOST_CLASS=A100_OFFLINE_CONSUMER
+M12_RUNTIME_G0_HOST_CLASS=A100_GPU_RUNTIME
+A100_C4_HARD_OFFLINE_ISOLATION_REQUIRED=true
+A100_C4_OFFLINE_ISOLATION_CURRENTLY_PROVEN=false
+M12_G0_3_STATE=CPU_BUILD_HOST_SELECTION_HOLD
+M12_C3_READY_TO_START=false
+A100_START_AUTHORIZED=false
+```
 
 The 2026-09-02 additive architecture checkpoint
 [`ADR-0019`](governance/ADR-0019-upstream-execution-method-and-requirement-routing.md)
@@ -3173,6 +3213,9 @@ publication approval.
 ```text
 M12_RUNTIME_G0_UNBLOCK=AUTHORIZED_NON_GPU
 M12_PERSISTENT_CPU_BUILD_ENVIRONMENT=REQUIRED
+M12_C3_HOST_CLASS=NON_A100_LINUX_X86_64_CPU_BUILD_HOST
+M12_C4_HOST_CLASS=A100_OFFLINE_CONSUMER
+M12_RUNTIME_G0_HOST_CLASS=A100_GPU_RUNTIME
 M12_A100_EXECUTION=NOT_AUTHORIZED
 
 M13_FULL_BACKEND_IMPLEMENTATION=AUTHORIZED_CPU_ONLY

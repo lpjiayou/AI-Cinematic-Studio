@@ -10,11 +10,11 @@ Accepted ADR、获批任务和明确公开契约后才可加入；目录存在�
 | 责任域 | 位置 | 主要责任 | 可公开的资产 | 不承担的责任 | 当前状态 |
 | --- | --- | --- | --- | --- | --- |
 | Creator Application | `apps/creator_workspace_mvp/` | Creator Server、公开 HTTP/API、Application orchestration 与 composition entry | Public HTTP/API、Application command/query/DTO/error contract | V5 authoritative facts、V4 Provider execution、对 V4/V3/Compute 的直接生产依赖 | 运行中；`R-CORE-ARCH-001` 的直接 V4 依赖偏差已由 G1-R1 纠正并完成 owner acceptance |
-| V5 Core OS | `services/v5_core_os/` | authoritative production facts、公开 capability boundary、版本/血缘及适用治理语义；拥有 ADR-0015 单向声音克隆血缘、ADR-0016 唯一 Timeline/TimelineVersion 权威，以及 ADR-0019 的 Script/M6、M7–M12 上游方法事实 | V5 public contracts；包括 ADR-0006 Text Generation、ADR-0015 M12 lineage、ADR-0016 M13 Timeline/RenderCandidate 与 ADR-0019 upstream-method contracts | Provider adapter、V4 execution ownership、V3 render execution、Application presentation/HTTP；不得建立第二 Script/M6/Identity/Shot/Asset/Timeline authority | 运行中；ADR-0019 的 M3–M12 上游 binding、validation、三轴 planning、method-aware routing 与显式音频 requirement bridge 已有界、fail-closed 实现；M12 Runtime G0 未完成，M13 产品能力仍不完整 |
+| V5 Core OS | `services/v5_core_os/` | authoritative production facts、公开 capability boundary、版本/血缘及适用治理语义；拥有 ADR-0015 单向声音克隆血缘、ADR-0016 唯一 Timeline/TimelineVersion 权威、ADR-0019 的 Script/M6、M7–M12 上游方法事实，以及 ADR-0020 的 closed runtime bundle 约束 | V5 public contracts；包括 ADR-0006 Text Generation、ADR-0015 M12 lineage、ADR-0016 M13 Timeline/RenderCandidate、ADR-0019 upstream-method contracts 与 ADR-0020 bundle boundary | Provider adapter、V4 execution ownership、V3 render execution、Application presentation/HTTP；不得建立第二 Script/M6/Identity/Shot/Asset/Timeline/runtime authority | 运行中；ADR-0019 的 M3–M12 上游 binding、validation、三轴 planning、method-aware routing 与显式音频 requirement bridge 已有界、fail-closed 实现；M12 Runtime G0 未完成，CPU Build Host 尚未选择，M13 产品能力仍不完整 |
 | V4 Platform | `services/v4_platform/` | AI/Provider execution boundary、公开 `TextGenerationPort`、隔离音频运行时的 closed-process execution boundary、现有 MediaJobCoordinator 与 M13 sealed deterministic-post orchestration | provider-neutral V4 execution contracts、关闭式方法 capability/routing 与结果证据 | V5 Domain Fact、Timeline/RenderCandidate authority、Application workflow、HTTP/UI、ML 包直接导入或运行时内部实现；不得为 Contact/Gait 使用 Wan fallback | 运行中；现有 MediaJobCoordinator 接受结构化 Micro single-anchor queue reservation，未执行 adapter；Contact/Gait runtime、Provider/GPU、M12 runtime install 与 Extension G0 均未完成或未授权 |
 | V3 Render Core | `services/v3_render_core/` | deterministic audiovisual composition/render，以及 M13 CPU/FFmpeg deterministic-post execution | V3 public render contracts、确定性执行结果与 artifact evidence | V5 creative/Timeline facts、RenderCandidate persistence、Application workflow、EpisodeMaster、ExportArtifact 或 publication authority | 运行中；M13 八项 deterministic post、renderer v3 与完整 CPU vertical slice 已验证；不产生 Master/Export/publication authority |
 | 共享能力 | `packages/` | 经验证、稳定且不承载产品工作流的复用能力 | 版本化包接口、类型与工具 | 应用专属流程、服务私有逻辑 | 按获批任务启用 |
-| 平台基础设施 | `infrastructure/` | 构建、部署和运行环境声明 | 环境契约、资源声明、策略 | 业务规则、领域模型 | 基线已建立 |
+| 平台基础设施 | `infrastructure/` | 构建、部署和运行环境声明；为 ADR-0020 后续 C3/C4 提供可验证的持久存储、批准来源与 hard-offline 能力 | 环境契约、资源声明、网络/存储策略 | 业务规则、领域模型、runtime bundle 内容选择或生产事实 | 基线已建立；M12 CPU Build Host 未选择，A100 C4 hard-offline isolation 未证明 |
 | 工程自动化 | `scripts/` | 可重复的仓库操作 | 命令入口及其使用说明 | 业务逻辑、常驻运行时 | 基线已建立 |
 | 质量保障 | `tests/` | 分层验证公开行为与集成质量 | 测试规范、夹具、报告 | 生产运行时能力 | 已启用 |
 | 知识体系 | `docs/` | 保存主题化、版本化工程知识 | 说明、决策背景、运行手册 | 强制规则的重复真源 | 已启用 |
@@ -33,6 +33,16 @@ ADR-0015 与 ADR-0016 保持同一相邻依赖方向：V5 持有事实与血缘�
 closed/sealed execution request 并编排独立进程，V3 只执行确定性合成与渲染。
 这两份 Accepted ADR 仍是实现边界；上表仅陈述已有合入证据，不把未安装的
 M12 runtime、未实现的 Frontend 产品面或未授权的 M13 Extension 视为已交付。
+
+ADR-0020 保留 ADR-0015 的 controlling build boundary，并只局部 supersede ADR-0019
+第 10 节和 Migration Plan 第 8 项中的 A100 C3 假设。它不创建新产品层或第二 runtime
+authority。三阶段主机职责固定为：
+
+| 阶段 | 主机类别 | 责任 | 明确非责任 |
+| --- | --- | --- | --- |
+| M12-C3 | 非 A100 Linux x86_64 CPU Build Host | 来源/许可证、lock、hashed wheelhouse、SBOM、封闭 bundle、clean hard-offline install test | A100 安装、GPU 模型加载、GPU 推理、live production |
+| M12-C4 | A100 hard-offline consumer | 摘要复算、ABI 验证、两个独立 runtime root 安装、无污染证据 | dependency resolution、公共下载、替代 wheel/model、GPU 推理 |
+| M12 Runtime G0 | A100 GPU runtime | 仅在 C3/C4 完成后另行授权真实 GPU 技术验证 | 自动继承 C3/C4 权限、Provider、Admission、publication |
 
 ADR-0019 在同一分层内冻结以下领域 Owner，不创建新顶层模块或持久化 authority：
 

@@ -24,14 +24,14 @@ and historical evidence cannot authorize current execution.
 
 | Class | Count | Current-state claims allowed |
 | --- | ---: | --- |
-| `ACCEPTED_DECISION` | 19 | no |
+| `ACCEPTED_DECISION` | 20 | no |
 | `NORMATIVE_ARCHITECTURE` | 14 | no |
 | `NORMATIVE_CONTRACT` | 31 | no |
-| `CURRENT_STATUS` | 2 | yes |
+| `CURRENT_STATUS` | 3 | yes |
 | `CAPABILITY_MATRIX` | 1 | yes |
 | `OPERATIONAL_RUNBOOK` | 18 | no |
 | `IMPLEMENTATION_EVIDENCE` | 21 | no |
-| `HISTORICAL_EVIDENCE` | 34 | no |
+| `HISTORICAL_EVIDENCE` | 35 | no |
 | `SUPERSEDED` | 9 | no |
 | `DRAFT` | 3 | no |
 | `DEPRECATED` | 0 | no |
@@ -60,6 +60,7 @@ and historical evidence cannot authorize current execution.
 | [`governance/ADR-0017-canonical-static-resource-assets-and-font-license-boundary.md`](../../governance/ADR-0017-canonical-static-resource-assets-and-font-license-boundary.md) | `ACCEPTED` | Architecture Owner / Documentation Governance Owner |
 | [`governance/ADR-0018-canonical-identity-reference-version-projection-and-runtime-currentness-boundary.md`](../../governance/ADR-0018-canonical-identity-reference-version-projection-and-runtime-currentness-boundary.md) | `ACCEPTED` | Architecture Owner / Documentation Governance Owner |
 | [`governance/ADR-0019-upstream-execution-method-and-requirement-routing.md`](../../governance/ADR-0019-upstream-execution-method-and-requirement-routing.md) | `ACCEPTED` | Architecture Owner / M3-M12 Domain Owners |
+| [`governance/ADR-0020-m12-cpu-build-host-and-a100-offline-consumer.md`](../../governance/ADR-0020-m12-cpu-build-host-and-a100-offline-consumer.md) | `ACCEPTED` | Project Lead / Architecture Owner / Infrastructure Owner / M12 Domain Owner |
 
 ## NORMATIVE_ARCHITECTURE
 
