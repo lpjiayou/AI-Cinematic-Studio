@@ -7,15 +7,15 @@ Reviewed: `2026-09-03`
 ## 1. Current repository and behavior values
 
 ```text
-CORE_MAIN=7feca3b2a4cbacdf2d50e4ccacb0d9f357249de0
-CORE_TREE=3a8f76dc805c772ab80bd6a33f1a737fb1fb6c31
-CORE_BEHAVIOR_MAIN=5c9ea7fe6993eddb7a492b2ae8f6bd8c2d5ae326
-CORE_BEHAVIOR_TREE=de6d43a16f97c1e34dc536336d05b0174d9aab39
+CORE_BEHAVIOR_MAIN=e21789d265c4e936b0e0b29921746a4c205889b8
+CORE_BEHAVIOR_TREE=086f37ed4e5412d1d6608c4ee856ac75d61625e9
+CORE_ACCEPTANCE_MAIN=aba10bebfa4d6184c6151b24befff9100e6bc70a
+CORE_ACCEPTANCE_TREE=b3d0d07160e49c316a1f0bfaf8fecd3b64d0d544
 
-FRONTEND_MAIN=d9f25165061988a5d7edb101aa881b0bc6f40bed
-FRONTEND_TREE=a72d63ff37914096ae6114993c9bed2cfb14cf1c
-FRONTEND_PIN_CORE_SHA=5c9ea7fe6993eddb7a492b2ae8f6bd8c2d5ae326
-FRONTEND_PIN_CORE_TREE=de6d43a16f97c1e34dc536336d05b0174d9aab39
+FRONTEND_MAIN=4d295718975c0ddb3d2e5d6099d4dea4d63acb54
+FRONTEND_TREE=4214fa4a4c5ddf8a61583d94f5ae89248d684da1
+FRONTEND_PIN_CORE_SHA=e21789d265c4e936b0e0b29921746a4c205889b8
+FRONTEND_PIN_CORE_TREE=086f37ed4e5412d1d6608c4ee856ac75d61625e9
 FRONTEND_PIN_MATCHES_CORE_BEHAVIOR=true
 
 M13_BASE_TAG=m13-base-backend-v1
@@ -23,10 +23,9 @@ M13_BASE_TAG_OBJECT=b2d086b622bdb5456f6af325e458aa3771e43e80
 M13_BASE_TAG_TARGET=a455c8e76427d53d75bb7f15259b9875d9768914
 ```
 
-`CORE_MAIN` records the final merged upstream-method implementation baseline.
-`CORE_BEHAVIOR_MAIN` is the production-behavior commit pinned by Frontend. Core PR
-#59 is tests/fixtures only, so the pin intentionally targets PR #58. Documentation-
-only and CI-only merges may advance the branch without moving either behavior pin.
+`CORE_BEHAVIOR_MAIN` is the final production-behavior commit and the immutable
+Frontend dependency. `CORE_ACCEPTANCE_MAIN` is its acceptance-only descendant.
+This document does not predict the future squash SHA of its own docs-only PR.
 
 ## 2. Closed upstream wave
 
@@ -42,19 +41,49 @@ M10_METHOD_AWARE_PLANNING=IMPLEMENTED
 M11_METHOD_CAPABILITY_BOUNDARY=IMPLEMENTED
 M9_M12_AUDIO_BRIDGE=IMPLEMENTED
 K2_METHOD_AWARE_PUBLIC_CUTOVER=PASS
+K2_OPERATIONAL_THREE_AXIS_ROUTING=PASS
 LEGACY_G4_NEW_WRITES=DISABLED
 LEGACY_G5_NEW_WRITES=DISABLED
+LEGACY_G4_EXACT_REPLAY=PASS
+LEGACY_G5_EXACT_REPLAY=PASS
 LEGACY_G4_G5_READ_REPLAY=SUPPORTED
 K2_002_METHOD_AWARE_SUCCESSOR_REQUIRED=true
+UNCONDITIONAL_VIDEO_REQUESTS=0
+UNCONDITIONAL_AUDIO_REQUESTS=0
+WAN_CONTACT_FALLBACK=0
+WAN_GAIT_FALLBACK=0
+WAN_DETERMINISTIC_EVENT_FALLBACK=0
+SQLITE_RESTART=PASS
+EXACT_REPLAY=PASS
+CHANGED_REPLAY_CONFLICT=PASS
+STALE_INPUT_REJECTION=PASS
+FOREIGN_WORKSPACE_REJECTION=PASS
 M11_CONTACT_RUNTIME=NOT_INSTALLED
 M11_GAIT_RUNTIME=NOT_INSTALLED
 ```
 
-Frontend PR #24 validated the unchanged five-state capability adapter and both real
-browser gates against the exact Core behavior tree. This pin proves compatibility,
-not complete M12/M13 product surfaces or production readiness.
+Core PR #63 introduced the public cutover. Core PR #64 proved restart, replay,
+changed-replay conflict, stale-input and foreign-workspace rejection without changing
+production behavior.
 
-## 3. Immutable M13 tag
+## 3. Frontend compatibility boundary
+
+```text
+FRONTEND_LEGACY_HISTORY_COMPATIBILITY_GATE=PASS
+FRONTEND_CORE_BEHAVIOR_PIN=PASS
+FRONTEND_METHOD_AWARE_PRODUCT_SURFACE=INCOMPLETE
+FRONTEND_PUSH_TRIGGER_REMOVED=true
+FRONTEND_WORKFLOW_DISPATCH_ENABLED=true
+FRONTEND_CONTROL_PLANE_FFMPEG_CONDITIONAL=true
+POST_MERGE_PUSH_CI_RUN_COUNT=0
+```
+
+Frontend PR #25 proved that the pinned Core reads immutable legacy G4/G5 history and
+that the existing Frontend remains compatible. It did not implement method-aware
+planning UI or five execution-class controls, install Contact/Gait or M12/M13
+runtimes, complete those product surfaces, or authorize publication.
+
+## 4. Immutable M13 tag
 
 `m13-base-backend-v1` is an annotated tag. Its tag object and peeled commit must
 remain exactly as recorded above.
@@ -69,7 +98,7 @@ M13_PRODUCT_CAPABILITY_COMPLETE=false
 The tag proves the accepted M13 base backend only. It does not prove Frontend product
 completion, M14 QC/Approval, M15 Master/Export or publication.
 
-## 4. Preserved predecessor snapshots
+## 5. Preserved predecessor snapshots
 
 The following values preserve the earlier M13 closeout and pre-pin Frontend snapshots
 for the already-merged documentation validator. They are historical compatibility
@@ -82,17 +111,24 @@ PRE_PIN_FRONTEND_MAIN=a0be9edc91437bf0e7c5dd14883e656e750b3aee
 PRE_PIN_FRONTEND_TREE=c25b9e3744d561c93fed26d0a07e59a1915a6071
 ```
 
-## 5. Closed execution boundaries
+## 6. Closed execution boundaries
 
 ```text
 M12_RUNTIME_G0=NOT_COMPLETE
 M12_C3_PREREQUISITE_UPSTREAM=PASS
 M12_A100_BUILD_HOST_PREFLIGHT=FAIL
+M12_BUILD_HOST_PREFLIGHT_BLOCKERS=INSUFFICIENT_PERSISTENT_DISK,APPROVED_DOWNLOAD_ORIGIN_UNAVAILABLE,CORE_PREFLIGHT_CHECKOUT_UNVERIFIED
+PERSISTENT_FREE_BYTES=62970826752
+PERSISTENT_REQUIRED_BYTES=107374182400
+OFFLINE_ISOLATION_MODE=UNSHARE_NETNS
 M12_C3_PREIMPLEMENTATION_BLOCKER=A100_BUILD_HOST_INFRASTRUCTURE_REMEDIATION_PENDING
 M12_C3_READY_TO_REQUEST_AUTHORIZATION=false
 M12_C3_READY_TO_START=false
+M12_C3_AUTHORIZED=false
+M12_C4_AUTHORIZED=false
 M13_EXTENSION_G0_AUTHORIZED=false
 A100_START_AUTHORIZED=false
+A100_GPU_EXECUTION_AUTHORIZED=false
 GPU_CALLS_ALLOWED=false
 PROVIDER_CALLS_ALLOWED=false
 PUBLICATION_ALLOWED=false
