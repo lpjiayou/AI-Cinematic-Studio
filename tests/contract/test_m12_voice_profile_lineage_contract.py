@@ -2189,32 +2189,47 @@ class M12VoiceProfileLineageContractTests(unittest.TestCase):
             )
 
     def test_no_creator_http_voice_profile_routes_are_added(self):
-        routes = {
+        route_constants = {
             value
             for name, value in vars(public_contract).items()
-            if name.endswith("_ENDPOINT") and isinstance(value, str)
+            if (
+                name.endswith("_ENDPOINT") or name.endswith("_RESOURCE")
+            )
+            and isinstance(value, str)
         }
+        capabilities = public_contract.capability_payload()["capabilities"]
+        capability_resources = {
+            resource
+            for capability in capabilities
+            for resource in capability["publicResources"]
+        }
+        routes = route_constants | capability_resources
         forbidden_fragments = {
             "voice-profile",
+            "voice-profiles",
             "voice-lock",
             "source-voice-recording",
+            "source-recording-binding",
             "consent-grant",
+            "clone-voice-lock",
         }
         self.assertFalse(
             any(fragment in route for fragment in forbidden_fragments for route in routes)
         )
-        m12 = next(
-            item
-            for item in public_contract.capability_payload()["capabilities"]
-            if item["id"] == "M12"
-        )
+        authorized_method_aware_resources = {
+            "execution-method-plan",
+            "method-aware-input-plan",
+            "method-aware-video-route",
+            "explicit-audio-requirement-route",
+        }
         self.assertEqual(
-            m12["publicResources"],
-            [
-                "episode-production-runs/production-readiness",
-                "episode-production-runs/media",
-            ],
+            set(public_contract.PUBLIC_METHOD_AWARE_RESOURCES),
+            authorized_method_aware_resources,
         )
+        for resource in authorized_method_aware_resources:
+            self.assertIn(
+                f"episode-production-runs/{resource}", capability_resources
+            )
 
 
 if __name__ == "__main__":

@@ -463,16 +463,22 @@ class K2DynamicMediaPreflightTests(unittest.TestCase):
             ),
         )
 
+        legacy_write_disabled_codes = {
+            "resolve_assets": "legacy_asset_resolution_write_disabled",
+            "execute_media": "legacy_media_execution_write_disabled",
+        }
         for operation, command in operations:
-            with self.subTest(operation=operation.__name__), self.assertRaises(
-                EpisodeProductionPublicError
-            ) as caught:
-                operation(command)
-            self.assertEqual(
-                (caught.exception.status, caught.exception.code),
-                (409, "execution_not_authorized"),
-                operation.__name__,
-            )
+            with self.subTest(operation=operation.__name__):
+                with self.assertRaises(EpisodeProductionPublicError) as caught:
+                    operation(command)
+                expected_code = legacy_write_disabled_codes.get(
+                    operation.__name__, "execution_not_authorized"
+                )
+                self.assertEqual(
+                    (caught.exception.status, caught.exception.code),
+                    (409, expected_code),
+                    operation.__name__,
+                )
 
         self.assertEqual(
             self.boundary.get_run(WORKSPACE, self.run["productionRunRef"]),

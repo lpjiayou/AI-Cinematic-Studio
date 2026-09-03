@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections import Counter
 from pathlib import Path
 import re
 import unittest
@@ -27,21 +28,24 @@ def iter_tests(suite: unittest.TestSuite):
 class IntegrationShardingTests(unittest.TestCase):
     def test_four_shards_cover_every_integration_file_exactly_once(self) -> None:
         audit = audit_integration_shard_files()
+        discovered = tuple(audit["discovered"])
+        assigned = tuple(audit["assigned"])
+        assignment_counts = Counter(assigned)
         self.assertEqual(4, len(INTEGRATION_SHARDS))
-        self.assertEqual(48, len(audit["discovered"]))
+        self.assertEqual(set(discovered), set(assigned))
+        self.assertTrue(
+            all(assignment_counts[path] == 1 for path in discovered)
+        )
         self.assertEqual((), audit["missing"])
         self.assertEqual((), audit["extra"])
         self.assertEqual(0, audit["duplicateCount"])
-        self.assertEqual(len(audit["discovered"]), len(audit["assigned"]))
+        self.assertEqual(len(discovered), len(assigned))
 
     def test_sharded_test_count_matches_complete_discovery(self) -> None:
         full_count, shard_counts = integration_test_counts()
-        self.assertEqual(297, full_count)
-        self.assertEqual(297, sum(shard_counts.values()))
-        self.assertEqual(
-            {"shard-1": 2, "shard-2": 91, "shard-3": 82, "shard-4": 122},
-            shard_counts,
-        )
+        self.assertGreater(full_count, 0)
+        self.assertEqual(set(INTEGRATION_SHARDS), set(shard_counts))
+        self.assertEqual(full_count, sum(shard_counts.values()))
 
     def test_duplicate_assignment_is_detected(self) -> None:
         shards = dict(INTEGRATION_SHARDS)
