@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
   "repository": "Core",
-  "reviewedBaseline": "65cc8898b8c3b0ba660900c350f248f85a424f3e",
-  "reviewedAt": "2026-09-03",
+  "reviewedBaseline": "3eaaeabf79fdb85581a15069ff6fe5f330445416",
+  "reviewedAt": "2026-09-04",
   "documentClasses": [
     "ACCEPTED_DECISION",
     "NORMATIVE_ARCHITECTURE",
@@ -114,8 +114,8 @@
       "supersededBy": [],
       "currentStateClaimsAllowed": true,
       "historicalMutationPolicy": "UPDATE_FROM_MERGED_EVIDENCE_ONLY",
-      "lastReviewedBaseline": "65cc8898b8c3b0ba660900c350f248f85a424f3e",
-      "lastReviewedAt": "2026-09-03",
+      "lastReviewedBaseline": "3eaaeabf79fdb85581a15069ff6fe5f330445416",
+      "lastReviewedAt": "2026-09-04",
       "linkedFromIndex": true,
       "notes": "Current claims require merged evidence and may not override Accepted ADRs."
     },
@@ -265,6 +265,24 @@
       "lastReviewedAt": "2026-09-02",
       "linkedFromIndex": true,
       "notes": "Does not grant current execution authority. HISTORICAL_PATH_NOT_EXECUTION_AUTHORITY=true"
+    },
+    {
+      "path": "architecture/M12_C3_DEDICATED_LINUX_CPU_BUILD_HOST_SPECIFICATION.md",
+      "repository": "Core",
+      "documentClass": "CURRENT_STATUS",
+      "status": "CURRENT",
+      "owner": "Project Lead / Architecture Owner / Infrastructure Owner / Repository Governance Owner / M12 Domain Owner",
+      "authoritativeFor": [
+        "evidence-backed current dedicated Linux CPU VM requirements and preflight hold subordinate to ADR-0015 and ADR-0020"
+      ],
+      "supersedes": [],
+      "supersededBy": [],
+      "currentStateClaimsAllowed": true,
+      "historicalMutationPolicy": "UPDATE_FROM_MERGED_EVIDENCE_ONLY",
+      "lastReviewedBaseline": "3eaaeabf79fdb85581a15069ff6fe5f330445416",
+      "lastReviewedAt": "2026-09-04",
+      "linkedFromIndex": true,
+      "notes": "Primary registry class is CURRENT_STATUS; secondary characteristic is ARCHITECTURE_SPECIFICATION. It does not supersede ADR-0020 or authorize purchase, VM creation, C3/C4, A100 or Runtime G0."
     },
     {
       "path": "architecture/M3_M11_UPSTREAM_METHOD_CLOSURE_CONTRACT.md",
@@ -1527,8 +1545,8 @@
       "supersededBy": [],
       "currentStateClaimsAllowed": false,
       "historicalMutationPolicy": "REGENERATE_FROM_REVIEWED_INVENTORY",
-      "lastReviewedBaseline": "65cc8898b8c3b0ba660900c350f248f85a424f3e",
-      "lastReviewedAt": "2026-09-03",
+      "lastReviewedBaseline": "3eaaeabf79fdb85581a15069ff6fe5f330445416",
+      "lastReviewedAt": "2026-09-04",
       "linkedFromIndex": true,
       "notes": "Navigation/reference only; resolve authority through the linked source documents."
     },
@@ -1671,8 +1689,8 @@
       "supersededBy": [],
       "currentStateClaimsAllowed": false,
       "historicalMutationPolicy": "REGENERATE_FROM_REVIEWED_INVENTORY",
-      "lastReviewedBaseline": "65cc8898b8c3b0ba660900c350f248f85a424f3e",
-      "lastReviewedAt": "2026-09-03",
+      "lastReviewedBaseline": "3eaaeabf79fdb85581a15069ff6fe5f330445416",
+      "lastReviewedAt": "2026-09-04",
       "linkedFromIndex": true,
       "notes": "Navigation/reference only; resolve authority through the linked source documents."
     },
@@ -1689,8 +1707,8 @@
       "supersededBy": [],
       "currentStateClaimsAllowed": false,
       "historicalMutationPolicy": "REGENERATE_FROM_REVIEWED_INVENTORY",
-      "lastReviewedBaseline": "65cc8898b8c3b0ba660900c350f248f85a424f3e",
-      "lastReviewedAt": "2026-09-03",
+      "lastReviewedBaseline": "3eaaeabf79fdb85581a15069ff6fe5f330445416",
+      "lastReviewedAt": "2026-09-04",
       "linkedFromIndex": true,
       "notes": "Navigation/reference only; resolve authority through the linked source documents."
     },
@@ -1707,8 +1725,8 @@
       "supersededBy": [],
       "currentStateClaimsAllowed": false,
       "historicalMutationPolicy": "REGENERATE_FROM_REVIEWED_INVENTORY",
-      "lastReviewedBaseline": "65cc8898b8c3b0ba660900c350f248f85a424f3e",
-      "lastReviewedAt": "2026-09-03",
+      "lastReviewedBaseline": "3eaaeabf79fdb85581a15069ff6fe5f330445416",
+      "lastReviewedAt": "2026-09-04",
       "linkedFromIndex": true,
       "notes": "Navigation/reference only; resolve authority through the linked source documents."
     },
@@ -1725,8 +1743,8 @@
       "supersededBy": [],
       "currentStateClaimsAllowed": true,
       "historicalMutationPolicy": "UPDATE_FROM_MERGED_EVIDENCE_ONLY",
-      "lastReviewedBaseline": "65cc8898b8c3b0ba660900c350f248f85a424f3e",
-      "lastReviewedAt": "2026-09-03",
+      "lastReviewedBaseline": "3eaaeabf79fdb85581a15069ff6fe5f330445416",
+      "lastReviewedAt": "2026-09-04",
       "linkedFromIndex": true,
       "notes": "Current claims require merged evidence and may not override Accepted ADRs."
     },
@@ -1771,6 +1789,24 @@
       "notes": "Reports the failed reflight and ADR-0015/ADR-0019 conflict without amending either Accepted ADR or authorizing M12-C3/C4."
     },
     {
+      "path": "docs/status/M12_C3_WSL2_CPU_BUILD_HOST_PREFLIGHT_2026-09-04.md",
+      "repository": "Core",
+      "documentClass": "HISTORICAL_EVIDENCE",
+      "status": "HISTORICAL",
+      "owner": "Project Lead / Architecture Owner / Infrastructure Owner / M12 Domain Owner",
+      "authoritativeFor": [
+        "historical WSL2 CPU build-host candidate preflight evidence only"
+      ],
+      "supersedes": [],
+      "supersededBy": [],
+      "currentStateClaimsAllowed": false,
+      "historicalMutationPolicy": "IMMUTABLE_EXCEPT_METADATA_AND_LINK_REPAIR",
+      "lastReviewedBaseline": "3eaaeabf79fdb85581a15069ff6fe5f330445416",
+      "lastReviewedAt": "2026-09-04",
+      "linkedFromIndex": true,
+      "notes": "Rejected for the current M12-C3 wave after one exhausted network-remediation attempt; this does not permanently prohibit WSL2 or grant execution authority. HISTORICAL_PATH_NOT_EXECUTION_AUTHORITY=true"
+    },
+    {
       "path": "docs/status/M1-M19-CAPABILITY-STATUS.md",
       "repository": "Core",
       "documentClass": "CAPABILITY_MATRIX",
@@ -1783,8 +1819,8 @@
       "supersededBy": [],
       "currentStateClaimsAllowed": true,
       "historicalMutationPolicy": "UPDATE_FROM_MERGED_EVIDENCE_ONLY",
-      "lastReviewedBaseline": "65cc8898b8c3b0ba660900c350f248f85a424f3e",
-      "lastReviewedAt": "2026-09-03",
+      "lastReviewedBaseline": "3eaaeabf79fdb85581a15069ff6fe5f330445416",
+      "lastReviewedAt": "2026-09-04",
       "linkedFromIndex": true,
       "notes": "Authority is limited to the document's declared scope and subordinate to Accepted ADRs."
     },
@@ -2996,8 +3032,8 @@
       "supersededBy": [],
       "currentStateClaimsAllowed": false,
       "historicalMutationPolicy": "UPDATE_WITH_AUTHORIZED_CONTRACT_CHANGE",
-      "lastReviewedBaseline": "65cc8898b8c3b0ba660900c350f248f85a424f3e",
-      "lastReviewedAt": "2026-09-03",
+      "lastReviewedBaseline": "3eaaeabf79fdb85581a15069ff6fe5f330445416",
+      "lastReviewedAt": "2026-09-04",
       "linkedFromIndex": true,
       "notes": "Authority is limited to the document's declared scope and subordinate to Accepted ADRs."
     },
