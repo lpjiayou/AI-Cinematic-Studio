@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "repository": "Core",
-  "reviewedBaseline": "1c7b9aa25d0ee6724fc6c7c743195d4797c1bdca",
+  "reviewedBaseline": "aba10bebfa4d6184c6151b24befff9100e6bc70a",
   "reviewedAt": "2026-09-03",
   "documentClasses": [
     "ACCEPTED_DECISION",
@@ -114,7 +114,7 @@
       "supersededBy": [],
       "currentStateClaimsAllowed": true,
       "historicalMutationPolicy": "UPDATE_FROM_MERGED_EVIDENCE_ONLY",
-      "lastReviewedBaseline": "1c7b9aa25d0ee6724fc6c7c743195d4797c1bdca",
+      "lastReviewedBaseline": "aba10bebfa4d6184c6151b24befff9100e6bc70a",
       "lastReviewedAt": "2026-09-03",
       "linkedFromIndex": true,
       "notes": "Current claims require merged evidence and may not override Accepted ADRs."
@@ -1689,7 +1689,7 @@
       "supersededBy": [],
       "currentStateClaimsAllowed": false,
       "historicalMutationPolicy": "REGENERATE_FROM_REVIEWED_INVENTORY",
-      "lastReviewedBaseline": "1c7b9aa25d0ee6724fc6c7c743195d4797c1bdca",
+      "lastReviewedBaseline": "aba10bebfa4d6184c6151b24befff9100e6bc70a",
       "lastReviewedAt": "2026-09-03",
       "linkedFromIndex": true,
       "notes": "Navigation/reference only; resolve authority through the linked source documents."
@@ -1725,7 +1725,7 @@
       "supersededBy": [],
       "currentStateClaimsAllowed": true,
       "historicalMutationPolicy": "UPDATE_FROM_MERGED_EVIDENCE_ONLY",
-      "lastReviewedBaseline": "7feca3b2a4cbacdf2d50e4ccacb0d9f357249de0",
+      "lastReviewedBaseline": "aba10bebfa4d6184c6151b24befff9100e6bc70a",
       "lastReviewedAt": "2026-09-03",
       "linkedFromIndex": true,
       "notes": "Current claims require merged evidence and may not override Accepted ADRs."
@@ -1761,7 +1761,7 @@
       "supersededBy": [],
       "currentStateClaimsAllowed": true,
       "historicalMutationPolicy": "UPDATE_FROM_MERGED_EVIDENCE_ONLY",
-      "lastReviewedBaseline": "1c7b9aa25d0ee6724fc6c7c743195d4797c1bdca",
+      "lastReviewedBaseline": "aba10bebfa4d6184c6151b24befff9100e6bc70a",
       "lastReviewedAt": "2026-09-03",
       "linkedFromIndex": true,
       "notes": "Authority is limited to the document's declared scope and subordinate to Accepted ADRs."
