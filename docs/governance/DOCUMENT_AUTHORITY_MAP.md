@@ -123,6 +123,7 @@ and historical evidence cannot authorize current execution.
 | --- | --- | --- |
 | [`CURRENT_MILESTONE.md`](../../CURRENT_MILESTONE.md) | `CURRENT` | Project Lead / Documentation Governance Owner |
 | [`architecture/M12_C3_DEDICATED_LINUX_CPU_BUILD_HOST_SPECIFICATION.md`](../../architecture/M12_C3_DEDICATED_LINUX_CPU_BUILD_HOST_SPECIFICATION.md) | `CURRENT` | Project Lead / Architecture Owner / Infrastructure Owner / Repository Governance Owner / M12 Domain Owner |
+| [`docs/status/CORE_CLEAN_STATE_PUBLIC_API_E2E_2026-09-06.md`](../status/CORE_CLEAN_STATE_PUBLIC_API_E2E_2026-09-06.md) | `CURRENT` | Project Lead / Creator Public HTTP Acceptance Owner / Clean-State E2E Owner |
 | [`docs/status/CORE_PUBLIC_JSON_AND_NUMERIC_INTEGRITY_HARDENING_2026-09-05.md`](../status/CORE_PUBLIC_JSON_AND_NUMERIC_INTEGRITY_HARDENING_2026-09-05.md) | `CURRENT` | Project Lead / Creator Public Contract Owner / V5 Domain Owners |
 | [`docs/status/CORE_RECOVERABLE_PROJECT_FOUNDATION_COMMAND_2026-09-05.md`](../status/CORE_RECOVERABLE_PROJECT_FOUNDATION_COMMAND_2026-09-05.md) | `CURRENT` | Project Lead / Creator Public Contract Owner / Project Foundation Command Owner |
 | [`docs/status/CORE_SERIES_PLANNING_SCOPE_AND_CANDIDATE_BINDING_HARDENING_2026-09-05.md`](../status/CORE_SERIES_PLANNING_SCOPE_AND_CANDIDATE_BINDING_HARDENING_2026-09-05.md) | `CURRENT` | Project Lead / Creator Public Contract Owner / M5 Domain Owner |
