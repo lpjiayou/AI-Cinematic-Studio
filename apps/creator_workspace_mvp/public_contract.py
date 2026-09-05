@@ -13,6 +13,9 @@ PUBLIC_CONFIRM_PLAN_ENDPOINT: Final = f"{PUBLIC_API_PREFIX}/creative-plans/confi
 PUBLIC_SERIES_ENDPOINT: Final = f"{PUBLIC_API_PREFIX}/series"
 PUBLIC_PROJECTS_ENDPOINT: Final = f"{PUBLIC_API_PREFIX}/projects"
 PUBLIC_PROJECT_CONTEXT_ENDPOINT: Final = f"{PUBLIC_API_PREFIX}/project-contexts"
+PUBLIC_PROJECT_FOUNDATIONS_ENDPOINT: Final = (
+    f"{PUBLIC_API_PREFIX}/project-foundations"
+)
 PUBLIC_EPISODES_ENDPOINT: Final = f"{PUBLIC_API_PREFIX}/episodes"
 PUBLIC_CANONICAL_REGISTRATIONS_ENDPOINT: Final = (
     f"{PUBLIC_API_PREFIX}/canonical-registrations"
@@ -113,6 +116,7 @@ CAPABILITY_PROJECTION: Final = (
         "publicResources": [
             "projects",
             "project-contexts",
+            "project-foundations",
             "canonical-registrations",
             "canonical-registrations/preflight",
         ],

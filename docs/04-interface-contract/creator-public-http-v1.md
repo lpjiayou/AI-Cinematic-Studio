@@ -1,6 +1,6 @@
 # Creator Public HTTP/API v1
 
-Status: `XR1 FROZEN / AUTH-W1 / ADR-0013 CONTROL PLANE / ADR-0019 METHOD-AWARE CUTOVER / STRICT JSON AND NUMERIC INTEGRITY / M5 SCOPE-BOUND RECEIPTS`
+Status: `XR1 FROZEN / AUTH-W1 / ADR-0013 CONTROL PLANE / ADR-0019 METHOD-AWARE CUTOVER / STRICT JSON AND NUMERIC INTEGRITY / M4 RECOVERABLE FOUNDATION / M5 SCOPE-BOUND RECEIPTS`
 
 This contract is the only browser-facing Core HTTP surface for the separate Commercial
 Frontend. Existing `/creator/internal/*` endpoints remain compatibility-only and must
@@ -20,7 +20,7 @@ Commercial Frontend → Frontend Experience Adapter → /creator/api/v1
 | M1 | `/ai-director/candidates`, `/creative-plans/confirm` | AI Director Application + Series/Episode boundary |
 | M2 | `/series`, `/episodes` | Series/Episode public boundary |
 | M3 | `/script-workspaces`, `/script-versions/*`, `/script-versions/reviewed-import`, `/script-versions/reviewed-import/accept` | Script Studio Application/public boundary |
-| M4 | `/projects`, `/project-contexts`, `/canonical-registrations`, `/canonical-registrations/preflight` | Project Context plus V5 canonical registration boundary |
+| M4 | `/projects`, `/project-contexts`, `/project-foundations`, `/canonical-registrations`, `/canonical-registrations/preflight` | Project Context, cross-M2/M4 Creator Application foundation orchestration and V5 canonical registration boundary |
 | M5 | `/series-planning-workspaces`, `/series-plan-*` | Series Planning + Series Director boundaries |
 | M6 | `/series-intelligence-workspaces`, `/series-intelligence/*` | accepted Series Intelligence public boundary |
 | M7–M9 | `/episode-production-runs/{runRef}/shot-graph`, `/execution-method-plan` | current M7 validation plus source-bound M8 action beats and server-derived M9 three-axis requirements |
@@ -49,6 +49,50 @@ Commercial Frontend → Frontend Experience Adapter → /creator/api/v1
   `500 / application_error` envelope before response headers are sent.
 - Core references and version references returned by successful commands are opaque.
 - Provider diagnostics, credentials, repository types and raw exceptions are forbidden.
+
+## Recoverable Project foundation command
+
+`POST /creator/api/v1/project-foundations` is the only recoverable composition
+command for creating a Project foundation. Its closed
+`creator.project-foundation-command.v1` body contains exactly `schemaVersion`,
+`idempotencyKey`, `contentProfileRef`, `series`, `project` and `episode`.
+Authentication supplies `workspaceRef`; clients cannot submit workspace or result
+scope, refs, state, timestamps, digests, authority, approval, Provider, execution or
+publication fields. Nested objects are closed, and all count/number fields follow the
+strict integer rules above.
+
+A `series` Project requires a Series. Standalone and brand-film Projects may omit a
+Series, and Core never creates a hidden Series. An Episode requires the new Series
+and an existing confirmed creative plan in the authenticated workspace; the command
+does not confirm a plan or create a Script. Series and Project use the same trusted
+content profile.
+
+Before domain mutation, Core normalizes the command, computes canonical standard
+JSON over `schemaVersion`, `contentProfileRef`, `series`, `project` and `episode`, and
+persists a `PENDING` intent scoped by authenticated workspace plus idempotency key.
+Workspace, key, refs, timestamps, retry metadata, headers and credentials are not
+part of the request digest. Phase B revalidates that intent and creates the optional
+Series, Project, relationship and optional Episode through their existing domain
+services in one Lifecycle transaction. The final
+`creator.project-foundation-result.v1` receipt and `COMPLETED` transition commit in
+that same transaction; failure rolls back every domain write while retaining only
+the Phase A intent for exact recovery.
+
+The first successful command returns `201`. A matching `PENDING` recovery or exact
+`COMPLETED` replay returns `200` with the original refs; the envelope reports
+`recoveredFromPending` and `idempotentReplay`. Reusing a workspace/key with a changed
+canonical request returns `409 / project_foundation_idempotency_conflict`. Temporary
+store or Lifecycle unavailability returns `503 / project_foundation_unavailable`.
+`GET /creator/api/v1/project-foundations/{foundationRef}` returns the exact validated
+receipt only inside the authenticated workspace; unknown and foreign refs return
+`404 / project_foundation_not_found` without disclosure.
+
+The durable intent/receipt is application recovery metadata, not a canonical fact,
+approval, Series/Project/Episode authority or publication authority. Those objects
+remain owned by the existing V5 repositories. The legacy `/series`, `/projects` and
+`/episodes` resources remain compatible and unchanged, but their multi-request
+combination is not atomic or recoverable. Frontend cutover to the new command is a
+separate task.
 
 ## Candidate and confirmation semantics
 

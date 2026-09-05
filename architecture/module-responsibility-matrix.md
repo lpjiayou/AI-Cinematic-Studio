@@ -30,6 +30,16 @@ closed-world validation never imports `apps`. This infrastructure is not exporte
 a Series Planning public boundary and owns no SeriesPlan, SeriesPlanVersion,
 confirmation, approval or publication authority.
 
+The recoverable Project foundation command is also adjacent Application
+orchestration. `apps/creator_workspace_mvp/project_foundation.py` owns command
+normalization sequencing, authenticated scope, recovery and HTTP-facing semantics.
+The exact optional intent/receipt store and durable validator live in
+`services/v5_core_os/project_engine/project_foundation_sqlite.py`; they own no Series,
+Project or Episode fact. Phase B invokes the existing Series/Episode and Project
+participants under one Lifecycle lease and shared connection, then atomically records
+the non-authoritative result receipt. Lower-level services never import `apps`, and
+the command store never writes V5 authority tables directly.
+
 当前相邻依赖方向保持：
 
 `Creator Application → V5 Core OS → V4 Platform → V3 Render Core → Compute → Foundation`

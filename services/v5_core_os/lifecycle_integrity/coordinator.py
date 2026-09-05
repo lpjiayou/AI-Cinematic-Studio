@@ -51,6 +51,19 @@ class LifecycleIntegrityCoordinator:
     def create_project(self, workspace_ref: str, mutation: Callable[[], Any]) -> Any:
         return self._mutate(workspace_ref, LifecycleOperation.CREATE_PROJECT, mutation)
 
+    def create_project_foundation(
+        self,
+        workspace_ref: str,
+        mutation: Callable[[object], Any],
+    ) -> Any:
+        """Run one bounded cross-domain foundation mutation under one lease."""
+
+        with self._state.lease(
+            workspace_ref=workspace_ref,
+            operation=LifecycleOperation.CREATE_PROJECT_FOUNDATION,
+        ) as lease:
+            return self._state.apply_mutation(lease, lambda: mutation(lease))
+
     def create_episode(self, workspace_ref: str, mutation: Callable[[], Any]) -> Any:
         return self._mutate(workspace_ref, LifecycleOperation.CREATE_EPISODE, mutation)
 

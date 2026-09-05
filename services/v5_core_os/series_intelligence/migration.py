@@ -35,6 +35,16 @@ from services.v5_core_os.canonical_registration.sqlite_schema import (
     MARKER_TABLE as CANONICAL_REGISTRATION_MARKER_TABLE,
     TABLE as CANONICAL_REGISTRATION_TABLE,
 )
+from services.v5_core_os.project_engine.project_foundation import (
+    ProjectFoundationStorageError,
+    ProjectFoundationValidationError,
+)
+from services.v5_core_os.project_engine.project_foundation_sqlite import (
+    INDEX as PROJECT_FOUNDATION_INDEX,
+    MARKER_TABLE as PROJECT_FOUNDATION_MARKER_TABLE,
+    TABLE as PROJECT_FOUNDATION_TABLE,
+    validate_project_foundation_connection,
+)
 
 from .sqlite_schema import (
     MARKER_COMPONENT,
@@ -166,6 +176,21 @@ def _validate_schema_allowlist(
     if candidate_receipt_present:
         expected_tables |= candidate_receipt_tables
         expected_indexes.add(CANDIDATE_RECEIPT_INDEX)
+    project_foundation_tables = {
+        PROJECT_FOUNDATION_TABLE,
+        PROJECT_FOUNDATION_MARKER_TABLE,
+    }
+    project_foundation_present = project_foundation_tables & tables
+    if (
+        project_foundation_present
+        and project_foundation_present != project_foundation_tables
+    ):
+        raise SeriesIntelligenceMigrationError(
+            "partial project foundation command schema"
+        )
+    if project_foundation_present:
+        expected_tables |= project_foundation_tables
+        expected_indexes.add(PROJECT_FOUNDATION_INDEX)
     if tables != expected_tables:
         raise SeriesIntelligenceMigrationError("undeclared SQLite table")
     forbidden = connection.execute(
@@ -192,6 +217,13 @@ def _validate_schema_allowlist(
         except CandidateReceiptSqliteError as exc:
             raise SeriesIntelligenceMigrationError(
                 "invalid candidate receipt schema"
+            ) from exc
+    if project_foundation_present:
+        try:
+            validate_project_foundation_connection(connection)
+        except (ProjectFoundationStorageError, ProjectFoundationValidationError) as exc:
+            raise SeriesIntelligenceMigrationError(
+                "invalid project foundation command schema"
             ) from exc
 
 

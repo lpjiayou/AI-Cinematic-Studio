@@ -53,6 +53,7 @@ INTEGRATION_SHARDS: dict[str, tuple[str, ...]] = {
         "tests/integration/test_creator_method_aware_media_m10_m11.py",
         "tests/integration/test_creator_public_http_v1.py",
         "tests/integration/test_creator_public_json_numeric_integrity.py",
+        "tests/integration/test_creator_project_foundation_http.py",
         "tests/integration/test_creator_script_studio.py",
         "tests/integration/test_creator_series_plan_candidate_receipts.py",
         "tests/integration/test_creator_series_intelligence.py",
