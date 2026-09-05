@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 import json
+import math
 import re
 from typing import Any, Mapping
 
@@ -342,15 +343,31 @@ def validate_plan(value: Any, brief: CreativeBrief) -> dict[str, Any]:
         if shot.get("shotNo") != index:
             errors.append("storyboard shotNo must be contiguous from 1")
         duration = shot.get("durationSec")
-        if isinstance(duration, bool) or not isinstance(duration, (int, float)) or duration <= 0:
+        if type(duration) not in (int, float):
             errors.append(f"storyboardPlan[{index - 1}].durationSec must be positive")
         else:
-            total_duration += float(duration)
+            try:
+                normalized_duration = float(duration)
+            except (TypeError, ValueError, OverflowError):
+                errors.append(
+                    f"storyboardPlan[{index - 1}].durationSec must be finite"
+                )
+                continue
+            if not math.isfinite(normalized_duration) or normalized_duration <= 0:
+                errors.append(
+                    f"storyboardPlan[{index - 1}].durationSec must be positive and finite"
+                )
+                continue
+            total_duration += normalized_duration
+            if not math.isfinite(total_duration):
+                errors.append("storyboard total duration must remain finite")
         for key in ("shotSize", "cameraMovement", "visualDescription", "narrativePurpose"):
             _require_text(shot.get(key), f"storyboardPlan[{index - 1}].{key}", errors)
 
     tolerance = max(2.0, brief.duration_seconds * 0.15)
-    if abs(total_duration - brief.duration_seconds) > tolerance:
+    if not math.isfinite(total_duration):
+        errors.append("storyboard total duration must be finite")
+    elif abs(total_duration - brief.duration_seconds) > tolerance:
         errors.append("storyboard duration does not reasonably match the brief")
 
     visual = _require_object(
@@ -379,7 +396,7 @@ def validate_plan(value: Any, brief: CreativeBrief) -> dict[str, Any]:
 
     if errors:
         raise PlanValidationError(errors)
-    return json.loads(json.dumps(plan, ensure_ascii=False))
+    return json.loads(json.dumps(plan, ensure_ascii=False, allow_nan=False))
 
 
 def build_session_project_draft_input(

@@ -1,6 +1,6 @@
 # Creator Public HTTP/API v1
 
-Status: `XR1 FROZEN / AUTH-W1 / ADR-0013 CONTROL PLANE / ADR-0019 METHOD-AWARE CUTOVER`
+Status: `XR1 FROZEN / AUTH-W1 / ADR-0013 CONTROL PLANE / ADR-0019 METHOD-AWARE CUTOVER / STRICT JSON AND NUMERIC INTEGRITY`
 
 This contract is the only browser-facing Core HTTP surface for the separate Commercial
 Frontend. Existing `/creator/internal/*` endpoints remain compatibility-only and must
@@ -38,6 +38,15 @@ Commercial Frontend → Frontend Experience Adapter → /creator/api/v1
 - Commands require `Content-Type: application/json`.
 - Request bodies are limited to 512000 bytes.
 - Responses use UTF-8 JSON and `Cache-Control: no-store`.
+- Request JSON uses the standard grammar only: `NaN`, `Infinity`, `-Infinity`,
+  comments and trailing commas are invalid. Maximum nesting depth is 64 and each
+  number token is limited to 128 characters.
+- Integer command fields accept JSON integers only. Booleans, floats (including
+  integral-valued floats), numeric strings and null are invalid and are never
+  rounded or truncated.
+- Public numeric fields must be finite. Every JSON response is serialized with
+  `allow_nan=False`; a serialization violation returns a complete
+  `500 / application_error` envelope before response headers are sent.
 - Core references and version references returned by successful commands are opaque.
 - Provider diagnostics, credentials, repository types and raw exceptions are forbidden.
 

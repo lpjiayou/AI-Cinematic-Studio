@@ -5,7 +5,6 @@ from __future__ import annotations
 from functools import partial
 from hashlib import sha256
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
-import json
 import sys
 from typing import Any, Mapping
 from pathlib import Path
@@ -90,6 +89,12 @@ from apps.creator_workspace_mvp.public_auth import (
     PublicApiAuthenticator,
     PublicApiPrincipal,
     public_server_configuration_from_environment,
+)
+from apps.creator_workspace_mvp.strict_json import (
+    PUBLIC_JSON_DECODE_ERRORS,
+    PUBLIC_JSON_ENCODE_ERRORS,
+    dump_public_json,
+    load_public_json,
 )
 from services.v5_core_os.project_engine import (
     ProjectPublicBoundary,
@@ -749,8 +754,8 @@ class CreatorRequestHandler(BaseHTTPRequestHandler):
             self._send_product_error(400, "invalid_request")
             return
         try:
-            payload = json.loads(self.rfile.read(content_length).decode("utf-8"))
-        except (UnicodeDecodeError, json.JSONDecodeError):
+            payload = load_public_json(self.rfile.read(content_length))
+        except PUBLIC_JSON_DECODE_ERRORS:
             self._send_product_error(400, "invalid_request")
             return
         if not isinstance(payload, dict):
@@ -2036,7 +2041,20 @@ class CreatorRequestHandler(BaseHTTPRequestHandler):
         *,
         extra_headers: MappingLike | None = None,
     ) -> None:
-        body = json.dumps(payload, ensure_ascii=False).encode("utf-8")
+        try:
+            body = dump_public_json(payload)
+        except PUBLIC_JSON_ENCODE_ERRORS:
+            status = 500
+            extra_headers = None
+            body = dump_public_json(
+                {
+                    "ok": False,
+                    "error": {
+                        "code": "application_error",
+                        "message": "暂时无法完成操作，请稍后重试。",
+                    },
+                }
+            )
         self.send_response(status)
         self.send_header("Content-Type", "application/json; charset=utf-8")
         self.send_header("Content-Length", str(len(body)))

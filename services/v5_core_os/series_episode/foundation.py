@@ -92,20 +92,22 @@ def _optional_ref(value: Any, field: str) -> str | None:
 
 
 def _positive_int(value: Any, field: str, *, maximum: int = 100_000) -> int:
-    if isinstance(value, bool):
+    if type(value) is not int:
         raise SeriesEpisodeError(f"{field} must be an integer")
-    try:
-        result = int(value)
-    except (TypeError, ValueError) as exc:
-        raise SeriesEpisodeError(f"{field} must be an integer") from exc
-    if result < 1 or result > maximum:
+    if value < 1 or value > maximum:
         raise SeriesEpisodeError(f"{field} is out of range")
-    return result
+    return value
 
 
 def _json_copy(value: Mapping[str, Any], field: str) -> str:
     try:
-        return json.dumps(dict(value), ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+        return json.dumps(
+            dict(value),
+            ensure_ascii=False,
+            sort_keys=True,
+            separators=(",", ":"),
+            allow_nan=False,
+        )
     except (TypeError, ValueError) as exc:
         raise SeriesEpisodeError(f"{field} must be JSON-compatible") from exc
 

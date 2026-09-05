@@ -7,6 +7,7 @@ from dataclasses import dataclass, replace
 from datetime import datetime, timezone
 import hashlib
 import json
+import math
 from pathlib import Path
 import re
 import sqlite3
@@ -239,25 +240,21 @@ def build_m6_consumer_binding(
 
 
 def _positive_int(value: Any, field: str, *, maximum: int = 100_000) -> int:
-    if isinstance(value, bool):
+    if type(value) is not int:
         raise ScriptStudioError(f"{field} must be an integer")
-    try:
-        result = int(value)
-    except (TypeError, ValueError) as exc:
-        raise ScriptStudioError(f"{field} must be an integer") from exc
-    if result < 1 or result > maximum:
+    if value < 1 or value > maximum:
         raise ScriptStudioError(f"{field} is out of range")
-    return result
+    return value
 
 
 def _positive_number(value: Any, field: str, *, maximum: float = 3600) -> float:
-    if isinstance(value, bool):
+    if type(value) not in (int, float):
         raise ScriptStudioError(f"{field} must be a number")
     try:
         result = float(value)
-    except (TypeError, ValueError) as exc:
+    except (TypeError, ValueError, OverflowError) as exc:
         raise ScriptStudioError(f"{field} must be a number") from exc
-    if result <= 0 or result > maximum:
+    if not math.isfinite(result) or result <= 0 or result > maximum:
         raise ScriptStudioError(f"{field} is out of range")
     return round(result, 3)
 
@@ -1952,7 +1949,13 @@ class ScriptStudioService:
                 bootstrap["sourcePlanSchemaVersion"],
                 bootstrap["sourcePlanVersion"],
                 1,
-                json.dumps(content, ensure_ascii=False, sort_keys=True, separators=(",", ":")),
+                json.dumps(
+                    content,
+                    ensure_ascii=False,
+                    sort_keys=True,
+                    separators=(",", ":"),
+                    allow_nan=False,
+                ),
                 change_kind,
                 None,
                 now,
@@ -2053,7 +2056,13 @@ class ScriptStudioService:
                 bootstrap["sourcePlanSchemaVersion"],
                 bootstrap["sourcePlanVersion"],
                 next_number,
-                json.dumps(content, ensure_ascii=False, sort_keys=True, separators=(",", ":")),
+                json.dumps(
+                    content,
+                    ensure_ascii=False,
+                    sort_keys=True,
+                    separators=(",", ":"),
+                    allow_nan=False,
+                ),
                 change_kind,
                 parent_ref,
                 now,
@@ -2275,6 +2284,7 @@ class ScriptStudioService:
                 ensure_ascii=False,
                 sort_keys=True,
                 separators=(",", ":"),
+                allow_nan=False,
             ),
             _canonical_digest(envelope),
             now,
