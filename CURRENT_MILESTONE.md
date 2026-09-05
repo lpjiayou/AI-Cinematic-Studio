@@ -2,7 +2,7 @@
 
 Status: `CURRENT / EVIDENCE-BACKED / FAIL-CLOSED`
 
-Last reviewed: `2026-09-03`
+Last reviewed: `2026-09-05`
 
 ## 1. Closed K2 cutover baselines
 
@@ -170,11 +170,11 @@ K2_HARDCODED_PRODUCTION_BRANCHES=0
 ## 6. Next legal task
 
 ```text
-NEXT_TASK=ACS-M12-C3-DEDICATED-LINUX-CPU-VM-PROVIDER-SELECTION-AND-PREFLIGHT
+NEXT_TASK=ACS-CORE-SERIES-PLANNING-SCOPE-AND-CANDIDATE-BINDING-HARDENING-B
 ```
 
-That task may compare providers, select and preflight one dedicated non-A100 Linux x86_64 CPU VM only after separate authorization.
-It does not authorize purchase, M12-C3/C4, A100, downloads, installation, GPU/Provider calls, admission or publication.
+That task is the separately authorized Core PR-B only. M12-C3/C4, A100,
+Frontend, Provider/GPU, admission and publication remain paused or unauthorized.
 
 The compatibility token below remains only because the already-merged docs-only
 validator recognizes the earlier name. It grants no current authority:

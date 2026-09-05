@@ -73,27 +73,19 @@ def _ref(value: Any, field: str) -> str:
 
 
 def _positive_int(value: Any, field: str) -> int:
-    if isinstance(value, bool):
+    if type(value) is not int:
         raise SeriesIntelligenceError(f"{field} must be an integer")
-    try:
-        result = int(value)
-    except (TypeError, ValueError) as exc:
-        raise SeriesIntelligenceError(f"{field} must be an integer") from exc
-    if result < 1:
+    if value < 1:
         raise SeriesIntelligenceError(f"{field} must be positive")
-    return result
+    return value
 
 
 def _nonnegative_int(value: Any, field: str) -> int:
-    if isinstance(value, bool):
+    if type(value) is not int:
         raise SeriesIntelligenceError(f"{field} must be an integer")
-    try:
-        result = int(value)
-    except (TypeError, ValueError) as exc:
-        raise SeriesIntelligenceError(f"{field} must be an integer") from exc
-    if result < 0:
+    if value < 0:
         raise SeriesIntelligenceError(f"{field} must not be negative")
-    return result
+    return value
 
 
 def _mapping(value: Any, field: str) -> dict[str, Any]:

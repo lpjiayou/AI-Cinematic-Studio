@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
   "repository": "Core",
-  "reviewedBaseline": "3eaaeabf79fdb85581a15069ff6fe5f330445416",
-  "reviewedAt": "2026-09-04",
+  "reviewedBaseline": "6b10166532c3cac9b8976a5d8986a4e8c1cfd7fc",
+  "reviewedAt": "2026-09-05",
   "documentClasses": [
     "ACCEPTED_DECISION",
     "NORMATIVE_ARCHITECTURE",
@@ -114,8 +114,8 @@
       "supersededBy": [],
       "currentStateClaimsAllowed": true,
       "historicalMutationPolicy": "UPDATE_FROM_MERGED_EVIDENCE_ONLY",
-      "lastReviewedBaseline": "3eaaeabf79fdb85581a15069ff6fe5f330445416",
-      "lastReviewedAt": "2026-09-04",
+      "lastReviewedBaseline": "6b10166532c3cac9b8976a5d8986a4e8c1cfd7fc",
+      "lastReviewedAt": "2026-09-05",
       "linkedFromIndex": true,
       "notes": "Current claims require merged evidence and may not override Accepted ADRs."
     },
@@ -673,8 +673,8 @@
       "supersededBy": [],
       "currentStateClaimsAllowed": false,
       "historicalMutationPolicy": "UPDATE_WITH_AUTHORIZED_CONTRACT_CHANGE",
-      "lastReviewedBaseline": "a455c8e76427d53d75bb7f15259b9875d9768914",
-      "lastReviewedAt": "2026-09-02",
+      "lastReviewedBaseline": "6b10166532c3cac9b8976a5d8986a4e8c1cfd7fc",
+      "lastReviewedAt": "2026-09-05",
       "linkedFromIndex": true,
       "notes": "Authority is limited to the document's declared scope and subordinate to Accepted ADRs."
     },
@@ -1545,8 +1545,8 @@
       "supersededBy": [],
       "currentStateClaimsAllowed": false,
       "historicalMutationPolicy": "REGENERATE_FROM_REVIEWED_INVENTORY",
-      "lastReviewedBaseline": "3eaaeabf79fdb85581a15069ff6fe5f330445416",
-      "lastReviewedAt": "2026-09-04",
+      "lastReviewedBaseline": "6b10166532c3cac9b8976a5d8986a4e8c1cfd7fc",
+      "lastReviewedAt": "2026-09-05",
       "linkedFromIndex": true,
       "notes": "Navigation/reference only; resolve authority through the linked source documents."
     },
@@ -1689,8 +1689,8 @@
       "supersededBy": [],
       "currentStateClaimsAllowed": false,
       "historicalMutationPolicy": "REGENERATE_FROM_REVIEWED_INVENTORY",
-      "lastReviewedBaseline": "3eaaeabf79fdb85581a15069ff6fe5f330445416",
-      "lastReviewedAt": "2026-09-04",
+      "lastReviewedBaseline": "6b10166532c3cac9b8976a5d8986a4e8c1cfd7fc",
+      "lastReviewedAt": "2026-09-05",
       "linkedFromIndex": true,
       "notes": "Navigation/reference only; resolve authority through the linked source documents."
     },
@@ -1707,8 +1707,8 @@
       "supersededBy": [],
       "currentStateClaimsAllowed": false,
       "historicalMutationPolicy": "REGENERATE_FROM_REVIEWED_INVENTORY",
-      "lastReviewedBaseline": "3eaaeabf79fdb85581a15069ff6fe5f330445416",
-      "lastReviewedAt": "2026-09-04",
+      "lastReviewedBaseline": "6b10166532c3cac9b8976a5d8986a4e8c1cfd7fc",
+      "lastReviewedAt": "2026-09-05",
       "linkedFromIndex": true,
       "notes": "Navigation/reference only; resolve authority through the linked source documents."
     },
@@ -1729,6 +1729,24 @@
       "lastReviewedAt": "2026-09-04",
       "linkedFromIndex": true,
       "notes": "Navigation/reference only; resolve authority through the linked source documents."
+    },
+    {
+      "path": "docs/status/CORE_PUBLIC_JSON_AND_NUMERIC_INTEGRITY_HARDENING_2026-09-05.md",
+      "repository": "Core",
+      "documentClass": "CURRENT_STATUS",
+      "status": "CURRENT",
+      "owner": "Project Lead / Creator Public Contract Owner / V5 Domain Owners",
+      "authoritativeFor": [
+        "evidence-backed bounded Creator public JSON and numeric integrity hardening state"
+      ],
+      "supersedes": [],
+      "supersededBy": [],
+      "currentStateClaimsAllowed": true,
+      "historicalMutationPolicy": "UPDATE_FROM_MERGED_EVIDENCE_ONLY",
+      "lastReviewedBaseline": "6b10166532c3cac9b8976a5d8986a4e8c1cfd7fc",
+      "lastReviewedAt": "2026-09-05",
+      "linkedFromIndex": true,
+      "notes": "Records only the bounded Core public JSON and numeric integrity closure; it does not authorize Provider, GPU, M12, M13, Frontend, admission or publication work."
     },
     {
       "path": "docs/status/CROSS_REPOSITORY_BASELINE.md",
@@ -1819,8 +1837,8 @@
       "supersededBy": [],
       "currentStateClaimsAllowed": true,
       "historicalMutationPolicy": "UPDATE_FROM_MERGED_EVIDENCE_ONLY",
-      "lastReviewedBaseline": "3eaaeabf79fdb85581a15069ff6fe5f330445416",
-      "lastReviewedAt": "2026-09-04",
+      "lastReviewedBaseline": "6b10166532c3cac9b8976a5d8986a4e8c1cfd7fc",
+      "lastReviewedAt": "2026-09-05",
       "linkedFromIndex": true,
       "notes": "Authority is limited to the document's declared scope and subordinate to Accepted ADRs."
     },
