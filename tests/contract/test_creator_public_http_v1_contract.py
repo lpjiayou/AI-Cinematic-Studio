@@ -201,6 +201,11 @@ class CreatorPublicHttpV1ContractTests(unittest.TestCase):
             "CREATOR_CANONICAL_TARGET_REF",
             "v5.canonical-registration.v1",
             "canonical_registration@1",
+            "series_scope_required",
+            "candidateRef",
+            "sourceContextDigest",
+            "creator.series-plan-candidate-receipt.v1",
+            "raw `creativeInput`",
         ):
             with self.subTest(required_term=required_term):
                 self.assertIn(required_term, document)

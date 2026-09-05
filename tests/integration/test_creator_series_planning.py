@@ -182,7 +182,10 @@ class CreatorSeriesPlanningHttpTests(unittest.TestCase):
         except error.HTTPError as exc:
             self.assertEqual(exc.code, 400)
             payload = json.loads(exc.read().decode("utf-8"))
-            self.assertEqual(payload["error"]["code"], "invalid_request")
+            self.assertEqual(
+                payload["error"]["code"],
+                "invalid_series_plan_candidate",
+            )
         else:
             self.fail("invalid candidate unexpectedly persisted")
         _, workspace = self.get(SERIES_PLANNING_ENDPOINT)

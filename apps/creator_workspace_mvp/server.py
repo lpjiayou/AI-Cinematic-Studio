@@ -40,6 +40,14 @@ from apps.creator_workspace_mvp.series_director import (
     SeriesDirectorGenerationError,
     SeriesPlanCandidateError,
 )
+from apps.creator_workspace_mvp.series_plan_candidate_receipts import (
+    CANDIDATE_RECEIPT_SCHEMA_VERSION,
+    SeriesPlanCandidateReceiptError,
+    SeriesPlanCandidateReceiptService,
+    build_series_plan_candidate_context,
+    create_in_memory_receipt_service,
+    create_local_development_receipt_service_from_environment,
+)
 from apps.creator_workspace_mvp.public_contract import (
     CAPABILITIES_ENDPOINT,
     PUBLIC_API_PREFIX,
@@ -686,6 +694,7 @@ class CreatorRequestHandler(BaseHTTPRequestHandler):
         series_episode_boundary: SeriesEpisodePublicBoundary,
         project_boundary: ProjectPublicBoundary,
         series_director_service: SeriesDirectorApplicationService,
+        series_plan_candidate_receipt_service: SeriesPlanCandidateReceiptService,
         series_planning_boundary: SeriesPlanningPublicBoundary,
         series_intelligence_boundary: SeriesIntelligencePublicBoundary | None,
         script_studio_service: ScriptStudioApplicationService,
@@ -700,6 +709,9 @@ class CreatorRequestHandler(BaseHTTPRequestHandler):
         self.series_episode_boundary = series_episode_boundary
         self.project_boundary = project_boundary
         self.series_director_service = series_director_service
+        self.series_plan_candidate_receipt_service = (
+            series_plan_candidate_receipt_service
+        )
         self.series_planning_boundary = series_planning_boundary
         self.series_intelligence_boundary = series_intelligence_boundary
         self.script_studio_service = script_studio_service
@@ -794,6 +806,27 @@ class CreatorRequestHandler(BaseHTTPRequestHandler):
                     "scriptVersionRef",
                     "idempotencyKey",
                     "approvalRef",
+                }:
+                    self._send_application_error(400, "invalid_request")
+                    return
+            elif requested_path == PUBLIC_SERIES_PLANNING_GENERATE_ENDPOINT:
+                required = {"projectRef", "creativeInput"}
+                if frozenset(payload) not in {
+                    frozenset(required),
+                    frozenset(required | {"seriesRef"}),
+                }:
+                    self._send_application_error(400, "invalid_request")
+                    return
+            elif requested_path == PUBLIC_SERIES_PLANNING_CONFIRM_ENDPOINT:
+                required = {
+                    "projectRef",
+                    "seriesRef",
+                    "humanConfirmed",
+                    "candidate",
+                }
+                if frozenset(payload) not in {
+                    frozenset(required),
+                    frozenset(required | {"candidateRef"}),
                 }:
                     self._send_application_error(400, "invalid_request")
                     return
@@ -1663,25 +1696,17 @@ class CreatorRequestHandler(BaseHTTPRequestHandler):
                     payload.get("projectRef"),
                     payload.get("seriesRef"),
                 )
-                project = context["project"]
-                series = context["series"]
-                generation_context = {
-                    "schemaVersion": "creator.series-director.context.v1",
-                    "workspaceRef": context["workspaceRef"],
-                    "contentProfileRef": context["contentProfileRef"],
-                    "projectRef": context["projectRef"],
-                    "projectTitle": project["title"],
-                    "projectDescription": project["description"],
-                    "targetPlatform": project["targetPlatform"],
-                    "aspectRatio": project["aspectRatio"],
-                    "plannedEpisodeCount": project["plannedEpisodeCount"],
-                    "seriesRef": context["seriesRef"],
-                    "seriesTitle": series["title"],
-                    "seriesDescription": series["description"],
-                    "createdEpisodeCount": len(series.get("episodes", [])),
-                }
+                candidate_context = build_series_plan_candidate_context(context)
                 candidate = self.series_director_service.generate(
-                    generation_context, payload.get("creativeInput")
+                    candidate_context["generationContext"],
+                    payload.get("creativeInput"),
+                )
+                receipt, replay = (
+                    self.series_plan_candidate_receipt_service.issue(
+                        candidate_context,
+                        payload.get("creativeInput"),
+                        candidate,
+                    )
                 )
                 self._send_json(
                     200,
@@ -1689,17 +1714,51 @@ class CreatorRequestHandler(BaseHTTPRequestHandler):
                         "ok": True,
                         "kind": "candidate-series-plan",
                         "confirmationRequired": True,
+                        "candidateRef": receipt.candidateRef,
+                        "candidateDigest": receipt.candidateDigest,
+                        "sourceContextDigest": receipt.sourceContextDigest,
+                        "candidateReceiptSchemaVersion": (
+                            CANDIDATE_RECEIPT_SCHEMA_VERSION
+                        ),
+                        "candidateReceiptReplay": replay,
                         "candidate": candidate,
                     },
                 )
                 return
             if path == SERIES_PLANNING_CONFIRM_ENDPOINT:
-                result = self.series_planning_boundary.confirm_candidate(payload)
+                if payload.get("humanConfirmed") is not True:
+                    raise SeriesPlanningPublicError(
+                        "series_plan_not_confirmed", 409
+                    )
+                context = self.project_boundary.build_context(
+                    payload.get("workspaceRef"),
+                    payload.get("projectRef"),
+                    payload.get("seriesRef"),
+                )
+                candidate_context = build_series_plan_candidate_context(context)
+                stored_candidate = (
+                    self.series_plan_candidate_receipt_service.resolve(
+                        candidate_context,
+                        payload.get("candidate"),
+                        candidate_ref=payload.get("candidateRef"),
+                    )
+                )
+                result = self.series_planning_boundary.confirm_candidate(
+                    {
+                        "workspaceRef": context["workspaceRef"],
+                        "projectRef": context["projectRef"],
+                        "seriesRef": context["seriesRef"],
+                        "humanConfirmed": True,
+                        "candidate": stored_candidate,
+                    }
+                )
             elif path == SERIES_PLANNING_MANUAL_VERSION_ENDPOINT:
                 result = self.series_planning_boundary.create_manual_version(payload)
             else:
                 result = {"plan": self.series_planning_boundary.confirm_version(payload)}
             self._send_json(201, {"ok": True, **result})
+        except SeriesPlanCandidateReceiptError as exc:
+            self._send_application_error(exc.status, exc.code)
         except SeriesPlanCandidateError:
             self._send_application_error(400, "invalid_series_plan_candidate")
         except SeriesDirectorGenerationError as exc:
@@ -1709,6 +1768,15 @@ class CreatorRequestHandler(BaseHTTPRequestHandler):
             self._send_project_error(exc)
         except SeriesPlanningPublicError as exc:
             self._send_series_planning_error(exc)
+        except Exception:
+            correlation_ref = f"series-planning-{uuid4().hex}"
+            print(
+                "SERIES_PLANNING_APPLICATION_ERROR "
+                f"category=unexpected_exception correlation={correlation_ref}",
+                file=sys.stderr,
+                flush=True,
+            )
+            self._send_application_error(500, "application_error")
 
     def _handle_script_post(self, path: str, payload: MappingLike) -> None:
         try:
@@ -1919,6 +1987,13 @@ class CreatorRequestHandler(BaseHTTPRequestHandler):
             "canonical_registration_unavailable": "请先配置显式 canonical target。",
             "dependent_script_exists": "该内容已有剧本版本，为保护制作链路暂不能删除。",
             "invalid_series_plan_candidate": "系列规划候选未通过本地结构校验。",
+            "series_scope_required": "系列规划候选需要已关联的系列项目。",
+            "series_plan_candidate_not_issued": "该系列规划候选未由当前服务签发。",
+            "series_plan_candidate_scope_mismatch": "该系列规划候选不属于当前项目与系列。",
+            "series_plan_candidate_stale": "项目或系列已更新，请重新生成候选。",
+            "series_plan_candidate_content_mismatch": "候选内容与服务端签发记录不一致。",
+            "series_plan_candidate_receipt_ambiguous": "候选签发记录不唯一，请重新生成候选。",
+            "series_plan_candidate_receipt_unavailable": "候选签发记录暂时不可用，请稍后重试。",
             "series_plan_not_confirmed": "请先完成人工确认。",
             "authority_unavailable": "当前工作区尚未连接 M6 权限与身份授权。",
             "identity_binding_denied": "当前身份不能绑定这组系列智能数据。",
@@ -2109,6 +2184,7 @@ def create_server(
     series_episode_boundary: SeriesEpisodePublicBoundary | None = None,
     project_boundary: ProjectPublicBoundary | None = None,
     series_director_service: SeriesDirectorApplicationService | None = None,
+    series_plan_candidate_receipt_service: SeriesPlanCandidateReceiptService | None = None,
     series_planning_boundary: SeriesPlanningPublicBoundary | None = None,
     series_intelligence_boundary: SeriesIntelligencePublicBoundary | None = None,
     script_studio_service: ScriptStudioApplicationService | None = None,
@@ -2140,6 +2216,10 @@ def create_server(
         project_boundary=projects,
         series_director_service=series_director_service
         or SeriesDirectorApplicationService(default_text_generation),
+        series_plan_candidate_receipt_service=(
+            series_plan_candidate_receipt_service
+            or create_in_memory_receipt_service()
+        ),
         series_planning_boundary=planning,
         series_intelligence_boundary=series_intelligence_boundary,
         script_studio_service=script_studio_service
@@ -2184,6 +2264,9 @@ def main() -> None:
         raise RuntimeError("Creator SQLite lifecycle assembly is required")
     project_boundary = assembly.project_context
     ai_director_service, script_service, series_director_service = capability_services_from_environment()
+    candidate_receipt_service = (
+        create_local_development_receipt_service_from_environment()
+    )
     series_planning_boundary = assembly.series_planning
     episode_production_boundary = create_episode_production_boundary_from_environment(
         project_boundary=project_boundary,
@@ -2197,6 +2280,7 @@ def main() -> None:
         series_episode_boundary=series_boundary,
         project_boundary=project_boundary,
         series_director_service=series_director_service,
+        series_plan_candidate_receipt_service=candidate_receipt_service,
         series_planning_boundary=series_planning_boundary,
         series_intelligence_boundary=assembly.series_intelligence,
         script_studio_service=script_service,

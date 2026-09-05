@@ -1,4 +1,5 @@
 import ast
+from dataclasses import is_dataclass
 from importlib.util import resolve_name
 import inspect
 from pathlib import Path
@@ -6,6 +7,16 @@ import unittest
 
 from services.v5_core_os import series_planning as public_package
 from services.v5_core_os.series_planning import SeriesPlanningPublicBoundary
+from services.v5_core_os.series_planning.candidate_receipt_sqlite import (
+    INDEX as CANDIDATE_RECEIPT_INDEX,
+    MARKER_TABLE as CANDIDATE_RECEIPT_MARKER_TABLE,
+    TABLE as CANDIDATE_RECEIPT_TABLE,
+    SeriesPlanCandidateReceipt,
+    SqliteSeriesPlanCandidateReceiptStore,
+)
+from apps.creator_workspace_mvp.series_plan_candidate_receipts import (
+    InMemorySeriesPlanCandidateReceiptStore,
+)
 from tests.unit.test_series_planning_m5 import WORKSPACE, confirm, create_context
 
 
@@ -14,6 +25,17 @@ SERVER = ROOT / "apps" / "creator_workspace_mvp" / "server.py"
 APPLICATION = ROOT / "apps" / "creator_workspace_mvp" / "series_director.py"
 APPS_ROOT = ROOT / "apps"
 TEXT_GENERATION_ROOT = ROOT / "services" / "v5_core_os" / "text_generation"
+SERVICES_ROOT = ROOT / "services"
+RECEIPT_APPLICATION = (
+    ROOT / "apps" / "creator_workspace_mvp" / "series_plan_candidate_receipts.py"
+)
+RECEIPT_INFRASTRUCTURE = (
+    ROOT
+    / "services"
+    / "v5_core_os"
+    / "series_planning"
+    / "candidate_receipt_sqlite.py"
+)
 
 
 def _imports_module(
@@ -250,6 +272,56 @@ class CreatorSeriesPlanningContractTests(unittest.TestCase):
         self.assertNotIn("series_planning.foundation", server)
         self.assertNotIn("SqliteSeriesPlanningAdapter", server)
         self.assertIn("from services.v5_core_os.text_generation import", application)
+
+    def test_candidate_receipt_is_non_authoritative_and_dependency_direction_is_closed(self):
+        self.assertTrue(is_dataclass(SeriesPlanCandidateReceipt))
+        self.assertTrue(SeriesPlanCandidateReceipt.__dataclass_params__.frozen)
+        self.assertFalse(CANDIDATE_RECEIPT_TABLE.startswith("v5_"))
+        self.assertFalse(CANDIDATE_RECEIPT_MARKER_TABLE.startswith("v5_"))
+        self.assertTrue(CANDIDATE_RECEIPT_INDEX.startswith("ux_creator_"))
+        for store in (
+            InMemorySeriesPlanCandidateReceiptStore,
+            SqliteSeriesPlanCandidateReceiptStore,
+        ):
+            self.assertFalse(
+                {"update", "delete", "confirm", "publish"} & set(store.__dict__)
+            )
+
+        application_tree = ast.parse(
+            RECEIPT_APPLICATION.read_text(encoding="utf-8")
+        )
+        infrastructure_tree = ast.parse(
+            RECEIPT_INFRASTRUCTURE.read_text(encoding="utf-8")
+        )
+        self.assertTrue(
+            _imports_module(
+                application_tree,
+                "services.v5_core_os.series_planning.candidate_receipt_sqlite",
+                current_package="apps.creator_workspace_mvp",
+            )
+        )
+        self.assertFalse(_imports_module(infrastructure_tree, "apps"))
+
+        service_importers = []
+        for path in SERVICES_ROOT.rglob("*.py"):
+            tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+            if _imports_module(tree, "apps"):
+                service_importers.append(path.relative_to(ROOT).as_posix())
+        self.assertEqual([], service_importers)
+
+        server = SERVER.read_text(encoding="utf-8")
+        self.assertIn('"candidate": stored_candidate', server)
+        self.assertNotIn("candidate_receipt", " ".join(public_package.__all__))
+        self.assertLess(
+            server.index("series_boundary = series_episode_boundary_from_environment()"),
+            server.rindex(
+                "create_local_development_receipt_service_from_environment()"
+            ),
+        )
+        self.assertIn(
+            "series_plan_candidate_receipt_service=candidate_receipt_service",
+            server,
+        )
 
     def test_all_application_sources_have_zero_static_or_programmatic_v4_imports(self):
         for path in APPS_ROOT.rglob("*.py"):
