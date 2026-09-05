@@ -30,6 +30,7 @@ class LifecycleOperation(str, Enum):
     CONFIRM_CREATIVE_PLAN = "confirm-creative-plan"
     CREATE_EPISODE = "create-episode"
     CREATE_PROJECT = "create-project"
+    CREATE_PROJECT_FOUNDATION = "create-project-foundation"
     ARCHIVE_PROJECT = "archive-project"
     CREATE_SCRIPT_VERSION = "create-script-version"
     CONFIRM_SCRIPT_VERSION = "confirm-script-version"

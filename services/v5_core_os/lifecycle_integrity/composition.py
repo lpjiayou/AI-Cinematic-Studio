@@ -16,6 +16,12 @@ from services.v5_core_os.project_engine.foundation import (
     SqliteProjectAdapter,
 )
 from services.v5_core_os.project_engine.public import ProjectPublicBoundary
+from services.v5_core_os.project_engine.project_foundation import (
+    InMemoryProjectFoundationStore,
+)
+from services.v5_core_os.project_engine.project_foundation_sqlite import (
+    SqliteProjectFoundationStore,
+)
 from services.v5_core_os.canonical_registration.foundation import (
     CanonicalRegistrationService,
     InMemoryCanonicalRegistrationRepository,
@@ -128,6 +134,7 @@ class LifecycleAssembly:
     script_studio: ScriptStudioPublicBoundary
     series_planning: SeriesPlanningPublicBoundary
     canonical_registration: CanonicalRegistrationPublicBoundary
+    project_foundation_store: object
     series_intelligence: object | None = None
 
     @classmethod
@@ -156,6 +163,9 @@ class LifecycleAssembly:
         script_repository = InMemoryScriptStudioAdapter()
         planning_repository = InMemorySeriesPlanningAdapter()
         registration_repository = InMemoryCanonicalRegistrationRepository()
+        project_foundation_store = InMemoryProjectFoundationStore(
+            lifecycle_state=state
+        )
 
         state.register_resource(
             "series-episode",
@@ -207,6 +217,11 @@ class LifecycleAssembly:
                 registration_repository,
                 ("_records", "_registration_keys", "_idempotency_keys"),
             ),
+        )
+        state.register_resource(
+            "project-foundation-command",
+            _capture(project_foundation_store, ("_records", "_keys")),
+            _restore(project_foundation_store, ("_records", "_keys")),
         )
 
         kwargs: dict[str, Any] = {}
@@ -313,6 +328,7 @@ class LifecycleAssembly:
             script_studio=script_boundary,
             series_planning=planning_boundary,
             canonical_registration=registration_boundary,
+            project_foundation_store=project_foundation_store,
             series_intelligence=intelligence_boundary,
         )
         for boundary in (
@@ -412,6 +428,10 @@ class LifecycleAssembly:
             clock=clock,
             fault_hook=m6_fault_hook,
         )
+        project_foundation_store = SqliteProjectFoundationStore(
+            database_path,
+            lifecycle_state=state,
+        )
         script_boundary._bind_m6_episode_baseline_reader(
             intelligence_boundary._active_m6_baseline_reader_or_none()
         )
@@ -460,6 +480,7 @@ class LifecycleAssembly:
             script_studio=script_boundary,
             series_planning=planning_boundary,
             canonical_registration=registration_boundary,
+            project_foundation_store=project_foundation_store,
             series_intelligence=intelligence_boundary,
         )
         for boundary in (

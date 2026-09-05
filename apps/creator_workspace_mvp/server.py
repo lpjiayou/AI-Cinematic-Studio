@@ -70,6 +70,7 @@ from apps.creator_workspace_mvp.public_contract import (
     PUBLIC_M6_CHARACTER_CONFIRM_ENDPOINT,
     PUBLIC_M6_CHARACTER_VERSION_ENDPOINT,
     PUBLIC_PROJECT_CONTEXT_ENDPOINT,
+    PUBLIC_PROJECT_FOUNDATIONS_ENDPOINT,
     PUBLIC_PROJECTS_ENDPOINT,
     PUBLIC_SCRIPT_CONFIRM_ENDPOINT,
     PUBLIC_SCRIPT_GENERATE_ENDPOINT,
@@ -89,6 +90,11 @@ from apps.creator_workspace_mvp.public_contract import (
     PUBLIC_STORYBOARD_BOOTSTRAP_ENDPOINT,
     capability_payload,
 )
+from apps.creator_workspace_mvp.project_foundation import (
+    ProjectFoundationApplicationError,
+    ProjectFoundationApplicationService,
+)
+from services.v5_core_os.project_engine.project_foundation import COMMAND_FIELDS
 from services.v5_core_os.canonical_registration import (
     CanonicalRegistrationPublicBoundary,
     CanonicalRegistrationPublicError,
@@ -701,6 +707,7 @@ class CreatorRequestHandler(BaseHTTPRequestHandler):
         script_studio_boundary: ScriptStudioPublicBoundary,
         episode_production_boundary: EpisodeProductionPublicBoundary,
         canonical_registration_boundary: CanonicalRegistrationPublicBoundary | None,
+        project_foundation_service: ProjectFoundationApplicationService | None,
         public_authenticator: PublicApiAuthenticator | None,
         allow_internal_routes: bool,
         **kwargs: Any,
@@ -718,6 +725,7 @@ class CreatorRequestHandler(BaseHTTPRequestHandler):
         self.script_studio_boundary = script_studio_boundary
         self.episode_production_boundary = episode_production_boundary
         self.canonical_registration_boundary = canonical_registration_boundary
+        self.project_foundation_service = project_foundation_service
         self.public_authenticator = public_authenticator
         self.allow_internal_routes = allow_internal_routes
         self.authenticated_principal: PublicApiPrincipal | None = None
@@ -752,6 +760,7 @@ class CreatorRequestHandler(BaseHTTPRequestHandler):
             PUBLIC_EPISODE_PRODUCTION_RUNS_ENDPOINT,
             PUBLIC_CANONICAL_REGISTRATIONS_ENDPOINT,
             PUBLIC_CANONICAL_REGISTRATION_PREFLIGHT_ENDPOINT,
+            PUBLIC_PROJECT_FOUNDATIONS_ENDPOINT,
         } and requested_path not in PUBLIC_M6_COMMAND_ENDPOINTS and production_subresource is None:
             self._send_application_error(404, "not_found")
             return
@@ -852,6 +861,12 @@ class CreatorRequestHandler(BaseHTTPRequestHandler):
                     **payload,
                     "importedByRef": self._authenticated_credential_ref(),
                 }
+            elif requested_path == PUBLIC_PROJECT_FOUNDATIONS_ENDPOINT:
+                if set(payload) != COMMAND_FIELDS:
+                    self._send_application_error(
+                        400, "invalid_project_foundation"
+                    )
+                    return
             if production_subresource is not None and "productionRunRef" in payload:
                 self._send_application_error(400, "invalid_request")
                 return
@@ -968,6 +983,35 @@ class CreatorRequestHandler(BaseHTTPRequestHandler):
             }
         if requested_path in PUBLIC_M6_COMMAND_ENDPOINTS:
             self._handle_series_intelligence_post(requested_path, payload)
+            return
+        if requested_path == PUBLIC_PROJECT_FOUNDATIONS_ENDPOINT:
+            if self.project_foundation_service is None:
+                self._send_application_error(
+                    503, "project_foundation_unavailable"
+                )
+                return
+            try:
+                result = self.project_foundation_service.execute(
+                    self._authenticated_workspace_ref(),
+                    {
+                        key: value
+                        for key, value in payload.items()
+                        if key != "workspaceRef"
+                    },
+                )
+            except ProjectFoundationApplicationError as exc:
+                self._send_application_error(exc.status, exc.code)
+                return
+            except Exception:
+                self._send_application_error(500, "application_error")
+                return
+            status = (
+                200
+                if result["idempotentReplay"]
+                or result["recoveredFromPending"]
+                else 201
+            )
+            self._send_json(status, {"ok": True, **result})
             return
         if requested_path in {
             PUBLIC_CANONICAL_REGISTRATIONS_ENDPOINT,
@@ -1267,6 +1311,39 @@ class CreatorRequestHandler(BaseHTTPRequestHandler):
             self._send_json(200, capability_payload())
             return
         try:
+            if requested_path.startswith(
+                f"{PUBLIC_PROJECT_FOUNDATIONS_ENDPOINT}/"
+            ):
+                foundation_ref = unquote(
+                    requested_path[
+                        len(PUBLIC_PROJECT_FOUNDATIONS_ENDPOINT) + 1 :
+                    ]
+                )
+                if not foundation_ref or "/" in foundation_ref:
+                    self._send_application_error(
+                        404, "project_foundation_not_found"
+                    )
+                    return
+                if self.project_foundation_service is None:
+                    self._send_application_error(
+                        503, "project_foundation_unavailable"
+                    )
+                    return
+                try:
+                    foundation = self.project_foundation_service.get(
+                        workspace_ref, foundation_ref
+                    )
+                except ProjectFoundationApplicationError as exc:
+                    self._send_application_error(exc.status, exc.code)
+                    return
+                except Exception:
+                    self._send_application_error(500, "application_error")
+                    return
+                self._send_json(
+                    200,
+                    {"ok": True, "foundation": foundation},
+                )
+                return
             if requested_path == PUBLIC_EPISODE_PRODUCTION_RUNS_ENDPOINT:
                 self._send_json(
                     200,
@@ -2015,6 +2092,10 @@ class CreatorRequestHandler(BaseHTTPRequestHandler):
             "worker_unavailable": "制作执行服务暂时不可用。",
             "artifact_verification_failed": "媒体文件未通过完整性与可播放性校验。",
             "application_error": "暂时无法完成操作，请稍后重试。",
+            "invalid_project_foundation": "项目基础命令无效，请检查后重试。",
+            "project_foundation_idempotency_conflict": "相同操作标识对应了不同的项目基础内容。",
+            "project_foundation_not_found": "没有找到对应的项目基础命令。",
+            "project_foundation_unavailable": "项目基础命令服务暂时不可用，请稍后重试。",
         }
         self._send_json(status, {"ok": False, "error": {"code": code, "message": messages.get(code, messages["application_error"])}})
 
@@ -2193,6 +2274,7 @@ def create_server(
     public_authenticator: PublicApiAuthenticator | None = None,
     allow_internal_routes: bool = True,
     canonical_registration_boundary: CanonicalRegistrationPublicBoundary | None = None,
+    project_foundation_service: ProjectFoundationApplicationService | None = None,
 ) -> ThreadingHTTPServer:
     series_boundary = series_episode_boundary or create_in_memory_series_boundary()
     projects = project_boundary or create_in_memory_project_boundary(series_boundary)
@@ -2201,6 +2283,16 @@ def create_server(
     assembly = series_boundary._lifecycle_assembly_or_none()
     registration = canonical_registration_boundary or (
         assembly.canonical_registration if assembly is not None else None
+    )
+    foundation_service = project_foundation_service or (
+        ProjectFoundationApplicationService(
+            assembly.project_foundation_store,
+            assembly.coordinator,
+            assembly.series_episode,
+            assembly.project_context,
+        )
+        if assembly is not None
+        else None
     )
     production = episode_production_boundary or create_in_memory_episode_production_boundary(
         project_boundary=projects,
@@ -2227,6 +2319,7 @@ def create_server(
         script_studio_boundary=scripts,
         episode_production_boundary=production,
         canonical_registration_boundary=registration,
+        project_foundation_service=foundation_service,
         public_authenticator=public_authenticator,
         allow_internal_routes=allow_internal_routes,
     )

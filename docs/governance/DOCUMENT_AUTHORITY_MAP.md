@@ -27,7 +27,7 @@ and historical evidence cannot authorize current execution.
 | `ACCEPTED_DECISION` | 20 | no |
 | `NORMATIVE_ARCHITECTURE` | 14 | no |
 | `NORMATIVE_CONTRACT` | 31 | no |
-| `CURRENT_STATUS` | 4 | yes |
+| `CURRENT_STATUS` | 7 | yes |
 | `CAPABILITY_MATRIX` | 1 | yes |
 | `OPERATIONAL_RUNBOOK` | 18 | no |
 | `IMPLEMENTATION_EVIDENCE` | 21 | no |
@@ -124,6 +124,7 @@ and historical evidence cannot authorize current execution.
 | [`CURRENT_MILESTONE.md`](../../CURRENT_MILESTONE.md) | `CURRENT` | Project Lead / Documentation Governance Owner |
 | [`architecture/M12_C3_DEDICATED_LINUX_CPU_BUILD_HOST_SPECIFICATION.md`](../../architecture/M12_C3_DEDICATED_LINUX_CPU_BUILD_HOST_SPECIFICATION.md) | `CURRENT` | Project Lead / Architecture Owner / Infrastructure Owner / Repository Governance Owner / M12 Domain Owner |
 | [`docs/status/CORE_PUBLIC_JSON_AND_NUMERIC_INTEGRITY_HARDENING_2026-09-05.md`](../status/CORE_PUBLIC_JSON_AND_NUMERIC_INTEGRITY_HARDENING_2026-09-05.md) | `CURRENT` | Project Lead / Creator Public Contract Owner / V5 Domain Owners |
+| [`docs/status/CORE_RECOVERABLE_PROJECT_FOUNDATION_COMMAND_2026-09-05.md`](../status/CORE_RECOVERABLE_PROJECT_FOUNDATION_COMMAND_2026-09-05.md) | `CURRENT` | Project Lead / Creator Public Contract Owner / Project Foundation Command Owner |
 | [`docs/status/CORE_SERIES_PLANNING_SCOPE_AND_CANDIDATE_BINDING_HARDENING_2026-09-05.md`](../status/CORE_SERIES_PLANNING_SCOPE_AND_CANDIDATE_BINDING_HARDENING_2026-09-05.md) | `CURRENT` | Project Lead / Creator Public Contract Owner / M5 Domain Owner |
 | [`docs/status/CROSS_REPOSITORY_BASELINE.md`](../status/CROSS_REPOSITORY_BASELINE.md) | `CURRENT` | Documentation Governance Owner |
 | [`docs/status/M12_A100_BUILD_HOST_REFLIGHT_2026-09-03.md`](../status/M12_A100_BUILD_HOST_REFLIGHT_2026-09-03.md) | `CURRENT` | Project Lead / Infrastructure Owner / Architecture Owner / M12 Domain Owner |

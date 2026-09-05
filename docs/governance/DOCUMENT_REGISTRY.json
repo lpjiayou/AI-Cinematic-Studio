@@ -1767,6 +1767,24 @@
       "notes": "Records only the B2/F4 Core closure and optional application candidate-receipt component; it grants no V5 canonical, Provider, GPU, Frontend, admission or publication authority."
     },
     {
+      "path": "docs/status/CORE_RECOVERABLE_PROJECT_FOUNDATION_COMMAND_2026-09-05.md",
+      "repository": "Core",
+      "documentClass": "CURRENT_STATUS",
+      "status": "CURRENT",
+      "owner": "Project Lead / Creator Public Contract Owner / Project Foundation Command Owner",
+      "authoritativeFor": [
+        "evidence-backed bounded Core recoverable Project foundation command state"
+      ],
+      "supersedes": [],
+      "supersededBy": [],
+      "currentStateClaimsAllowed": true,
+      "historicalMutationPolicy": "UPDATE_FROM_MERGED_EVIDENCE_ONLY",
+      "lastReviewedBaseline": "84d5d71b1b01ef17f4e5def080deacd0faea6bd8",
+      "lastReviewedAt": "2026-09-05",
+      "linkedFromIndex": true,
+      "notes": "Records only the Core I4 recovery-command closure and optional application intent/receipt component; Frontend cutover, Provider/GPU, canonical authority, admission and publication remain outside scope."
+    },
+    {
       "path": "docs/status/CROSS_REPOSITORY_BASELINE.md",
       "repository": "Core",
       "documentClass": "CURRENT_STATUS",

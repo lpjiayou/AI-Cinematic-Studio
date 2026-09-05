@@ -81,6 +81,29 @@ class ProjectPublicBoundary:
             lambda: self.__service.create_project(command),
         )
 
+    def _create_project_participant(
+        self,
+        lease: object,
+        command: Mapping[str, Any],
+    ) -> dict[str, Any]:
+        """Create Project inside the coordinator-owned foundation transaction."""
+
+        workspace_ref = (
+            str(command.get("workspaceRef") or "")
+            if isinstance(command, Mapping)
+            else ""
+        )
+        if self.__lifecycle_state is None:
+            raise ProjectPublicError("lifecycle_unavailable", 503)
+        self.__lifecycle_state.validate_lease(
+            lease,
+            workspace_ref=workspace_ref,
+            allowed_operations=frozenset(
+                {LifecycleOperation.CREATE_PROJECT_FOUNDATION}
+            ),
+        )
+        return self._invoke(self.__service.create_project, command)
+
     def get_project(self, workspace_ref: str, project_ref: str) -> dict[str, Any]:
         return self._invoke(self.__service.get_project, workspace_ref, project_ref)
 

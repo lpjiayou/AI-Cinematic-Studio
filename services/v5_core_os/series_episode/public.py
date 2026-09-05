@@ -87,6 +87,29 @@ class SeriesEpisodePublicBoundary:
             workspace_ref, LifecycleOperation.CREATE_SERIES, self.__service.create_series, command
         )
 
+    def _create_series_participant(
+        self,
+        lease: object,
+        command: Mapping[str, Any],
+    ) -> dict[str, Any]:
+        """Create Series inside the coordinator-owned foundation transaction."""
+
+        workspace_ref = (
+            str(command.get("workspaceRef") or "")
+            if isinstance(command, Mapping)
+            else ""
+        )
+        if self.__lifecycle_state is None:
+            raise SeriesEpisodePublicError("lifecycle_unavailable", 503)
+        self.__lifecycle_state.validate_lease(
+            lease,
+            workspace_ref=workspace_ref,
+            allowed_operations=frozenset(
+                {LifecycleOperation.CREATE_PROJECT_FOUNDATION}
+            ),
+        )
+        return self._invoke(self.__service.create_series, command)
+
     def get_series(self, workspace_ref: str, series_ref: str) -> dict[str, Any]:
         return self._invoke(self.__service.get_series, workspace_ref, series_ref)
 
@@ -111,6 +134,29 @@ class SeriesEpisodePublicBoundary:
             workspace_ref,
             lambda: self.__service.create_episode(command),
         )
+
+    def _create_episode_participant(
+        self,
+        lease: object,
+        command: Mapping[str, Any],
+    ) -> dict[str, Any]:
+        """Create Episode inside the coordinator-owned foundation transaction."""
+
+        workspace_ref = (
+            str(command.get("workspaceRef") or "")
+            if isinstance(command, Mapping)
+            else ""
+        )
+        if self.__lifecycle_state is None:
+            raise SeriesEpisodePublicError("lifecycle_unavailable", 503)
+        self.__lifecycle_state.validate_lease(
+            lease,
+            workspace_ref=workspace_ref,
+            allowed_operations=frozenset(
+                {LifecycleOperation.CREATE_PROJECT_FOUNDATION}
+            ),
+        )
+        return self._invoke(self.__service.create_episode, command)
 
     def get_episode(
         self,
