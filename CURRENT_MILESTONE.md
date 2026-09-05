@@ -31,10 +31,7 @@ M13_BASE_TAG_TARGET=a455c8e76427d53d75bb7f15259b9875d9768914
 M13_BASE_TAG_IMMUTABLE=true
 ```
 
-`CORE_BEHAVIOR_MAIN` is the last production change; `CORE_ACCEPTANCE_MAIN` is its
-acceptance-only descendant. This document does not predict its own merge SHA.
-Frontend PR #25 proves compatibility only. See the [cross-repository baseline](docs/status/CROSS_REPOSITORY_BASELINE.md)
-and [capability matrix](docs/status/M1-M19-CAPABILITY-STATUS.md).
+`CORE_BEHAVIOR_MAIN` is the last production change; `CORE_ACCEPTANCE_MAIN` is its acceptance-only descendant. This document does not predict its own merge SHA. Frontend PR #25 proves compatibility only. See the [cross-repository baseline](docs/status/CROSS_REPOSITORY_BASELINE.md) and [capability matrix](docs/status/M1-M19-CAPABILITY-STATUS.md).
 
 ## 2. Upstream method closure
 
@@ -71,13 +68,9 @@ M11_CONTACT_RUNTIME=NOT_INSTALLED
 M11_GAIT_RUNTIME=NOT_INSTALLED
 ```
 
-Evidence is Core PRs #54–#59 (upstream method chain), #63 (public cutover), #64
-(acceptance), and Frontend PR #25 (pin and immutable-history compatibility gate).
+Evidence is Core PRs #54–#59 (upstream method chain), #63 (public cutover), #64 (acceptance), and Frontend PR #25 (pin and immutable-history compatibility gate).
 
-Historical v1 facts remain readable. Contact and Gait are explicitly unavailable
-instead of falling back to Wan. Runtime installation, live production and publication
-are not implied by this closure. Future K2-002 production must create an additive
-method-aware successor; it may not reinterpret or upgrade historic G4/G5 facts.
+Historical v1 facts remain readable. Contact and Gait are explicitly unavailable instead of falling back to Wan. Runtime installation, live production and publication are not implied by this closure. Future K2-002 production must create an additive method-aware successor; it may not reinterpret or upgrade historic G4/G5 facts.
 
 ## 3. M12 and M13 boundary
 
@@ -139,9 +132,7 @@ BRANCH_CONSOLIDATION=PASS
 UNRESOLVED_BRANCHES=0
 ```
 
-The concise [AGENTS.md](AGENTS.md), its immutable archive and the
-[single-call CI waiter](docs/governance/CI_WAITING_RUNBOOK.md) remain authoritative
-within their declared scopes.
+The concise [AGENTS.md](AGENTS.md), its immutable archive and the [single-call CI waiter](docs/governance/CI_WAITING_RUNBOOK.md) remain authoritative within their declared scopes.
 
 ## 5. Explicit prohibitions
 
@@ -167,28 +158,32 @@ SECOND_AUDIO_AUTHORITY_CREATED=false
 K2_HARDCODED_PRODUCTION_BRANCHES=0
 ```
 
-## 6. Next legal task
+## 6. Current Core closure and next legal task
 
 ```text
-NEXT_TASK=ACS-CORE-SERIES-PLANNING-SCOPE-AND-CANDIDATE-BINDING-HARDENING-B
-```
-
-That task is the separately authorized Core PR-B only. M12-C3/C4, A100,
-Frontend, Provider/GPU, admission and publication remain paused or unauthorized.
-
-The compatibility token below remains only because the already-merged docs-only
-validator recognizes the earlier name. It grants no current authority:
-
-```text
+CORE_SERIES_PLANNING_SCOPE_AND_CANDIDATE_BINDING=IMPLEMENTED_AND_VERIFIED
+B2_SERIES_PLANNING_SCOPE_ERROR=CLOSED
+F4_FRONTEND_VECTOR_CLOSED=true
+F4_CORE_CANDIDATE_SOURCE_BINDING=CLOSED
+F4_FULLY_CLOSED=true
+CANDIDATE_PROVENANCE_MODE=APPLICATION_OWNED_DURABLE_CANDIDATE_RECEIPT
+CANDIDATE_RECEIPT_OPTIONAL_SCHEMA_REGISTERED=true
+CANDIDATE_RECEIPT_SCHEMA_EXACT_VALIDATION=PASS
+CURRENT_FRONTEND_BODY_WITHOUT_CANDIDATE_REF=SUPPORTED_SECURELY
+GLOBAL_LIFECYCLE_SCHEMA_VERSION_DIFF=0
+V5_SERIES_PLAN_AUTHORITY_DUPLICATED=false
+DATABASE_SCHEMA_DIFF=ADDITIVE_OPTIONAL_APPLICATION_CANDIDATE_RECEIPT_COMPONENT_ONLY
+NEXT_TASK=ACS-CORE-RECOVERABLE-PROJECT-FOUNDATION-COMMAND-C
 SUPERSEDED_VALIDATOR_M12_G0_3_STATE=ENVIRONMENT_HOLD
 SUPERSEDED_VALIDATOR_NEXT_TASK=LOCAL_WSL2_HANDOFF_AND_M12_C3_PREFLIGHT
 SUPERSEDED_VALIDATOR_TOKEN_GRANTS_AUTHORITY=false
 ```
 
+The [bounded checkpoint receipt](docs/status/CORE_SERIES_PLANNING_SCOPE_AND_CANDIDATE_BINDING_HARDENING_2026-09-05.md) records the exact B2/F4 evidence and non-authority boundary. The next task requires separate authorization; M12-C3/C4, A100, Frontend, Provider/GPU, admission and publication remain paused or unauthorized. The compatibility tokens remain only for the already-merged validator and grant no current authority.
+
 ## 7. Immutable history
 
-The former `## 0A.` through EOF remains byte-for-byte in
-[CURRENT_MILESTONE_HISTORY_THROUGH_2026-09-02.md](CURRENT_MILESTONE_HISTORY_THROUGH_2026-09-02.md).
+The former archived material remains byte-for-byte in [CURRENT_MILESTONE_HISTORY_THROUGH_2026-09-02.md](CURRENT_MILESTONE_HISTORY_THROUGH_2026-09-02.md).
 
 ```text
 HISTORICAL_SECTION_SHA256=5e05b68e83ed55f90b342aee627001a7bbf66cf59f92e5106270175b07f61f6a
@@ -196,5 +191,4 @@ HISTORICAL_DOCUMENT_GRANTS_CURRENT_AUTHORITY=false
 HISTORICAL_PATH_NOT_EXECUTION_AUTHORITY=true
 ```
 
-Historical uses of “current”, “next”, “authorized” or local paths retain only their
-original checkpoint meaning.
+Historical uses of “current”, “next”, “authorized” or local paths retain only their original checkpoint meaning.

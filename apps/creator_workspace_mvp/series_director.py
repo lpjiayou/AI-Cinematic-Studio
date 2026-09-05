@@ -73,14 +73,10 @@ def _integer(
     minimum: int = 1,
     maximum: int = 10_000,
 ) -> int:
-    if isinstance(value, bool):
+    if type(value) is not int:
         _issue(issues, field, "invalid_type")
         return 0
-    try:
-        result = int(value)
-    except (TypeError, ValueError):
-        _issue(issues, field, "invalid_type")
-        return 0
+    result = value
     if result < minimum or result > maximum:
         _issue(issues, field, "out_of_range")
     return result
@@ -256,7 +252,15 @@ def validate_series_plan_candidate(value: Any, context: Mapping[str, Any]) -> di
 
 
 def _candidate_contract(context: Mapping[str, Any]) -> dict[str, Any]:
-    count = int(context["plannedEpisodeCount"])
+    count = context.get("plannedEpisodeCount")
+    if type(count) is not int or count < 1 or count > 500:
+        raise SeriesPlanCandidateError(
+            [
+                SeriesPlanValidationIssue(
+                    "context.plannedEpisodeCount", "invalid_type"
+                )
+            ]
+        )
     shape_example = {
         "schemaVersion": SERIES_PLAN_CANDIDATE_SCHEMA_VERSION,
         "seriesConcept": "系列核心概念",

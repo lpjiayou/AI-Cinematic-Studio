@@ -1,6 +1,6 @@
 # Creator Public HTTP/API v1
 
-Status: `XR1 FROZEN / AUTH-W1 / ADR-0013 CONTROL PLANE / ADR-0019 METHOD-AWARE CUTOVER / STRICT JSON AND NUMERIC INTEGRITY`
+Status: `XR1 FROZEN / AUTH-W1 / ADR-0013 CONTROL PLANE / ADR-0019 METHOD-AWARE CUTOVER / STRICT JSON AND NUMERIC INTEGRITY / M5 SCOPE-BOUND RECEIPTS`
 
 This contract is the only browser-facing Core HTTP surface for the separate Commercial
 Frontend. Existing `/creator/internal/*` endpoints remain compatibility-only and must
@@ -58,6 +58,26 @@ specific confirmation route. The Experience Adapter must preserve
 response. The M1 candidate response also carries the Core-issued opaque
 `sourcePlanRef` and `sourcePlanVersion`; browser code must return those exact values on
 confirmation and must not mint or infer a source-plan reference.
+
+For M5, `POST /creator/api/v1/series-plan-candidates` requires an associated Series.
+A standalone Project without a Series returns `409 / series_scope_required` before
+any Provider call, receipt write or Series Plan write. A successful response includes
+the server-owned opaque `candidateRef`, `candidateDigest`, `sourceContextDigest`,
+`candidateReceiptSchemaVersion=creator.series-plan-candidate-receipt.v1` and
+`candidateReceiptReplay` alongside the unchanged
+`creator.series-plan.candidate.v1` candidate.
+
+`POST /creator/api/v1/series-plans/confirm-candidate` accepts exactly `projectRef`, `seriesRef`,
+`humanConfirmed` and `candidate`, plus an optional `candidateRef`. Authentication
+supplies `workspaceRef`; clients cannot submit receipt scope, version, digest,
+timestamp, raw receipt JSON or Provider facts. With `candidateRef`, Core performs an
+exact authenticated-workspace lookup. Without it, compatibility is limited to one
+exact durable receipt matching workspace, Project, Series, current trusted source
+context and candidate digest. Cross-scope, stale, changed, unknown and unissued
+candidates fail closed. Only the canonical candidate reloaded from the server receipt
+reaches the existing V5 Series Planning confirmation boundary. The receipt is
+application provenance, not a confirmed plan, approval, canonical fact or publication
+authority; raw `creativeInput` is represented only by its SHA-256 digest.
 
 ## ADR-0019 method-aware production planning
 

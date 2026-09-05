@@ -21,6 +21,15 @@ Accepted ADR、获批任务和明确公开契约后才可加入；目录存在�
 | 架构治理 | `architecture/` | 维护当前架构基线与规范契约 | 系统总览、边界、矩阵、规则、规范合同 | 生产运行时实现 | 基线已建立 |
 | 工程治理 | `governance/` | 维护 ADR、协作、评审和变更规则 | ADR、风险、开发、评审、Git 规则 | 产品运行时代码 | 基线已建立 |
 
+M5 candidate receipts follow the same adjacent dependency direction. Creator
+Application owns issuance, compatibility lookup and confirmation orchestration in
+`apps/creator_workspace_mvp/series_plan_candidate_receipts.py`. The exact optional
+SQLite table/index/marker and durable-row validator live in
+`services/v5_core_os/series_planning/candidate_receipt_sqlite.py` so lower-level
+closed-world validation never imports `apps`. This infrastructure is not exported as
+a Series Planning public boundary and owns no SeriesPlan, SeriesPlanVersion,
+confirmation, approval or publication authority.
+
 当前相邻依赖方向保持：
 
 `Creator Application → V5 Core OS → V4 Platform → V3 Render Core → Compute → Foundation`

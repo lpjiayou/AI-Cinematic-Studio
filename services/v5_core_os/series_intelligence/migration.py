@@ -20,6 +20,13 @@ from services.v5_core_os.script_studio.acceptance_sqlite import (
     TABLE as SCRIPT_ACCEPTANCE_TABLE,
     _validate_script_acceptance_connection,
 )
+from services.v5_core_os.series_planning.candidate_receipt_sqlite import (
+    INDEX as CANDIDATE_RECEIPT_INDEX,
+    MARKER_TABLE as CANDIDATE_RECEIPT_MARKER_TABLE,
+    TABLE as CANDIDATE_RECEIPT_TABLE,
+    CandidateReceiptSqliteError,
+    validate_candidate_receipt_connection,
+)
 from services.v5_core_os.canonical_registration.migration import (
     _validate_canonical_registration_connection,
 )
@@ -144,6 +151,21 @@ def _validate_schema_allowlist(
     if registration_present:
         expected_tables |= registration_tables
         expected_indexes.add(CANONICAL_REGISTRATION_INDEX)
+    candidate_receipt_tables = {
+        CANDIDATE_RECEIPT_TABLE,
+        CANDIDATE_RECEIPT_MARKER_TABLE,
+    }
+    candidate_receipt_present = candidate_receipt_tables & tables
+    if (
+        candidate_receipt_present
+        and candidate_receipt_present != candidate_receipt_tables
+    ):
+        raise SeriesIntelligenceMigrationError(
+            "partial candidate receipt schema"
+        )
+    if candidate_receipt_present:
+        expected_tables |= candidate_receipt_tables
+        expected_indexes.add(CANDIDATE_RECEIPT_INDEX)
     if tables != expected_tables:
         raise SeriesIntelligenceMigrationError("undeclared SQLite table")
     forbidden = connection.execute(
@@ -164,6 +186,13 @@ def _validate_schema_allowlist(
         _validate_script_acceptance_connection(connection)
     if registration_present and acceptance_present:
         _validate_canonical_registration_connection(connection)
+    if candidate_receipt_present:
+        try:
+            validate_candidate_receipt_connection(connection)
+        except CandidateReceiptSqliteError as exc:
+            raise SeriesIntelligenceMigrationError(
+                "invalid candidate receipt schema"
+            ) from exc
 
 
 def _validate_lifecycle_v2_connection(

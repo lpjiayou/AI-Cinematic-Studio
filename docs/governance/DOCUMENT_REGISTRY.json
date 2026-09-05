@@ -1749,6 +1749,24 @@
       "notes": "Records only the bounded Core public JSON and numeric integrity closure; it does not authorize Provider, GPU, M12, M13, Frontend, admission or publication work."
     },
     {
+      "path": "docs/status/CORE_SERIES_PLANNING_SCOPE_AND_CANDIDATE_BINDING_HARDENING_2026-09-05.md",
+      "repository": "Core",
+      "documentClass": "CURRENT_STATUS",
+      "status": "CURRENT",
+      "owner": "Project Lead / Creator Public Contract Owner / M5 Domain Owner",
+      "authoritativeFor": [
+        "evidence-backed bounded M5 Series scope and candidate provenance hardening state"
+      ],
+      "supersedes": [],
+      "supersededBy": [],
+      "currentStateClaimsAllowed": true,
+      "historicalMutationPolicy": "UPDATE_FROM_MERGED_EVIDENCE_ONLY",
+      "lastReviewedBaseline": "cc678988ede3f9b02dd9be828ac4b34bd7affe15",
+      "lastReviewedAt": "2026-09-05",
+      "linkedFromIndex": true,
+      "notes": "Records only the B2/F4 Core closure and optional application candidate-receipt component; it grants no V5 canonical, Provider, GPU, Frontend, admission or publication authority."
+    },
+    {
       "path": "docs/status/CROSS_REPOSITORY_BASELINE.md",
       "repository": "Core",
       "documentClass": "CURRENT_STATUS",

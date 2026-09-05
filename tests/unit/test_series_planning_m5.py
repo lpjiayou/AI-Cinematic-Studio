@@ -201,6 +201,32 @@ class SeriesDirectorTests(unittest.TestCase):
         with self.assertRaises(SeriesPlanCandidateError):
             validate_series_plan_candidate(invalid, context)
 
+    def test_candidate_integer_fields_require_exact_int_without_coercion(self):
+        paths = (
+            ("main-arc-number", ("mainArcs", 0, "arcNumber")),
+            ("main-arc-start", ("mainArcs", 0, "episodeStart")),
+            ("main-arc-end", ("mainArcs", 0, "episodeEnd")),
+            ("sub-arc-start", ("subArcs", 0, "episodeStart")),
+            ("sub-arc-end", ("subArcs", 0, "episodeEnd")),
+            ("episode-number", ("episodePlanItems", 0, "episodeNumber")),
+            ("episode-arc-number", ("episodePlanItems", 0, "arcNumber")),
+        )
+        for value in (True, 1.0, 1.9, "1", None):
+            for name, path in paths:
+                with self.subTest(field=name, value=repr(value)):
+                    candidate = valid_candidate()
+                    target = candidate[path[0]][path[1]]
+                    target[path[2]] = value
+                    with self.assertRaises(SeriesPlanCandidateError):
+                        validate_series_plan_candidate(
+                            candidate, {"plannedEpisodeCount": 4}
+                        )
+            with self.subTest(field="plannedEpisodeCount", value=repr(value)):
+                with self.assertRaises(SeriesPlanCandidateError):
+                    validate_series_plan_candidate(
+                        valid_candidate(), {"plannedEpisodeCount": value}
+                    )
+
     def test_series_director_uses_v5_capability_and_repairs_at_most_once(self):
         invalid = valid_candidate()
         invalid["episodePlanItems"] = invalid["episodePlanItems"][:-1]

@@ -20,7 +20,7 @@ only its accepted base backend.
 | M2 | `BASELINE_DEFINED` | `IMPLEMENTED` | `REPOSITORY_VERIFIED` | `CONNECTED_BASELINE` | `IMPLEMENTED_BOUNDED` | `UNVERIFIED` |
 | M3 | `BASELINE_DEFINED_ADR_0019` | `IMPLEMENTED_M6_BOUND_V2` | `SQLITE_RESTART_VERIFIED` | `BEHAVIOR_PIN_COMPATIBLE` | `IMPLEMENTED_BOUNDED` | `UNVERIFIED` |
 | M4 | `BASELINE_DEFINED` | `IMPLEMENTED` | `REPOSITORY_VERIFIED` | `CONNECTED_BASELINE` | `IMPLEMENTED_BOUNDED` | `UNVERIFIED` |
-| M5 | `BASELINE_DEFINED` | `IMPLEMENTED` | `REPOSITORY_VERIFIED` | `CONNECTED_BASELINE` | `IMPLEMENTED_BOUNDED` | `UNVERIFIED` |
+| M5 | `BASELINE_DEFINED` | `IMPLEMENTED_SCOPE_BOUND_RECEIPTS` | `SQLITE_RESTART_VERIFIED` | `CURRENT_BODY_COMPATIBLE` | `IMPLEMENTED_BOUNDED` | `UNVERIFIED` |
 | M6 | `ACCEPTED_ADR_0019_BINDING_INPUT` | `IMPLEMENTED_BOUNDED_CONSUMER_BOUND` | `LOCAL_SQLITE_VERIFIED` | `ACCEPTED_FAIL_CLOSED_BOUNDARY` | `BOUNDED_ACCEPTED` | `NOT_AUTHORIZED` |
 | M7 | `ADR_0019_ACCEPTED` | `IMPLEMENTED_NARRATIVE_CURRENTNESS` | `SQLITE_RESTART_VERIFIED` | `ADAPTER_COMPATIBLE_NO_DEDICATED_SURFACE` | `IMPLEMENTED_BOUNDED` | `NOT_AUTHORIZED` |
 | M8 | `ADR_0019_ACCEPTED` | `IMPLEMENTED_ACTION_EXECUTION_BEATS_V2_PUBLIC_CUTOVER` | `SQLITE_RESTART_VERIFIED` | `LEGACY_HISTORY_GATE_COMPATIBLE_METHOD_AWARE_UI_INCOMPLETE` | `IMPLEMENTED_BOUNDED` | `NOT_AUTHORIZED` |
@@ -97,7 +97,7 @@ database was created.
 | --- | --- | --- | --- | --- |
 | M1–M2 | System Master Plan; ADR-0002 lifecycle | accepted repository baselines | live production unverified | separate production-readiness authority if needed |
 | M3 | ADR-0002, ADR-0019 | #55 and #59 | production not established | upstream prerequisite closed |
-| M4–M5 | System Master Plan | accepted repository baselines | live production unverified | separate production-readiness authority if needed |
+| M4–M5 | System Master Plan | accepted repository baselines; M5 B2/F4 scope and durable candidate-provenance hardening | live production unverified; receipt is not canonical authority | separate production-readiness authority if needed |
 | M6 | ADR-0003/0004/0005/0019 | #55 and #59 | production authority absent | upstream prerequisite closed |
 | M7 | ADR-0019 | #55 and #59 | no automatic rewrite or WARN waiver | upstream prerequisite closed |
 | M8–M9 | ADR-0019 | #56, #58, #63 and #64; Frontend #25 | live asset production/admission not authorized | method-aware successor required |
@@ -171,7 +171,7 @@ M12_C3_PREIMPLEMENTATION_BLOCKER=DEDICATED_CPU_VM_PROVIDER_SELECTION_AND_PREFLIG
 A100_GPU_EXECUTION_AUTHORIZED=false
 A100_START_AUTHORIZED=false
 A100_FUTURE_START_AUTHORIZED=false
-NEXT_TASK=ACS-CORE-SERIES-PLANNING-SCOPE-AND-CANDIDATE-BINDING-HARDENING-B
+NEXT_TASK=ACS-CORE-RECOVERABLE-PROJECT-FOUNDATION-COMMAND-C
 ```
 
 ## 6. Required Frontend projection
