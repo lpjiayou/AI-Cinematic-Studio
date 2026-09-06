@@ -2,7 +2,7 @@
 
 Status: `CURRENT / SIX-DIMENSIONAL / FAIL-CLOSED`
 
-Reviewed: `2026-09-05`
+Reviewed: `2026-09-06`
 
 ## 1. Reading rules
 
@@ -97,7 +97,7 @@ database was created.
 | --- | --- | --- | --- | --- |
 | M1–M2 | System Master Plan; ADR-0002 lifecycle | accepted repository baselines | live production unverified | separate production-readiness authority if needed |
 | M3 | ADR-0002, ADR-0019 | #55 and #59 | production not established | upstream prerequisite closed |
-| M4 | System Master Plan; ADR-0002 lifecycle | recoverable Project foundation command with durable intent, one atomic Lifecycle mutation and restart/concurrency evidence | Frontend still uses legacy multi-POST; receipt is not domain authority | `ACS-CORE-CLEAN-STATE-PUBLIC-API-E2E-D` |
+| M4 | System Master Plan; ADR-0002 lifecycle | recoverable Project foundation command plus clean-state public HTTP, restart, replay, response-loss and isolation evidence | Frontend still uses legacy multi-POST; receipt is not domain authority | separate Frontend cutover authorization |
 | M5 | System Master Plan | B2/F4 scope and durable candidate-provenance hardening | live production unverified; candidate receipt is not canonical authority | separate production-readiness authority if needed |
 | M6 | ADR-0003/0004/0005/0019 | #55 and #59 | production authority absent | upstream prerequisite closed |
 | M7 | ADR-0019 | #55 and #59 | no automatic rewrite or WARN waiver | upstream prerequisite closed |
@@ -107,6 +107,17 @@ database was created.
 | M12 | ADR-0015, ADR-0019, ADR-0020 | #20/#21, #58/#63/#64; A100 evidence `93c1c96d…a1ce`; WSL2 evidence `801e4e8c…7ed`; dedicated VM specification | WSL2 rejected for this wave; dedicated CPU VM/provider unselected; A100 C4 isolation unproven; Runtime G0 incomplete | `ACS-M12-C3-DEDICATED-LINUX-CPU-VM-PROVIDER-SELECTION-AND-PREFLIGHT` |
 | M13 | ADR-0016/0017/0018/0019 | immutable base tag, #48/#63/#64; Frontend #25 | product surface, M14/M15 and publication incomplete | Extension G0 requires separate authorization |
 | M14–M19 | System Master Plan and applicable M13 boundary | no authorized implementation | prerequisite and authority gates absent | no current implementation authority |
+
+```text
+CORE_CLEAN_STATE_PUBLIC_API_E2E=PASS
+I6_CORE_PUBLIC_API_VECTOR_CLOSED=true
+I6_BROWSER_VECTOR_CLOSED=false
+I6_FULLY_CLOSED=false
+PRE_M6_SCRIPT_PUBLIC_FLOW=PASS
+M6_BOUND_SCRIPT_FAIL_CLOSED=PASS
+M7_READY=false
+M8_READY=false
+```
 
 ## 5. Required M12 projection
 
@@ -172,7 +183,7 @@ M12_C3_PREIMPLEMENTATION_BLOCKER=DEDICATED_CPU_VM_PROVIDER_SELECTION_AND_PREFLIG
 A100_GPU_EXECUTION_AUTHORIZED=false
 A100_START_AUTHORIZED=false
 A100_FUTURE_START_AUTHORIZED=false
-NEXT_TASK=ACS-CORE-CLEAN-STATE-PUBLIC-API-E2E-D
+NEXT_TASK=ACS-M10-M11-CORE-COMFYUI-PROTOCOL-SPIKE-0-READINESS-AND-AUTHORIZATION-CHECKPOINT
 ```
 
 ## 6. Required Frontend projection

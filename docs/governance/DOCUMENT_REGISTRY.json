@@ -1731,6 +1731,24 @@
       "notes": "Navigation/reference only; resolve authority through the linked source documents."
     },
     {
+      "path": "docs/status/CORE_CLEAN_STATE_PUBLIC_API_E2E_2026-09-06.md",
+      "repository": "Core",
+      "documentClass": "CURRENT_STATUS",
+      "status": "CURRENT",
+      "owner": "Project Lead / Creator Public HTTP Acceptance Owner / Clean-State E2E Owner",
+      "authoritativeFor": [
+        "evidence-backed clean-state Creator public HTTP acceptance state"
+      ],
+      "supersedes": [],
+      "supersededBy": [],
+      "currentStateClaimsAllowed": true,
+      "historicalMutationPolicy": "UPDATE_FROM_MERGED_EVIDENCE_ONLY",
+      "lastReviewedBaseline": "40540e95be170f4f74fb3d5d7266226e2da2bd86",
+      "lastReviewedAt": "2026-09-06",
+      "linkedFromIndex": true,
+      "notes": "Records only public-only clean-state M1-M5 plus pre-M6 Script acceptance; browser, Frontend cutover, M6 activation, Provider/GPU, M7/M8 readiness, admission and publication remain outside scope."
+    },
+    {
       "path": "docs/status/CORE_PUBLIC_JSON_AND_NUMERIC_INTEGRITY_HARDENING_2026-09-05.md",
       "repository": "Core",
       "documentClass": "CURRENT_STATUS",
