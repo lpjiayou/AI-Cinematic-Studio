@@ -131,10 +131,11 @@ class V4MediaJobFaultRecoveryTests(unittest.TestCase):
             self.assertEqual(leased["jobRef"], created["jobRef"])
             artifacts.rmdir()
 
-            with self.assertRaises(MediaJobError) as raised:
-                coordinator.run_leased(leased, "worker-root-gone")
-
-            self.assertIn("artifact root became unavailable", str(raised.exception))
+            failed = coordinator.run_leased(leased, "worker-root-gone")
+            self.assertEqual(failed["state"], "FAILED")
+            self.assertEqual(failed["attempts"][-1]["failureClass"],
+                             "PRE_EXECUTION_VALIDATION_FAILED")
+            self.assertIsNone(failed["lease"])
 
     def _crash_after_publish(self, directory, *, max_attempts=1):
         database = Path(directory) / "jobs.sqlite3"

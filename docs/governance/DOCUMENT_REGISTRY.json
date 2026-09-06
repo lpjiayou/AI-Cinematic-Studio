@@ -3216,6 +3216,24 @@
       "lastReviewedAt": "2026-09-02",
       "linkedFromIndex": true,
       "notes": "Navigation/reference only; resolve authority through the linked source documents."
+    },
+    {
+      "path": "docs/status/M10_M11_METHOD_AWARE_WORKER_SEAM_CORRECTIVE_E1_2026-09-06.md",
+      "repository": "Core",
+      "documentClass": "CURRENT_STATUS",
+      "status": "CURRENT",
+      "owner": "Project Lead / V4 Media Job Owner / M10-M11 Method-Aware Owner",
+      "authoritativeFor": [
+        "evidence-backed bounded method-aware V4 worker seam status"
+      ],
+      "supersedes": [],
+      "supersededBy": [],
+      "currentStateClaimsAllowed": true,
+      "historicalMutationPolicy": "UPDATE_FROM_MERGED_EVIDENCE_ONLY",
+      "lastReviewedBaseline": "35d48ab2a00e8c0580b798b0d4fea8890cda24f8",
+      "lastReviewedAt": "2026-09-06",
+      "linkedFromIndex": true,
+      "notes": "E1 technical worker/adapter evidence only; result intake, live Spike, GPU, Frontend and admission remain outside scope."
     }
   ]
 }

@@ -27,7 +27,7 @@ and historical evidence cannot authorize current execution.
 | `ACCEPTED_DECISION` | 20 | no |
 | `NORMATIVE_ARCHITECTURE` | 14 | no |
 | `NORMATIVE_CONTRACT` | 31 | no |
-| `CURRENT_STATUS` | 7 | yes |
+| `CURRENT_STATUS` | 8 | yes |
 | `CAPABILITY_MATRIX` | 1 | yes |
 | `OPERATIONAL_RUNBOOK` | 18 | no |
 | `IMPLEMENTATION_EVIDENCE` | 21 | no |
@@ -129,6 +129,8 @@ and historical evidence cannot authorize current execution.
 | [`docs/status/CORE_SERIES_PLANNING_SCOPE_AND_CANDIDATE_BINDING_HARDENING_2026-09-05.md`](../status/CORE_SERIES_PLANNING_SCOPE_AND_CANDIDATE_BINDING_HARDENING_2026-09-05.md) | `CURRENT` | Project Lead / Creator Public Contract Owner / M5 Domain Owner |
 | [`docs/status/CROSS_REPOSITORY_BASELINE.md`](../status/CROSS_REPOSITORY_BASELINE.md) | `CURRENT` | Documentation Governance Owner |
 | [`docs/status/M12_A100_BUILD_HOST_REFLIGHT_2026-09-03.md`](../status/M12_A100_BUILD_HOST_REFLIGHT_2026-09-03.md) | `CURRENT` | Project Lead / Infrastructure Owner / Architecture Owner / M12 Domain Owner |
+
+| [`docs/status/M10_M11_METHOD_AWARE_WORKER_SEAM_CORRECTIVE_E1_2026-09-06.md`](../status/M10_M11_METHOD_AWARE_WORKER_SEAM_CORRECTIVE_E1_2026-09-06.md) | `CURRENT` | Project Lead / V4 Media Job Owner / M10-M11 Method-Aware Owner |
 
 ## CAPABILITY_MATRIX
 

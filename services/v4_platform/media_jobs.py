@@ -20,8 +20,20 @@ from typing import Any, Callable, Mapping, Protocol
 from .artifact_recovery import ArtifactRecoveryStore, ArtifactRecoveryStoreError
 
 
+from .backend_registry import (
+    BackendValidationError, UnavailableBackendResolver, attempt_binding,
+    canonical as backend_canonical, execution_classification, ref as backend_ref,
+    validate_attempt_binding, validate_decision,
+)
+from .method_aware_execution import (
+    METHOD_AWARE_JOB_SCHEMA_VERSION, MethodAwareExecutionEnvelopeBuilder,
+    output_probe_request, validate_context, validate_envelope, validate_execution_result,
+)
+
 LEGACY_JOB_SCHEMA_VERSION = "v4.media-job.v1"
 JOB_SCHEMA_VERSION = "v4.media-job.v2"
+
+FENCED_JOB_SCHEMAS = {JOB_SCHEMA_VERSION, METHOD_AWARE_JOB_SCHEMA_VERSION}
 ARTIFACT_SCHEMA_VERSION = "v4.media-artifact-handoff.v1"
 ARTIFACT_COMMIT_INTENT_SCHEMA_VERSION = "v4.media-artifact-commit-intent.v1"
 MEDIA_BATCH_SCHEMA_VERSION = "v4.media-batch.v1"
@@ -424,14 +436,19 @@ def _validate_method_aware_video_request(request: Mapping[str, Any]) -> None:
         or _digest({k: v for k, v in request.items() if k != "payloadDigest"})
         != request.get("payloadDigest")
         or request.get("version") != 1
-        or isinstance(request.get("version"), bool)
+        or type(request.get("version")) is not int
         or request.get("executionClass") != "MICRO_MOTION"
         or request.get("executionMethod") != "SINGLE_ANCHOR_I2V"
-        or request.get("adapterCapability") != M11_VIDEO_CAPABILITY
-        or request.get("executionMode") != "INTERNAL_SELF_HOSTED"
+        or not isinstance(request.get("adapterCapability"), str)
+        or not request.get("adapterCapability")
+        or request.get("executionMode") not in {
+            "INTERNAL_SELF_HOSTED", "EXTERNAL_PROVIDER_API", "CPU_DETERMINISTIC"
+        }
         or request.get("executionAuthorizationState")
         != "QUEUED_NOT_EXECUTED"
-        or request.get("requestedProvenance") != M11_VIDEO_PROVENANCE
+        or request.get("requestedProvenance") not in {
+            M11_VIDEO_PROVENANCE, "LIVE_PROVIDER", "LOCAL_EVIDENCE"
+        }
         or request.get("selectionRequired") is not True
         or request.get("publicationAllowed") is not False
         or request.get("sourceImageMediaType") not in {"image/png", "image/jpeg"}
@@ -842,7 +859,7 @@ def _validate_job_state_shape(job: Mapping[str, Any]) -> None:
 
     if state in {"LEASED", "RUNNING"}:
         expected_lease_fields = {"workerRef", "leasedAt", "expiresAt"}
-        if job["schemaVersion"] == JOB_SCHEMA_VERSION:
+        if job["schemaVersion"] in FENCED_JOB_SCHEMAS:
             expected_lease_fields.add("leaseToken")
         if (
             not isinstance(lease, Mapping)
@@ -903,7 +920,7 @@ def _validate_job_state_shape(job: Mapping[str, Any]) -> None:
 def _validate_job(job: Mapping[str, Any]) -> None:
     if (
         job.get("schemaVersion")
-        not in {LEGACY_JOB_SCHEMA_VERSION, JOB_SCHEMA_VERSION}
+        not in {LEGACY_JOB_SCHEMA_VERSION, *FENCED_JOB_SCHEMAS}
         or job.get("state")
         not in {
             "QUEUED", "LEASED", "RUNNING", "SUCCEEDED", "FAILED",
@@ -952,11 +969,43 @@ def _validate_job(job: Mapping[str, Any]) -> None:
         raise MediaJobError("media job attempt identity is invalid")
     intent = job.get("artifactCommitIntent")
     if intent is not None:
-        if job.get("schemaVersion") != JOB_SCHEMA_VERSION:
+        if job.get("schemaVersion") not in FENCED_JOB_SCHEMAS:
             raise MediaJobError(
                 "legacy media job cannot contain an artifact commit intent"
             )
         _validate_artifact_commit_intent(intent, job)
+    if job["schemaVersion"] == METHOD_AWARE_JOB_SCHEMA_VERSION:
+        try:
+            backend_canonical(job)
+            if request["schemaVersion"] != METHOD_AWARE_VIDEO_REQUEST_SCHEMA_VERSION or job["maxAttempts"] != 1:
+                raise BackendValidationError("method-aware job policy is invalid")
+            decision = validate_decision(job.get("backendBinding"))
+            validate_context(request, job.get("executionContext"))
+            mode, provenance = execution_classification(decision)
+            if (request["adapterCapability"] != decision["adapterCapability"]
+                    or request["executionMode"] != mode or request["requestedProvenance"] != provenance):
+                raise BackendValidationError("job/backend binding mismatch")
+            envelope = job.get("executionEnvelope")
+            if envelope is not None:
+                validate_envelope(envelope, request)
+                if (envelope["backendBinding"] != decision
+                        or envelope["outputConstraints"] != job["executionContext"]["outputConstraints"]):
+                    raise BackendValidationError("job/envelope binding mismatch")
+            if job["state"] in {"RUNNING", "SUCCEEDED"} and envelope is None:
+                raise BackendValidationError("running job has no execution envelope")
+            for attempt in job["attempts"]:
+                validate_attempt_binding(attempt.get("backendBinding"), decision)
+                if (attempt["workerRef"] != attempt["backendBinding"]["workerRef"]
+                        or attempt["adapterIdentity"] != decision["adapterIdentity"]):
+                    raise BackendValidationError("attempt identity mismatch")
+                if attempt["state"] == "FAILED" and attempt.get("nonRetryable") is not True:
+                    raise BackendValidationError("method-aware failure must be non-retryable")
+                if "providerExecution" in attempt:
+                    validate_execution_result(attempt["providerExecution"], envelope)
+            if job.get("artifact") is not None:
+                validate_execution_result(job["artifact"].get("providerExecution"), envelope)
+        except (BackendValidationError, KeyError, TypeError) as exc:
+            raise MediaJobError("invalid method-aware job binding") from exc
     _validate_job_state_shape(job)
 
 
@@ -1037,6 +1086,8 @@ _IMMUTABLE_JOB_FIELDS = (
     "executionScope",
     "batchProductionAllowed",
     "createdAt",
+    "backendBinding",
+    "executionContext",
 )
 
 
@@ -1053,6 +1104,7 @@ def _validate_job_update(
             (LEGACY_JOB_SCHEMA_VERSION, LEGACY_JOB_SCHEMA_VERSION),
             (LEGACY_JOB_SCHEMA_VERSION, JOB_SCHEMA_VERSION),
             (JOB_SCHEMA_VERSION, JOB_SCHEMA_VERSION),
+            (METHOD_AWARE_JOB_SCHEMA_VERSION, METHOD_AWARE_JOB_SCHEMA_VERSION),
         }
         or any(
             current.get(field) != value.get(field)
@@ -1065,6 +1117,16 @@ def _validate_job_update(
         not in {("QUEUED", "LEASED"), ("LEASED", "RUNNING")}
     ):
         raise MediaJobStateError("legacy media job upgrade is not at an attempt fence")
+    if current.get("executionEnvelope") != value.get("executionEnvelope") and not (
+        current.get("executionEnvelope") is None
+        and current["state"] == "LEASED" and value["state"] == "RUNNING"
+    ):
+        raise MediaJobStateError("execution envelope is immutable after validation")
+    if current["schemaVersion"] == METHOD_AWARE_JOB_SCHEMA_VERSION and (
+        value["state"] == "RETRYING" or
+        (value["state"] in {"QUEUED", "LEASED"} and current["attempts"])
+    ):
+        raise MediaJobStateError("method-aware retry is forbidden")
     if value.get("revision") != current.get("revision"):
         raise MediaJobStateError("media job revision changed inside payload")
 
@@ -1090,9 +1152,12 @@ def _validate_job_update(
     if len(next_attempts) == len(current_attempts) + 1:
         if (
             current["state"] != "LEASED"
-            or value["state"] != "RUNNING"
             or next_attempts[:-1] != current_attempts
-            or next_attempts[-1].get("state") != "RUNNING"
+            or not (
+                value["state"] == "RUNNING" and next_attempts[-1].get("state") == "RUNNING"
+                or value["state"] == "FAILED" and next_attempts[-1].get("state") == "FAILED"
+                and next_attempts[-1].get("failureClass") == "PRE_EXECUTION_VALIDATION_FAILED"
+            )
         ):
             raise MediaJobStateError("invalid media job attempt append")
     elif current_attempts:
@@ -1180,8 +1245,8 @@ def _validate_job_update(
             >= _parse_time(current_lease["expiresAt"])
         )
         heartbeat_renewal = (
-            current["schemaVersion"] == JOB_SCHEMA_VERSION
-            and value["schemaVersion"] == JOB_SCHEMA_VERSION
+            current["schemaVersion"] in FENCED_JOB_SCHEMAS
+            and value["schemaVersion"] in FENCED_JOB_SCHEMAS
             and current["state"] == "RUNNING"
             and value["state"] == "RUNNING"
             and isinstance(current_lease, Mapping)
@@ -1225,7 +1290,8 @@ class InMemoryMediaJobAdapter:
             existing_ref = self._idem.get(idem)
             if existing_ref is not None:
                 existing = self._jobs[(idem[0], idem[1], existing_ref)]
-                if existing["requestDigest"] != value["requestDigest"]:
+                if (existing["requestDigest"] != value["requestDigest"] or any(
+                    existing.get(key) != value.get(key) for key in ("backendBinding", "executionContext"))):
                     raise MediaJobConflictError("media dispatch idempotency conflict")
                 return deepcopy(existing), True
             if key in self._jobs:
@@ -1555,7 +1621,8 @@ class SqliteMediaJobAdapter:
             ).fetchone()
             if existing is not None:
                 restored = self._decode(existing)
-                if restored["requestDigest"] != value["requestDigest"]:
+                if (restored["requestDigest"] != value["requestDigest"] or any(
+                    restored.get(key) != value.get(key) for key in ("backendBinding", "executionContext"))):
                     raise MediaJobConflictError("media dispatch idempotency conflict")
                 connection.rollback()
                 return deepcopy(restored), True
@@ -1828,6 +1895,9 @@ class MediaJobCoordinator:
         lease_seconds: int = 30,
         heartbeat_interval_seconds: float | None = None,
         max_attempts: int = 3,
+        backend_resolver: Any = None,
+        source_images: Any = None,
+        envelope_builder: Any = None,
     ) -> None:
         if (
             isinstance(lease_seconds, bool)
@@ -1850,6 +1920,9 @@ class MediaJobCoordinator:
             raise MediaJobError("media worker recovery limits are invalid")
         self.repository = repository
         self.adapter = adapter
+        self.backend_resolver = backend_resolver or UnavailableBackendResolver()
+        self.source_images = source_images
+        self.envelope_builder = envelope_builder or MethodAwareExecutionEnvelopeBuilder()
         try:
             self._artifact_recovery = ArtifactRecoveryStore(artifact_root)
         except ArtifactRecoveryStoreError as exc:
@@ -2027,7 +2100,8 @@ class MediaJobCoordinator:
         *,
         create: bool = True,
     ) -> tuple[Path, Path]:
-        extension = ".mp4" if job["request"]["mediaKind"] == "video" else ".wav"
+        probe_request = self._probe_request(job)
+        extension = ".mp4" if probe_request["mediaKind"] == "video" else ".wav"
         matching = [
             attempt
             for attempt in job["attempts"]
@@ -2191,10 +2265,16 @@ class MediaJobCoordinator:
             or content_size != artifact.get("byteSize")
         ):
             raise ArtifactVerificationError("artifact commit bytes changed")
-        probe = verify_media_against_request(final_path, job["request"])
+        probe = verify_media_against_request(final_path, self._probe_request(job))
         if probe != artifact.get("probe"):
             raise ArtifactVerificationError("artifact commit probe changed")
-        self._validate_recovery_execution(artifact, job["request"])
+        if job["schemaVersion"] == METHOD_AWARE_JOB_SCHEMA_VERSION:
+            try:
+                validate_execution_result(artifact.get("providerExecution"), job["executionEnvelope"])
+            except BackendValidationError as exc:
+                raise ArtifactVerificationError("artifact execution binding changed") from exc
+        else:
+            self._validate_recovery_execution(artifact, job["request"])
         return artifact
 
     def _quarantine_intent_artifacts(
@@ -2328,6 +2408,8 @@ class MediaJobCoordinator:
                         "state": "FAILED",
                         "finishedAt": self._clock(),
                         "errorCode": "artifact_recovery_mismatch",
+                        **({"failureClass": "ARTIFACT_RECOVERY_MISMATCH", "nonRetryable": True}
+                           if job["schemaVersion"] == METHOD_AWARE_JOB_SCHEMA_VERSION else {}),
                         "artifactCommitIntentDigest": intent["intentDigest"],
                         "quarantineStorageKeys": [],
                     }
@@ -2389,7 +2471,9 @@ class MediaJobCoordinator:
             return current
 
     def dispatch(
-        self, request: Mapping[str, Any], *, idempotency_key: str
+        self, request: Mapping[str, Any], *, idempotency_key: str,
+        backend_binding: Mapping[str, Any] | None = None,
+        execution_context: Mapping[str, Any] | None = None,
     ) -> tuple[dict[str, Any], bool]:
         _validate_request(request)
         if not isinstance(idempotency_key, str) or not idempotency_key:
@@ -2415,12 +2499,77 @@ class MediaJobCoordinator:
             "createdAt": now,
             "updatedAt": now,
         }
+        if request.get("schemaVersion") == METHOD_AWARE_VIDEO_REQUEST_SCHEMA_VERSION:
+            try:
+                decision = validate_decision(backend_binding)
+                self.backend_resolver.profile(decision)
+                validate_context(request, execution_context)
+                if self.adapter.adapter_identity != decision["adapterIdentity"]:
+                    raise BackendValidationError("worker adapter is incompatible")
+            except (BackendValidationError, AttributeError) as exc:
+                raise MediaJobError("method-aware backend is unavailable") from exc
+            job.update(schemaVersion=METHOD_AWARE_JOB_SCHEMA_VERSION, maxAttempts=1,
+                       backendBinding=decision, executionContext=deepcopy(execution_context),
+                       executionEnvelope=None)
         return self.repository.create(job)
 
-    def recover_expired(self, workspace_ref: str, run_ref: str) -> list[dict[str, Any]]:
+    @staticmethod
+    def _probe_request(job):
+        if job["schemaVersion"] == METHOD_AWARE_JOB_SCHEMA_VERSION:
+            return output_probe_request(job["executionEnvelope"])
+        return job["request"]
+
+    def _validate_method_backend(self, job):
+        decision = validate_decision(job["backendBinding"])
+        profile = self.backend_resolver.profile(decision)
+        if (self.adapter.adapter_identity != decision["adapterIdentity"]
+                or self.adapter.provenance != execution_classification(decision)[1]):
+            raise BackendValidationError("worker/backend identity mismatch")
+        return profile
+
+    def lease_job(self, workspace_ref: str, run_ref: str, job_ref: str,
+                  worker_ref: str) -> dict[str, Any]:
+        backend_ref(worker_ref, "workerRef")
+        job = self.repository.get(workspace_ref, run_ref, job_ref)
+        if job is None:
+            raise MediaJobStateError("exact media job was not found")
+        if job["schemaVersion"] != METHOD_AWARE_JOB_SCHEMA_VERSION:
+            raise MediaJobStateError("exact worker requires a bound method-aware job")
+        self._validate_method_backend(job)
+        if job["state"] != "QUEUED" or job["attempts"]:
+            raise MediaJobStateError("exact media job is not claimable")
+        now = _parse_time(self._clock())
+        job.update(state="LEASED", lease={"workerRef": worker_ref,
+            "leaseToken": self._ref_factory("media-job-lease"), "leasedAt": _format_time(now),
+            "expiresAt": _format_time(now + timedelta(seconds=self.lease_seconds))},
+            updatedAt=self._clock())
+        return self.repository.save(job, job["revision"])
+
+    def run_one(self, workspace_ref: str, run_ref: str, job_ref: str,
+                worker_ref: str) -> dict[str, Any]:
+        backend_ref(worker_ref, "workerRef")
+        job = self.repository.get(workspace_ref, run_ref, job_ref)
+        if job is None or job["schemaVersion"] != METHOD_AWARE_JOB_SCHEMA_VERSION:
+            raise MediaJobStateError("exact bound method-aware job was not found")
+        self._validate_method_backend(job)
+        self.recover_expired(workspace_ref, run_ref, job_ref=job_ref)
+        job = self.repository.get(workspace_ref, run_ref, job_ref)
+        if job["state"] in {"SUCCEEDED", "FAILED", "CANCELLED"}:
+            return job
+        if job["state"] != "QUEUED":
+            raise MediaJobStateError("exact media job is already leased")
+        return self.run_leased(self.lease_job(workspace_ref, run_ref, job_ref, worker_ref), worker_ref)
+
+    def recover_expired(self, workspace_ref: str, run_ref: str, *,
+                        job_ref: str | None = None) -> list[dict[str, Any]]:
         recovered = []
         now = _parse_time(self._clock())
-        for job in self.repository.list(workspace_ref, run_ref):
+        jobs = ([self.repository.get(workspace_ref, run_ref, job_ref)] if job_ref is not None
+                else [j for j in self.repository.list(workspace_ref, run_ref)
+                      if j["schemaVersion"] != METHOD_AWARE_JOB_SCHEMA_VERSION])
+        for job in jobs:
+            if job is None:
+                continue
             pending_cleanup = job.get("artifactCommitIntent")
             if job["state"] in {"FAILED", "CANCELLED"} and isinstance(
                 pending_cleanup, Mapping
@@ -2477,7 +2626,9 @@ class MediaJobCoordinator:
                 recovered.append(self._recover_commit_intent(job))
                 continue
             expected = job["revision"]
-            error_code = "lease_expired"
+            error_code = ("REMOTE_SUBMISSION_INDETERMINATE"
+                          if job["schemaVersion"] == METHOD_AWARE_JOB_SCHEMA_VERSION
+                          else "lease_expired")
             synthetic_intent: dict[str, str] | None = None
             if job["attempts"] and job["attempts"][-1].get("state") == "RUNNING":
                 attempt_number = job["attempts"][-1].get("attemptNumber")
@@ -2502,6 +2653,8 @@ class MediaJobCoordinator:
                     {
                         "state": "FAILED",
                         "errorCode": error_code,
+                        **({"failureClass": error_code, "nonRetryable": True}
+                           if job["schemaVersion"] == METHOD_AWARE_JOB_SCHEMA_VERSION else {}),
                         "finishedAt": self._clock(),
                         "quarantineStorageKeys": [],
                     }
@@ -2536,7 +2689,7 @@ class MediaJobCoordinator:
     ) -> dict[str, Any] | None:
         self.recover_expired(workspace_ref, run_ref)
         for job in self.repository.list(workspace_ref, run_ref):
-            if job["state"] != "QUEUED":
+            if job["state"] != "QUEUED" or job["schemaVersion"] == METHOD_AWARE_JOB_SCHEMA_VERSION:
                 continue
             if len(job["attempts"]) >= job["maxAttempts"]:
                 expected = job["revision"]
@@ -2646,10 +2799,6 @@ class MediaJobCoordinator:
         if len(current["attempts"]) >= current["maxAttempts"]:
             raise MediaJobStateError("media job attempt limit reached")
         request = current["request"]
-        if self.adapter.provenance != request["requestedProvenance"]:
-            raise MediaJobStateError(
-                "worker adapter provenance does not match the generation request"
-            )
         expected = current["revision"]
         attempt_number = len(current["attempts"]) + 1
         attempt = {
@@ -2660,7 +2809,41 @@ class MediaJobCoordinator:
             "state": "RUNNING",
             "startedAt": self._clock(),
         }
-        current["attempts"].append(attempt)
+        bound_method = current["schemaVersion"] == METHOD_AWARE_JOB_SCHEMA_VERSION
+        if bound_method:
+            attempt["backendBinding"] = attempt_binding(current["backendBinding"], worker_ref)
+            attempt["adapterIdentity"] = current["backendBinding"]["adapterIdentity"]
+        prepared = deepcopy(current)
+        try:
+            if self.adapter.provenance != request["requestedProvenance"]:
+                raise BackendValidationError("worker provenance mismatch")
+            if bound_method:
+                profile = self._validate_method_backend(current)
+                if self.source_images is None:
+                    raise BackendValidationError("source image probe is unavailable")
+                source = self.source_images.resolve(request)
+                envelope = self.envelope_builder.build(request, source,
+                    current["backendBinding"], profile, current["executionContext"])
+                validate_envelope(envelope, request)
+                if (envelope["sourceAsset"] != source or envelope["backendBinding"] != current["backendBinding"]
+                        or envelope["outputConstraints"] != current["executionContext"]["outputConstraints"]):
+                    raise BackendValidationError("execution bridge changed trusted context")
+                self.adapter.validate_method_aware_envelope(envelope)
+                prepared["executionEnvelope"] = envelope
+            elif request.get("schemaVersion") == METHOD_AWARE_VIDEO_REQUEST_SCHEMA_VERSION:
+                raise BackendValidationError("legacy request lacks an execution binding")
+            prepared["attempts"].append(attempt)
+            candidate_path, final_path = self._attempt_paths(prepared, attempt_number)
+            self._artifact_recovery.require_absent(candidate_path)
+            self._artifact_recovery.require_absent(final_path)
+        except Exception:
+            attempt.update(state="FAILED", failureClass="PRE_EXECUTION_VALIDATION_FAILED",
+                           errorCode="PRE_EXECUTION_VALIDATION_FAILED", nonRetryable=True,
+                           finishedAt=self._clock())
+            current["attempts"].append(attempt)
+            current.update(state="FAILED", lease=None, updatedAt=self._clock())
+            return self.repository.save(current, expected)
+        current = prepared
         if current["schemaVersion"] == LEGACY_JOB_SCHEMA_VERSION:
             current["lease"] = {
                 **dict(current["lease"]),
@@ -2668,7 +2851,7 @@ class MediaJobCoordinator:
             }
         current.update(
             {
-                "schemaVersion": JOB_SCHEMA_VERSION,
+                "schemaVersion": METHOD_AWARE_JOB_SCHEMA_VERSION if bound_method else JOB_SCHEMA_VERSION,
                 "state": "RUNNING",
                 "artifactCommitIntent": None,
                 "updatedAt": self._clock(),
@@ -2681,7 +2864,6 @@ class MediaJobCoordinator:
         ):
             raise MediaJobStateError("worker lease token is missing")
         attempt_lease_token = lease["leaseToken"]
-        candidate_path, final_path = self._attempt_paths(current, attempt_number)
         intent_persisted = False
         heartbeat: tuple[Event, Thread, list[BaseException]] | None = None
         heartbeat_job: dict[str, Any] | None = None
@@ -2695,11 +2877,14 @@ class MediaJobCoordinator:
                 self._artifact_recovery.require_absent(final_path)
             except ArtifactRecoveryStoreError as exc:
                 raise ArtifactVerificationError(str(exc)) from exc
-            produced = self.adapter.generate(request, candidate_path)
+            produced = self.adapter.generate(
+                current["executionEnvelope"] if bound_method else request, candidate_path)
             execution: dict[str, Any] | None = None
             if isinstance(produced, MediaAdapterResult):
                 produced_value = produced.path
-                if request["requestedProvenance"] == "LIVE_PROVIDER":
+                if bound_method:
+                    execution = validate_execution_result(produced.execution, current["executionEnvelope"])
+                elif request["requestedProvenance"] == "LIVE_PROVIDER":
                     execution = _validate_live_execution(
                         produced.execution, request
                     )
@@ -2713,7 +2898,7 @@ class MediaJobCoordinator:
                     )
             else:
                 produced_value = produced
-                if request["requestedProvenance"] != "LOCAL_EVIDENCE":
+                if bound_method or request["requestedProvenance"] != "LOCAL_EVIDENCE":
                     raise ArtifactVerificationError(
                         "live provider request omitted execution evidence"
                     )
@@ -2732,7 +2917,8 @@ class MediaJobCoordinator:
                 raise ArtifactVerificationError(str(exc)) from exc
             if produced_path != candidate_path:
                 raise ArtifactVerificationError("adapter returned an unexpected artifact")
-            probe = verify_media_against_request(produced_path, request)
+            probe_request = self._probe_request(current)
+            probe = verify_media_against_request(produced_path, probe_request)
             content_digest, content_size = _file_digest_and_size(produced_path)
             provenance = request["requestedProvenance"]
             try:
@@ -2748,8 +2934,8 @@ class MediaJobCoordinator:
                 "generationRequestRef": request["generationRequestRef"],
                 "generationRequestVersionRef": request["generationRequestVersionRef"],
                 "generationRequestDigest": request["payloadDigest"],
-                "mediaKind": request["mediaKind"],
-                "mediaType": request["mediaType"],
+                "mediaKind": probe_request["mediaKind"],
+                "mediaType": probe_request["mediaType"],
                 "internalPath": str(final_path),
                 "storageKey": final_storage_key,
                 "byteSize": content_size,
@@ -2761,7 +2947,7 @@ class MediaJobCoordinator:
                     execution["executionDevice"] if execution is not None
                     else "CPU_FFMPEG"
                 ),
-                "gpuUsed": execution is not None,
+                "gpuUsed": execution["gpuUsed"] if bound_method else execution is not None,
                 "publicationAllowed": False,
                 "createdAt": self._clock(),
             }
@@ -2885,6 +3071,7 @@ class MediaJobCoordinator:
                 {
                     "state": "FAILED", "finishedAt": self._clock(),
                     "errorCode": error_code,
+                    **({"failureClass": error_code, "nonRetryable": True} if bound_method else {}),
                     "quarantineStorageKeys": [],
                 }
             )

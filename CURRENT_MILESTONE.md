@@ -2,8 +2,7 @@
 
 Status: `CURRENT / EVIDENCE-BACKED / FAIL-CLOSED`
 
-Last reviewed: `2026-09-05`
-
+Last reviewed: `2026-09-06`
 ## 1. Closed K2 cutover baselines
 
 The production behavior, acceptance evidence and compatible Frontend pin are:
@@ -31,8 +30,7 @@ M13_BASE_TAG_TARGET=a455c8e76427d53d75bb7f15259b9875d9768914
 M13_BASE_TAG_IMMUTABLE=true
 ```
 
-`CORE_BEHAVIOR_MAIN` is the last production change; `CORE_ACCEPTANCE_MAIN` is its acceptance-only descendant. This document does not predict its own merge SHA. Frontend PR #25 proves compatibility only. See the [cross-repository baseline](docs/status/CROSS_REPOSITORY_BASELINE.md) and [capability matrix](docs/status/M1-M19-CAPABILITY-STATUS.md).
-
+`CORE_BEHAVIOR_MAIN` is the last production change in this K2 cutover baseline; `CORE_ACCEPTANCE_MAIN` is its acceptance-only descendant. This document does not predict its own merge SHA. Frontend PR #25 proves compatibility only. See the [cross-repository baseline](docs/status/CROSS_REPOSITORY_BASELINE.md) and [capability matrix](docs/status/M1-M19-CAPABILITY-STATUS.md).
 ## 2. Upstream method closure
 
 ```text
@@ -178,12 +176,14 @@ I4_FRONTEND_VECTOR_CLOSED=false
 I4_FULLY_CLOSED=false
 CURRENT_FRONTEND_STILL_USES_LEGACY_MULTI_POST=true
 FRONTEND_CUTOVER_REQUIRED=true
-NEXT_TASK=ACS-M10-M11-CORE-COMFYUI-PROTOCOL-SPIKE-0-READINESS-AND-AUTHORIZATION-CHECKPOINT
+METHOD_AWARE_WORKER_SEAM_E1=IMPLEMENTED_AND_VERIFIED
+SPIKE_0_READINESS=BLOCKED
+NEXT_TASK=ACS-M10-M11-METHOD-AWARE-JOB-RESULT-INTAKE-CORRECTIVE-E2
 SUPERSEDED_VALIDATOR_M12_G0_3_STATE=ENVIRONMENT_HOLD
 SUPERSEDED_VALIDATOR_NEXT_TASK=LOCAL_WSL2_HANDOFF_AND_M12_C3_PREFLIGHT
 SUPERSEDED_VALIDATOR_TOKEN_GRANTS_AUTHORITY=false
 ```
-The [PR-B receipt](docs/status/CORE_SERIES_PLANNING_SCOPE_AND_CANDIDATE_BINDING_HARDENING_2026-09-05.md), [Project foundation receipt](docs/status/CORE_RECOVERABLE_PROJECT_FOUNDATION_COMMAND_2026-09-05.md) and [clean-state public E2E receipt](docs/status/CORE_CLEAN_STATE_PUBLIC_API_E2E_2026-09-06.md) hold detailed evidence and non-authority boundaries. Frontend cutover and the next task require separate authorization; M12-C3/C4, A100, Provider/GPU, admission and publication remain paused or unauthorized. Compatibility tokens grant no current authority.
+The [PR-B receipt](docs/status/CORE_SERIES_PLANNING_SCOPE_AND_CANDIDATE_BINDING_HARDENING_2026-09-05.md), [Project foundation receipt](docs/status/CORE_RECOVERABLE_PROJECT_FOUNDATION_COMMAND_2026-09-05.md) and [clean-state public E2E receipt](docs/status/CORE_CLEAN_STATE_PUBLIC_API_E2E_2026-09-06.md) and the [E1 worker seam receipt](docs/status/M10_M11_METHOD_AWARE_WORKER_SEAM_CORRECTIVE_E1_2026-09-06.md) hold detailed evidence and non-authority boundaries. Frontend cutover and the next task require separate authorization; M12-C3/C4, A100, Provider/GPU, admission and publication remain paused or unauthorized. Compatibility tokens grant no current authority.
 ## 7. Immutable history
 The former archived material remains byte-for-byte in [CURRENT_MILESTONE_HISTORY_THROUGH_2026-09-02.md](CURRENT_MILESTONE_HISTORY_THROUGH_2026-09-02.md).
 ```text

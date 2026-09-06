@@ -39,6 +39,28 @@ from tests.unit.test_execution_method_planning_m8_m9 import (
 )
 
 
+def backend_registry_fixture(*, adapter_identity="v4.comfyui-wan22-image-to-video.v1",
+                             capability="self-hosted-wan22-image-to-video-v1", **overrides):
+    from services.v4_platform.backend_registry import BackendRegistry, digest
+    profile = overrides.pop("profile", {"schemaVersion": "fake.i2v-profile.v1", "parameters": {}, "modelFiles": []})
+    backend = {"backendRef": "backend-test", "backendType": "SELF_HOSTED_SINGLE_GPU",
+        "adapterIdentity": adapter_identity, "adapterCapability": capability,
+        "providerId": "provider-test", "modelId": "model-test", "region": "test",
+        "endpointClass": "loopback-test", "backendProfileRef": "profile-test",
+        "backendProfileDigest": digest(profile), "credentialSourceRef": "env:TEST_CREDENTIAL",
+        "runtimeAttestationRef": "runtime-test", "runtimeAttestationDigest": "1"*64,
+        "costCurrency": "USD", "maxCostMinor": 10,
+        "resourceShape": {"gpuCount": 1, "minimumVramPerGpu": 0, "minimumTotalVram": 0,
+                          "distributionMode": "HORIZONTAL_INDEPENDENT_WORKERS"},
+        "supportedExecutionClasses": ["MICRO_MOTION"], "supportedExecutionMethods": ["SINGLE_ANCHOR_I2V"],
+        "acceptedInputRoles": ["ACTION_READY_ANCHOR"], "supportedOutputFormats": ["video/mp4"], "profile": profile}
+    backend.update(overrides)
+    return BackendRegistry({"schemaVersion": "v4.video-execution-backend-registry.v1",
+        "registryVersion": "server-backends.v1", "backends": [backend],
+        "policy": {"policyRef": "policy-test", "pinnedBackendRef": backend["backendRef"],
+                   "maxAttempts": 1, "fallbackAllowed": False}})
+
+
 class NoCallWanAdapter:
     adapter_identity = "v4.comfyui-wan22-image-to-video.v1"
     provenance = "SELF_HOSTED_AI_GENERATED"
@@ -267,11 +289,15 @@ class MethodAwareMediaTests(unittest.TestCase):
             Path(self.temporary.name) / "artifacts",
             ref_factory=lambda prefix: f"{prefix}-neutral",
             clock=lambda: "2026-09-02T04:00:00Z",
+            backend_resolver=backend_registry_fixture(),
         )
         method_service(self.seed["boundary"]).media_jobs = self.coordinator
         self.execution_plan = self.seed["boundary"].create_execution_method_plan(
             plan_command(self.seed, validation, key="neutral-m8-m9")
         )
+
+    def configure_backend(self, **kwargs):
+        self.coordinator.backend_resolver = backend_registry_fixture(**kwargs)
 
     def test_m10_emits_method_specific_inputs_without_exact_four_constraint(self):
         before = len(

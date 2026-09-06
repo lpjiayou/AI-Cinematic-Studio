@@ -7,6 +7,9 @@ from pathlib import Path
 from typing import Any, Mapping, Sequence
 from uuid import uuid4
 
+from services.v4_platform.method_aware_worker import (
+    create_method_aware_coordinator_from_environment,
+)
 from services.v4_platform import (
     DeterministicLocalFfmpegAdapter,
     MediaJobCoordinator,
@@ -1604,6 +1607,7 @@ def _services(
     real_image_candidate_evidence=None,
     real_video_candidate_evidence=None,
     media_execution=None,
+    method_aware_execution=None,
     composition_execution=None,
     approval_authority=None,
     media_selection_approval_authority=None,
@@ -1770,7 +1774,7 @@ def _services(
         execution_method_planning,
         evidence_repository,
         candidate_review,
-        media.execution,
+        method_aware_execution or RejectingMediaExecution(),
         ref_factory=selected_ref_factory,
         clock=selected_clock,
     )
@@ -1836,6 +1840,7 @@ def create_in_memory_boundary(
     real_image_candidate_evidence=None,
     real_video_candidate_evidence=None,
     media_execution=None,
+    method_aware_execution=None,
     composition_execution=None,
     approval_authority=None,
     media_selection_approval_authority=None,
@@ -1881,6 +1886,7 @@ def create_in_memory_boundary(
         real_image_candidate_evidence=real_image_candidate_evidence,
         real_video_candidate_evidence=real_video_candidate_evidence,
         media_execution=media_execution,
+        method_aware_execution=method_aware_execution,
         composition_execution=composition_execution,
         approval_authority=approval_authority,
         media_selection_approval_authority=media_selection_approval_authority,
@@ -1930,6 +1936,7 @@ def create_local_development_boundary(
     real_image_candidate_evidence=None,
     real_video_candidate_evidence=None,
     media_execution=None,
+    method_aware_execution=None,
     composition_execution=None,
     approval_authority=None,
     media_selection_approval_authority=None,
@@ -2008,6 +2015,7 @@ def create_local_development_boundary(
         real_image_candidate_evidence=real_image_candidate_evidence,
         real_video_candidate_evidence=real_video_candidate_evidence,
         media_execution=media_execution,
+        method_aware_execution=method_aware_execution,
         composition_execution=composition_execution,
         approval_authority=approval_authority,
         media_selection_approval_authority=media_selection_approval_authority,
@@ -2148,6 +2156,10 @@ def create_local_development_boundary_from_environment(
         ref_factory=lambda prefix: f"{prefix}-{uuid4().hex}",
         clock=_utc_now,
     )
+    method_execution = create_method_aware_coordinator_from_environment(
+        job_repository, artifact_root, environ=values,
+        ref_factory=lambda prefix: f"{prefix}-{uuid4().hex}", clock=_utc_now,
+    )
     real_video_candidate_evidence = MediaJobRealVideoCandidateEvidence(
         job_repository,
         artifact_root,
@@ -2168,6 +2180,7 @@ def create_local_development_boundary_from_environment(
         real_image_candidate_evidence=real_image_candidate_evidence,
         real_video_candidate_evidence=real_video_candidate_evidence,
         media_execution=execution,
+        method_aware_execution=method_execution,
         composition_execution=V4CompositionExecutor.from_artifact_root(artifact_root),
         approval_authority=approval_authority,
         media_selection_approval_authority=media_selection_approval_authority,

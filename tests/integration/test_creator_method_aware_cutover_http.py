@@ -8,6 +8,7 @@ from pathlib import Path
 import tempfile
 import threading
 import unittest
+from tests.unit.test_method_aware_media_m10_m11 import backend_registry_fixture
 from urllib import error, parse, request
 
 from apps.creator_workspace_mvp.ai_director import AiDirectorService
@@ -498,13 +499,14 @@ class CreatorMethodAwareRealBoundaryHttpTests(unittest.TestCase):
                 Path(directory) / "artifacts",
                 ref_factory=refs,
                 clock=lambda: "2026-09-03T06:00:00Z",
+                backend_resolver=backend_registry_fixture(),
             )
             boundary = create_in_memory_boundary(
                 project_boundary=lifecycle.project_context,
                 series_episode_boundary=lifecycle.series_episode,
                 series_planning_boundary=lifecycle.series_planning,
                 script_studio_boundary=lifecycle.script_studio,
-                media_execution=coordinator,
+                method_aware_execution=coordinator,
                 ref_factory=refs,
                 clock=lambda: "2026-09-03T06:00:00Z",
             )
@@ -949,6 +951,7 @@ class K2MethodAwarePublicCutoverAcceptanceTests(unittest.TestCase):
                 artifact_root,
                 ref_factory=refs,
                 clock=lambda: "2026-09-03T06:00:00Z",
+                backend_resolver=backend_registry_fixture(),
             )
             boundary_kwargs = {
                 "project_boundary": lifecycle.project_context,
@@ -956,7 +959,7 @@ class K2MethodAwarePublicCutoverAcceptanceTests(unittest.TestCase):
                 "series_planning_boundary": lifecycle.series_planning,
                 "script_studio_boundary": lifecycle.script_studio,
                 "evidence_database_path": evidence_database,
-                "media_execution": coordinator,
+                "method_aware_execution": coordinator,
             }
             boundary = create_local_development_boundary(
                 production_database,
@@ -1507,6 +1510,7 @@ class K2MethodAwarePublicCutoverAcceptanceTests(unittest.TestCase):
                     f"{prefix}-restart-{secrets.token_hex(16)}"
                 ),
                 clock=lambda: "2026-09-03T06:00:01Z",
+                backend_resolver=backend_registry_fixture(),
             )
             restarted = create_local_development_boundary(
                 production_database,
@@ -1515,7 +1519,7 @@ class K2MethodAwarePublicCutoverAcceptanceTests(unittest.TestCase):
                 series_planning_boundary=restarted_lifecycle.series_planning,
                 script_studio_boundary=restarted_lifecycle.script_studio,
                 evidence_database_path=evidence_database,
-                media_execution=restarted_coordinator,
+                method_aware_execution=restarted_coordinator,
                 clock=lambda: "2026-09-03T06:00:01Z",
                 initialize_if_missing=False,
             )
