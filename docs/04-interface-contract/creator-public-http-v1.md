@@ -1,6 +1,6 @@
 # Creator Public HTTP/API v1
 
-Status: `XR1 FROZEN / AUTH-W1 / ADR-0013 CONTROL PLANE / ADR-0019 METHOD-AWARE CUTOVER / STRICT JSON AND NUMERIC INTEGRITY / M4 RECOVERABLE FOUNDATION / M5 SCOPE-BOUND RECEIPTS`
+Status: `XR1 FROZEN / AUTH-W1 / ADR-0013 CONTROL PLANE / ADR-0019 METHOD-AWARE CUTOVER / STRICT JSON AND NUMERIC INTEGRITY / M1 DURABLE CONFIRMATION / M4 RECOVERABLE FOUNDATION / M5 SCOPE-BOUND RECEIPTS`
 
 This contract is the only browser-facing Core HTTP surface for the separate Commercial
 Frontend. Existing `/creator/internal/*` endpoints remain compatibility-only and must
@@ -102,6 +102,57 @@ specific confirmation route. The Experience Adapter must preserve
 response. The M1 candidate response also carries the Core-issued opaque
 `sourcePlanRef` and `sourcePlanVersion`; browser code must return those exact values on
 confirmation and must not mint or infer a source-plan reference.
+
+### M1 durable confirmation (E3B)
+
+`POST /creator/api/v1/creative-plans/confirm` accepts exactly `humanConfirmed`,
+`brief`, `plan`, `sourcePlanRef` and `sourcePlanVersion`, with one optional field:
+`idempotencyKey`. `humanConfirmed` must be true; the existing brief/plan validation
+and strict positive integer version rules apply before persistence. Unknown and
+server-owned fields, including body `workspaceRef`, return `400 / invalid_request`.
+Duplicate JSON object keys are rejected at every depth. Authentication still runs
+first and supplies the workspace; the shared strict JSON depth/numeric limits apply.
+
+An explicit key must be a nonempty printable string of at most 200 characters,
+without leading/trailing whitespace or slash/backslash; `.` and `..` are invalid
+values. Core does not trim or coerce it. Invalid keys return `400 / invalid_request`
+without mutation. Raw keys are never echoed, logged, stored in plan payloads or
+embedded in references.
+
+The versioned internal identity is
+`v5.confirmed-creative-plan-idempotency-identity.v1`. Its canonical UTF-8 JSON uses
+sorted keys, compact separators, `ensure_ascii=False` and `allow_nan=False`:
+
+| Mode | Identity fields in addition to `schemaVersion`, authenticated `workspaceRef` and `identityMode` |
+| --- | --- |
+| `EXPLICIT_CLIENT_KEY` | `idempotencyKey` |
+| `CORE_ISSUED_SOURCE_PLAN_IDENTITY` | validated `sourcePlanRef`, `sourcePlanSchemaVersion`, `sourcePlanVersion` |
+
+The distinct mode values separate the namespaces. Core derives `creativePlanRef`
+as `creative-plan-` plus the complete 64-character lowercase SHA-256 identity digest.
+Brief/plan content, timestamps, bearer credentials and randomness never enter this
+identity. Different explicit keys are independent commands, even for identical content.
+
+Within the existing Lifecycle transaction, the existing workspace/ref primary key
+selects one durable winner. Core compares `sourcePlanRef`, `sourcePlanSchemaVersion`,
+`sourcePlanVersion`, canonical `briefJson`, canonical `sourcePlanJson`,
+`confirmationStatus` and `version`. Exact replay returns the original complete plan,
+including its original ref, confirmation time and version, without rewriting it.
+Changed content returns `409 / creative_plan_idempotency_conflict` without mutation.
+This also applies to concurrent insertion conflicts and fresh-process recovery.
+
+| Request | First success | Exact replay | Changed replay |
+| --- | --- | --- | --- |
+| Explicit key | `201`, `ok`, `confirmedPlan`, `idempotentReplay=false` | `200`, same plan, `idempotentReplay=true` | `409 / creative_plan_idempotency_conflict` |
+| Current Frontend body without key | `201`, `ok`, `confirmedPlan` | `200`, identical envelope and plan | `409 / creative_plan_idempotency_conflict` for changed brief/plan under the same source identity |
+
+There is no new route, plan schema, table, column, index, migration or authority.
+Historical random-reference plans remain unchanged, readable and Episode-bindable.
+The internal non-idempotent confirmation method retains its compatibility behavior.
+The [E3B receipt](../status/M1_CREATIVE_PLAN_CONFIRMATION_IDEMPOTENCY_E3B_2026-09-06.md)
+records the bounded recovery tests; E3 lineage execution requires separate authorization.
+
+### M5 scope-bound candidate receipts
 
 For M5, `POST /creator/api/v1/series-plan-candidates` requires an associated Series.
 A standalone Project without a Series returns `409 / series_scope_required` before
@@ -576,7 +627,9 @@ applies to the complete public v1 prefix:
 - non-loopback listeners expose no `/creator/internal/*` compatibility routes.
 
 Authentication failure is `401 / authentication_required`. Attempted client workspace
-selection is `400 / client_workspace_scope_forbidden`. Existing application-level
+selection is `400 / client_workspace_scope_forbidden`, except that the E3B closed
+confirmation body rejects every extra field, including `workspaceRef`, as
+`400 / invalid_request`. Query scope rejection remains unchanged. Existing application-level
 `403` errors, including `authority_unavailable`, keep their accepted meaning.
 
 ## M10 current single-input image admission (E3A)

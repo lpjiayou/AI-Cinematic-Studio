@@ -5,6 +5,7 @@ from __future__ import annotations
 from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import datetime, timezone
+from hashlib import sha256
 import json
 from pathlib import Path
 import sqlite3
@@ -21,6 +22,7 @@ EPISODE_SCHEMA_VERSION = "v5.episode.v1"
 SCRIPT_STUDIO_BOOTSTRAP_SCHEMA_VERSION = "creator.script-studio.bootstrap-input.v1"
 SQLITE_SCHEMA_VERSION = 1
 AI_DIRECTOR_PLAN_SCHEMA_VERSION = "creator.ai-director.plan.v1"
+CONFIRMED_PLAN_IDEMPOTENCY_IDENTITY_SCHEMA = "v5.confirmed-creative-plan-idempotency-identity.v1"
 
 
 class SeriesEpisodeError(ValueError):
@@ -33,6 +35,10 @@ class RecordNotFoundError(SeriesEpisodeError):
 
 class DuplicateRecordError(SeriesEpisodeError):
     code = "duplicate_record"
+
+
+class CreativePlanIdempotencyConflictError(SeriesEpisodeError):
+    code = "creative_plan_idempotency_conflict"
 
 
 class UnconfirmedPlanError(SeriesEpisodeError):
@@ -110,6 +116,22 @@ def _json_copy(value: Mapping[str, Any], field: str) -> str:
         )
     except (TypeError, ValueError) as exc:
         raise SeriesEpisodeError(f"{field} must be JSON-compatible") from exc
+
+
+def _confirmation_idempotency_key(value: Any) -> str:
+    if (not isinstance(value, str) or not value or len(value) > 200
+            or value != value.strip() or not value.isprintable()
+            or "/" in value or "\\" in value or value in {".", ".."}):
+        raise SeriesEpisodeError("idempotencyKey is invalid")
+    return value
+
+
+def _confirmed_plan_semantics(record: ConfirmedCreativePlanRecord) -> tuple[Any, ...]:
+    # Ref and confirmation time identify the winner; they are not request content.
+    return (
+        record.sourcePlanRef, record.sourcePlanSchemaVersion, record.sourcePlanVersion,
+        record.briefJson, record.sourcePlanJson, record.confirmationStatus, record.version,
+    )
 
 
 def _validate_confirmed_source_plan(value: Any, schema_version: Any) -> Mapping[str, Any]:
@@ -907,6 +929,56 @@ class SeriesEpisodeService:
             1,
         )
         return self._plan_mapping(self.repository.store_confirmed_plan(record))
+
+    def confirm_creative_plan_idempotently(self, value: Mapping[str, Any]) -> dict[str, Any]:
+        """Bind a scoped command to one durable record using the existing primary key."""
+        if not isinstance(value, Mapping) or value.get("humanConfirmed") is not True:
+            raise UnconfirmedPlanError("explicit human confirmation is required")
+        workspace = _required_ref(value.get("workspaceRef"), "workspaceRef")
+        source_ref = _required_ref(value.get("sourcePlanRef"), "sourcePlanRef")
+        source_schema = _required_ref(value.get("sourcePlanSchemaVersion"), "sourcePlanSchemaVersion")
+        source_version = _positive_int(value.get("sourcePlanVersion"), "sourcePlanVersion")
+        plan = _validate_confirmed_source_plan(value.get("sourcePlan"), source_schema)
+        brief = value.get("brief")
+        if not isinstance(brief, Mapping):
+            raise SeriesEpisodeError("brief must be an object")
+        brief_json = _json_copy(brief, "brief")
+        plan_json = _json_copy(plan, "sourcePlan")
+        identity = {
+            "schemaVersion": CONFIRMED_PLAN_IDEMPOTENCY_IDENTITY_SCHEMA,
+            "workspaceRef": workspace,
+        }
+        if "idempotencyKey" in value:
+            identity.update({
+                "identityMode": "EXPLICIT_CLIENT_KEY",
+                "idempotencyKey": _confirmation_idempotency_key(value["idempotencyKey"]),
+            })
+        else:
+            identity.update({
+                "identityMode": "CORE_ISSUED_SOURCE_PLAN_IDENTITY",
+                "sourcePlanRef": source_ref,
+                "sourcePlanSchemaVersion": source_schema,
+                "sourcePlanVersion": source_version,
+            })
+        ref = "creative-plan-" + sha256(_json_copy(identity, "identity").encode("utf-8")).hexdigest()
+        record = ConfirmedCreativePlanRecord(
+            CONFIRMED_PLAN_SCHEMA_VERSION, workspace, ref, source_ref, source_schema,
+            source_version, brief_json, plan_json, "confirmed", self._clock(), 1,
+        )
+        try:
+            stored = self.repository.store_confirmed_plan(record)
+        except DuplicateRecordError:
+            # Also covers a concurrent winner in another service/SQLite assembly.
+            # Reading through the repository retains the current lifecycle lease.
+            stored = self.repository.get_confirmed_plan(workspace, ref)
+            if stored is None:
+                raise
+            if _confirmed_plan_semantics(stored) != _confirmed_plan_semantics(record):
+                raise CreativePlanIdempotencyConflictError(
+                    "creative plan confirmation command conflicts"
+                ) from None
+            return {"confirmedPlan": self._plan_mapping(stored), "idempotentReplay": True}
+        return {"confirmedPlan": self._plan_mapping(stored), "idempotentReplay": False}
 
     def create_episode(self, value: Mapping[str, Any]) -> dict[str, Any]:
         if not isinstance(value, Mapping):

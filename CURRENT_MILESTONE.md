@@ -1,7 +1,6 @@
 # AI Cinematic Studio — Current Execution State
 
 Status: `CURRENT / EVIDENCE-BACKED / FAIL-CLOSED`
-
 Last reviewed: `2026-09-06`
 ## 1. Closed K2 cutover baselines
 
@@ -177,14 +176,15 @@ FRONTEND_CUTOVER_REQUIRED=true
 METHOD_AWARE_WORKER_SEAM_E1=IMPLEMENTED_AND_VERIFIED
 METHOD_AWARE_JOB_RESULT_INTAKE_E2=IMPLEMENTED_AND_VERIFIED
 CURRENT_SINGLE_INPUT_IMAGE_ADMISSION_E3A=IMPLEMENTED_AND_VERIFIED
+CREATIVE_PLAN_CONFIRMATION_IDEMPOTENCY_E3B=IMPLEMENTED_AND_VERIFIED
 SPIKE_0_ELIGIBLE_LINEAGE_E3=BLOCKED_PENDING_RESUME
 SPIKE_0_READINESS=BLOCKED
-NEXT_TASK=ACS-M10-M11-SPIKE-0-ELIGIBLE-LINEAGE-PREPARATION-E3-RESUME-R1
+NEXT_TASK=ACS-M10-M11-SPIKE-0-ELIGIBLE-LINEAGE-PREPARATION-E3-RESUME-R4
 SUPERSEDED_VALIDATOR_M12_G0_3_STATE=ENVIRONMENT_HOLD
 SUPERSEDED_VALIDATOR_NEXT_TASK=LOCAL_WSL2_HANDOFF_AND_M12_C3_PREFLIGHT
 SUPERSEDED_VALIDATOR_TOKEN_GRANTS_AUTHORITY=false
 ```
-The [PR-B receipt](docs/status/CORE_SERIES_PLANNING_SCOPE_AND_CANDIDATE_BINDING_HARDENING_2026-09-05.md), [Project foundation receipt](docs/status/CORE_RECOVERABLE_PROJECT_FOUNDATION_COMMAND_2026-09-05.md) and [clean-state public E2E receipt](docs/status/CORE_CLEAN_STATE_PUBLIC_API_E2E_2026-09-06.md) and the [E1 worker seam receipt](docs/status/M10_M11_METHOD_AWARE_WORKER_SEAM_CORRECTIVE_E1_2026-09-06.md) and [E2 result intake receipt](docs/status/M10_M11_METHOD_AWARE_JOB_RESULT_INTAKE_CORRECTIVE_E2_2026-09-06.md) and [E3A input admission receipt](docs/status/M10_METHOD_AWARE_SINGLE_INPUT_IMAGE_ADMISSION_E3A_2026-09-06.md) hold detailed evidence and non-authority boundaries. Frontend cutover and the next task require separate authorization; M12-C3/C4, A100, Provider/GPU and publication remain paused; E3A admission is technical evidence only. Compatibility tokens grant no current authority.
+The [PR-B receipt](docs/status/CORE_SERIES_PLANNING_SCOPE_AND_CANDIDATE_BINDING_HARDENING_2026-09-05.md), [Project foundation receipt](docs/status/CORE_RECOVERABLE_PROJECT_FOUNDATION_COMMAND_2026-09-05.md) and [clean-state public E2E receipt](docs/status/CORE_CLEAN_STATE_PUBLIC_API_E2E_2026-09-06.md) and the [E1 worker seam receipt](docs/status/M10_M11_METHOD_AWARE_WORKER_SEAM_CORRECTIVE_E1_2026-09-06.md) and [E2 result intake receipt](docs/status/M10_M11_METHOD_AWARE_JOB_RESULT_INTAKE_CORRECTIVE_E2_2026-09-06.md) and [E3A input admission receipt](docs/status/M10_METHOD_AWARE_SINGLE_INPUT_IMAGE_ADMISSION_E3A_2026-09-06.md) and the [E3B confirmation receipt](docs/status/M1_CREATIVE_PLAN_CONFIRMATION_IDEMPOTENCY_E3B_2026-09-06.md) hold detailed evidence and non-authority boundaries. Frontend cutover and the next task require separate authorization; M12-C3/C4, A100, Provider/GPU and publication remain paused; E3A admission is technical evidence only. Compatibility tokens grant no current authority.
 ## 7. Immutable history
 The former archived material remains byte-for-byte in [CURRENT_MILESTONE_HISTORY_THROUGH_2026-09-02.md](CURRENT_MILESTONE_HISTORY_THROUGH_2026-09-02.md).
 ```text

@@ -226,3 +226,9 @@ Runtime G0、A100、下载、安装或 GPU。WSL2 候选已在本轮因网络修
 | `R-M10-INPUT-048` — missing single-image path encourages direct journal seeding or legacy/FONT bypass | Untrusted input facts or duplicate asset authority | Independent pinned bundle, strict bytes/probe, current lineage, atomic 3/2 records, external exact selection, closed AssetVersion, CAS/replay/restart and legacy regression | M10 Input Asset / Candidate Lifecycle Owner; E3A required CI; E3 resume separately authorized |
 
 [E3A receipt](../docs/status/M10_METHOD_AWARE_SINGLE_INPUT_IMAGE_ADMISSION_E3A_2026-09-06.md) records bounded implementation. Technical admission grants no provider processing or publication, and no GPU or live lineage was exercised.
+
+## M1 E3B confirmation recovery
+
+| Risk | Impact | Control and evidence | Owner / next gate |
+| --- | --- | --- | --- |
+| `R-M1-REPLAY-049` — repeated confirmation previously allocated another plan; retry after response loss could duplicate upstream lineage | Duplicate confirmed plans or cross-workspace command confusion | Versioned workspace-scoped deterministic ref, closed explicit/legacy request shapes, existing primary key and Lifecycle transaction, canonical content conflict, restart/concurrency and downstream regressions; no DDL or historical rewrite. `MITIGATED / BOUNDED_IMPLEMENTATION / REQUIRED_CI_GATE`. Failed E3 staging is quarantined, never reused. | M1 Creative Plan / Lifecycle Integrity Owner; [E3B receipt](../docs/status/M1_CREATIVE_PLAN_CONFIRMATION_IDEMPOTENCY_E3B_2026-09-06.md); E3 R4 separately authorized |

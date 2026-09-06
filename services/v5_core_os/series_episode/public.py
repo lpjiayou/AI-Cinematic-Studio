@@ -9,6 +9,7 @@ from typing import Any, Mapping
 from services.v5_core_os.lifecycle_integrity.contracts import LifecycleOperation
 
 from .foundation import (
+    CreativePlanIdempotencyConflictError,
     DependentRecordError,
     DuplicateRecordError,
     InMemorySeriesEpisodeAdapter,
@@ -56,7 +57,8 @@ class SeriesEpisodePublicBoundary:
     def _error(exc: SeriesEpisodeError) -> SeriesEpisodePublicError:
         if isinstance(exc, RecordNotFoundError):
             return SeriesEpisodePublicError(exc.code, 404)
-        if isinstance(exc, (DuplicateRecordError, UnconfirmedPlanError, DependentRecordError)):
+        if isinstance(exc, (DuplicateRecordError, UnconfirmedPlanError, DependentRecordError,
+                            CreativePlanIdempotencyConflictError)):
             return SeriesEpisodePublicError(exc.code, 409)
         if isinstance(exc, ScopeMismatchError):
             return SeriesEpisodePublicError(exc.code, 400)
@@ -122,6 +124,15 @@ class SeriesEpisodePublicBoundary:
             workspace_ref,
             LifecycleOperation.CONFIRM_CREATIVE_PLAN,
             self.__service.confirm_creative_plan,
+            command,
+        )
+
+    def confirm_creative_plan_idempotently(self, command: Mapping[str, Any]) -> dict[str, Any]:
+        workspace_ref = str(command.get("workspaceRef") or "") if isinstance(command, Mapping) else ""
+        return self._lifecycle_write(
+            workspace_ref,
+            LifecycleOperation.CONFIRM_CREATIVE_PLAN,
+            self.__service.confirm_creative_plan_idempotently,
             command,
         )
 
