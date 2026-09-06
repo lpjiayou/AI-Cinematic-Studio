@@ -109,6 +109,7 @@ def append_admitted_image(
     suffix="v1",
     asset_ref="neutral-action-anchor",
     version=1,
+    content_digest=None,
 ):
     service = method_service(seed["boundary"])
     evidence = service.evidence_repository
@@ -219,7 +220,7 @@ def append_admitted_image(
                 "sourceCandidateRef": candidate_ref,
                 "mediaKind": "image",
                 "mediaType": "image/png",
-                "sha256": _digest({"neutral-image": suffix}),
+                "sha256": content_digest or _digest({"neutral-image": suffix}),
                 "state": "REGISTERED",
                 "immutable": True,
                 "publicationAllowed": False,

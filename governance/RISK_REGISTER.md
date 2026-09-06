@@ -191,7 +191,7 @@ Runtime G0、A100、下载、安装或 GPU。WSL2 候选已在本轮因网络修
 
 | 风险编号 | 风险描述 | 影响 | 概率 | 缓解措施 | 状态 | 责任人 | 触发条件 / 验证证据 | 目标日期 / 事件 | 最近复核日期 | 关联事项 |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| `R-M11-WORKER-046` | ready Micro 路由与 worker 不兼容、缺少 attempt backend binding 或重投未知提交会形成 RUNNING 孤儿、供应商锁定或重复 GPU 开销。 | 高：技术 artifact 与输入/执行血缘失配，或重复执行 | 低：E1 fake/SQLite seam 已封闭；真实运行与 result intake 尚未验证 | 共用 MediaJob repository、服务端 resolver、精确 envelope/预验证、不可变 attempt、exact run-one、提交不明零重投；I2V 归档保留 LoadImage 和全部事实。 | 已缓解（`MITIGATED / BOUNDED_IMPLEMENTATION / REQUIRED_CI_GATE`） | V4 Media Job Owner / M10-M11 Owner `蔺鹏` | 绑定可改写、第二队列、browser provider selector、invalid input 调用 Adapter、响应丢失后第二次提交或假称 Spike ready；持续证据：E1 unit/SQLite/CLI/loopback 与版本化 archive 回归 | E1 required checks；E2 和 live Spike 独立授权 | `2026-09-06` | [E1 worker seam receipt](../docs/status/M10_M11_METHOD_AWARE_WORKER_SEAM_CORRECTIVE_E1_2026-09-06.md); [ADR-0019](ADR-0019-upstream-execution-method-and-requirement-routing.md) |
+| `R-M11-WORKER-046` | ready Micro 路由与 worker 不兼容、缺少 attempt backend binding 或重投未知提交会形成 RUNNING 孤儿、供应商锁定或重复 GPU 开销。 | 高：技术 artifact 与输入/执行血缘失配，或重复执行 | 低：E1 fake/SQLite seam 与 E2 result intake 已有隔离测试证明；真实运行尚未验证 | 共用 MediaJob repository、服务端 resolver、精确 envelope/预验证、不可变 attempt、exact run-one、提交不明零重投；I2V 归档保留 LoadImage 和全部事实。 | 已缓解（`MITIGATED / BOUNDED_IMPLEMENTATION / REQUIRED_CI_GATE`） | V4 Media Job Owner / M10-M11 Owner `蔺鹏` | 绑定可改写、第二队列、browser provider selector、invalid input 调用 Adapter、响应丢失后第二次提交或假称 Spike ready；持续证据：E1 unit/SQLite/CLI/loopback 与版本化 archive 回归 | E1/E2 required checks；E3 和 live Spike 独立授权 | `2026-09-06` | [E1 worker seam receipt](../docs/status/M10_M11_METHOD_AWARE_WORKER_SEAM_CORRECTIVE_E1_2026-09-06.md); [ADR-0019](ADR-0019-upstream-execution-method-and-requirement-routing.md) |
 
 ## 6. 新增风险模板
 
@@ -216,3 +216,5 @@ Runtime G0、A100、下载、安装或 GPU。WSL2 候选已在本轮因网络修
 只有在当前 Source-of-Truth、Accepted ADR 与 Project Lead 明确工作包同时授权时，
 才可进入对应受控实现；风险条目中的建议、目标事件或责任人不能替代该授权，也不能
 改变 V2.3 架构、扩展里程碑或宣称风险已被接受。
+
+| `R-M11-RESULT-047` | 把旧 QUEUED 快照当作实时状态、接收未绑定/篡改/过期 Job 或跨库部分接收，会产生无可信来源的 Candidate 或重复记录。 | 高：技术结果与创作血缘失配 | 低：E2 fake/HTTP/SQLite 验证已封闭；live evidence 尚无 | V4 精确只读 terminal/attempt/envelope/binding 与 fresh bytes/probe；V5 current route/source 与原子三记录 journal CAS；exact replay、并发与中途 rollback。 | 已缓解（`MITIGATED / BOUNDED_IMPLEMENTATION / REQUIRED_CI_GATE`） | V4 Media Job Owner / M10-M11 Result Intake Owner `蔺鹏` | 第二 Candidate authority/queue、泄露内部路径或 Provider secret、部分写入、把技术 PASS 升级为 QC/Selection/Admission 或 Spike readiness；持续证据：E2 reader/currentness/HTTP/SQLite/restart/concurrency 与 legacy 回归 | E2 required checks；E3 与 live Spike 另行授权 | `2026-09-06` | [E2 result intake receipt](../docs/status/M10_M11_METHOD_AWARE_JOB_RESULT_INTAKE_CORRECTIVE_E2_2026-09-06.md); [ADR-0019](ADR-0019-upstream-execution-method-and-requirement-routing.md) |

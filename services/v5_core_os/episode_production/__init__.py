@@ -56,6 +56,12 @@ from .method_aware_media import (
     WAN_SINGLE_ANCHOR_CAPABILITY,
     resolve_video_method_capability,
 )
+from .method_aware_result_intake import (
+    METHOD_AWARE_MEDIA_JOB_RESULT_RECORD_KIND,
+    METHOD_AWARE_MEDIA_JOB_RESULT_RECEIPT_SCHEMA,
+    METHOD_AWARE_VIDEO_JOB_PROJECTION_SCHEMA,
+    MethodAwareResultIntakeService,
+)
 from .explicit_audio_bridge import (
     AUDIO_CUE_TIMING_BINDING_SCHEMA_VERSION,
     AUDIO_REQUIREMENT_ROUTE_RECORD_KIND,
@@ -641,6 +647,10 @@ from .timeline_preview import (
 )
 
 __all__ = [
+    "METHOD_AWARE_MEDIA_JOB_RESULT_RECORD_KIND",
+    "METHOD_AWARE_MEDIA_JOB_RESULT_RECEIPT_SCHEMA",
+    "METHOD_AWARE_VIDEO_JOB_PROJECTION_SCHEMA",
+    "MethodAwareResultIntakeService",
     "EpisodeProductionPublicBoundary",
     "EpisodeProductionPublicError",
     "EpisodeProductionService",

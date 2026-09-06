@@ -3234,6 +3234,24 @@
       "lastReviewedAt": "2026-09-06",
       "linkedFromIndex": true,
       "notes": "E1 technical worker/adapter evidence only; result intake, live Spike, GPU, Frontend and admission remain outside scope."
+    },
+    {
+      "path": "docs/status/M10_M11_METHOD_AWARE_JOB_RESULT_INTAKE_CORRECTIVE_E2_2026-09-06.md",
+      "repository": "Core",
+      "documentClass": "CURRENT_STATUS",
+      "status": "CURRENT",
+      "owner": "Project Lead / V4 Media Job Owner / M10-M11 Result Intake Owner",
+      "authoritativeFor": [
+        "evidence-backed bounded method-aware V4 result to V5 technical Candidate handoff status"
+      ],
+      "supersedes": [],
+      "supersededBy": [],
+      "currentStateClaimsAllowed": true,
+      "historicalMutationPolicy": "UPDATE_FROM_MERGED_EVIDENCE_ONLY",
+      "lastReviewedBaseline": "d6c60f9de11c5bf4df559f71c43f86b40e8211ad",
+      "lastReviewedAt": "2026-09-06",
+      "linkedFromIndex": true,
+      "notes": "E2 neutral read/technical-intake evidence only; no live Spike, GPU, Frontend, selection, admission or new authority."
     }
   ]
 }

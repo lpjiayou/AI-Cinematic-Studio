@@ -54,6 +54,7 @@ VISUAL_QC_PROFILE_DIGEST = _digest(VISUAL_QC_PROFILE)
 MEDIA_SELECTION_SUBJECT_SCHEMA_VERSION = "v5.k2-media-selection-subject.v1"
 VERIFIED_MEDIA_SELECTION_SCHEMA_VERSION = "v5.k2-verified-media-selection.v1"
 SUCCESSOR_VIDEO_CANDIDATE_SCHEMA_VERSION = "v5.k2-media-candidate.v2"
+METHOD_AWARE_VIDEO_CANDIDATE_SCHEMA_VERSION = "v5.method-aware-video-candidate.v1"
 
 
 class CandidateLifecycleError(EpisodeProductionError):
@@ -777,6 +778,54 @@ class K2MediaCandidateReviewService:
             payload=payload,
         )
         return item
+
+    def prepare_method_aware_candidate_record(
+        self, receipt: EvidenceRecord, *, candidate_ref: str, idempotency_key: str,
+    ) -> EvidenceRecord:
+        """Prepare the neutral Candidate in the existing lifecycle authority.
+
+        Only the result intake service supplies this sealed, not-yet-appended
+        receipt.  The caller commits receipt, Candidate and validation together.
+        """
+        workspace, run_ref, key = self._scope({
+            "workspaceRef": receipt.workspaceRef,
+            "productionRunRef": receipt.productionRunRef,
+            "idempotencyKey": idempotency_key,
+        })
+        value = deepcopy(dict(receipt.payload))
+        sealed_digest = value.pop("payloadDigest", None)
+        if (receipt.recordKind != "MethodAwareMediaJobResult"
+                or value.get("schemaVersion") != "v5.method-aware-media-job-result-receipt.v1"
+                or sealed_digest != receipt.payloadDigest or _digest(value) != sealed_digest
+                or value.get("resultState") != "SUCCEEDED_VERIFIED"
+                or value.get("publicationAllowed") is not False):
+            raise CandidateLifecycleError("method-aware result receipt is invalid")
+        root = self.root_service.get_run(workspace, run_ref)
+        ref = _required_ref(candidate_ref, "candidateRef")
+        payload = {
+            "schemaVersion": METHOD_AWARE_VIDEO_CANDIDATE_SCHEMA_VERSION,
+            "candidateRef": ref, "candidateVersion": 1,
+            "rootPayloadDigest": _digest_value(root["payloadDigest"], "rootPayloadDigest"),
+            "revisionRef": _required_ref(value["videoMethodRouteVersionRef"], "revisionRef"),
+            "mediaKind": "VIDEO", "slotRef": _required_ref(value["creativeShotVersionRef"], "slotRef"),
+            "sourceRequestRef": _required_ref(value["generationRequestRef"], "sourceRequestRef"),
+            "sourceRequestDigest": _digest_value(value["generationRequestDigest"], "sourceRequestDigest"),
+            "artifactRef": _required_ref(value["artifactRef"], "artifactRef"),
+            "artifactDigest": _digest_value(value["artifactDigest"], "artifactDigest"),
+            "artifactByteSize": _positive_int(value["artifactByteSize"], "artifactByteSize", maximum=10**12),
+            "sourceAssetVersions": [{
+                "assetVersionRef": _required_ref(value["sourceAssetVersionRef"], "assetVersionRef"),
+                "assetVersionDigest": _digest_value(value["sourceAssetVersionDigest"], "assetVersionDigest"),
+            }],
+            "storageKey": _storage_key(value["artifactStorageKey"]),
+            "provenance": "AI_GENERATED", "lifecycleState": "CANDIDATE_RECORDED",
+            "methodAwareMediaJobResultRef": receipt.recordRef,
+            "methodAwareMediaJobResultVersion": receipt.recordVersion,
+            "methodAwareMediaJobResultDigest": receipt.payloadDigest,
+            "publicationAllowed": False,
+        }
+        return _record(workspace_ref=workspace, run_ref=run_ref, kind=CANDIDATE,
+            ref=ref, version=1, idempotency_key=key, created_at=self._clock(), payload=payload)
 
     def register_candidate(self, command: Mapping[str, Any]) -> dict[str, Any]:
         item = self.prepare_candidate_record(command)
