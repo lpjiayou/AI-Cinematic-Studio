@@ -810,9 +810,15 @@ class CreatorRequestHandler(BaseHTTPRequestHandler):
         try:
             raw_payload = self.rfile.read(content_length)
             payload = load_public_json(raw_payload)
-            if (production_subresource is not None
-                    and production_subresource[1] in {PUBLIC_METHOD_AWARE_VIDEO_CANDIDATES_RESOURCE,
-                        PUBLIC_METHOD_AWARE_INPUT_CANDIDATES_RESOURCE, PUBLIC_METHOD_AWARE_INPUT_ADMISSION_RESOURCE}):
+            if (
+                requested_path == PUBLIC_CONFIRM_PLAN_ENDPOINT
+                or (production_subresource is not None
+                    and production_subresource[1] in {
+                        PUBLIC_METHOD_AWARE_VIDEO_CANDIDATES_RESOURCE,
+                        PUBLIC_METHOD_AWARE_INPUT_CANDIDATES_RESOURCE,
+                        PUBLIC_METHOD_AWARE_INPUT_ADMISSION_RESOURCE,
+                    })
+            ):
                 # Depth and numeric bounds have already passed the shared
                 # strict parser.  This closed DTO also rejects duplicate keys.
                 payload = json.loads(raw_payload, object_pairs_hook=_unique_result_object)
@@ -823,6 +829,15 @@ class CreatorRequestHandler(BaseHTTPRequestHandler):
             self._send_application_error(400, "invalid_request")
             return
         if self._is_public_path(requested_path):
+            if requested_path == PUBLIC_CONFIRM_PLAN_ENDPOINT:
+                required = {
+                    "humanConfirmed", "brief", "plan", "sourcePlanRef", "sourcePlanVersion",
+                }
+                if frozenset(payload) not in {
+                    frozenset(required), frozenset(required | {"idempotencyKey"}),
+                }:
+                    self._send_application_error(400, "invalid_request")
+                    return
             if "workspaceRef" in payload:
                 self._send_application_error(
                     400, "client_workspace_scope_forbidden"
@@ -2057,17 +2072,26 @@ class CreatorRequestHandler(BaseHTTPRequestHandler):
                 brief_value = payload.get("brief")
                 brief = CreativeBrief.from_mapping(brief_value if isinstance(brief_value, dict) else {})
                 plan = validate_plan(payload.get("plan"), brief)
-                result = self.series_episode_boundary.confirm_creative_plan(
-                    {
-                        "workspaceRef": payload.get("workspaceRef"),
-                        "humanConfirmed": payload.get("humanConfirmed"),
-                        "sourcePlanRef": payload.get("sourcePlanRef"),
-                        "sourcePlanSchemaVersion": plan["schemaVersion"],
-                        "sourcePlanVersion": payload.get("sourcePlanVersion"),
-                        "brief": brief_value,
-                        "sourcePlan": plan,
-                    }
-                )
+                command = {
+                    "workspaceRef": payload.get("workspaceRef"),
+                    "humanConfirmed": payload.get("humanConfirmed"),
+                    "sourcePlanRef": payload.get("sourcePlanRef"),
+                    "sourcePlanSchemaVersion": plan["schemaVersion"],
+                    "sourcePlanVersion": payload.get("sourcePlanVersion"),
+                    "brief": brief_value,
+                    "sourcePlan": plan,
+                }
+                if self._is_public_path(urlsplit(self.path).path):
+                    explicit_key = "idempotencyKey" in payload
+                    if explicit_key:
+                        command["idempotencyKey"] = payload["idempotencyKey"]
+                    result = self.series_episode_boundary.confirm_creative_plan_idempotently(command)
+                    response = {"ok": True, "confirmedPlan": result["confirmedPlan"]}
+                    if explicit_key:
+                        response["idempotentReplay"] = result["idempotentReplay"]
+                    self._send_json(200 if result["idempotentReplay"] else 201, response)
+                    return
+                result = self.series_episode_boundary.confirm_creative_plan(command)
             else:
                 result_key = "episode"
                 result = self.series_episode_boundary.create_episode(payload)
@@ -2120,6 +2144,7 @@ class CreatorRequestHandler(BaseHTTPRequestHandler):
             "resource_not_found": "没有找到对应内容。",
             "duplicate_record": "该集数已经存在，请检查后重试。",
             "creative_plan_not_confirmed": "请先完成人工确认。",
+            "creative_plan_idempotency_conflict": "相同确认操作对应了不同内容，请检查后重试。",
             "scope_mismatch": "当前工作区与内容引用不匹配。",
             "invalid_creative_plan": "创意方案未通过校验。",
             "invalid_script_candidate": "剧本候选内容未通过校验。",

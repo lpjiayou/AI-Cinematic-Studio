@@ -3270,6 +3270,24 @@
       "lastReviewedAt": "2026-09-06",
       "linkedFromIndex": true,
       "notes": "E3A current image input evidence only; E3 lineage resume, live execution, Frontend and publication remain gated."
+    },
+    {
+      "path": "docs/status/M1_CREATIVE_PLAN_CONFIRMATION_IDEMPOTENCY_E3B_2026-09-06.md",
+      "repository": "Core",
+      "documentClass": "CURRENT_STATUS",
+      "status": "CURRENT",
+      "owner": "Project Lead / M1 Creative Plan Confirmation Owner / Lifecycle Integrity Owner",
+      "authoritativeFor": [
+        "bounded durable Creative Plan confirmation replay evidence and E3 partial-evidence quarantine"
+      ],
+      "supersedes": [],
+      "supersededBy": [],
+      "currentStateClaimsAllowed": true,
+      "historicalMutationPolicy": "UPDATE_FROM_MERGED_EVIDENCE_ONLY",
+      "lastReviewedBaseline": "617a25218e4e290ddf924ea158b87c7d67b622e7",
+      "lastReviewedAt": "2026-09-06",
+      "linkedFromIndex": true,
+      "notes": "E3B bounded product corrective; no DDL changes, E3 execution, visual reinspection, GPU, Provider or Frontend authority."
     }
   ]
 }

@@ -27,7 +27,7 @@ and historical evidence cannot authorize current execution.
 | `ACCEPTED_DECISION` | 20 | no |
 | `NORMATIVE_ARCHITECTURE` | 14 | no |
 | `NORMATIVE_CONTRACT` | 31 | no |
-| `CURRENT_STATUS` | 8 | yes |
+| `CURRENT_STATUS` | 9 | yes |
 | `CAPABILITY_MATRIX` | 1 | yes |
 | `OPERATIONAL_RUNBOOK` | 18 | no |
 | `IMPLEMENTATION_EVIDENCE` | 21 | no |
@@ -121,6 +121,7 @@ and historical evidence cannot authorize current execution.
 
 | Document | Status | Owner |
 | --- | --- | --- |
+| [`docs/status/M1_CREATIVE_PLAN_CONFIRMATION_IDEMPOTENCY_E3B_2026-09-06.md`](../status/M1_CREATIVE_PLAN_CONFIRMATION_IDEMPOTENCY_E3B_2026-09-06.md) | `CURRENT` | Project Lead / M1 Creative Plan Confirmation Owner / Lifecycle Integrity Owner |
 | [`CURRENT_MILESTONE.md`](../../CURRENT_MILESTONE.md) | `CURRENT` | Project Lead / Documentation Governance Owner |
 | [`architecture/M12_C3_DEDICATED_LINUX_CPU_BUILD_HOST_SPECIFICATION.md`](../../architecture/M12_C3_DEDICATED_LINUX_CPU_BUILD_HOST_SPECIFICATION.md) | `CURRENT` | Project Lead / Architecture Owner / Infrastructure Owner / Repository Governance Owner / M12 Domain Owner |
 | [`docs/status/CORE_CLEAN_STATE_PUBLIC_API_E2E_2026-09-06.md`](../status/CORE_CLEAN_STATE_PUBLIC_API_E2E_2026-09-06.md) | `CURRENT` | Project Lead / Creator Public HTTP Acceptance Owner / Clean-State E2E Owner |
