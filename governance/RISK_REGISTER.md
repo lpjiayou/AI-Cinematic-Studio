@@ -218,3 +218,11 @@ Runtime G0、A100、下载、安装或 GPU。WSL2 候选已在本轮因网络修
 改变 V2.3 架构、扩展里程碑或宣称风险已被接受。
 
 | `R-M11-RESULT-047` | 把旧 QUEUED 快照当作实时状态、接收未绑定/篡改/过期 Job 或跨库部分接收，会产生无可信来源的 Candidate 或重复记录。 | 高：技术结果与创作血缘失配 | 低：E2 fake/HTTP/SQLite 验证已封闭；live evidence 尚无 | V4 精确只读 terminal/attempt/envelope/binding 与 fresh bytes/probe；V5 current route/source 与原子三记录 journal CAS；exact replay、并发与中途 rollback。 | 已缓解（`MITIGATED / BOUNDED_IMPLEMENTATION / REQUIRED_CI_GATE`） | V4 Media Job Owner / M10-M11 Result Intake Owner `蔺鹏` | 第二 Candidate authority/queue、泄露内部路径或 Provider secret、部分写入、把技术 PASS 升级为 QC/Selection/Admission 或 Spike readiness；持续证据：E2 reader/currentness/HTTP/SQLite/restart/concurrency 与 legacy 回归 | E2 required checks；E3 与 live Spike 另行授权 | `2026-09-06` | [E2 result intake receipt](../docs/status/M10_M11_METHOD_AWARE_JOB_RESULT_INTAKE_CORRECTIVE_E2_2026-09-06.md); [ADR-0019](ADR-0019-upstream-execution-method-and-requirement-routing.md) |
+
+## Current single-input image admission E3A
+
+| Risk | Impact | Control and bounded evidence | Owner / remaining gate |
+| --- | --- | --- | --- |
+| `R-M10-INPUT-048` — missing single-image path encourages direct journal seeding or legacy/FONT bypass | Untrusted input facts or duplicate asset authority | Independent pinned bundle, strict bytes/probe, current lineage, atomic 3/2 records, external exact selection, closed AssetVersion, CAS/replay/restart and legacy regression | M10 Input Asset / Candidate Lifecycle Owner; E3A required CI; E3 resume separately authorized |
+
+[E3A receipt](../docs/status/M10_METHOD_AWARE_SINGLE_INPUT_IMAGE_ADMISSION_E3A_2026-09-06.md) records bounded implementation. Technical admission grants no provider processing or publication, and no GPU or live lineage was exercised.

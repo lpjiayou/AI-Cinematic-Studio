@@ -31,6 +31,7 @@ ALLOWED_EVIDENCE_RECORD_KINDS = frozenset(
         "MethodAwareInputPlanVersion",
         "VideoMethodRouteVersion",
         "MethodAwareMediaJobResult",
+        "MethodAwareInputArtifact",
         "AudioRequirementRouteVersion",
         "TechnicalValidation",
         "SemanticVisualQCDecision",

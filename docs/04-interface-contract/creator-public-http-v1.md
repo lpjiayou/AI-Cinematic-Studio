@@ -24,7 +24,7 @@ Commercial Frontend → Frontend Experience Adapter → /creator/api/v1
 | M5 | `/series-planning-workspaces`, `/series-plan-*` | Series Planning + Series Director boundaries |
 | M6 | `/series-intelligence-workspaces`, `/series-intelligence/*` | accepted Series Intelligence public boundary |
 | M7–M9 | `/episode-production-runs/{runRef}/shot-graph`, `/execution-method-plan` | current M7 validation plus source-bound M8 action beats and server-derived M9 three-axis requirements |
-| M10 | `/episode-production-runs/{runRef}/method-aware-input-plan`, `/dynamic-media-preflight`, `/real-media-revision`, `/real-image-candidates`, `/semantic-visual-qc`, `/media-selection`, `/real-image-admission`, `/real-image-successor-admission`, `/real-image-selection`, `/state-projection`, `/production-readiness` | current-plan input resolution over the one canonical AssetVersion stream, plus the existing typed media control plane |
+| M10 | `/episode-production-runs/{runRef}/method-aware-input-plan`, `/method-aware-input-candidates`, `/method-aware-input-admission`, `/dynamic-media-preflight`, `/real-media-revision`, `/real-image-candidates`, `/semantic-visual-qc`, `/media-selection`, `/real-image-admission`, `/real-image-successor-admission`, `/real-image-selection`, `/state-projection`, `/production-readiness` | current-plan input resolution over the one canonical AssetVersion stream, plus the existing typed media control plane |
 | M11 | `/episode-production-runs/{runRef}/method-aware-video-route`, `/method-aware-video-jobs`, `/method-aware-video-candidates`, `/real-video-revision`, `/real-video-candidates`, `/semantic-visual-qc`, `/media-selection`, `/real-video-admission`, `/state-projection`, `/provider-experiments` | closed method routing and verified technical result intake; only Micro Motion can reserve the existing single-anchor queue, while Contact and Gait fail closed |
 | M12 | `/episode-production-runs/{runRef}/explicit-audio-requirement-route`, `/production-readiness` | explicit M9 AudioRequirement routing; Runtime G0 remains incomplete |
 | M13–M14 | `/episode-production-runs/{runRef}/render-candidates`, `/preview`, `/finalize` | bounded V5 RenderCandidate/delivery services over the accepted M13 base backend and V4/V3 execution boundaries |
@@ -578,3 +578,58 @@ applies to the complete public v1 prefix:
 Authentication failure is `401 / authentication_required`. Attempted client workspace
 selection is `400 / client_workspace_scope_forbidden`. Existing application-level
 `403` errors, including `authority_unavailable`, keep their accepted meaning.
+
+## M10 current single-input image admission (E3A)
+
+Two POST-only subresources under `/creator/api/v1/episode-production-runs/{runRef}`
+reuse the existing Candidate lifecycle and AssetVersion journal. The exact method-aware
+resource set now has eight members; Episode Production has 34 subresources. No other
+route family or existing count prohibition changes.
+
+| Resource | Exact browser fields in addition to the common fields below | Result |
+| --- | --- | --- |
+| `method-aware-input-candidates` | `stagedArtifactRef`, `stagedArtifactDigest` | 201 new atomic receipt/Candidate/TechnicalValidation; 200 exact reuse |
+| `method-aware-input-admission` | `humanSelectionRef`, `humanSelectionVersion`, `humanSelectionDigest` | 201 atomic AssetAdmission/AssetVersion; 200 exact selection reuse |
+
+Both require `projectRef`, `seriesRef`, `episodeRef`, `executionMethodPlanVersionRef`,
+`executionMethodPlanDigest`, `visualExecutionRequirementRef`,
+`visualExecutionRequirementDigest`, and `idempotencyKey`. Workspace comes from the
+credential; run comes from the route. All digests are 64 lowercase hexadecimal
+characters and selection version is a strict positive integer. Unknown or duplicate
+keys, browser workspace, paths, artifact facts, Candidate/AssetVersion refs, role,
+provenance, actor/authority, provider or publication claims are rejected.
+
+The only supported v1 input is IMAGE / ACTION_READY_ANCHOR / PNG or JPEG for a
+current MICRO_MOTION / SINGLE_ANCHOR_I2V requirement. V4 resolves independently pinned
+operator evidence and rechecks regular-file containment, bytes, SHA and single-image
+probe. The first command writes only technical evidence. Existing `semantic-visual-qc`
+and `media-selection` provide the separate review steps; only exact digest-pinned
+external human approval can SELECT this input. No implicit approval is created.
+
+Admission rechecks current plan, requirement, Shot, Candidate, QC, external selection
+and artifact bytes. It grants `TECHNICAL_EVIDENCE_ONLY`, never provider processing or
+publication. There is one initial logical asset per workspace/run/requirement/role;
+a second candidate requires a future successor contract. Canonical input planning
+resolves the new asset with exact role, requirement key, requirement ref/digest and
+plan ref/digest; its existing browser DTO remains unchanged.
+
+| Error condition | Status / stable code |
+| --- | --- |
+| Invalid shape, duplicate key or numeric type | 400 / `invalid_request` |
+| Missing artifact authority | 503 / `method_aware_input_artifact_unavailable` |
+| Unknown/foreign artifact | 404 / `method_aware_input_artifact_not_found` |
+| Foreign production scope | 404 / `method_aware_input_scope_mismatch` |
+| Invalid/tampered artifact | 409 / `method_aware_input_artifact_invalid` |
+| Stale plan or requirement | 409 / `method_aware_input_plan_stale` or `method_aware_input_requirement_stale` |
+| Changed intake or admission request | 409 / `method_aware_input_candidate_conflict` or `method_aware_input_admission_conflict` |
+| Unselected or stale selection | 409 / `method_aware_input_selection_required` |
+| Missing exact external decision | 403 / `media_selection_approval_required` |
+| Distinct candidate for an admitted requirement | 409 / `method_aware_input_asset_successor_not_implemented` |
+| GET on either new write-only resource | 405 / `method_not_allowed` |
+
+Public responses recursively remove internal storage locators. Stored canonical
+digests remain concurrency tokens for the complete server record; clients do not
+recompute them from redacted DTOs. No absolute paths, credentials or raw authority
+bundles are returned. The V4 internal safe projection includes the relative storage
+key and its schema version; it is not a browser authority. Full ownership, configuration,
+atomicity and stop boundaries are in the [E3A receipt](../status/M10_METHOD_AWARE_SINGLE_INPUT_IMAGE_ADMISSION_E3A_2026-09-06.md).

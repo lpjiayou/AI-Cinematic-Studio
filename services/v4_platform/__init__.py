@@ -378,3 +378,12 @@ from .method_aware_results import (
 )
 __all__ += ["MethodAwareMediaJobResultReader", "MethodAwareJobResultError",
     "V4_METHOD_AWARE_JOB_STATUS_SCHEMA", "V4_METHOD_AWARE_JOB_RESULT_SCHEMA"]
+
+from .method_aware_input_artifacts import (
+    MethodAwareInputArtifactEvidencePort, DigestPinnedMethodAwareInputArtifactEvidence,
+    RejectingMethodAwareInputArtifactEvidence, MethodAwareInputArtifactError,
+    input_artifact_evidence_from_environment,
+)
+__all__ += ["MethodAwareInputArtifactEvidencePort", "DigestPinnedMethodAwareInputArtifactEvidence",
+    "RejectingMethodAwareInputArtifactEvidence", "MethodAwareInputArtifactError",
+    "input_artifact_evidence_from_environment"]

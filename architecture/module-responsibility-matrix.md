@@ -110,3 +110,16 @@ E1 的服务端 backend/profile/runtime/worker binding 与双版本归档证据�
 | Creator result resources | `apps/creator_workspace_mvp`：GET 指定 route Job 投影、POST 闭集 refs/digests | 不授予浏览器 Provider、artifact、Candidate 或执行选择权；只调用 V5 public boundary | Creator Public HTTP Owner；public HTTP v1 contract |
 
 实现状态与真实 HTTP、并发、rollback、restart 证据见 [E2 result intake receipt](../docs/status/M10_M11_METHOD_AWARE_JOB_RESULT_INTAKE_CORRECTIVE_E2_2026-09-06.md)。复用既有 Candidate lifecycle；无新的数据库、队列、QC、Selection 或 Admission authority。
+
+### M10 current single-input image admission E3A
+
+| Layer | Owner and bounded responsibility | Excluded authority |
+| --- | --- | --- |
+| V4 | `method_aware_input_artifacts.py`: independent bundle SHA, closed staged IMAGE evidence, safe local bytes/probe reader | No facts, approval, writes, provider or GPU calls |
+| Operator | `scripts/method_aware_input_artifact_bundle.py`: explicit existing refs, no-replace content-addressed staging | No Core database or invented production lineage |
+| V5 | `method_aware_input_assets.py`: current plan/requirement binding, atomic three-record intake and two-record admission in the existing journal | No second Candidate/AssetVersion authority or schema DDL |
+| Existing review/asset authority | Separate semantic QC, digest-pinned external human selection, exact immutable asset chain validation | No implicit QC/selection, legacy gate weakening, rights upgrade or successor |
+| Creator Public HTTP | Two closed POST resources and redacted projections | No browser artifact/provider/actor authority |
+
+Implementation and isolated HTTP/SQLite evidence: [E3A receipt](../docs/status/M10_METHOD_AWARE_SINGLE_INPUT_IMAGE_ADMISSION_E3A_2026-09-06.md).
+E3 lineage, route/job creation and live execution remain separately gated.

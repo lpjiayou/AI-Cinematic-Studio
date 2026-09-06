@@ -3252,6 +3252,24 @@
       "lastReviewedAt": "2026-09-06",
       "linkedFromIndex": true,
       "notes": "E2 neutral read/technical-intake evidence only; no live Spike, GPU, Frontend, selection, admission or new authority."
+    },
+    {
+      "path": "docs/status/M10_METHOD_AWARE_SINGLE_INPUT_IMAGE_ADMISSION_E3A_2026-09-06.md",
+      "repository": "Core",
+      "documentClass": "CURRENT_STATUS",
+      "status": "CURRENT",
+      "owner": "Project Lead / M10 Input Asset Owner / Candidate Lifecycle Owner",
+      "authoritativeFor": [
+        "bounded current single-input image intake and admission implementation evidence"
+      ],
+      "supersedes": [],
+      "supersededBy": [],
+      "currentStateClaimsAllowed": true,
+      "historicalMutationPolicy": "UPDATE_FROM_MERGED_EVIDENCE_ONLY",
+      "lastReviewedBaseline": "ccb624eb222fba703573018a433acdebc645bbfd",
+      "lastReviewedAt": "2026-09-06",
+      "linkedFromIndex": true,
+      "notes": "E3A current image input evidence only; E3 lineage resume, live execution, Frontend and publication remain gated."
     }
   ]
 }

@@ -468,6 +468,10 @@ class M10M11MethodAwareMediaService:
         input_requirement_key: str,
         input_role: str,
         creative_shot_version_ref: str,
+        execution_plan_version_ref: str | None = None,
+        execution_plan_digest: str | None = None,
+        visual_requirement_ref: str | None = None,
+        visual_requirement_digest: str | None = None,
     ) -> dict[str, Any]:
         ref = _required_ref(raw.get("assetVersionRef"), "assetVersionRef")
         digest = raw.get("assetVersionDigest")
@@ -482,6 +486,16 @@ class M10M11MethodAwareMediaService:
         if len(matches) != 1:
             raise StaleInputError("bound AssetVersion is unavailable or changed")
         asset = matches[0]
+        if asset.get("schemaVersion") == "v5.method-aware-input-image-asset-version.v1":
+            expected = {
+                "inputRole": input_role, "inputRequirementKey": input_requirement_key,
+                "visualExecutionRequirementRef": visual_requirement_ref,
+                "visualExecutionRequirementDigest": visual_requirement_digest,
+                "executionMethodPlanVersionRef": execution_plan_version_ref,
+                "executionMethodPlanDigest": execution_plan_digest,
+            }
+            if any(asset.get(key) != value or value is None for key, value in expected.items()):
+                raise StaleInputError("bound input AssetVersion requirement or plan changed")
         logical = [
             item for item in assets if item.get("assetRef") == asset.get("assetRef")
         ]
@@ -693,6 +707,10 @@ class M10M11MethodAwareMediaService:
                         creative_shot_version_ref=requirement[
                             "creativeShotVersionRef"
                         ],
+                        execution_plan_version_ref=plan["executionMethodPlanVersionRef"],
+                        execution_plan_digest=plan["payloadDigest"],
+                        visual_requirement_ref=requirement["visualExecutionRequirementRef"],
+                        visual_requirement_digest=requirement["payloadDigest"],
                     )
                     for raw in selected
                 ]
@@ -980,6 +998,10 @@ class M10M11MethodAwareMediaService:
                     creative_shot_version_ref=method_plan[
                         "creativeShotVersionRef"
                     ],
+                    execution_plan_version_ref=payload["executionMethodPlanVersionRef"],
+                    execution_plan_digest=payload["executionMethodPlanDigest"],
+                    visual_requirement_ref=method_plan["visualExecutionRequirementRef"],
+                    visual_requirement_digest=method_plan["visualExecutionRequirementDigest"],
                 )
                 if resolved != binding:
                     return False
