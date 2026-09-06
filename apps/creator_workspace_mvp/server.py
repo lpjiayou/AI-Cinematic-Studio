@@ -65,6 +65,8 @@ from apps.creator_workspace_mvp.public_contract import (
     PUBLIC_METHOD_AWARE_VIDEO_ROUTE_RESOURCE,
     PUBLIC_METHOD_AWARE_VIDEO_JOBS_RESOURCE,
     PUBLIC_METHOD_AWARE_VIDEO_CANDIDATES_RESOURCE,
+    PUBLIC_METHOD_AWARE_INPUT_CANDIDATES_RESOURCE,
+    PUBLIC_METHOD_AWARE_INPUT_ADMISSION_RESOURCE,
     PUBLIC_M6_BASELINE_ACTIVATE_ENDPOINT,
     PUBLIC_M6_BIBLE_CANDIDATE_ENDPOINT,
     PUBLIC_M6_BIBLE_CONFIRM_ENDPOINT,
@@ -192,6 +194,8 @@ EPISODE_PRODUCTION_SUBRESOURCES = {
     PUBLIC_METHOD_AWARE_VIDEO_ROUTE_RESOURCE,
     PUBLIC_METHOD_AWARE_VIDEO_JOBS_RESOURCE,
     PUBLIC_METHOD_AWARE_VIDEO_CANDIDATES_RESOURCE,
+    PUBLIC_METHOD_AWARE_INPUT_CANDIDATES_RESOURCE,
+    PUBLIC_METHOD_AWARE_INPUT_ADMISSION_RESOURCE,
     PUBLIC_EXPLICIT_AUDIO_REQUIREMENT_ROUTE_RESOURCE,
 }
 
@@ -292,6 +296,15 @@ def _valid_method_aware_public_command(resource: str, payload: Mapping[str, Any]
         return set(payload) == (_METHOD_AWARE_SCOPE_FIELDS | {
             "videoMethodRouteVersionRef", "videoMethodRouteDigest", "mediaJobRef", "mediaJobResultDigest",
         })
+    if resource in {PUBLIC_METHOD_AWARE_INPUT_CANDIDATES_RESOURCE, PUBLIC_METHOD_AWARE_INPUT_ADMISSION_RESOURCE}:
+        fields = _METHOD_AWARE_SCOPE_FIELDS | {
+            "executionMethodPlanVersionRef", "executionMethodPlanDigest",
+            "visualExecutionRequirementRef", "visualExecutionRequirementDigest",
+        }
+        fields |= ({"stagedArtifactRef", "stagedArtifactDigest"}
+                   if resource == PUBLIC_METHOD_AWARE_INPUT_CANDIDATES_RESOURCE else
+                   {"humanSelectionRef", "humanSelectionVersion", "humanSelectionDigest"})
+        return set(payload) == fields
     if resource == PUBLIC_EXPLICIT_AUDIO_REQUIREMENT_ROUTE_RESOURCE:
         required = _METHOD_AWARE_SCOPE_FIELDS | {"audioRequirementRef"}
         allowed = required | {"rightsBindingRef", "voiceAssetVersionRef"}
@@ -798,7 +811,8 @@ class CreatorRequestHandler(BaseHTTPRequestHandler):
             raw_payload = self.rfile.read(content_length)
             payload = load_public_json(raw_payload)
             if (production_subresource is not None
-                    and production_subresource[1] == PUBLIC_METHOD_AWARE_VIDEO_CANDIDATES_RESOURCE):
+                    and production_subresource[1] in {PUBLIC_METHOD_AWARE_VIDEO_CANDIDATES_RESOURCE,
+                        PUBLIC_METHOD_AWARE_INPUT_CANDIDATES_RESOURCE, PUBLIC_METHOD_AWARE_INPUT_ADMISSION_RESOURCE}):
                 # Depth and numeric bounds have already passed the shared
                 # strict parser.  This closed DTO also rejects duplicate keys.
                 payload = json.loads(raw_payload, object_pairs_hook=_unique_result_object)
@@ -1122,6 +1136,10 @@ class CreatorRequestHandler(BaseHTTPRequestHandler):
                     )
                 elif resource == PUBLIC_METHOD_AWARE_VIDEO_CANDIDATES_RESOURCE:
                     result = self.episode_production_boundary.ingest_public_method_aware_video_result(command)
+                elif resource == PUBLIC_METHOD_AWARE_INPUT_CANDIDATES_RESOURCE:
+                    result = self.episode_production_boundary.ingest_public_method_aware_input_candidate(command)
+                elif resource == PUBLIC_METHOD_AWARE_INPUT_ADMISSION_RESOURCE:
+                    result = self.episode_production_boundary.admit_public_method_aware_input_image(command)
                 elif resource == PUBLIC_METHOD_AWARE_VIDEO_JOBS_RESOURCE:
                     raise EpisodeProductionPublicError("method_not_allowed", 405)
                 elif resource == "explicit-audio-requirement-route":
@@ -1429,7 +1447,9 @@ class CreatorRequestHandler(BaseHTTPRequestHandler):
                 )
                 if production_subresource is not None:
                     run_ref, resource = production_subresource
-                    if resource == PUBLIC_METHOD_AWARE_VIDEO_CANDIDATES_RESOURCE:
+                    if resource in {PUBLIC_METHOD_AWARE_VIDEO_CANDIDATES_RESOURCE,
+                                    PUBLIC_METHOD_AWARE_INPUT_CANDIDATES_RESOURCE,
+                                    PUBLIC_METHOD_AWARE_INPUT_ADMISSION_RESOURCE}:
                         raise EpisodeProductionPublicError("method_not_allowed", 405)
                     if resource == PUBLIC_METHOD_AWARE_VIDEO_JOBS_RESOURCE:
                         required = {"projectRef", "seriesRef", "episodeRef"}

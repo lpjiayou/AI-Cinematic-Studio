@@ -2222,6 +2222,8 @@ class M12VoiceProfileLineageContractTests(unittest.TestCase):
             "method-aware-video-route",
             "method-aware-video-jobs",
             "method-aware-video-candidates",
+            "method-aware-input-candidates",
+            "method-aware-input-admission",
             "explicit-audio-requirement-route",
         }
         self.assertEqual(

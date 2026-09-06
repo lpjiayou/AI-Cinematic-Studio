@@ -23,6 +23,8 @@ from services.v4_platform.real_video_candidates import (
 )
 from services.v4_platform.method_aware_results import MethodAwareMediaJobResultReader
 from .method_aware_result_intake import MethodAwareResultIntakeError, MethodAwareResultIntakeService
+from services.v4_platform.method_aware_input_artifacts import input_artifact_evidence_from_environment
+from .method_aware_input_assets import MethodAwareInputAssetError, MethodAwareInputAssetService
 
 from .authority import (
     AuthorityRequiredError,
@@ -420,6 +422,7 @@ class EpisodeProductionPublicBoundary:
         method_aware_media: M10M11MethodAwareMediaService | None = None,
         explicit_audio_bridge: M9M12ExplicitAudioBridgeService | None = None,
         method_aware_result_reader=None,
+        method_aware_input_artifact_evidence=None,
     ) -> None:
         self.__service = service
         self.__narrative_validation = narrative_validation
@@ -447,9 +450,15 @@ class EpisodeProductionPublicBoundary:
             if method_aware_media is not None else None
         )
         self.__state_projection = real_media_revision.state_projection
+        self.__method_aware_input_assets = (
+            MethodAwareInputAssetService(method_aware_media,self.__candidate_review,method_aware_input_artifact_evidence)
+            if method_aware_media is not None else None
+        )
 
     @staticmethod
     def _error(exc: EpisodeProductionError) -> EpisodeProductionPublicError:
+        if isinstance(exc, MethodAwareInputAssetError):
+            return EpisodeProductionPublicError(exc.code, exc.status)
         if isinstance(exc, MethodAwareResultIntakeError):
             return EpisodeProductionPublicError(exc.code, exc.status)
         if isinstance(exc, RecordNotFoundError):
@@ -939,6 +948,17 @@ class EpisodeProductionPublicBoundary:
 
     def ingest_public_method_aware_video_result(self, command: Mapping[str, Any]) -> dict[str, Any]:
         return self._invoke(self._method_aware_result_service().ingest, command)
+
+    def _input_asset_service(self):
+        if self.__method_aware_input_assets is None:
+            raise EpisodeProductionPublicError("method_aware_input_artifact_unavailable",503)
+        return self.__method_aware_input_assets
+
+    def ingest_public_method_aware_input_candidate(self, command: Mapping[str, Any]) -> dict[str, Any]:
+        return self._invoke_public_media(self._input_asset_service().ingest,command)
+
+    def admit_public_method_aware_input_image(self, command: Mapping[str, Any]) -> dict[str, Any]:
+        return self._invoke_public_media(self._input_asset_service().admit,command)
 
     def get_public_method_aware_video_jobs(self, workspace_ref, project_ref, series_ref, episode_ref,
                                          production_run_ref, version_ref=None):
@@ -1867,6 +1887,7 @@ def create_in_memory_boundary(
     media_execution=None,
     method_aware_execution=None,
     method_aware_result_reader=None,
+    method_aware_input_artifact_evidence=None,
     composition_execution=None,
     approval_authority=None,
     media_selection_approval_authority=None,
@@ -1940,6 +1961,7 @@ def create_in_memory_boundary(
         method_aware_media,
         explicit_audio_bridge,
         method_aware_result_reader=method_aware_result_reader,
+        method_aware_input_artifact_evidence=method_aware_input_artifact_evidence,
     )
 
 
@@ -1965,6 +1987,7 @@ def create_local_development_boundary(
     media_execution=None,
     method_aware_execution=None,
     method_aware_result_reader=None,
+    method_aware_input_artifact_evidence=None,
     composition_execution=None,
     approval_authority=None,
     media_selection_approval_authority=None,
@@ -2071,6 +2094,7 @@ def create_local_development_boundary(
         method_aware_media,
         explicit_audio_bridge,
         method_aware_result_reader=method_aware_result_reader,
+        method_aware_input_artifact_evidence=method_aware_input_artifact_evidence,
     )
 
 
@@ -2083,6 +2107,7 @@ def create_local_development_boundary_from_environment(
     environ: Mapping[str, str] | None = None,
 ) -> EpisodeProductionPublicBoundary:
     values = os.environ if environ is None else environ
+    input_artifact_evidence = input_artifact_evidence_from_environment(values)
     rights_authority, provider_authority = external_authorities_from_environment(values)
     identity_reference_authority = (
         identity_reference_authority_from_environment(values)
@@ -2211,6 +2236,7 @@ def create_local_development_boundary_from_environment(
         media_execution=execution,
         method_aware_execution=method_execution,
         method_aware_result_reader=MethodAwareMediaJobResultReader(job_repository, artifact_root),
+        method_aware_input_artifact_evidence=input_artifact_evidence,
         composition_execution=V4CompositionExecutor.from_artifact_root(artifact_root),
         approval_authority=approval_authority,
         media_selection_approval_authority=media_selection_approval_authority,

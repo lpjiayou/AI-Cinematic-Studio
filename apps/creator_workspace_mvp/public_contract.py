@@ -63,6 +63,8 @@ PUBLIC_METHOD_AWARE_INPUT_PLAN_RESOURCE: Final = "method-aware-input-plan"
 PUBLIC_METHOD_AWARE_VIDEO_ROUTE_RESOURCE: Final = "method-aware-video-route"
 PUBLIC_METHOD_AWARE_VIDEO_JOBS_RESOURCE: Final = "method-aware-video-jobs"
 PUBLIC_METHOD_AWARE_VIDEO_CANDIDATES_RESOURCE: Final = "method-aware-video-candidates"
+PUBLIC_METHOD_AWARE_INPUT_CANDIDATES_RESOURCE: Final = "method-aware-input-candidates"
+PUBLIC_METHOD_AWARE_INPUT_ADMISSION_RESOURCE: Final = "method-aware-input-admission"
 PUBLIC_EXPLICIT_AUDIO_REQUIREMENT_ROUTE_RESOURCE: Final = (
     "explicit-audio-requirement-route"
 )
@@ -73,6 +75,8 @@ PUBLIC_METHOD_AWARE_RESOURCES: Final = frozenset(
         PUBLIC_METHOD_AWARE_VIDEO_ROUTE_RESOURCE,
         PUBLIC_METHOD_AWARE_VIDEO_JOBS_RESOURCE,
         PUBLIC_METHOD_AWARE_VIDEO_CANDIDATES_RESOURCE,
+        PUBLIC_METHOD_AWARE_INPUT_CANDIDATES_RESOURCE,
+        PUBLIC_METHOD_AWARE_INPUT_ADMISSION_RESOURCE,
         PUBLIC_EXPLICIT_AUDIO_REQUIREMENT_ROUTE_RESOURCE,
     }
 )
@@ -166,6 +170,8 @@ CAPABILITY_PROJECTION: Final = (
             "episode-production-runs/real-media-revision",
             "episode-production-runs/dynamic-media-preflight",
             "episode-production-runs/real-image-candidates",
+            "episode-production-runs/method-aware-input-candidates",
+            "episode-production-runs/method-aware-input-admission",
             "episode-production-runs/real-image-selection",
             "episode-production-runs/real-image-admission",
             "episode-production-runs/real-image-successor-admission",

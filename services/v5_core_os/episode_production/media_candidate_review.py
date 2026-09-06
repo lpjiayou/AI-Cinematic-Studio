@@ -499,8 +499,9 @@ def _record(
 class CanonicalAssetVersionAuthority:
     """Read-only projection over the one canonical AssetVersion evidence stream."""
 
-    def __init__(self, evidence: EpisodeProductionEvidenceRepository) -> None:
+    def __init__(self, evidence: EpisodeProductionEvidenceRepository, *, root_service=None) -> None:
         self.evidence = evidence
+        self.root_service = root_service
 
     def list_asset_versions(
         self,
@@ -538,6 +539,14 @@ class CanonicalAssetVersionAuthority:
         )
         for record in record_values:
             self._add(versions, _payload(record))
+        for value in versions.values():
+            if value.get("schemaVersion") == "v5.method-aware-input-image-asset-version.v1":
+                from .method_aware_input_assets import validate_asset_version
+                all_records = self.evidence.list_records(workspace_ref, production_run_ref) if records is None else records
+                root = (self.root_service.verify_run_current(workspace_ref, production_run_ref)
+                    if self.root_service is not None else None)
+                validate_asset_version(value, records=all_records,
+                    workspace_ref=workspace_ref, run_ref=production_run_ref, root=root)
         return sorted(
             versions.values(),
             key=lambda item: (
@@ -589,7 +598,8 @@ class K2MediaCandidateReviewService:
     ) -> None:
         self.root_service = root_service
         self.evidence = evidence
-        self.asset_versions = CanonicalAssetVersionAuthority(evidence)
+        self.asset_versions = CanonicalAssetVersionAuthority(evidence, root_service=root_service)
+        self.input_selection_validator = None
         self._clock = clock
         self.selection_authority = (
             selection_authority or RejectingMediaSelectionApprovalAuthority()
@@ -1664,7 +1674,9 @@ class K2MediaCandidateReviewService:
             workspace, run_ref
         )
         item = self.prepare_human_selection_record(command)
-        if item.payload.get("decision") == "SELECTED":
+        if item.payload.get("decision") == "SELECTED" and not (
+            callable(self.input_selection_validator) and self.input_selection_validator(item)
+        ):
             raise CandidateLifecycleError(
                 "SELECTED decisions must be committed atomically by admission"
             )

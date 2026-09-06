@@ -222,8 +222,15 @@ class MethodAwareComfyLoopbackIntegrationTests(unittest.TestCase):
         from services.v5_core_os.lifecycle_integrity import LifecycleAssembly
         from services.v5_core_os.episode_production.public import create_local_development_boundary_from_environment
         from tests.unit.test_method_aware_media_m10_m11 import method_service
+        from tests.unit.test_method_aware_input_image_admission_e3a import InputImageFixture
         life=LifecycleAssembly.in_memory()
-        env={**self.env,'CREATOR_EPISODE_PRODUCTION_DATA_PATH':str(self.root/'episode.sqlite3'),
+        # E3A shares this source root and requires all artifact-authority settings together.
+        image=InputImageFixture(self)
+        image.source_root=self.case.sources
+        image.source=image.source_root/(image.content_digest+'.png')
+        image.source.write_bytes(image.content)
+        image.configure()
+        env={**self.env,**image.environment,'CREATOR_EPISODE_PRODUCTION_DATA_PATH':str(self.root/'episode.sqlite3'),
              'CREATOR_MEDIA_JOB_DATA_PATH':str(self.db),'CREATOR_MEDIA_ARTIFACT_ROOT':str(self.root/'artifacts')}
         boundary=create_local_development_boundary_from_environment(
             project_boundary=life.project_context,series_episode_boundary=life.series_episode,
