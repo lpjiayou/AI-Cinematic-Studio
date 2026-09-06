@@ -42,46 +42,20 @@ VIDEO_METHOD_ROUTE_SCHEMA_VERSION = "v5.video-method-route.v1"
 METHOD_AWARE_VIDEO_REQUEST_SCHEMA_VERSION = (
     "v5.method-aware-video-generation-request.v1"
 )
-WAN_SINGLE_ANCHOR_CAPABILITY = "self-hosted-wan22-image-to-video-v1"
-WAN_SINGLE_ANCHOR_ADAPTER_IDENTITY = "v4.comfyui-wan22-image-to-video.v1"
+# Legacy v1 display/read exports; routing authority is the injected V4 resolver.
+from services.v4_platform.backend_registry import (
+    BackendUnavailableError, BackendValidationError, UnavailableBackendResolver,
+    VideoExecutionBackendResolver,
+    execution_classification, validate_decision,
+    LEGACY_VIDEO_CAPABILITY as WAN_SINGLE_ANCHOR_CAPABILITY,
+    LEGACY_VIDEO_ADAPTER_IDENTITY as WAN_SINGLE_ANCHOR_ADAPTER_IDENTITY,
+    LEGACY_METHOD_CAPABILITIES as METHOD_CAPABILITY_REGISTRY,
+    LEGACY_METHOD_IDENTITIES as METHOD_ADAPTER_IDENTITY_REGISTRY,
+    LEGACY_REGISTRY_VERSION as METHOD_CAPABILITY_REGISTRY_VERSION,
+    LEGACY_REGISTRY_DIGEST as METHOD_CAPABILITY_REGISTRY_DIGEST,
+)
 WAN_FALLBACK_USED = False
-
-VIDEO_METHODS = frozenset(
-    {
-        "SINGLE_ANCHOR_I2V",
-        "CONTACT_CONDITIONED_VIDEO",
-        "POSE_OR_TRAJECTORY_CONDITIONED_VIDEO",
-    }
-)
-METHOD_CAPABILITY_REGISTRY = {
-    ("MICRO_MOTION", "SINGLE_ANCHOR_I2V"): WAN_SINGLE_ANCHOR_CAPABILITY,
-    ("CONTACT_ACTION", "CONTACT_CONDITIONED_VIDEO"): None,
-    ("GAIT_LOCOMOTION", "POSE_OR_TRAJECTORY_CONDITIONED_VIDEO"): None,
-}
-METHOD_ADAPTER_IDENTITY_REGISTRY = {
-    ("MICRO_MOTION", "SINGLE_ANCHOR_I2V"): WAN_SINGLE_ANCHOR_ADAPTER_IDENTITY,
-    ("CONTACT_ACTION", "CONTACT_CONDITIONED_VIDEO"): None,
-    ("GAIT_LOCOMOTION", "POSE_OR_TRAJECTORY_CONDITIONED_VIDEO"): None,
-}
-METHOD_CAPABILITY_REGISTRY_VERSION = "v5.video-method-capability-registry.v1"
-METHOD_CAPABILITY_REGISTRY_DIGEST = _digest(
-    {
-        "schemaVersion": METHOD_CAPABILITY_REGISTRY_VERSION,
-        "routes": [
-            {
-                "executionClass": execution_class,
-                "executionMethod": execution_method,
-                "adapterCapability": capability,
-                "adapterIdentity": METHOD_ADAPTER_IDENTITY_REGISTRY[
-                    (execution_class, execution_method)
-                ],
-            }
-            for (execution_class, execution_method), capability in sorted(
-                METHOD_CAPABILITY_REGISTRY.items()
-            )
-        ],
-    }
-)
+VIDEO_METHODS = frozenset(method for _, method in METHOD_CAPABILITY_REGISTRY)
 
 _SCOPE_FIELDS = ("workspaceRef", "projectRef", "seriesRef", "episodeRef")
 _CREATE_INPUT_FIELDS = frozenset(
@@ -249,8 +223,11 @@ _QUEUED_JOB_FIELDS = frozenset(
 
 
 class MediaJobDispatchPort(Protocol):
+    backend_resolver: VideoExecutionBackendResolver
+
     def dispatch(
-        self, request: Mapping[str, Any], *, idempotency_key: str
+        self, request: Mapping[str, Any], *, idempotency_key: str,
+        backend_binding: Mapping[str, Any], execution_context: Mapping[str, Any],
     ) -> tuple[dict[str, Any], bool]: ...
 
 
@@ -1086,9 +1063,8 @@ class M10M11MethodAwareMediaService:
             raise ExecutionNotAuthorizedError("current M10 input plan is required")
         return plan
 
-    @staticmethod
     def _route_request_digest(
-        scope: Mapping[str, str], run_ref: str, input_plan: Mapping[str, Any]
+        self, scope: Mapping[str, str], run_ref: str, input_plan: Mapping[str, Any]
     ) -> str:
         return _digest(
             {
@@ -1099,9 +1075,13 @@ class M10M11MethodAwareMediaService:
                     "methodAwareInputPlanVersionRef"
                 ],
                 "methodAwareInputPlanDigest": input_plan["payloadDigest"],
-                "capabilityRegistryDigest": METHOD_CAPABILITY_REGISTRY_DIGEST,
+                "capabilityRegistryDigest": self.backend_resolver.registry_digest,
             }
         )
+
+    @property
+    def backend_resolver(self):
+        return getattr(self.media_jobs, "backend_resolver", UnavailableBackendResolver())
 
     @staticmethod
     def _anchor(method_plan: Mapping[str, Any]) -> Mapping[str, Any] | None:
@@ -1122,6 +1102,7 @@ class M10M11MethodAwareMediaService:
         method_plan: Mapping[str, Any],
         execution_plan: Mapping[str, Any],
         created_at: str,
+        backend_decision: Mapping[str, Any],
     ) -> dict[str, Any]:
         anchor = self._anchor(method_plan)
         if anchor is None:
@@ -1203,10 +1184,10 @@ class M10M11MethodAwareMediaService:
                     "startFrameInclusive": beat["frameRangeStartInclusive"],
                     "endFrameExclusive": beat["frameRangeEndExclusive"],
                 },
-                "adapterCapability": WAN_SINGLE_ANCHOR_CAPABILITY,
-                "executionMode": "INTERNAL_SELF_HOSTED",
+                "adapterCapability": backend_decision["adapterCapability"],
+                "executionMode": execution_classification(backend_decision)[0],
                 "executionAuthorizationState": "QUEUED_NOT_EXECUTED",
-                "requestedProvenance": "SELF_HOSTED_AI_GENERATED",
+                "requestedProvenance": execution_classification(backend_decision)[1],
                 "selectionRequired": True,
                 "publicationAllowed": False,
                 "createdAt": created_at,
@@ -1251,31 +1232,37 @@ class M10M11MethodAwareMediaService:
             elif method not in VIDEO_METHODS:
                 raise RepositoryUnavailableError("M11 method registry is closed")
             else:
-                try:
-                    registry_route = resolve_video_method_capability(
-                        execution_class, method
-                    )
-                except EpisodeProductionError as exc:
-                    raise RepositoryUnavailableError(
-                        "M11 execution class/method pair is unsupported"
-                    ) from exc
-                capability = registry_route["adapterCapability"]
-                adapter_identity = registry_route["adapterIdentity"]
                 target = "M11_VIDEO_EXECUTION"
-                if capability is None:
+                pair = (execution_class, method)
+                if pair not in METHOD_CAPABILITY_REGISTRY:
+                    raise RepositoryUnavailableError("M11 execution class/method pair is unsupported")
+                if execution_class in {"CONTACT_ACTION", "GAIT_LOCOMOTION"}:
                     state = "CAPABILITY_UNAVAILABLE"
                 elif method_plan["inputPlanningState"] != "READY":
                     state = "INPUT_BLOCKED"
+                    # Capability display also follows the active server resolver.
+                    try:
+                        pending = validate_decision(self.backend_resolver.resolve(
+                            execution_class, method, ["ACTION_READY_ANCHOR"], {"mediaType": "video/mp4"}))
+                    except BackendUnavailableError:
+                        pending = None
+                    except BackendValidationError as exc:
+                        raise WorkerUnavailableError("method-aware backend configuration is invalid") from exc
+                    if pending is not None:
+                        capability = pending["adapterCapability"]
+                        adapter_identity = pending["adapterIdentity"]
                 else:
-                    configured_adapter = getattr(self.media_jobs, "adapter", None)
-                    if (
-                        getattr(configured_adapter, "adapter_identity", None)
-                        != WAN_SINGLE_ANCHOR_ADAPTER_IDENTITY
-                    ):
-                        raise WorkerUnavailableError(
-                            "existing MediaJobCoordinator is not bound to the "
-                            "single-anchor Wan adapter"
-                        )
+                    context = self.execution_method_planning.resolve_current_video_execution_context(
+                            scope["workspaceRef"], scope["projectRef"], scope["seriesRef"],
+                            scope["episodeRef"], run_ref, execution_plan["executionMethodPlanVersionRef"],
+                            method_plan["creativeShotVersionRef"], method_plan["beatRef"])
+                    try:
+                        decision = validate_decision(self.backend_resolver.resolve(
+                            execution_class, method, ["ACTION_READY_ANCHOR"], context["outputConstraints"]))
+                    except (BackendUnavailableError, BackendValidationError) as exc:
+                        raise WorkerUnavailableError("no compatible method-aware backend is configured") from exc
+                    capability = decision["adapterCapability"]
+                    adapter_identity = decision["adapterIdentity"]
                     request = self._micro_request(
                         scope=scope,
                         run_ref=run_ref,
@@ -1283,6 +1270,7 @@ class M10M11MethodAwareMediaService:
                         method_plan=method_plan,
                         execution_plan=execution_plan,
                         created_at=now,
+                        backend_decision=decision,
                     )
                     child_key = _digest(
                         {
@@ -1294,7 +1282,8 @@ class M10M11MethodAwareMediaService:
                     )
                     try:
                         job, queue_replay = self.media_jobs.dispatch(
-                            request, idempotency_key=child_key
+                            request, idempotency_key=child_key,
+                            backend_binding=decision, execution_context=context,
                         )
                     except (AttributeError, MediaJobError) as exc:
                         raise WorkerUnavailableError(
@@ -1405,8 +1394,8 @@ class M10M11MethodAwareMediaService:
                 "executionMethodPlanDigest": input_plan[
                     "executionMethodPlanDigest"
                 ],
-                "capabilityRegistryVersion": METHOD_CAPABILITY_REGISTRY_VERSION,
-                "capabilityRegistryDigest": METHOD_CAPABILITY_REGISTRY_DIGEST,
+                "capabilityRegistryVersion": self.backend_resolver.registry_version,
+                "capabilityRegistryDigest": self.backend_resolver.registry_digest,
                 "routes": routes,
                 "videoGenerationRequests": requests,
                 "queuedJobs": queued,
@@ -1424,10 +1413,9 @@ class M10M11MethodAwareMediaService:
             not _sealed(value)
             or set(value) != _ROUTE_PLAN_FIELDS
             or value.get("schemaVersion") != VIDEO_METHOD_ROUTE_PLAN_SCHEMA_VERSION
-            or value.get("capabilityRegistryVersion")
-            != METHOD_CAPABILITY_REGISTRY_VERSION
-            or value.get("capabilityRegistryDigest")
-            != METHOD_CAPABILITY_REGISTRY_DIGEST
+            or not isinstance(value.get("capabilityRegistryVersion"), str)
+            or not value.get("capabilityRegistryVersion")
+            or not _is_digest(value.get("capabilityRegistryDigest"))
             or value.get("wanFallbackUsed") is not False
             or value.get("publicationAllowed") is not False
             or not isinstance(value.get("routes"), list)
@@ -1449,8 +1437,8 @@ class M10M11MethodAwareMediaService:
             != METHOD_AWARE_VIDEO_REQUEST_SCHEMA_VERSION
             or request.get("executionClass") != "MICRO_MOTION"
             or request.get("executionMethod") != "SINGLE_ANCHOR_I2V"
-            or request.get("adapterCapability")
-            != WAN_SINGLE_ANCHOR_CAPABILITY
+            or not isinstance(request.get("adapterCapability"), str)
+            or not request.get("adapterCapability")
             or request.get("executionAuthorizationState")
             != "QUEUED_NOT_EXECUTED"
             or request.get("publicationAllowed") is not False
@@ -1498,10 +1486,9 @@ class M10M11MethodAwareMediaService:
                     or reservation.get("generationRequestDigest")
                     != request.get("payloadDigest")
                     or reservation.get("mediaJobRef") != route.get("mediaJobRef")
-                    or route.get("adapterCapability")
-                    != WAN_SINGLE_ANCHOR_CAPABILITY
-                    or route.get("adapterIdentity")
-                    != WAN_SINGLE_ANCHOR_ADAPTER_IDENTITY
+                    or route.get("adapterCapability") != request.get("adapterCapability")
+                    or not isinstance(route.get("adapterIdentity"), str)
+                    or not route.get("adapterIdentity")
                     or not isinstance(route.get("mediaJobRef"), str)
                 ):
                     raise RepositoryUnavailableError(
@@ -1549,10 +1536,12 @@ class M10M11MethodAwareMediaService:
             ) or (
                 pair == ("MICRO_MOTION", "SINGLE_ANCHOR_I2V")
                 and state in {"INPUT_BLOCKED", "QUEUED_EXISTING_MEDIA_JOB"}
-                and route.get("adapterCapability")
-                == WAN_SINGLE_ANCHOR_CAPABILITY
-                and route.get("adapterIdentity")
-                == WAN_SINGLE_ANCHOR_ADAPTER_IDENTITY
+                and (
+                    isinstance(route.get("adapterCapability"), str) and bool(route.get("adapterCapability"))
+                    and isinstance(route.get("adapterIdentity"), str) and bool(route.get("adapterIdentity"))
+                    or state == "INPUT_BLOCKED" and route.get("adapterCapability") is None
+                    and route.get("adapterIdentity") is None
+                )
             )
             if not valid_route:
                 raise RepositoryUnavailableError(
@@ -1709,7 +1698,7 @@ class M10M11MethodAwareMediaService:
                 and input_plan["payloadDigest"]
                 == payload["methodAwareInputPlanDigest"]
                 and payload["capabilityRegistryDigest"]
-                == METHOD_CAPABILITY_REGISTRY_DIGEST
+                == self.backend_resolver.registry_digest
             )
         except EpisodeProductionError:
             current = False

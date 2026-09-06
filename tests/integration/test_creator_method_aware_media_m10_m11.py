@@ -2,6 +2,7 @@ from pathlib import Path
 import sqlite3
 import tempfile
 import unittest
+from tests.unit.test_method_aware_media_m10_m11 import backend_registry_fixture
 
 from services.v4_platform import MediaJobCoordinator, SqliteMediaJobAdapter
 from services.v5_core_os.episode_production import create_local_development_boundary
@@ -50,6 +51,7 @@ class MethodAwareMediaPersistenceIntegrationTests(unittest.TestCase):
                 root / "artifacts",
                 ref_factory=lambda prefix: f"{prefix}-integration",
                 clock=lambda: "2026-09-02T06:00:00Z",
+                backend_resolver=backend_registry_fixture(),
             )
             kwargs = {
                 "project_boundary": assembly.project_context,
@@ -58,7 +60,7 @@ class MethodAwareMediaPersistenceIntegrationTests(unittest.TestCase):
                 "script_studio_boundary": assembly.script_studio,
                 "evidence_database_path": evidence,
                 "narrative_validation_profiles": validation_profiles(),
-                "media_execution": coordinator,
+                "method_aware_execution": coordinator,
             }
             first = create_local_development_boundary(
                 database,
@@ -101,10 +103,11 @@ class MethodAwareMediaPersistenceIntegrationTests(unittest.TestCase):
                 root / "artifacts",
                 ref_factory=lambda prefix: f"{prefix}-restart",
                 clock=lambda: "2026-09-02T06:00:01Z",
+                backend_resolver=backend_registry_fixture(),
             )
             restarted = create_local_development_boundary(
                 database,
-                **{**kwargs, "media_execution": restarted_coordinator},
+                **{**kwargs, "method_aware_execution": restarted_coordinator},
                 initialize_if_missing=False,
             )
             input_replay = restarted.create_method_aware_input_plan(input_command)

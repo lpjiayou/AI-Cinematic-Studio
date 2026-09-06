@@ -62,7 +62,7 @@ def _arguments() -> argparse.Namespace:
     parser.add_argument(
         "--require-start-image",
         action="store_true",
-        help="require LoadImage → Wan start_image capability for M11",
+        help="emit exact v2 IMAGE_TO_VIDEO attestation with LoadImage/start_image (default: legacy v1 T2V)",
     )
     args = parser.parse_args()
     for attribute, option_name, environment_name in (

@@ -20,7 +20,7 @@ from tests.unit.test_execution_method_planning_m8_m9 import (
     seeded_plan,
 )
 from tests.unit.test_method_aware_media_m10_m11 import (
-    NoCallWanAdapter,
+    NoCallWanAdapter, backend_registry_fixture,
     append_admitted_image,
     m10_command,
     m11_command,
@@ -46,6 +46,7 @@ class CreatorMethodAwareMediaContractTests(unittest.TestCase):
             Path(self.temporary.name) / "artifacts",
             ref_factory=lambda prefix: f"{prefix}-contract",
             clock=lambda: "2026-09-02T05:00:00Z",
+            backend_resolver=backend_registry_fixture(),
         )
         method_service(self.seed["boundary"]).media_jobs = self.coordinator
         self.execution_plan = self.seed["boundary"].create_execution_method_plan(

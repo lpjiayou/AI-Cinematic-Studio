@@ -102,8 +102,8 @@ database was created.
 | M6 | ADR-0003/0004/0005/0019 | #55 and #59 | production authority absent | upstream prerequisite closed |
 | M7 | ADR-0019 | #55 and #59 | no automatic rewrite or WARN waiver | upstream prerequisite closed |
 | M8–M9 | ADR-0019 | #56, #58, #63 and #64; Frontend #25 | live asset production/admission not authorized | method-aware successor required |
-| M10 | ADR-0019 | #57, #63 and #64; Frontend #25 pin only | model execution and method-aware UI not complete | no runtime expansion |
-| M11 | ADR-0019 | #57, #63 and #64; Frontend #25 pin only | Contact/Gait runtimes not installed | no fallback or runtime expansion |
+| M10 | ADR-0019 | #57/#63/#64 plus E1 neutral backend/envelope and shared job reservation | current result intake and live execution absent; Frontend separate | E2 requires separate authorization |
+| M11 | ADR-0019 | E1 exact worker, immutable attempt binding, fake I2V and versioned archive | result intake, live runtime/cost and eligible lineage absent; Contact/Gait unavailable | E2 requires separate authorization; Spike remains blocked |
 | M12 | ADR-0015, ADR-0019, ADR-0020 | #20/#21, #58/#63/#64; A100 evidence `93c1c96d…a1ce`; WSL2 evidence `801e4e8c…7ed`; dedicated VM specification | WSL2 rejected for this wave; dedicated CPU VM/provider unselected; A100 C4 isolation unproven; Runtime G0 incomplete | `ACS-M12-C3-DEDICATED-LINUX-CPU-VM-PROVIDER-SELECTION-AND-PREFLIGHT` |
 | M13 | ADR-0016/0017/0018/0019 | immutable base tag, #48/#63/#64; Frontend #25 | product surface, M14/M15 and publication incomplete | Extension G0 requires separate authorization |
 | M14–M19 | System Master Plan and applicable M13 boundary | no authorized implementation | prerequisite and authority gates absent | no current implementation authority |
@@ -222,3 +222,5 @@ M13_M14_M15_INTEGRATION=NOT_AUTHORIZED
 M13_PUBLICATION=NOT_AUTHORIZED
 M13_PRODUCT_CAPABILITY_COMPLETE=false
 ```
+
+The [E1 worker seam receipt](M10_M11_METHOD_AWARE_WORKER_SEAM_CORRECTIVE_E1_2026-09-06.md) records fake-only execution and legacy compatibility. `SPIKE_0_READINESS=BLOCKED`; no real GPU/provider or method-aware Candidate intake was executed.

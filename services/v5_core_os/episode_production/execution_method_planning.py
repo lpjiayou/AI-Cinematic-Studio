@@ -1823,6 +1823,37 @@ class M8M9ExecutionMethodPlanningService:
             )
         return plan
 
+    def resolve_current_video_execution_context(
+        self, workspace_ref: str, project_ref: str, series_ref: str, episode_ref: str,
+        production_run_ref: str, execution_method_plan_version_ref: str,
+        creative_shot_version_ref: str, beat_ref: str,
+    ) -> dict[str, Any]:
+        """Read current semantic text and existing run output constraints for V4."""
+        plan = self.require_current_plan(workspace_ref, project_ref, series_ref, episode_ref,
+                                        production_run_ref, execution_method_plan_version_ref)
+        shot = next((s for s in plan["creativeShotVersions"]
+                     if s["creativeShotVersionRef"] == creative_shot_version_ref), None)
+        beat = next((b for b in (shot or {}).get("actionExecutionBeats", [])
+                     if b["beatRef"] == beat_ref), None)
+        if shot is None or beat is None:
+            raise RecordNotFoundError("current video Shot/beat was not found")
+        scope = dict(zip(("workspaceRef", "projectRef", "seriesRef", "episodeRef"),
+                         (workspace_ref, project_ref, series_ref, episode_ref)))
+        resolution = self._current_resolution(scope, production_run_ref,
+                                              plan["consistencyValidationVersionRef"])
+        sources = _source_index(resolution["scriptVersion"])
+        span = self._validate_stored_source_span(beat["sourceSpan"], beat["sourceTextDigest"],
+                sources=sources, expected_field=beat["sourceSpan"]["sourceField"])
+        source = sources[(span["scriptSceneRef"], span["sourceField"], span["sourceIndex"])]
+        text = source.text[span["startOffsetInclusive"]:span["endOffsetExclusive"]]
+        if _text_digest(text) != beat["sourceTextDigest"]:
+            raise StaleInputError("video action source changed")
+        output = resolution["run"]["manifest"]["output"]
+        return {"sourceText": text, "outputConstraints": {
+            "mediaKind": "video", "mediaType": "video/mp4", "width": output["width"],
+            "height": output["height"], "frameRate": output["frameRate"],
+            "durationFrames": beat["frameRangeEndExclusive"] - beat["frameRangeStartInclusive"]}}
+
     def resolve_current_audio_requirement(
         self,
         workspace_ref: str,

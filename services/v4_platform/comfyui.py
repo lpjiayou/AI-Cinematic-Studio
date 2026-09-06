@@ -9,6 +9,8 @@ approval or publication fact.
 
 from __future__ import annotations
 
+from copy import deepcopy
+
 from dataclasses import dataclass
 from datetime import datetime
 from hashlib import sha256
@@ -857,6 +859,66 @@ def _m11_negative_prompt(value: Mapping[str, Any]) -> str:
     return prompt
 
 
+class RemoteSubmissionIndeterminate(ComfyUIProviderExecutionError):
+    code = "REMOTE_SUBMISSION_INDETERMINATE"
+
+
+COMFYUI_I2V_RUNTIME_ATTESTATION_SCHEMA = "v4.comfyui-runtime-attestation.v2"
+
+
+def validate_runtime_attestation(value: Mapping[str, Any]) -> Mapping[str, Any]:
+    """Exact v1 T2V / v2 capability-mode validation, without network access."""
+    from .backend_registry import exact, hex_digest, integer, digest
+    fields = {"schemaVersion", "attestationRef", "observedAt", "factsDigest", "facts",
+              "authorityState", "publicationAllowed", "payloadDigest"}
+    version = value.get("schemaVersion")
+    if version == COMFYUI_I2V_RUNTIME_ATTESTATION_SCHEMA:
+        fields.add("capabilityMode")
+        if value.get("capabilityMode") not in {"TEXT_TO_VIDEO", "IMAGE_TO_VIDEO"}:
+            raise ComfyUIConfigurationError("attestation capability mode is invalid")
+    elif version != COMFYUI_RUNTIME_ATTESTATION_SCHEMA:
+        raise ComfyUIConfigurationError("attestation schema is invalid")
+    exact(value, fields, "runtime attestation")
+    _text(value["attestationRef"], "attestationRef")
+    try:
+        timestamp = datetime.fromisoformat(value["observedAt"].replace("Z", "+00:00"))
+        if timestamp.tzinfo is None:
+            raise ValueError("timezone")
+    except (AttributeError, TypeError, ValueError) as exc:
+        raise ComfyUIConfigurationError("attestation timestamp is invalid") from exc
+    if value["authorityState"] != "TECHNICAL_EVIDENCE_ONLY" or value["publicationAllowed"] is not False:
+        raise ComfyUIConfigurationError("attestation authority state is unsafe")
+    i2v = value.get("capabilityMode") == "IMAGE_TO_VIDEO"
+    fact_fields = {"providerId", "modelId", "region", "endpointClass", "comfyuiVersion",
+        "pythonVersion", "pytorchVersion", "deviceName", "deviceType", "vramTotalBytes",
+        "requiredNodes", "modelFiles", "objectInfoDigest", "modelDigestVerification"}
+    if i2v:
+        fact_fields.add("startImageCapability")
+    facts = exact(value["facts"], fact_fields, "runtime facts")
+    if (facts["requiredNodes"] != list(REQUIRED_NODES) + (["LoadImage"] if i2v else [])
+            or i2v and facts["startImageCapability"] != "LOAD_IMAGE_TO_WAN_START_IMAGE_VERIFIED"):
+        raise ComfyUIConfigurationError("attestation image capability is incomplete")
+    if facts["deviceType"] != "cuda" or facts["modelDigestVerification"] != "LOCAL_FILE_SHA256_VERIFIED":
+        raise ComfyUIConfigurationError("attestation runtime verification is incomplete")
+    integer(facts["vramTotalBytes"], "vramTotalBytes")
+    for key in fact_fields - {"requiredNodes", "modelFiles", "vramTotalBytes"}:
+        _text(facts[key], key)
+    hex_digest(facts["objectInfoDigest"], "objectInfoDigest")
+    files = facts["modelFiles"]
+    if not isinstance(files, list) or len(files) != 3:
+        raise ComfyUIConfigurationError("attestation model files are invalid")
+    for item in files:
+        exact(item, {"role", "name", "sha256"}, "attested model")
+        _text(item["name"], "model name")
+        hex_digest(item["sha256"], "model digest")
+    if {i["role"] for i in files} != {"UNET", "TEXT_ENCODER", "VAE"} or len({i["name"] for i in files}) != 3:
+        raise ComfyUIConfigurationError("attestation model roles are invalid")
+    if (value["factsDigest"] != digest(facts)
+            or value["payloadDigest"] != digest({k:v for k,v in value.items() if k != "payloadDigest"})):
+        raise ComfyUIConfigurationError("attestation digest mismatch")
+    return facts
+
+
 class ComfyUIWan22ImageToVideoAdapter(ComfyUIWan22VideoAdapter):
     """Exact start-image adapter for the internal non-publishing M11 run."""
 
@@ -867,8 +929,11 @@ class ComfyUIWan22ImageToVideoAdapter(ComfyUIWan22VideoAdapter):
         self,
         config: ComfyUIWan22Config,
         *,
-        source_images: Mapping[str, Path | str],
+        source_images: Any,
         input_root: Path | str,
+        backend_registry: Any = None,
+        runtime_attestation: Mapping[str, Any] | None = None,
+        model_root: Path | str | None = None,
         workflow_evidence_root: Path | str | None = None,
         client: ComfyUIHttpClient | None = None,
         monotonic: Callable[[], float] = time.monotonic,
@@ -877,10 +942,15 @@ class ComfyUIWan22ImageToVideoAdapter(ComfyUIWan22VideoAdapter):
         super().__init__(
             config, client=client, monotonic=monotonic, sleep=sleep
         )
-        if not isinstance(source_images, Mapping) or not source_images:
+        from .method_aware_execution import ContentAddressedSourceImages
+        self.backend_registry = backend_registry
+        self.runtime_attestation = deepcopy(runtime_attestation)
+        self.model_root = Path(model_root).resolve() if model_root is not None else None
+        self.source_locator = source_images if isinstance(source_images, ContentAddressedSourceImages) else None
+        if self.source_locator is None and (not isinstance(source_images, Mapping) or not source_images):
             raise ComfyUIConfigurationError("M11 source image map is unavailable")
         normalized: dict[str, Path] = {}
-        for content_digest, raw_path in source_images.items():
+        for content_digest, raw_path in (source_images.items() if self.source_locator is None else []):
             digest = _sha256(content_digest, "source image content digest")
             path = Path(raw_path).resolve()
             if (
@@ -910,9 +980,89 @@ class ComfyUIWan22ImageToVideoAdapter(ComfyUIWan22VideoAdapter):
                     "M11 workflow evidence root is unavailable"
                 )
 
+    def validate_method_aware_envelope(self, envelope: Mapping[str, Any]) -> None:
+        from .backend_registry import exact, digest, integer
+        from .method_aware_execution import validate_envelope
+        validate_envelope(envelope)
+        binding = envelope["backendBinding"]
+        if self.backend_registry is None or self.runtime_attestation is None or self.model_root is None:
+            raise ComfyUIConfigurationError("method-aware runtime binding is unavailable")
+        profile = self.backend_registry.profile(binding)
+        parameters = exact(profile["parameters"],
+            {"seed", "steps", "cfg", "samplerName", "scheduler", "modelShift", "negativePrompt"},
+            "I2V profile parameters")
+        if profile["schemaVersion"] != "v4.comfyui-i2v-backend-profile.v1":
+            raise ComfyUIConfigurationError("I2V profile schema is invalid")
+        integer(parameters["steps"], "steps", maximum=100)
+        integer(parameters["seed"], "seed", minimum=0, maximum=2**64-1)
+        for key in ("cfg", "modelShift"):
+            if type(parameters[key]) not in (int, float) or not 0 < parameters[key] <= 100:
+                raise ComfyUIConfigurationError("I2V numeric profile is invalid")
+        if parameters["samplerName"] != "uni_pc" or parameters["scheduler"] != "simple":
+            raise ComfyUIConfigurationError("I2V sampler profile is unsupported")
+        _text(parameters["negativePrompt"], "negativePrompt", maximum=4000)
+        facts = validate_runtime_attestation(self.runtime_attestation)
+        if (self.runtime_attestation.get("capabilityMode") != "IMAGE_TO_VIDEO"
+                or self.runtime_attestation["attestationRef"] != binding["runtimeAttestationRef"]
+                or self.runtime_attestation["payloadDigest"] != binding["runtimeAttestationDigest"]
+                or profile["modelFiles"] != facts["modelFiles"]):
+            raise ComfyUIConfigurationError("exact I2V attestation binding is invalid")
+        for key, field in (("providerId", "provider_id"), ("modelId", "model_id"),
+                           ("region", "region"), ("endpointClass", "endpoint_class"),
+                           ("costCurrency", "cost_currency"), ("runtimeAttestationRef", "runtime_attestation_ref"),
+                           ("runtimeAttestationDigest", "runtime_attestation_digest")):
+            if binding[key] != getattr(self.config, field):
+                raise ComfyUIConfigurationError("configured backend binding changed")
+            if key in facts and facts[key] != binding[key]:
+                raise ComfyUIConfigurationError("attested backend identity changed")
+        if (binding["adapterIdentity"] != self.adapter_identity
+                or binding["adapterCapability"] != COMFYUI_IMAGE_TO_VIDEO_CAPABILITY
+                or binding["backendType"] not in {"SELF_HOSTED_SINGLE_GPU", "CLOUD_GPU_WORKER"}
+                or self.config.cost_minor_per_attempt > binding["maxCostMinor"]):
+            raise ComfyUIConfigurationError("I2V adapter/backend policy mismatch")
+        for role, directory, name, expected in (
+            ("UNET", "diffusion_models", self.config.unet_name, self.config.unet_sha256),
+            ("TEXT_ENCODER", "text_encoders", self.config.clip_name, self.config.clip_sha256),
+            ("VAE", "vae", self.config.vae_name, self.config.vae_sha256)):
+            model = (self.model_root / directory / name).resolve()
+            if (not model.is_relative_to(self.model_root) or not model.is_file()
+                    or _file_sha256(model) != expected
+                    or {"role": role, "name": name, "sha256": expected} not in facts["modelFiles"]):
+                raise ComfyUIConfigurationError("exact model bytes changed")
+        source = envelope["sourceAsset"]
+        request = {"sourceImageContentDigest": source["contentDigest"], "sourceImageMediaType": source["mediaType"],
+            "sourceImageAssetRef": source["assetRef"], "sourceImageAssetVersionRef": source["assetVersionRef"],
+            "sourceImageAssetVersionDigest": source["assetVersionDigest"]}
+        if self.source_locator is None or self.source_locator.resolve(request) != source:
+            raise ComfyUIConfigurationError("I2V source bytes/probe changed")
+        if (_image_dimensions(self.source_locator.path_for(request)) != (source["width"], source["height"])):
+            raise ComfyUIConfigurationError("actual source image dimensions changed")
+        if source["mediaType"] != "image/png":
+            raise ComfyUIConfigurationError("this I2V profile requires a PNG start image")
+        shape = binding["resourceShape"]
+        if (shape["gpuCount"] != 1 or max(shape["minimumVramPerGpu"], shape["minimumTotalVram"])
+                > facts["vramTotalBytes"]):
+            raise ComfyUIConfigurationError("attested GPU does not satisfy this adapter resource shape")
+        output = envelope["outputConstraints"]
+        if output["durationFrames"] % 4 or output["width"] % 16 or output["height"] % 16:
+            raise ComfyUIConfigurationError("I2V output shape is incompatible with the profile")
+        if not self.input_root.is_dir() or self.input_root.is_symlink():
+            raise ComfyUIConfigurationError("I2V staging root is unavailable")
+
+    def _method_projection(self, envelope):
+        self.validate_method_aware_envelope(envelope)
+        profile = self.backend_registry.profile(envelope["backendBinding"])
+        source = envelope["sourceAsset"]
+        parameters = {**profile["parameters"], **{k:v for k,v in envelope["outputConstraints"].items()
+                                                 if k not in {"mediaKind", "mediaType"}}}
+        return {"generationRequestRef": envelope["generationRequestRef"], "parameters": parameters,
+                "sourceImageContentDigest": source["contentDigest"], "sourceImageMediaType": source["mediaType"],
+                "sourceImageProbe": {"width": source["width"], "height": source["height"]}}
+
     def _stage_start_image(self, generation_request: Mapping[str, Any]) -> str:
         content_digest = generation_request["sourceImageContentDigest"]
-        source = self.source_images.get(content_digest)
+        source = (self.source_locator.path_for(generation_request) if self.source_locator is not None
+                  else self.source_images.get(content_digest))
         if source is None or _file_sha256(source) != content_digest:
             raise ComfyUIConfigurationError(
                 "M11 source image binding is unavailable"
@@ -979,7 +1129,11 @@ class ComfyUIWan22ImageToVideoAdapter(ComfyUIWan22VideoAdapter):
     def generate(
         self, generation_request: Mapping[str, Any], candidate_path: Path
     ) -> MediaAdapterResult:
-        if (
+        from .method_aware_execution import EXECUTION_ENVELOPE_SCHEMA
+        envelope = generation_request if generation_request.get("schemaVersion") == EXECUTION_ENVELOPE_SCHEMA else None
+        if envelope is not None:
+            generation_request = self._method_projection(envelope)
+        if envelope is None and (
             generation_request.get("requestedProvenance")
             != COMFYUI_IMAGE_TO_VIDEO_PROVENANCE
             or generation_request.get("adapterCapability")
@@ -998,6 +1152,12 @@ class ComfyUIWan22ImageToVideoAdapter(ComfyUIWan22VideoAdapter):
                 "M11 request does not match the self-hosted execution scope"
             )
         runtime_facts = self.probe_capability(require_start_image=True)
+        if envelope is not None:
+            observed = {k:v for k,v in runtime_facts.items()
+                        if k not in {"runtimeAttestationRef", "runtimeAttestationDigest"}}
+            observed["modelDigestVerification"] = "LOCAL_FILE_SHA256_VERIFIED"
+            if observed != self.runtime_attestation["facts"]:
+                raise ComfyUIConfigurationError("runtime differs from the exact I2V attestation")
         start_image_name = self._stage_start_image(generation_request)
         parameters = generation_request["parameters"]
         latent_frame_count = parameters["durationFrames"] + 1
@@ -1005,8 +1165,15 @@ class ComfyUIWan22ImageToVideoAdapter(ComfyUIWan22VideoAdapter):
             raise ComfyUIConfigurationError(
                 "M11 latent frame count is incompatible with Wan2.2"
             )
-        positive_prompt = _m11_prompt(generation_request)
-        negative_prompt = _m11_negative_prompt(generation_request)
+        if envelope is not None:
+            semantic = envelope["semanticIntent"]
+            camera = semantic["cameraInstruction"]
+            positive_prompt = (f"{semantic['sourceAction']['sourceText']}; "
+                               f"framing: {camera['framing']}; movement: {camera['movement']}")
+            negative_prompt = parameters["negativePrompt"]
+        else:
+            positive_prompt = _m11_prompt(generation_request)
+            negative_prompt = _m11_negative_prompt(generation_request)
         workflow = self.build_workflow(
             generation_request,
             prompt_text=positive_prompt,
@@ -1017,7 +1184,8 @@ class ComfyUIWan22ImageToVideoAdapter(ComfyUIWan22VideoAdapter):
         workflow_digest = _canonical_digest(workflow)
         if self.workflow_evidence_root is not None:
             workflow_path = self.workflow_evidence_root / (
-                f"shot-{generation_request['ordinal']:02d}-workflow.json"
+                (f"envelope-{envelope['envelopeDigest']}-workflow.json" if envelope is not None
+                 else f"shot-{generation_request['ordinal']:02d}-workflow.json")
             )
             serialized = json.dumps(
                 workflow,
@@ -1048,18 +1216,23 @@ class ComfyUIWan22ImageToVideoAdapter(ComfyUIWan22VideoAdapter):
                     temporary.unlink(missing_ok=True)
         output_prefix = workflow["11"]["inputs"]["filename_prefix"].split("/")[-1]
         started = self._monotonic()
-        submitted = self.client.json(
-            "POST",
-            "/prompt",
-            payload={
-                "prompt": workflow,
-                "client_id": "acs-v4-m11-"
-                + sha256(
-                    str(generation_request["generationRequestRef"]).encode()
-                ).hexdigest()[:24],
-            },
-        )
-        prompt_ref = self._prompt_ref(submitted)
+        try:
+            submitted = self.client.json(
+                "POST",
+                "/prompt",
+                payload={
+                    "prompt": workflow,
+                    "client_id": "acs-v4-m11-"
+                    + sha256(
+                        str(generation_request["generationRequestRef"]).encode()
+                    ).hexdigest()[:24],
+                },
+            )
+            prompt_ref = self._prompt_ref(submitted)
+        except Exception as exc:
+            if envelope is not None:
+                raise RemoteSubmissionIndeterminate("remote submission cannot be determined; retry is forbidden") from exc
+            raise
         file_info = self._wait_for_output(
             prompt_ref,
             started,
@@ -1099,6 +1272,16 @@ class ComfyUIWan22ImageToVideoAdapter(ComfyUIWan22VideoAdapter):
             "outputFrameCount": parameters["durationFrames"],
             "postprocessIdentity": "v4.ffmpeg-exact-frame-trim.v1",
         }
+        if envelope is not None:
+            from .backend_registry import digest
+            binding = envelope["backendBinding"]
+            execution = {"schemaVersion": "v4.method-aware-execution-result.v1",
+                "backendBindingDigest": digest(binding),
+                **{k:binding[k] for k in ("providerId", "modelId", "region", "endpointClass",
+                    "adapterIdentity", "costCurrency", "runtimeAttestationRef", "runtimeAttestationDigest")},
+                "providerRequestRef": prompt_ref, "costMinor": self.config.cost_minor_per_attempt,
+                "executionDevice": runtime_facts["deviceName"], "gpuUsed": True,
+                "executionEvidence": execution, "executionEvidenceDigest": digest(execution)}
         return MediaAdapterResult(candidate_path, execution)
 
 
@@ -1182,6 +1365,9 @@ def build_comfyui_runtime_attestation(
         "authorityState": "TECHNICAL_EVIDENCE_ONLY",
         "publicationAllowed": False,
     }
+    if require_start_image:
+        attestation["schemaVersion"] = COMFYUI_I2V_RUNTIME_ATTESTATION_SCHEMA
+        attestation["capabilityMode"] = "IMAGE_TO_VIDEO"
     attestation["payloadDigest"] = _canonical_digest(attestation)
     return attestation
 

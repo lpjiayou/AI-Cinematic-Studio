@@ -152,60 +152,11 @@ def _json_object(payload: bytes, label: str) -> Mapping[str, Any]:
 
 
 def _validate_attestation(value: Mapping[str, Any]) -> Mapping[str, Any]:
-    expected_fields = {
-        "schemaVersion",
-        "attestationRef",
-        "observedAt",
-        "factsDigest",
-        "facts",
-        "authorityState",
-        "publicationAllowed",
-        "payloadDigest",
-    }
-    if set(value) != expected_fields:
-        raise EvidenceArchiveError("attestation fields are invalid")
-    if value["schemaVersion"] != COMFYUI_RUNTIME_ATTESTATION_SCHEMA:
-        raise EvidenceArchiveError("attestation schema is invalid")
-    _text(value["attestationRef"], "attestationRef")
-    _timestamp(value["observedAt"], "observedAt")
-    if (
-        value["authorityState"] != "TECHNICAL_EVIDENCE_ONLY"
-        or value["publicationAllowed"] is not False
-    ):
-        raise EvidenceArchiveError("attestation authority state is unsafe")
-    facts = value["facts"]
-    if not isinstance(facts, Mapping):
-        raise EvidenceArchiveError("attestation facts are invalid")
-    if set(facts) != EXPECTED_FACT_FIELDS:
-        raise EvidenceArchiveError("attestation facts fields are invalid")
-    if _canonical_digest(facts) != _sha256(value["factsDigest"], "factsDigest"):
-        raise EvidenceArchiveError("attestation facts digest does not match")
-    unsigned = dict(value)
-    payload_digest = _sha256(unsigned.pop("payloadDigest"), "payloadDigest")
-    if _canonical_digest(unsigned) != payload_digest:
-        raise EvidenceArchiveError("attestation payload digest does not match")
-    for field in (
-        "providerId",
-        "modelId",
-        "region",
-        "endpointClass",
-        "comfyuiVersion",
-        "pythonVersion",
-        "pytorchVersion",
-        "deviceName",
-    ):
-        _text(facts[field], field)
-    if facts["deviceType"] != "cuda":
-        raise EvidenceArchiveError("attestation device type is invalid")
-    vram_total = facts["vramTotalBytes"]
-    if isinstance(vram_total, bool) or not isinstance(vram_total, int) or vram_total <= 0:
-        raise EvidenceArchiveError("attestation VRAM facts are invalid")
-    if facts["requiredNodes"] != list(REQUIRED_NODES):
-        raise EvidenceArchiveError("attestation required nodes are invalid")
-    _sha256(facts["objectInfoDigest"], "objectInfoDigest")
-    if facts["modelDigestVerification"] != "LOCAL_FILE_SHA256_VERIFIED":
-        raise EvidenceArchiveError("model digest verification is incomplete")
-    return facts
+    from services.v4_platform.comfyui import validate_runtime_attestation, ComfyUIConfigurationError
+    try:
+        return validate_runtime_attestation(value)
+    except (ComfyUIConfigurationError, ValueError, TypeError, KeyError) as exc:
+        raise EvidenceArchiveError("invalid exact runtime attestation") from exc
 
 
 def _model_files(facts: Mapping[str, Any]) -> dict[str, str]:
@@ -294,9 +245,14 @@ def _validate_object_info(
     expected = _sha256(facts.get("objectInfoDigest"), "objectInfoDigest")
     if _canonical_digest(object_info) != expected:
         raise EvidenceArchiveError("object info digest does not match attestation")
-    missing_nodes = [node for node in REQUIRED_NODES if node not in object_info]
+    missing_nodes = [node for node in facts["requiredNodes"] if node not in object_info]
     if missing_nodes:
         raise EvidenceArchiveError("object info is missing required nodes")
+    if "startImageCapability" in facts:
+        from services.v4_platform.comfyui import _node_fields
+        if ("image" not in _node_fields(object_info, "LoadImage", "required")
+                or "start_image" not in _node_fields(object_info, "Wan22ImageToVideoLatent", "optional")):
+            raise EvidenceArchiveError("object info start-image wiring is incomplete")
 
 
 def _manifest(

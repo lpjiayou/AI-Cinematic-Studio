@@ -188,6 +188,10 @@ from .real_image_candidates import (
 )
 
 __all__ = [
+    "BACKEND_REGISTRY_SCHEMA", "BACKEND_ROUTE_DECISION_SCHEMA", "ATTEMPT_BACKEND_BINDING_SCHEMA",
+    "BackendRegistry", "VideoExecutionBackendResolver", "BackendUnavailableError", "BackendValidationError",
+    "EXECUTION_ENVELOPE_SCHEMA", "METHOD_AWARE_JOB_SCHEMA_VERSION",
+    "MethodAwareExecutionEnvelopeBuilder", "ContentAddressedSourceImages",
     "DeepSeekTextProvider",
     "FakeTextProvider",
     "ProviderConfigurationError",
@@ -357,3 +361,14 @@ __all__ = [
     "RealImageCandidateEvidenceError",
     "real_image_candidate_evidence_from_environment",
 ]
+
+# Server-owned method-aware execution seam; no new public HTTP authority.
+from .backend_registry import (
+    BACKEND_REGISTRY_SCHEMA, BACKEND_ROUTE_DECISION_SCHEMA,
+    ATTEMPT_BACKEND_BINDING_SCHEMA, BackendRegistry, VideoExecutionBackendResolver,
+    BackendUnavailableError, BackendValidationError,
+)
+from .method_aware_execution import (
+    EXECUTION_ENVELOPE_SCHEMA, METHOD_AWARE_JOB_SCHEMA_VERSION,
+    MethodAwareExecutionEnvelopeBuilder, ContentAddressedSourceImages,
+)
