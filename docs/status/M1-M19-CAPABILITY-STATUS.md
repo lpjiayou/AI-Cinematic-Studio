@@ -102,8 +102,8 @@ database was created.
 | M6 | ADR-0003/0004/0005/0019 | #55 and #59 | production authority absent | upstream prerequisite closed |
 | M7 | ADR-0019 | #55 and #59 | no automatic rewrite or WARN waiver | upstream prerequisite closed |
 | M8–M9 | ADR-0019 | #56, #58, #63 and #64; Frontend #25 | live asset production/admission not authorized | method-aware successor required |
-| M10 | ADR-0019 | #57/#63/#64 plus E1 neutral backend/envelope and shared job reservation | current result intake and live execution absent; Frontend separate | E2 requires separate authorization |
-| M11 | ADR-0019 | E1 exact worker, immutable attempt binding, fake I2V and versioned archive | result intake, live runtime/cost and eligible lineage absent; Contact/Gait unavailable | E2 requires separate authorization; Spike remains blocked |
+| M10 | ADR-0019 | #57/#63/#64, E1 neutral worker seam, E2 current source/result binding | live execution absent; Frontend separate | E3 requires separate authorization |
+| M11 | ADR-0019 | E1 exact worker and E2 verified result/status plus atomic technical Candidate handoff | live runtime/cost and eligible lineage absent; Contact/Gait unavailable | E3 requires separate authorization; Spike remains blocked |
 | M12 | ADR-0015, ADR-0019, ADR-0020 | #20/#21, #58/#63/#64; A100 evidence `93c1c96d…a1ce`; WSL2 evidence `801e4e8c…7ed`; dedicated VM specification | WSL2 rejected for this wave; dedicated CPU VM/provider unselected; A100 C4 isolation unproven; Runtime G0 incomplete | `ACS-M12-C3-DEDICATED-LINUX-CPU-VM-PROVIDER-SELECTION-AND-PREFLIGHT` |
 | M13 | ADR-0016/0017/0018/0019 | immutable base tag, #48/#63/#64; Frontend #25 | product surface, M14/M15 and publication incomplete | Extension G0 requires separate authorization |
 | M14–M19 | System Master Plan and applicable M13 boundary | no authorized implementation | prerequisite and authority gates absent | no current implementation authority |
@@ -223,4 +223,4 @@ M13_PUBLICATION=NOT_AUTHORIZED
 M13_PRODUCT_CAPABILITY_COMPLETE=false
 ```
 
-The [E1 worker seam receipt](M10_M11_METHOD_AWARE_WORKER_SEAM_CORRECTIVE_E1_2026-09-06.md) records fake-only execution and legacy compatibility. `SPIKE_0_READINESS=BLOCKED`; no real GPU/provider or method-aware Candidate intake was executed.
+The [E1 worker seam receipt](M10_M11_METHOD_AWARE_WORKER_SEAM_CORRECTIVE_E1_2026-09-06.md) records fake-only execution and legacy compatibility. [`E2 result intake`](M10_M11_METHOD_AWARE_JOB_RESULT_INTAKE_CORRECTIVE_E2_2026-09-06.md) adds current exact result verification and atomic technical Candidates, verified with fake CPU artifacts. `SPIKE_0_READINESS=BLOCKED`; no real GPU/provider execution, automatic QC/selection/admission, production auto-routing or E3 was started.

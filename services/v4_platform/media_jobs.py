@@ -1762,16 +1762,18 @@ def _probe_media_cache_key(path: Path) -> tuple[str, int]:
     return digest.hexdigest(), size
 
 
-def probe_media(path: Path) -> dict[str, Any]:
+def probe_media(path: Path, *, fresh: bool = False) -> dict[str, Any]:
     cache_key = _probe_media_cache_key(path)
     with _PROBE_MEDIA_CACHE_LOCK:
         cached = _PROBE_MEDIA_CACHE.get(cache_key)
-    if cached is not None:
+    if cached is not None and not fresh:
         return deepcopy(cached)
     try:
         result = subprocess.run(
             [
-                "ffprobe", "-v", "error", "-count_frames", "-show_streams",
+                "ffprobe", "-v", "error",
+                *(["-protocol_whitelist", "file,pipe", "-f", "mov"] if fresh else []),
+                "-count_frames", "-show_streams",
                 "-show_format", "-of", "json", str(path),
             ],
             check=True,
@@ -1805,13 +1807,17 @@ def probe_media(path: Path) -> dict[str, Any]:
         "formatName": payload.get("format", {}).get("format_name"),
         "durationSeconds": payload.get("format", {}).get("duration"),
     }
+    if fresh:
+        return probe
     with _PROBE_MEDIA_CACHE_LOCK:
         cached = _PROBE_MEDIA_CACHE.setdefault(cache_key, deepcopy(probe))
     return deepcopy(cached)
 
 
-def verify_media_against_request(path: Path, request: Mapping[str, Any]) -> dict[str, Any]:
-    probe = probe_media(path)
+def verify_media_against_request(
+    path: Path, request: Mapping[str, Any], *, fresh_probe: bool = False,
+) -> dict[str, Any]:
+    probe = probe_media(path, fresh=True) if fresh_probe else probe_media(path)
     parameters = request["parameters"]
     kind = request["mediaKind"]
     matches = [item for item in probe["streams"] if item.get("codec_type") == kind]

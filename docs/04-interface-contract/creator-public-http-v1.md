@@ -25,7 +25,7 @@ Commercial Frontend → Frontend Experience Adapter → /creator/api/v1
 | M6 | `/series-intelligence-workspaces`, `/series-intelligence/*` | accepted Series Intelligence public boundary |
 | M7–M9 | `/episode-production-runs/{runRef}/shot-graph`, `/execution-method-plan` | current M7 validation plus source-bound M8 action beats and server-derived M9 three-axis requirements |
 | M10 | `/episode-production-runs/{runRef}/method-aware-input-plan`, `/dynamic-media-preflight`, `/real-media-revision`, `/real-image-candidates`, `/semantic-visual-qc`, `/media-selection`, `/real-image-admission`, `/real-image-successor-admission`, `/real-image-selection`, `/state-projection`, `/production-readiness` | current-plan input resolution over the one canonical AssetVersion stream, plus the existing typed media control plane |
-| M11 | `/episode-production-runs/{runRef}/method-aware-video-route`, `/real-video-revision`, `/real-video-candidates`, `/semantic-visual-qc`, `/media-selection`, `/real-video-admission`, `/state-projection`, `/provider-experiments` | closed method routing; only Micro Motion can reserve the existing single-anchor queue, while Contact and Gait fail closed |
+| M11 | `/episode-production-runs/{runRef}/method-aware-video-route`, `/method-aware-video-jobs`, `/method-aware-video-candidates`, `/real-video-revision`, `/real-video-candidates`, `/semantic-visual-qc`, `/media-selection`, `/real-video-admission`, `/state-projection`, `/provider-experiments` | closed method routing and verified technical result intake; only Micro Motion can reserve the existing single-anchor queue, while Contact and Gait fail closed |
 | M12 | `/episode-production-runs/{runRef}/explicit-audio-requirement-route`, `/production-readiness` | explicit M9 AudioRequirement routing; Runtime G0 remains incomplete |
 | M13–M14 | `/episode-production-runs/{runRef}/render-candidates`, `/preview`, `/finalize` | bounded V5 RenderCandidate/delivery services over the accepted M13 base backend and V4/V3 execution boundaries |
 | M15 | `/episode-production-runs/{runRef}/delivery`, preview/export content | bounded K2 V5 delivery authority |
@@ -158,6 +158,72 @@ adapter capability/identity, Provider, local path, storage key, authority digest
 `publicationAllowed` or fallback policy. Public responses strip internal storage,
 raw RightsBinding, voice snapshots and requested authority provenance. GET selects
 the latest version by default and accepts an optional opaque `versionRef` query.
+
+### Method-aware job results (E2)
+
+Two additional resources use `/episode-production-runs/{runRef}`:
+
+| Resource | Method and closed input | Result |
+| --- | --- | --- |
+| `method-aware-video-jobs` | GET with `projectRef`, `seriesRef`, `episodeRef`, optional `versionRef`; no extra/duplicate query parameters | 200 `{ok, jobProjection}` with schema `v5.method-aware-video-job-projection.v1` |
+| `method-aware-video-candidates` | POST the eight fields below; no extra or duplicate JSON keys | 201 new batch; 200 exact replay or same-job/result reuse |
+
+```text
+projectRef
+seriesRef
+episodeRef
+videoMethodRouteVersionRef
+videoMethodRouteDigest
+mediaJobRef
+mediaJobResultDigest
+idempotencyKey
+```
+
+Authentication supplies Workspace and the path supplies Run. Every input value
+is an opaque string ref, digest or key; fractional/non-finite values are rejected.
+Browser Candidate, artifact, attempt, Provider, model, adapter, checks, provenance,
+publication and storage claims are rejected. POST jobs and GET candidates return
+405. The existing route's sealed `queuedJobs.queueState` remains its original
+snapshot; clients use the separate job projection for current technical status.
+
+The projection reads only exact jobs referenced by the selected route. Each item
+contains request ref/digest, Shot/Beat refs, job ref/state, attempt count, stable
+failure class/error code, verified result digest, bounded artifact summary and
+Candidate/validation refs. `candidateIntakeState` is `NOT_READY`,
+`READY_FOR_INTAKE`, `RECORDED`, `BLOCKED_STALE_ROUTE`, `FAILED` or `CANCELLED`.
+An artifact summary may contain only media type, byte size, SHA-256, dimensions,
+frame rate/count and duration frames. No raw V4 job, internal path, lease token,
+credential, provider request ID, runtime facts or queue controls are returned.
+
+Intake requires current route/input/method/source and exact route/request/job/
+registry binding. V4 must freshly verify a SUCCEEDED v3 job with one attempt and
+its bytes/probe. The existing V5 evidence journal appends exactly three records:
+`MethodAwareMediaJobResult`, `Candidate`, `TechnicalValidation`. The response has
+`ok`, `resultReceipt`, `candidate`, `technicalValidation`, `candidateLifecycle`,
+`idempotentReplay` and `publicationAllowed=false`.
+
+Receipt schema is `v5.method-aware-media-job-result-receipt.v1`; Candidate schema
+is `v5.method-aware-video-candidate.v1`, with `AI_GENERATED` provenance, one source
+AssetVersion and exact receipt ref/version/digest. It binds the route version as
+`revisionRef` and Shot as `slotRef`, never a fabricated RealVideoRevision. The
+result means technical verification only: no automatic Semantic QC, selection,
+admission, AssetVersion or publication. Receipt storage keys are opaque relative
+artifact locators, not file-serving authority or local filesystem paths.
+
+| Stable error | HTTP status |
+| --- | --- |
+| `invalid_request` or invalid typed field | 400 |
+| `method_aware_job_not_found`, `method_aware_job_scope_mismatch` | 404 |
+| `method_aware_job_not_terminal`, `method_aware_job_failed`, `method_aware_job_cancelled` | 409 |
+| `method_aware_job_result_invalid`, `method_aware_job_route_stale` | 409 |
+| `method_aware_job_result_conflict`, `method_aware_job_result_digest_mismatch`, `idempotency_conflict`, `stale_input` | 409 |
+| `method_aware_job_result_unavailable` | 503 |
+
+Errors contain stable codes, not exception text. Result replay preserves all three
+record identities; a different key reuses the same exact job/result without an
+additional record. A changed recorded key or received result conflicts. Response
+loss/restart recovery uses exact result digests and V5 atomic append, not a
+cross-database transaction. See the [E2 receipt](../status/M10_M11_METHOD_AWARE_JOB_RESULT_INTAKE_CORRECTIVE_E2_2026-09-06.md).
 
 Legacy `/assets` and `/media` remain routable only for immutable history. POST is
 an exact replay query: it succeeds only when the matching G4/G5 gate already exists

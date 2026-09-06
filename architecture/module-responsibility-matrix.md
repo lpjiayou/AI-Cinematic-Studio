@@ -101,4 +101,12 @@ G1-R1 已关闭原 `apps/` 直接依赖 V4 的架构偏差。历史偏差记录�
 模块条目不得仅凭目录创建而视为批准；必须关联已批准的工程任务。处于 Phase 0
 时不得填写未来业务模块条目；后续阶段也不得借本模板提前创建未授权模块。
 
-E1 的服务端 backend/profile/runtime/worker binding 与双版本归档证据见 [worker seam receipt](../docs/status/M10_M11_METHOD_AWARE_WORKER_SEAM_CORRECTIVE_E1_2026-09-06.md)；不新增队列或 Candidate authority，不授权 live GPU 或 E2。
+E1 的服务端 backend/profile/runtime/worker binding 与双版本归档证据见 [worker seam receipt](../docs/status/M10_M11_METHOD_AWARE_WORKER_SEAM_CORRECTIVE_E1_2026-09-06.md)；不新增队列或 Candidate authority，不授权 live GPU。E2 的独立结果接收授权与证据见下表。
+
+| E2 模块 | 所属目录 / 责任 | 明确非责任 / 允许依赖 | 所有者 / 契约与证据 |
+| --- | --- | --- | --- |
+| Method-aware result reader | `services/v4_platform/method_aware_results.py`：只读精确 Job、重验 envelope/binding、artifact 字节和 probe，返回中立 v1 status/result | 不调用 Adapter、不调度/恢复/修改 Job；依赖现有 MediaJob repository 与 V4 校验器 | V4 Media Job Owner；E2 unit/HTTP/SQLite；ADR-0019 |
+| Method-aware result intake | `services/v5_core_os/episode_production/method_aware_result_intake.py`：current route/source 绑定、幂等与现有 journal 三记录原子追加 | 不消费旧 RealVideoRevision 或 Provider Experiment；依赖只读 V4 port、现有 route 和 Candidate authority | M10/M11 Result Intake Owner；E2 v1 receipt/Candidate/projection |
+| Creator result resources | `apps/creator_workspace_mvp`：GET 指定 route Job 投影、POST 闭集 refs/digests | 不授予浏览器 Provider、artifact、Candidate 或执行选择权；只调用 V5 public boundary | Creator Public HTTP Owner；public HTTP v1 contract |
+
+实现状态与真实 HTTP、并发、rollback、restart 证据见 [E2 result intake receipt](../docs/status/M10_M11_METHOD_AWARE_JOB_RESULT_INTAKE_CORRECTIVE_E2_2026-09-06.md)。复用既有 Candidate lifecycle；无新的数据库、队列、QC、Selection 或 Admission authority。

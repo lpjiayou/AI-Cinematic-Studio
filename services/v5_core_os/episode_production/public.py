@@ -21,6 +21,8 @@ from services.v4_platform import (
 from services.v4_platform.real_video_candidates import (
     MediaJobRealVideoCandidateEvidence,
 )
+from services.v4_platform.method_aware_results import MethodAwareMediaJobResultReader
+from .method_aware_result_intake import MethodAwareResultIntakeError, MethodAwareResultIntakeService
 
 from .authority import (
     AuthorityRequiredError,
@@ -417,6 +419,7 @@ class EpisodeProductionPublicBoundary:
         execution_method_planning: M8M9ExecutionMethodPlanningService | None = None,
         method_aware_media: M10M11MethodAwareMediaService | None = None,
         explicit_audio_bridge: M9M12ExplicitAudioBridgeService | None = None,
+        method_aware_result_reader=None,
     ) -> None:
         self.__service = service
         self.__narrative_validation = narrative_validation
@@ -436,10 +439,19 @@ class EpisodeProductionPublicBoundary:
         self.__explicit_audio_bridge = explicit_audio_bridge
         self.__dynamic_media_preflight = K2DynamicMediaPreflightService(shot_graph)
         self.__candidate_review = real_media_revision.candidate_review
+        self.__method_aware_result_intake = (
+            MethodAwareResultIntakeService(method_aware_media,
+                method_aware_result_reader if method_aware_result_reader is not None else
+                MethodAwareMediaJobResultReader.from_coordinator(method_aware_media.media_jobs),
+                self.__candidate_review)
+            if method_aware_media is not None else None
+        )
         self.__state_projection = real_media_revision.state_projection
 
     @staticmethod
     def _error(exc: EpisodeProductionError) -> EpisodeProductionPublicError:
+        if isinstance(exc, MethodAwareResultIntakeError):
+            return EpisodeProductionPublicError(exc.code, exc.status)
         if isinstance(exc, RecordNotFoundError):
             return EpisodeProductionPublicError(exc.code, 404)
         if isinstance(exc, ScopeMismatchError):
@@ -919,6 +931,19 @@ class EpisodeProductionPublicBoundary:
                 video_method_route_version_ref,
             )
         )
+
+    def _method_aware_result_service(self) -> MethodAwareResultIntakeService:
+        if self.__method_aware_result_intake is None:
+            raise EpisodeProductionPublicError("method_aware_job_result_unavailable", 503)
+        return self.__method_aware_result_intake
+
+    def ingest_public_method_aware_video_result(self, command: Mapping[str, Any]) -> dict[str, Any]:
+        return self._invoke(self._method_aware_result_service().ingest, command)
+
+    def get_public_method_aware_video_jobs(self, workspace_ref, project_ref, series_ref, episode_ref,
+                                         production_run_ref, version_ref=None):
+        return self._invoke(self._method_aware_result_service().project_jobs, workspace_ref,
+            project_ref, series_ref, episode_ref, production_run_ref, version_ref)
 
     def _explicit_audio_bridge_service(
         self,
@@ -1841,6 +1866,7 @@ def create_in_memory_boundary(
     real_video_candidate_evidence=None,
     media_execution=None,
     method_aware_execution=None,
+    method_aware_result_reader=None,
     composition_execution=None,
     approval_authority=None,
     media_selection_approval_authority=None,
@@ -1913,6 +1939,7 @@ def create_in_memory_boundary(
         execution_method_planning,
         method_aware_media,
         explicit_audio_bridge,
+        method_aware_result_reader=method_aware_result_reader,
     )
 
 
@@ -1937,6 +1964,7 @@ def create_local_development_boundary(
     real_video_candidate_evidence=None,
     media_execution=None,
     method_aware_execution=None,
+    method_aware_result_reader=None,
     composition_execution=None,
     approval_authority=None,
     media_selection_approval_authority=None,
@@ -2042,6 +2070,7 @@ def create_local_development_boundary(
         execution_method_planning,
         method_aware_media,
         explicit_audio_bridge,
+        method_aware_result_reader=method_aware_result_reader,
     )
 
 
@@ -2181,6 +2210,7 @@ def create_local_development_boundary_from_environment(
         real_video_candidate_evidence=real_video_candidate_evidence,
         media_execution=execution,
         method_aware_execution=method_execution,
+        method_aware_result_reader=MethodAwareMediaJobResultReader(job_repository, artifact_root),
         composition_execution=V4CompositionExecutor.from_artifact_root(artifact_root),
         approval_authority=approval_authority,
         media_selection_approval_authority=media_selection_approval_authority,

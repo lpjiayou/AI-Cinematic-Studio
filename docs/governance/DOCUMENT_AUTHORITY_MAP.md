@@ -131,6 +131,7 @@ and historical evidence cannot authorize current execution.
 | [`docs/status/M12_A100_BUILD_HOST_REFLIGHT_2026-09-03.md`](../status/M12_A100_BUILD_HOST_REFLIGHT_2026-09-03.md) | `CURRENT` | Project Lead / Infrastructure Owner / Architecture Owner / M12 Domain Owner |
 
 | [`docs/status/M10_M11_METHOD_AWARE_WORKER_SEAM_CORRECTIVE_E1_2026-09-06.md`](../status/M10_M11_METHOD_AWARE_WORKER_SEAM_CORRECTIVE_E1_2026-09-06.md) | `CURRENT` | Project Lead / V4 Media Job Owner / M10-M11 Method-Aware Owner |
+| [`docs/status/M10_M11_METHOD_AWARE_JOB_RESULT_INTAKE_CORRECTIVE_E2_2026-09-06.md`](../status/M10_M11_METHOD_AWARE_JOB_RESULT_INTAKE_CORRECTIVE_E2_2026-09-06.md) | `CURRENT` | Project Lead / V4 Media Job Owner / M10-M11 Result Intake Owner |
 
 ## CAPABILITY_MATRIX
 

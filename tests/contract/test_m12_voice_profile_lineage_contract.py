@@ -2220,6 +2220,8 @@ class M12VoiceProfileLineageContractTests(unittest.TestCase):
             "execution-method-plan",
             "method-aware-input-plan",
             "method-aware-video-route",
+            "method-aware-video-jobs",
+            "method-aware-video-candidates",
             "explicit-audio-requirement-route",
         }
         self.assertEqual(

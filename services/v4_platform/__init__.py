@@ -372,3 +372,9 @@ from .method_aware_execution import (
     EXECUTION_ENVELOPE_SCHEMA, METHOD_AWARE_JOB_SCHEMA_VERSION,
     MethodAwareExecutionEnvelopeBuilder, ContentAddressedSourceImages,
 )
+from .method_aware_results import (
+    MethodAwareMediaJobResultReader, MethodAwareJobResultError,
+    V4_METHOD_AWARE_JOB_STATUS_SCHEMA, V4_METHOD_AWARE_JOB_RESULT_SCHEMA,
+)
+__all__ += ["MethodAwareMediaJobResultReader", "MethodAwareJobResultError",
+    "V4_METHOD_AWARE_JOB_STATUS_SCHEMA", "V4_METHOD_AWARE_JOB_RESULT_SCHEMA"]

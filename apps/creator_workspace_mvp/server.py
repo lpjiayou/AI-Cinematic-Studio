@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from functools import partial
 from hashlib import sha256
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -62,6 +63,8 @@ from apps.creator_workspace_mvp.public_contract import (
     PUBLIC_METHOD_AWARE_INPUT_PLAN_RESOURCE,
     PUBLIC_METHOD_AWARE_RESOURCES,
     PUBLIC_METHOD_AWARE_VIDEO_ROUTE_RESOURCE,
+    PUBLIC_METHOD_AWARE_VIDEO_JOBS_RESOURCE,
+    PUBLIC_METHOD_AWARE_VIDEO_CANDIDATES_RESOURCE,
     PUBLIC_M6_BASELINE_ACTIVATE_ENDPOINT,
     PUBLIC_M6_BIBLE_CANDIDATE_ENDPOINT,
     PUBLIC_M6_BIBLE_CONFIRM_ENDPOINT,
@@ -187,10 +190,23 @@ EPISODE_PRODUCTION_SUBRESOURCES = {
     PUBLIC_EXECUTION_METHOD_PLAN_RESOURCE,
     PUBLIC_METHOD_AWARE_INPUT_PLAN_RESOURCE,
     PUBLIC_METHOD_AWARE_VIDEO_ROUTE_RESOURCE,
+    PUBLIC_METHOD_AWARE_VIDEO_JOBS_RESOURCE,
+    PUBLIC_METHOD_AWARE_VIDEO_CANDIDATES_RESOURCE,
     PUBLIC_EXPLICIT_AUDIO_REQUIREMENT_ROUTE_RESOURCE,
 }
 
-_METHOD_AWARE_WRITE_RESOURCES = PUBLIC_METHOD_AWARE_RESOURCES
+_METHOD_AWARE_WRITE_RESOURCES = PUBLIC_METHOD_AWARE_RESOURCES - {PUBLIC_METHOD_AWARE_VIDEO_JOBS_RESOURCE}
+
+
+def _unique_result_object(pairs):
+    value = {}
+    for key, item in pairs:
+        if key in value:
+            raise ValueError("duplicate result intake field")
+        value[key] = item
+    return value
+
+
 _METHOD_AWARE_SCOPE_FIELDS = frozenset(
     {"projectRef", "seriesRef", "episodeRef", "idempotencyKey"}
 )
@@ -272,6 +288,10 @@ def _valid_method_aware_public_command(resource: str, payload: Mapping[str, Any]
         return set(payload) == _METHOD_AWARE_SCOPE_FIELDS and not (
             _contains_forbidden_method_aware_claim(payload)
         )
+    if resource == PUBLIC_METHOD_AWARE_VIDEO_CANDIDATES_RESOURCE:
+        return set(payload) == (_METHOD_AWARE_SCOPE_FIELDS | {
+            "videoMethodRouteVersionRef", "videoMethodRouteDigest", "mediaJobRef", "mediaJobResultDigest",
+        })
     if resource == PUBLIC_EXPLICIT_AUDIO_REQUIREMENT_ROUTE_RESOURCE:
         required = _METHOD_AWARE_SCOPE_FIELDS | {"audioRequirementRef"}
         allowed = required | {"rightsBindingRef", "voiceAssetVersionRef"}
@@ -775,7 +795,13 @@ class CreatorRequestHandler(BaseHTTPRequestHandler):
             self._send_product_error(400, "invalid_request")
             return
         try:
-            payload = load_public_json(self.rfile.read(content_length))
+            raw_payload = self.rfile.read(content_length)
+            payload = load_public_json(raw_payload)
+            if (production_subresource is not None
+                    and production_subresource[1] == PUBLIC_METHOD_AWARE_VIDEO_CANDIDATES_RESOURCE):
+                # Depth and numeric bounds have already passed the shared
+                # strict parser.  This closed DTO also rejects duplicate keys.
+                payload = json.loads(raw_payload, object_pairs_hook=_unique_result_object)
         except PUBLIC_JSON_DECODE_ERRORS:
             self._send_product_error(400, "invalid_request")
             return
@@ -1094,6 +1120,10 @@ class CreatorRequestHandler(BaseHTTPRequestHandler):
                         self.episode_production_boundary
                         .create_public_method_aware_video_route(command)
                     )
+                elif resource == PUBLIC_METHOD_AWARE_VIDEO_CANDIDATES_RESOURCE:
+                    result = self.episode_production_boundary.ingest_public_method_aware_video_result(command)
+                elif resource == PUBLIC_METHOD_AWARE_VIDEO_JOBS_RESOURCE:
+                    raise EpisodeProductionPublicError("method_not_allowed", 405)
                 elif resource == "explicit-audio-requirement-route":
                     result = (
                         self.episode_production_boundary
@@ -1399,6 +1429,21 @@ class CreatorRequestHandler(BaseHTTPRequestHandler):
                 )
                 if production_subresource is not None:
                     run_ref, resource = production_subresource
+                    if resource == PUBLIC_METHOD_AWARE_VIDEO_CANDIDATES_RESOURCE:
+                        raise EpisodeProductionPublicError("method_not_allowed", 405)
+                    if resource == PUBLIC_METHOD_AWARE_VIDEO_JOBS_RESOURCE:
+                        required = {"projectRef", "seriesRef", "episodeRef"}
+                        # The shared query parser retains blanks and duplicates.
+                        exact_query = query
+                        if (not required.issubset(exact_query)
+                                or not set(exact_query).issubset(required | {"versionRef"})
+                                or any(len(v) != 1 or not v[0] for v in exact_query.values())):
+                            raise EpisodeProductionPublicError("invalid_request", 400)
+                        projection = self.episode_production_boundary.get_public_method_aware_video_jobs(
+                            workspace_ref, exact_query["projectRef"][0], exact_query["seriesRef"][0],
+                            exact_query["episodeRef"][0], run_ref, exact_query.get("versionRef", [None])[0])
+                        self._send_json(200, {"ok": True, "jobProjection": projection})
+                        return
                     if resource == "authority-identity":
                         result = self.episode_production_boundary.get_authority_identity(
                             workspace_ref, run_ref
