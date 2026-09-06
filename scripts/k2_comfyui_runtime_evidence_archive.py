@@ -153,6 +153,16 @@ def _json_object(payload: bytes, label: str) -> Mapping[str, Any]:
 
 def _validate_attestation(value: Mapping[str, Any]) -> Mapping[str, Any]:
     from services.v4_platform.comfyui import validate_runtime_attestation, ComfyUIConfigurationError
+    if value.get("schemaVersion") == COMFYUI_RUNTIME_ATTESTATION_SCHEMA:
+        if set(value) != {
+            "schemaVersion", "attestationRef", "observedAt", "factsDigest", "facts",
+            "authorityState", "publicationAllowed", "payloadDigest",
+        }:
+            raise EvidenceArchiveError("attestation fields are invalid")
+        if not isinstance(value["facts"], Mapping):
+            raise EvidenceArchiveError("attestation facts are invalid")
+        if set(value["facts"]) != EXPECTED_FACT_FIELDS:
+            raise EvidenceArchiveError("attestation facts fields are invalid")
     try:
         return validate_runtime_attestation(value)
     except (ComfyUIConfigurationError, ValueError, TypeError, KeyError) as exc:
