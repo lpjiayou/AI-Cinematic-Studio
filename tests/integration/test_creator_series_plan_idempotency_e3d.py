@@ -41,6 +41,11 @@ WORKSPACE = "e3d-http-workspace"
 FOREIGN_WORKSPACE = "e3d-http-foreign"
 TABLE = "creator_series_plan_candidate_commands"
 
+# CI discovery imports this file under a bare name; child interpreters need
+# the stable package entrypoint from this checkout.
+CHILD_MODULE = "tests.integration.test_creator_series_plan_idempotency_e3d"
+REPO_ROOT = Path(__file__).resolve().parents[2]
+
 
 class SeriesPlanHttpHarness:
     def __init__(self, path, *, initialize=True, capability=None, tokens=None):
@@ -459,9 +464,11 @@ class FreshProcessHttp:
 
     def __init__(self, path, tokens, *, crash=False):
         self.tokens = tokens
-        self.process = subprocess.Popen([sys.executable, "-m", __name__ if __name__ != "__main__" else
-            "tests.integration.test_creator_series_plan_idempotency_e3d", "--http-child", str(path)],
-            stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        self.process = subprocess.Popen(
+            [sys.executable, "-m", CHILD_MODULE, "--http-child", str(Path(path).resolve())],
+            cwd=REPO_ROOT,
+            stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
+        )
         self.process.stdin.write(json.dumps({"tokens": tokens, "crash": crash}) + "\n")
         self.process.stdin.flush()
         with selectors.DefaultSelector() as selector:

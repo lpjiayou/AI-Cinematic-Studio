@@ -316,6 +316,12 @@ flags are false on first HTTP 200 and true on replay HTTP 200. Every other succe
 response field, candidate ref, digest and canonical content is unchanged on replay.
 It does not insert or rewrite a v1 receipt.
 
+Unkeyed generation retains
+`creator.series-plan-candidate-receipt.v1`; historical v1 receipts
+remain readable without migration or rewriting. Core does not persist
+raw `creativeInput`; only the SHA-256 digest of the normalized input
+is retained as `creativeInputDigest`.
+
 One application receipt facade resolves historical v1 receipts and completed v2
 commands. Confirmation checks issuance, authenticated workspace/scope, current source
 context, candidate content/digest, then confirmation idempotency. Unknown, foreign,
