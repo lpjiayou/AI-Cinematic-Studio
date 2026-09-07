@@ -3342,6 +3342,24 @@
       "lastReviewedAt": "2026-09-07",
       "linkedFromIndex": true,
       "notes": "E3E preserves the immutable audit, M3 pending E3F observations and M5 UNPROVEN historical confirmation recovery. No domain/schema/Script/Frontend change or live R6/provider/GPU authority."
+    },
+    {
+      "path": "docs/status/M3_SCRIPT_GENERATION_AND_CONFIRMATION_RECOVERY_E3F_2026-09-07.md",
+      "repository": "Core",
+      "documentClass": "CURRENT_STATUS",
+      "status": "CURRENT",
+      "owner": "Project Lead / M3 Script Studio Owner / Creator Application Recovery Owner / Lifecycle Transaction Integrity Owner",
+      "authoritativeFor": [
+        "bounded M3 keyed generation recovery and guarded current-target confirmation no-op/CAS verification for V1 and M6_BOUND_V2"
+      ],
+      "supersedes": [],
+      "supersededBy": [],
+      "currentStateClaimsAllowed": true,
+      "historicalMutationPolicy": "UPDATE_FROM_MERGED_EVIDENCE_ONLY",
+      "lastReviewedBaseline": "710687ec402482da0d3d2352d5c3b2b66333ec48",
+      "lastReviewedAt": "2026-09-07",
+      "linkedFromIndex": true,
+      "notes": "E3F adds optional application recovery metadata and a bounded confirmation CAS contract. Original audit, Script domain schemas, M5 UNPROVEN historical recovery and live R6/provider/GPU restrictions remain. Frontend switch CAS wiring is not implemented."
     }
   ]
 }

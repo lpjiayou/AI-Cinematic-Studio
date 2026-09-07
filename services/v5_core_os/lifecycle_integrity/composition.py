@@ -36,6 +36,8 @@ from services.v5_core_os.script_studio.foundation import (
     SqliteScriptStudioAdapter,
 )
 from services.v5_core_os.script_studio.public import ScriptStudioPublicBoundary
+from services.v5_core_os.script_studio.generation_recovery import InMemoryGenerationStore
+from services.v5_core_os.script_studio.generation_recovery_sqlite import SqliteGenerationStore
 from services.v5_core_os.script_studio.external_acceptance import (
     script_acceptance_authority_from_environment,
 )
@@ -161,6 +163,7 @@ class LifecycleAssembly:
         series_repository = InMemorySeriesEpisodeAdapter()
         project_repository = InMemoryProjectAdapter()
         script_repository = InMemoryScriptStudioAdapter()
+        generation_store = InMemoryGenerationStore()
         planning_repository = InMemorySeriesPlanningAdapter()
         registration_repository = InMemoryCanonicalRegistrationRepository()
         project_foundation_store = InMemoryProjectFoundationStore(
@@ -208,6 +211,11 @@ class LifecycleAssembly:
             _restore(planning_repository, ("_plans", "_scope_index", "_versions")),
         )
         state.register_resource(
+            "script-generation-recovery",
+            _capture(generation_store, ("_records",)),
+            _restore(generation_store, ("_records",)),
+        )
+        state.register_resource(
             "canonical-registration",
             _capture(
                 registration_repository,
@@ -246,6 +254,7 @@ class LifecycleAssembly:
             **kwargs,
         )
         script_boundary = ScriptStudioPublicBoundary(script_service, lifecycle_state=state)
+        script_boundary._bind_generation_store(generation_store)
         registration_service = CanonicalRegistrationService(
             registration_repository,
             series_repository=series_repository,
@@ -432,6 +441,7 @@ class LifecycleAssembly:
             database_path,
             lifecycle_state=state,
         )
+        script_boundary._bind_generation_store(SqliteGenerationStore(database_path, lifecycle_state=state))
         script_boundary._bind_m6_episode_baseline_reader(
             intelligence_boundary._active_m6_baseline_reader_or_none()
         )

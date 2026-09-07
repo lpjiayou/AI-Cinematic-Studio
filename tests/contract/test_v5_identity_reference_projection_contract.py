@@ -404,6 +404,7 @@ class IdentityReferenceProjectionContractTests(unittest.TestCase):
                 "episodeRef": root_fixture["episode"]["episodeRef"],
                 "scriptRef": changed["script"]["scriptRef"],
                 "scriptVersionRef": changed["scriptVersion"]["scriptVersionRef"],
+                "expectedScriptVersion": changed["script"]["version"],
                 "humanConfirmed": True,
             }
         )

@@ -34,6 +34,12 @@ PUBLIC_SCRIPT_REVIEWED_ACCEPT_ENDPOINT: Final = (
 PUBLIC_SCRIPT_MANUAL_VERSION_ENDPOINT: Final = f"{PUBLIC_API_PREFIX}/script-versions/manual"
 PUBLIC_SCRIPT_REWRITE_ENDPOINT: Final = f"{PUBLIC_API_PREFIX}/script-versions/rewrite-scene"
 PUBLIC_SCRIPT_CONFIRM_ENDPOINT: Final = f"{PUBLIC_API_PREFIX}/script-versions/confirm"
+SCRIPT_GENERATION_REQUIRED_FIELDS: Final = frozenset({"seriesRef", "episodeRef"})
+SCRIPT_GENERATION_OPTIONAL_FIELDS: Final = frozenset({"projectRef", "idempotencyKey"})
+SCRIPT_CONFIRMATION_REQUIRED_FIELDS: Final = frozenset({
+    "seriesRef", "episodeRef", "scriptRef", "scriptVersionRef", "humanConfirmed",
+})
+SCRIPT_CONFIRMATION_OPTIONAL_FIELDS: Final = frozenset({"projectRef", "expectedScriptVersion"})
 PUBLIC_STORYBOARD_BOOTSTRAP_ENDPOINT: Final = (
     f"{PUBLIC_API_PREFIX}/script-workspaces/storyboard-bootstrap"
 )

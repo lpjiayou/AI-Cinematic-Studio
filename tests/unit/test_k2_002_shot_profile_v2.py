@@ -168,6 +168,7 @@ def _activate_k2_002_roots(assembly, project, series, episode, generated):
             "episodeRef": episode["episodeRef"],
             "scriptRef": script["script"]["scriptRef"],
             "scriptVersionRef": script["scriptVersion"]["scriptVersionRef"],
+            "expectedScriptVersion": script["script"]["version"],
             "humanConfirmed": True,
         }
     )

@@ -3,8 +3,10 @@
 from __future__ import annotations
 
 import os
+from copy import deepcopy
 from pathlib import Path
 from typing import Any, Mapping
+from uuid import uuid4
 
 from services.v5_core_os.lifecycle_integrity.contracts import LifecycleOperation
 from services.v5_core_os.lifecycle_integrity.errors import LifecycleIntegrityError
@@ -25,6 +27,9 @@ from .foundation import (
     TrustedApprovalRequiredError,
     VersionConflictError,
 )
+from .generation_recovery import (
+    GenerationRecoveryError, ScriptGenerationRecovery, InMemoryGenerationStore,
+)
 
 
 class ScriptStudioPublicError(RuntimeError):
@@ -43,6 +48,12 @@ class ScriptStudioPublicBoundary:
         self.__lifecycle_coordinator = None
         self.__lifecycle_assembly = None
         self.__m6_episode_baseline_reader = None
+        self.__generation_recovery = None
+
+    def _bind_generation_store(self, store) -> None:
+        if self.__generation_recovery is not None:
+            raise RuntimeError("Script generation recovery is already bound")
+        self.__generation_recovery = ScriptGenerationRecovery(self.__service, store)
 
     def bind_lifecycle(self, coordinator) -> None:
         if self.__lifecycle_coordinator is not None:
@@ -73,6 +84,10 @@ class ScriptStudioPublicBoundary:
 
     @staticmethod
     def _error(exc: ScriptStudioError) -> ScriptStudioPublicError:
+        if isinstance(exc, GenerationRecoveryError):
+            return ScriptStudioPublicError(exc.code, exc.status)
+        if exc.code == "script_confirmation_precondition_required":
+            return ScriptStudioPublicError(exc.code, 409)
         if exc.code in {
             "m6_baseline_not_available",
             "m6_episode_mapping_unavailable",
@@ -200,6 +215,8 @@ class ScriptStudioPublicBoundary:
 
     def create_version(self, command: Mapping[str, Any]) -> dict[str, Any]:
         if self.__lifecycle_coordinator is None:
+            if self.__lifecycle_state is not None:
+                return self._script_mutation(command, self.__service.create_version)
             return self._invoke(self.__service.create_version, command)
         workspace_ref = str(command.get("workspaceRef") or "") if isinstance(command, Mapping) else ""
         return self._invoke(
@@ -208,15 +225,48 @@ class ScriptStudioPublicBoundary:
             lambda: self.__service.create_version(command),
         )
 
-    def confirm_version(self, command: Mapping[str, Any]) -> dict[str, Any]:
+    def _script_mutation(self, command, operation):
+        workspace = str(command.get("workspaceRef") or "") if isinstance(command, Mapping) else ""
+        with self.__lifecycle_state.lease(
+            workspace_ref=workspace, operation=LifecycleOperation.CREATE_SCRIPT_VERSION,
+        ) as lease:
+            return self.__lifecycle_state.apply_mutation(lease, lambda: self._invoke(operation, command))
+
+    def _generation_operation(self, name, command, *args):
+        if self.__generation_recovery is None or self.__lifecycle_state is None:
+            raise ScriptStudioPublicError("script_generation_storage_unavailable", 503)
+        scope = command if name == "reserve" else command.get("scope", {})
+        try:
+            return self._script_mutation(scope, lambda _: getattr(self.__generation_recovery, name)(command, *args))
+        except LifecycleIntegrityError:
+            raise ScriptStudioPublicError("script_generation_storage_unavailable", 503) from None
+
+    def reserve_generation(self, command):
+        return self._generation_operation("reserve", command)
+
+    def save_generation_result(self, ticket, content):
+        return self._generation_operation("save_result", ticket, content)
+
+    def complete_generation(self, ticket):
+        return self._generation_operation("complete", ticket)
+
+    def fail_generation(self, ticket, failure_code):
+        return self._generation_operation("fail", ticket, failure_code)
+
+    def confirm_version(self, command: Mapping[str, Any], *, include_outcome=False) -> dict[str, Any]:
+        def confirm(value):
+            result = self.__service.confirm_version(value)
+            if not include_outcome:
+                result.pop("confirmationNoOp")
+            return result
         if self.__lifecycle_state is None:
-            return self._invoke(self.__service.confirm_version, command)
+            return self._invoke(confirm, command)
         workspace_ref = str(command.get("workspaceRef") or "") if isinstance(command, Mapping) else ""
         with self.__lifecycle_state.lease(
             workspace_ref=workspace_ref, operation=LifecycleOperation.CONFIRM_SCRIPT_VERSION
         ) as lease:
             return self.__lifecycle_state.apply_mutation(
-                lease, lambda: self._invoke(self.__service.confirm_version, command)
+                lease, lambda: self._invoke(confirm, command)
             )
 
     def accept_reviewed_import(
@@ -269,18 +319,33 @@ def create_in_memory_boundary(
         kwargs["ref_factory"] = ref_factory
     if clock is not None:
         kwargs["clock"] = clock
-    return ScriptStudioPublicBoundary(
-        ScriptStudioService(InMemoryScriptStudioAdapter(), upstream, **kwargs)
-    )
+    from services.v5_core_os.lifecycle_integrity.in_memory import InMemoryLifecycleState
+    from services.v5_core_os.lifecycle_integrity.contracts import BackendKind, LifecycleAssemblyIdentity
+    repository = InMemoryScriptStudioAdapter()
+    state = InMemoryLifecycleState(LifecycleAssemblyIdentity(
+        "script-standalone-" + uuid4().hex, BackendKind.IN_MEMORY, "memory:" + uuid4().hex))
+    names = ("_scripts", "_episode_index", "_versions", "_acceptances", "_acceptance_idempotency", "_acceptance_uniques")
+    state.register_resource("script-studio", lambda: {k: deepcopy(getattr(repository, k)) for k in names},
+        lambda snapshot: [setattr(repository, k, deepcopy(snapshot[k])) for k in names])
+    store = InMemoryGenerationStore()
+    state.register_resource("script-generation-recovery", lambda: deepcopy(store._records),
+                            lambda snapshot: setattr(store, "_records", deepcopy(snapshot)))
+    boundary = ScriptStudioPublicBoundary(ScriptStudioService(repository, upstream, **kwargs), lifecycle_state=state)
+    boundary._bind_generation_store(store)
+    return boundary
 
 
 def create_local_development_boundary(
     database_path: Path | str,
     upstream: SeriesEpisodePublicBoundary,
 ) -> ScriptStudioPublicBoundary:
-    return ScriptStudioPublicBoundary(
-        ScriptStudioService(SqliteScriptStudioAdapter(database_path), upstream)
-    )
+    from services.v5_core_os.lifecycle_integrity.sqlite_backend import SqliteLifecycleState
+    from .generation_recovery_sqlite import SqliteGenerationStore
+    state = SqliteLifecycleState(database_path)
+    boundary = ScriptStudioPublicBoundary(ScriptStudioService(
+        SqliteScriptStudioAdapter(database_path, lifecycle_state=state), upstream), lifecycle_state=state)
+    boundary._bind_generation_store(SqliteGenerationStore(database_path, lifecycle_state=state))
+    return boundary
 
 
 def create_local_development_boundary_from_environment(

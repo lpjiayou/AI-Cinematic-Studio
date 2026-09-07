@@ -331,6 +331,7 @@ class NarrativeValidationHttpEntrypointTests(unittest.TestCase):
         self.assembly.script_studio.confirm_version({
             "workspaceRef": WORKSPACE, "seriesRef": self.command["seriesRef"], "episodeRef": self.command["episodeRef"],
             "scriptRef": changed["script"]["scriptRef"], "scriptVersionRef": changed["scriptVersion"]["scriptVersionRef"],
+            "expectedScriptVersion": changed["script"]["version"],
             "humanConfirmed": True})
         self.assert_stale_zero_write()
 

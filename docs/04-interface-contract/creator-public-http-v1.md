@@ -361,6 +361,106 @@ its original method, random refs, HTTP 201 envelope and duplicate-record behavio
 Existing manual append, v2 item binding, M6 bootstrap and historical random-ref reads
 remain supported. See the [E3D receipt](../status/M5_SERIES_PLAN_COMMAND_IDEMPOTENCY_E3D_2026-09-07.md).
 
+### M3 Script generation recovery and confirmation (E3F)
+
+`POST /creator/api/v1/script-versions/generate` creates the first unconfirmed Script
+and ScriptVersion for an Episode. This draft is a domain fact, with no confirmation,
+approval, publication or downstream execution authority. It is not an append-version
+endpoint. The exact external request requires `seriesRef`, `episodeRef`, and accepts
+only optional `projectRef`, `idempotencyKey`. Workspace comes from authentication.
+Unknown fields, duplicate JSON keys, query input, client workspace/M6 bindings,
+digests, permissions, content, provider/model/prompt settings and target Ref overrides
+are rejected before generation. Without Project the existing v1 mode remains;
+Project requires the current trusted M6 context and produces v2. Missing or invalid
+M6 configuration never silently falls back to v1.
+
+The optional key is a nonempty string, at most 200 characters, without surrounding
+whitespace, controls, slash/backslash, or the exact values `.` and `..`. No trimming
+or coercion occurs. Its versioned canonical JSON/SHA-256 identity binds authenticated
+Workspace, `SCRIPT_GENERATION` and key; only the digest is retained. Raw keys are not
+persisted, echoed or logged. A separate digest binds the normalized request scope.
+Reusing a Workspace/key for a different valid scope/input returns
+`409 / idempotency_conflict`, with no generation or business write.
+
+The optional `script_generation_recovery@1` component in the existing Creator SQLite
+database stores application recovery metadata. It is not a second Script authority,
+provider queue or confirmation ledger. It retains validated recovery content, original
+server bootstrap/M6 source association, digests and original result refs/projection.
+`v5.script.v1`, `creator.script-studio.script-version.v1` and
+`creator.script-studio.script-version.v2` remain the domain schemas. No historical
+Script rows are rewritten. Exact DDL, marker/index and row/association validation
+reject partial, altered or incorrectly linked components at startup.
+
+| Durable state | Retry meaning |
+| --- | --- |
+| `PENDING` | Reservation committed before generation. No reliably persisted result; `409 / script_generation_pending`, never automatic resubmission. |
+| `RESULT_READY` | Legal content and original source are durable; resume only the local domain commit, with no new text call. |
+| `COMPLETED` | Script/ScriptVersion and the original result were committed atomically; verify the immutable domain association and replay that result. |
+| `FAILED` | Known terminal invalid output; the same key returns `409 / invalid_provider_output` without regeneration. |
+
+Reservation and result saving each use a short V5 transaction. The text call runs
+outside every database transaction and Lifecycle write lock, through the existing
+Script Studio capability and its existing maximum-one schema repair. Completion
+rechecks scope, source and Script absence and calls the existing V5 owner; Script,
+ScriptVersion and COMPLETED commit in one transaction. Failure after Script insertion
+rolls the entire transaction back to RESULT_READY. A lost output before RESULT_READY
+cannot be reconstructed: the reservation stays PENDING. Transport timeout, unavailable
+transport or unknown execution outcome does not prove remote execution stopped and
+retains that exclusion. An old result cannot be rebound to a changed source
+(`409 / script_generation_source_changed`, or the existing M6 error).
+
+Keyed first success is HTTP 201 with the existing `script`/`scriptVersion` plus
+`idempotentReplay=false`. COMPLETED replay is HTTP 200 with
+`idempotentReplay=true`. Actual RESULT_READY recovery is HTTP 200 with
+`idempotentReplay=false`, `recoveredFromResultReady=true`. Stable business payloads
+are preserved, rather than promising identical whole envelopes. Replayed Script
+metadata describes the original generation result; current edits/confirmation still
+come from the existing workspace read. Authentication and legal current source access
+remain prerequisites; replay does not bypass current M6 authority checks.
+
+Unkeyed first generation keeps its original HTTP 201 request/response shape and uses
+an internal random reservation through the same infrastructure. It cannot bypass
+Episode exclusion and does not promise exact receipt recovery from repeated body
+alone. Existing Script is rejected before any text call with
+`409 / script_already_exists`; the workspace read exposes the created Script. A unique
+pending Episode index excludes competing keys and processes. A known terminal FAILED
+attempt may permit a new key only when no old execution remains possible, source is
+valid and no Script exists. If a legal import wins during generation, completion
+refuses to overwrite it; the already incurred first call remains counted.
+
+`POST /creator/api/v1/script-versions/confirm` requires exactly `seriesRef`,
+`episodeRef`, `scriptRef`, `scriptVersionRef`, `humanConfirmed`; optional fields are
+`projectRef`, `expectedScriptVersion`. It applies the same closed JSON/query and
+authenticated Workspace rules. The optional expected value is a strict positive JSON
+integer for the Script root metadata version, not `ScriptVersion.versionNumber`;
+bool, float, string and null are rejected. No confirmation key or receipt table exists.
+
+Before every decision, including no-op, V5 validates scope, immutable target/lineage,
+the reviewed-import approval protection and applicable current M6. These checks and
+the following decision share a linearizable transaction:
+
+| Current confirmed target | Precondition and outcome |
+| --- | --- |
+| None | Omitted expected version remains compatible; a supplied value must match. One update, HTTP 201. |
+| Same exact target | Omitted expected version, current expected version, or exactly expected+1 permits zero-write no-op, HTTP 200. Any further/mismatched advance returns `409 / version_conflict`. |
+| Different target | Missing expected version returns `409 / script_confirmation_precondition_required`; only matching current root CAS permits one explicit switch, HTTP 201. Stale CAS returns `409 / version_conflict`. |
+
+Success preserves `script` and `confirmedVersion`. No-op changes neither root version,
+`updatedAt`, confirmed pointer nor content. Same-target concurrent requests cause at
+most one effective update; different targets sharing one expected root cannot silently
+overwrite each other. Delayed old requests cannot restore an older target. The result
+proves current target satisfaction without this request writing; it does not reconstruct
+an arbitrary historical confirmation event or original operator receipt. No client or
+server automatically refreshes expected values and resubmits.
+
+First and same-target legacy confirmation requests remain supported. Switching an
+already confirmed target is explicitly tightened to require CAS. Frontend CAS wiring
+is not implemented or verified in E3F. Manual versions, scene rewriting, reviewed
+import/acceptance and M5 historical confirmation semantics are unchanged. Repeated
+confirmation keeps existing ProductionRun snapshots and current M7 validation valid;
+real content changes and target switches still invalidate old downstream evidence.
+Current M7 narrative validation continues to require M6-bound ScriptVersion v2.
+
 ## M5 controlled binding operator (E3E)
 
 M5 binding remains Core-only under ADR-0005. No public HTTP binding write route is
