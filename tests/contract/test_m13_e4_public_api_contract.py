@@ -110,7 +110,7 @@ def _public(stub: _DeliveryStub) -> EpisodeProductionPublicBoundary:
 
 class M13E4PublicApiContractTests(unittest.TestCase):
     def test_reuses_the_single_existing_route_and_adds_one_closed_kind(self):
-        self.assertEqual(len(EPISODE_PRODUCTION_SUBRESOURCES), 34)
+        self.assertEqual(len(EPISODE_PRODUCTION_SUBRESOURCES), 35)
         self.assertIn("method-aware-video-jobs", EPISODE_PRODUCTION_SUBRESOURCES)
         self.assertIn("method-aware-video-candidates", EPISODE_PRODUCTION_SUBRESOURCES)
         self.assertIn("method-aware-input-candidates", EPISODE_PRODUCTION_SUBRESOURCES)

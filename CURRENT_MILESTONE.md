@@ -2,9 +2,7 @@
 
 Status: `CURRENT / EVIDENCE-BACKED / FAIL-CLOSED`; last reviewed: `2026-09-07`
 ## 1. Closed K2 cutover baselines
-
 The production behavior, acceptance evidence and compatible Frontend pin are:
-
 ```text
 CORE_BEHAVIOR_MAIN=e21789d265c4e936b0e0b29921746a4c205889b8
 CORE_BEHAVIOR_TREE=086f37ed4e5412d1d6608c4ee856ac75d61625e9
@@ -27,10 +25,8 @@ M13_BASE_TAG_OBJECT=b2d086b622bdb5456f6af325e458aa3771e43e80
 M13_BASE_TAG_TARGET=a455c8e76427d53d75bb7f15259b9875d9768914
 M13_BASE_TAG_IMMUTABLE=true
 ```
-
 `CORE_BEHAVIOR_MAIN` is the last production change in this K2 cutover baseline; `CORE_ACCEPTANCE_MAIN` is its acceptance-only descendant. This document does not predict its own merge SHA. Frontend PR #25 proves compatibility only. See the [cross-repository baseline](docs/status/CROSS_REPOSITORY_BASELINE.md) and [capability matrix](docs/status/M1-M19-CAPABILITY-STATUS.md).
 ## 2. Upstream method closure
-
 ```text
 UPSTREAM_METHOD_CLOSURE=PASS
 GENERIC_NON_K2_VERTICAL_SLICE=PASS
@@ -63,11 +59,8 @@ FOREIGN_WORKSPACE_REJECTION=PASS
 M11_CONTACT_RUNTIME=NOT_INSTALLED
 M11_GAIT_RUNTIME=NOT_INSTALLED
 ```
-
 Evidence is Core PRs #54–#59 (upstream method chain), #63 (public cutover), #64 (acceptance), and Frontend PR #25 (pin and immutable-history compatibility gate). Historical v1 facts remain readable. Contact and Gait are explicitly unavailable instead of falling back to Wan. Runtime installation, live production and publication are not implied by this closure. Future K2-002 production must create an additive method-aware successor; it may not reinterpret or upgrade historic G4/G5 facts.
-
 ## 3. M12 and M13 boundary
-
 ```text
 M12_DOMAIN_CONTRACT=MERGED
 M12_RUNTIME_PROTOCOL=MERGED
@@ -177,14 +170,21 @@ CREATIVE_PLAN_CONFIRMATION_IDEMPOTENCY_E3B=IMPLEMENTED_AND_VERIFIED
 AI_DIRECTOR_CANDIDATE_IDEMPOTENCY_E3C=IMPLEMENTED_AND_VERIFIED
 M5_SERIES_PLAN_CANDIDATE_IDEMPOTENCY_E3D=IMPLEMENTED_AND_VERIFIED
 M5_SERIES_PLAN_CONFIRMATION_IDEMPOTENCY_E3D=IMPLEMENTED_AND_VERIFIED
+M5_BINDING_OPERATOR_ENTRYPOINT=IMPLEMENTED_AND_VERIFIED
+M7_VALIDATION_PUBLIC_HTTP=IMPLEMENTED_AND_VERIFIED
+M3_GENERATION_RECOVERY=OBSERVED_DUPLICATE_CALL_PENDING_E3F
+M3_CONFIRMATION_STABILITY=OBSERVED_ROOT_VERSION_DRIFT_PENDING_E3F
+M5_CONFIRM_VERSION_HISTORICAL_RECEIPT=UNPROVEN_CONTRACT_DECISION_PENDING
+SPIKE_0_EXECUTED=false
+E3F_STARTED=false
 SPIKE_0_ELIGIBLE_LINEAGE_E3=BLOCKED_PENDING_RESUME
 SPIKE_0_READINESS=BLOCKED
-NEXT_TASK=ACS-M10-M11-SPIKE-0-ELIGIBLE-LINEAGE-PREPARATION-E3-RESUME-R6
+NEXT_TASK_AFTER_VERIFIED_E3E_MERGE=ACS-M3-SCRIPT-GENERATION-AND-CONFIRMATION-RECOVERY-E3F
 SUPERSEDED_VALIDATOR_M12_G0_3_STATE=ENVIRONMENT_HOLD
 SUPERSEDED_VALIDATOR_NEXT_TASK=LOCAL_WSL2_HANDOFF_AND_M12_C3_PREFLIGHT
 SUPERSEDED_VALIDATOR_TOKEN_GRANTS_AUTHORITY=false
 ```
-The [PR-B receipt](docs/status/CORE_SERIES_PLANNING_SCOPE_AND_CANDIDATE_BINDING_HARDENING_2026-09-05.md), [Project foundation receipt](docs/status/CORE_RECOVERABLE_PROJECT_FOUNDATION_COMMAND_2026-09-05.md) and [clean-state public E2E receipt](docs/status/CORE_CLEAN_STATE_PUBLIC_API_E2E_2026-09-06.md) and the [E1 worker seam receipt](docs/status/M10_M11_METHOD_AWARE_WORKER_SEAM_CORRECTIVE_E1_2026-09-06.md) and [E2 result intake receipt](docs/status/M10_M11_METHOD_AWARE_JOB_RESULT_INTAKE_CORRECTIVE_E2_2026-09-06.md) and [E3A input admission receipt](docs/status/M10_METHOD_AWARE_SINGLE_INPUT_IMAGE_ADMISSION_E3A_2026-09-06.md) and the [E3B confirmation receipt](docs/status/M1_CREATIVE_PLAN_CONFIRMATION_IDEMPOTENCY_E3B_2026-09-06.md) and the [E3C candidate receipt](docs/status/M1_AI_DIRECTOR_CANDIDATE_IDEMPOTENCY_E3C_2026-09-07.md) and [M5 E3D receipt](docs/status/M5_SERIES_PLAN_COMMAND_IDEMPOTENCY_E3D_2026-09-07.md) hold detailed evidence and non-authority boundaries. R5 is quarantined valid-prefix evidence; R6 requires fresh staging/database/token and separate authorization; M12-C3/C4, A100, Provider/GPU and publication remain paused; E3A admission is technical evidence only. Compatibility tokens grant no current authority.
+The [PR-B receipt](docs/status/CORE_SERIES_PLANNING_SCOPE_AND_CANDIDATE_BINDING_HARDENING_2026-09-05.md), [Project foundation receipt](docs/status/CORE_RECOVERABLE_PROJECT_FOUNDATION_COMMAND_2026-09-05.md) and [clean-state public E2E receipt](docs/status/CORE_CLEAN_STATE_PUBLIC_API_E2E_2026-09-06.md) and the [E1 worker seam receipt](docs/status/M10_M11_METHOD_AWARE_WORKER_SEAM_CORRECTIVE_E1_2026-09-06.md) and [E2 result intake receipt](docs/status/M10_M11_METHOD_AWARE_JOB_RESULT_INTAKE_CORRECTIVE_E2_2026-09-06.md) and [E3A input admission receipt](docs/status/M10_METHOD_AWARE_SINGLE_INPUT_IMAGE_ADMISSION_E3A_2026-09-06.md) and the [E3B confirmation receipt](docs/status/M1_CREATIVE_PLAN_CONFIRMATION_IDEMPOTENCY_E3B_2026-09-06.md) and the [E3C candidate receipt](docs/status/M1_AI_DIRECTOR_CANDIDATE_IDEMPOTENCY_E3C_2026-09-07.md) and [M5 E3D receipt](docs/status/M5_SERIES_PLAN_COMMAND_IDEMPOTENCY_E3D_2026-09-07.md) and [E3E receipt](docs/status/M5_M7_LEGAL_ENTRYPOINT_CLOSURE_E3E_2026-09-07.md) hold detailed evidence and non-authority boundaries. R5 is quarantined valid-prefix evidence; R6 requires fresh staging/database/token and separate authorization; M12-C3/C4, A100, Provider/GPU and publication remain paused; E3A admission is technical evidence only. Compatibility tokens grant no current authority.
 ## 7. Immutable history
 The former archived material remains byte-for-byte in [CURRENT_MILESTONE_HISTORY_THROUGH_2026-09-02.md](CURRENT_MILESTONE_HISTORY_THROUGH_2026-09-02.md).
 ```text

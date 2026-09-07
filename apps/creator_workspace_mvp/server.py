@@ -68,6 +68,7 @@ from apps.creator_workspace_mvp.public_contract import (
     PUBLIC_CANONICAL_REGISTRATION_PREFLIGHT_ENDPOINT,
     PUBLIC_EPISODES_ENDPOINT,
     PUBLIC_EPISODE_PRODUCTION_RUNS_ENDPOINT,
+    PUBLIC_NARRATIVE_VALIDATION_RESOURCE,
     PUBLIC_EXECUTION_METHOD_PLAN_RESOURCE,
     PUBLIC_EXPLICIT_AUDIO_REQUIREMENT_ROUTE_RESOURCE,
     PUBLIC_METHOD_AWARE_INPUT_PLAN_RESOURCE,
@@ -173,6 +174,7 @@ SERIES_PLANNING_M6_BOOTSTRAP_ENDPOINT = f"{SERIES_PLANNING_ENDPOINT}/m6-bootstra
 MAX_REQUEST_BYTES = 512_000
 HEALTH_ENDPOINT = "/health"
 EPISODE_PRODUCTION_SUBRESOURCES = {
+    PUBLIC_NARRATIVE_VALIDATION_RESOURCE,
     "authority-identity",
     "production-readiness",
     "provider-experiments",
@@ -832,6 +834,7 @@ class CreatorRequestHandler(BaseHTTPRequestHandler):
                         PUBLIC_METHOD_AWARE_VIDEO_CANDIDATES_RESOURCE,
                         PUBLIC_METHOD_AWARE_INPUT_CANDIDATES_RESOURCE,
                         PUBLIC_METHOD_AWARE_INPUT_ADMISSION_RESOURCE,
+                        PUBLIC_NARRATIVE_VALIDATION_RESOURCE,
                     })
             ):
                 # Depth and numeric bounds have already passed the shared
@@ -970,6 +973,14 @@ class CreatorRequestHandler(BaseHTTPRequestHandler):
             if production_subresource is not None and "productionRunRef" in payload:
                 self._send_application_error(400, "invalid_request")
                 return
+            if production_subresource is not None and production_subresource[1] == PUBLIC_NARRATIVE_VALIDATION_RESOURCE:
+                if (set(payload) != {"projectRef", "seriesRef", "episodeRef", "validationProfileRef",
+                                     "validationProfileVersion", "idempotencyKey"}
+                        or type(payload.get("validationProfileVersion")) is not int
+                        or payload["validationProfileVersion"] < 1
+                        or query):
+                    self._send_application_error(400, "invalid_request")
+                    return
             if (
                 production_subresource is not None
                 and production_subresource[1] in _METHOD_AWARE_WRITE_RESOURCES
@@ -1175,6 +1186,8 @@ class CreatorRequestHandler(BaseHTTPRequestHandler):
                     result = self.episode_production_boundary.compile_shot_graph(
                         command
                     )
+                elif resource == PUBLIC_NARRATIVE_VALIDATION_RESOURCE:
+                    result = self.episode_production_boundary.create_narrative_validation(command)
                 elif resource == "assets":
                     result = self.episode_production_boundary.resolve_assets(command)
                 elif resource == "media":
@@ -1277,7 +1290,9 @@ class CreatorRequestHandler(BaseHTTPRequestHandler):
             except EpisodeProductionPublicError as exc:
                 self._send_episode_production_error(exc)
                 return
-            if resource == "dynamic-media-preflight":
+            if resource == PUBLIC_NARRATIVE_VALIDATION_RESOURCE:
+                self._send_json(200, {"ok": True, "validation": result})
+            elif resource == "dynamic-media-preflight":
                 self._send_json(200, {"ok": True, "preflight": result})
             else:
                 self._send_json(
@@ -1514,6 +1529,18 @@ class CreatorRequestHandler(BaseHTTPRequestHandler):
                 )
                 if production_subresource is not None:
                     run_ref, resource = production_subresource
+                    if resource == PUBLIC_NARRATIVE_VALIDATION_RESOURCE:
+                        required = {"projectRef", "seriesRef", "episodeRef"}
+                        if (not required.issubset(query)
+                                or not set(query).issubset(required | {"consistencyValidationVersionRef"})
+                                or any(len(values) != 1 or not values[0].strip() for values in query.values())):
+                            raise EpisodeProductionPublicError("invalid_request", 400)
+                        validation = self.episode_production_boundary.get_narrative_validation(
+                            workspace_ref, query["projectRef"][0], query["seriesRef"][0],
+                            query["episodeRef"][0], run_ref,
+                            query.get("consistencyValidationVersionRef", [None])[0])
+                        self._send_json(200, {"ok": True, "validation": validation})
+                        return
                     if resource in {PUBLIC_METHOD_AWARE_VIDEO_CANDIDATES_RESOURCE,
                                     PUBLIC_METHOD_AWARE_INPUT_CANDIDATES_RESOURCE,
                                     PUBLIC_METHOD_AWARE_INPUT_ADMISSION_RESOURCE}:

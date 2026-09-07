@@ -12,12 +12,12 @@ from scripts import method_aware_input_artifact_bundle as operator
 
 
 class CurrentInputAdmissionContractTests(unittest.TestCase):
-    def test_exact_eight_method_aware_resources_and_34_subresources(self):
+    def test_exact_eight_method_aware_resources_and_35_subresources(self):
         expected={'execution-method-plan','method-aware-input-plan','method-aware-video-route',
             'method-aware-video-jobs','method-aware-video-candidates','explicit-audio-requirement-route',
             'method-aware-input-candidates','method-aware-input-admission'}
         self.assertEqual(set(public_contract.PUBLIC_METHOD_AWARE_RESOURCES),expected)
-        self.assertEqual(len(server.EPISODE_PRODUCTION_SUBRESOURCES),34)
+        self.assertEqual(len(server.EPISODE_PRODUCTION_SUBRESOURCES),35)
         m10=next(c for c in public_contract.CAPABILITY_PROJECTION if c['id']=='M10')
         for resource in ('method-aware-input-candidates','method-aware-input-admission'):
             self.assertIn(resource,server.EPISODE_PRODUCTION_SUBRESOURCES)

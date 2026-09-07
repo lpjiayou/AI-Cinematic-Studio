@@ -58,6 +58,7 @@ PUBLIC_M6_BASELINE_ACTIVATE_ENDPOINT: Final = f"{PUBLIC_API_PREFIX}/series-intel
 PUBLIC_EPISODE_PRODUCTION_RUNS_ENDPOINT: Final = (
     f"{PUBLIC_API_PREFIX}/episode-production-runs"
 )
+PUBLIC_NARRATIVE_VALIDATION_RESOURCE: Final = "narrative-validation"
 PUBLIC_EXECUTION_METHOD_PLAN_RESOURCE: Final = "execution-method-plan"
 PUBLIC_METHOD_AWARE_INPUT_PLAN_RESOURCE: Final = "method-aware-input-plan"
 PUBLIC_METHOD_AWARE_VIDEO_ROUTE_RESOURCE: Final = "method-aware-video-route"
@@ -149,7 +150,10 @@ CAPABILITY_PROJECTION: Final = (
     },
     {
         "id": "M7", "name": "Narrative Closed Loop", "state": "local_evidence_only",
-        "publicResources": ["episode-production-runs/shot-graph"],
+        "publicResources": [
+            "episode-production-runs/shot-graph",
+            "episode-production-runs/narrative-validation",
+        ],
         "requirements": ["M6", "confirmed_script"],
     },
     {
