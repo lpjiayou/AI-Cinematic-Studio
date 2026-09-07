@@ -23,7 +23,7 @@ Commercial Frontend → Frontend Experience Adapter → /creator/api/v1
 | M4 | `/projects`, `/project-contexts`, `/project-foundations`, `/canonical-registrations`, `/canonical-registrations/preflight` | Project Context, cross-M2/M4 Creator Application foundation orchestration and V5 canonical registration boundary |
 | M5 | `/series-planning-workspaces`, `/series-plan-*` | Series Planning + Series Director boundaries |
 | M6 | `/series-intelligence-workspaces`, `/series-intelligence/*` | accepted Series Intelligence public boundary |
-| M7–M9 | `/episode-production-runs/{runRef}/shot-graph`, `/execution-method-plan` | current M7 validation plus source-bound M8 action beats and server-derived M9 three-axis requirements |
+| M7–M9 | `/episode-production-runs/{runRef}/narrative-validation`, `/shot-graph`, `/execution-method-plan` | current M7 validation plus source-bound M8 action beats and server-derived M9 three-axis requirements |
 | M10 | `/episode-production-runs/{runRef}/method-aware-input-plan`, `/method-aware-input-candidates`, `/method-aware-input-admission`, `/dynamic-media-preflight`, `/real-media-revision`, `/real-image-candidates`, `/semantic-visual-qc`, `/media-selection`, `/real-image-admission`, `/real-image-successor-admission`, `/real-image-selection`, `/state-projection`, `/production-readiness` | current-plan input resolution over the one canonical AssetVersion stream, plus the existing typed media control plane |
 | M11 | `/episode-production-runs/{runRef}/method-aware-video-route`, `/method-aware-video-jobs`, `/method-aware-video-candidates`, `/real-video-revision`, `/real-video-candidates`, `/semantic-visual-qc`, `/media-selection`, `/real-video-admission`, `/state-projection`, `/provider-experiments` | closed method routing and verified technical result intake; only Micro Motion can reserve the existing single-anchor queue, while Contact and Gait fail closed |
 | M12 | `/episode-production-runs/{runRef}/explicit-audio-requirement-route`, `/production-readiness` | explicit M9 AudioRequirement routing; Runtime G0 remains incomplete |
@@ -360,6 +360,137 @@ drift also conflicts; replay never rewrites later history. Unkeyed confirmation 
 its original method, random refs, HTTP 201 envelope and duplicate-record behavior.
 Existing manual append, v2 item binding, M6 bootstrap and historical random-ref reads
 remain supported. See the [E3D receipt](../status/M5_SERIES_PLAN_COMMAND_IDEMPOTENCY_E3D_2026-09-07.md).
+
+## M5 controlled binding operator (E3E)
+
+M5 binding remains Core-only under ADR-0005. No public HTTP binding write route is
+added. `scripts/episode_plan_item_binding.py` calls the controlled
+`EpisodePlanBindingOperator`, using `LifecycleAssembly.sqlite` with
+`initialize_or_upgrade=False` and the existing `SeriesPlanningPublicBoundary`.
+All domain writes use `create_episode_plan_item_binding_version`; public
+`get_workspace` and `project_context.build_context` provide source and membership
+checks. The operator executes no SQL and accesses no private repository or lease.
+
+The deployment owner supplies a managed configuration with exactly `targetRef`,
+`databasePath` and `allowedScopes`. Each allowed scope has exactly `workspaceRef`,
+`projectRef`, `seriesRef` and a nonempty `operationAuthorizationRefs` list. This
+configuration must be provisioned independently of command input. An authorization
+ref is managed operation metadata, not a self-issued bearer token or new RBAC system.
+The database must be an existing absolute regular file with no symlink in its parent
+chain. Missing, invalid or incomplete databases fail closed; no home-directory
+fallback, initialization, migration or repair is performed. File identity is checked
+again before and after public reads.
+
+The closed command fields are:
+
+```text
+targetRef
+workspaceRef
+projectRef
+seriesRef
+seriesPlanRef
+expectedPlanVersion
+sourceSeriesPlanVersionRef
+sourceContentDigest
+episodePlanItemBindings
+operationAuthorizationRef
+```
+
+`expectedPlanVersion` is a strict positive integer, excluding booleans and floats.
+Both JSON documents reject duplicate keys, unknown fields and nonfinite numbers.
+Each binding has exactly `episodeRef` and `episodePlanItemRef`; both sides are unique.
+The entire explicit collection replaces the binding collection in the new version;
+the tool never infers, merges or fills pairs from titles, episode numbers or indices.
+Canonical ordering follows the exact source EpisodePlanItem order, then Episode ref.
+
+`sourceContentDigest` is lowercase SHA-256 of UTF-8 JSON with sorted keys, compact
+separators and no NaN. Its payload contains `seriesConcept`, `premise`, `logline`,
+`mainNarrativeDirection`, `mainArcs`, `subArcs`, `characterArcIntents`,
+`episodePlanItems`, `narrativeRhythm`, `worldIntent`, `continuityIntent`,
+`foreshadowingContext` and `productionAssumptions`, plus `episodePlanItemBindings`
+for a v2 source. Ref, root revision and source digest are independent checks.
+
+```sh
+python scripts/episode_plan_item_binding.py --config /absolute/managed/config.json --input /absolute/command.json
+python scripts/episode_plan_item_binding.py --config /absolute/managed/config.json --input /absolute/command.json --apply
+```
+
+The default returns `PREFLIGHT_READY` with zero business or schema writes. Explicit
+`--apply` re-reads the same scope/source/digest/CAS immediately before at most one
+binding call. It supports v1→v2 and v2→v2 and preserves all historical and non-binding
+content. It never confirms the version or activates M6. A successful first call
+preserves the actual command response, including `draft`.
+
+Receipts separately report `BINDING_VERSION_CREATED`, `BINDING_VERSION_CURRENT`
+and `BINDING_VERSION_CONFIRMED`. The last field compares the exact immutable version
+ref with the confirmed pointer; root status alone proves no binding confirmation.
+The existing SQLite append can retain the root's earlier `confirmed` status while
+the binding command returns `draft`; its confirmed pointer still names the older
+version. E3E does not change that persistence behavior or reconstruct a first receipt.
+
+Before a retry writes, authoritative readback searches for exactly one v2 successor
+with the same scope/Plan, exact parent, `episode-plan-item-binding` change kind,
+unchanged non-binding content, exact complete binding set and one-step immutable/root
+revision advance. It must still be current with no later version. Such recovery
+returns `BINDING_RESULT_RECOVERED_BY_AUTHORITATIVE_READBACK`, the observed version and
+the actual current Plan, with `BINDING_VERSION_CREATED=false`. Missing evidence,
+ambiguity, later confirmation or another advance returns `CONFLICT` or
+`UNRESOLVED_OUTCOME` without another write. CAS is never refreshed automatically.
+No historical confirmation receipt, domain idempotency-key replay or human approval
+is claimed. Safe CLI errors contain only a code; managed target/configuration/input
+errors use `TARGET_UNAVAILABLE`, `INVALID_CONFIGURATION`, `INVALID_REQUEST` or
+`SCOPE_FORBIDDEN`. Exit status is zero on success and nonzero on failure.
+
+## M7 current narrative validation HTTP (E3E)
+
+`GET` and `POST` share exactly one resource:
+`/creator/api/v1/episode-production-runs/{runRef}/narrative-validation`.
+It connects `create_narrative_validation` and `get_narrative_validation` on the
+existing EpisodeProduction public boundary. The actual record kind is
+`ConsistencyValidationVersion`, with `consistencyValidationVersionRef`; the legacy
+shot-graph `ConsistencyValidation` is a separate historical result and is unchanged.
+
+POST accepts exactly `projectRef`, `seriesRef`, `episodeRef`, `validationProfileRef`,
+`validationProfileVersion` and `idempotencyKey`, with no query parameters.
+Authentication injects `workspaceRef`; the path injects `productionRunRef`.
+`validationProfileVersion` is a strict positive integer, never boolean or float.
+Unknown fields, duplicate JSON keys, nonfinite numbers, client scope/run claims,
+findings/readiness, source snapshots, digests, rules, authority and Provider/runtime
+values are rejected before domain dispatch. Profiles resolve only in the existing
+server registry; callers cannot define or replace rules or profile digests.
+
+Both first success and exact replay use HTTP 200 with exactly
+`{"ok": true, "validation": <existing public boundary projection>}`. All existing
+projection fields are retained, including the boundary's own `idempotentReplay`;
+the handler does not infer or add a replay flag. The exact ScriptVersion/digest,
+M6 binding/baseline, SeriesPlan/Bible/Character versions, profile ref/version/digest,
+findings/source spans, result, payloadDigest and currentness remain authoritative.
+
+GET requires exactly one nonempty `projectRef`, `seriesRef` and `episodeRef` query,
+with optional `consistencyValidationVersionRef`. Omitting the version selects latest;
+supplying it selects that exact immutable version. Unknown, duplicate and empty
+queries fail closed. GET never creates a missing validation. Foreign scope and
+missing run/version return the same existing not-found behavior.
+
+| Condition | Existing HTTP / code |
+| --- | --- |
+| Missing or invalid authentication | `401 / authentication_required` |
+| Client workspace claim | `400 / client_workspace_scope_forbidden` |
+| Invalid DTO, duplicate input or invalid integer | `400 / invalid_request` |
+| Unregistered profile or unavailable profile version | `409 / upstream_not_confirmed` |
+| Missing or foreign run/scope/version | `404 / not_found` |
+| Same key with changed valid input | `409 / idempotency_conflict` |
+| Changed confirmed Script or M6 input before create/replay | `409 / stale_input` |
+
+Profile and current-source validation precede idempotency lookup. GET returns the
+original payload with `currentness=STALE` when authoritative inputs drift; it does
+not rewrite history. The existing mapping remains `PASS → READY_FOR_M8`,
+`WARN → NOT_READY_PENDING_DISPOSITION`, `BLOCK → NOT_READY`. These are validation
+results, not execution or publication authorization. `require_m8_ready_validation`
+is the existing read-only downstream consumer; only current PASS is eligible.
+The resource creates no ShotGraph, ExecutionMethodPlan, Route, Job or Attempt and
+writes no Script/M6 facts. It is the 35th EpisodeProduction subresource; the eight
+method-aware resources remain unchanged. See the [E3E receipt](../status/M5_M7_LEGAL_ENTRYPOINT_CLOSURE_E3E_2026-09-07.md).
 
 ## ADR-0019 method-aware production planning
 

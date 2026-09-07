@@ -246,3 +246,11 @@ No-key requests intentionally generate a new independently receipted candidate p
 | Risk | Consequence | Mitigation and gate | Owner / evidence |
 | --- | --- | --- | --- |
 | `R-M5-REPLAY-051` — M5 rejected keyed requests and unkeyed retries repeated generation or returned duplicate confirmation | Extra text calls, lost candidate identity or inability to recover confirmed lineage | Committed PENDING before generation; durable COMPLETED/FAILED; no uncertain automatic retry; unified v1/v2 receipt checks; deterministic Plan/root/item refs and exact winner comparison under the existing Lifecycle transaction. Exact two-table optional component, global unknown-object rejection, authenticated HTTP/SQLite/fresh-process/concurrency and inventory tests. `MITIGATED / BOUNDED_IMPLEMENTATION / REQUIRED_CI_GATE`. | Creator Application / M5 Series Planning / Lifecycle Integrity Owner; [E3D receipt](../docs/status/M5_SERIES_PLAN_COMMAND_IDEMPOTENCY_E3D_2026-09-07.md). R5 remains quarantined; R6 fresh staging and separate authorization required. |
+
+## M5 / M7 E3E entrypoint closure
+
+| Risk | Consequence | Mitigation and gate | Owner / evidence |
+| --- | --- | --- | --- |
+| `R-M5-M7-ENTRY-052` — existing Core capabilities lacked a legal controlled binding entrypoint and current M7 HTTP resource | Ad hoc private writes or substitution of legacy validation could lose source/approval boundaries | Managed target/scope, zero-write preflight, unchanged CAS, unique authoritative binding readback; authenticated closed M7 GET/POST over the existing validation service. No SQL, new domain/store, automatic confirmation or downstream execution. `MITIGATED / BOUNDED_IMPLEMENTATION / REQUIRED_CI_GATE`. | M5 Binding / M7 Narrative Validation / Creator HTTP Owners; [E3E receipt](../docs/status/M5_M7_LEGAL_ENTRYPOINT_CLOSURE_E3E_2026-09-07.md) |
+
+Original audit classifications remain 19 SAFE / 8 UNSAFE / 1 UNPROVEN across 28 endpoints. M3 duplicate-generation and confirmation-root-drift observations remain pending E3F; M5 CAS historical confirmation recovery remains UNPROVEN. The existing SQLite Plan status/command-response difference is preserved, so exact confirmed-version refs govern binding confirmation. No R6 or E3F live work is authorized by this entry.

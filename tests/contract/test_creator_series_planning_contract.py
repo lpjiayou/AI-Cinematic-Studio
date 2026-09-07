@@ -219,7 +219,7 @@ class CreatorSeriesPlanningContractTests(unittest.TestCase):
         self.assertIn("v5_core_os", owner_path.parts)
         self.assertNotIn("apps", owner_path.parts)
 
-    def test_binding_version_is_core_only_and_adds_no_application_route_or_dto(self):
+    def test_binding_version_is_core_only_with_one_controlled_operator_and_no_http_dto(self):
         signature = inspect.signature(
             SeriesPlanningPublicBoundary.create_episode_plan_item_binding_version
         )
@@ -247,11 +247,21 @@ class CreatorSeriesPlanningContractTests(unittest.TestCase):
                 "SERIES_PLANNING_M6_BOOTSTRAP_ENDPOINT",
             },
         )
+        binding_callers = set()
+        binding_dtos = set()
         for path in APPS_ROOT.rglob("*.py"):
             source = path.read_text(encoding="utf-8")
-            with self.subTest(path=path.relative_to(ROOT)):
-                self.assertNotIn("create_episode_plan_item_binding_version", source)
-                self.assertNotIn("episodePlanItemBindings", source)
+            if "create_episode_plan_item_binding_version" in source:
+                binding_callers.add(path.relative_to(ROOT).as_posix())
+            if "episodePlanItemBindings" in source:
+                binding_dtos.add(path.relative_to(ROOT).as_posix())
+        # E3E authorizes exactly this non-HTTP operator. Every other application
+        # file, including the HTTP handler and route registry, stays excluded.
+        allowed = {"apps/creator_workspace_mvp/episode_plan_binding_operator.py"}
+        self.assertEqual(allowed, binding_callers)
+        self.assertEqual(allowed, binding_dtos)
+        self.assertNotIn("create_episode_plan_item_binding_version", server_source)
+        self.assertNotIn("episodePlanItemBindings", server_source)
 
     def test_m6_bridge_preserves_lineage_and_contains_no_display_name_lookup(self):
         _, _, planning, series, project = create_context()

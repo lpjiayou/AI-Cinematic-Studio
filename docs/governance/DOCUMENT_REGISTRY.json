@@ -3324,6 +3324,24 @@
       "lastReviewedAt": "2026-09-07",
       "linkedFromIndex": true,
       "notes": "E3C adds application metadata only; E3 R4 remains quarantined and R5 requires fresh staging and separate authorization. No GPU, Provider, visual reinspection or Frontend authority."
+    },
+    {
+      "path": "docs/status/M5_M7_LEGAL_ENTRYPOINT_CLOSURE_E3E_2026-09-07.md",
+      "repository": "Core",
+      "documentClass": "CURRENT_STATUS",
+      "status": "CURRENT",
+      "owner": "Project Lead / M5 Binding Owner / M7 Narrative Validation Owner / Creator Public HTTP Owner",
+      "authoritativeFor": [
+        "bounded Core-only M5 binding operator and existing current M7 authenticated HTTP create/read verification"
+      ],
+      "supersedes": [],
+      "supersededBy": [],
+      "currentStateClaimsAllowed": true,
+      "historicalMutationPolicy": "UPDATE_FROM_MERGED_EVIDENCE_ONLY",
+      "lastReviewedBaseline": "4755c73330d775591d479966f007e8fa39996d54",
+      "lastReviewedAt": "2026-09-07",
+      "linkedFromIndex": true,
+      "notes": "E3E preserves the immutable audit, M3 pending E3F observations and M5 UNPROVEN historical confirmation recovery. No domain/schema/Script/Frontend change or live R6/provider/GPU authority."
     }
   ]
 }
