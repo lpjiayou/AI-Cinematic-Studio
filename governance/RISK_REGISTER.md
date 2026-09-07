@@ -231,4 +231,12 @@ Runtime G0、A100、下载、安装或 GPU。WSL2 候选已在本轮因网络修
 
 | Risk | Impact | Control and evidence | Owner / next gate |
 | --- | --- | --- | --- |
-| `R-M1-REPLAY-049` — repeated confirmation previously allocated another plan; retry after response loss could duplicate upstream lineage | Duplicate confirmed plans or cross-workspace command confusion | Versioned workspace-scoped deterministic ref, closed explicit/legacy request shapes, existing primary key and Lifecycle transaction, canonical content conflict, restart/concurrency and downstream regressions; no DDL or historical rewrite. `MITIGATED / BOUNDED_IMPLEMENTATION / REQUIRED_CI_GATE`. Failed E3 staging is quarantined, never reused. | M1 Creative Plan / Lifecycle Integrity Owner; [E3B receipt](../docs/status/M1_CREATIVE_PLAN_CONFIRMATION_IDEMPOTENCY_E3B_2026-09-06.md); E3 R4 separately authorized |
+| `R-M1-REPLAY-049` — repeated confirmation previously allocated another plan; retry after response loss could duplicate upstream lineage | Duplicate confirmed plans or cross-workspace command confusion | Versioned workspace-scoped deterministic ref, closed explicit/legacy request shapes, existing primary key and Lifecycle transaction, canonical content conflict, restart/concurrency and downstream regressions; no DDL or historical rewrite. `MITIGATED / BOUNDED_IMPLEMENTATION / REQUIRED_CI_GATE`. Failed E3 staging is quarantined, never reused. | M1 Creative Plan / Lifecycle Integrity Owner; [E3B receipt](../docs/status/M1_CREATIVE_PLAN_CONFIRMATION_IDEMPOTENCY_E3B_2026-09-06.md); E3 R5 separately authorized |
+
+## M1 E3C candidate generation recovery and issuance
+
+| Risk | Impact | Control and evidence | Owner / next gate |
+| --- | --- | --- | --- |
+| `R-M1-CANDIDATE-050` — repeated keyed generation previously allocated new refs and unissued client sources could be confirmed | Duplicate generation after response loss, drifting upstream refs, or confirmation of unissued content | Workspace/key deterministic identity, committed PENDING reservation, atomic COMPLETED/FAILED receipt, no automatic retry of uncertain/failed commands, exact canonical content binding before E3B, full optional-schema and durable-row validation, process restart/concurrency tests. `MITIGATED / BOUNDED_IMPLEMENTATION / REQUIRED_CI_GATE`. R4 remains quarantined. | Creator Application / M1 AI Director Owner; [E3C receipt](../docs/status/M1_AI_DIRECTOR_CANDIDATE_IDEMPOTENCY_E3C_2026-09-07.md); E3 R5 needs fresh staging/database/token and separate authorization |
+
+No-key requests intentionally generate a new independently receipted candidate per click. They provide no response-loss deduplication guarantee. Application command metadata grants no production or publication authority; E3 readiness remains blocked.

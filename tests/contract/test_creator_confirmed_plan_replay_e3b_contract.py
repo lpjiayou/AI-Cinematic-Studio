@@ -105,7 +105,7 @@ class CreatorConfirmedPlanReplayContractTests(unittest.TestCase):
         status, failure = self.http.request(PUBLIC_CONFIRM_PLAN_ENDPOINT, command)
         self.assertEqual(status, 409)
         self.assertEqual(set(failure), {"ok", "error"})
-        self.assertEqual(failure["error"]["code"], "creative_plan_idempotency_conflict")
+        self.assertEqual(failure["error"]["code"], "ai_director_candidate_content_mismatch")
         for forbidden in (self.command["idempotencyKey"], command["brief"]["theme"],
                           self.command["sourcePlanRef"], "SQLite", "Traceback", str(self.http.path)):
             self.assertNotIn(forbidden, str(failure))

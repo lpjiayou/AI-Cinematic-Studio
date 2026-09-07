@@ -87,11 +87,12 @@ class ConfirmationHttpHarness:
         finally:
             client.close()
 
-    def command(self):
-        status, candidate = self.request(PUBLIC_AI_DIRECTOR_ENDPOINT, {"brief": valid_brief()})
+    def command(self, *, brief=None, token=None):
+        brief = brief or valid_brief()
+        status, candidate = self.request(PUBLIC_AI_DIRECTOR_ENDPOINT, {"brief": brief}, token=token)
         assert status == 200 and candidate["ok"] is True
         return {
-            "humanConfirmed": True, "brief": valid_brief(), "plan": candidate["plan"],
+            "humanConfirmed": True, "brief": brief, "plan": candidate["plan"],
             "sourcePlanRef": candidate["sourcePlanRef"],
             "sourcePlanVersion": candidate["sourcePlanVersion"],
             "idempotencyKey": "confirmation-e3b-command",
@@ -148,18 +149,28 @@ class CreativePlanConfirmationIdempotencyHttpTests(unittest.TestCase):
         self.assertEqual(status, 201)
         durable_bytes = self.path.read_bytes()
         variants = []
-        for field, value in {"sourcePlanRef": "another-source", "sourcePlanVersion": 2,
-                             "brief": {**self.command["brief"], "theme": "changed theme"}}.items():
-            variants.append({**self.command, field: value})
+        for field, value, status, error_code in [
+            ("sourcePlanRef", "another-source", 404, "ai_director_candidate_not_issued"),
+            ("sourcePlanVersion", 2, 409, "ai_director_candidate_version_mismatch"),
+            ("brief", {**self.command["brief"], "theme": "changed theme"}, 409, "ai_director_candidate_content_mismatch"),
+        ]:
+            variants.append(({**self.command, field: value}, status, error_code))
         changed_plan = copy.deepcopy(self.command)
         changed_plan["plan"]["storyDirection"]["title"] = "changed title"
-        variants.append(changed_plan)
-        for changed in variants:
+        variants.append((changed_plan, 409, "ai_director_candidate_content_mismatch"))
+        for changed, expected_status, expected_code in variants:
             with self.subTest(changed_fields=[key for key in changed if changed[key] != self.command[key]]):
                 code, rejected = self.http.request(PUBLIC_CONFIRM_PLAN_ENDPOINT, changed)
-                self.assertEqual(code, 409)
-                self.assertEqual(rejected["error"]["code"], "creative_plan_idempotency_conflict")
+                self.assertEqual(code, expected_status)
+                self.assertEqual(rejected["error"]["code"], expected_code)
                 self.assertEqual(durable_bytes, self.path.read_bytes())
+        # A second legitimately issued candidate reaches the unchanged E3B
+        # domain conflict, after E3C has validated its independent issuance.
+        changed_issued = self.http.command(brief={**valid_brief(), "theme": "new issued theme"})
+        durable_bytes = self.path.read_bytes()
+        code, rejected = self.http.request(PUBLIC_CONFIRM_PLAN_ENDPOINT, changed_issued)
+        self.assertEqual((code, rejected["error"]["code"]), (409, "creative_plan_idempotency_conflict"))
+        self.assertEqual(durable_bytes, self.path.read_bytes())
         self.assertEqual(len(self.http.rows()), 1)
         self.assertEqual(self.http.request(PUBLIC_CONFIRM_PLAN_ENDPOINT, self.command)[1]["confirmedPlan"], first["confirmedPlan"])
 
@@ -180,7 +191,7 @@ class CreativePlanConfirmationIdempotencyHttpTests(unittest.TestCase):
                 changed[field]["storyDirection"]["title"] = "different title"
             status, failure = self.http.request(PUBLIC_CONFIRM_PLAN_ENDPOINT, changed)
             self.assertEqual(status, 409)
-            self.assertEqual(failure["error"]["code"], "creative_plan_idempotency_conflict")
+            self.assertEqual(failure["error"]["code"], "ai_director_candidate_content_mismatch")
             self.assertEqual(len(self.http.rows()), 1)
 
     def test_response_loss_retry_reads_the_committed_winner(self):
@@ -226,7 +237,7 @@ class CreativePlanConfirmationIdempotencyHttpTests(unittest.TestCase):
         self.addCleanup(second.close)
         commands = [self.command, copy.deepcopy(self.command)]
         if changed:
-            commands[1]["brief"]["theme"] = "competing theme"
+            commands[1] = second.command(brief={**valid_brief(), "theme": "competing theme"})
         barrier = threading.Barrier(2)
         servers = [self.http, second]
         def call(index):
@@ -262,19 +273,22 @@ class CreativePlanConfirmationIdempotencyHttpTests(unittest.TestCase):
         self.assertNotEqual(first[1]["confirmedPlan"]["creativePlanRef"], second[1]["confirmedPlan"]["creativePlanRef"])
         self.assertEqual(len(self.http.rows()), 2)
 
-    def test_same_key_and_source_identity_in_different_workspaces_are_isolated(self):
+    def test_same_confirmation_key_with_workspace_issued_sources_is_isolated(self):
         for keyed in (True, False):
             command = dict(self.command)
+            foreign_command = self.http.command(token=self.http.tokens[1])
             if not keyed:
                 del command["idempotencyKey"]
+                del foreign_command["idempotencyKey"]
             first_status, first = self.http.request(PUBLIC_CONFIRM_PLAN_ENDPOINT, command)
-            second_status, second = self.http.request(PUBLIC_CONFIRM_PLAN_ENDPOINT, command, token=self.http.tokens[1])
+            self.assertEqual(self.http.request(PUBLIC_CONFIRM_PLAN_ENDPOINT, command, token=self.http.tokens[1])[0], 404)
+            second_status, second = self.http.request(PUBLIC_CONFIRM_PLAN_ENDPOINT, foreign_command, token=self.http.tokens[1])
             self.assertEqual((first_status, second_status), (201, 201))
             self.assertEqual(first["confirmedPlan"]["workspaceRef"], WORKSPACE)
             self.assertEqual(second["confirmedPlan"]["workspaceRef"], FOREIGN_WORKSPACE)
             self.assertNotEqual(first["confirmedPlan"]["creativePlanRef"], second["confirmedPlan"]["creativePlanRef"])
-            for token, expected in zip(self.http.tokens, (first, second)):
-                status, replay = self.http.request(PUBLIC_CONFIRM_PLAN_ENDPOINT, command, token=token)
+            for token, expected, issued in zip(self.http.tokens, (first, second), (command, foreign_command)):
+                status, replay = self.http.request(PUBLIC_CONFIRM_PLAN_ENDPOINT, issued, token=token)
                 self.assertEqual(status, 200)
                 self.assertEqual(replay["confirmedPlan"], expected["confirmedPlan"])
         self.assertEqual(len(self.http.rows()), 4)

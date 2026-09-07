@@ -103,6 +103,90 @@ response. The M1 candidate response also carries the Core-issued opaque
 `sourcePlanRef` and `sourcePlanVersion`; browser code must return those exact values on
 confirmation and must not mint or infer a source-plan reference.
 
+### M1 candidate command and issuance (E3C)
+
+`POST /creator/api/v1/ai-director/candidates` accepts exactly `{brief}` or
+`{brief,idempotencyKey}`. Unknown fields, including client workspace, source refs,
+digests, plan or provider claims, return `400 / invalid_request` before generation
+or command writes. Duplicate JSON keys at every depth are rejected; authentication
+and the shared strict JSON limits apply. Key validation is the same printable,
+nonempty, at-most-200-character rule described for confirmation below. Raw keys
+are never trimmed, coerced, echoed, logged, stored or embedded in refs or plans.
+
+An explicit key reserves one application command per authenticated workspace/key.
+Canonical UTF-8 JSON uses `ensure_ascii=False`, sorted keys, compact separators and
+`allow_nan=False`; all digests use complete 64-character lowercase SHA-256.
+
+| Identity or digest | Canonical input |
+| --- | --- |
+| `identityDigest` | `schemaVersion=creator.ai-director-candidate-command-identity.v1`, `operation=AI_DIRECTOR_CANDIDATE`, authenticated `workspaceRef`, `idempotencyKey` |
+| `commandRef` | `ai-director-candidate-command-` plus `identityDigest` |
+| `sourcePlanRef` | `ai-director-candidate-` plus digest of `schemaVersion=creator.ai-director-candidate-source-identity.v1`, `workspaceRef`, `commandIdentityDigest` |
+| `briefDigest` | Existing `CreativeBrief` normalization: trimmed topic/theme/audience/platform/style/character and numeric `durationSec` |
+| `requestDigest` | `schemaVersion=creator.ai-director-candidate-request.v1`, normalized `brief` |
+| `planDigest` | Existing validated candidate plan |
+| `candidateDigest` | Exact candidate object: `schemaVersion=creator.ai-director-candidate.v1`, `sourcePlanRef`, `sourcePlanVersion=1`, `briefDigest`, `planDigest`, `plan` |
+
+Brief content and provider output never participate in keyed identity. A new key
+requests a new command. Without a key, each explicit HTTP call requests a new
+candidate, with a fresh random command identity and an independently persisted
+issuance receipt; equal briefs are not deduplicated.
+
+The command commits `PENDING` before calling the existing `AiDirectorService`.
+Generation and its existing repair-once behavior run outside any SQLite transaction.
+One logical command can therefore use at most two text capability calls. The same
+record atomically becomes `COMPLETED` with canonical candidate JSON before HTTP
+success. Replay adds zero generation calls and does not rewrite the row.
+
+| Existing workspace/key | Public result | Additional generation |
+| --- | --- | --- |
+| Same request, `COMPLETED` | `200`, original candidate, `idempotentReplay=true` | Zero |
+| Changed normalized request | `409 / ai_director_candidate_idempotency_conflict` | Zero |
+| Same request, `PENDING` | `409 / ai_director_candidate_generation_pending` | Zero |
+| Same request, `FAILED` | Original stable product failure envelope, HTTP `200` | Zero |
+| Storage unavailable or corrupt | `503 / ai_director_candidate_receipt_unavailable` | Zero |
+
+Failures persist only `provider_timeout`, `provider_unavailable`,
+`invalid_provider_output` or `application_error`, with no exception body or raw
+request. `PENDING` after process death and `FAILED` never automatically retry;
+another generation requires a new key. Failed replay is tracked internally while
+preserving the existing product error envelope.
+
+Both successful modes return HTTP `200`. The current Frontend's unkeyed response
+remains exactly `ok`, `kind`, `confirmationRequired`, `sourcePlanRef`,
+`sourcePlanVersion`, `plan`. Keyed responses add `candidateDigest`,
+`candidateReceiptSchemaVersion=creator.ai-director-candidate-receipt.v1` and
+`idempotentReplay` (`false` first, `true` on replay). Compare the source ref/version,
+candidate digest and canonical plan across retries. The complete HTTP envelope
+digest differs because the replay flag changes.
+
+The optional application component shares the current Creator SQLite database:
+`creator_ai_director_candidate_commands`, marker
+`creator_ai_director_candidate_schema` / `ai_director_candidate_commands`, and unique
+indexes `ux_creator_ai_director_candidate_commands_identity` and
+`ux_creator_ai_director_candidate_commands_source_ref`. Component version is 1;
+Lifecycle, M6 and confirmed-plan schema versions remain unchanged. Exact DDL,
+marker, indexes and all durable rows are validated at startup and on access.
+Completely absent components remain accepted before initialization; partial or
+unknown definitions fail closed. A row checksum binds all durable metadata,
+including opaque request/brief digests, and candidate/plan digests are recomputed.
+This checksum detects corruption; it is not a credential or cryptographic signature.
+
+Public confirmation first requires a `COMPLETED` issuance receipt in the authenticated
+workspace. Unknown, foreign, pending or failed sources return
+`404 / ai_director_candidate_not_issued`. Malformed versions retain
+`400 / invalid_request`; a valid integer unequal to the issued version returns
+`409 / ai_director_candidate_version_mismatch`. A changed normalized brief or
+validated plan returns `409 / ai_director_candidate_content_mismatch`. Unavailable
+or corrupt receipt storage returns `503 / ai_director_candidate_receipt_unavailable`.
+Every rejection creates zero confirmed plans. Exact matches pass the server's
+canonical plan to the unchanged E3B domain method. Historical confirmed rows remain
+readable without receipt backfill, and internal compatibility confirmation is unchanged.
+
+These receipts are Creator application recovery metadata. They grant no confirmed
+plan, Project/Series/Episode, production, GPU/provider execution or publication
+authority. See the [E3C receipt](../status/M1_AI_DIRECTOR_CANDIDATE_IDEMPOTENCY_E3C_2026-09-07.md).
+
 ### M1 durable confirmation (E3B)
 
 `POST /creator/api/v1/creative-plans/confirm` accepts exactly `humanConfirmed`,
@@ -138,15 +222,17 @@ selects one durable winner. Core compares `sourcePlanRef`, `sourcePlanSchemaVers
 `sourcePlanVersion`, canonical `briefJson`, canonical `sourcePlanJson`,
 `confirmationStatus` and `version`. Exact replay returns the original complete plan,
 including its original ref, confirmation time and version, without rewriting it.
-Changed content returns `409 / creative_plan_idempotency_conflict` without mutation.
+After the E3C issuance check, different issued content under the same confirmation
+key returns `409 / creative_plan_idempotency_conflict` without mutation.
 This also applies to concurrent insertion conflicts and fresh-process recovery.
 
 | Request | First success | Exact replay | Changed replay |
 | --- | --- | --- | --- |
-| Explicit key | `201`, `ok`, `confirmedPlan`, `idempotentReplay=false` | `200`, same plan, `idempotentReplay=true` | `409 / creative_plan_idempotency_conflict` |
-| Current Frontend body without key | `201`, `ok`, `confirmedPlan` | `200`, identical envelope and plan | `409 / creative_plan_idempotency_conflict` for changed brief/plan under the same source identity |
+| Explicit key | `201`, `ok`, `confirmedPlan`, `idempotentReplay=false` | `200`, same plan, `idempotentReplay=true` | `409 / creative_plan_idempotency_conflict` for another legitimately issued candidate; issuance mismatches are rejected first |
+| Current Frontend body without key | `201`, `ok`, `confirmedPlan` | `200`, identical envelope and plan | E3C rejects changed brief/plan under the same source identity with `409 / ai_director_candidate_content_mismatch` |
 
-There is no new route, plan schema, table, column, index, migration or authority.
+E3B adds no route, plan schema, table, column, index, migration or authority;
+E3C adds only the optional application command component described above.
 Historical random-reference plans remain unchanged, readable and Episode-bindable.
 The internal non-idempotent confirmation method retains its compatibility behavior.
 The [E3B receipt](../status/M1_CREATIVE_PLAN_CONFIRMATION_IDEMPOTENCY_E3B_2026-09-06.md)

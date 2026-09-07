@@ -12,6 +12,7 @@ from apps.creator_workspace_mvp.ai_director import AiDirectorService
 from apps.creator_workspace_mvp.public_auth import PublicApiAuthenticator
 from apps.creator_workspace_mvp.public_contract import (
     CAPABILITIES_ENDPOINT,
+    PUBLIC_AI_DIRECTOR_ENDPOINT,
     PUBLIC_CONFIRM_PLAN_ENDPOINT,
     PUBLIC_EPISODES_ENDPOINT,
     PUBLIC_PROJECTS_ENDPOINT,
@@ -307,14 +308,17 @@ class CreatorPublicJsonNumericIntegrityTests(unittest.TestCase):
         )
         self.assertEqual(status, 201)
         series = _strict_loads(raw)["series"]
+        status, _, raw = self._post(PUBLIC_AI_DIRECTOR_ENDPOINT, {"brief": valid_brief()})
+        self.assertEqual(status, 200)
+        candidate = _strict_loads(raw)
         status, _, raw = self._post(
             PUBLIC_CONFIRM_PLAN_ENDPOINT,
             {
                 "humanConfirmed": True,
-                "sourcePlanRef": "candidate-episode-integer",
+                "sourcePlanRef": candidate["sourcePlanRef"],
                 "sourcePlanVersion": 1,
                 "brief": valid_brief(),
-                "plan": valid_plan(),
+                "plan": candidate["plan"],
             },
         )
         self.assertEqual(status, 201)
