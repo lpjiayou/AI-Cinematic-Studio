@@ -20,6 +20,12 @@ from apps.creator_workspace_mvp.ai_director import (
     PlanValidationError,
     validate_plan,
 )
+from apps.creator_workspace_mvp.ai_director_candidate_receipts import (
+    AiDirectorCandidateReceiptError,
+    AiDirectorCandidateReceiptService,
+    create_candidate_receipt_service,
+    validate_idempotency_key,
+)
 from apps.creator_workspace_mvp.script_studio import (
     ScriptCandidateValidationError,
     ScriptGenerationError,
@@ -730,6 +736,7 @@ class CreatorRequestHandler(BaseHTTPRequestHandler):
         self,
         *args: Any,
         ai_director_service: AiDirectorService,
+        ai_director_candidate_receipt_service: AiDirectorCandidateReceiptService,
         series_episode_boundary: SeriesEpisodePublicBoundary,
         project_boundary: ProjectPublicBoundary,
         series_director_service: SeriesDirectorApplicationService,
@@ -746,6 +753,7 @@ class CreatorRequestHandler(BaseHTTPRequestHandler):
         **kwargs: Any,
     ) -> None:
         self.ai_director_service = ai_director_service
+        self.ai_director_candidate_receipt_service = ai_director_candidate_receipt_service
         self.series_episode_boundary = series_episode_boundary
         self.project_boundary = project_boundary
         self.series_director_service = series_director_service
@@ -811,7 +819,7 @@ class CreatorRequestHandler(BaseHTTPRequestHandler):
             raw_payload = self.rfile.read(content_length)
             payload = load_public_json(raw_payload)
             if (
-                requested_path == PUBLIC_CONFIRM_PLAN_ENDPOINT
+                requested_path in {PUBLIC_CONFIRM_PLAN_ENDPOINT, PUBLIC_AI_DIRECTOR_ENDPOINT}
                 or (production_subresource is not None
                     and production_subresource[1] in {
                         PUBLIC_METHOD_AWARE_VIDEO_CANDIDATES_RESOURCE,
@@ -829,6 +837,16 @@ class CreatorRequestHandler(BaseHTTPRequestHandler):
             self._send_application_error(400, "invalid_request")
             return
         if self._is_public_path(requested_path):
+            if requested_path == PUBLIC_AI_DIRECTOR_ENDPOINT:
+                if frozenset(payload) not in {frozenset({"brief"}), frozenset({"brief", "idempotencyKey"})}:
+                    self._send_application_error(400, "invalid_request")
+                    return
+                if "idempotencyKey" in payload:
+                    try:
+                        validate_idempotency_key(payload["idempotencyKey"])
+                    except AiDirectorCandidateReceiptError as exc:
+                        self._send_application_error(exc.status, exc.code)
+                        return
             if requested_path == PUBLIC_CONFIRM_PLAN_ENDPOINT:
                 required = {
                     "humanConfirmed", "brief", "plan", "sourcePlanRef", "sourcePlanVersion",
@@ -836,6 +854,10 @@ class CreatorRequestHandler(BaseHTTPRequestHandler):
                 if frozenset(payload) not in {
                     frozenset(required), frozenset(required | {"idempotencyKey"}),
                 }:
+                    self._send_application_error(400, "invalid_request")
+                    return
+                version = payload["sourcePlanVersion"]
+                if type(version) is not int or version < 1:
                     self._send_application_error(400, "invalid_request")
                     return
             if "workspaceRef" in payload:
@@ -1250,6 +1272,14 @@ class CreatorRequestHandler(BaseHTTPRequestHandler):
             self._handle_creator_post(path, payload)
             return
         try:
+            if requested_path == PUBLIC_AI_DIRECTOR_ENDPOINT:
+                response = self.ai_director_candidate_receipt_service.generate_candidate(
+                    payload["workspaceRef"], payload["brief"],
+                    idempotency_key=payload.get("idempotencyKey"),
+                    generator=self.ai_director_service.generate,
+                )
+                self._send_json(200, response)
+                return
             plan = self.ai_director_service.generate(payload.get("brief", {}))
         except BriefValidationError as exc:
             self._send_json(
@@ -1264,6 +1294,12 @@ class CreatorRequestHandler(BaseHTTPRequestHandler):
                 },
             )
             return
+        except AiDirectorCandidateReceiptError as exc:
+            if exc.status == 200:
+                self._send_product_error(200, exc.code)
+            else:
+                self._send_application_error(exc.status, exc.code)
+            return
         except PlanGenerationError as exc:
             # The same-origin application contract carries capability failures in
             # a stable product envelope. Provider transport status never crosses
@@ -1277,13 +1313,6 @@ class CreatorRequestHandler(BaseHTTPRequestHandler):
             "confirmationRequired": True,
             "plan": plan,
         }
-        if requested_path == PUBLIC_AI_DIRECTOR_ENDPOINT:
-            response.update(
-                {
-                    "sourcePlanRef": f"ai-director-candidate-{uuid4().hex}",
-                    "sourcePlanVersion": 1,
-                }
-            )
         self._send_json(200, response)
 
     def do_DELETE(self) -> None:
@@ -2071,7 +2100,14 @@ class CreatorRequestHandler(BaseHTTPRequestHandler):
                 result_key = "confirmedPlan"
                 brief_value = payload.get("brief")
                 brief = CreativeBrief.from_mapping(brief_value if isinstance(brief_value, dict) else {})
-                plan = validate_plan(payload.get("plan"), brief)
+                public_confirmation = self._is_public_path(urlsplit(self.path).path)
+                plan = (
+                    self.ai_director_candidate_receipt_service.resolve_for_confirmation(
+                        payload.get("workspaceRef"), payload.get("sourcePlanRef"),
+                        payload.get("sourcePlanVersion"), brief_value, payload.get("plan"),
+                    )
+                    if public_confirmation else validate_plan(payload.get("plan"), brief)
+                )
                 command = {
                     "workspaceRef": payload.get("workspaceRef"),
                     "humanConfirmed": payload.get("humanConfirmed"),
@@ -2081,7 +2117,7 @@ class CreatorRequestHandler(BaseHTTPRequestHandler):
                     "brief": brief_value,
                     "sourcePlan": plan,
                 }
-                if self._is_public_path(urlsplit(self.path).path):
+                if public_confirmation:
                     explicit_key = "idempotencyKey" in payload
                     if explicit_key:
                         command["idempotencyKey"] = payload["idempotencyKey"]
@@ -2095,6 +2131,9 @@ class CreatorRequestHandler(BaseHTTPRequestHandler):
             else:
                 result_key = "episode"
                 result = self.series_episode_boundary.create_episode(payload)
+        except AiDirectorCandidateReceiptError as exc:
+            self._send_application_error(exc.status, exc.code)
+            return
         except SeriesEpisodePublicError as exc:
             self._send_series_episode_error(exc)
             return
@@ -2145,6 +2184,12 @@ class CreatorRequestHandler(BaseHTTPRequestHandler):
             "duplicate_record": "该集数已经存在，请检查后重试。",
             "creative_plan_not_confirmed": "请先完成人工确认。",
             "creative_plan_idempotency_conflict": "相同确认操作对应了不同内容，请检查后重试。",
+            "ai_director_candidate_idempotency_conflict": "相同生成操作对应了不同输入，请检查后重试。",
+            "ai_director_candidate_generation_pending": "该生成操作尚无确定结果，请使用新的生成操作重试。",
+            "ai_director_candidate_not_issued": "没有找到可确认的候选方案。",
+            "ai_director_candidate_version_mismatch": "候选方案版本不匹配。",
+            "ai_director_candidate_content_mismatch": "候选方案内容与签发记录不匹配。",
+            "ai_director_candidate_receipt_unavailable": "候选方案记录暂时不可用，请稍后重试。",
             "scope_mismatch": "当前工作区与内容引用不匹配。",
             "invalid_creative_plan": "创意方案未通过校验。",
             "invalid_script_candidate": "剧本候选内容未通过校验。",
@@ -2365,12 +2410,16 @@ def create_server(
     allow_internal_routes: bool = True,
     canonical_registration_boundary: CanonicalRegistrationPublicBoundary | None = None,
     project_foundation_service: ProjectFoundationApplicationService | None = None,
+    ai_director_candidate_receipt_service: AiDirectorCandidateReceiptService | None = None,
 ) -> ThreadingHTTPServer:
     series_boundary = series_episode_boundary or create_in_memory_series_boundary()
     projects = project_boundary or create_in_memory_project_boundary(series_boundary)
     planning = series_planning_boundary or create_in_memory_series_planning_boundary(projects)
     scripts = script_studio_boundary or create_in_memory_script_boundary(series_boundary)
     assembly = series_boundary._lifecycle_assembly_or_none()
+    ai_candidate_receipts = ai_director_candidate_receipt_service or create_candidate_receipt_service(
+        getattr(assembly.state, "database_path", None) if assembly is not None else None
+    )
     registration = canonical_registration_boundary or (
         assembly.canonical_registration if assembly is not None else None
     )
@@ -2394,6 +2443,7 @@ def create_server(
     handler = partial(
         CreatorRequestHandler,
         ai_director_service=service,
+        ai_director_candidate_receipt_service=ai_candidate_receipts,
         series_episode_boundary=series_boundary,
         project_boundary=projects,
         series_director_service=series_director_service

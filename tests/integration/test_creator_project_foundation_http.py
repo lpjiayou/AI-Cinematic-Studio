@@ -20,6 +20,7 @@ from apps.creator_workspace_mvp.public_auth import (
     token_sha256,
 )
 from apps.creator_workspace_mvp.public_contract import (
+    PUBLIC_AI_DIRECTOR_ENDPOINT,
     PUBLIC_CONFIRM_PLAN_ENDPOINT,
     PUBLIC_EPISODES_ENDPOINT,
     PUBLIC_PROJECT_FOUNDATIONS_ENDPOINT,
@@ -116,7 +117,7 @@ class FoundationHttpHarness:
         self.foundation_service = service_override or default_service
         self.server = create_server(
             ("127.0.0.1", 0),
-            AiDirectorService(FakeTextGenerationCapability([])),
+            AiDirectorService(FakeTextGenerationCapability([json.dumps(valid_plan())] * 4)),
             series_episode_boundary=self.assembly.series_episode,
             project_boundary=self.assembly.project_context,
             series_plan_candidate_receipt_service=receipt_service,
@@ -185,14 +186,19 @@ class FoundationHttpHarness:
             return response.status, dict(response.headers.items()), json.loads(raw.decode("utf-8"))
 
     def confirm_plan(self):
+        candidate_status, _headers, candidate = self.post(
+            PUBLIC_AI_DIRECTOR_ENDPOINT, {"brief": valid_brief()},
+        )
+        if candidate_status != 200 or not candidate["ok"]:
+            raise AssertionError(candidate)
         status, _headers, payload = self.post(
             PUBLIC_CONFIRM_PLAN_ENDPOINT,
             {
                 "humanConfirmed": True,
                 "brief": valid_brief(),
-                "plan": valid_plan(),
-                "sourcePlanRef": "source-plan-project-foundation-http",
-                "sourcePlanVersion": 1,
+                "plan": candidate["plan"],
+                "sourcePlanRef": candidate["sourcePlanRef"],
+                "sourcePlanVersion": candidate["sourcePlanVersion"],
             },
         )
         if status != 201:

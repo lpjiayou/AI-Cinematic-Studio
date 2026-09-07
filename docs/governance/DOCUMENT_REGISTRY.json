@@ -114,8 +114,8 @@
       "supersededBy": [],
       "currentStateClaimsAllowed": true,
       "historicalMutationPolicy": "UPDATE_FROM_MERGED_EVIDENCE_ONLY",
-      "lastReviewedBaseline": "6b10166532c3cac9b8976a5d8986a4e8c1cfd7fc",
-      "lastReviewedAt": "2026-09-05",
+      "lastReviewedBaseline": "7c14b0da0146e00dfdebfb94b53b069051032def",
+      "lastReviewedAt": "2026-09-07",
       "linkedFromIndex": true,
       "notes": "Current claims require merged evidence and may not override Accepted ADRs."
     },
@@ -673,8 +673,8 @@
       "supersededBy": [],
       "currentStateClaimsAllowed": false,
       "historicalMutationPolicy": "UPDATE_WITH_AUTHORIZED_CONTRACT_CHANGE",
-      "lastReviewedBaseline": "6b10166532c3cac9b8976a5d8986a4e8c1cfd7fc",
-      "lastReviewedAt": "2026-09-05",
+      "lastReviewedBaseline": "7c14b0da0146e00dfdebfb94b53b069051032def",
+      "lastReviewedAt": "2026-09-07",
       "linkedFromIndex": true,
       "notes": "Authority is limited to the document's declared scope and subordinate to Accepted ADRs."
     },
@@ -1545,8 +1545,8 @@
       "supersededBy": [],
       "currentStateClaimsAllowed": false,
       "historicalMutationPolicy": "REGENERATE_FROM_REVIEWED_INVENTORY",
-      "lastReviewedBaseline": "6b10166532c3cac9b8976a5d8986a4e8c1cfd7fc",
-      "lastReviewedAt": "2026-09-05",
+      "lastReviewedBaseline": "7c14b0da0146e00dfdebfb94b53b069051032def",
+      "lastReviewedAt": "2026-09-07",
       "linkedFromIndex": true,
       "notes": "Navigation/reference only; resolve authority through the linked source documents."
     },
@@ -1689,8 +1689,8 @@
       "supersededBy": [],
       "currentStateClaimsAllowed": false,
       "historicalMutationPolicy": "REGENERATE_FROM_REVIEWED_INVENTORY",
-      "lastReviewedBaseline": "6b10166532c3cac9b8976a5d8986a4e8c1cfd7fc",
-      "lastReviewedAt": "2026-09-05",
+      "lastReviewedBaseline": "7c14b0da0146e00dfdebfb94b53b069051032def",
+      "lastReviewedAt": "2026-09-07",
       "linkedFromIndex": true,
       "notes": "Navigation/reference only; resolve authority through the linked source documents."
     },
@@ -1891,8 +1891,8 @@
       "supersededBy": [],
       "currentStateClaimsAllowed": true,
       "historicalMutationPolicy": "UPDATE_FROM_MERGED_EVIDENCE_ONLY",
-      "lastReviewedBaseline": "6b10166532c3cac9b8976a5d8986a4e8c1cfd7fc",
-      "lastReviewedAt": "2026-09-05",
+      "lastReviewedBaseline": "7c14b0da0146e00dfdebfb94b53b069051032def",
+      "lastReviewedAt": "2026-09-07",
       "linkedFromIndex": true,
       "notes": "Authority is limited to the document's declared scope and subordinate to Accepted ADRs."
     },
@@ -3104,8 +3104,8 @@
       "supersededBy": [],
       "currentStateClaimsAllowed": false,
       "historicalMutationPolicy": "UPDATE_WITH_AUTHORIZED_CONTRACT_CHANGE",
-      "lastReviewedBaseline": "3eaaeabf79fdb85581a15069ff6fe5f330445416",
-      "lastReviewedAt": "2026-09-04",
+      "lastReviewedBaseline": "7c14b0da0146e00dfdebfb94b53b069051032def",
+      "lastReviewedAt": "2026-09-07",
       "linkedFromIndex": true,
       "notes": "Authority is limited to the document's declared scope and subordinate to Accepted ADRs."
     },
@@ -3288,6 +3288,24 @@
       "lastReviewedAt": "2026-09-06",
       "linkedFromIndex": true,
       "notes": "E3B bounded product corrective; no DDL changes, E3 execution, visual reinspection, GPU, Provider or Frontend authority."
+    },
+    {
+      "path": "docs/status/M1_AI_DIRECTOR_CANDIDATE_IDEMPOTENCY_E3C_2026-09-07.md",
+      "repository": "Core",
+      "documentClass": "CURRENT_STATUS",
+      "status": "CURRENT",
+      "owner": "Project Lead / Creator Application Owner / M1 AI Director Owner",
+      "authoritativeFor": [
+        "bounded AI Director candidate command replay, issuance binding and optional application recovery schema evidence"
+      ],
+      "supersedes": [],
+      "supersededBy": [],
+      "currentStateClaimsAllowed": true,
+      "historicalMutationPolicy": "UPDATE_FROM_MERGED_EVIDENCE_ONLY",
+      "lastReviewedBaseline": "7c14b0da0146e00dfdebfb94b53b069051032def",
+      "lastReviewedAt": "2026-09-07",
+      "linkedFromIndex": true,
+      "notes": "E3C adds application metadata only; E3 R4 remains quarantined and R5 requires fresh staging and separate authorization. No GPU, Provider, visual reinspection or Frontend authority."
     }
   ]
 }

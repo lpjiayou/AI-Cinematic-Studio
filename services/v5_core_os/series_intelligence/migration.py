@@ -27,6 +27,14 @@ from services.v5_core_os.series_planning.candidate_receipt_sqlite import (
     CandidateReceiptSqliteError,
     validate_candidate_receipt_connection,
 )
+from services.v5_core_os.series_episode.ai_director_candidate_receipt_sqlite import (
+    IDENTITY_INDEX as AI_DIRECTOR_IDENTITY_INDEX,
+    SOURCE_REF_INDEX as AI_DIRECTOR_SOURCE_REF_INDEX,
+    MARKER_TABLE as AI_DIRECTOR_MARKER_TABLE,
+    TABLE as AI_DIRECTOR_TABLE,
+    AiDirectorCandidateStorageError,
+    validate_ai_director_candidate_connection,
+)
 from services.v5_core_os.canonical_registration.migration import (
     _validate_canonical_registration_connection,
 )
@@ -176,6 +184,13 @@ def _validate_schema_allowlist(
     if candidate_receipt_present:
         expected_tables |= candidate_receipt_tables
         expected_indexes.add(CANDIDATE_RECEIPT_INDEX)
+    ai_director_tables = {AI_DIRECTOR_TABLE, AI_DIRECTOR_MARKER_TABLE}
+    ai_director_present = ai_director_tables & tables
+    if ai_director_present and ai_director_present != ai_director_tables:
+        raise SeriesIntelligenceMigrationError("partial AI Director command schema")
+    if ai_director_present:
+        expected_tables |= ai_director_tables
+        expected_indexes |= {AI_DIRECTOR_IDENTITY_INDEX, AI_DIRECTOR_SOURCE_REF_INDEX}
     project_foundation_tables = {
         PROJECT_FOUNDATION_TABLE,
         PROJECT_FOUNDATION_MARKER_TABLE,
@@ -218,6 +233,11 @@ def _validate_schema_allowlist(
             raise SeriesIntelligenceMigrationError(
                 "invalid candidate receipt schema"
             ) from exc
+    if ai_director_present:
+        try:
+            validate_ai_director_candidate_connection(connection)
+        except AiDirectorCandidateStorageError as exc:
+            raise SeriesIntelligenceMigrationError("invalid AI Director command schema") from exc
     if project_foundation_present:
         try:
             validate_project_foundation_connection(connection)
