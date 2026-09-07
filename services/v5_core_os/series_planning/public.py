@@ -75,6 +75,9 @@ class SeriesPlanningPublicBoundary:
     def confirm_candidate(self, command: Mapping[str, Any]) -> dict[str, Any]:
         return self._lifecycle_write(command, LifecycleOperation.CREATE_SERIES_PLAN, self.__service.confirm_candidate)
 
+    def confirm_candidate_idempotently(self, command: Mapping[str, Any]) -> dict[str, Any]:
+        return self._lifecycle_write(command, LifecycleOperation.CREATE_SERIES_PLAN, self.__service.confirm_candidate_idempotently)
+
     def create_manual_version(self, command: Mapping[str, Any]) -> dict[str, Any]:
         return self._lifecycle_write(command, LifecycleOperation.APPEND_SERIES_PLAN_VERSION, self.__service.create_manual_version)
 

@@ -121,6 +121,7 @@ and historical evidence cannot authorize current execution.
 
 | Document | Status | Owner |
 | --- | --- | --- |
+| [`docs/status/M5_SERIES_PLAN_COMMAND_IDEMPOTENCY_E3D_2026-09-07.md`](../status/M5_SERIES_PLAN_COMMAND_IDEMPOTENCY_E3D_2026-09-07.md) | `CURRENT` | Project Lead / Creator Application Owner / M5 Series Planning Owner |
 | [`docs/status/M1_AI_DIRECTOR_CANDIDATE_IDEMPOTENCY_E3C_2026-09-07.md`](../status/M1_AI_DIRECTOR_CANDIDATE_IDEMPOTENCY_E3C_2026-09-07.md) | `CURRENT` | Project Lead / Creator Application Owner / M1 AI Director Owner |
 | [`docs/status/M1_CREATIVE_PLAN_CONFIRMATION_IDEMPOTENCY_E3B_2026-09-06.md`](../status/M1_CREATIVE_PLAN_CONFIRMATION_IDEMPOTENCY_E3B_2026-09-06.md) | `CURRENT` | Project Lead / M1 Creative Plan Confirmation Owner / Lifecycle Integrity Owner |
 | [`CURRENT_MILESTONE.md`](../../CURRENT_MILESTONE.md) | `CURRENT` | Project Lead / Documentation Governance Owner |

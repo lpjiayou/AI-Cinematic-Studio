@@ -42,6 +42,10 @@ from services.v5_core_os.series_episode.ai_director_candidate_receipt_sqlite imp
     TABLE as AI_DIRECTOR_CANDIDATE_COMMAND_TABLE,
 )
 from services.v5_core_os.text_generation.testing import FakeTextGenerationCapability
+from services.v5_core_os.series_planning.candidate_command_sqlite import (
+    MARKER_TABLE as M5_CANDIDATE_COMMAND_MARKER_TABLE,
+    TABLE as M5_CANDIDATE_COMMAND_TABLE,
+)
 from services.v4_platform import (
     DeterministicLocalFfmpegAdapter,
     InMemoryMediaJobAdapter,
@@ -86,6 +90,7 @@ AI_DIRECTOR_CANDIDATE_APPLICATION_TABLES = {
     AI_DIRECTOR_CANDIDATE_MARKER_TABLE,
     AI_DIRECTOR_CANDIDATE_COMMAND_TABLE,
 }
+M5_CANDIDATE_APPLICATION_TABLES = {M5_CANDIDATE_COMMAND_MARKER_TABLE, M5_CANDIDATE_COMMAND_TABLE}
 
 
 class _JsonHttpClient:
@@ -1023,6 +1028,7 @@ class K2MethodAwarePublicCutoverAcceptanceTests(unittest.TestCase):
             expected_creator_tables_after_server_start = (
                 creator_tables_before_server
                 | AI_DIRECTOR_CANDIDATE_APPLICATION_TABLES
+                | M5_CANDIDATE_APPLICATION_TABLES
             )
             evidence_tables = sqlite_tables(evidence_database)
             media_job_tables = sqlite_tables(media_jobs_database)
@@ -1038,7 +1044,7 @@ class K2MethodAwarePublicCutoverAcceptanceTests(unittest.TestCase):
                 )
                 self.assertEqual(
                     actual_after_start - creator_tables_before_server,
-                    AI_DIRECTOR_CANDIDATE_APPLICATION_TABLES
+                    (AI_DIRECTOR_CANDIDATE_APPLICATION_TABLES | M5_CANDIDATE_APPLICATION_TABLES)
                     - creator_tables_before_server,
                 )
                 self.assertEqual(

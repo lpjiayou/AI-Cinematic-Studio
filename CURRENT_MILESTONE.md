@@ -64,9 +64,7 @@ M11_CONTACT_RUNTIME=NOT_INSTALLED
 M11_GAIT_RUNTIME=NOT_INSTALLED
 ```
 
-Evidence is Core PRs #54–#59 (upstream method chain), #63 (public cutover), #64 (acceptance), and Frontend PR #25 (pin and immutable-history compatibility gate).
-
-Historical v1 facts remain readable. Contact and Gait are explicitly unavailable instead of falling back to Wan. Runtime installation, live production and publication are not implied by this closure. Future K2-002 production must create an additive method-aware successor; it may not reinterpret or upgrade historic G4/G5 facts.
+Evidence is Core PRs #54–#59 (upstream method chain), #63 (public cutover), #64 (acceptance), and Frontend PR #25 (pin and immutable-history compatibility gate). Historical v1 facts remain readable. Contact and Gait are explicitly unavailable instead of falling back to Wan. Runtime installation, live production and publication are not implied by this closure. Future K2-002 production must create an additive method-aware successor; it may not reinterpret or upgrade historic G4/G5 facts.
 
 ## 3. M12 and M13 boundary
 
@@ -177,14 +175,16 @@ METHOD_AWARE_JOB_RESULT_INTAKE_E2=IMPLEMENTED_AND_VERIFIED
 CURRENT_SINGLE_INPUT_IMAGE_ADMISSION_E3A=IMPLEMENTED_AND_VERIFIED
 CREATIVE_PLAN_CONFIRMATION_IDEMPOTENCY_E3B=IMPLEMENTED_AND_VERIFIED
 AI_DIRECTOR_CANDIDATE_IDEMPOTENCY_E3C=IMPLEMENTED_AND_VERIFIED
+M5_SERIES_PLAN_CANDIDATE_IDEMPOTENCY_E3D=IMPLEMENTED_AND_VERIFIED
+M5_SERIES_PLAN_CONFIRMATION_IDEMPOTENCY_E3D=IMPLEMENTED_AND_VERIFIED
 SPIKE_0_ELIGIBLE_LINEAGE_E3=BLOCKED_PENDING_RESUME
 SPIKE_0_READINESS=BLOCKED
-NEXT_TASK=ACS-M10-M11-SPIKE-0-ELIGIBLE-LINEAGE-PREPARATION-E3-RESUME-R5
+NEXT_TASK=ACS-M10-M11-SPIKE-0-ELIGIBLE-LINEAGE-PREPARATION-E3-RESUME-R6
 SUPERSEDED_VALIDATOR_M12_G0_3_STATE=ENVIRONMENT_HOLD
 SUPERSEDED_VALIDATOR_NEXT_TASK=LOCAL_WSL2_HANDOFF_AND_M12_C3_PREFLIGHT
 SUPERSEDED_VALIDATOR_TOKEN_GRANTS_AUTHORITY=false
 ```
-The [PR-B receipt](docs/status/CORE_SERIES_PLANNING_SCOPE_AND_CANDIDATE_BINDING_HARDENING_2026-09-05.md), [Project foundation receipt](docs/status/CORE_RECOVERABLE_PROJECT_FOUNDATION_COMMAND_2026-09-05.md) and [clean-state public E2E receipt](docs/status/CORE_CLEAN_STATE_PUBLIC_API_E2E_2026-09-06.md) and the [E1 worker seam receipt](docs/status/M10_M11_METHOD_AWARE_WORKER_SEAM_CORRECTIVE_E1_2026-09-06.md) and [E2 result intake receipt](docs/status/M10_M11_METHOD_AWARE_JOB_RESULT_INTAKE_CORRECTIVE_E2_2026-09-06.md) and [E3A input admission receipt](docs/status/M10_METHOD_AWARE_SINGLE_INPUT_IMAGE_ADMISSION_E3A_2026-09-06.md) and the [E3B confirmation receipt](docs/status/M1_CREATIVE_PLAN_CONFIRMATION_IDEMPOTENCY_E3B_2026-09-06.md) and the [E3C candidate receipt](docs/status/M1_AI_DIRECTOR_CANDIDATE_IDEMPOTENCY_E3C_2026-09-07.md) hold detailed evidence and non-authority boundaries. Frontend cutover and the next task require separate authorization; M12-C3/C4, A100, Provider/GPU and publication remain paused; E3A admission is technical evidence only. Compatibility tokens grant no current authority.
+The [PR-B receipt](docs/status/CORE_SERIES_PLANNING_SCOPE_AND_CANDIDATE_BINDING_HARDENING_2026-09-05.md), [Project foundation receipt](docs/status/CORE_RECOVERABLE_PROJECT_FOUNDATION_COMMAND_2026-09-05.md) and [clean-state public E2E receipt](docs/status/CORE_CLEAN_STATE_PUBLIC_API_E2E_2026-09-06.md) and the [E1 worker seam receipt](docs/status/M10_M11_METHOD_AWARE_WORKER_SEAM_CORRECTIVE_E1_2026-09-06.md) and [E2 result intake receipt](docs/status/M10_M11_METHOD_AWARE_JOB_RESULT_INTAKE_CORRECTIVE_E2_2026-09-06.md) and [E3A input admission receipt](docs/status/M10_METHOD_AWARE_SINGLE_INPUT_IMAGE_ADMISSION_E3A_2026-09-06.md) and the [E3B confirmation receipt](docs/status/M1_CREATIVE_PLAN_CONFIRMATION_IDEMPOTENCY_E3B_2026-09-06.md) and the [E3C candidate receipt](docs/status/M1_AI_DIRECTOR_CANDIDATE_IDEMPOTENCY_E3C_2026-09-07.md) and [M5 E3D receipt](docs/status/M5_SERIES_PLAN_COMMAND_IDEMPOTENCY_E3D_2026-09-07.md) hold detailed evidence and non-authority boundaries. R5 is quarantined valid-prefix evidence; R6 requires fresh staging/database/token and separate authorization; M12-C3/C4, A100, Provider/GPU and publication remain paused; E3A admission is technical evidence only. Compatibility tokens grant no current authority.
 ## 7. Immutable history
 The former archived material remains byte-for-byte in [CURRENT_MILESTONE_HISTORY_THROUGH_2026-09-02.md](CURRENT_MILESTONE_HISTORY_THROUGH_2026-09-02.md).
 ```text

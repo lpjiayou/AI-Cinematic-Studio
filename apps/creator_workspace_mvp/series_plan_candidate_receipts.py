@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from dataclasses import replace
 from datetime import datetime, timezone
 from hashlib import sha256
 import os
@@ -11,8 +12,13 @@ from typing import Any, Callable, Mapping, Protocol
 from uuid import uuid4
 
 from apps.creator_workspace_mvp.series_director import (
+    SeriesPlanCandidateError,
     validate_series_plan_candidate,
 )
+from apps.creator_workspace_mvp.series_plan_candidate_commands import (
+    SeriesPlanCandidateCommandError, create_command_service,
+)
+from services.v5_core_os.series_planning.candidate_command_sqlite import COMPLETED_RECEIPT_SCHEMA
 from services.v5_core_os.series_planning.candidate_receipt_sqlite import (
     CANDIDATE_RECEIPT_SCHEMA_VERSION,
     SOURCE_CONTEXT_SCHEMA_VERSION,
@@ -298,12 +304,14 @@ class SeriesPlanCandidateReceiptService:
         *,
         ref_factory: Callable[[str], str] | None = None,
         clock: Callable[[], str] = _utc_now,
+        command_service=None,
     ) -> None:
         self.store = store
         self._ref_factory = ref_factory or (
             lambda prefix: f"{prefix}-{uuid4().hex}"
         )
         self._clock = clock
+        self.commands = command_service if command_service is not None else create_command_service()
 
     @staticmethod
     def _parts(
@@ -380,16 +388,18 @@ class SeriesPlanCandidateReceiptService:
             raise _unavailable()
         return stored, replay
 
-    def resolve(
+    def generate_idempotently(self, context, creative_input, key, director):
+        self._parts(context)
+        return self.commands.generate(context, creative_input, key, director)
+
+    def resolve_receipt(
         self,
         context: Mapping[str, Any],
         candidate: Any,
         *,
         candidate_ref: Any = None,
-    ) -> dict[str, Any]:
+    ) -> tuple[SeriesPlanCandidateReceipt, dict[str, Any]]:
         generation, source = self._parts(context)
-        validated_request = validate_series_plan_candidate(candidate, generation)
-        request_digest = canonical_json_digest(validated_request)
         source_digest = canonical_json_digest(source)
         workspace_ref = _required_ref(source.get("workspaceRef"))
         project_ref = _required_ref(source.get("projectRef"))
@@ -404,9 +414,15 @@ class SeriesPlanCandidateReceiptService:
                 except SeriesPlanCandidateReceiptError:
                     raise _error("series_plan_candidate_not_issued") from None
                 receipt = self.store.get(workspace_ref, validated_ref)
+                keyed = self.commands.get(workspace_ref, validated_ref)
+                if receipt is not None and keyed is not None:
+                    raise _error("series_plan_candidate_receipt_ambiguous")
+                receipt = receipt if receipt is not None else keyed
                 if receipt is None:
                     raise _error("series_plan_candidate_not_issued")
             else:
+                validated_request = validate_series_plan_candidate(candidate, generation)
+                request_digest = canonical_json_digest(validated_request)
                 matches = self.store.find_exact(
                     workspace_ref,
                     project_ref,
@@ -414,17 +430,23 @@ class SeriesPlanCandidateReceiptService:
                     source_digest,
                     request_digest,
                 )
+                matches += self.commands.find_exact(workspace_ref, project_ref, series_ref, source_digest, request_digest)
                 if not matches:
                     raise _error("series_plan_candidate_not_issued")
                 if len(matches) != 1:
                     raise _error("series_plan_candidate_receipt_ambiguous")
                 receipt = matches[0]
-        except SeriesPlanCandidateReceiptError:
+        except (SeriesPlanCandidateReceiptError, SeriesPlanCandidateCommandError, SeriesPlanCandidateError):
             raise
         except Exception:
             raise _unavailable() from None
 
-        stored_candidate = _validate_receipt_integrity(receipt)
+        # A completed v2 command has already passed its full row validation.
+        # Apply the same existing receipt projection rules to both generations.
+        stored_candidate = _validate_receipt_integrity(
+            replace(receipt, schemaVersion=CANDIDATE_RECEIPT_SCHEMA_VERSION)
+            if receipt.schemaVersion == COMPLETED_RECEIPT_SCHEMA else receipt
+        )
         if (
             receipt.workspaceRef != workspace_ref
             or receipt.projectRef != project_ref
@@ -438,7 +460,11 @@ class SeriesPlanCandidateReceiptService:
             or receipt.sourceContextDigest != source_digest
         ):
             raise _error("series_plan_candidate_stale")
-        if receipt.candidateDigest != request_digest:
+        try:
+            validated_request = validate_series_plan_candidate(candidate, generation)
+        except SeriesPlanCandidateError:
+            raise _error("series_plan_candidate_content_mismatch") from None
+        if receipt.candidateDigest != canonical_json_digest(validated_request):
             raise _error("series_plan_candidate_content_mismatch")
 
         validated_stored = validate_series_plan_candidate(
@@ -446,7 +472,10 @@ class SeriesPlanCandidateReceiptService:
         )
         if canonical_json_digest(validated_stored) != receipt.candidateDigest:
             raise _unavailable()
-        return validated_stored
+        return receipt, validated_stored
+
+    def resolve(self, context, candidate, *, candidate_ref=None):
+        return self.resolve_receipt(context, candidate, candidate_ref=candidate_ref)[1]
 
 
 def create_in_memory_receipt_service(
@@ -469,7 +498,15 @@ def create_local_development_receipt_service(
         store = SqliteSeriesPlanCandidateReceiptStore(database_path)
     except CandidateReceiptSqliteError:
         raise _unavailable() from None
-    return SeriesPlanCandidateReceiptService(store)
+    return SeriesPlanCandidateReceiptService(store, command_service=create_command_service(database_path))
+
+
+def create_server_receipt_service(database_path=None):
+    # Preserve create_server's existing in-memory v1 default. Only the new
+    # command component is initialized in a supplied Lifecycle SQLite database.
+    return SeriesPlanCandidateReceiptService(
+        InMemorySeriesPlanCandidateReceiptStore(), command_service=create_command_service(database_path)
+    )
 
 
 def create_local_development_receipt_service_from_environment(
