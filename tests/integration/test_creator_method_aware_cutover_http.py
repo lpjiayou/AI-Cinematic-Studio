@@ -37,6 +37,10 @@ from services.v5_core_os.episode_production.media import (
     MEDIA_MANIFEST_SCHEMA_VERSION,
 )
 from services.v5_core_os.lifecycle_integrity import LifecycleAssembly
+from services.v5_core_os.series_episode.ai_director_candidate_receipt_sqlite import (
+    MARKER_TABLE as AI_DIRECTOR_CANDIDATE_MARKER_TABLE,
+    TABLE as AI_DIRECTOR_CANDIDATE_COMMAND_TABLE,
+)
 from services.v5_core_os.text_generation.testing import FakeTextGenerationCapability
 from services.v4_platform import (
     DeterministicLocalFfmpegAdapter,
@@ -78,6 +82,10 @@ from tests.unit.test_episode_production_k2 import (
 
 WORKSPACE = "workspace-method-aware-http"
 RUN = "run-method-aware-http"
+AI_DIRECTOR_CANDIDATE_APPLICATION_TABLES = {
+    AI_DIRECTOR_CANDIDATE_MARKER_TABLE,
+    AI_DIRECTOR_CANDIDATE_COMMAND_TABLE,
+}
 
 
 class _JsonHttpClient:
@@ -1011,7 +1019,11 @@ class K2MethodAwarePublicCutoverAcceptanceTests(unittest.TestCase):
                 f"{parse.quote(run['productionRunRef'], safe='')}"
             )
             repository = method_service(boundary).evidence_repository
-            creator_tables = sqlite_tables(creator_database)
+            creator_tables_before_server = sqlite_tables(creator_database)
+            expected_creator_tables_after_server_start = (
+                creator_tables_before_server
+                | AI_DIRECTOR_CANDIDATE_APPLICATION_TABLES
+            )
             evidence_tables = sqlite_tables(evidence_database)
             media_job_tables = sqlite_tables(media_jobs_database)
             files_before = {path.name for path in root.iterdir()}
@@ -1019,6 +1031,19 @@ class K2MethodAwarePublicCutoverAcceptanceTests(unittest.TestCase):
             with _serve_public_boundary(
                 boundary, lifecycle, fixture["workspaceRef"]
             ) as client:
+                actual_after_start = sqlite_tables(creator_database)
+                self.assertEqual(
+                    actual_after_start,
+                    expected_creator_tables_after_server_start,
+                )
+                self.assertEqual(
+                    actual_after_start - creator_tables_before_server,
+                    AI_DIRECTOR_CANDIDATE_APPLICATION_TABLES
+                    - creator_tables_before_server,
+                )
+                self.assertEqual(
+                    creator_tables_before_server - actual_after_start, set()
+                )
                 forged_fields = {
                     "executionMethod": "SINGLE_ANCHOR_I2V",
                     "adapterCapability": "forged-capability",
@@ -1714,7 +1739,10 @@ class K2MethodAwarePublicCutoverAcceptanceTests(unittest.TestCase):
                     records_before_stale_rejection,
                 )
 
-            self.assertEqual(sqlite_tables(creator_database), creator_tables)
+            self.assertEqual(
+                sqlite_tables(creator_database),
+                expected_creator_tables_after_server_start,
+            )
             self.assertEqual(sqlite_tables(evidence_database), evidence_tables)
             self.assertEqual(
                 sqlite_tables(media_jobs_database), media_job_tables
