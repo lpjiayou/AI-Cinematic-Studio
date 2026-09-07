@@ -72,6 +72,11 @@ from .sqlite_schema import (
     table_statements,
 )
 from .record_integrity import validate_durable_rows
+from services.v5_core_os.script_studio.generation_recovery_sqlite import (
+    TABLE as SCRIPT_GENERATION_TABLE, MARKER_TABLE as SCRIPT_GENERATION_MARKER,
+    INDEX as SCRIPT_GENERATION_INDEX, validate_generation_connection,
+)
+from services.v5_core_os.script_studio.generation_recovery import GenerationStorageError
 
 
 class SeriesIntelligenceMigrationError(RuntimeError):
@@ -221,6 +226,13 @@ def _validate_schema_allowlist(
     if project_foundation_present:
         expected_tables |= project_foundation_tables
         expected_indexes.add(PROJECT_FOUNDATION_INDEX)
+    generation_tables = {SCRIPT_GENERATION_TABLE, SCRIPT_GENERATION_MARKER}
+    generation_present = generation_tables & tables
+    if generation_present and generation_present != generation_tables:
+        raise SeriesIntelligenceMigrationError("partial Script generation recovery schema")
+    if generation_present:
+        expected_tables |= generation_tables
+        expected_indexes.add(SCRIPT_GENERATION_INDEX)
     if tables != expected_tables:
         raise SeriesIntelligenceMigrationError("undeclared SQLite table")
     forbidden = connection.execute(
@@ -239,6 +251,11 @@ def _validate_schema_allowlist(
         raise SeriesIntelligenceMigrationError("undeclared SQLite index")
     if acceptance_present:
         _validate_script_acceptance_connection(connection)
+    if generation_present:
+        try:
+            validate_generation_connection(connection)
+        except GenerationStorageError as exc:
+            raise SeriesIntelligenceMigrationError("invalid Script generation recovery schema") from exc
     if registration_present and acceptance_present:
         _validate_canonical_registration_connection(connection)
     if candidate_receipt_present:

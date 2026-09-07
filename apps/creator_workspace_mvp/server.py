@@ -31,6 +31,11 @@ from apps.creator_workspace_mvp.script_studio import (
     ScriptGenerationError,
     ScriptStudioApplicationService,
 )
+from apps.creator_workspace_mvp.script_generation_recovery import ScriptGenerationRecoveryApplication
+from apps.creator_workspace_mvp.public_contract import (
+    SCRIPT_GENERATION_REQUIRED_FIELDS, SCRIPT_GENERATION_OPTIONAL_FIELDS,
+    SCRIPT_CONFIRMATION_REQUIRED_FIELDS, SCRIPT_CONFIRMATION_OPTIONAL_FIELDS,
+)
 from services.v5_core_os.series_episode import (
     SeriesEpisodePublicBoundary,
     SeriesEpisodePublicError,
@@ -828,6 +833,7 @@ class CreatorRequestHandler(BaseHTTPRequestHandler):
                 requested_path in {
                     PUBLIC_CONFIRM_PLAN_ENDPOINT, PUBLIC_AI_DIRECTOR_ENDPOINT,
                     PUBLIC_SERIES_PLANNING_GENERATE_ENDPOINT, PUBLIC_SERIES_PLANNING_CONFIRM_ENDPOINT,
+                    PUBLIC_SCRIPT_GENERATE_ENDPOINT, PUBLIC_SCRIPT_CONFIRM_ENDPOINT,
                 }
                 or (production_subresource is not None
                     and production_subresource[1] in {
@@ -877,6 +883,18 @@ class CreatorRequestHandler(BaseHTTPRequestHandler):
                     } else "client_workspace_scope_forbidden"
                 )
                 return
+            if requested_path in {PUBLIC_SCRIPT_GENERATE_ENDPOINT, PUBLIC_SCRIPT_CONFIRM_ENDPOINT}:
+                required, optional = (
+                    (SCRIPT_GENERATION_REQUIRED_FIELDS, SCRIPT_GENERATION_OPTIONAL_FIELDS)
+                    if requested_path == PUBLIC_SCRIPT_GENERATE_ENDPOINT else
+                    (SCRIPT_CONFIRMATION_REQUIRED_FIELDS, SCRIPT_CONFIRMATION_OPTIONAL_FIELDS))
+                if (not required <= set(payload) or set(payload) - required - optional or parsed.query
+                        or any(not isinstance(payload[field], str) or not payload[field]
+                               for field in (required | {"projectRef"}) & set(payload) - {"humanConfirmed"})
+                        or ("expectedScriptVersion" in payload and
+                            (type(payload["expectedScriptVersion"]) is not int or payload["expectedScriptVersion"] < 1))):
+                    self._send_application_error(400, "invalid_request")
+                    return
             if requested_path == PUBLIC_SCRIPT_REVIEWED_IMPORT_ENDPOINT:
                 reviewed_import_fields = {
                     "seriesRef",
@@ -2030,18 +2048,14 @@ class CreatorRequestHandler(BaseHTTPRequestHandler):
             self._send_application_error(500, "application_error")
 
     def _handle_script_post(self, path: str, payload: MappingLike) -> None:
+        status = 201
         try:
             if path == SCRIPT_GENERATE_ENDPOINT:
                 scope = self._script_scope(payload)
-                bootstrap = self.series_episode_boundary.build_script_studio_bootstrap(
-                    scope["workspaceRef"],
-                    scope["seriesRef"],
-                    scope["episodeRef"],
-                )
-                content = self.script_studio_service.generate(bootstrap)
-                result = self.script_studio_boundary.create_version(
-                    {**scope, "changeKind": "ai-generation", "content": content}
-                )
+                if "idempotencyKey" in payload:
+                    scope["idempotencyKey"] = payload["idempotencyKey"]
+                status, result = ScriptGenerationRecoveryApplication(
+                    self.script_studio_boundary, self.script_studio_service).generate(scope)
             elif path == SCRIPT_REVIEWED_IMPORT_ENDPOINT:
                 if self.authenticated_principal is None:
                     self._send_application_error(403, "forbidden")
@@ -2122,8 +2136,11 @@ class CreatorRequestHandler(BaseHTTPRequestHandler):
                         "scriptRef": payload.get("scriptRef"),
                         "scriptVersionRef": payload.get("scriptVersionRef"),
                         "humanConfirmed": payload.get("humanConfirmed"),
-                    }
+                        **({"expectedScriptVersion": payload["expectedScriptVersion"]}
+                           if "expectedScriptVersion" in payload else {}),
+                    }, include_outcome=True,
                 )
+                status = 200 if result.pop("confirmationNoOp") else 201
         except ScriptGenerationError as exc:
             self._log_script_provider_error(exc)
             self._send_script_product_error(200, exc.code)
@@ -2140,7 +2157,7 @@ class CreatorRequestHandler(BaseHTTPRequestHandler):
         except Exception:
             self._send_application_error(500, "application_error")
             return
-        self._send_json(201, {"ok": True, **result})
+        self._send_json(status, {"ok": True, **result})
 
     @staticmethod
     def _script_scope(payload: MappingLike) -> MappingLike:
@@ -2260,6 +2277,11 @@ class CreatorRequestHandler(BaseHTTPRequestHandler):
             "invalid_script_candidate": "剧本候选内容未通过校验。",
             "version_conflict": "剧本版本已更新，请刷新后重试。",
             "script_not_confirmed": "请先确认一个剧本版本。",
+            "script_already_exists": "本集已有剧本，请打开现有剧本继续编辑。",
+            "script_generation_pending": "该集生成尚无确定的可恢复结果，请勿重新提交生成。",
+            "script_generation_source_changed": "生成时的来源已变化，旧结果无法提交为当前剧本。",
+            "script_generation_storage_unavailable": "剧本恢复记录暂时不可用。",
+            "script_confirmation_precondition_required": "切换确认目标需要提供当前剧本根版本。",
             "trusted_approval_required": "该导入剧本需要可信的项目负责人审批后才能确认。",
             "canonical_registration_unavailable": "请先配置显式 canonical target。",
             "dependent_script_exists": "该内容已有剧本版本，为保护制作链路暂不能删除。",

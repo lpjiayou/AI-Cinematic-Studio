@@ -106,6 +106,10 @@ class VersionConflictError(ScriptStudioError):
     code = "version_conflict"
 
 
+class ConfirmationPreconditionRequiredError(ScriptStudioError):
+    code = "script_confirmation_precondition_required"
+
+
 class ScriptNotConfirmedError(ScriptStudioError):
     code = "script_not_confirmed"
 
@@ -2094,6 +2098,12 @@ class ScriptStudioService:
     def confirm_version(self, value: Mapping[str, Any]) -> dict[str, Any]:
         if not isinstance(value, Mapping) or value.get("humanConfirmed") is not True:
             raise ScriptStudioError("explicit human confirmation is required")
+        required = {"workspaceRef", "seriesRef", "episodeRef", "scriptRef", "scriptVersionRef", "humanConfirmed"}
+        if not required <= set(value) or set(value) - required - {"projectRef", "expectedScriptVersion"}:
+            raise ScriptStudioError("confirmation fields are invalid")
+        expected = value.get("expectedScriptVersion")
+        if "expectedScriptVersion" in value and (type(expected) is not int or expected < 1):
+            raise ScriptStudioError("expectedScriptVersion must be a positive root integer")
         workspace = _required_ref(value.get("workspaceRef"), "workspaceRef")
         series = _required_ref(value.get("seriesRef"), "seriesRef")
         episode = _required_ref(value.get("episodeRef"), "episodeRef")
@@ -2102,14 +2112,43 @@ class ScriptStudioService:
         script = self.repository.get_script(workspace, series, episode)
         if script is None or script.scriptRef != script_ref:
             raise RecordNotFoundError("Script was not found")
+        if type(script.version) is not int or script.version < 1:
+            raise RepositoryWriteError("persisted Script root version is invalid")
         version = self.repository.get_version(workspace, script_ref, version_ref)
         if version is None or version.seriesRef != series or version.episodeRef != episode:
             raise RecordNotFoundError("ScriptVersion was not found")
+        bootstrap = self._bootstrap(workspace, series, episode)
+        target = self._lineage_version_mapping(version, workspace_ref=workspace,
+            series_ref=series, episode_ref=episode, script_ref=script_ref, bootstrap=bootstrap)
         versions = self.repository.list_versions(workspace, script_ref)
+        if (not versions or sorted(item.versionNumber for item in versions) != list(range(1, len(versions) + 1))
+                or version not in versions
+                or script.currentScriptVersionRef not in {item.scriptVersionRef for item in versions}):
+            raise RepositoryWriteError("persisted ScriptVersion history is incomplete")
         if versions and versions[0].changeKind == "reviewed-import":
             raise TrustedApprovalRequiredError(
                 "reviewed-import lineage requires a trusted approval resolver"
             )
+        binding = target.get("m6ConsumerBinding")
+        if binding is not None:
+            project = binding["projectRef"]
+            if "projectRef" in value and _required_ref(value["projectRef"], "projectRef") != project:
+                raise ScopeMismatchError("projectRef does not match the ScriptVersion")
+            current = self.resolve_current_m6_consumer_binding(workspace, project, series, episode)
+            if current != binding:
+                raise M6ConsumerReadError("m6_baseline_stale")
+        elif "projectRef" in value:
+            self.resolve_current_m6_consumer_context(workspace,
+                _required_ref(value["projectRef"], "projectRef"), series, episode)
+        if script.confirmedScriptVersionRef == version_ref:
+            if expected is not None and script.version not in {expected, expected + 1}:
+                raise VersionConflictError("Script root version no longer identifies this target")
+            return {"script": self._script_mapping(script), "confirmedVersion": target,
+                    "confirmationNoOp": True}
+        if script.confirmedScriptVersionRef is not None and expected is None:
+            raise ConfirmationPreconditionRequiredError("changing the confirmed target requires root CAS")
+        if expected is not None and expected != script.version:
+            raise VersionConflictError("Script root version changed")
         updated = replace(
             script,
             confirmedScriptVersionRef=version_ref,
@@ -2119,7 +2158,8 @@ class ScriptStudioService:
         stored = self.repository.confirm_version(updated, script.version)
         return {
             "script": self._script_mapping(stored),
-            "confirmedVersion": self._version_mapping(version),
+            "confirmedVersion": target,
+            "confirmationNoOp": False,
         }
 
     def accept_reviewed_import(self, value: Mapping[str, Any]) -> dict[str, Any]:

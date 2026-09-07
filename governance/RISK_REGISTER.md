@@ -253,4 +253,17 @@ No-key requests intentionally generate a new independently receipted candidate p
 | --- | --- | --- | --- |
 | `R-M5-M7-ENTRY-052` — existing Core capabilities lacked a legal controlled binding entrypoint and current M7 HTTP resource | Ad hoc private writes or substitution of legacy validation could lose source/approval boundaries | Managed target/scope, zero-write preflight, unchanged CAS, unique authoritative binding readback; authenticated closed M7 GET/POST over the existing validation service. No SQL, new domain/store, automatic confirmation or downstream execution. `MITIGATED / BOUNDED_IMPLEMENTATION / REQUIRED_CI_GATE`. | M5 Binding / M7 Narrative Validation / Creator HTTP Owners; [E3E receipt](../docs/status/M5_M7_LEGAL_ENTRYPOINT_CLOSURE_E3E_2026-09-07.md) |
 
-Original audit classifications remain 19 SAFE / 8 UNSAFE / 1 UNPROVEN across 28 endpoints. M3 duplicate-generation and confirmation-root-drift observations remain pending E3F; M5 CAS historical confirmation recovery remains UNPROVEN. The existing SQLite Plan status/command-response difference is preserved, so exact confirmed-version refs govern binding confirmation. No R6 or E3F live work is authorized by this entry.
+Original audit classifications remain 19 SAFE / 8 UNSAFE / 1 UNPROVEN across 28 endpoints. At the E3E checkpoint, M3 duplicate-generation and confirmation-root-drift observations remained pending E3F; M5 CAS historical confirmation recovery remains UNPROVEN. The existing SQLite Plan status/command-response difference is preserved, so exact confirmed-version refs govern binding confirmation. No R6 or E3F live work is authorized by this entry.
+
+## M3 E3F generation recovery and guarded confirmation
+
+| Risk | Consequence | Mitigation and gate | Owner / evidence |
+| --- | --- | --- | --- |
+| `R-M3-RECOVERY-053` — observed extra calls on initial-generation retry and same-target confirmation metadata drift lacked an explicit recovery contract | Lost responses can duplicate generation or invalidate otherwise current downstream snapshots | Durable Episode exclusion before text calls, four-state recovery, source-bound legal results, atomic Script/COMPLETED transaction and exact replay. Same-target confirmation validates source, approval and currentness before zero-write return; target changes require root CAS. HTTP/SQLite fault, new-process and concurrent tests preserve real downstream stale detection. `MITIGATED / BOUNDED_IMPLEMENTATION / REQUIRED_CI_GATE`. | M3 Script Studio / Creator Application Recovery / Lifecycle Transaction Integrity Owners; [E3F receipt](../docs/status/M3_SCRIPT_GENERATION_AND_CONFIRMATION_RECOVERY_E3F_2026-09-07.md) |
+
+Unpersisted provider output cannot be reconstructed; uncertain PENDING commands keep
+their Episode exclusion and cannot automatically resubmit under a new key. Unkeyed
+requests do not promise exact receipt replay. Confirmation proves the current target,
+not an arbitrary historical acknowledgement. Frontend target-switch CAS is not wired
+in this task; M5 historical confirmation remains UNPROVEN. These new bounded proofs
+do not rewrite the original audit or authorize R6, real Providers, GPU or media jobs.
