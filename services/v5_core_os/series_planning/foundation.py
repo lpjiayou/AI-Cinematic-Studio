@@ -25,6 +25,14 @@ M6_BOOTSTRAP_SCHEMA_VERSION = "creator.series-plan.m6-bootstrap.v1"
 M6_SOURCE_SNAPSHOT_SCHEMA_VERSION = "v5.series-plan.m6-source-snapshot.v1"
 M6_SOURCE_SNAPSHOT_SCHEMA_VERSION_V2 = "v5.series-plan.m6-source-snapshot.v2"
 SQLITE_SCHEMA_VERSION = 1
+CONFIRMATION_IDENTITY_SCHEMA = "v5.series-plan-confirmation-idempotency-identity.v1"
+CONFIRMATION_REQUEST_SCHEMA = "v5.series-plan-confirmation-request.v1"
+CONFIRMATION_VERSION_IDENTITY_SCHEMA = "v5.series-plan-confirmation-version-identity.v1"
+EPISODE_ITEM_CONFIRMATION_IDENTITY_SCHEMA = "v5.episode-plan-item-confirmation-identity.v1"
+_CONFIRMATION_REQUEST_FIELDS = frozenset({
+    "contentProfileRef", "projectRef", "seriesRef", "sourceProjectVersion",
+    "sourceSeriesVersion", "sourceContextDigest", "candidateRef", "candidateDigest", "candidate",
+})
 
 _SERIES_PLAN_CONTENT_FIELDS = frozenset({
     "seriesConcept", "premise", "logline", "mainNarrativeDirection", "mainArcs",
@@ -55,6 +63,49 @@ class ScopeMismatchError(SeriesPlanningError):
 
 class VersionConflictError(SeriesPlanningError):
     code = "version_conflict"
+
+
+class ConfirmationIdempotencyConflictError(VersionConflictError):
+    code = "series_plan_confirmation_idempotency_conflict"
+
+
+class CandidateSourceStaleError(VersionConflictError):
+    code = "series_plan_candidate_stale"
+
+
+def validate_series_plan_idempotency_key(value: Any) -> str:
+    if (not isinstance(value, str) or not 0 < len(value) <= 200
+            or value != value.strip() or not value.isprintable()
+            or "/" in value or "\\" in value or value in {".", ".."}):
+        raise SeriesPlanningError("invalid idempotency key")
+    return value
+
+
+def _confirmation_digest(value: Any) -> str:
+    return hashlib.sha256(json.dumps(value, ensure_ascii=False, sort_keys=True,
+                                    separators=(",", ":"), allow_nan=False).encode("utf-8")).hexdigest()
+
+
+def confirmation_identity(workspace_ref: str, key: str) -> str:
+    validate_series_plan_idempotency_key(key)
+    return _confirmation_digest({"schemaVersion": CONFIRMATION_IDENTITY_SCHEMA,
+        "workspaceRef": workspace_ref, "identityMode": "EXPLICIT_CLIENT_KEY", "idempotencyKey": key})
+
+
+def _current_confirmation_source(context):
+    # Recheck the receipt's source under the existing Lifecycle write lease.
+    # These are the frozen M5 source-context fields, not a new source authority.
+    project, series = context["project"], context["series"]
+    return {
+        "schemaVersion": "creator.series-plan-candidate-source-context.v1",
+        **{name: context[name] for name in ("workspaceRef", "contentProfileRef", "projectRef", "seriesRef")},
+        "projectTitle": project["title"], "projectDescription": project["description"],
+        "targetPlatform": project["targetPlatform"], "aspectRatio": project["aspectRatio"],
+        "plannedEpisodeCount": project["plannedEpisodeCount"], "projectVersion": project["version"],
+        "projectStatus": project["status"], "seriesTitle": series["title"],
+        "seriesDescription": series["description"], "seriesVersion": series["version"],
+        "seriesStatus": series["status"], "createdEpisodeCount": len(series["episodes"]),
+    }
 
 
 class PlanNotConfirmedError(SeriesPlanningError):
@@ -1311,6 +1362,91 @@ class SeriesPlanningService:
         )
         stored_plan, stored_version = self.repository.create_plan_with_version(plan, version)
         return {"plan": self._plan_mapping(stored_plan), "version": self._version_mapping(stored_version)}
+
+    def confirm_candidate_idempotently(self, command: Mapping[str, Any]) -> dict[str, Any]:
+        if not isinstance(command, Mapping) or set(command) != (
+            _CONFIRMATION_REQUEST_FIELDS | {"workspaceRef", "humanConfirmed", "idempotencyKey"}
+        ):
+            raise SeriesPlanningError("confirmation command fields are invalid")
+        key = validate_series_plan_idempotency_key(command["idempotencyKey"])
+        if command["humanConfirmed"] is not True:
+            raise PlanNotConfirmedError("explicit human confirmation is required")
+        context = _project_context(self.project_reader, command)
+        source = _current_confirmation_source(context)
+        if (command["contentProfileRef"] != context["contentProfileRef"]
+                or type(command["sourceProjectVersion"]) is not int
+                or type(command["sourceSeriesVersion"]) is not int
+                or command["sourceProjectVersion"] != source["projectVersion"]
+                or command["sourceSeriesVersion"] != source["seriesVersion"]
+                or command["sourceContextDigest"] != _confirmation_digest(source)):
+            raise CandidateSourceStaleError("candidate source is no longer current")
+        if not _is_canonical_ref(command["candidateRef"]):
+            raise SeriesPlanningError("candidate reference is invalid")
+        if command["candidateDigest"] != _confirmation_digest(command["candidate"]):
+            raise SeriesPlanningError("candidate digest is invalid")
+        identity = confirmation_identity(context["workspaceRef"], key)
+        request = {"schemaVersion": CONFIRMATION_REQUEST_SCHEMA,
+                   **{name: command[name] for name in _CONFIRMATION_REQUEST_FIELDS}}
+        digest = _confirmation_digest(request)
+        plan_ref = "series-plan-" + identity
+        version_ref = "series-plan-version-" + _confirmation_digest({
+            "schemaVersion": CONFIRMATION_VERSION_IDENTITY_SCHEMA,
+            "confirmationIdentityDigest": identity, "requestDigest": digest,
+        })
+        item_refs = iter("episode-plan-item-" + _confirmation_digest({
+            "schemaVersion": EPISODE_ITEM_CONFIRMATION_IDENTITY_SCHEMA,
+            "requestDigest": digest, "episodeNumber": number,
+        }) for number in range(1, context["project"]["plannedEpisodeCount"] + 1))
+        content = _normalize_content(command["candidate"],
+            planned_count=context["project"]["plannedEpisodeCount"], ref_factory=lambda _prefix: next(item_refs))
+
+        def records(timestamp):
+            return (
+                SeriesPlanRecord(SERIES_PLAN_SCHEMA_VERSION, context["workspaceRef"], context["contentProfileRef"],
+                    context["projectRef"], context["seriesRef"], plan_ref, version_ref, version_ref,
+                    "confirmed", timestamp, timestamp, 1),
+                SeriesPlanVersionRecord(SERIES_PLAN_VERSION_SCHEMA_VERSION, context["workspaceRef"],
+                    context["contentProfileRef"], context["projectRef"], context["seriesRef"], plan_ref,
+                    version_ref, 1, json.dumps(content, ensure_ascii=False, sort_keys=True),
+                    "ai-candidate-confirmed", None, timestamp),
+            )
+
+        def winner():
+            scoped = self.repository.get_plan(context["workspaceRef"], context["projectRef"], context["seriesRef"])
+            by_identity = self.repository.get_plan_by_ref(context["workspaceRef"], plan_ref)
+            if by_identity is None:
+                if scoped is not None:
+                    raise DuplicateRecordError("Series Plan already exists; create a new version instead")
+                return None
+            try:
+                versions = self.repository.list_versions(context["workspaceRef"], plan_ref)
+                root = self.repository.get_version(context["workspaceRef"], plan_ref, version_ref)
+                current = self.repository.get_version(context["workspaceRef"], plan_ref, by_identity.currentSeriesPlanVersionRef)
+                confirmed = self.repository.get_version(context["workspaceRef"], plan_ref, by_identity.confirmedSeriesPlanVersionRef)
+                expected_plan, expected_version = records(by_identity.createdAt)
+                if by_identity != expected_plan or scoped != by_identity or root is None:
+                    raise ConfirmationIdempotencyConflictError("confirmation identity changed")
+                _validate_plan_lineage(by_identity, context=context)
+                _validate_current_version_lineage(root, by_identity, versions)
+                if (len(versions) != 1 or current != root or confirmed != root
+                        or _confirmation_digest(_validated_version_content(root)) != _confirmation_digest(content)
+                        or root != replace(expected_version, contentJson=root.contentJson)):
+                    raise ConfirmationIdempotencyConflictError("confirmation version or content changed")
+                return {"plan": self._plan_mapping(by_identity), "version": self._version_mapping(root), "idempotentReplay": True}
+            except SeriesPlanningError:
+                raise ConfirmationIdempotencyConflictError("confirmation identity, version or content changed") from None
+
+        replay = winner()
+        if replay is not None:
+            return replay
+        try:
+            plan, version = self.repository.create_plan_with_version(*records(self._clock()))
+        except DuplicateRecordError:
+            replay = winner()
+            if replay is None:
+                raise
+            return replay
+        return {"plan": self._plan_mapping(plan), "version": self._version_mapping(version), "idempotentReplay": False}
 
     def create_manual_version(self, command: Mapping[str, Any]) -> dict[str, Any]:
         context = _project_context(self.project_reader, command)

@@ -3290,6 +3290,24 @@
       "notes": "E3B bounded product corrective; no DDL changes, E3 execution, visual reinspection, GPU, Provider or Frontend authority."
     },
     {
+      "path": "docs/status/M5_SERIES_PLAN_COMMAND_IDEMPOTENCY_E3D_2026-09-07.md",
+      "repository": "Core",
+      "documentClass": "CURRENT_STATUS",
+      "status": "CURRENT",
+      "owner": "Project Lead / Creator Application Owner / M5 Series Planning Owner",
+      "authoritativeFor": [
+        "bounded M5 candidate pre-call reservation, unified receipt compatibility, deterministic confirmation replay and optional application component evidence"
+      ],
+      "supersedes": [],
+      "supersededBy": [],
+      "currentStateClaimsAllowed": true,
+      "historicalMutationPolicy": "UPDATE_FROM_MERGED_EVIDENCE_ONLY",
+      "lastReviewedBaseline": "85ddf84a6a59059020407b96001823659039c462",
+      "lastReviewedAt": "2026-09-07",
+      "linkedFromIndex": true,
+      "notes": "E3D changes only authorized M5 recovery and its exact optional allowlist. R5 valid-prefix evidence is quarantined; R6 requires fresh staging/database/token and separate authorization. No live GPU, Provider, visual reinspection or Frontend authority."
+    },
+    {
       "path": "docs/status/M1_AI_DIRECTOR_CANDIDATE_IDEMPOTENCY_E3C_2026-09-07.md",
       "repository": "Core",
       "documentClass": "CURRENT_STATUS",

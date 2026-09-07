@@ -238,27 +238,122 @@ The internal non-idempotent confirmation method retains its compatibility behavi
 The [E3B receipt](../status/M1_CREATIVE_PLAN_CONFIRMATION_IDEMPOTENCY_E3B_2026-09-06.md)
 records the bounded recovery tests; E3 lineage execution requires separate authorization.
 
-### M5 scope-bound candidate receipts
+### M5 candidate generation and confirmation recovery
 
-For M5, `POST /creator/api/v1/series-plan-candidates` requires an associated Series.
-A standalone Project without a Series returns `409 / series_scope_required` before
-any Provider call, receipt write or Series Plan write. A successful response includes
-the server-owned opaque `candidateRef`, `candidateDigest`, `sourceContextDigest`,
-`candidateReceiptSchemaVersion=creator.series-plan-candidate-receipt.v1` and
-`candidateReceiptReplay` alongside the unchanged
-`creator.series-plan.candidate.v1` candidate.
+The existing M5 resources accept only these field sets. Authentication supplies
+`workspaceRef`; duplicate JSON keys, nonfinite numbers, unknown fields and
+client-supplied scope, versions, digests, output refs or Provider facts fail with
+`400 / invalid_request`, before generation or writes.
 
-`POST /creator/api/v1/series-plans/confirm-candidate` accepts exactly `projectRef`, `seriesRef`,
-`humanConfirmed` and `candidate`, plus an optional `candidateRef`. Authentication
-supplies `workspaceRef`; clients cannot submit receipt scope, version, digest,
-timestamp, raw receipt JSON or Provider facts. With `candidateRef`, Core performs an
-exact authenticated-workspace lookup. Without it, compatibility is limited to one
-exact durable receipt matching workspace, Project, Series, current trusted source
-context and candidate digest. Cross-scope, stale, changed, unknown and unissued
-candidates fail closed. Only the canonical candidate reloaded from the server receipt
-reaches the existing V5 Series Planning confirmation boundary. The receipt is
-application provenance, not a confirmed plan, approval, canonical fact or publication
-authority; raw `creativeInput` is represented only by its SHA-256 digest.
+| Resource | Accepted request fields |
+| --- | --- |
+| `POST /creator/api/v1/series-plan-candidates` | `projectRef, creativeInput`; optionally `seriesRef`, `idempotencyKey`, or both |
+| `POST /creator/api/v1/series-plans/confirm-candidate`, unkeyed | `projectRef, seriesRef, humanConfirmed, candidate`; optionally `candidateRef` |
+| Same confirmation resource, keyed | `projectRef, seriesRef, humanConfirmed, candidateRef, candidate, idempotencyKey`; a nonempty string `candidateRef` is mandatory |
+
+Both keys are nonempty strings of at most 200 printable characters, with no
+surrounding whitespace, slash or backslash; `.` and `..` are invalid. Keys are never
+trimmed, coerced, persisted or returned. A standalone Project without an associated
+Series still returns `409 / series_scope_required` before generation or writes.
+The existing Series Director validates and normalizes the candidate and retains its
+bounded repair behavior. Creative input uses the existing `str(value or "").strip()`
+normalization, must contain 1–4000 characters, and persists only as SHA-256.
+
+All E3D identities use SHA-256 of UTF-8 JSON with `ensure_ascii=False`, sorted keys,
+compact separators and `allow_nan=False`, without Unicode normalization. The keyed
+candidate identity payload is exactly:
+
+```json
+{
+  "schemaVersion": "creator.series-plan-candidate-command-identity.v1",
+  "operation": "SERIES_PLAN_CANDIDATE",
+  "workspaceRef": "<authenticated workspace>",
+  "idempotencyKey": "<validated client key>"
+}
+```
+
+`commandRef` is `series-plan-candidate-command-` plus the full identity digest.
+`candidateRef` is `series-plan-candidate-` plus the full digest of
+`{schemaVersion: creator.series-plan-candidate-source-identity.v1, workspaceRef,
+commandIdentityDigest}`. The request digest covers exactly
+`{schemaVersion: creator.series-plan-candidate-request.v1, projectRef, seriesRef,
+sourceContextDigest, creativeInputDigest}`. Trusted current Project/Series data
+forms the existing `creator.series-plan-candidate-source-context.v1` context;
+clients cannot select its versions or digest.
+
+The optional application component uses the existing Creator SQLite file:
+`creator_series_plan_candidate_commands`, marker
+`creator_series_plan_candidate_command_schema`, component `series_plan_candidate_commands`,
+component version 1. Its command schema is `creator.series-plan-candidate-command.v1`.
+The primary key is `(workspace_ref, command_ref)`; unique indexes
+`ux_creator_series_plan_candidate_commands_identity` and
+`ux_creator_series_plan_candidate_commands_candidate_ref` bind workspace/identity
+and workspace/candidate respectively. DDL, columns, indexes, marker, canonical JSON,
+derived refs, all available digests, timestamps and state-dependent nullability are
+validated on access. `rowDigest` covers every other command field; it is a corruption
+checksum. The component must be complete or absent; unknown schema objects fail closed.
+No global, M5 domain, M6 or historical receipt schema is migrated.
+
+`PENDING` is committed before generation and holds no database transaction during
+the text call. The same row becomes `COMPLETED` before success, or `FAILED` with only
+one stable code: `provider_timeout`, `provider_unavailable`, `invalid_provider_output`
+or `application_error`. Pending and failed commands never automatically regenerate.
+Same-key changed Project/Series, current source context or creative input returns
+`409 / series_plan_candidate_idempotency_conflict`; pending returns
+`409 / series_plan_candidate_generation_pending`. Exact completed replay adds no
+generation or writes. Corrupt/unavailable command storage returns
+`503 / series_plan_candidate_command_unavailable`. Product failures retain HTTP 200
+and the existing safe Series Director error envelope; first failure and replay have
+the same stable error code and omit raw provider details.
+
+Unkeyed generation keeps its existing nine response fields: `ok`, `kind`,
+`confirmationRequired`, `candidateRef`, `candidateDigest`, `sourceContextDigest`,
+`candidateReceiptSchemaVersion`, `candidateReceiptReplay`, `candidate`.
+It still generates on each request and then deduplicates v1 receipts by exact scope,
+source and candidate content. Keyed generation adds `idempotentReplay` and projects
+`candidateReceiptSchemaVersion=creator.series-plan-candidate-receipt.v2`; both replay
+flags are false on first HTTP 200 and true on replay HTTP 200. Every other successful
+response field, candidate ref, digest and canonical content is unchanged on replay.
+It does not insert or rewrite a v1 receipt.
+
+One application receipt facade resolves historical v1 receipts and completed v2
+commands. Confirmation checks issuance, authenticated workspace/scope, current source
+context, candidate content/digest, then confirmation idempotency. Unknown, foreign,
+PENDING and FAILED candidates retain safe `409 / series_plan_candidate_not_issued`
+concealment; scope mismatch and stale source retain their existing 409 codes.
+Changed content on an issued ref returns `series_plan_candidate_content_mismatch`
+before idempotency. Without `candidateRef`, unkeyed compatibility requires exactly
+one matching v1/v2 receipt; ambiguity returns `series_plan_candidate_receipt_ambiguous`.
+Only the stored canonical candidate reaches V5. Receipts grant no domain, approval
+or publication authority.
+
+Keyed confirmation calls the independent V5 `confirm_candidate_idempotently()`
+method through the existing Lifecycle transaction. Its identity payload is exactly
+`{schemaVersion: v5.series-plan-confirmation-idempotency-identity.v1, workspaceRef,
+identityMode: EXPLICIT_CLIENT_KEY, idempotencyKey}`. `seriesPlanRef` is `series-plan-`
+plus the full identity digest. The server receipt/context forms the confirmation
+request: `schemaVersion=v5.series-plan-confirmation-request.v1`, `contentProfileRef`,
+`projectRef`, `seriesRef`, `sourceProjectVersion`, `sourceSeriesVersion`,
+`sourceContextDigest`, `candidateRef`, `candidateDigest`, `candidate`.
+
+The root version ref is `series-plan-version-` plus the digest of
+`{schemaVersion: v5.series-plan-confirmation-version-identity.v1,
+confirmationIdentityDigest, requestDigest}`. Each item ref is `episode-plan-item-`
+plus the digest of `{schemaVersion: v5.episode-plan-item-confirmation-identity.v1,
+requestDigest, episodeNumber}`. All digests use all 64 lowercase hex characters.
+
+First confirmation atomically creates a confirmed Plan and root v1 Version and
+returns HTTP 201 with `{ok, plan, version, idempotentReplay:false}`. Exact replay,
+including after response loss, process restart or a concurrent winner, returns
+HTTP 200 and `idempotentReplay:true`, preserving the original Plan, Version, item
+refs, timestamps, status and version numbers without writing. Same identity with a
+different legitimate candidate, scope, version or content returns
+`409 / series_plan_confirmation_idempotency_conflict`. A different key when a scoped
+Plan already exists retains `409 / duplicate_record`. Current/root/confirmed version
+drift also conflicts; replay never rewrites later history. Unkeyed confirmation keeps
+its original method, random refs, HTTP 201 envelope and duplicate-record behavior.
+Existing manual append, v2 item binding, M6 bootstrap and historical random-ref reads
+remain supported. See the [E3D receipt](../status/M5_SERIES_PLAN_COMMAND_IDEMPOTENCY_E3D_2026-09-07.md).
 
 ## ADR-0019 method-aware production planning
 

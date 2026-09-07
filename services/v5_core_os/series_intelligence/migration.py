@@ -27,6 +27,14 @@ from services.v5_core_os.series_planning.candidate_receipt_sqlite import (
     CandidateReceiptSqliteError,
     validate_candidate_receipt_connection,
 )
+from services.v5_core_os.series_planning.candidate_command_sqlite import (
+    IDENTITY_INDEX as M5_COMMAND_IDENTITY_INDEX,
+    CANDIDATE_REF_INDEX as M5_COMMAND_CANDIDATE_REF_INDEX,
+    MARKER_TABLE as M5_COMMAND_MARKER_TABLE,
+    TABLE as M5_COMMAND_TABLE,
+    SeriesPlanCandidateCommandStorageError,
+    validate_candidate_command_connection,
+)
 from services.v5_core_os.series_episode.ai_director_candidate_receipt_sqlite import (
     IDENTITY_INDEX as AI_DIRECTOR_IDENTITY_INDEX,
     SOURCE_REF_INDEX as AI_DIRECTOR_SOURCE_REF_INDEX,
@@ -184,6 +192,13 @@ def _validate_schema_allowlist(
     if candidate_receipt_present:
         expected_tables |= candidate_receipt_tables
         expected_indexes.add(CANDIDATE_RECEIPT_INDEX)
+    m5_command_tables = {M5_COMMAND_TABLE, M5_COMMAND_MARKER_TABLE}
+    m5_command_present = m5_command_tables & tables
+    if m5_command_present and m5_command_present != m5_command_tables:
+        raise SeriesIntelligenceMigrationError("partial M5 candidate command schema")
+    if m5_command_present:
+        expected_tables |= m5_command_tables
+        expected_indexes |= {M5_COMMAND_IDENTITY_INDEX, M5_COMMAND_CANDIDATE_REF_INDEX}
     ai_director_tables = {AI_DIRECTOR_TABLE, AI_DIRECTOR_MARKER_TABLE}
     ai_director_present = ai_director_tables & tables
     if ai_director_present and ai_director_present != ai_director_tables:
@@ -233,6 +248,11 @@ def _validate_schema_allowlist(
             raise SeriesIntelligenceMigrationError(
                 "invalid candidate receipt schema"
             ) from exc
+    if m5_command_present:
+        try:
+            validate_candidate_command_connection(connection)
+        except SeriesPlanCandidateCommandStorageError as exc:
+            raise SeriesIntelligenceMigrationError("invalid M5 candidate command schema") from exc
     if ai_director_present:
         try:
             validate_ai_director_candidate_connection(connection)

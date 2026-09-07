@@ -52,8 +52,12 @@ from apps.creator_workspace_mvp.series_plan_candidate_receipts import (
     SeriesPlanCandidateReceiptError,
     SeriesPlanCandidateReceiptService,
     build_series_plan_candidate_context,
-    create_in_memory_receipt_service,
+    create_server_receipt_service,
     create_local_development_receipt_service_from_environment,
+)
+from apps.creator_workspace_mvp.series_plan_candidate_commands import (
+    SeriesPlanCandidateCommandError,
+    validate_idempotency_key as validate_series_plan_command_key,
 )
 from apps.creator_workspace_mvp.public_contract import (
     CAPABILITIES_ENDPOINT,
@@ -819,7 +823,10 @@ class CreatorRequestHandler(BaseHTTPRequestHandler):
             raw_payload = self.rfile.read(content_length)
             payload = load_public_json(raw_payload)
             if (
-                requested_path in {PUBLIC_CONFIRM_PLAN_ENDPOINT, PUBLIC_AI_DIRECTOR_ENDPOINT}
+                requested_path in {
+                    PUBLIC_CONFIRM_PLAN_ENDPOINT, PUBLIC_AI_DIRECTOR_ENDPOINT,
+                    PUBLIC_SERIES_PLANNING_GENERATE_ENDPOINT, PUBLIC_SERIES_PLANNING_CONFIRM_ENDPOINT,
+                }
                 or (production_subresource is not None
                     and production_subresource[1] in {
                         PUBLIC_METHOD_AWARE_VIDEO_CANDIDATES_RESOURCE,
@@ -862,7 +869,9 @@ class CreatorRequestHandler(BaseHTTPRequestHandler):
                     return
             if "workspaceRef" in payload:
                 self._send_application_error(
-                    400, "client_workspace_scope_forbidden"
+                    400, "invalid_request" if requested_path in {
+                        PUBLIC_SERIES_PLANNING_GENERATE_ENDPOINT, PUBLIC_SERIES_PLANNING_CONFIRM_ENDPOINT,
+                    } else "client_workspace_scope_forbidden"
                 )
                 return
             if requested_path == PUBLIC_SCRIPT_REVIEWED_IMPORT_ENDPOINT:
@@ -900,6 +909,8 @@ class CreatorRequestHandler(BaseHTTPRequestHandler):
                 if frozenset(payload) not in {
                     frozenset(required),
                     frozenset(required | {"seriesRef"}),
+                    frozenset(required | {"idempotencyKey"}),
+                    frozenset(required | {"seriesRef", "idempotencyKey"}),
                 }:
                     self._send_application_error(400, "invalid_request")
                     return
@@ -913,6 +924,7 @@ class CreatorRequestHandler(BaseHTTPRequestHandler):
                 if frozenset(payload) not in {
                     frozenset(required),
                     frozenset(required | {"candidateRef"}),
+                    frozenset(required | {"candidateRef", "idempotencyKey"}),
                 }:
                     self._send_application_error(400, "invalid_request")
                     return
@@ -943,6 +955,17 @@ class CreatorRequestHandler(BaseHTTPRequestHandler):
                     self._send_application_error(
                         400, "invalid_project_foundation"
                     )
+                    return
+            if requested_path in {PUBLIC_SERIES_PLANNING_GENERATE_ENDPOINT, PUBLIC_SERIES_PLANNING_CONFIRM_ENDPOINT} and "idempotencyKey" in payload:
+                if requested_path == PUBLIC_SERIES_PLANNING_CONFIRM_ENDPOINT and (
+                    not isinstance(payload["candidateRef"], str) or not payload["candidateRef"]
+                ):
+                    self._send_application_error(400, "invalid_request")
+                    return
+                try:
+                    validate_series_plan_command_key(payload["idempotencyKey"])
+                except SeriesPlanCandidateCommandError as exc:
+                    self._send_application_error(exc.status, exc.code)
                     return
             if production_subresource is not None and "productionRunRef" in payload:
                 self._send_application_error(400, "invalid_request")
@@ -1883,17 +1906,18 @@ class CreatorRequestHandler(BaseHTTPRequestHandler):
                     payload.get("seriesRef"),
                 )
                 candidate_context = build_series_plan_candidate_context(context)
-                candidate = self.series_director_service.generate(
-                    candidate_context["generationContext"],
-                    payload.get("creativeInput"),
-                )
-                receipt, replay = (
-                    self.series_plan_candidate_receipt_service.issue(
-                        candidate_context,
-                        payload.get("creativeInput"),
-                        candidate,
+                keyed = "idempotencyKey" in payload
+                if keyed:
+                    receipt, replay, candidate = self.series_plan_candidate_receipt_service.generate_idempotently(
+                        candidate_context, payload.get("creativeInput"), payload["idempotencyKey"], self.series_director_service,
                     )
-                )
+                else:
+                    candidate = self.series_director_service.generate(
+                        candidate_context["generationContext"], payload.get("creativeInput"),
+                    )
+                    receipt, replay = self.series_plan_candidate_receipt_service.issue(
+                        candidate_context, payload.get("creativeInput"), candidate,
+                    )
                 self._send_json(
                     200,
                     {
@@ -1904,10 +1928,11 @@ class CreatorRequestHandler(BaseHTTPRequestHandler):
                         "candidateDigest": receipt.candidateDigest,
                         "sourceContextDigest": receipt.sourceContextDigest,
                         "candidateReceiptSchemaVersion": (
-                            CANDIDATE_RECEIPT_SCHEMA_VERSION
+                            receipt.schemaVersion
                         ),
                         "candidateReceiptReplay": replay,
                         "candidate": candidate,
+                        **({"idempotentReplay": replay} if keyed else {}),
                     },
                 )
                 return
@@ -1922,6 +1947,19 @@ class CreatorRequestHandler(BaseHTTPRequestHandler):
                     payload.get("seriesRef"),
                 )
                 candidate_context = build_series_plan_candidate_context(context)
+                if "idempotencyKey" in payload:
+                    receipt, stored_candidate = self.series_plan_candidate_receipt_service.resolve_receipt(
+                        candidate_context, payload.get("candidate"), candidate_ref=payload["candidateRef"],
+                    )
+                    result = self.series_planning_boundary.confirm_candidate_idempotently({
+                        **{name: getattr(receipt, name) for name in (
+                            "workspaceRef", "contentProfileRef", "projectRef", "seriesRef", "sourceProjectVersion",
+                            "sourceSeriesVersion", "sourceContextDigest", "candidateRef", "candidateDigest",
+                        )},
+                        "humanConfirmed": True, "candidate": stored_candidate, "idempotencyKey": payload["idempotencyKey"],
+                    })
+                    self._send_json(200 if result["idempotentReplay"] else 201, {"ok": True, **result})
+                    return
                 stored_candidate = (
                     self.series_plan_candidate_receipt_service.resolve(
                         candidate_context,
@@ -1943,7 +1981,7 @@ class CreatorRequestHandler(BaseHTTPRequestHandler):
             else:
                 result = {"plan": self.series_planning_boundary.confirm_version(payload)}
             self._send_json(201, {"ok": True, **result})
-        except SeriesPlanCandidateReceiptError as exc:
+        except (SeriesPlanCandidateReceiptError, SeriesPlanCandidateCommandError) as exc:
             self._send_application_error(exc.status, exc.code)
         except SeriesPlanCandidateError:
             self._send_application_error(400, "invalid_series_plan_candidate")
@@ -2206,6 +2244,10 @@ class CreatorRequestHandler(BaseHTTPRequestHandler):
             "series_plan_candidate_content_mismatch": "候选内容与服务端签发记录不一致。",
             "series_plan_candidate_receipt_ambiguous": "候选签发记录不唯一，请重新生成候选。",
             "series_plan_candidate_receipt_unavailable": "候选签发记录暂时不可用，请稍后重试。",
+            "series_plan_candidate_command_unavailable": "候选生成记录暂时不可用，请稍后重试。",
+            "series_plan_candidate_idempotency_conflict": "相同生成操作对应了不同输入，请检查后重试。",
+            "series_plan_candidate_generation_pending": "该生成操作尚无确定结果，请稍后查看。",
+            "series_plan_confirmation_idempotency_conflict": "相同确认操作对应了不同候选或版本，请检查后重试。",
             "series_plan_not_confirmed": "请先完成人工确认。",
             "authority_unavailable": "当前工作区尚未连接 M6 权限与身份授权。",
             "identity_binding_denied": "当前身份不能绑定这组系列智能数据。",
@@ -2450,7 +2492,9 @@ def create_server(
         or SeriesDirectorApplicationService(default_text_generation),
         series_plan_candidate_receipt_service=(
             series_plan_candidate_receipt_service
-            or create_in_memory_receipt_service()
+            or create_server_receipt_service(
+                getattr(assembly.state, "database_path", None) if assembly is not None else None
+            )
         ),
         series_planning_boundary=planning,
         series_intelligence_boundary=series_intelligence_boundary,
