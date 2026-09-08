@@ -15,6 +15,7 @@
 | Supersedes | 无 |
 | Superseded by | 无 |
 | Scope amended by | [`ADR-0020`](ADR-0020-m12-cpu-build-host-and-a100-offline-consumer.md)；仅第 10 节与 Migration Plan 第 8 项的 A100 C3 假设被局部 supersede |
+| Extended by | [`ADR-0021`](ADR-0021-manifest-v2-technical-input-append-authority.md)；仅增加 exact manifest v2 M10 technical-input append authority，不授权 M11 execution |
 
 ## ADR ID
 

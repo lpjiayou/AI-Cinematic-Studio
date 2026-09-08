@@ -1,6 +1,6 @@
 # Document Supersession Map
 
-Status: `GENERATED_REFERENCE / REVIEWED 2026-09-04`
+Status: `GENERATED_REFERENCE / REVIEWED 2026-09-08`
 
 This map makes existing replacement and amendment relationships discoverable. It does
 not rewrite predecessor content or create architecture authority. Machine-readable
@@ -31,6 +31,8 @@ edges remain in [`DOCUMENT_REGISTRY.json`](DOCUMENT_REGISTRY.json).
 | [`ADR-0016`](../../governance/ADR-0016-m13-timeline-render-candidate-and-deterministic-post-boundary.md) | `REINFORCES_SCOPE` | [`ADR-0019`](../../governance/ADR-0019-upstream-execution-method-and-requirement-routing.md) | ADR-0019 keeps deterministic events and effects in M13 and does not move them into M11 generation planning. |
 | [`ADR-0015`](../../governance/ADR-0015-m12-isolated-audio-runtime-and-acyclic-voice-clone-lineage.md) | `REINFORCES_SCOPE` | [`ADR-0020`](../../governance/ADR-0020-m12-cpu-build-host-and-a100-offline-consumer.md) | ADR-0020 preserves ADR-0015 section 3 as the controlling non-A100 C3 build boundary and section 4 as the A100 closed-input consumer boundary. |
 | [`ADR-0019`](../../governance/ADR-0019-upstream-execution-method-and-requirement-routing.md) | `AMENDS_SCOPE` | [`ADR-0020`](../../governance/ADR-0020-m12-cpu-build-host-and-a100-offline-consumer.md) | Only ADR-0019 section 10 and Migration Plan item 8's A100 C3 assumption are superseded. ADR-0019 remains Accepted for upstream method and requirement routing. |
+| [`ADR-0014`](../../governance/ADR-0014-k2-001-archive-k2-002-changan-start.md) | `AMENDS_SCOPE` | [`ADR-0021`](../../governance/ADR-0021-manifest-v2-technical-input-append-authority.md) | ADR-0021 narrowly permits its exact authority-bound manifest v2 M10 technical-input lifecycle; all ShotPlan/camera, execution, Provider/GPU and publication restrictions remain controlling. |
+| [`ADR-0019`](../../governance/ADR-0019-upstream-execution-method-and-requirement-routing.md) | `EXTENDS_SCOPE` | [`ADR-0021`](../../governance/ADR-0021-manifest-v2-technical-input-append-authority.md) | ADR-0021 adds the exact M10 input-append authority and persistent receipt chain without granting M11 execution or creating another Candidate, AssetVersion, queue or database owner. |
 
 All referenced ADRs remain `ACCEPTED_DECISION`; a relationship does not delete an
 Accepted ADR or turn it into ordinary historical prose.

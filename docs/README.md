@@ -32,6 +32,7 @@ deliberately isolated and do not authorize current execution.
 - [`governance/ADR-0018-canonical-identity-reference-version-projection-and-runtime-currentness-boundary.md`](../governance/ADR-0018-canonical-identity-reference-version-projection-and-runtime-currentness-boundary.md) — `ACCEPTED`
 - [`governance/ADR-0019-upstream-execution-method-and-requirement-routing.md`](../governance/ADR-0019-upstream-execution-method-and-requirement-routing.md) — `ACCEPTED`
 - [`governance/ADR-0020-m12-cpu-build-host-and-a100-offline-consumer.md`](../governance/ADR-0020-m12-cpu-build-host-and-a100-offline-consumer.md) — `ACCEPTED`
+- [`governance/ADR-0021-manifest-v2-technical-input-append-authority.md`](../governance/ADR-0021-manifest-v2-technical-input-append-authority.md) — `ACCEPTED`
 
 ## NORMATIVE_ARCHITECTURE
 
@@ -60,6 +61,7 @@ deliberately isolated and do not authorize current execution.
 - [`architecture/K2_INTERNAL_IMAGE_FIRST_REAL_MEDIA_REVISION_CONTRACT.md`](../architecture/K2_INTERNAL_IMAGE_FIRST_REAL_MEDIA_REVISION_CONTRACT.md) — `ACTIVE`
 - [`architecture/K2_INTERNAL_SELF_HOSTED_P1_CONTRACT.md`](../architecture/K2_INTERNAL_SELF_HOSTED_P1_CONTRACT.md) — `ACTIVE`
 - [`architecture/M3_M11_UPSTREAM_METHOD_CLOSURE_CONTRACT.md`](../architecture/M3_M11_UPSTREAM_METHOD_CLOSURE_CONTRACT.md) — `ACTIVE`
+- [`architecture/M10_MANIFEST_V2_TECHNICAL_INPUT_APPEND_AUTHORITY_CONTRACT.md`](../architecture/M10_MANIFEST_V2_TECHNICAL_INPUT_APPEND_AUTHORITY_CONTRACT.md) — `ACTIVE`
 - [`architecture/M6_SERIES_INTELLIGENCE_CONSUMER_CONTRACT.md`](../architecture/M6_SERIES_INTELLIGENCE_CONSUMER_CONTRACT.md) — `ACTIVE`
 - [`architecture/M6_SERIES_INTELLIGENCE_DOMAIN_CONTRACT.md`](../architecture/M6_SERIES_INTELLIGENCE_DOMAIN_CONTRACT.md) — `ACTIVE`
 - [`architecture/M6_SERIES_INTELLIGENCE_SQLITE_CONTRACT.md`](../architecture/M6_SERIES_INTELLIGENCE_SQLITE_CONTRACT.md) — `ACTIVE`
@@ -86,6 +88,7 @@ deliberately isolated and do not authorize current execution.
 
 ## CURRENT_STATUS
 
+- [`docs/status/M10_MANIFEST_V2_TECHNICAL_INPUT_APPEND_AUTHORITY_E3H_2026-09-08.md`](status/M10_MANIFEST_V2_TECHNICAL_INPUT_APPEND_AUTHORITY_E3H_2026-09-08.md) — `CURRENT`
 - [`docs/status/M10_INPUT_ARTIFACT_EXECUTION_CONFIG_DECOUPLING_E3G_2026-09-08.md`](status/M10_INPUT_ARTIFACT_EXECUTION_CONFIG_DECOUPLING_E3G_2026-09-08.md) — `CURRENT`
 - [`docs/status/M5_M7_LEGAL_ENTRYPOINT_CLOSURE_E3E_2026-09-07.md`](status/M5_M7_LEGAL_ENTRYPOINT_CLOSURE_E3E_2026-09-07.md) — `CURRENT`
 - [`docs/status/M3_SCRIPT_GENERATION_AND_CONFIRMATION_RECOVERY_E3F_2026-09-07.md`](status/M3_SCRIPT_GENERATION_AND_CONFIRMATION_RECOVERY_E3F_2026-09-07.md) — `CURRENT`

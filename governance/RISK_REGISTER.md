@@ -277,3 +277,14 @@ do not rewrite the original audit or authorize R6, real Providers, GPU or media 
 E3G adds no environment variable, registry schema, backend, queue, database DDL,
 route or request field. Input readiness remains distinct from execution readiness.
 The correction does not authorize R6, E4, ComfyUI, GPU, Provider or media execution.
+
+## Manifest v2 bounded technical-input append authority E3H
+
+| Risk | Consequence | Mitigation and gate | Owner / evidence |
+| --- | --- | --- | --- |
+| `R-M10-APPEND-055` — deleting the manifest v2 review guard or treating transport, technical provenance or a persisted receipt as authority could permit arbitrary Candidate writes or leak into M11 execution | Unscoped assets, partial lifecycle records, unauthorized Job/Attempt/provider work, or false Run/publication readiness | Preserve default v2 rejection; accept only an operator-managed absolute-path and independently pinned closed bundle for one exact current Run/M6/M7/M8/M9/requirement/beat/image subject and five input-only operations. Atomically append authority evidence + receipt v2 + Candidate + TechnicalValidation, retain external selection approval and canonical AssetVersion, and reverify current source/bundle on every write/replay. Manifest safety flags stay unchanged; v2 route rejects before queue/backend even with READY input and a working mock backend. SQLite fault/concurrency, authenticated HTTP and fresh-process authority-removal tests are required CI gates. `MITIGATED / BOUNDED_IMPLEMENTATION / REQUIRED_CI_GATE`. | Project Lead / Core Architecture / M10 Canonical Input Append / Candidate Review and Admission Owners; [ADR-0021](ADR-0021-manifest-v2-technical-input-append-authority.md), [normative contract](../architecture/M10_MANIFEST_V2_TECHNICAL_INPUT_APPEND_AUTHORITY_CONTRACT.md) and [E3H receipt](../docs/status/M10_MANIFEST_V2_TECHNICAL_INPUT_APPEND_AUTHORITY_E3H_2026-09-08.md) |
+
+This authority adds one receipt schema version and one journal record kind, but no
+DDL, database, queue, public route or client authority field. It does not migrate,
+issue authority to, mutate or resume the preserved R6 prefix. Provider processing,
+video result/output intake, execution, Master/Export and publication remain closed.

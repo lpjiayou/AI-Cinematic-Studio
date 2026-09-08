@@ -20,6 +20,7 @@ from .foundation import (
     EpisodeProductionError,
     ExecutionNotAuthorizedError,
     IdempotencyConflictError,
+    MANIFEST_SCHEMA_VERSION_V2,
     RecordNotFoundError,
     RepositoryUnavailableError,
     StaleInputError,
@@ -28,6 +29,7 @@ from .foundation import (
     _required_ref,
     _utc_now,
 )
+from .input_append_authority import VerifiedInputAppendAuthority
 from .media import WorkerUnavailableError
 from .media_candidate_review import K2MediaCandidateReviewService
 
@@ -914,12 +916,40 @@ class M10M11MethodAwareMediaService:
             result.append((deepcopy(dict(record)), payload))
         return result
 
-    def create_input_plan(self, command: Mapping[str, Any]) -> dict[str, Any]:
+    def create_input_plan(
+        self,
+        command: Mapping[str, Any],
+        *,
+        input_append_contexts: Sequence[VerifiedInputAppendAuthority] = (),
+    ) -> dict[str, Any]:
         if not isinstance(command, Mapping) or set(command) != _CREATE_INPUT_FIELDS:
             raise EpisodeProductionError(
                 "command fields do not match the M10 input-plan contract"
             )
         scope, run_ref = self._scope(command)
+        root = self.candidate_review.root_service.get_run(
+            scope["workspaceRef"], run_ref
+        )
+        manifest = root.get("manifest")
+        if (
+            isinstance(manifest, Mapping)
+            and manifest.get("schemaVersion") == MANIFEST_SCHEMA_VERSION_V2
+        ):
+            if (
+                not input_append_contexts
+                or any(
+                    not isinstance(context, VerifiedInputAppendAuthority)
+                    or not context.matches_run(
+                        workspace_ref=scope["workspaceRef"],
+                        production_run_ref=run_ref,
+                        operation="METHOD_AWARE_INPUT_PLAN",
+                    )
+                    for context in input_append_contexts
+                )
+            ):
+                raise ExecutionNotAuthorizedError(
+                    "manifest v2 input planning requires exact input append authority"
+                )
         key = _idempotency_key(command.get("idempotencyKey"))
         plan = self._current_execution_plan(
             scope, run_ref, command.get("executionMethodPlanVersionRef")
@@ -1605,6 +1635,27 @@ class M10M11MethodAwareMediaService:
                 "command fields do not match the M11 route contract"
             )
         scope, run_ref = self._scope(command)
+        root = self.candidate_review.root_service.get_run(
+            scope["workspaceRef"], run_ref
+        )
+        manifest = root.get("manifest")
+        if (
+            isinstance(manifest, Mapping)
+            and manifest.get("schemaVersion") == MANIFEST_SCHEMA_VERSION_V2
+        ):
+            if (
+                manifest.get("shotPlanAuthorityState")
+                != "LOCAL_STRUCTURAL_REPRESENTATION_ONLY"
+                or manifest.get("shotPlanApprovalState") != "NOT_VERIFIED"
+                or manifest.get("cameraContractState") != "NOT_READY"
+                or manifest.get("dispatchAllowed") is not False
+            ):
+                raise StaleInputError(
+                    "v2 production run safety boundary is inconsistent"
+                )
+            raise ExecutionNotAuthorizedError(
+                "manifest v2 input authority does not authorize video routing"
+            )
         key = _idempotency_key(command.get("idempotencyKey"))
         input_plan = self.require_current_input_plan(
             scope["workspaceRef"],

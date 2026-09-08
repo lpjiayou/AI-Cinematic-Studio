@@ -11,14 +11,24 @@ from services.v4_platform.method_aware_input_artifacts import (
     exact, hex_digest, integer, ref, storage_key,
 )
 from .evidence import EvidenceRecord
-from .foundation import (EpisodeProductionError, RecordNotFoundError, StaleInputError,
+from .foundation import (EpisodeProductionError, ExecutionNotAuthorizedError,
+    MANIFEST_SCHEMA_VERSION_V2, RecordNotFoundError, StaleInputError,
     IdempotencyConflictError, _digest, _idempotency_key)
+from .input_append_authority import (
+    EVIDENCE_RECORD_KIND as INPUT_APPEND_AUTHORITY_KIND,
+    InputAppendAuthorityConfigurationError,
+    RejectingInputAppendAuthority,
+    VerifiedInputAppendAuthority,
+    seal_subject,
+    validate_evidence as validate_input_append_authority_evidence,
+)
 from .media_candidate_review import (CANDIDATE,TECHNICAL_VALIDATION,SEMANTIC_VISUAL_QC,
     HUMAN_SELECTION,ASSET_ADMISSION,ASSET_VERSION,MediaSelectionSubject,VerifiedMediaSelection,
     MediaSelectionApprovalRequiredError,VISUAL_QC_PROFILE_DIGEST)
 
 RECEIPT_KIND='MethodAwareInputArtifact'
 RECEIPT_SCHEMA='v5.method-aware-input-artifact-receipt.v1'
+RECEIPT_SCHEMA_V2='v5.method-aware-input-artifact-receipt.v2'
 ADMISSION_SCHEMA='v5.method-aware-input-asset-admission.v1'
 ASSET_SCHEMA='v5.method-aware-input-image-asset-version.v1'
 INPUT_ROLE='ACTION_READY_ANCHOR'
@@ -30,6 +40,7 @@ ADMIT_FIELDS=SCOPE_FIELDS|PLAN_FIELDS|{'humanSelectionRef','humanSelectionVersio
 RECEIPT_FIELDS=SCOPE_FIELDS|LINEAGE_FIELDS|{'schemaVersion','inputArtifactReceiptRef','version',
     'inputRole','inputRequirementKey','stagedArtifactRef','stagedArtifactDigest','artifact',
     'authorityState','providerProcessingAuthorized','publicationAllowed','createdAt','payloadDigest'}
+RECEIPT_V2_FIELDS=RECEIPT_FIELDS|{'inputAppendAuthorityRef','inputAppendAuthorityDigest'}
 CHAIN_FIELDS=frozenset({'sourceArtifactReceiptRef','sourceArtifactReceiptDigest',
     'technicalValidationRef','technicalValidationDigest','semanticVisualQcRef','semanticVisualQcDigest',
     'humanSelectionRef','humanSelectionDigest'})
@@ -87,9 +98,13 @@ def probe_for(artifact):
 
 
 def validate_receipt(value):
-    value=checked(value,RECEIPT_FIELDS)
+    if not isinstance(value,Mapping):raise MethodAwareInputArtifactError()
+    schema=value.get('schemaVersion')
+    fields=RECEIPT_V2_FIELDS if schema==RECEIPT_SCHEMA_V2 else RECEIPT_FIELDS
+    value=checked(value,fields)
     try:
-        if (value['schemaVersion']!=RECEIPT_SCHEMA or type(value['version']) is not int or value['version']!=1
+        expected_version={RECEIPT_SCHEMA:1,RECEIPT_SCHEMA_V2:2}.get(schema)
+        if (expected_version is None or type(value['version']) is not int or value['version']!=expected_version
                 or value['inputRole']!=INPUT_ROLE or value['authorityState']!='TECHNICAL_EVIDENCE_ONLY'
                 or value['publicationAllowed'] is not False or value['providerProcessingAuthorized'] is not False
                 or value['inputRequirementKey']!='action-ready-anchor:'+value['visualExecutionRequirementRef']):
@@ -105,8 +120,33 @@ def validate_receipt(value):
         storage_key(artifact['storageKey'])
         if artifact['format']!={'image/png':'png','image/jpeg':'jpeg'}.get(artifact['mediaType']):
             raise MethodAwareInputArtifactError()
+        if schema==RECEIPT_SCHEMA_V2:
+            ref(value['inputAppendAuthorityRef']);hex_digest(value['inputAppendAuthorityDigest'])
         return value
     except (ValueError,TypeError,KeyError) as exc:raise MethodAwareInputAssetError() from exc
+
+
+def validate_receipt_authority(receipt,records):
+    """Validate the immutable receipt-to-authority link without granting writes."""
+    receipt=validate_receipt(receipt)
+    if receipt['schemaVersion']==RECEIPT_SCHEMA:return None
+    try:
+        authority=validate_input_append_authority_evidence(exact_record(records,
+            INPUT_APPEND_AUTHORITY_KIND,receipt['inputAppendAuthorityRef'],
+            receipt['inputAppendAuthorityDigest']))
+    except InputAppendAuthorityConfigurationError as exc:
+        raise MethodAwareInputAssetError() from exc
+    subject=authority['subject'];artifact=receipt['artifact']
+    linked=SCOPE_FIELDS|LINEAGE_FIELDS|{'stagedArtifactRef','stagedArtifactDigest','inputRole',
+        'inputRequirementKey','authorityState','providerProcessingAuthorized','publicationAllowed'}
+    if (authority['inputAppendAuthorityRef']!=receipt['inputAppendAuthorityRef']
+            or authority['payloadDigest']!=receipt['inputAppendAuthorityDigest']
+            or any(subject[k]!=receipt[k] for k in linked)
+            or subject['artifactContentDigest']!=artifact['contentDigest']
+            or subject['artifactMediaType']!=artifact['mediaType']
+            or subject['artifactByteSize']!=artifact['byteSize']):
+        raise MethodAwareInputAssetError()
+    return authority
 
 
 def validate_asset_version(value,*,records,workspace_ref,run_ref,root=None):
@@ -128,7 +168,9 @@ def validate_asset_version(value,*,records,workspace_ref,run_ref,root=None):
         exact(asset['probe'],{'width','height','format','streamCount','frameCount'})
         for name in ('width','height','streamCount','frameCount'):
             integer(asset['probe'][name],16384)
-        receipt=validate_receipt(exact_record(records,RECEIPT_KIND,asset['sourceArtifactReceiptRef'],asset['sourceArtifactReceiptDigest']))
+        receipt=validate_receipt(exact_record(records,RECEIPT_KIND,
+            asset['sourceArtifactReceiptRef'],asset['sourceArtifactReceiptDigest'],version=None))
+        validate_receipt_authority(receipt,records)
         if any(asset[k]!=receipt[k] for k in SCOPE_FIELDS|LINEAGE_FIELDS|{'inputRole','inputRequirementKey'}):raise MethodAwareInputArtifactError()
         artifact=receipt['artifact']
         if (asset['artifactRef']!=artifact['stagedArtifactRef'] or asset['sha256']!=artifact['contentDigest']
@@ -208,9 +250,10 @@ def selection_subject(receipt,candidate,qc):
 
 
 class MethodAwareInputAssetService:
-    def __init__(self,method_planning,review,artifact_evidence=None):
+    def __init__(self,method_planning,review,artifact_evidence=None,input_append_authority=None):
         self.planning=method_planning;self.review=review;self.evidence=review.evidence
         self.artifact_evidence=artifact_evidence or RejectingMethodAwareInputArtifactEvidence()
+        self.input_append_authority=input_append_authority or RejectingInputAppendAuthority()
         review.input_selection_validator=self.verify_standalone_selection
 
     @staticmethod
@@ -241,7 +284,7 @@ class MethodAwareInputAssetService:
         requirement=requirements[0]
         if (requirement['executionClass'],requirement['executionMethod'])!=('MICRO_MOTION','SINGLE_ANCHOR_I2V'):
             raise MethodAwareInputAssetError('method_aware_input_requirement_stale')
-        return scope,plan,requirement
+        return scope,plan,requirement,root
 
     def _artifact(self,command,requirement):
         lineage={k:command[k] if k in PLAN_FIELDS else requirement[k] for k in LINEAGE_FIELDS}
@@ -250,11 +293,96 @@ class MethodAwareInputAssetService:
                 staged_artifact_digest=command['stagedArtifactDigest'],scope={k:command[k] for k in SCOPE_FIELDS},lineage=lineage)
         except MethodAwareInputArtifactError as exc:raise MethodAwareInputAssetError(exc.code) from exc
 
-    def _record(self,kind,record_ref,key,payload,request_digest=None):
+    def _record(self,kind,record_ref,key,payload,request_digest=None,version=1):
         value=sealed(payload)
         return EvidenceRecord(workspaceRef=value['workspaceRef'],productionRunRef=value['productionRunRef'],
-            recordKind=kind,recordRef=record_ref,recordVersion=1,idempotencyKey=key,
+            recordKind=kind,recordRef=record_ref,recordVersion=version,idempotencyKey=key,
             requestDigest=request_digest or value['payloadDigest'],createdAt=value['createdAt'],payload=value,payloadDigest=value['payloadDigest'])
+
+    @staticmethod
+    def _is_manifest_v2(root):
+        manifest=root.get('manifest') if isinstance(root,Mapping) else None
+        return isinstance(manifest,Mapping) and manifest.get('schemaVersion')==MANIFEST_SCHEMA_VERSION_V2
+
+    def _authority_subject(self,command,scope,plan,requirement,root,artifact):
+        manifest=root.get('manifest')
+        if not isinstance(manifest,Mapping):raise MethodAwareInputAssetError('method_aware_input_plan_stale')
+        validation=self.planning.execution_method_planning.narrative_validation.require_m8_ready_validation(
+            *[scope[k] for k in ('workspaceRef','projectRef','seriesRef','episodeRef','productionRunRef')],
+            plan['consistencyValidationVersionRef'])
+        if (validation['payloadDigest']!=plan['consistencyValidationDigest']
+                or validation['scriptVersionRef']!=plan['scriptVersionRef']
+                or validation['scriptVersionDigest']!=plan['scriptVersionDigest']):
+            raise MethodAwareInputAssetError('method_aware_input_plan_stale')
+        shots=[item for item in plan['creativeShotVersions']
+            if item['creativeShotVersionRef']==requirement['creativeShotVersionRef']
+            and item['payloadDigest']==requirement['creativeShotVersionDigest']]
+        if len(shots)!=1:raise MethodAwareInputAssetError('method_aware_input_requirement_stale')
+        beats=[item for item in shots[0]['actionExecutionBeats']
+            if item['beatRef']==requirement['beatRef'] and item['payloadDigest']==requirement['beatDigest']]
+        if len(beats)!=1:raise MethodAwareInputAssetError('method_aware_input_requirement_stale')
+        beat=beats[0]
+        return seal_subject({'schemaVersion':'v5.m10-input-append-authority-subject.v1',
+            **scope,'productionRunPayloadDigest':root['payloadDigest'],
+            'manifestSchemaVersion':manifest['schemaVersion'],'manifestDigest':_digest(dict(manifest)),
+            'upstreamDigest':root['upstreamDigest'],'scriptVersionRef':plan['scriptVersionRef'],
+            'scriptVersionDigest':plan['scriptVersionDigest'],
+            **{k:validation[k] for k in ('m6ConsumerBindingDigest','m6BaselineSnapshotRef',
+                'm6BaselineCanonicalDigest','activationRevision','seriesPlanVersionRef',
+                'seriesPlanVersionDigest','seriesBibleVersionRef','seriesBibleVersionDigest',
+                'characterContinuityVersionRef','characterContinuityVersionDigest')},
+            'consistencyValidationVersionRef':validation['consistencyValidationVersionRef'],
+            'consistencyValidationDigest':validation['payloadDigest'],
+            'executionMethodPlanVersionRef':plan['executionMethodPlanVersionRef'],
+            'executionMethodPlanDigest':plan['payloadDigest'],
+            'visualExecutionRequirementRef':requirement['visualExecutionRequirementRef'],
+            'visualExecutionRequirementDigest':requirement['payloadDigest'],
+            'creativeShotVersionRef':shots[0]['creativeShotVersionRef'],
+            'creativeShotVersionDigest':shots[0]['payloadDigest'],
+            'actionExecutionBeatRef':beat['beatRef'],'actionExecutionBeatDigest':beat['payloadDigest'],
+            'sourceSpan':deepcopy(beat['sourceSpan']),'sourceTextDigest':beat['sourceTextDigest'],
+            'executionClass':requirement['executionClass'],'executionMethod':requirement['executionMethod'],
+            'inputRequirementKey':'action-ready-anchor:'+requirement['visualExecutionRequirementRef'],
+            'stagedArtifactRef':command['stagedArtifactRef'],'stagedArtifactDigest':command['stagedArtifactDigest'],
+            'artifactContentDigest':artifact['contentDigest'],'artifactMediaType':artifact['mediaType'],
+            'artifactByteSize':artifact['byteSize'],'mediaKind':'IMAGE','inputRole':INPUT_ROLE,
+            'authorityState':'TECHNICAL_EVIDENCE_ONLY',
+            'shotPlanAuthorityState':manifest.get('shotPlanAuthorityState'),
+            'shotPlanApprovalState':manifest.get('shotPlanApprovalState'),
+            'cameraContractState':manifest.get('cameraContractState'),
+            'dispatchAllowed':manifest.get('dispatchAllowed'),
+            'providerProcessingAuthorized':False,'publicationAllowed':False})
+
+    def _authority_context(self,command,scope,plan,requirement,root,artifact,operation):
+        if not self._is_manifest_v2(root):return None
+        try:subject=self._authority_subject(command,scope,plan,requirement,root,artifact)
+        except InputAppendAuthorityConfigurationError as exc:
+            raise ExecutionNotAuthorizedError('manifest v2 technical input subject is invalid') from exc
+        return self.input_append_authority.verify(subject=subject,operation=operation)
+
+    def _persisted_authority(self,receipt,records):
+        evidence=validate_receipt_authority(receipt,records)
+        return evidence
+
+    def _authority_for_receipt(self,receipt,operation):
+        if receipt['schemaVersion']==RECEIPT_SCHEMA:return None
+        command={**{k:receipt[k] for k in SCOPE_FIELDS|PLAN_FIELDS},
+            'stagedArtifactRef':receipt['stagedArtifactRef'],
+            'stagedArtifactDigest':receipt['stagedArtifactDigest']}
+        scope,plan,requirement,root=self._current(command)
+        artifact=self._artifact(command,requirement)
+        if artifact!=receipt['artifact']:raise MethodAwareInputAssetError()
+        context=self._authority_context(command,scope,plan,requirement,root,artifact,operation)
+        records=self.evidence.list_records(scope['workspaceRef'],scope['productionRunRef'])
+        persisted=self._persisted_authority(receipt,records)
+        if (persisted is None or context is None
+                or persisted['inputAppendAuthorityRef']!=context.input_append_authority_ref
+                or persisted['authorityRef']!=context.authority_ref
+                or persisted['subject']!=context.subject
+                or persisted['authorityDecisionRef']!=context.authority_decision_ref
+                or persisted['authorityDecisionDigest']!=context.authority_decision_digest):
+            raise ExecutionNotAuthorizedError('manifest v2 technical input append authority changed')
+        return context
 
     def _key(self,command,kind):
         request_digest=_digest({k:v for k,v in command.items() if k!='idempotencyKey'})
@@ -266,11 +394,16 @@ class MethodAwareInputAssetService:
 
     def _intake_response(self,receipt_record,replay):
         receipt=validate_receipt(record_payload(receipt_record,RECEIPT_KIND));records=self.evidence.list_records(receipt['workspaceRef'],receipt['productionRunRef'])
+        validate_receipt_authority(receipt,records)
         candidates=[record_payload(r,CANDIDATE) for r in records if r['recordKind']==CANDIDATE and r['payload'].get('revisionRef')==receipt['inputArtifactReceiptRef']]
         validations=[record_payload(r,TECHNICAL_VALIDATION) for r in records if r['recordKind']==TECHNICAL_VALIDATION
             and len(candidates)==1 and r['payload'].get('candidateRef')==candidates[0]['candidateRef']]
         if len(candidates)!=1 or len(validations)!=1:raise MethodAwareInputAssetError('method_aware_input_candidate_conflict')
         validate_candidate_chain(receipt,candidates[0],validations[0])
+        if (replay and receipt['schemaVersion']==RECEIPT_SCHEMA_V2
+                and self.review._current_candidate_record(receipt['workspaceRef'],receipt['productionRunRef'],
+                    candidates[0]['candidateRef'],records=records) is None):
+            raise StaleInputError('manifest v2 input Candidate is no longer current')
         return {'inputArtifactReceipt':receipt,'candidate':candidates[0],'technicalValidation':validations[0],
             'idempotentReplay':replay,'publicationAllowed':False}
 
@@ -278,56 +411,79 @@ class MethodAwareInputAssetService:
         command=self._command(command,INTAKE_FIELDS)
         if isinstance(self.artifact_evidence,RejectingMethodAwareInputArtifactEvidence):
             raise MethodAwareInputAssetError('method_aware_input_artifact_unavailable')
-        scope,plan,requirement=self._current(command)
+        scope,plan,requirement,root=self._current(command)
         head=self.evidence.record_journal_head(scope['workspaceRef'],scope['productionRunRef'])
         request_digest=self._key(command,RECEIPT_KIND);artifact=self._artifact(command,requirement)
+        context=self._authority_context(command,scope,plan,requirement,root,artifact,'TECHNICAL_INPUT_INTAKE')
+        is_v2=self._is_manifest_v2(root);receipt_version=2 if is_v2 else 1
         identity=_digest({**scope,**{k:command[k] for k in PLAN_FIELDS},'stagedArtifactRef':command['stagedArtifactRef'],'stagedArtifactDigest':command['stagedArtifactDigest']})[:40]
         receipt_ref='input-artifact-'+identity
-        existing=self.evidence.get_record(scope['workspaceRef'],scope['productionRunRef'],receipt_ref,1)
+        existing=self.evidence.get_record(scope['workspaceRef'],scope['productionRunRef'],receipt_ref,receipt_version)
         if existing is not None:
             response=self._intake_response(existing,True)
             if response['inputArtifactReceipt']['artifact']!=artifact:raise MethodAwareInputAssetError('method_aware_input_candidate_conflict')
+            if is_v2:self._authority_for_receipt(response['inputArtifactReceipt'],'TECHNICAL_INPUT_INTAKE')
             return response
         created=self.planning._clock()
-        receipt=self._record(RECEIPT_KIND,receipt_ref,command['idempotencyKey'],{'schemaVersion':RECEIPT_SCHEMA,
+        authority_record=None
+        if is_v2:
+            if not isinstance(context,VerifiedInputAppendAuthority):
+                raise ExecutionNotAuthorizedError('manifest v2 technical input append authority is required')
+            authority_payload=context.evidence_payload(created_at=created)
+            authority_record=self._record(INPUT_APPEND_AUTHORITY_KIND,
+                context.input_append_authority_ref,command['idempotencyKey']+':authority',
+                {k:v for k,v in authority_payload.items() if k!='payloadDigest'})
+        receipt_payload={'schemaVersion':RECEIPT_SCHEMA_V2 if is_v2 else RECEIPT_SCHEMA,
             **scope,**{k:command[k] if k in PLAN_FIELDS else requirement[k] for k in LINEAGE_FIELDS},
-            'inputArtifactReceiptRef':receipt_ref,'version':1,'inputRole':INPUT_ROLE,
+            'inputArtifactReceiptRef':receipt_ref,'version':receipt_version,'inputRole':INPUT_ROLE,
             'inputRequirementKey':'action-ready-anchor:'+requirement['visualExecutionRequirementRef'],
             'stagedArtifactRef':command['stagedArtifactRef'],'stagedArtifactDigest':command['stagedArtifactDigest'],
             'artifact':artifact,'authorityState':'TECHNICAL_EVIDENCE_ONLY','providerProcessingAuthorized':False,
-            'publicationAllowed':False,'createdAt':created},request_digest)
+            'publicationAllowed':False,'createdAt':created}
+        if authority_record is not None:
+            receipt_payload.update({'inputAppendAuthorityRef':authority_record.recordRef,
+                'inputAppendAuthorityDigest':authority_record.payloadDigest})
+        receipt=self._record(RECEIPT_KIND,receipt_ref,command['idempotencyKey'],receipt_payload,
+            request_digest,version=receipt_version)
         validate_receipt(receipt.payload)
         candidate=self.review.prepare_candidate_record({**scope,'candidateRef':'input-candidate-'+identity,
             'idempotencyKey':command['idempotencyKey']+':candidate','revisionRef':receipt_ref,'mediaKind':'IMAGE',
             'slotRef':requirement['creativeShotVersionRef'],'sourceRequestRef':requirement['visualExecutionRequirementRef'],
             'sourceRequestDigest':requirement['payloadDigest'],'artifactRef':artifact['stagedArtifactRef'],
             'artifactDigest':artifact['contentDigest'],'artifactByteSize':artifact['byteSize'],'storageKey':artifact['storageKey'],
-            'provenance':'IMPORTED','sourceAssetVersions':[]})
+            'provenance':'IMPORTED','sourceAssetVersions':[]},input_append_context=context)
         validation=self.review.prepare_technical_validation_record({**scope,'idempotencyKey':command['idempotencyKey']+':validation',
             'candidateRef':candidate.recordRef,'candidateVersion':1,'candidateDigest':candidate.payloadDigest,
             'technicalValidationRef':'input-validation-'+identity,'validatorRef':VALIDATOR_REF,'result':'PASS',
-            'checks':[{'check':name,'passed':True} for name in CHECKS]},candidate_record=candidate)
+            'checks':[{'check':name,'passed':True} for name in CHECKS]},candidate_record=candidate,
+            input_append_context=context)
         validate_candidate_chain(receipt.payload,candidate.payload,validation.payload)
         self._current(command)
+        batch=(receipt,candidate,validation) if authority_record is None else (authority_record,receipt,candidate,validation)
         try:
-            stored,replay=self.evidence.append_records((receipt,candidate,validation),expected_record_journal_head=head)
+            stored,replay=self.evidence.append_records(batch,expected_record_journal_head=head)
         except (StaleInputError,IdempotencyConflictError):
-            existing=self.evidence.get_record(scope['workspaceRef'],scope['productionRunRef'],receipt_ref,1)
+            existing=self.evidence.get_record(scope['workspaceRef'],scope['productionRunRef'],receipt_ref,receipt_version)
             if existing is None:raise
             self._key(command,RECEIPT_KIND)
-            return self._intake_response(existing,True)
-        return self._intake_response(stored[0],replay)
+            response=self._intake_response(existing,True)
+            if is_v2:self._authority_for_receipt(response['inputArtifactReceipt'],'TECHNICAL_INPUT_INTAKE')
+            return response
+        receipt_record=stored[0] if authority_record is None else stored[1]
+        return self._intake_response(receipt_record,replay)
 
-    def _selection_chain(self,selection,workspace,run_ref):
+    def _selection_chain(self,selection,workspace,run_ref,operation='INPUT_ADMISSION'):
         records=self.evidence.list_records(workspace,run_ref)
         candidate=exact_record(records,CANDIDATE,selection['candidateRef'],selection['candidateDigest'],selection['candidateVersion'])
-        receipt=validate_receipt(exact_record(records,RECEIPT_KIND,candidate['revisionRef']))
+        receipt=validate_receipt(exact_record(records,RECEIPT_KIND,candidate['revisionRef'],version=None))
+        validate_receipt_authority(receipt,records)
         qc=exact_record(records,SEMANTIC_VISUAL_QC,selection['visualQcRef'],selection['visualQcDigest'],selection['visualQcVersion'])
         validation=exact_record(records,TECHNICAL_VALIDATION,qc['technicalValidationRef'],qc['technicalValidationDigest'],qc['technicalValidationVersion'])
         validate_candidate_chain(receipt,candidate,validation)
         command={**{k:receipt[k] for k in SCOPE_FIELDS|PLAN_FIELDS},'stagedArtifactRef':receipt['stagedArtifactRef'],'stagedArtifactDigest':receipt['stagedArtifactDigest']}
-        _,_,requirement=self._current(command)
+        _,_,requirement,_=self._current(command)
         if self._artifact(command,requirement)!=receipt['artifact']:raise MethodAwareInputAssetError()
+        self._authority_for_receipt(receipt,operation)
         current_qc=self.review._applicable_visual_qc(workspace,run_ref,candidate['candidateRef'])
         if (selection['decision']!='SELECTED' or qc['result']!='PASS' or selection['publicationAllowed'] is not False
                 or qc['publicationAllowed'] is not False or current_qc is None or current_qc[0]['payloadDigest']!=qc['payloadDigest']
@@ -349,10 +505,96 @@ class MethodAwareInputAssetService:
     def verify_standalone_selection(self,item):
         candidate=self.evidence.get_record(item.workspaceRef,item.productionRunRef,item.payload['candidateRef'],item.payload['candidateVersion'])
         if candidate is None:return False
-        receipt=self.evidence.get_record(item.workspaceRef,item.productionRunRef,candidate['payload']['revisionRef'],1)
-        if receipt is None or receipt['recordKind']!=RECEIPT_KIND:return False
-        self._selection_chain(dict(item.payload),item.workspaceRef,item.productionRunRef)
+        receipts=[record for record in self.evidence.list_records(item.workspaceRef,item.productionRunRef,
+            record_kind=RECEIPT_KIND) if record['recordRef']==candidate['payload']['revisionRef']]
+        if len(receipts)!=1:return False
+        self._selection_chain(dict(item.payload),item.workspaceRef,item.productionRunRef,'HUMAN_SELECTION')
         return True
+
+    def _receipt_for_validation(self,workspace,run_ref,validation_ref,validation_version,validation_digest):
+        records=self.evidence.list_records(workspace,run_ref)
+        matches=[record for record in records if record['recordKind']==TECHNICAL_VALIDATION
+            and record['recordRef']==validation_ref and record['recordVersion']==validation_version
+            and record['payloadDigest']==validation_digest]
+        if len(matches)!=1:return None
+        validation=record_payload(matches[0],TECHNICAL_VALIDATION)
+        candidates=[record for record in records if record['recordKind']==CANDIDATE
+            and record['recordRef']==validation.get('candidateRef')
+            and record['recordVersion']==validation.get('candidateVersion')
+            and record['payloadDigest']==validation.get('candidateDigest')]
+        if len(candidates)!=1:return None
+        candidate=record_payload(candidates[0],CANDIDATE)
+        if self.review._current_candidate_record(workspace,run_ref,candidate['candidateRef'],records=records) is None:return None
+        receipts=[record for record in records if record['recordKind']==RECEIPT_KIND
+            and record['recordRef']==candidate.get('revisionRef')]
+        if len(receipts)!=1:return None
+        receipt=validate_receipt(record_payload(receipts[0],RECEIPT_KIND))
+        validate_candidate_chain(receipt,candidate,validation)
+        return receipt
+
+    def _review_context(self,command,operation):
+        if not isinstance(command,Mapping):return None
+        workspace=command.get('workspaceRef');run_ref=command.get('productionRunRef')
+        try:root=self.review.root_service.get_run(workspace,run_ref)
+        except (EpisodeProductionError,TypeError,ValueError):return None
+        if not self._is_manifest_v2(root):return None
+        receipt=None
+        if operation=='SEMANTIC_VISUAL_QC':
+            receipt=self._receipt_for_validation(workspace,run_ref,command.get('technicalValidationRef'),
+                command.get('technicalValidationVersion'),command.get('technicalValidationDigest'))
+        elif operation=='HUMAN_SELECTION':
+            records=self.evidence.list_records(workspace,run_ref)
+            qcs=[record for record in records if record['recordKind']==SEMANTIC_VISUAL_QC
+                and record['recordRef']==command.get('visualQcRef')
+                and record['recordVersion']==command.get('visualQcVersion')
+                and record['payloadDigest']==command.get('visualQcDigest')]
+            if len(qcs)==1:
+                qc=record_payload(qcs[0],SEMANTIC_VISUAL_QC)
+                receipt=self._receipt_for_validation(workspace,run_ref,qc.get('technicalValidationRef'),
+                    qc.get('technicalValidationVersion'),qc.get('technicalValidationDigest'))
+        if receipt is None:return None
+        return self._authority_for_receipt(receipt,operation)
+
+    def record_semantic_visual_qc(self,command):
+        context=self._review_context(command,'SEMANTIC_VISUAL_QC')
+        return self.review.record_semantic_visual_qc(command,input_append_context=context)
+
+    def record_human_selection(self,command):
+        context=self._review_context(command,'HUMAN_SELECTION')
+        return self.review.record_human_selection(command,input_append_context=context)
+
+    def create_input_plan(self,command):
+        if not isinstance(command,Mapping):
+            return self.planning.create_input_plan(command)
+        workspace=command.get('workspaceRef');run_ref=command.get('productionRunRef')
+        try:root=self.review.root_service.get_run(workspace,run_ref)
+        except (EpisodeProductionError,TypeError,ValueError):
+            return self.planning.create_input_plan(command)
+        if not self._is_manifest_v2(root):return self.planning.create_input_plan(command)
+        records=self.evidence.list_records(workspace,run_ref);contexts=[]
+        bindings=command.get('assetBindings')
+        if not isinstance(bindings,list) or not bindings:
+            raise ExecutionNotAuthorizedError('manifest v2 technical input append authority is required')
+        for binding in bindings:
+            if not isinstance(binding,Mapping):
+                raise ExecutionNotAuthorizedError('manifest v2 technical input append authority is required')
+            assets=[record for record in records if record['recordKind']==ASSET_VERSION
+                and record['recordRef']==binding.get('assetVersionRef')
+                and record['payloadDigest']==binding.get('assetVersionDigest')]
+            if len(assets)!=1:
+                raise ExecutionNotAuthorizedError('manifest v2 authorized input AssetVersion is required')
+            asset=validate_asset_version(record_payload(assets[0],ASSET_VERSION),records=records,
+                workspace_ref=workspace,run_ref=run_ref,root=root)
+            receipt=validate_receipt(exact_record(records,RECEIPT_KIND,
+                asset['sourceArtifactReceiptRef'],asset['sourceArtifactReceiptDigest'],version=None))
+            if (receipt['schemaVersion']!=RECEIPT_SCHEMA_V2
+                    or binding.get('visualExecutionRequirementRef')!=receipt['visualExecutionRequirementRef']
+                    or binding.get('inputRequirementKey')!=receipt['inputRequirementKey']
+                    or binding.get('inputRole')!=receipt['inputRole']
+                    or command.get('executionMethodPlanVersionRef')!=receipt['executionMethodPlanVersionRef']):
+                raise ExecutionNotAuthorizedError('manifest v2 authorized input binding changed')
+            contexts.append(self._authority_for_receipt(receipt,'METHOD_AWARE_INPUT_PLAN'))
+        return self.planning.create_input_plan(command,input_append_contexts=tuple(contexts))
 
     def _admission_response(self,record,replay):
         admission=checked(record_payload(record,ASSET_ADMISSION),ADMISSION_FIELDS)
@@ -367,12 +609,12 @@ class MethodAwareInputAssetService:
         command=self._command(command,ADMIT_FIELDS)
         if isinstance(self.artifact_evidence,RejectingMethodAwareInputArtifactEvidence):
             raise MethodAwareInputAssetError('method_aware_input_artifact_unavailable')
-        scope,plan,requirement=self._current(command)
+        scope,plan,requirement,root=self._current(command)
         workspace,run_ref=scope['workspaceRef'],scope['productionRunRef']
         head=self.evidence.record_journal_head(workspace,run_ref);request_digest=self._key(command,ASSET_ADMISSION)
         records=self.evidence.list_records(workspace,run_ref)
         selection=exact_record(records,HUMAN_SELECTION,command['humanSelectionRef'],command['humanSelectionDigest'],command['humanSelectionVersion'])
-        receipt,candidate,validation,qc=self._selection_chain(selection,workspace,run_ref)
+        receipt,candidate,validation,qc=self._selection_chain(selection,workspace,run_ref,'INPUT_ADMISSION')
         if any(command[k]!=receipt[k] for k in SCOPE_FIELDS|PLAN_FIELDS):raise MethodAwareInputAssetError('method_aware_input_requirement_stale')
         existing=[r for r in records if r['recordKind']==ASSET_ADMISSION and r['payload'].get('schemaVersion')==ADMISSION_SCHEMA
             and r['payload'].get('visualExecutionRequirementRef')==command['visualExecutionRequirementRef'] and r['payload'].get('inputRole')==INPUT_ROLE]

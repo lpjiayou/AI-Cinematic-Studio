@@ -26,6 +26,7 @@ from .foundation import (
     _positive_int,
     _required_ref,
 )
+from .input_append_authority import VerifiedInputAppendAuthority
 
 
 CANDIDATE = "Candidate"
@@ -605,7 +606,13 @@ class K2MediaCandidateReviewService:
             selection_authority or RejectingMediaSelectionApprovalAuthority()
         )
 
-    def _scope(self, command: Mapping[str, Any]) -> tuple[str, str, str]:
+    def _scope(
+        self,
+        command: Mapping[str, Any],
+        *,
+        input_append_context: VerifiedInputAppendAuthority | None = None,
+        input_append_operation: str | None = None,
+    ) -> tuple[str, str, str]:
         workspace = _required_ref(command.get("workspaceRef"), "workspaceRef")
         run_ref = _required_ref(
             command.get("productionRunRef"), "productionRunRef"
@@ -626,9 +633,20 @@ class K2MediaCandidateReviewService:
                 raise StaleInputError(
                     "v2 production run safety boundary is inconsistent"
                 )
-            raise ExecutionNotAuthorizedError(
-                "v2 production run is preflight-only and not eligible for review"
-            )
+            if (
+                not isinstance(
+                    input_append_context, VerifiedInputAppendAuthority
+                )
+                or input_append_operation is None
+                or not input_append_context.matches_run(
+                    workspace_ref=workspace,
+                    production_run_ref=run_ref,
+                    operation=input_append_operation,
+                )
+            ):
+                raise ExecutionNotAuthorizedError(
+                    "v2 production run is preflight-only and not eligible for review"
+                )
         return workspace, run_ref, key
 
     def _exact(
@@ -652,7 +670,12 @@ class K2MediaCandidateReviewService:
             raise StaleInputError(f"{kind} evidence changed")
         return record, _payload(record)
 
-    def prepare_candidate_record(self, command: Mapping[str, Any]) -> EvidenceRecord:
+    def prepare_candidate_record(
+        self,
+        command: Mapping[str, Any],
+        *,
+        input_append_context: VerifiedInputAppendAuthority | None = None,
+    ) -> EvidenceRecord:
         """Validate and seal a Candidate without mutating the journal.
 
         Trusted V4 handoff services use this to commit Candidate and
@@ -661,7 +684,11 @@ class K2MediaCandidateReviewService:
         appends the prepared record.
         """
 
-        workspace, run_ref, key = self._scope(command)
+        workspace, run_ref, key = self._scope(
+            command,
+            input_append_context=input_append_context,
+            input_append_operation="TECHNICAL_INPUT_INTAKE",
+        )
         root = self.root_service.get_run(workspace, run_ref)
         root_digest = _digest_value(root.get("payloadDigest"), "rootPayloadDigest")
         candidate_ref = _required_ref(command.get("candidateRef"), "candidateRef")
@@ -776,6 +803,12 @@ class K2MediaCandidateReviewService:
         if "sourceCandidateRef" in command:
             payload["sourceCandidateRef"] = _required_ref(
                 command.get("sourceCandidateRef"), "sourceCandidateRef"
+            )
+        if input_append_context is not None and not (
+            input_append_context.matches_input_candidate(payload)
+        ):
+            raise ExecutionNotAuthorizedError(
+                "input append authority does not match Candidate lineage"
             )
         item = _record(
             workspace_ref=workspace,
@@ -1066,8 +1099,13 @@ class K2MediaCandidateReviewService:
         command: Mapping[str, Any],
         *,
         candidate_record: EvidenceRecord | None = None,
+        input_append_context: VerifiedInputAppendAuthority | None = None,
     ) -> EvidenceRecord:
-        workspace, run_ref, key = self._scope(command)
+        workspace, run_ref, key = self._scope(
+            command,
+            input_append_context=input_append_context,
+            input_append_operation="TECHNICAL_INPUT_INTAKE",
+        )
         if candidate_record is None:
             candidate, candidate_payload = self._exact(
                 workspace,
@@ -1096,6 +1134,12 @@ class K2MediaCandidateReviewService:
                 "payloadDigest": candidate_record.payloadDigest,
             }
             candidate_payload = deepcopy(dict(candidate_record.payload))
+        if input_append_context is not None and not (
+            input_append_context.matches_input_candidate(candidate_payload)
+        ):
+            raise ExecutionNotAuthorizedError(
+                "input append authority does not match Candidate lineage"
+            )
         result = _enum(command.get("result"), "result", {"PASS", "FAIL"})
         checks = command.get("checks")
         if not isinstance(checks, list) or not checks:
@@ -1154,7 +1198,10 @@ class K2MediaCandidateReviewService:
         return {"technicalValidation": _payload(stored), "idempotentReplay": replayed}
 
     def record_semantic_visual_qc(
-        self, command: Mapping[str, Any]
+        self,
+        command: Mapping[str, Any],
+        *,
+        input_append_context: VerifiedInputAppendAuthority | None = None,
     ) -> dict[str, Any]:
         required_fields = {
             "workspaceRef",
@@ -1176,7 +1223,11 @@ class K2MediaCandidateReviewService:
             raise CandidateLifecycleError(
                 "semantic visual QC command fields are invalid"
             )
-        workspace, run_ref, key = self._scope(command)
+        workspace, run_ref, key = self._scope(
+            command,
+            input_append_context=input_append_context,
+            input_append_operation="SEMANTIC_VISUAL_QC",
+        )
         if command.get("reviewProfile") != VISUAL_QC_PROFILE["assessmentProfileRef"]:
             raise CandidateLifecycleError("semantic visual QC profile is invalid")
         validation_ref = _required_ref(
@@ -1443,7 +1494,10 @@ class K2MediaCandidateReviewService:
         return {"semanticVisualQc": _payload(stored), "idempotentReplay": replayed}
 
     def prepare_human_selection_record(
-        self, command: Mapping[str, Any]
+        self,
+        command: Mapping[str, Any],
+        *,
+        input_append_context: VerifiedInputAppendAuthority | None = None,
     ) -> EvidenceRecord:
         """Verify authority and seal a selection without writing it.
 
@@ -1466,7 +1520,11 @@ class K2MediaCandidateReviewService:
         }
         if not isinstance(command, Mapping) or set(command) != required_fields:
             raise CandidateLifecycleError("human selection command fields are invalid")
-        workspace, run_ref, key = self._scope(command)
+        workspace, run_ref, key = self._scope(
+            command,
+            input_append_context=input_append_context,
+            input_append_operation="HUMAN_SELECTION",
+        )
         qc_ref = _required_ref(command.get("visualQcRef"), "visualQcRef")
         qc_version = _positive_int(
             command.get("visualQcVersion"),
@@ -1665,7 +1723,12 @@ class K2MediaCandidateReviewService:
         )
         return item
 
-    def record_human_selection(self, command: Mapping[str, Any]) -> dict[str, Any]:
+    def record_human_selection(
+        self,
+        command: Mapping[str, Any],
+        *,
+        input_append_context: VerifiedInputAppendAuthority | None = None,
+    ) -> dict[str, Any]:
         workspace = _required_ref(command.get("workspaceRef"), "workspaceRef")
         run_ref = _required_ref(
             command.get("productionRunRef"), "productionRunRef"
@@ -1673,7 +1736,9 @@ class K2MediaCandidateReviewService:
         expected_record_journal_head = self.evidence.record_journal_head(
             workspace, run_ref
         )
-        item = self.prepare_human_selection_record(command)
+        item = self.prepare_human_selection_record(
+            command, input_append_context=input_append_context
+        )
         if item.payload.get("decision") == "SELECTED" and not (
             callable(self.input_selection_validator) and self.input_selection_validator(item)
         ):

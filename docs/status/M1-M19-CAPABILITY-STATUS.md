@@ -2,7 +2,7 @@
 
 Status: `CURRENT / SIX-DIMENSIONAL / FAIL-CLOSED`
 
-Reviewed: `2026-09-07`
+Reviewed: `2026-09-08`
 
 ## 1. Reading rules
 
@@ -25,7 +25,7 @@ only its accepted base backend.
 | M7 | `ADR_0019_ACCEPTED` | `IMPLEMENTED_NARRATIVE_CURRENTNESS_PUBLIC_HTTP` | `SQLITE_RESTART_VERIFIED` | `ADAPTER_COMPATIBLE_NO_DEDICATED_SURFACE` | `IMPLEMENTED_BOUNDED` | `NOT_AUTHORIZED` |
 | M8 | `ADR_0019_ACCEPTED` | `IMPLEMENTED_ACTION_EXECUTION_BEATS_V2_PUBLIC_CUTOVER` | `SQLITE_RESTART_VERIFIED` | `LEGACY_HISTORY_GATE_COMPATIBLE_METHOD_AWARE_UI_INCOMPLETE` | `IMPLEMENTED_BOUNDED` | `NOT_AUTHORIZED` |
 | M9 | `ADR_0019_ACCEPTED` | `IMPLEMENTED_THREE_AXIS_REQUIREMENTS_LEGACY_G4_WRITE_FROZEN` | `SQLITE_RESTART_VERIFIED` | `LEGACY_HISTORY_GATE_COMPATIBLE_METHOD_AWARE_UI_INCOMPLETE` | `IMPLEMENTED_BOUNDED` | `NOT_AUTHORIZED` |
-| M10 | `ADR_0019_ACCEPTED` | `IMPLEMENTED_METHOD_AWARE_INPUT_PLANNING_PUBLIC_ROUTE` | `SQLITE_RESTART_VERIFIED_NO_MODEL_CALL` | `BEHAVIOR_PIN_COMPATIBLE_METHOD_AWARE_UI_INCOMPLETE` | `IMPLEMENTED_BOUNDED` | `NOT_AUTHORIZED` |
+| M10 | `ADR_0019_0021_ACCEPTED` | `IMPLEMENTED_METHOD_AWARE_INPUT_PLANNING_AND_EXACT_MANIFEST_V2_TECHNICAL_APPEND` | `SQLITE_RESTART_VERIFIED_NO_MODEL_CALL` | `BEHAVIOR_PIN_COMPATIBLE_METHOD_AWARE_UI_INCOMPLETE` | `IMPLEMENTED_BOUNDED` | `NOT_AUTHORIZED` |
 | M11 | `ADR_0019_ACCEPTED_FAIL_CLOSED_METHOD_BOUNDARY` | `IMPLEMENTED_CLOSED_METHOD_ROUTING_LEGACY_G5_WRITE_FROZEN` | `WAN_MICRO_QUEUE_ONLY_CONTACT_GAIT_UNAVAILABLE` | `BEHAVIOR_PIN_COMPATIBLE_METHOD_AWARE_UI_INCOMPLETE` | `IMPLEMENTED_BOUNDED_HISTORICAL_QC_FAILURE_PRESERVED` | `NOT_AUTHORIZED` |
 | M12 | `ADR_0015_0020_ACCEPTED_DEDICATED_CPU_VM_SELECTION_HOLD` | `EXPLICIT_M9_REQUIREMENT_BRIDGE_IMPLEMENTED` | `A100_AND_WSL2_BUILD_HOST_PREFLIGHTS_FAILED_HOST_UNSELECTED` | `V1_ADAPTER_COMPATIBLE_BEHAVIOR_PINNED` | `NOT_COMPLETE` | `NOT_AUTHORIZED` |
 | M13 | `BASE_ACCEPTED` | `BASE_BACKEND_COMPLETE_RENDER_CANDIDATE_PROJECTED` | `DETERMINISTIC_CPU_VERIFIED` | `PIN_ONLY_PRODUCT_SURFACE_INCOMPLETE` | `NOT_COMPLETE` | `NOT_AUTHORIZED` |
@@ -51,6 +51,7 @@ M8_ACTION_EXECUTION_BEATS=IMPLEMENTED
 M8_EXECUTION_CLASS=IMPLEMENTED
 M9_THREE_AXIS_REQUIREMENTS=IMPLEMENTED
 M10_METHOD_AWARE_PLANNING=IMPLEMENTED
+M10_MANIFEST_V2_TECHNICAL_INPUT_APPEND=IMPLEMENTED_BOUNDED
 M11_METHOD_CAPABILITY_BOUNDARY=IMPLEMENTED
 M9_M12_AUDIO_BRIDGE=IMPLEMENTED
 K2_METHOD_AWARE_PUBLIC_CUTOVER=PASS
@@ -102,8 +103,8 @@ database was created.
 | M6 | ADR-0003/0004/0005/0019 | #55 and #59 | production authority absent | upstream prerequisite closed |
 | M7 | ADR-0019 | #55 and #59 | no automatic rewrite or WARN waiver | upstream prerequisite closed |
 | M8–M9 | ADR-0019 | #56, #58, #63 and #64; Frontend #25 | live asset production/admission not authorized | method-aware successor required |
-| M10 | ADR-0019 | #57/#63/#64, E1 neutral worker seam, E2 current source/result binding, E3A single-image intake/admission and E3G input-only environment composition | R6 valid prefix quarantined; live execution absent; Frontend separate | preserved-prefix compatibility check and explicit R6 resume authorization |
-| M11 | ADR-0019 | E1 exact worker, E2 verified result/status and E3G unavailable-backend separation after READY input | live runtime/cost absent; Contact/Gait unavailable; no R6 resume | preserved-prefix compatibility check and explicit R6 resume authorization |
+| M10 | ADR-0019, ADR-0021 | #57/#63/#64, E1 neutral worker seam, E2 current source/result binding, E3A v1 intake/admission, E3G input-only composition and E3H exact manifest-v2 technical-input append | R6 valid prefix quarantined and has no E3H grant; live execution absent; Frontend separate | exact R6 subject issuance and preserved-prefix resume under separate authorization |
+| M11 | ADR-0019, ADR-0021 | E1 exact worker, E2 verified result/status, E3G unavailable-backend separation and E3H manifest-v2 pre-route execution rejection | live runtime/cost absent; Contact/Gait unavailable; no R6 resume | exact R6 subject issuance and preserved-prefix resume under separate authorization; M11 remains blocked |
 | M12 | ADR-0015, ADR-0019, ADR-0020 | #20/#21, #58/#63/#64; A100 evidence `93c1c96d…a1ce`; WSL2 evidence `801e4e8c…7ed`; dedicated VM specification | WSL2 rejected for this wave; dedicated CPU VM/provider unselected; A100 C4 isolation unproven; Runtime G0 incomplete | `ACS-M12-C3-DEDICATED-LINUX-CPU-VM-PROVIDER-SELECTION-AND-PREFLIGHT` |
 | M13 | ADR-0016/0017/0018/0019 | immutable base tag, #48/#63/#64; Frontend #25 | product surface, M14/M15 and publication incomplete | Extension G0 requires separate authorization |
 | M14–M19 | System Master Plan and applicable M13 boundary | no authorized implementation | prerequisite and authority gates absent | no current implementation authority |
@@ -238,3 +239,5 @@ The [M5/M7 E3E receipt](M5_M7_LEGAL_ENTRYPOINT_CLOSURE_E3E_2026-09-07.md) record
 The [M3 E3F receipt](M3_SCRIPT_GENERATION_AND_CONFIRMATION_RECOVERY_E3F_2026-09-07.md) records the new keyed generation recovery contract: committed reservation, RESULT_READY persistence, atomic Script/domain-completion association and exact completed-command replay. `M3_GENERATION_RECOVERY=IMPLEMENTED_AND_VERIFIED`, `M3_CONFIRMATION_STABILITY=IMPLEMENTED_AND_VERIFIED`. Guarded same-target confirmation performs no business writes; switching the confirmed target requires current root CAS. Unkeyed exact receipt replay and arbitrary historical confirmation reconstruction are not guaranteed; uncertain PENDING generation never automatically resubmits. The optional application DDL is additive, Script/Lifecycle/M6 domain schemas are unchanged, and Frontend switch CAS is not wired in this task. `M5_CONFIRM_VERSION_HISTORICAL_RECEIPT=UNPROVEN_CONTRACT_DECISION_PENDING`; E3F tests did not prove live lineage.
 
 The [E3G receipt](M10_INPUT_ARTIFACT_EXECUTION_CONFIG_DECOUPLING_E3G_2026-09-08.md) records the exact input/execution configuration partition. Complete E3A input configuration now starts the real environment factory without registry, credential, runtime or model configuration while retaining the genuine unavailable adapter/resolver. Isolated authenticated HTTP/SQLite tests reach one READY input, then reject video routing at the backend boundary with zero Route/Job/Attempt/Adapter/Provider delta; exact replay and a new Python process preserve CURRENT input facts. Partial or unknown execution configuration, invalid input authority and worker CLI registry requirements remain fail closed. `METHOD_AWARE_INPUT_EXECUTION_CONFIG_DECOUPLING_E3G=IMPLEMENTED_AND_VERIFIED`, `SPIKE_0_ELIGIBLE_LINEAGE_E3=BLOCKED_PENDING_RESUME`, `SPIKE_0_READINESS=BLOCKED`, `SPIKE_0_EXECUTED=false`, `R6_RESUMED=false`. The next task is `E3_R6_VALID_PREFIX_COMPATIBILITY_CHECK_AND_EXPLICIT_RESUME` under separate authorization.
+
+The [E3H receipt](M10_MANIFEST_V2_TECHNICAL_INPUT_APPEND_AUTHORITY_E3H_2026-09-08.md) records ADR-0021's exact manifest-v2 technical-input exception. A server-derived current subject and digest-pinned operator grant permit only receipt v2 → IMAGE Candidate → TechnicalValidation → QC → external HumanSelection → Admission/AssetVersion → InputPlan. Default v2 rejection, legacy/video isolation and all four manifest safety flags remain unchanged. Authenticated HTTP/SQLite, fault rollback, concurrency and fresh-process removal tests prove zero Route/Job/Attempt/adapter/provider work. `M10_MANIFEST_V2_TECHNICAL_INPUT_APPEND_E3H=IMPLEMENTED_AND_VERIFIED`, but no R6 grant was issued and `R6_RESUMED=false`; the next legal task is `E3_R6_V2_INPUT_AUTHORITY_ISSUANCE_AND_PRESERVED_PREFIX_RESUME` under separate authorization.
