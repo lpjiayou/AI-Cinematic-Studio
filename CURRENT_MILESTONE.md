@@ -107,7 +107,6 @@ M13_PRODUCT_CAPABILITY_COMPLETE=false
 ```
 
 ## 4. Repository and CI governance
-
 ```text
 DOCUMENT_GOVERNANCE_VALIDATION=IMPLEMENTED
 DOCS_ONLY_CI_FAST_PATH=IMPLEMENTED
@@ -128,14 +127,14 @@ A100_FUTURE_START_AUTHORIZED=false
 A100_GPU_EXECUTION_AUTHORIZED=false
 GPU_CALLS_ALLOWED=false
 PROVIDER_CALLS_ALLOWED=false
-ASSET_ADMISSION_ALLOWED=false
+OUTPUT_ASSET_ADMISSION_ALLOWED=false
 PUBLICATION_ALLOWED=false
 M14_M15_IMPLEMENTATION=NOT_AUTHORIZED
 GPU_OR_PROVIDER_CALLS=0
 COMFYUI_START_COUNT=0
 PROMPT_POST_COUNT=0
-ASSET_ADMISSION=0
-LIVE_CANONICAL_MUTATIONS=0
+TECHNICAL_INPUT_ASSET_ADMISSION_COUNT=1
+OUTPUT_ASSET_ADMISSION_COUNT=0
 EPISODE_MASTER_CREATED=0
 EXPORT_ARTIFACT_CREATED=0
 SECOND_AUTHORITY_DATABASE_OR_QUEUE_CREATED=false
@@ -176,15 +175,16 @@ M3_GENERATION_RECOVERY=IMPLEMENTED_AND_VERIFIED
 M3_CONFIRMATION_STABILITY=IMPLEMENTED_AND_VERIFIED
 M5_CONFIRM_VERSION_HISTORICAL_RECEIPT=UNPROVEN_CONTRACT_DECISION_PENDING
 SPIKE_0_EXECUTED=false
-R6_RESUMED=false
-SPIKE_0_ELIGIBLE_LINEAGE_E3=BLOCKED_PENDING_RESUME
+R6_RESUMED=true
+SPIKE_0_ELIGIBLE_LINEAGE_E3=PREPARED_AND_VERIFIED
+LINEAGE_READINESS=READY_FOR_A100_RUNTIME_AND_COST_PREFLIGHT
 SPIKE_0_READINESS=BLOCKED
+E4_STARTED=false
 METHOD_AWARE_INPUT_CONFIG_E3G_AND_MANIFEST_V2_APPEND_E3H=IMPLEMENTED_AND_VERIFIED
 SUPERSEDED_VALIDATOR_M12_G0_3_STATE=ENVIRONMENT_HOLD
 SUPERSEDED_VALIDATOR_NEXT_TASK=LOCAL_WSL2_HANDOFF_AND_M12_C3_PREFLIGHT
-SUPERSEDED_VALIDATOR_TOKEN_GRANTS_AUTHORITY=false
 ```
-The [PR-B receipt](docs/status/CORE_SERIES_PLANNING_SCOPE_AND_CANDIDATE_BINDING_HARDENING_2026-09-05.md), [Project foundation receipt](docs/status/CORE_RECOVERABLE_PROJECT_FOUNDATION_COMMAND_2026-09-05.md), [clean-state public E2E receipt](docs/status/CORE_CLEAN_STATE_PUBLIC_API_E2E_2026-09-06.md), [E1 worker receipt](docs/status/M10_M11_METHOD_AWARE_WORKER_SEAM_CORRECTIVE_E1_2026-09-06.md), [E2 result receipt](docs/status/M10_M11_METHOD_AWARE_JOB_RESULT_INTAKE_CORRECTIVE_E2_2026-09-06.md), [E3A input receipt](docs/status/M10_METHOD_AWARE_SINGLE_INPUT_IMAGE_ADMISSION_E3A_2026-09-06.md), E3B–E3F recovery receipts, [E3G separation receipt](docs/status/M10_INPUT_ARTIFACT_EXECUTION_CONFIG_DECOUPLING_E3G_2026-09-08.md) and [E3H authority receipt](docs/status/M10_MANIFEST_V2_TECHNICAL_INPUT_APPEND_AUTHORITY_E3H_2026-09-08.md) hold detailed evidence and non-authority boundaries. ADR-0021 permits only exact manifest-v2 technical-input append; Run/camera/dispatch/publication state stays blocked. The failed R6 request and valid prefix remain quarantined unchanged, no E3H authority was issued to them, and R6 was not resumed. The next task is `E3_R6_V2_INPUT_AUTHORITY_ISSUANCE_AND_PRESERVED_PREFIX_RESUME` under separate authorization. M12-C3/C4, A100, Provider/GPU and publication remain paused. Compatibility tokens grant no current authority.
+The prior receipts through [E3H](docs/status/M10_MANIFEST_V2_TECHNICAL_INPUT_APPEND_AUTHORITY_E3H_2026-09-08.md) preserve implementation evidence and non-authority boundaries. The [post-E3H R6 receipt](docs/status/M10_M11_SPIKE_0_ELIGIBLE_LINEAGE_E3_R6_POST_E3H_2026-09-08.md) records the separately authorized exact grant, authenticated input-only suffix, current/replay checks and verified transfer bundle. The old 409 failure remains unchanged; existing upstream facts received zero update/delete and zero new object/version. This prepares only the eligible technical input lineage: Run/camera/dispatch, A100, Provider/GPU, media execution and publication remain blocked. The next task is `ACS-M10-M11-SPIKE-0-A100-READ-ONLY-RUNTIME-AND-COST-PREFLIGHT-E4`; it grants no start or execution authority. Compatibility tokens grant no current authority.
 ## 7. Immutable history
 The former archived material remains byte-for-byte in [CURRENT_MILESTONE_HISTORY_THROUGH_2026-09-02.md](CURRENT_MILESTONE_HISTORY_THROUGH_2026-09-02.md).
 ```text

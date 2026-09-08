@@ -27,7 +27,7 @@ and historical evidence cannot authorize current execution.
 | `ACCEPTED_DECISION` | 20 | no |
 | `NORMATIVE_ARCHITECTURE` | 14 | no |
 | `NORMATIVE_CONTRACT` | 31 | no |
-| `CURRENT_STATUS` | 10 | yes |
+| `CURRENT_STATUS` | 11 | yes |
 | `CAPABILITY_MATRIX` | 1 | yes |
 | `OPERATIONAL_RUNBOOK` | 18 | no |
 | `IMPLEMENTATION_EVIDENCE` | 21 | no |
@@ -123,6 +123,7 @@ and historical evidence cannot authorize current execution.
 
 | Document | Status | Owner |
 | --- | --- | --- |
+| [`docs/status/M10_M11_SPIKE_0_ELIGIBLE_LINEAGE_E3_R6_POST_E3H_2026-09-08.md`](../status/M10_M11_SPIKE_0_ELIGIBLE_LINEAGE_E3_R6_POST_E3H_2026-09-08.md) | `CURRENT` | Project Lead / Core Architecture Owner / M10 Input Admission Owner / Spike-0 Evidence Custody Owner |
 | [`docs/status/M10_MANIFEST_V2_TECHNICAL_INPUT_APPEND_AUTHORITY_E3H_2026-09-08.md`](../status/M10_MANIFEST_V2_TECHNICAL_INPUT_APPEND_AUTHORITY_E3H_2026-09-08.md) | `CURRENT` | Project Lead / Core Architecture Owner / M10 Canonical Input Append Owner / Candidate Review and Admission Owner |
 | [`docs/status/M10_INPUT_ARTIFACT_EXECUTION_CONFIG_DECOUPLING_E3G_2026-09-08.md`](../status/M10_INPUT_ARTIFACT_EXECUTION_CONFIG_DECOUPLING_E3G_2026-09-08.md) | `CURRENT` | Project Lead / Core Architecture Owner / M10 Input Asset Owner / M11 Execution Configuration Owner |
 | [`docs/status/M5_M7_LEGAL_ENTRYPOINT_CLOSURE_E3E_2026-09-07.md`](../status/M5_M7_LEGAL_ENTRYPOINT_CLOSURE_E3E_2026-09-07.md) | `CURRENT` | Project Lead / M5 Binding Owner / M7 Narrative Validation Owner / Creator Public HTTP Owner |
