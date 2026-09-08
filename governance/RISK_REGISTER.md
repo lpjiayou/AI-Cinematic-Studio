@@ -288,3 +288,13 @@ This authority adds one receipt schema version and one journal record kind, but 
 DDL, database, queue, public route or client authority field. It does not migrate,
 issue authority to, mutate or resume the preserved R6 prefix. Provider processing,
 video result/output intake, execution, Master/Export and publication remain closed.
+
+## Spike-0 preserved-prefix exact input lineage R6 post-E3H
+
+| Risk | Consequence | Mitigation and gate | Owner / evidence |
+| --- | --- | --- | --- |
+| `R-M10-M11-LINEAGE-056` — treating one exact technical-input grant, a CURRENT input plan or a transferable staging bundle as Run, runtime, cost, dispatch or publication authority | Operators could bypass the remaining A100/runtime/camera gates, reuse controlled authority material for another subject, or falsely report a preflight-only Run as executable | Bind the single grant to the complete current R6 subject, one unchanged anchor and five input-only operations; retain independent HumanSelection; revalidate every write/replay; preserve the prior 409; permit zero upstream mutation and zero Route/Job/Attempt/provider work. Verify fresh-process replay and a secret-scanned digest-pinned transfer roundtrip. Keep `dispatchAllowed`, provider processing and publication false. `MITIGATED / ELIGIBLE_INPUT_LINEAGE_PREPARED / EXECUTION_BLOCKED`. | Project Lead / Core Architecture / M10 Input Admission / Spike-0 Evidence Custody Owners; [post-E3H R6 receipt](../docs/status/M10_M11_SPIKE_0_ELIGIBLE_LINEAGE_E3_R6_POST_E3H_2026-09-08.md) |
+
+The next gate may inspect A100 runtime availability and cost only under separate,
+read-only E4 authorization. It cannot start A100 or ComfyUI, route video, create a
+MediaJob or Attempt, invoke a Provider, or change the manifest execution contract.

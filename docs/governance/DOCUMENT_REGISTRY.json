@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "repository": "Core",
-  "reviewedBaseline": "1ce0c7a32624d8899e70c192d72755aeef600f2c",
+  "reviewedBaseline": "7081f9dbfbda2664f539a59e20b30f079d039dc4",
   "reviewedAt": "2026-09-08",
   "documentClasses": [
     "ACCEPTED_DECISION",
@@ -114,7 +114,7 @@
       "supersededBy": [],
       "currentStateClaimsAllowed": true,
       "historicalMutationPolicy": "UPDATE_FROM_MERGED_EVIDENCE_ONLY",
-      "lastReviewedBaseline": "1ce0c7a32624d8899e70c192d72755aeef600f2c",
+      "lastReviewedBaseline": "7081f9dbfbda2664f539a59e20b30f079d039dc4",
       "lastReviewedAt": "2026-09-08",
       "linkedFromIndex": true,
       "notes": "Current claims require merged evidence and may not override Accepted ADRs."
@@ -1563,7 +1563,7 @@
       "supersededBy": [],
       "currentStateClaimsAllowed": false,
       "historicalMutationPolicy": "REGENERATE_FROM_REVIEWED_INVENTORY",
-      "lastReviewedBaseline": "1ce0c7a32624d8899e70c192d72755aeef600f2c",
+      "lastReviewedBaseline": "7081f9dbfbda2664f539a59e20b30f079d039dc4",
       "lastReviewedAt": "2026-09-08",
       "linkedFromIndex": true,
       "notes": "Navigation/reference only; resolve authority through the linked source documents."
@@ -1707,7 +1707,7 @@
       "supersededBy": [],
       "currentStateClaimsAllowed": false,
       "historicalMutationPolicy": "REGENERATE_FROM_REVIEWED_INVENTORY",
-      "lastReviewedBaseline": "1ce0c7a32624d8899e70c192d72755aeef600f2c",
+      "lastReviewedBaseline": "7081f9dbfbda2664f539a59e20b30f079d039dc4",
       "lastReviewedAt": "2026-09-08",
       "linkedFromIndex": true,
       "notes": "Navigation/reference only; resolve authority through the linked source documents."
@@ -1725,7 +1725,7 @@
       "supersededBy": [],
       "currentStateClaimsAllowed": false,
       "historicalMutationPolicy": "REGENERATE_FROM_REVIEWED_INVENTORY",
-      "lastReviewedBaseline": "1ce0c7a32624d8899e70c192d72755aeef600f2c",
+      "lastReviewedBaseline": "7081f9dbfbda2664f539a59e20b30f079d039dc4",
       "lastReviewedAt": "2026-09-08",
       "linkedFromIndex": true,
       "notes": "Navigation/reference only; resolve authority through the linked source documents."
@@ -1909,7 +1909,7 @@
       "supersededBy": [],
       "currentStateClaimsAllowed": true,
       "historicalMutationPolicy": "UPDATE_FROM_MERGED_EVIDENCE_ONLY",
-      "lastReviewedBaseline": "1ce0c7a32624d8899e70c192d72755aeef600f2c",
+      "lastReviewedBaseline": "7081f9dbfbda2664f539a59e20b30f079d039dc4",
       "lastReviewedAt": "2026-09-08",
       "linkedFromIndex": true,
       "notes": "Authority is limited to the document's declared scope and subordinate to Accepted ADRs."
@@ -3140,7 +3140,7 @@
       "supersededBy": [],
       "currentStateClaimsAllowed": false,
       "historicalMutationPolicy": "UPDATE_WITH_AUTHORIZED_CONTRACT_CHANGE",
-      "lastReviewedBaseline": "1ce0c7a32624d8899e70c192d72755aeef600f2c",
+      "lastReviewedBaseline": "7081f9dbfbda2664f539a59e20b30f079d039dc4",
       "lastReviewedAt": "2026-09-08",
       "linkedFromIndex": true,
       "notes": "Authority is limited to the document's declared scope and subordinate to Accepted ADRs."
@@ -3432,6 +3432,24 @@
       "lastReviewedAt": "2026-09-08",
       "linkedFromIndex": true,
       "notes": "Records exact manifest-v2 technical-input append, persistent receipt lineage and zero-execution tests. It issues no R6 grant and does not resume the preserved prefix."
+    },
+    {
+      "path": "docs/status/M10_M11_SPIKE_0_ELIGIBLE_LINEAGE_E3_R6_POST_E3H_2026-09-08.md",
+      "repository": "Core",
+      "documentClass": "CURRENT_STATUS",
+      "status": "CURRENT",
+      "owner": "Project Lead / Core Architecture Owner / M10 Input Admission Owner / Spike-0 Evidence Custody Owner",
+      "authoritativeFor": [
+        "evidence-backed post-E3H exact input grant, preserved-prefix input lifecycle, restart and transferable eligible-lineage status"
+      ],
+      "supersedes": [],
+      "supersededBy": [],
+      "currentStateClaimsAllowed": true,
+      "historicalMutationPolicy": "UPDATE_FROM_MERGED_EVIDENCE_ONLY",
+      "lastReviewedBaseline": "7081f9dbfbda2664f539a59e20b30f079d039dc4",
+      "lastReviewedAt": "2026-09-08",
+      "linkedFromIndex": true,
+      "notes": "Records one exact manifest-v2 technical-input suffix and verified handoff bundle. Run, camera, dispatch, Provider, media execution and publication remain blocked."
     }
   ]
 }
