@@ -267,3 +267,13 @@ requests do not promise exact receipt replay. Confirmation proves the current ta
 not an arbitrary historical acknowledgement. Frontend target-switch CAS is not wired
 in this task; M5 historical confirmation remains UNPROVEN. These new bounded proofs
 do not rewrite the original audit or authorize R6, real Providers, GPU or media jobs.
+
+## M10/M11 input and execution configuration separation E3G
+
+| Risk | Consequence | Mitigation and gate | Owner / evidence |
+| --- | --- | --- | --- |
+| `R-M10-M11-CONFIG-054` — treating complete E3A input evidence settings as partial backend configuration prevents legal input-only composition; broadly ignoring the shared prefix would instead hide malformed execution configuration | Operators may bypass the real environment factory, fabricate a backend, or silently downgrade invalid execution settings, making READY input appear executable without authority | Exempt only the three exact existing input setting names from the registry-presence predicate. The input loader still validates the complete bundle first; unknown related names and every partial/invalid execution configuration fail closed. Real factory/SQLite/authenticated HTTP/new-process tests create a CURRENT READY input and then prove backend-unavailable rejection with zero Route/Job/Attempt/Adapter/Provider delta. Existing configured E1 and E2/E3A regressions remain gates. `MITIGATED / BOUNDED_IMPLEMENTATION / REQUIRED_CI_GATE`. | Core Architecture / M10 Input Asset / M11 Execution Configuration Owners; [E3G receipt](../docs/status/M10_INPUT_ARTIFACT_EXECUTION_CONFIG_DECOUPLING_E3G_2026-09-08.md). R6 valid-prefix state is preserved and cannot resume without separate compatibility authorization. |
+
+E3G adds no environment variable, registry schema, backend, queue, database DDL,
+route or request field. Input readiness remains distinct from execution readiness.
+The correction does not authorize R6, E4, ComfyUI, GPU, Provider or media execution.

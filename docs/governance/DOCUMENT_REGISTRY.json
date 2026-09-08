@@ -3360,6 +3360,24 @@
       "lastReviewedAt": "2026-09-07",
       "linkedFromIndex": true,
       "notes": "E3F adds optional application recovery metadata and a bounded confirmation CAS contract. Original audit, Script domain schemas, M5 UNPROVEN historical recovery and live R6/provider/GPU restrictions remain. Frontend switch CAS wiring is not implemented."
+    },
+    {
+      "path": "docs/status/M10_INPUT_ARTIFACT_EXECUTION_CONFIG_DECOUPLING_E3G_2026-09-08.md",
+      "repository": "Core",
+      "documentClass": "CURRENT_STATUS",
+      "status": "CURRENT",
+      "owner": "Project Lead / Core Architecture Owner / M10 Input Asset Owner / M11 Execution Configuration Owner",
+      "authoritativeFor": [
+        "bounded exact separation of E3A input artifact configuration from M11 execution backend enablement"
+      ],
+      "supersedes": [],
+      "supersededBy": [],
+      "currentStateClaimsAllowed": true,
+      "historicalMutationPolicy": "UPDATE_FROM_MERGED_EVIDENCE_ONLY",
+      "lastReviewedBaseline": "9c367c476b0486639444435f296407caf1b01bf8",
+      "lastReviewedAt": "2026-09-08",
+      "linkedFromIndex": true,
+      "notes": "E3G corrects only the input/execution configuration ownership predicate. Public schemas, DDL, routing and worker execution contracts remain unchanged; R6 valid-prefix state is preserved and not resumed."
     }
   ]
 }

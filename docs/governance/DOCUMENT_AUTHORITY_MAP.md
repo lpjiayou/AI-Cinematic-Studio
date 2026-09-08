@@ -121,6 +121,7 @@ and historical evidence cannot authorize current execution.
 
 | Document | Status | Owner |
 | --- | --- | --- |
+| [`docs/status/M10_INPUT_ARTIFACT_EXECUTION_CONFIG_DECOUPLING_E3G_2026-09-08.md`](../status/M10_INPUT_ARTIFACT_EXECUTION_CONFIG_DECOUPLING_E3G_2026-09-08.md) | `CURRENT` | Project Lead / Core Architecture Owner / M10 Input Asset Owner / M11 Execution Configuration Owner |
 | [`docs/status/M5_M7_LEGAL_ENTRYPOINT_CLOSURE_E3E_2026-09-07.md`](../status/M5_M7_LEGAL_ENTRYPOINT_CLOSURE_E3E_2026-09-07.md) | `CURRENT` | Project Lead / M5 Binding Owner / M7 Narrative Validation Owner / Creator Public HTTP Owner |
 | [`docs/status/M3_SCRIPT_GENERATION_AND_CONFIRMATION_RECOVERY_E3F_2026-09-07.md`](../status/M3_SCRIPT_GENERATION_AND_CONFIRMATION_RECOVERY_E3F_2026-09-07.md) | `CURRENT` | Project Lead / M3 Script Studio Owner / Creator Application Recovery Owner / Lifecycle Transaction Integrity Owner |
 | [`docs/status/M5_SERIES_PLAN_COMMAND_IDEMPOTENCY_E3D_2026-09-07.md`](../status/M5_SERIES_PLAN_COMMAND_IDEMPOTENCY_E3D_2026-09-07.md) | `CURRENT` | Project Lead / Creator Application Owner / M5 Series Planning Owner |

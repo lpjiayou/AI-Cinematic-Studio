@@ -1104,3 +1104,42 @@ recompute them from redacted DTOs. No absolute paths, credentials or raw authori
 bundles are returned. The V4 internal safe projection includes the relative storage
 key and its schema version; it is not a browser authority. Full ownership, configuration,
 atomicity and stop boundaries are in the [E3A receipt](../status/M10_METHOD_AWARE_SINGLE_INPUT_IMAGE_ADMISSION_E3A_2026-09-06.md).
+
+## M10 input-artifact / M11 execution configuration separation (E3G)
+
+The E3A input artifact authority and the M11 execution backend have independent
+configuration ownership. A complete input-only server configuration consists of
+exactly the existing bundle path, bundle SHA-256 and source root:
+
+```text
+CREATOR_METHOD_AWARE_INPUT_ARTIFACT_BUNDLE_PATH
+CREATOR_METHOD_AWARE_INPUT_ARTIFACT_BUNDLE_SHA256
+CREATOR_METHOD_AWARE_SOURCE_ROOT
+```
+
+These three settings do not require a backend registry, Provider credential,
+ComfyUI endpoint, runtime attestation or model/input directory. They continue to be
+validated together by the input evidence loader before database composition. A
+partial or invalid input configuration remains a startup error.
+
+Only these exact names are exempt from the registry-presence predicate. A nonempty
+unknown `CREATOR_METHOD_AWARE_*` or `METHOD_AWARE_COMFYUI_*` setting, a registry pin
+without a registry, or any other partial execution configuration remains fail
+closed. If a registry is present, the existing pin, schema, credential, profile,
+runtime, model and adapter validation sequence is unchanged. `SOURCE_ROOT` retains
+its execution-path use when a real registry is configured; it is not by itself an
+execution-enablement signal. The `run-one` worker CLI still requires its registry
+manifest and digest arguments.
+
+Input readiness is not backend readiness. With valid admitted input but no execution
+configuration, the environment factory uses the existing unavailable adapter and
+resolver. Candidate/QC/selection/admission/InputPlan HTTP operations remain
+available, but a READY video route reaches the backend resolver and returns the
+existing `worker_unavailable` response before any VideoMethodRoute, MediaJob or
+Attempt is persisted. No fallback adapter, fabricated registry or Provider request
+is permitted. Input AssetVersions remain technical evidence with
+`providerProcessingAuthorized=false` and `publicationAllowed=false`.
+
+The bounded proof and non-authority limits are recorded in the
+[E3G receipt](../status/M10_INPUT_ARTIFACT_EXECUTION_CONFIG_DECOUPLING_E3G_2026-09-08.md).
+E3G does not resume R6 or authorize live execution.

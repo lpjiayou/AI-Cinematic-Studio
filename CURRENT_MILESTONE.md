@@ -1,6 +1,6 @@
 # AI Cinematic Studio — Current Execution State
 
-Status: `CURRENT / EVIDENCE-BACKED / FAIL-CLOSED`; last reviewed: `2026-09-07`
+Status: `CURRENT / EVIDENCE-BACKED / FAIL-CLOSED`; last reviewed: `2026-09-08`
 ## 1. Closed K2 cutover baselines
 The production behavior, acceptance evidence and compatible Frontend pin are:
 ```text
@@ -176,15 +176,15 @@ M3_GENERATION_RECOVERY=IMPLEMENTED_AND_VERIFIED
 M3_CONFIRMATION_STABILITY=IMPLEMENTED_AND_VERIFIED
 M5_CONFIRM_VERSION_HISTORICAL_RECEIPT=UNPROVEN_CONTRACT_DECISION_PENDING
 SPIKE_0_EXECUTED=false
-R6_LIVE_LINEAGE_STARTED=false
+R6_RESUMED=false
 SPIKE_0_ELIGIBLE_LINEAGE_E3=BLOCKED_PENDING_RESUME
 SPIKE_0_READINESS=BLOCKED
-NEXT_TASK_AFTER_VERIFIED_E3F_MERGE=ACS-M10-M11-SPIKE-0-ELIGIBLE-LINEAGE-PREPARATION-E3-RESUME-R6
+METHOD_AWARE_INPUT_EXECUTION_CONFIG_DECOUPLING_E3G=IMPLEMENTED_AND_VERIFIED
 SUPERSEDED_VALIDATOR_M12_G0_3_STATE=ENVIRONMENT_HOLD
 SUPERSEDED_VALIDATOR_NEXT_TASK=LOCAL_WSL2_HANDOFF_AND_M12_C3_PREFLIGHT
 SUPERSEDED_VALIDATOR_TOKEN_GRANTS_AUTHORITY=false
 ```
-The [PR-B receipt](docs/status/CORE_SERIES_PLANNING_SCOPE_AND_CANDIDATE_BINDING_HARDENING_2026-09-05.md), [Project foundation receipt](docs/status/CORE_RECOVERABLE_PROJECT_FOUNDATION_COMMAND_2026-09-05.md) and [clean-state public E2E receipt](docs/status/CORE_CLEAN_STATE_PUBLIC_API_E2E_2026-09-06.md) and the [E1 worker seam receipt](docs/status/M10_M11_METHOD_AWARE_WORKER_SEAM_CORRECTIVE_E1_2026-09-06.md) and [E2 result intake receipt](docs/status/M10_M11_METHOD_AWARE_JOB_RESULT_INTAKE_CORRECTIVE_E2_2026-09-06.md) and [E3A input admission receipt](docs/status/M10_METHOD_AWARE_SINGLE_INPUT_IMAGE_ADMISSION_E3A_2026-09-06.md) and the [E3B confirmation receipt](docs/status/M1_CREATIVE_PLAN_CONFIRMATION_IDEMPOTENCY_E3B_2026-09-06.md) and the [E3C candidate receipt](docs/status/M1_AI_DIRECTOR_CANDIDATE_IDEMPOTENCY_E3C_2026-09-07.md) and [M5 E3D receipt](docs/status/M5_SERIES_PLAN_COMMAND_IDEMPOTENCY_E3D_2026-09-07.md) and [E3E receipt](docs/status/M5_M7_LEGAL_ENTRYPOINT_CLOSURE_E3E_2026-09-07.md) and [E3F receipt](docs/status/M3_SCRIPT_GENERATION_AND_CONFIRMATION_RECOVERY_E3F_2026-09-07.md) hold detailed evidence and non-authority boundaries. R5 is quarantined valid-prefix evidence; R6 requires fresh staging/database/token and separate authorization; M12-C3/C4, A100, Provider/GPU and publication remain paused; E3A admission is technical evidence only. Compatibility tokens grant no current authority.
+The [PR-B receipt](docs/status/CORE_SERIES_PLANNING_SCOPE_AND_CANDIDATE_BINDING_HARDENING_2026-09-05.md), [Project foundation receipt](docs/status/CORE_RECOVERABLE_PROJECT_FOUNDATION_COMMAND_2026-09-05.md) and [clean-state public E2E receipt](docs/status/CORE_CLEAN_STATE_PUBLIC_API_E2E_2026-09-06.md) and the [E1 worker seam receipt](docs/status/M10_M11_METHOD_AWARE_WORKER_SEAM_CORRECTIVE_E1_2026-09-06.md) and [E2 result intake receipt](docs/status/M10_M11_METHOD_AWARE_JOB_RESULT_INTAKE_CORRECTIVE_E2_2026-09-06.md) and [E3A input admission receipt](docs/status/M10_METHOD_AWARE_SINGLE_INPUT_IMAGE_ADMISSION_E3A_2026-09-06.md) and the [E3B confirmation receipt](docs/status/M1_CREATIVE_PLAN_CONFIRMATION_IDEMPOTENCY_E3B_2026-09-06.md) and the [E3C candidate receipt](docs/status/M1_AI_DIRECTOR_CANDIDATE_IDEMPOTENCY_E3C_2026-09-07.md) and [M5 E3D receipt](docs/status/M5_SERIES_PLAN_COMMAND_IDEMPOTENCY_E3D_2026-09-07.md) and [E3E receipt](docs/status/M5_M7_LEGAL_ENTRYPOINT_CLOSURE_E3E_2026-09-07.md) and [E3F receipt](docs/status/M3_SCRIPT_GENERATION_AND_CONFIRMATION_RECOVERY_E3F_2026-09-07.md) and [E3G receipt](docs/status/M10_INPUT_ARTIFACT_EXECUTION_CONFIG_DECOUPLING_E3G_2026-09-08.md) hold detailed evidence and non-authority boundaries. The failed R6 request and valid prefix are quarantined unchanged; E3G does not resume them. The next task is `E3_R6_VALID_PREFIX_COMPATIBILITY_CHECK_AND_EXPLICIT_RESUME` under separate authorization. M12-C3/C4, A100, Provider/GPU and publication remain paused; E3A admission is technical evidence only. Compatibility tokens grant no current authority.
 ## 7. Immutable history
 The former archived material remains byte-for-byte in [CURRENT_MILESTONE_HISTORY_THROUGH_2026-09-02.md](CURRENT_MILESTONE_HISTORY_THROUGH_2026-09-02.md).
 ```text
