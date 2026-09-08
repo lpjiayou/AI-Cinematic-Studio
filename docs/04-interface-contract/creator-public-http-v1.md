@@ -1,6 +1,6 @@
 # Creator Public HTTP/API v1
 
-Status: `XR1 FROZEN / AUTH-W1 / ADR-0013 CONTROL PLANE / ADR-0019 METHOD-AWARE CUTOVER / STRICT JSON AND NUMERIC INTEGRITY / M1 DURABLE CONFIRMATION / M4 RECOVERABLE FOUNDATION / M5 SCOPE-BOUND RECEIPTS`
+Status: `XR1 FROZEN / AUTH-W1 / ADR-0013 CONTROL PLANE / ADR-0019 METHOD-AWARE CUTOVER / ADR-0021 BOUNDED MANIFEST-V2 INPUT APPEND / STRICT JSON AND NUMERIC INTEGRITY / M1 DURABLE CONFIRMATION / M4 RECOVERABLE FOUNDATION / M5 SCOPE-BOUND RECEIPTS`
 
 This contract is the only browser-facing Core HTTP surface for the separate Commercial
 Frontend. Existing `/creator/internal/*` endpoints remain compatibility-only and must
@@ -24,7 +24,7 @@ Commercial Frontend → Frontend Experience Adapter → /creator/api/v1
 | M5 | `/series-planning-workspaces`, `/series-plan-*` | Series Planning + Series Director boundaries |
 | M6 | `/series-intelligence-workspaces`, `/series-intelligence/*` | accepted Series Intelligence public boundary |
 | M7–M9 | `/episode-production-runs/{runRef}/narrative-validation`, `/shot-graph`, `/execution-method-plan` | current M7 validation plus source-bound M8 action beats and server-derived M9 three-axis requirements |
-| M10 | `/episode-production-runs/{runRef}/method-aware-input-plan`, `/method-aware-input-candidates`, `/method-aware-input-admission`, `/dynamic-media-preflight`, `/real-media-revision`, `/real-image-candidates`, `/semantic-visual-qc`, `/media-selection`, `/real-image-admission`, `/real-image-successor-admission`, `/real-image-selection`, `/state-projection`, `/production-readiness` | current-plan input resolution over the one canonical AssetVersion stream, plus the existing typed media control plane |
+| M10 | `/episode-production-runs/{runRef}/method-aware-input-plan`, `/method-aware-input-candidates`, `/method-aware-input-admission`, `/dynamic-media-preflight`, `/real-media-revision`, `/real-image-candidates`, `/semantic-visual-qc`, `/media-selection`, `/real-image-admission`, `/real-image-successor-admission`, `/real-image-selection`, `/state-projection`, `/production-readiness` | current-plan input resolution over the one canonical AssetVersion stream, including the exact ADR-0021 manifest-v2 technical-input exception, plus the existing typed media control plane |
 | M11 | `/episode-production-runs/{runRef}/method-aware-video-route`, `/method-aware-video-jobs`, `/method-aware-video-candidates`, `/real-video-revision`, `/real-video-candidates`, `/semantic-visual-qc`, `/media-selection`, `/real-video-admission`, `/state-projection`, `/provider-experiments` | closed method routing and verified technical result intake; only Micro Motion can reserve the existing single-anchor queue, while Contact and Gait fail closed |
 | M12 | `/episode-production-runs/{runRef}/explicit-audio-requirement-route`, `/production-readiness` | explicit M9 AudioRequirement routing; Runtime G0 remains incomplete |
 | M13–M14 | `/episode-production-runs/{runRef}/render-candidates`, `/preview`, `/finalize` | bounded V5 RenderCandidate/delivery services over the accepted M13 base backend and V4/V3 execution boundaries |
@@ -858,10 +858,14 @@ It does not compile or return an `ExecutableShotGraph`, append `G3_SHOT_GRAPH`, 
 `cameraContractState=NOT_READY`.
 
 The draft is a local structural representation with unverified ShotPlan and camera
-authority. All legacy G4–G6, provider-experiment, M10/M11 candidate/review/
-admission mutation routes reject that run with `execution_not_authorized`. A future
-canonical M10 append or Provider/GPU dispatch requires a separate accepted contract,
-all listed authorities and explicit Project Lead authorization.
+authority. The original blanket rejection remains the default and continues to
+control legacy G4–G6, provider-experiment, generic/video/output Candidate, review,
+admission and all M11 execution mutations. ADR-0021 now narrowly permits only the
+exact authority-bound M10 technical-input lifecycle documented below. Without that
+separate input-append authority, the existing `execution_not_authorized` response
+and zero-write behavior remain unchanged. Provider/GPU dispatch still requires a
+different accepted contract, all listed authorities and explicit Project Lead
+authorization.
 
 ## K2 M10 image-plan semantics
 
@@ -1143,3 +1147,71 @@ is permitted. Input AssetVersions remain technical evidence with
 The bounded proof and non-authority limits are recorded in the
 [E3G receipt](../status/M10_INPUT_ARTIFACT_EXECUTION_CONFIG_DECOUPLING_E3G_2026-09-08.md).
 E3G does not resume R6 or authorize live execution.
+
+## Manifest v2 bounded technical-input append authority (E3H)
+
+ADR-0021 and the normative
+[M10 authority contract](../../architecture/M10_MANIFEST_V2_TECHNICAL_INPUT_APPEND_AUTHORITY_CONTRACT.md)
+add no public route or request field. The existing authenticated E3A endpoints may
+enter one manifest v2 input lifecycle only when the server freshly resolves both a
+valid staged-image authority and an independently configured exact M10 input-append
+authority. Ordinary transport credentials, request bodies, headers,
+`TECHNICAL_EVIDENCE_ONLY`, IMAGE provenance and an arbitrary receipt ref do not
+grant the exception.
+
+The production configuration is exactly:
+
+```text
+CREATOR_M10_INPUT_APPEND_AUTHORITY_BUNDLE_PATH
+CREATOR_M10_INPUT_APPEND_AUTHORITY_BUNDLE_SHA256
+```
+
+Both values must be present at environment composition. Partial, missing, changed,
+unsealed, foreign, stale or symlinked authority input fails closed. No configuration
+falls back to v1 or enables a backend. The server derives the closed authority
+subject from the current ProductionRun manifest and upstream digest; current
+Script/M6/M7/M8/M9 refs and digests; the exact requirement, CreativeShot,
+ActionExecutionBeat and source span; and the independently verified staged IMAGE /
+ACTION_READY_ANCHOR bytes.
+
+Authorized manifest v2 intake appends exactly four records atomically:
+
+```text
+MethodAwareInputAppendAuthority
+MethodAwareInputArtifact receipt v2
+Candidate
+TechnicalValidation
+```
+
+The additive receipt schema is
+`v5.method-aware-input-artifact-receipt.v2`; it binds the authority record by exact
+ref and digest. The Candidate binds that receipt, and the final canonical
+AssetVersion binds the same receipt, so the persisted lineage reaches the exact
+authority subject and decision. Historical receipt v1 remains unchanged and
+readable. Admission still appends exactly `AssetAdmission + AssetVersion` as one
+two-record transaction. External HumanSelection approval remains mandatory and
+independent from the input-append authority.
+
+Every new write and legal replay revalidates the current source, persisted chain and
+digest-pinned bundle. Recomposition without the exact authority preserves immutable
+records for readback but rejects further lifecycle writes and InputPlan append.
+Generic Candidate registration, legacy image/video revision, video result or output
+intake and a different run, plan, requirement or image cannot borrow this permission.
+
+InputPlan `READY` is only input readiness. The ProductionRun remains exact:
+
+```text
+shotPlanAuthorityState=LOCAL_STRUCTURAL_REPRESENTATION_ONLY
+shotPlanApprovalState=NOT_VERIFIED
+cameraContractState=NOT_READY
+dispatchAllowed=false
+```
+
+For manifest v2, `method-aware-video-route` rejects with
+`409 / execution_not_authorized` before any VideoMethodRoute, MediaJob, Attempt,
+adapter or Provider work, even if an admitted input is current and a working backend
+is configured. AssetVersions remain `providerProcessingAuthorized=false` and
+`publicationAllowed=false`. E3H neither issues authority to nor mutates or resumes
+the preserved R6 staging root, database, token, run or evidence prefix. The bounded
+verification is recorded in the
+[E3H receipt](../status/M10_MANIFEST_V2_TECHNICAL_INPUT_APPEND_AUTHORITY_E3H_2026-09-08.md).

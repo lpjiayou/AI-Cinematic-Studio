@@ -33,6 +33,20 @@ class SnapshotEvidence:
         return self.repository.read_snapshot(workspace_ref, run_ref)
 
 
+class InputAssetOperations:
+    def __init__(self, response):
+        self.response = response
+        self.calls = []
+
+    def record_semantic_visual_qc(self, command):
+        self.calls.append(("record_semantic_visual_qc", command))
+        return self.response
+
+    def record_human_selection(self, command):
+        self.calls.append(("record_human_selection", command))
+        return self.response
+
+
 class K2PublicMediaSanitizationTests(unittest.TestCase):
     def setUp(self):
         self.response = {
@@ -90,17 +104,11 @@ class K2PublicMediaSanitizationTests(unittest.TestCase):
                 },
             )(),
         )
+        self.input_assets = InputAssetOperations(self.response)
         setattr(
             self.boundary,
-            "_EpisodeProductionPublicBoundary__candidate_review",
-            type(
-                "CandidateReview",
-                (),
-                {
-                    "record_semantic_visual_qc": self.operation.command,
-                    "record_human_selection": self.operation.command,
-                },
-            )(),
+            "_EpisodeProductionPublicBoundary__method_aware_input_assets",
+            self.input_assets,
         )
         setattr(
             self.boundary,
@@ -146,6 +154,14 @@ class K2PublicMediaSanitizationTests(unittest.TestCase):
         for operation in operations:
             with self.subTest(operation=operation.__name__):
                 self.assert_sanitized(operation({"idempotencyKey": "request"}))
+        self.assertEqual(
+            [name for name, _ in self.input_assets.calls],
+            ["record_semantic_visual_qc", "record_human_selection"],
+        )
+        self.assertEqual(
+            [command for _, command in self.input_assets.calls],
+            [{"idempotencyKey": "request"}, {"idempotencyKey": "request"}],
+        )
 
     def test_real_media_and_state_queries_strip_internal_locators(self):
         for operation in (

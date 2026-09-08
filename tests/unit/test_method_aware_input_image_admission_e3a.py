@@ -17,6 +17,7 @@ from tests.unit.test_execution_method_planning_m8_m9 import seeded_plan, plan_co
 from tests.unit.test_method_aware_media_m10_m11 import method_service, m10_command
 from services.v4_platform import method_aware_input_artifacts as artifacts
 from services.v5_core_os.episode_production import method_aware_input_assets as assets
+from services.v5_core_os.episode_production import input_append_authority as append_authority
 from services.v5_core_os.episode_production.external_media_selection_approval import (
     MEDIA_SELECTION_APPROVAL_AUTHORITY_BUNDLE_SCHEMA, media_selection_approval_authority_from_environment)
 from services.v5_core_os.episode_production.media_candidate_review import VerifiedMediaSelection
@@ -31,17 +32,22 @@ def png_bytes(width=8, height=12, color=40):
 
 
 class InputImageFixture:
-    def __init__(self, case, *, sqlite=False):
+    def __init__(self, case, *, sqlite=False, manifest_v2=False):
         self.temp = tempfile.TemporaryDirectory(); case.addCleanup(self.temp.cleanup)
         self.root = Path(self.temp.name)
         self.sqlite = sqlite
+        self.manifest_v2 = manifest_v2
         self.seed, validation = seeded_plan()
-        if sqlite:
+        if sqlite or manifest_v2:
             from tests.unit.test_episode_production_k2 import run_command
             from tests.unit.test_narrative_currentness_m7 import validation_command
             self.seed['boundary'] = self.make_boundary()
-            self.seed['run'] = self.seed['boundary'].create_run(run_command(
-                self.seed['project'],self.seed['series'],self.seed['episode']))
+            command=run_command(self.seed['project'],self.seed['series'],self.seed['episode'])
+            if manifest_v2:
+                command.pop('shotsPerScene')
+                command['idempotencyKey']='m10-e3h-manifest-v2-run'
+                command['shotBudgets']=self.v2_shot_budgets(self.seed['bound']['scriptVersion'])
+            self.seed['run'] = self.seed['boundary'].create_run(command)
             validation = self.seed['boundary'].create_narrative_validation(validation_command(self.seed))
         self.boundary = self.seed['boundary']
         self.plan = self.boundary.create_execution_method_plan(plan_command(self.seed, validation))
@@ -55,23 +61,55 @@ class InputImageFixture:
 
     def make_boundary(self, *, restart=False):
         from tests.unit.test_narrative_currentness_m7 import validation_profiles
+        from tests.unit.test_k2_002_shot_profile_v2 import PortraitProjectBoundary
         assembly=self.seed['assembly']
-        return public.create_local_development_boundary(self.root/'runs.sqlite3',
-            project_boundary=assembly.project_context,series_episode_boundary=assembly.series_episode,
-            series_planning_boundary=assembly.series_planning,script_studio_boundary=assembly.script_studio,
-            narrative_validation_profiles=validation_profiles(),initialize_if_missing=not restart,
-            method_aware_input_artifact_evidence=getattr(self,'port',None),
-            media_selection_approval_authority=getattr(self,'selection_authority',None))
+        factory=public.create_local_development_boundary if self.sqlite else public.create_in_memory_boundary
+        arguments={'project_boundary':PortraitProjectBoundary(assembly.project_context) if self.manifest_v2 else assembly.project_context,
+            'series_episode_boundary':assembly.series_episode,
+            'series_planning_boundary':assembly.series_planning,'script_studio_boundary':assembly.script_studio,
+            'narrative_validation_profiles':validation_profiles(),
+            'method_aware_input_artifact_evidence':getattr(self,'port',None),
+            'method_aware_input_append_authority':getattr(self,'input_append_authority',None),
+            'media_selection_approval_authority':getattr(self,'selection_authority',None)}
+        if self.sqlite:
+            return factory(self.root/'runs.sqlite3',initialize_if_missing=not restart,**arguments)
+        return factory(**arguments)
 
-    def restart(self):
+    @staticmethod
+    def v2_shot_budgets(script):
+        result=[]
+        for scene in script['scenes']:
+            requirements=[{'speaker':line['speaker'],'text':line['text'],'sourceMode':'DIALOGUE'}
+                for line in scene['dialogue']]
+            requirements.extend({'speaker':scene['characters'][0],'text':text,'sourceMode':'NARRATION'}
+                for text in scene['narration'])
+            count=max(1,len(requirements));total=int(scene['estimatedDurationSec']*24)
+            durations=[total//count]*count
+            for index in range(total%count):durations[index]+=1
+            if not requirements:
+                requirements=[{'speaker':None,'text':'无对白或旁白。','sourceMode':'SFX_OR_SILENCE'}]
+            for index,(duration,requirement) in enumerate(zip(durations,requirements),start=1):
+                result.append({'scriptSceneRef':scene['scriptSceneRef'],'sceneOrder':index,
+                    'durationFrames':duration,'editorialShotSize':'MS',
+                    'visibleIdentityBindings':[{'characterName':scene['characters'][0],'bindingMode':'BODY_ONLY'}],
+                    'actionBeat':scene['action'],'dialogueSyncMode':('NONE' if requirement['sourceMode']=='SFX_OR_SILENCE'
+                        else 'OFF_CAMERA_OR_NON_VISIBLE_MOUTH'),'dialogueRequirement':requirement,
+                    'postprocessRequirements':[]})
+        return result
+
+    def restart(self, *, with_input_append_authority=True):
         self.port=artifacts.input_artifact_evidence_from_environment(self.environment)
+        if self.manifest_v2:
+            self.input_append_authority=(append_authority.input_append_authority_from_environment(
+                self.input_append_environment) if with_input_append_authority
+                else append_authority.RejectingInputAppendAuthority())
         if hasattr(self,'selection_environment'):
             self.selection_authority=media_selection_approval_authority_from_environment(self.selection_environment)
         self.boundary=self.make_boundary(restart=True);self.seed['boundary']=self.boundary
         self.evidence=method_service(self.boundary).evidence_repository
         self.review=method_service(self.boundary).candidate_review
 
-    def configure(self, **changes):
+    def configure(self, *, authorize_v2=True, authority_subject_changes=None, **changes):
         entry={'schemaVersion':artifacts.ENTRY_SCHEMA,**self.scope,
             'executionMethodPlanVersionRef':self.plan['executionMethodPlanVersionRef'],
             'executionMethodPlanDigest':self.plan['payloadDigest'],
@@ -88,8 +126,34 @@ class InputImageFixture:
         data=artifacts.canonical(self.bundle);self.bundle_path.write_bytes(data)
         self.environment=dict(zip(artifacts.CONFIG_NAMES,(str(self.bundle_path),sha256(data).hexdigest(),str(self.source_root))))
         self.port=artifacts.input_artifact_evidence_from_environment(self.environment)
-        self.boundary._EpisodeProductionPublicBoundary__method_aware_input_assets.artifact_evidence=self.port
+        service=self.boundary._EpisodeProductionPublicBoundary__method_aware_input_assets
+        service.artifact_evidence=self.port
+        if self.manifest_v2 and authorize_v2:
+            self.configure_input_append_authority(**(authority_subject_changes or {}))
         return self.port
+
+    def configure_input_append_authority(self, **subject_changes):
+        service=self.boundary._EpisodeProductionPublicBoundary__method_aware_input_assets
+        scope,plan,requirement,root=service._current(self.command())
+        artifact=service._artifact(self.command(),requirement)
+        subject=service._authority_subject(self.command(),scope,plan,requirement,root,artifact)
+        if subject_changes:
+            subject={k:v for k,v in subject.items() if k!='payloadDigest'}
+            subject.update(subject_changes);subject=append_authority.seal_subject(subject)
+        authority_ref='synthetic-m10-input-append-owner'
+        grant=append_authority.create_grant(authority_ref=authority_ref,
+            input_append_authority_ref='synthetic-m10-input-append-grant',subject=subject,
+            authority_decision_ref='synthetic-m10-input-append-decision',
+            decided_at='2026-09-08T06:00:00Z')
+        bundle=append_authority.create_bundle(authority_ref=authority_ref,grants=[grant])
+        data=artifacts.canonical(bundle);path=self.root/'input-append-authority.json';path.write_bytes(data)
+        self.input_append_environment=dict(zip(append_authority.CONFIG_NAMES,
+            (str(path),sha256(data).hexdigest())))
+        self.input_append_authority=append_authority.input_append_authority_from_environment(
+            self.input_append_environment)
+        service.input_append_authority=self.input_append_authority
+        self.input_append_subject=subject;self.input_append_bundle=bundle
+        return self.input_append_authority
 
     def qc_command(self, intake, **kwargs):
         command=review_tests.InMemoryCandidateReviewTests().qc_command(intake['technicalValidation'],**kwargs)

@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
   "repository": "Core",
-  "reviewedBaseline": "6b10166532c3cac9b8976a5d8986a4e8c1cfd7fc",
-  "reviewedAt": "2026-09-05",
+  "reviewedBaseline": "1ce0c7a32624d8899e70c192d72755aeef600f2c",
+  "reviewedAt": "2026-09-08",
   "documentClasses": [
     "ACCEPTED_DECISION",
     "NORMATIVE_ARCHITECTURE",
@@ -114,8 +114,8 @@
       "supersededBy": [],
       "currentStateClaimsAllowed": true,
       "historicalMutationPolicy": "UPDATE_FROM_MERGED_EVIDENCE_ONLY",
-      "lastReviewedBaseline": "7c14b0da0146e00dfdebfb94b53b069051032def",
-      "lastReviewedAt": "2026-09-07",
+      "lastReviewedBaseline": "1ce0c7a32624d8899e70c192d72755aeef600f2c",
+      "lastReviewedAt": "2026-09-08",
       "linkedFromIndex": true,
       "notes": "Current claims require merged evidence and may not override Accepted ADRs."
     },
@@ -265,6 +265,24 @@
       "lastReviewedAt": "2026-09-02",
       "linkedFromIndex": true,
       "notes": "Does not grant current execution authority. HISTORICAL_PATH_NOT_EXECUTION_AUTHORITY=true"
+    },
+    {
+      "path": "architecture/M10_MANIFEST_V2_TECHNICAL_INPUT_APPEND_AUTHORITY_CONTRACT.md",
+      "repository": "Core",
+      "documentClass": "NORMATIVE_CONTRACT",
+      "status": "ACTIVE",
+      "owner": "Project Lead / Core Architecture Owner / M10 Canonical Input Append Owner",
+      "authoritativeFor": [
+        "exact manifest v2 technical-input append authority, persistent lineage, currentness and execution anti-escalation contract"
+      ],
+      "supersedes": [],
+      "supersededBy": [],
+      "currentStateClaimsAllowed": false,
+      "historicalMutationPolicy": "UPDATE_WITH_AUTHORIZED_CONTRACT_CHANGE",
+      "lastReviewedBaseline": "1ce0c7a32624d8899e70c192d72755aeef600f2c",
+      "lastReviewedAt": "2026-09-08",
+      "linkedFromIndex": true,
+      "notes": "Normative scope accepted by ADR-0021; default v2 rejection and all M11 execution, Provider/GPU and publication restrictions remain controlling."
     },
     {
       "path": "architecture/M12_C3_DEDICATED_LINUX_CPU_BUILD_HOST_SPECIFICATION.md",
@@ -673,8 +691,8 @@
       "supersededBy": [],
       "currentStateClaimsAllowed": false,
       "historicalMutationPolicy": "UPDATE_WITH_AUTHORIZED_CONTRACT_CHANGE",
-      "lastReviewedBaseline": "7c14b0da0146e00dfdebfb94b53b069051032def",
-      "lastReviewedAt": "2026-09-07",
+      "lastReviewedBaseline": "1ce0c7a32624d8899e70c192d72755aeef600f2c",
+      "lastReviewedAt": "2026-09-08",
       "linkedFromIndex": true,
       "notes": "Authority is limited to the document's declared scope and subordinate to Accepted ADRs."
     },
@@ -1545,8 +1563,8 @@
       "supersededBy": [],
       "currentStateClaimsAllowed": false,
       "historicalMutationPolicy": "REGENERATE_FROM_REVIEWED_INVENTORY",
-      "lastReviewedBaseline": "7c14b0da0146e00dfdebfb94b53b069051032def",
-      "lastReviewedAt": "2026-09-07",
+      "lastReviewedBaseline": "1ce0c7a32624d8899e70c192d72755aeef600f2c",
+      "lastReviewedAt": "2026-09-08",
       "linkedFromIndex": true,
       "notes": "Navigation/reference only; resolve authority through the linked source documents."
     },
@@ -1689,8 +1707,8 @@
       "supersededBy": [],
       "currentStateClaimsAllowed": false,
       "historicalMutationPolicy": "REGENERATE_FROM_REVIEWED_INVENTORY",
-      "lastReviewedBaseline": "7c14b0da0146e00dfdebfb94b53b069051032def",
-      "lastReviewedAt": "2026-09-07",
+      "lastReviewedBaseline": "1ce0c7a32624d8899e70c192d72755aeef600f2c",
+      "lastReviewedAt": "2026-09-08",
       "linkedFromIndex": true,
       "notes": "Navigation/reference only; resolve authority through the linked source documents."
     },
@@ -1707,8 +1725,8 @@
       "supersededBy": [],
       "currentStateClaimsAllowed": false,
       "historicalMutationPolicy": "REGENERATE_FROM_REVIEWED_INVENTORY",
-      "lastReviewedBaseline": "6b10166532c3cac9b8976a5d8986a4e8c1cfd7fc",
-      "lastReviewedAt": "2026-09-05",
+      "lastReviewedBaseline": "1ce0c7a32624d8899e70c192d72755aeef600f2c",
+      "lastReviewedAt": "2026-09-08",
       "linkedFromIndex": true,
       "notes": "Navigation/reference only; resolve authority through the linked source documents."
     },
@@ -1725,8 +1743,8 @@
       "supersededBy": [],
       "currentStateClaimsAllowed": false,
       "historicalMutationPolicy": "REGENERATE_FROM_REVIEWED_INVENTORY",
-      "lastReviewedBaseline": "3eaaeabf79fdb85581a15069ff6fe5f330445416",
-      "lastReviewedAt": "2026-09-04",
+      "lastReviewedBaseline": "1ce0c7a32624d8899e70c192d72755aeef600f2c",
+      "lastReviewedAt": "2026-09-08",
       "linkedFromIndex": true,
       "notes": "Navigation/reference only; resolve authority through the linked source documents."
     },
@@ -1891,8 +1909,8 @@
       "supersededBy": [],
       "currentStateClaimsAllowed": true,
       "historicalMutationPolicy": "UPDATE_FROM_MERGED_EVIDENCE_ONLY",
-      "lastReviewedBaseline": "7c14b0da0146e00dfdebfb94b53b069051032def",
-      "lastReviewedAt": "2026-09-07",
+      "lastReviewedBaseline": "1ce0c7a32624d8899e70c192d72755aeef600f2c",
+      "lastReviewedAt": "2026-09-08",
       "linkedFromIndex": true,
       "notes": "Authority is limited to the document's declared scope and subordinate to Accepted ADRs."
     },
@@ -2638,10 +2656,10 @@
       "supersededBy": [],
       "currentStateClaimsAllowed": false,
       "historicalMutationPolicy": "AMEND_OR_SUPERSEDE_BY_ACCEPTED_ADR_ONLY",
-      "lastReviewedBaseline": "a455c8e76427d53d75bb7f15259b9875d9768914",
-      "lastReviewedAt": "2026-09-02",
+      "lastReviewedBaseline": "1ce0c7a32624d8899e70c192d72755aeef600f2c",
+      "lastReviewedAt": "2026-09-08",
       "linkedFromIndex": true,
-      "notes": "Authority is limited to the document's declared scope and subordinate to Accepted ADRs."
+      "notes": "ADR-0021 narrowly amends only the exact manifest-v2 M10 technical-input lifecycle; all remaining K2-002 ShotPlan/camera, execution, Provider/GPU and publication restrictions remain controlling."
     },
     {
       "path": "governance/ADR-0015-m12-isolated-audio-runtime-and-acyclic-voice-clone-lineage.md",
@@ -2728,10 +2746,10 @@
       "supersededBy": [],
       "currentStateClaimsAllowed": false,
       "historicalMutationPolicy": "AMEND_OR_SUPERSEDE_BY_ACCEPTED_ADR_ONLY",
-      "lastReviewedBaseline": "65cc8898b8c3b0ba660900c350f248f85a424f3e",
-      "lastReviewedAt": "2026-09-03",
+      "lastReviewedBaseline": "1ce0c7a32624d8899e70c192d72755aeef600f2c",
+      "lastReviewedAt": "2026-09-08",
       "linkedFromIndex": true,
-      "notes": "ADR-0019 remains Accepted; ADR-0020 partially supersedes only section 10 and Migration Plan item 8's A100 C3 assumption. Other decisions remain controlling."
+      "notes": "ADR-0019 remains Accepted; ADR-0020 partially supersedes only its A100 C3 assumption, and ADR-0021 extends only exact M10 technical-input append without M11 execution. Other decisions remain controlling."
     },
     {
       "path": "governance/ADR-0020-m12-cpu-build-host-and-a100-offline-consumer.md",
@@ -2750,6 +2768,24 @@
       "lastReviewedAt": "2026-09-03",
       "linkedFromIndex": true,
       "notes": "Preserves ADR-0015 sections 3 and 4 and partially supersedes only ADR-0019 section 10 and Migration Plan item 8's A100 C3 assumption."
+    },
+    {
+      "path": "governance/ADR-0021-manifest-v2-technical-input-append-authority.md",
+      "repository": "Core",
+      "documentClass": "ACCEPTED_DECISION",
+      "status": "ACCEPTED",
+      "owner": "Project Lead / Core Architecture Owner / Manifest v2 Contract Owner / M10 Canonical Input Append Owner / Candidate Review and Admission Owner",
+      "authoritativeFor": [
+        "bounded exact manifest v2 M10 technical-input append authority without M11 execution or publication authority"
+      ],
+      "supersedes": [],
+      "supersededBy": [],
+      "currentStateClaimsAllowed": false,
+      "historicalMutationPolicy": "AMEND_OR_SUPERSEDE_BY_ACCEPTED_ADR_ONLY",
+      "lastReviewedBaseline": "1ce0c7a32624d8899e70c192d72755aeef600f2c",
+      "lastReviewedAt": "2026-09-08",
+      "linkedFromIndex": true,
+      "notes": "Narrowly amends ADR-0014's blanket M10 mutation rejection and extends ADR-0019 with one exact input-only authority; all other restrictions remain Accepted."
     },
     {
       "path": "governance/ADR_TEMPLATE.md",
@@ -3104,8 +3140,8 @@
       "supersededBy": [],
       "currentStateClaimsAllowed": false,
       "historicalMutationPolicy": "UPDATE_WITH_AUTHORIZED_CONTRACT_CHANGE",
-      "lastReviewedBaseline": "7c14b0da0146e00dfdebfb94b53b069051032def",
-      "lastReviewedAt": "2026-09-07",
+      "lastReviewedBaseline": "1ce0c7a32624d8899e70c192d72755aeef600f2c",
+      "lastReviewedAt": "2026-09-08",
       "linkedFromIndex": true,
       "notes": "Authority is limited to the document's declared scope and subordinate to Accepted ADRs."
     },
@@ -3378,6 +3414,24 @@
       "lastReviewedAt": "2026-09-08",
       "linkedFromIndex": true,
       "notes": "E3G corrects only the input/execution configuration ownership predicate. Public schemas, DDL, routing and worker execution contracts remain unchanged; R6 valid-prefix state is preserved and not resumed."
+    },
+    {
+      "path": "docs/status/M10_MANIFEST_V2_TECHNICAL_INPUT_APPEND_AUTHORITY_E3H_2026-09-08.md",
+      "repository": "Core",
+      "documentClass": "CURRENT_STATUS",
+      "status": "CURRENT",
+      "owner": "Project Lead / Core Architecture Owner / M10 Canonical Input Append Owner / Candidate Review and Admission Owner",
+      "authoritativeFor": [
+        "evidence-backed bounded E3H implementation status, isolated verification and explicit R6 non-issuance boundary"
+      ],
+      "supersedes": [],
+      "supersededBy": [],
+      "currentStateClaimsAllowed": true,
+      "historicalMutationPolicy": "UPDATE_FROM_MERGED_EVIDENCE_ONLY",
+      "lastReviewedBaseline": "1ce0c7a32624d8899e70c192d72755aeef600f2c",
+      "lastReviewedAt": "2026-09-08",
+      "linkedFromIndex": true,
+      "notes": "Records exact manifest-v2 technical-input append, persistent receipt lineage and zero-execution tests. It issues no R6 grant and does not resume the preserved prefix."
     }
   ]
 }

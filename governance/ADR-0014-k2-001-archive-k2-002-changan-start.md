@@ -8,6 +8,8 @@
 - Supersedes as current project: K2-001 production execution
 - Preserves: K2-001 immutable history, ADR-0013 control-plane authority,
   fail-closed selection/admission/publication rules
+- Scope amended by: [ADR-0021](ADR-0021-manifest-v2-technical-input-append-authority.md),
+  only for its exact authority-bound M10 technical-input lifecycle
 - Production Ready: `NO`
 - Publication allowed: `false`
 
@@ -23,6 +25,12 @@
 > the ordered EP01 non-GPU implementation through final prerequisite audit. Missing
 > rights evidence remains fail-closed, and Provider/GPU execution still requires a
 > separate later decision.
+>
+> Bounded M10 supplement — `2026-09-08`:
+> [ADR-0021](ADR-0021-manifest-v2-technical-input-append-authority.md) accepts one
+> exact, operator-authorized manifest v2 technical-input append lifecycle. The
+> default rejection, unverified ShotPlan/camera state, M11 execution, Provider/GPU
+> and publication restrictions in this ADR remain unchanged.
 
 ## Context
 

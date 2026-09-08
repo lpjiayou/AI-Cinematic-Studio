@@ -61,6 +61,7 @@ and historical evidence cannot authorize current execution.
 | [`governance/ADR-0018-canonical-identity-reference-version-projection-and-runtime-currentness-boundary.md`](../../governance/ADR-0018-canonical-identity-reference-version-projection-and-runtime-currentness-boundary.md) | `ACCEPTED` | Architecture Owner / Documentation Governance Owner |
 | [`governance/ADR-0019-upstream-execution-method-and-requirement-routing.md`](../../governance/ADR-0019-upstream-execution-method-and-requirement-routing.md) | `ACCEPTED` | Architecture Owner / M3-M12 Domain Owners |
 | [`governance/ADR-0020-m12-cpu-build-host-and-a100-offline-consumer.md`](../../governance/ADR-0020-m12-cpu-build-host-and-a100-offline-consumer.md) | `ACCEPTED` | Project Lead / Architecture Owner / Infrastructure Owner / M12 Domain Owner |
+| [`governance/ADR-0021-manifest-v2-technical-input-append-authority.md`](../../governance/ADR-0021-manifest-v2-technical-input-append-authority.md) | `ACCEPTED` | Project Lead / Core Architecture Owner / Manifest v2 Contract Owner / M10 Canonical Input Append Owner / Candidate Review and Admission Owner |
 
 ## NORMATIVE_ARCHITECTURE
 
@@ -93,6 +94,7 @@ and historical evidence cannot authorize current execution.
 | [`architecture/K2_INTERNAL_IMAGE_FIRST_REAL_MEDIA_REVISION_CONTRACT.md`](../../architecture/K2_INTERNAL_IMAGE_FIRST_REAL_MEDIA_REVISION_CONTRACT.md) | `ACTIVE` | Architecture Owner |
 | [`architecture/K2_INTERNAL_SELF_HOSTED_P1_CONTRACT.md`](../../architecture/K2_INTERNAL_SELF_HOSTED_P1_CONTRACT.md) | `ACTIVE` | Architecture Owner |
 | [`architecture/M3_M11_UPSTREAM_METHOD_CLOSURE_CONTRACT.md`](../../architecture/M3_M11_UPSTREAM_METHOD_CLOSURE_CONTRACT.md) | `ACTIVE` | Architecture Owner / M3-M12 Domain Owners |
+| [`architecture/M10_MANIFEST_V2_TECHNICAL_INPUT_APPEND_AUTHORITY_CONTRACT.md`](../../architecture/M10_MANIFEST_V2_TECHNICAL_INPUT_APPEND_AUTHORITY_CONTRACT.md) | `ACTIVE` | Project Lead / Core Architecture Owner / M10 Canonical Input Append Owner |
 | [`architecture/M6_SERIES_INTELLIGENCE_CONSUMER_CONTRACT.md`](../../architecture/M6_SERIES_INTELLIGENCE_CONSUMER_CONTRACT.md) | `ACTIVE` | Architecture Owner |
 | [`architecture/M6_SERIES_INTELLIGENCE_DOMAIN_CONTRACT.md`](../../architecture/M6_SERIES_INTELLIGENCE_DOMAIN_CONTRACT.md) | `ACTIVE` | Architecture Owner |
 | [`architecture/M6_SERIES_INTELLIGENCE_SQLITE_CONTRACT.md`](../../architecture/M6_SERIES_INTELLIGENCE_SQLITE_CONTRACT.md) | `ACTIVE` | Architecture Owner |
@@ -121,6 +123,7 @@ and historical evidence cannot authorize current execution.
 
 | Document | Status | Owner |
 | --- | --- | --- |
+| [`docs/status/M10_MANIFEST_V2_TECHNICAL_INPUT_APPEND_AUTHORITY_E3H_2026-09-08.md`](../status/M10_MANIFEST_V2_TECHNICAL_INPUT_APPEND_AUTHORITY_E3H_2026-09-08.md) | `CURRENT` | Project Lead / Core Architecture Owner / M10 Canonical Input Append Owner / Candidate Review and Admission Owner |
 | [`docs/status/M10_INPUT_ARTIFACT_EXECUTION_CONFIG_DECOUPLING_E3G_2026-09-08.md`](../status/M10_INPUT_ARTIFACT_EXECUTION_CONFIG_DECOUPLING_E3G_2026-09-08.md) | `CURRENT` | Project Lead / Core Architecture Owner / M10 Input Asset Owner / M11 Execution Configuration Owner |
 | [`docs/status/M5_M7_LEGAL_ENTRYPOINT_CLOSURE_E3E_2026-09-07.md`](../status/M5_M7_LEGAL_ENTRYPOINT_CLOSURE_E3E_2026-09-07.md) | `CURRENT` | Project Lead / M5 Binding Owner / M7 Narrative Validation Owner / Creator Public HTTP Owner |
 | [`docs/status/M3_SCRIPT_GENERATION_AND_CONFIRMATION_RECOVERY_E3F_2026-09-07.md`](../status/M3_SCRIPT_GENERATION_AND_CONFIRMATION_RECOVERY_E3F_2026-09-07.md) | `CURRENT` | Project Lead / M3 Script Studio Owner / Creator Application Recovery Owner / Lifecycle Transaction Integrity Owner |
