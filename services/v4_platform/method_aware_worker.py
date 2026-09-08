@@ -15,6 +15,15 @@ from .method_aware_execution import ContentAddressedSourceImages
 from .media_jobs import MediaJobCoordinator, SqliteMediaJobAdapter
 
 
+_INPUT_ARTIFACT_CONFIGURATION_NAMES = frozenset(
+    {
+        "CREATOR_METHOD_AWARE_INPUT_ARTIFACT_BUNDLE_PATH",
+        "CREATOR_METHOD_AWARE_INPUT_ARTIFACT_BUNDLE_SHA256",
+        "CREATOR_METHOD_AWARE_SOURCE_ROOT",
+    }
+)
+
+
 class WorkerTerminated(Exception):
     code = "WORKER_TERMINATED_NO_RETRY"
 
@@ -73,8 +82,12 @@ def create_method_aware_coordinator_from_environment(
                 runtime_attestation=attestation, model_root=values["METHOD_AWARE_COMFYUI_MODEL_ROOT"])
         except (KeyError, OSError, ValueError) as exc:
             raise BackendValidationError("method-aware worker configuration is incomplete or invalid") from exc
-    elif any(key.startswith(("CREATOR_METHOD_AWARE_", "METHOD_AWARE_COMFYUI_")) and value
-             for key, value in values.items()):
+    elif any(
+        key not in _INPUT_ARTIFACT_CONFIGURATION_NAMES
+        and key.startswith(("CREATOR_METHOD_AWARE_", "METHOD_AWARE_COMFYUI_"))
+        and value
+        for key, value in values.items()
+    ):
         raise BackendValidationError("method-aware backend registry is missing")
     return MediaJobCoordinator(repository, adapter, artifact_root,
         backend_resolver=registry, source_images=source, max_attempts=1,
