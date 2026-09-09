@@ -164,6 +164,9 @@ deliberately isolated and do not authorize current execution.
 
 ## HISTORICAL_EVIDENCE
 
+- [`docs/status/M10_M11_SPIKE_0_E4_RUNTIME_PREFLIGHT_2026-09-09.md`](status/M10_M11_SPIKE_0_E4_RUNTIME_PREFLIGHT_2026-09-09.md) — `RECORDED`
+- [`docs/status/M10_M11_SPIKE_0_E4_EXACT_BINDING_REVIEW_2026-09-09.md`](status/M10_M11_SPIKE_0_E4_EXACT_BINDING_REVIEW_2026-09-09.md) — `RECORDED`
+- [`docs/status/M10_M11_GENERATION_DISPATCH_AUTHORITY_AUDIT_2026-09-09.md`](status/M10_M11_GENERATION_DISPATCH_AUTHORITY_AUDIT_2026-09-09.md) — `RECORDED`
 - [`CURRENT_MILESTONE_HISTORY_THROUGH_2026-09-02.md`](../CURRENT_MILESTONE_HISTORY_THROUGH_2026-09-02.md) — `HISTORICAL`
 - [`docs/archive/AGENTS_HISTORICAL_EXECUTION_RECORDS_THROUGH_2026-09-03.md`](archive/AGENTS_HISTORICAL_EXECUTION_RECORDS_THROUGH_2026-09-03.md) — `HISTORICAL`
 - [`docs/status/M12_A100_BUILD_HOST_PREFLIGHT_2026-09-03.md`](status/M12_A100_BUILD_HOST_PREFLIGHT_2026-09-03.md) — `HISTORICAL`
@@ -215,6 +218,7 @@ deliberately isolated and do not authorize current execution.
 
 ## DRAFT
 
+- [`governance/ADR-0022-generation-dispatch-grant.md`](../governance/ADR-0022-generation-dispatch-grant.md) — `PROPOSED`
 - [`architecture/technology-stack-decision.md`](../architecture/technology-stack-decision.md) — `DRAFT`
 - [`experiments/ccv-r1/experiment-manifest.pending.json`](../experiments/ccv-r1/experiment-manifest.pending.json) — `DRAFT`
 - [`governance/ADR_TEMPLATE.md`](../governance/ADR_TEMPLATE.md) — `DRAFT`
@@ -225,6 +229,7 @@ _No documents currently classified in this category._
 
 ## GENERATED_REFERENCE
 
+- [`docs/status/M10_M11_SPIKE_0_E4_EVIDENCE_INDEX_2026-09-09.md`](status/M10_M11_SPIKE_0_E4_EVIDENCE_INDEX_2026-09-09.md) — `REFERENCE`
 - [`README.md`](../README.md) — `REFERENCE`
 - [`docs/03-data-design/README.md`](03-data-design/README.md) — `REFERENCE`
 - [`docs/04-interface-contract/README.md`](04-interface-contract/README.md) — `REFERENCE`
