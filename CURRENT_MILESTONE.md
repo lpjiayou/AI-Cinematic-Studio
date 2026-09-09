@@ -1,6 +1,6 @@
 # AI Cinematic Studio — Current Execution State
 
-Status: `CURRENT / EVIDENCE-BACKED / FAIL-CLOSED`; last reviewed: `2026-09-08`
+Status: `CURRENT / EVIDENCE-BACKED / FAIL-CLOSED`; last reviewed: `2026-09-09`
 ## 1. Closed K2 cutover baselines
 The production behavior, acceptance evidence and compatible Frontend pin are:
 ```text
@@ -130,19 +130,13 @@ PROVIDER_CALLS_ALLOWED=false
 OUTPUT_ASSET_ADMISSION_ALLOWED=false
 PUBLICATION_ALLOWED=false
 M14_M15_IMPLEMENTATION=NOT_AUTHORIZED
-GPU_OR_PROVIDER_CALLS=0
-COMFYUI_START_COUNT=0
-PROMPT_POST_COUNT=0
-TECHNICAL_INPUT_ASSET_ADMISSION_COUNT=1
-OUTPUT_ASSET_ADMISSION_COUNT=0
-EPISODE_MASTER_CREATED=0
-EXPORT_ARTIFACT_CREATED=0
 SECOND_AUTHORITY_DATABASE_OR_QUEUE_CREATED=false
 SECOND_RUNTIME_AUTHORITY_CREATED=false
 SECOND_AUDIO_AUTHORITY_CREATED=false
 K2_HARDCODED_PRODUCTION_BRANCHES=0
 ```
-## 6. Current Core closure and next legal task
+截至 2026-09-08 的 E3 回执记录：GPU/Provider、ComfyUI 启动、prompt、输出准入、Episode Master、Export 均为 0，技术输入准入为 1。这些是该历史范围的计数；后期 E4 服务采集分阶段记账，不声称全期间累计为零。
+## 6. Current Core closure and E4 evidence
 ```text
 CORE_SERIES_PLANNING_SCOPE_AND_CANDIDATE_BINDING=IMPLEMENTED_AND_VERIFIED
 B2_SERIES_PLANNING_SCOPE_ERROR=CLOSED
@@ -179,12 +173,20 @@ R6_RESUMED=true
 SPIKE_0_ELIGIBLE_LINEAGE_E3=PREPARED_AND_VERIFIED
 LINEAGE_READINESS=READY_FOR_A100_RUNTIME_AND_COST_PREFLIGHT
 SPIKE_0_READINESS=BLOCKED
-E4_STARTED=false
+E4_RUNTIME_EVIDENCE=VERIFIED_TECHNICAL_ONLY
+E4_V2_I2V_ATTESTATION=CREATED_AND_VALIDATED
+E4_EXACT_BINDING_REVIEW=COMPLETED_WITH_EXECUTION_AUTHORITY_CONFLICTS
+GENERATION_DISPATCH_MECHANISM_AT_AUDITED_COMMIT=NOT_IMPLEMENTED
+GENERATION_DISPATCH_DESIGN_DIRECTION=INDEPENDENT_IMMUTABLE_GRANT_CONFIRMED
+ADR_0022_STATUS=PROPOSED
+ADR_0022_FULL_ACCEPTANCE=PENDING
+GENERATION_DISPATCH_IMPLEMENTATION_AUTHORIZED=false
+GENERATION_AUTHORIZATION_APPLICATION_SUBMITTED=false
 METHOD_AWARE_INPUT_CONFIG_E3G_AND_MANIFEST_V2_APPEND_E3H=IMPLEMENTED_AND_VERIFIED
 SUPERSEDED_VALIDATOR_M12_G0_3_STATE=ENVIRONMENT_HOLD
 SUPERSEDED_VALIDATOR_NEXT_TASK=LOCAL_WSL2_HANDOFF_AND_M12_C3_PREFLIGHT
 ```
-The prior receipts through [E3H](docs/status/M10_MANIFEST_V2_TECHNICAL_INPUT_APPEND_AUTHORITY_E3H_2026-09-08.md) preserve implementation evidence and non-authority boundaries. The [post-E3H R6 receipt](docs/status/M10_M11_SPIKE_0_ELIGIBLE_LINEAGE_E3_R6_POST_E3H_2026-09-08.md) records the separately authorized exact grant, authenticated input-only suffix, current/replay checks and verified transfer bundle. The old 409 failure remains unchanged; existing upstream facts received zero update/delete and zero new object/version. This prepares only the eligible technical input lineage: Run/camera/dispatch, A100, Provider/GPU, media execution and publication remain blocked. The next task is `ACS-M10-M11-SPIKE-0-A100-READ-ONLY-RUNTIME-AND-COST-PREFLIGHT-E4`; it grants no start or execution authority. Compatibility tokens grant no current authority.
+The prior receipts through [E3H](docs/status/M10_MANIFEST_V2_TECHNICAL_INPUT_APPEND_AUTHORITY_E3H_2026-09-08.md) and [post-E3H R6](docs/status/M10_M11_SPIKE_0_ELIGIBLE_LINEAGE_E3_R6_POST_E3H_2026-09-08.md) remain unchanged: eligible input lineage is PREPARED_AND_VERIFIED; the old 409 failure and historical E4_STARTED=false retain their 2026-09-08 meaning. No upstream fact was updated/deleted or recreated in that input-only resume. Later [E4 runtime evidence](docs/status/M10_M11_SPIKE_0_E4_RUNTIME_PREFLIGHT_2026-09-09.md) records the completed 632-file snapshot and validated v2 I2V proof; [exact binding](docs/status/M10_M11_SPIKE_0_E4_EXACT_BINDING_REVIEW_2026-09-09.md) retains C1/C2. The [dispatch audit](docs/status/M10_M11_GENERATION_DISPATCH_AUTHORITY_AUDIT_2026-09-09.md) records the missing mechanism; [ADR-0022](governance/ADR-0022-generation-dispatch-grant.md) is Proposed, not Accepted. See the [evidence index](docs/status/M10_M11_SPIKE_0_E4_EVIDENCE_INDEX_2026-09-09.md). The five historical fields remain false / NOT_VERIFIED / NOT_READY / false / false; runtime metadata grants no dispatch, Provider processing, output admission, Master/Export or publication. No A100 power action, M12-C3, Grant implementation, generation application or next task is authorized by this docs update. E4 audited code remains f007ab3e93c3fb7f5e8b3b7f81c34fec28858176; the docs tip does not upgrade its execution pin. Compatibility tokens grant no current authority.
 ## 7. Immutable history
 The former archived material remains byte-for-byte in [CURRENT_MILESTONE_HISTORY_THROUGH_2026-09-02.md](CURRENT_MILESTONE_HISTORY_THROUGH_2026-09-02.md).
 ```text

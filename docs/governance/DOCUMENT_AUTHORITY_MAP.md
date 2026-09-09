@@ -20,22 +20,24 @@ the policy and source documents remain controlling within their declared scopes.
 Scope always matters. `CURRENT_MILESTONE.md` cannot override an Accepted ADR,
 and historical evidence cannot authorize current execution.
 
+Reviewed evidence baseline: `f007ab3e93c3fb7f5e8b3b7f81c34fec28858176`; date: `2026-09-09`. New E4 entries are linked below. Complete class-index registration in `docs/README.md` remains pending the explicit path-scope extension; this draft does not claim that governance gate has passed.
+
 ## Classification totals
 
 | Class | Count | Current-state claims allowed |
 | --- | ---: | --- |
-| `ACCEPTED_DECISION` | 20 | no |
+| `ACCEPTED_DECISION` | 21 | no |
 | `NORMATIVE_ARCHITECTURE` | 14 | no |
-| `NORMATIVE_CONTRACT` | 31 | no |
-| `CURRENT_STATUS` | 11 | yes |
+| `NORMATIVE_CONTRACT` | 32 | no |
+| `CURRENT_STATUS` | 19 | yes |
 | `CAPABILITY_MATRIX` | 1 | yes |
 | `OPERATIONAL_RUNBOOK` | 18 | no |
 | `IMPLEMENTATION_EVIDENCE` | 21 | no |
-| `HISTORICAL_EVIDENCE` | 36 | no |
+| `HISTORICAL_EVIDENCE` | 39 | no |
 | `SUPERSEDED` | 9 | no |
-| `DRAFT` | 3 | no |
+| `DRAFT` | 4 | no |
 | `DEPRECATED` | 0 | no |
-| `GENERATED_REFERENCE` | 15 | no |
+| `GENERATED_REFERENCE` | 16 | no |
 
 ## ACCEPTED_DECISION
 
@@ -204,6 +206,9 @@ and historical evidence cannot authorize current execution.
 
 | Document | Status | Owner |
 | --- | --- | --- |
+| [`docs/status/M10_M11_GENERATION_DISPATCH_AUTHORITY_AUDIT_2026-09-09.md`](../status/M10_M11_GENERATION_DISPATCH_AUTHORITY_AUDIT_2026-09-09.md) | `RECORDED` | Project Lead / Core Architecture Owner / Generation Dispatch Authority Owner |
+| [`docs/status/M10_M11_SPIKE_0_E4_EXACT_BINDING_REVIEW_2026-09-09.md`](../status/M10_M11_SPIKE_0_E4_EXACT_BINDING_REVIEW_2026-09-09.md) | `RECORDED` | Project Lead / Core Architecture Owner / Spike-0 Execution Gate Owner |
+| [`docs/status/M10_M11_SPIKE_0_E4_RUNTIME_PREFLIGHT_2026-09-09.md`](../status/M10_M11_SPIKE_0_E4_RUNTIME_PREFLIGHT_2026-09-09.md) | `RECORDED` | Project Lead / Core Architecture Owner / Spike-0 Execution Gate Owner |
 | [`CURRENT_MILESTONE_HISTORY_THROUGH_2026-09-02.md`](../../CURRENT_MILESTONE_HISTORY_THROUGH_2026-09-02.md) | `HISTORICAL` | Documentation Governance Owner |
 | [`docs/archive/AGENTS_HISTORICAL_EXECUTION_RECORDS_THROUGH_2026-09-03.md`](../archive/AGENTS_HISTORICAL_EXECUTION_RECORDS_THROUGH_2026-09-03.md) | `HISTORICAL` | Documentation Governance Owner |
 | [`docs/status/M12_A100_BUILD_HOST_PREFLIGHT_2026-09-03.md`](../status/M12_A100_BUILD_HOST_PREFLIGHT_2026-09-03.md) | `HISTORICAL` | Project Lead / Repository Governance Owner / M12 Domain Owner |
@@ -259,6 +264,7 @@ and historical evidence cannot authorize current execution.
 
 | Document | Status | Owner |
 | --- | --- | --- |
+| [`governance/ADR-0022-generation-dispatch-grant.md`](../../governance/ADR-0022-generation-dispatch-grant.md) | `PROPOSED` | Project Lead / Core Architecture Owner / Generation Dispatch Authority Owner / Spike-0 Execution Gate Owner |
 | [`architecture/technology-stack-decision.md`](../../architecture/technology-stack-decision.md) | `DRAFT` | Architecture Owner |
 | [`experiments/ccv-r1/experiment-manifest.pending.json`](../../experiments/ccv-r1/experiment-manifest.pending.json) | `DRAFT` | Experiment Owner |
 | [`governance/ADR_TEMPLATE.md`](../../governance/ADR_TEMPLATE.md) | `DRAFT` | Architecture Owner / Documentation Governance Owner |
@@ -273,6 +279,7 @@ and historical evidence cannot authorize current execution.
 
 | Document | Status | Owner |
 | --- | --- | --- |
+| [`docs/status/M10_M11_SPIKE_0_E4_EVIDENCE_INDEX_2026-09-09.md`](../status/M10_M11_SPIKE_0_E4_EVIDENCE_INDEX_2026-09-09.md) | `REFERENCE` | Project Lead / Documentation Governance Owner |
 | [`README.md`](../../README.md) | `REFERENCE` | Project Lead / Documentation Governance Owner |
 | [`docs/03-data-design/README.md`](../03-data-design/README.md) | `REFERENCE` | Data Architecture Owner |
 | [`docs/04-interface-contract/README.md`](../04-interface-contract/README.md) | `REFERENCE` | Public Contract Owner |
