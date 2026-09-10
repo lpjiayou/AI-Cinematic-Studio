@@ -1,6 +1,6 @@
 # AI Cinematic Studio — Current Execution State
 
-Status: `CURRENT / EVIDENCE-BACKED / FAIL-CLOSED`; last reviewed: `2026-09-09`
+Status: `CURRENT / EVIDENCE-BACKED / FAIL-CLOSED`; last reviewed: `2026-09-10`
 ## 1. Closed K2 cutover baselines
 The production behavior, acceptance evidence and compatible Frontend pin are:
 ```text
@@ -178,15 +178,16 @@ E4_V2_I2V_ATTESTATION=CREATED_AND_VALIDATED
 E4_EXACT_BINDING_REVIEW=COMPLETED_WITH_EXECUTION_AUTHORITY_CONFLICTS
 GENERATION_DISPATCH_MECHANISM_AT_AUDITED_COMMIT=NOT_IMPLEMENTED
 GENERATION_DISPATCH_DESIGN_DIRECTION=INDEPENDENT_IMMUTABLE_GRANT_CONFIRMED
-ADR_0022_STATUS=PROPOSED
-ADR_0022_FULL_ACCEPTANCE=PENDING
+ADR_0022_STATUS=ACCEPTED
+ADR_0022_FULL_ACCEPTANCE=ACCEPTED_ARCHITECTURE_ONLY
+ADR_0022_ACCEPTED_VERSION=1.2
 GENERATION_DISPATCH_IMPLEMENTATION_AUTHORIZED=false
 GENERATION_AUTHORIZATION_APPLICATION_SUBMITTED=false
 METHOD_AWARE_INPUT_CONFIG_E3G_AND_MANIFEST_V2_APPEND_E3H=IMPLEMENTED_AND_VERIFIED
 SUPERSEDED_VALIDATOR_M12_G0_3_STATE=ENVIRONMENT_HOLD
 SUPERSEDED_VALIDATOR_NEXT_TASK=LOCAL_WSL2_HANDOFF_AND_M12_C3_PREFLIGHT
 ```
-The prior receipts through [E3H](docs/status/M10_MANIFEST_V2_TECHNICAL_INPUT_APPEND_AUTHORITY_E3H_2026-09-08.md) and [post-E3H R6](docs/status/M10_M11_SPIKE_0_ELIGIBLE_LINEAGE_E3_R6_POST_E3H_2026-09-08.md) remain unchanged: eligible input lineage is PREPARED_AND_VERIFIED; the old 409 failure and historical E4_STARTED=false retain their 2026-09-08 meaning. No upstream fact was updated/deleted or recreated in that input-only resume. Later [E4 runtime evidence](docs/status/M10_M11_SPIKE_0_E4_RUNTIME_PREFLIGHT_2026-09-09.md) records the completed 632-file snapshot and validated v2 I2V proof; [exact binding](docs/status/M10_M11_SPIKE_0_E4_EXACT_BINDING_REVIEW_2026-09-09.md) retains C1/C2. The [dispatch audit](docs/status/M10_M11_GENERATION_DISPATCH_AUTHORITY_AUDIT_2026-09-09.md) records the missing mechanism; [ADR-0022](governance/ADR-0022-generation-dispatch-grant.md) is Proposed, not Accepted. See the [evidence index](docs/status/M10_M11_SPIKE_0_E4_EVIDENCE_INDEX_2026-09-09.md). The five historical fields remain false / NOT_VERIFIED / NOT_READY / false / false; runtime metadata grants no dispatch, Provider processing, output admission, Master/Export or publication. No A100 power action, M12-C3, Grant implementation, generation application or next task is authorized by this docs update. E4 audited code remains f007ab3e93c3fb7f5e8b3b7f81c34fec28858176; the docs tip does not upgrade its execution pin. Compatibility tokens grant no current authority.
+The prior receipts through [E3H](docs/status/M10_MANIFEST_V2_TECHNICAL_INPUT_APPEND_AUTHORITY_E3H_2026-09-08.md) and [post-E3H R6](docs/status/M10_M11_SPIKE_0_ELIGIBLE_LINEAGE_E3_R6_POST_E3H_2026-09-08.md) remain unchanged: eligible input lineage is PREPARED_AND_VERIFIED; the old 409 failure and historical E4_STARTED=false retain their 2026-09-08 meaning. No upstream fact was updated/deleted or recreated in that input-only resume. Later [E4 runtime evidence](docs/status/M10_M11_SPIKE_0_E4_RUNTIME_PREFLIGHT_2026-09-09.md) records the completed 632-file snapshot and validated v2 I2V proof; [exact binding](docs/status/M10_M11_SPIKE_0_E4_EXACT_BINDING_REVIEW_2026-09-09.md) retains C1/C2. The [dispatch audit](docs/status/M10_M11_GENERATION_DISPATCH_AUTHORITY_AUDIT_2026-09-09.md) records the missing mechanism; [ADR-0022](governance/ADR-0022-generation-dispatch-grant.md) v1.2 is accepted as architecture only; the [acceptance record](docs/status/ADR_0022_V1_2_ARCHITECTURE_ACCEPTANCE_2026-09-10.md) preserves the exact accepted subject and metadata mapping. Grant implementation remains unauthorized. See the [evidence index](docs/status/M10_M11_SPIKE_0_E4_EVIDENCE_INDEX_2026-09-09.md). The five historical fields remain false / NOT_VERIFIED / NOT_READY / false / false; runtime metadata grants no dispatch, Provider processing, output admission, Master/Export or publication. No A100 power action, M12-C3, Grant implementation, generation application or next task is authorized by this docs update. E4 audited code remains f007ab3e93c3fb7f5e8b3b7f81c34fec28858176; the docs tip does not upgrade its execution pin. Compatibility tokens grant no current authority.
 ## 7. Immutable history
 The former archived material remains byte-for-byte in [CURRENT_MILESTONE_HISTORY_THROUGH_2026-09-02.md](CURRENT_MILESTONE_HISTORY_THROUGH_2026-09-02.md).
 ```text

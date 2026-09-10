@@ -153,6 +153,8 @@ REFERENCE_ONLY_HISTORY 描述审核窗口没有恢复旧归档本体。这个历
 
 ## 7. Public derivatives and ADR transformation
 
+本节为 PR #84 在 `3bf2e7a5152a7bd9c1087571aab6413a53a43bb6` 发布的 2026-09-09 历史派生记录。ADR 行的 37611 字节及 `ee2ff93f…` 摘要只指该提交内的 v1.0 对象，不是当前 ADR 链接内容的摘要；当前 v1.2 接受与发布身份见第 9 节。三份 E4 派生报告的字节及摘要保持不变。
+
 下列 Markdown 由本次文档执行在 2026-09-09 编制，采集/分析基线仍为 f007。保护方式为限定字段公开派生，原始 JSON、账单、端点、完整 argv/环境字典、主机和会话标识留仓库外。所有摘要按最终派生字节计算，不能用来加载或校验密封原件。
 
 | 派生文档 | 字节数 | 派生 SHA-256 | 转换 |
@@ -162,10 +164,28 @@ REFERENCE_ONLY_HISTORY 描述审核窗口没有恢复旧归档本体。这个历
 | [M10_M11_GENERATION_DISPATCH_AUTHORITY_AUDIT_2026-09-09.md](M10_M11_GENERATION_DISPATCH_AUTHORITY_AUDIT_2026-09-09.md) | 7915 | `edafa9cfed4f5e18028f80cdd022ff580913081cbdf25358b6b630c97473ff0c` | 多份原件的脱敏、有时点限定的文档化 |
 | [ADR-0022-generation-dispatch-grant.md](../../governance/ADR-0022-generation-dispatch-grant.md) | 37611 | `ee2ff93f2e5477c00de6b5492ea0ea4aa4b42b3ea63de18a3d365da584a2ee16` | 原审议稿的登记/时点/私有定位元数据/相对链接修正；方案正文保持 |
 
-ADR 原稿为 36889 字节，SHA-256 `23455b3d4a211f5e28b3563703c94551699e379a5b08f01034967b234065bac6`；原件见第 4 节。入库候选为 37611 字节，SHA-256 `ee2ff93f2e5477c00de6b5492ea0ea4aa4b42b3ea63de18a3d365da584a2ee16`。转换仅包括提案编号登记说明、提案形成时点限定、用相同 commit/Tree 表示私有源码定位和添加相对证据链接；第 1–12 节方案正文逐字节相同，第 13 节只添加历史时点说明。schema、Terminal、CAS、签发及消费边界未重新设计。Status=Proposed；完整审批 PENDING；不 supersede 任何 Accepted ADR。
+本历史检查点的 ADR v1.0 原稿为 36889 字节，SHA-256 `23455b3d4a211f5e28b3563703c94551699e379a5b08f01034967b234065bac6`；原件见第 4 节。入库候选为 37611 字节，SHA-256 `ee2ff93f2e5477c00de6b5492ea0ea4aa4b42b3ea63de18a3d365da584a2ee16`。转换仅包括提案编号登记说明、提案形成时点限定、用相同 commit/Tree 表示私有源码定位和添加相对证据链接；第 1–12 节方案正文逐字节相同，第 13 节只添加历史时点说明。schema、Terminal、CAS、签发及消费边界未重新设计。该 v1.0 历史发布时点 Status=Proposed；完整审批 PENDING；当时不 supersede 任何 Accepted ADR。此句不描述 v1.2 的当前接受状态。
 
 本索引以及 CURRENT_MILESTONE、registry、authority map 的最终摘要由仓库外执行回执记录，避免自包含摘要循环。最终 PR、CI、merge commit/Tree 只记入该执行回执，不在文档中预报或触发第二次自引用 PR。
 
-## 8. Current boundary
+## 8. Historical boundary — 2026-09-09
+
+本节保留 2026-09-09 文档检查点的边界；下述“本次”和“ADR 提案登记”仅指该历史动作。v1.2 后续架构接受另见第 9 节，原运行观察和限制不因接受而改写。
 
 E3 PREPARED_AND_VERIFIED 保留；E4_RUNTIME_EVIDENCE=VERIFIED_TECHNICAL_ONLY；正式 v2 证明已创建并验证。C1/C2、派发机制缺失、未来服务 currentness、费用与完整执行绑定仍限制后续执行。ADR 提案登记不批准实现、真实 Grant、生成、输出准入或发布；Spike-0 仍 BLOCKED，本次不提出生成授权申请、不启动下一任务。
+
+## 9. ADR-0022 v1.2 接受与发布（2026-09-10）
+
+Project Lead 已接受精确 v1.2 全文，并另行授权 Accepted 元数据回填及文档入库。架构状态为 ACCEPTED_ARCHITECTURE_ONLY；规范以 [ADR-0022](../../governance/ADR-0022-generation-dispatch-grant.md) 为准，人工决定及来源映射见 [v1.2 架构接受记录](ADR_0022_V1_2_ARCHITECTURE_ACCEPTANCE_2026-09-10.md)。本节为可重建导航增补，不是新 runtime 采集、第二批准机制或真实 Grant。
+
+| 对象 | 字节数 | SHA-256 | 来源与转换 |
+| --- | ---: | --- | --- |
+| 原接受 v1.2 候选 | 72590 | `b963c12a07dea8816516752a40470df035e275714909a302ee8087963d4af75f` | Project Lead 接受的精确原字节，仓库外保全；原 Proposed 元数据属于候选时点 |
+| [ADR-0022 Accepted 发布版](../../governance/ADR-0022-generation-dispatch-grant.md) | 74503 | `ecb896012ec1a501b1883d6239ba22514c07d61adab06062d453f441c1573f60` | 原接受对象的元数据派生，仅回填接受/发布依据和历史语境 |
+| [公开接受记录](ADR_0022_V1_2_ARCHITECTURE_ACCEPTANCE_2026-09-10.md) | 4275 | `9b0c40a2618918a7f4476becaa502caec4ea7f13575b61b0d13fd1642d929137` | 原人工接受记录与回执的公开历史登记，包含原接受对象和发布对象的准确映射 |
+
+ADR 第 1—13 节从 `## 1. Context 与保留边界` 到 `## 14. 修订记录与源码依据` 之前，含段间全部空白，共 66124 字节，两版完全相同，SHA-256 为 `b63c0a588de2ae4f4085fa0b80fc69889d6a9836d29f133c9de5c8b8d960b7d1`。未更改规范 schema、权限、摘要、CAS、消费、幂等、时序或费用语义；原 v1.0/v1.1 及 E3/E4 记录仍按各自历史时点解释。
+
+SPIKE_0_READINESS=BLOCKED；GENERATION_DISPATCH_MECHANISM_AT_AUDITED_COMMIT=NOT_IMPLEMENTED；GENERATION_DISPATCH_IMPLEMENTATION_AUTHORIZED=false；GENERATION_AUTHORIZATION_APPLICATION_SUBMITTED=false。架构接受不授权实现、正式数据库/配置写入、真实 Grant 签发/消费、费用、A100/ComfyUI、prompt、输出准入或发布。E4 执行 pin 仍为 `f007ab3e93c3fb7f5e8b3b7f81c34fec28858176`；Frontend pin 和既有 tag 不变。
+
+本索引、registry、authority map、CURRENT_MILESTONE 及最终 commit/tree 的摘要只由仓库外执行回执记录。本节不预报 PR/CI/合并通过，不修改原件摘要，不解除运行阻塞，也不自动开启实现或生成申请。

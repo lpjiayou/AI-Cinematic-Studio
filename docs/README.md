@@ -33,6 +33,7 @@ deliberately isolated and do not authorize current execution.
 - [`governance/ADR-0019-upstream-execution-method-and-requirement-routing.md`](../governance/ADR-0019-upstream-execution-method-and-requirement-routing.md) — `ACCEPTED`
 - [`governance/ADR-0020-m12-cpu-build-host-and-a100-offline-consumer.md`](../governance/ADR-0020-m12-cpu-build-host-and-a100-offline-consumer.md) — `ACCEPTED`
 - [`governance/ADR-0021-manifest-v2-technical-input-append-authority.md`](../governance/ADR-0021-manifest-v2-technical-input-append-authority.md) — `ACCEPTED`
+- [`governance/ADR-0022-generation-dispatch-grant.md`](../governance/ADR-0022-generation-dispatch-grant.md) — `ACCEPTED`
 
 ## NORMATIVE_ARCHITECTURE
 
@@ -164,6 +165,7 @@ deliberately isolated and do not authorize current execution.
 
 ## HISTORICAL_EVIDENCE
 
+- [`docs/status/ADR_0022_V1_2_ARCHITECTURE_ACCEPTANCE_2026-09-10.md`](status/ADR_0022_V1_2_ARCHITECTURE_ACCEPTANCE_2026-09-10.md) — `RECORDED`
 - [`docs/status/M10_M11_SPIKE_0_E4_RUNTIME_PREFLIGHT_2026-09-09.md`](status/M10_M11_SPIKE_0_E4_RUNTIME_PREFLIGHT_2026-09-09.md) — `RECORDED`
 - [`docs/status/M10_M11_SPIKE_0_E4_EXACT_BINDING_REVIEW_2026-09-09.md`](status/M10_M11_SPIKE_0_E4_EXACT_BINDING_REVIEW_2026-09-09.md) — `RECORDED`
 - [`docs/status/M10_M11_GENERATION_DISPATCH_AUTHORITY_AUDIT_2026-09-09.md`](status/M10_M11_GENERATION_DISPATCH_AUTHORITY_AUDIT_2026-09-09.md) — `RECORDED`
@@ -218,7 +220,6 @@ deliberately isolated and do not authorize current execution.
 
 ## DRAFT
 
-- [`governance/ADR-0022-generation-dispatch-grant.md`](../governance/ADR-0022-generation-dispatch-grant.md) — `PROPOSED`
 - [`architecture/technology-stack-decision.md`](../architecture/technology-stack-decision.md) — `DRAFT`
 - [`experiments/ccv-r1/experiment-manifest.pending.json`](../experiments/ccv-r1/experiment-manifest.pending.json) — `DRAFT`
 - [`governance/ADR_TEMPLATE.md`](../governance/ADR_TEMPLATE.md) — `DRAFT`

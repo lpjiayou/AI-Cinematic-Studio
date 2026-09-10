@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
   "repository": "Core",
-  "reviewedBaseline": "f007ab3e93c3fb7f5e8b3b7f81c34fec28858176",
-  "reviewedAt": "2026-09-09",
+  "reviewedBaseline": "3bf2e7a5152a7bd9c1087571aab6413a53a43bb6",
+  "reviewedAt": "2026-09-10",
   "documentClasses": [
     "ACCEPTED_DECISION",
     "NORMATIVE_ARCHITECTURE",
@@ -114,8 +114,8 @@
       "supersededBy": [],
       "currentStateClaimsAllowed": true,
       "historicalMutationPolicy": "UPDATE_FROM_MERGED_EVIDENCE_ONLY",
-      "lastReviewedBaseline": "f007ab3e93c3fb7f5e8b3b7f81c34fec28858176",
-      "lastReviewedAt": "2026-09-09",
+      "lastReviewedBaseline": "3bf2e7a5152a7bd9c1087571aab6413a53a43bb6",
+      "lastReviewedAt": "2026-09-10",
       "linkedFromIndex": true,
       "notes": "Current claims require merged evidence and may not override Accepted ADRs."
     },
@@ -1563,8 +1563,8 @@
       "supersededBy": [],
       "currentStateClaimsAllowed": false,
       "historicalMutationPolicy": "REGENERATE_FROM_REVIEWED_INVENTORY",
-      "lastReviewedBaseline": "7081f9dbfbda2664f539a59e20b30f079d039dc4",
-      "lastReviewedAt": "2026-09-08",
+      "lastReviewedBaseline": "3bf2e7a5152a7bd9c1087571aab6413a53a43bb6",
+      "lastReviewedAt": "2026-09-10",
       "linkedFromIndex": true,
       "notes": "Navigation/reference only; resolve authority through the linked source documents."
     },
@@ -1707,8 +1707,8 @@
       "supersededBy": [],
       "currentStateClaimsAllowed": false,
       "historicalMutationPolicy": "REGENERATE_FROM_REVIEWED_INVENTORY",
-      "lastReviewedBaseline": "f007ab3e93c3fb7f5e8b3b7f81c34fec28858176",
-      "lastReviewedAt": "2026-09-09",
+      "lastReviewedBaseline": "3bf2e7a5152a7bd9c1087571aab6413a53a43bb6",
+      "lastReviewedAt": "2026-09-10",
       "linkedFromIndex": true,
       "notes": "Navigation/reference only; resolve authority through the linked source documents."
     },
@@ -1725,8 +1725,8 @@
       "supersededBy": [],
       "currentStateClaimsAllowed": false,
       "historicalMutationPolicy": "REGENERATE_FROM_REVIEWED_INVENTORY",
-      "lastReviewedBaseline": "f007ab3e93c3fb7f5e8b3b7f81c34fec28858176",
-      "lastReviewedAt": "2026-09-09",
+      "lastReviewedBaseline": "3bf2e7a5152a7bd9c1087571aab6413a53a43bb6",
+      "lastReviewedAt": "2026-09-10",
       "linkedFromIndex": true,
       "notes": "Navigation/reference only; resolve authority through the linked source documents."
     },
@@ -3518,26 +3518,46 @@
       "supersededBy": [],
       "currentStateClaimsAllowed": false,
       "historicalMutationPolicy": "REGENERATE_FROM_REVIEWED_INVENTORY",
-      "lastReviewedBaseline": "f007ab3e93c3fb7f5e8b3b7f81c34fec28858176",
-      "lastReviewedAt": "2026-09-09",
+      "lastReviewedBaseline": "3bf2e7a5152a7bd9c1087571aab6413a53a43bb6",
+      "lastReviewedAt": "2026-09-10",
       "linkedFromIndex": true,
       "notes": "Source custody and sanitized projections only; no execution authority. Linked from DOCUMENT_AUTHORITY_MAP.md."
     },
     {
       "path": "governance/ADR-0022-generation-dispatch-grant.md",
       "repository": "Core",
-      "documentClass": "DRAFT",
-      "status": "PROPOSED",
+      "documentClass": "ACCEPTED_DECISION",
+      "status": "ACCEPTED",
       "owner": "Project Lead / Core Architecture Owner / Generation Dispatch Authority Owner / Spike-0 Execution Gate Owner",
-      "authoritativeFor": [],
+      "authoritativeFor": [
+        "v1.2 exact technical-subject generation-dispatch architecture contract only; no implementation or live execution permission"
+      ],
       "supersedes": [],
       "supersededBy": [],
       "currentStateClaimsAllowed": false,
-      "historicalMutationPolicy": "EDITABLE_UNTIL_ACCEPTED_OR_WITHDRAWN",
-      "lastReviewedBaseline": "f007ab3e93c3fb7f5e8b3b7f81c34fec28858176",
-      "lastReviewedAt": "2026-09-09",
+      "historicalMutationPolicy": "AMEND_OR_SUPERSEDE_BY_ACCEPTED_ADR_ONLY",
+      "lastReviewedBaseline": "3bf2e7a5152a7bd9c1087571aab6413a53a43bb6",
+      "lastReviewedAt": "2026-09-10",
       "linkedFromIndex": true,
-      "notes": "Proposed only; full acceptance pending; no implementation or execution authority. Linked from DOCUMENT_AUTHORITY_MAP.md."
+      "notes": "Project Lead accepted exact v1.2 SHA-256 b963c12a07dea8816516752a40470df035e275714909a302ee8087963d4af75f; publication SHA-256 ecb896012ec1a501b1883d6239ba22514c07d61adab06062d453f441c1573f60 maps acceptance metadata only, with sections 1-13 unchanged. ACCEPTED_ARCHITECTURE_ONLY; no implementation, live Grant, runtime or generation authority. Scope-limited ADR-0014 Decision 10 amendment is defined in section 2.3; other accepted decisions and historical facts remain intact."
+    },
+    {
+      "path": "docs/status/ADR_0022_V1_2_ARCHITECTURE_ACCEPTANCE_2026-09-10.md",
+      "repository": "Core",
+      "documentClass": "HISTORICAL_EVIDENCE",
+      "status": "RECORDED",
+      "owner": "Project Lead / Core Architecture Owner / Generation Dispatch Authority Owner / Spike-0 Execution Gate Owner",
+      "authoritativeFor": [
+        "recorded human architecture-acceptance fact and original-to-publication document identity mapping only"
+      ],
+      "supersedes": [],
+      "supersededBy": [],
+      "currentStateClaimsAllowed": false,
+      "historicalMutationPolicy": "IMMUTABLE_ONCE_RECORDED",
+      "lastReviewedBaseline": "3bf2e7a5152a7bd9c1087571aab6413a53a43bb6",
+      "lastReviewedAt": "2026-09-10",
+      "linkedFromIndex": true,
+      "notes": "HISTORICAL_PATH_NOT_EXECUTION_AUTHORITY=true; Public historical registration of the Project Lead acceptance decision; not a substitute for ADR-0022, not a live Grant or runtime approval bundle, and no implementation or generation permission."
     }
   ]
 }

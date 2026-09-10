@@ -20,22 +20,22 @@ the policy and source documents remain controlling within their declared scopes.
 Scope always matters. `CURRENT_MILESTONE.md` cannot override an Accepted ADR,
 and historical evidence cannot authorize current execution.
 
-Reviewed evidence baseline: `f007ab3e93c3fb7f5e8b3b7f81c34fec28858176`; date: `2026-09-09`. New E4 entries are linked below. Complete class-index registration in `docs/README.md` remains pending the explicit path-scope extension; this draft does not claim that governance gate has passed.
+Reviewed documentation baseline: `3bf2e7a5152a7bd9c1087571aab6413a53a43bb6`; date: `2026-09-10`. PR #84 established the five E4 classification-index links in `docs/README.md`; this update separately records ADR-0022 v1.2 architecture acceptance. Neither navigation update changes the E4 execution pin or clears runtime blockers.
 
 ## Classification totals
 
 | Class | Count | Current-state claims allowed |
 | --- | ---: | --- |
-| `ACCEPTED_DECISION` | 21 | no |
+| `ACCEPTED_DECISION` | 22 | no |
 | `NORMATIVE_ARCHITECTURE` | 14 | no |
 | `NORMATIVE_CONTRACT` | 32 | no |
 | `CURRENT_STATUS` | 19 | yes |
 | `CAPABILITY_MATRIX` | 1 | yes |
 | `OPERATIONAL_RUNBOOK` | 18 | no |
 | `IMPLEMENTATION_EVIDENCE` | 21 | no |
-| `HISTORICAL_EVIDENCE` | 39 | no |
+| `HISTORICAL_EVIDENCE` | 40 | no |
 | `SUPERSEDED` | 9 | no |
-| `DRAFT` | 4 | no |
+| `DRAFT` | 3 | no |
 | `DEPRECATED` | 0 | no |
 | `GENERATED_REFERENCE` | 16 | no |
 
@@ -64,6 +64,7 @@ Reviewed evidence baseline: `f007ab3e93c3fb7f5e8b3b7f81c34fec28858176`; date: `2
 | [`governance/ADR-0019-upstream-execution-method-and-requirement-routing.md`](../../governance/ADR-0019-upstream-execution-method-and-requirement-routing.md) | `ACCEPTED` | Architecture Owner / M3-M12 Domain Owners |
 | [`governance/ADR-0020-m12-cpu-build-host-and-a100-offline-consumer.md`](../../governance/ADR-0020-m12-cpu-build-host-and-a100-offline-consumer.md) | `ACCEPTED` | Project Lead / Architecture Owner / Infrastructure Owner / M12 Domain Owner |
 | [`governance/ADR-0021-manifest-v2-technical-input-append-authority.md`](../../governance/ADR-0021-manifest-v2-technical-input-append-authority.md) | `ACCEPTED` | Project Lead / Core Architecture Owner / Manifest v2 Contract Owner / M10 Canonical Input Append Owner / Candidate Review and Admission Owner |
+| [`governance/ADR-0022-generation-dispatch-grant.md`](../../governance/ADR-0022-generation-dispatch-grant.md) | `ACCEPTED` | Project Lead / Core Architecture Owner / Generation Dispatch Authority Owner / Spike-0 Execution Gate Owner |
 
 ## NORMATIVE_ARCHITECTURE
 
@@ -206,6 +207,7 @@ Reviewed evidence baseline: `f007ab3e93c3fb7f5e8b3b7f81c34fec28858176`; date: `2
 
 | Document | Status | Owner |
 | --- | --- | --- |
+| [`docs/status/ADR_0022_V1_2_ARCHITECTURE_ACCEPTANCE_2026-09-10.md`](../status/ADR_0022_V1_2_ARCHITECTURE_ACCEPTANCE_2026-09-10.md) | `RECORDED` | Project Lead / Core Architecture Owner / Generation Dispatch Authority Owner / Spike-0 Execution Gate Owner |
 | [`docs/status/M10_M11_GENERATION_DISPATCH_AUTHORITY_AUDIT_2026-09-09.md`](../status/M10_M11_GENERATION_DISPATCH_AUTHORITY_AUDIT_2026-09-09.md) | `RECORDED` | Project Lead / Core Architecture Owner / Generation Dispatch Authority Owner |
 | [`docs/status/M10_M11_SPIKE_0_E4_EXACT_BINDING_REVIEW_2026-09-09.md`](../status/M10_M11_SPIKE_0_E4_EXACT_BINDING_REVIEW_2026-09-09.md) | `RECORDED` | Project Lead / Core Architecture Owner / Spike-0 Execution Gate Owner |
 | [`docs/status/M10_M11_SPIKE_0_E4_RUNTIME_PREFLIGHT_2026-09-09.md`](../status/M10_M11_SPIKE_0_E4_RUNTIME_PREFLIGHT_2026-09-09.md) | `RECORDED` | Project Lead / Core Architecture Owner / Spike-0 Execution Gate Owner |
@@ -264,7 +266,6 @@ Reviewed evidence baseline: `f007ab3e93c3fb7f5e8b3b7f81c34fec28858176`; date: `2
 
 | Document | Status | Owner |
 | --- | --- | --- |
-| [`governance/ADR-0022-generation-dispatch-grant.md`](../../governance/ADR-0022-generation-dispatch-grant.md) | `PROPOSED` | Project Lead / Core Architecture Owner / Generation Dispatch Authority Owner / Spike-0 Execution Gate Owner |
 | [`architecture/technology-stack-decision.md`](../../architecture/technology-stack-decision.md) | `DRAFT` | Architecture Owner |
 | [`experiments/ccv-r1/experiment-manifest.pending.json`](../../experiments/ccv-r1/experiment-manifest.pending.json) | `DRAFT` | Experiment Owner |
 | [`governance/ADR_TEMPLATE.md`](../../governance/ADR_TEMPLATE.md) | `DRAFT` | Architecture Owner / Documentation Governance Owner |
