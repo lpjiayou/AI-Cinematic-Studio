@@ -22,6 +22,8 @@ and historical evidence cannot authorize current execution.
 
 Reviewed documentation baseline: `3bf2e7a5152a7bd9c1087571aab6413a53a43bb6`; date: `2026-09-10`. PR #84 established the five E4 classification-index links in `docs/README.md`; this update separately records ADR-0022 v1.2 architecture acceptance. Neither navigation update changes the E4 execution pin or clears runtime blockers.
 
+Package 1 acceptance registration baseline: `521439dad61bad49c415059f8503727d2d95d233`; date: `2026-09-10`. The new implementation-evidence record preserves the bounded Owner decision and exact CPU candidate identity; it does not grant runtime authority. Existing documentation review baselines retain their historical scope.
+
 ## Classification totals
 
 | Class | Count | Current-state claims allowed |
@@ -32,7 +34,7 @@ Reviewed documentation baseline: `3bf2e7a5152a7bd9c1087571aab6413a53a43bb6`; dat
 | `CURRENT_STATUS` | 19 | yes |
 | `CAPABILITY_MATRIX` | 1 | yes |
 | `OPERATIONAL_RUNBOOK` | 18 | no |
-| `IMPLEMENTATION_EVIDENCE` | 21 | no |
+| `IMPLEMENTATION_EVIDENCE` | 22 | no |
 | `HISTORICAL_EVIDENCE` | 40 | no |
 | `SUPERSEDED` | 9 | no |
 | `DRAFT` | 3 | no |
@@ -181,6 +183,7 @@ Reviewed documentation baseline: `3bf2e7a5152a7bd9c1087571aab6413a53a43bb6`; dat
 
 | Document | Status | Owner |
 | --- | --- | --- |
+| [`docs/status/ADR_0022_PKG1_CPU_ACCEPTANCE_2026-09-10.md`](../status/ADR_0022_PKG1_CPU_ACCEPTANCE_2026-09-10.md) | `RECORDED` | Project Lead / Core Architecture Owner / Repository Governance Owner |
 | [`docs/archive/AGENTS_ARCHIVE_MIGRATION_MANIFEST.json`](../archive/AGENTS_ARCHIVE_MIGRATION_MANIFEST.json) | `RECORDED` | Repository Governance Owner / CI Governance Owner |
 | [`design-qa.md`](../../design-qa.md) | `RECORDED` | Documentation Governance Owner |
 | [`docs/04-interface-contract/v5-v3-vertical-slice-review.md`](../04-interface-contract/v5-v3-vertical-slice-review.md) | `RECORDED` | Public Contract Owner |

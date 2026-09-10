@@ -3558,6 +3558,24 @@
       "lastReviewedAt": "2026-09-10",
       "linkedFromIndex": true,
       "notes": "HISTORICAL_PATH_NOT_EXECUTION_AUTHORITY=true; Public historical registration of the Project Lead acceptance decision; not a substitute for ADR-0022, not a live Grant or runtime approval bundle, and no implementation or generation permission."
+    },
+    {
+      "path": "docs/status/ADR_0022_PKG1_CPU_ACCEPTANCE_2026-09-10.md",
+      "repository": "Core",
+      "documentClass": "IMPLEMENTATION_EVIDENCE",
+      "status": "RECORDED",
+      "owner": "Project Lead / Core Architecture Owner / Repository Governance Owner",
+      "authoritativeFor": [
+        "Historical record of bounded Package 1 CPU-isolated Owner acceptance, exact accepted candidate identity and candidate-specific F01 closure; not runtime grant authority."
+      ],
+      "supersedes": [],
+      "supersededBy": [],
+      "currentStateClaimsAllowed": false,
+      "historicalMutationPolicy": "IMMUTABLE_ONCE_RECORDED",
+      "lastReviewedBaseline": "521439dad61bad49c415059f8503727d2d95d233",
+      "lastReviewedAt": "2026-09-10",
+      "linkedFromIndex": true,
+      "notes": "HISTORICAL_PATH_NOT_EXECUTION_AUTHORITY=true; records the supplied human acceptance and existing final_A/final_B CPU evidence only. Does not authorize live Grant issuance/consumption, later packages, deployment or generation."
     }
   ]
 }

@@ -22,6 +22,44 @@ from .foundation import (
 
 
 EVIDENCE_SCHEMA_VERSION = 2
+
+
+class GrantIssueValidityCheck(Protocol):
+    """Internal first-Grant check: trusted clock and local comparisons only.
+
+    No connection, client callback, external reads or additional writes are passed
+    through this port. Historical replay never invokes it.
+    """
+    def validate_before_commit(self) -> None: ...
+
+
+class RecordAppendValidationRejected(Exception):
+    """Internal receipt: validation failed and this append left no new record."""
+    def __init__(self, reason: Exception):
+        super().__init__("record append validation rejected")
+        self.reason = reason
+
+
+class RecordAppendOutcomeUnknown(Exception):
+    """Internal receipt: transaction completion/rollback cannot be confirmed."""
+
+
+def _validate_grant_issue_check(records, check):
+    if check is not None and (len(records) != 1
+            or records[0].recordKind != "GenerationDispatchGrant"
+            or not callable(getattr(check, "validate_before_commit", None))):
+        raise EpisodeProductionError("first-Grant validity check is invalid")
+
+
+def _rollback_grant_issue(connection):
+    try:
+        connection.rollback()
+        if connection.in_transaction:
+            raise RecordAppendOutcomeUnknown("rollback did not end transaction")
+    except Exception as exc:
+        raise RecordAppendOutcomeUnknown("rollback could not be confirmed") from exc
+
+
 ROOTS_READY = "ROOTS_READY"
 ALLOWED_EVIDENCE_RECORD_KINDS = frozenset(
     {
@@ -33,6 +71,8 @@ ALLOWED_EVIDENCE_RECORD_KINDS = frozenset(
         "MethodAwareMediaJobResult",
         "MethodAwareInputArtifact",
         "MethodAwareInputAppendAuthority",
+        "GenerationDispatchGrant",
+        "GenerationDispatchGrantTerminal",
         "AudioRequirementRouteVersion",
         "TechnicalValidation",
         "SemanticVisualQCDecision",
@@ -231,6 +271,7 @@ class EpisodeProductionEvidenceRepository(Protocol):
         expected_record_journal_head: str | None = None,
         expected_workspace_record_journal_head: str | None = None,
         expected_evidence_revision_token: str | None = None,
+        grant_issue_validity: GrantIssueValidityCheck | None = None,
     ) -> tuple[list[dict[str, Any]], bool]: ...
     def record_journal_head(self, workspace_ref: str, run_ref: str) -> str: ...
     def workspace_record_journal_head(self, workspace_ref: str) -> str: ...
@@ -271,6 +312,8 @@ def _gate_mapping(gate: GateAppend) -> dict[str, Any]:
 
 
 def _record_mapping(record: EvidenceRecord) -> dict[str, Any]:
+    if record.recordKind in {"GenerationDispatchGrant", "GenerationDispatchGrantTerminal"}:
+        _validate_record(record)
     return {
         "workspaceRef": record.workspaceRef,
         "productionRunRef": record.productionRunRef,
@@ -500,6 +543,12 @@ def _validate_record(record: EvidenceRecord) -> None:
         raise EpisodeProductionError("record embedded payload digest is invalid")
     if _digest(digest_payload) != record.payloadDigest:
         raise EpisodeProductionError("record payload digest is invalid")
+    if record.recordKind in {"GenerationDispatchGrant", "GenerationDispatchGrantTerminal"}:
+        from .generation_dispatch_contracts import DispatchError, validate_record_envelope
+        try:
+            validate_record_envelope(record)
+        except DispatchError as exc:
+            raise EpisodeProductionError("generation dispatch record is invalid") from exc
 
 
 def _validate_gate(gate: GateAppend) -> None:
@@ -863,9 +912,11 @@ class InMemoryEpisodeProductionEvidenceAdapter:
         expected_record_journal_head: str | None = None,
         expected_workspace_record_journal_head: str | None = None,
         expected_evidence_revision_token: str | None = None,
+        grant_issue_validity: GrantIssueValidityCheck | None = None,
     ) -> tuple[list[dict[str, Any]], bool]:
         if not records:
             raise EpisodeProductionError("record batch is empty")
+        _validate_grant_issue_check(records, grant_issue_validity)
         for record in records:
             _validate_record(record)
         scope = {(item.workspaceRef, item.productionRunRef) for item in records}
@@ -944,6 +995,24 @@ class InMemoryEpisodeProductionEvidenceAdapter:
                 and current_revision != expected_revision
             ):
                 raise StaleInputError("evidence snapshot revision changed")
+            if grant_issue_validity is not None:
+                # Prepare the single record/result under the same lock, then
+                # make the final decision immediately before publishing it.
+                record = deepcopy(records[0])
+                result = _record_mapping(record)
+                key = (record.workspaceRef, record.productionRunRef,
+                       record.recordRef, record.recordVersion)
+                replay_key = (record.workspaceRef, record.productionRunRef,
+                              record.idempotencyKey)
+                try:
+                    grant_issue_validity.validate_before_commit()
+                except Exception as exc:
+                    raise RecordAppendValidationRejected(exc) from exc
+                self._records[key] = record
+                self._record_idempotency[replay_key] = (record.recordRef, record.recordVersion)
+                self._record_order.setdefault((record.workspaceRef, record.productionRunRef), []).append(
+                    (record.recordRef, record.recordVersion))
+                return [result], False
             for record in records:
                 key = (
                     record.workspaceRef,
@@ -1728,7 +1797,11 @@ class SqliteEpisodeProductionEvidenceAdapter:
     @staticmethod
     def _decode_record(row: sqlite3.Row) -> dict[str, Any]:
         try:
-            payload = json.loads(row["payload_json"])
+            if row["record_kind"] in {"GenerationDispatchGrant", "GenerationDispatchGrantTerminal"}:
+                from .generation_dispatch_contracts import strict_json
+                payload = strict_json(row["payload_json"].encode("utf-8"))
+            else:
+                payload = json.loads(row["payload_json"])
             if not isinstance(payload, dict):
                 raise ValueError("record payload must be an object")
             record = EvidenceRecord(
@@ -1798,9 +1871,11 @@ class SqliteEpisodeProductionEvidenceAdapter:
         expected_record_journal_head: str | None = None,
         expected_workspace_record_journal_head: str | None = None,
         expected_evidence_revision_token: str | None = None,
+        grant_issue_validity: GrantIssueValidityCheck | None = None,
     ) -> tuple[list[dict[str, Any]], bool]:
         if not records:
             raise EpisodeProductionError("record batch is empty")
+        _validate_grant_issue_check(records, grant_issue_validity)
         for record in records:
             _validate_record(record)
         scope = {(item.workspaceRef, item.productionRunRef) for item in records}
@@ -1924,19 +1999,39 @@ class SqliteEpisodeProductionEvidenceAdapter:
                 if stored is None:
                     raise RepositoryUnavailableError("stored record could not be read")
                 result.append(self._decode_record(stored))
+            if grant_issue_validity is not None:
+                try:
+                    grant_issue_validity.validate_before_commit()
+                except Exception as exc:
+                    _rollback_grant_issue(connection)
+                    raise RecordAppendValidationRejected(exc) from exc
             connection.commit()
             return result, False
         except EpisodeProductionError:
-            connection.rollback()
+            if grant_issue_validity is None:
+                connection.rollback()
+            else:
+                _rollback_grant_issue(connection)
             raise
         except sqlite3.IntegrityError as exc:
-            connection.rollback()
+            if grant_issue_validity is None:
+                connection.rollback()
+            else:
+                _rollback_grant_issue(connection)
             raise IdempotencyConflictError("episode evidence record constraint failed") from exc
         except sqlite3.DatabaseError as exc:
-            connection.rollback()
+            if grant_issue_validity is None:
+                connection.rollback()
+            else:
+                _rollback_grant_issue(connection)
             raise RepositoryUnavailableError("episode evidence record write failed") from exc
         finally:
-            connection.close()
+            try:
+                connection.close()
+            except Exception as exc:
+                if grant_issue_validity is not None:
+                    raise RecordAppendOutcomeUnknown("connection close could not be confirmed") from exc
+                raise
 
     @classmethod
     def _workspace_record_journal_head_in_connection(
