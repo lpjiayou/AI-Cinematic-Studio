@@ -118,6 +118,7 @@ class K2CanonicalLineageBootstrapTests(unittest.TestCase):
             self.assertTrue(target.is_dir())
             expected_files = {
                 *bootstrap.DATABASE_FILENAMES.values(),
+                *bootstrap.STORAGE_LEASE_FILENAMES,
                 bootstrap.RECEIPT_FILENAME,
                 bootstrap.INVENTORY_FILENAME,
             }

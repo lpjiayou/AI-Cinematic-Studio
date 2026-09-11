@@ -444,7 +444,8 @@ def validate_canonical_registration_database(database_path: Path | str) -> None:
         raise CanonicalRegistrationMigrationError(
             "database initialization required"
         )
-    connection = sqlite3.connect(path, timeout=10)
+    from services.v4_platform.generation_dispatch_jobs import connect_storage
+    connection = connect_storage(path, None, timeout=10)
     connection.row_factory = sqlite3.Row
     connection.execute("PRAGMA foreign_keys=ON")
     try:

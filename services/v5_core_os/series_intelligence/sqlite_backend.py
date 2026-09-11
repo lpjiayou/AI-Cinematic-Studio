@@ -456,7 +456,8 @@ class SqliteSeriesIntelligenceRepository:
     ) -> None:
         self.database_path = Path(database_path).resolve()
         self._state = lifecycle_state
-        self._lock = RLock()
+        from services.v4_platform.generation_dispatch_jobs import storage_access_lock
+        self._lock = storage_access_lock(self, "database_path")
         self._fault = fault_hook or (lambda _point: None)
         self._column_cache: dict[str, tuple[str, ...]] = {}
         self._validate_schema()
@@ -489,10 +490,11 @@ class SqliteSeriesIntelligenceRepository:
         self.active_snapshots = _ActiveSnapshotMapping(self)
 
     def _connect(self) -> sqlite3.Connection:
+        from services.v4_platform.generation_dispatch_jobs import connect_storage
         connection = None
         try:
-            connection = sqlite3.connect(
-                self.database_path, timeout=10, isolation_level=None
+            connection = connect_storage(
+                self.database_path, self, timeout=10, isolation_level=None
             )
             connection.row_factory = sqlite3.Row
             connection.execute("PRAGMA foreign_keys = ON")

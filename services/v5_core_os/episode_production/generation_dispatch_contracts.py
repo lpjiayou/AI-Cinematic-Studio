@@ -444,10 +444,52 @@ def validate_read_set_bindings(read_set: dict, plan: dict, approval: dict) -> No
         ("V5_EPISODE_PRODUCTION", s["inputAsset"]["assetVersionRef"], s["inputAsset"]["assetVersionDigest"]),
         ("V5_EPISODE_PRODUCTION", s["inputAppendAuthority"]["ref"], s["inputAppendAuthority"]["digest"]),
         ("V4_BACKEND_CONFIG", b["executionProfile"]["ref"], b["executionProfile"]["digest"]),
-        ("V4_BACKEND_CONFIG", b["costBasis"]["ref"], b["costBasis"]["digest"]),
-        ("OWNER_APPROVAL", approval["approvalEvidenceRef"], approval["approvalEvidenceDigest"])]
+        ("V4_BACKEND_CONFIG", b["costBasis"]["ref"], b["costBasis"]["digest"])]
+    if read_set["phase"] != "PREPARE":
+        expected.append(("OWNER_APPROVAL", approval["approvalEvidenceRef"], approval["approvalEvidenceDigest"]))
     expected.extend(("V5_EPISODE_PRODUCTION", s[k]["ref"], s[k]["digest"]) for k in ("creativeShotVersion", "actionExecutionBeat", "visualExecutionRequirement"))
     require(all(item in objects for item in expected), "SOURCE_CHANGED")
+
+
+def required_read_set_proofs(plan_package: dict) -> list[dict]:
+    """Known proof dependencies at a complete, current material boundary.
+
+    These are requirements, not observations or proof of an original read.
+    The plan-only historical validator deliberately cannot make this check.
+    """
+    package = validate_plan_package(plan_package)
+    decision = package["plan"]["executionBinding"]["backendDecision"]
+    cost = package["materials"]["costBasis"]
+    required = {}
+
+    def add(owner, kind, reference, digest_value):
+        key = (owner, kind, reference)
+        value = {"owner": owner, "objectKind": kind,
+                 "objectRef": reference, "objectDigest": digest_value}
+        require(key not in required or required[key] == value, "SOURCE_CHANGED")
+        required[key] = value
+
+    add("RUNTIME_PROCESS", "RuntimeAttestation", decision["runtimeAttestationRef"],
+        decision["runtimeAttestationDigest"])
+    for proof in [*cost["sourceEvidence"], cost["billingResponsibility"]["continuingChargesEvidence"]]:
+        add("V4_BACKEND_CONFIG", "CostEvidence", proof["ref"], proof["digest"])
+    return [required[key] for key in sorted(required)]
+
+
+def validate_read_set_proof_bindings(read_set: dict, plan_package: dict) -> None:
+    """Require all known proofs without changing historical record schemas."""
+    validate_read_set(read_set, expected_scope=plan_package["plan"]["scope"])
+    required = required_read_set_proofs(plan_package)
+    actual = {(o["owner"], o["objectKind"], o["objectRef"]): o["objectDigest"]
+              for o in read_set["objects"]}
+    for proof in required:
+        key = (proof["owner"], proof["objectKind"], proof["objectRef"])
+        require(actual.get(key) == proof["objectDigest"], "SOURCE_CHANGED")
+        # A second representation of the same original must not conceal drift.
+        require(all(o["objectDigest"] == proof["objectDigest"]
+                    for o in read_set["objects"]
+                    if (o["owner"], o["objectRef"]) == (proof["owner"], proof["objectRef"])),
+                "SOURCE_CHANGED")
 
 
 def request_identity(plan: dict) -> dict:
@@ -656,7 +698,10 @@ def validate_record_envelope(record) -> None:
 
 def validate_command(operation: str, value: Any) -> dict:
     common = {"workspaceRef", "productionRunRef"}
-    if operation == "ISSUE":
+    if operation == "PREPARE":
+        fields = common | {"methodAwareInputPlanVersionRef", "creativeShotVersionRef", "beatRef",
+            "inputAssetVersionRef", "backendRef", "executionConfigRef", "costBasisRef", "limits"}
+    elif operation == "ISSUE":
         fields = common | {"methodAwareInputPlanVersionRef", "creativeShotVersionRef", "beatRef", "inputAssetVersionRef", "backendRef",
             "expectedSubjectDigest", "expectedApprovedPlanDigest", "authorityDecisionRef", "idempotencyKey", "snapshotTokens"}
     elif operation == "INSPECT":
@@ -667,7 +712,9 @@ def validate_command(operation: str, value: Any) -> dict:
         raise DispatchError()
     exact(value, fields)
     for key, item in value.items():
-        if key == "snapshotTokens":
+        if key == "limits":
+            validate_limits(item)
+        elif key == "snapshotTokens":
             tokens(item)
         elif key.endswith("Digest"):
             sha(item)

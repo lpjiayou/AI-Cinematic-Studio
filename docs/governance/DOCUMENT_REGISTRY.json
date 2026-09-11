@@ -3576,6 +3576,24 @@
       "lastReviewedAt": "2026-09-10",
       "linkedFromIndex": true,
       "notes": "HISTORICAL_PATH_NOT_EXECUTION_AUTHORITY=true; records the supplied human acceptance and existing final_A/final_B CPU evidence only. Does not authorize live Grant issuance/consumption, later packages, deployment or generation."
+    },
+    {
+      "path": "docs/status/ADR_0022_PKG2_CPU_ACCEPTANCE_2026-09-11.md",
+      "repository": "Core",
+      "documentClass": "IMPLEMENTATION_EVIDENCE",
+      "status": "RECORDED",
+      "owner": "Project Lead / Core Architecture Owner / Repository Governance Owner",
+      "authoritativeFor": [
+        "Historical record of bounded Package 2 CPU-isolated Owner acceptance, exact accepted candidate identity, candidate-specific finding closures and accepted residual evidence risk; not runtime grant authority."
+      ],
+      "supersedes": [],
+      "supersededBy": [],
+      "currentStateClaimsAllowed": false,
+      "historicalMutationPolicy": "IMMUTABLE_ONCE_RECORDED",
+      "lastReviewedBaseline": "230bde8ac53a4d7d02ef02f8eea85efe6f1afc13",
+      "lastReviewedAt": "2026-09-11",
+      "linkedFromIndex": true,
+      "notes": "HISTORICAL_PATH_NOT_EXECUTION_AUTHORITY=true; records the supplied Owner decision, CPU-isolated A110/B38 evidence and bounded R4 streaming-export risk. Does not authorize live Grant issuance/consumption, Package 3, deployment, GPU sending or generation."
     }
   ]
 }

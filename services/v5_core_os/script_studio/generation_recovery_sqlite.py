@@ -97,9 +97,10 @@ def validate_generation_connection(connection):
 class SqliteGenerationStore:
     def __init__(self, database_path, *, lifecycle_state):
         self.database_path = Path(database_path)
+        from services.v4_platform.generation_dispatch_jobs import connect_storage
         self._state = lifecycle_state
         try:
-            with closing(sqlite3.connect(self.database_path, timeout=10, isolation_level=None)) as connection:
+            with closing(connect_storage(self.database_path, self, timeout=10, isolation_level=None)) as connection:
                 connection.row_factory = sqlite3.Row
                 connection.execute("BEGIN IMMEDIATE")
                 names = connection.execute("SELECT name FROM sqlite_master WHERE name IN (?,?,?)",

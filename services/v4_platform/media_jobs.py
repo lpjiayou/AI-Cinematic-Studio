@@ -28,12 +28,15 @@ from .backend_registry import (
 from .method_aware_execution import (
     METHOD_AWARE_JOB_SCHEMA_VERSION, MethodAwareExecutionEnvelopeBuilder,
     output_probe_request, validate_context, validate_envelope, validate_execution_result,
+    DISPATCH_JOB_SCHEMA_VERSION, DISPATCH_REQUEST_SCHEMA,
+    validate_dispatch_grant_binding,
 )
 
 LEGACY_JOB_SCHEMA_VERSION = "v4.media-job.v1"
 JOB_SCHEMA_VERSION = "v4.media-job.v2"
 
-FENCED_JOB_SCHEMAS = {JOB_SCHEMA_VERSION, METHOD_AWARE_JOB_SCHEMA_VERSION}
+FENCED_JOB_SCHEMAS = {JOB_SCHEMA_VERSION, METHOD_AWARE_JOB_SCHEMA_VERSION, DISPATCH_JOB_SCHEMA_VERSION}
+DISPATCH_KEY_PREFIX = "generation-dispatch-job-v1:"
 ARTIFACT_SCHEMA_VERSION = "v4.media-artifact-handoff.v1"
 ARTIFACT_COMMIT_INTENT_SCHEMA_VERSION = "v4.media-artifact-commit-intent.v1"
 MEDIA_BATCH_SCHEMA_VERSION = "v4.media-batch.v1"
@@ -424,6 +427,13 @@ def _validate_method_aware_video_request(request: Mapping[str, Any]) -> None:
         "createdAt",
         "payloadDigest",
     }
+    dispatch_bound = isinstance(request, Mapping) and request.get("schemaVersion") == DISPATCH_REQUEST_SCHEMA
+    if dispatch_bound:
+        fields.add("dispatchGrantBinding")
+        try:
+            validate_dispatch_grant_binding(request.get("dispatchGrantBinding"))
+        except BackendValidationError as exc:
+            raise MediaJobError("invalid dispatch Grant binding") from exc
     camera = request.get("cameraInstruction")
     action = request.get("sourceAction")
     span = action.get("sourceSpan") if isinstance(action, Mapping) else None
@@ -432,10 +442,10 @@ def _validate_method_aware_video_request(request: Mapping[str, Any]) -> None:
         not isinstance(request, Mapping)
         or set(request) != fields
         or request.get("schemaVersion")
-        != METHOD_AWARE_VIDEO_REQUEST_SCHEMA_VERSION
+        != (DISPATCH_REQUEST_SCHEMA if dispatch_bound else METHOD_AWARE_VIDEO_REQUEST_SCHEMA_VERSION)
         or _digest({k: v for k, v in request.items() if k != "payloadDigest"})
         != request.get("payloadDigest")
-        or request.get("version") != 1
+        or request.get("version") != (2 if dispatch_bound else 1)
         or type(request.get("version")) is not int
         or request.get("executionClass") != "MICRO_MOTION"
         or request.get("executionMethod") != "SINGLE_ANCHOR_I2V"
@@ -586,7 +596,7 @@ def _validate_request(request: Mapping[str, Any]) -> None:
     if (
         isinstance(request, Mapping)
         and request.get("schemaVersion")
-        == METHOD_AWARE_VIDEO_REQUEST_SCHEMA_VERSION
+        in {METHOD_AWARE_VIDEO_REQUEST_SCHEMA_VERSION, DISPATCH_REQUEST_SCHEMA}
     ):
         _validate_method_aware_video_request(request)
         return
@@ -942,6 +952,8 @@ def _validate_job(job: Mapping[str, Any]) -> None:
     if not isinstance(request, Mapping):
         raise MediaJobError("media job request is missing")
     _validate_request(request)
+    if (request.get("schemaVersion") == DISPATCH_REQUEST_SCHEMA) != (job["schemaVersion"] == DISPATCH_JOB_SCHEMA_VERSION):
+        raise MediaJobError("Grant-bound request/Job version mismatch")
     if (
         job.get("workspaceRef") != request.get("workspaceRef")
         or job.get("productionRunRef") != request.get("productionRunRef")
@@ -974,11 +986,21 @@ def _validate_job(job: Mapping[str, Any]) -> None:
                 "legacy media job cannot contain an artifact commit intent"
             )
         _validate_artifact_commit_intent(intent, job)
-    if job["schemaVersion"] == METHOD_AWARE_JOB_SCHEMA_VERSION:
+    if job["schemaVersion"] in {METHOD_AWARE_JOB_SCHEMA_VERSION, DISPATCH_JOB_SCHEMA_VERSION}:
         try:
             backend_canonical(job)
-            if request["schemaVersion"] != METHOD_AWARE_VIDEO_REQUEST_SCHEMA_VERSION or job["maxAttempts"] != 1:
+            dispatch_bound = job["schemaVersion"] == DISPATCH_JOB_SCHEMA_VERSION
+            expected_request = DISPATCH_REQUEST_SCHEMA if dispatch_bound else METHOD_AWARE_VIDEO_REQUEST_SCHEMA_VERSION
+            if request["schemaVersion"] != expected_request or job["maxAttempts"] != 1:
                 raise BackendValidationError("method-aware job policy is invalid")
+            if dispatch_bound:
+                binding = validate_dispatch_grant_binding(job.get("dispatchGrantBinding"))
+                if binding != request["dispatchGrantBinding"] or job.get("executionEnvelope") is None:
+                    raise BackendValidationError("Job/request Grant binding is inconsistent")
+                from .generation_dispatch_jobs import internal_dispatch_key
+                if job["idempotencyKey"] != internal_dispatch_key(job["workspaceRef"],
+                        job["productionRunRef"], binding["generationDispatchGrantRef"]):
+                    raise BackendValidationError("Job internal dispatch key is inconsistent")
             decision = validate_decision(job.get("backendBinding"))
             validate_context(request, job.get("executionContext"))
             mode, provenance = execution_classification(decision)
@@ -1007,6 +1029,24 @@ def _validate_job(job: Mapping[str, Any]) -> None:
         except (BackendValidationError, KeyError, TypeError) as exc:
             raise MediaJobError("invalid method-aware job binding") from exc
     _validate_job_state_shape(job)
+
+
+def _same_dispatch_replay(existing, value):
+    if existing["requestDigest"] != value["requestDigest"] or any(
+            existing.get(k) != value.get(k) for k in ("backendBinding", "executionContext")):
+        return False
+    if DISPATCH_JOB_SCHEMA_VERSION in {existing["schemaVersion"], value["schemaVersion"]}:
+        return (existing["schemaVersion"] == value["schemaVersion"] == DISPATCH_JOB_SCHEMA_VERSION
+            and existing["request"] == value["request"]
+            and existing["dispatchGrantBinding"] == value["dispatchGrantBinding"]
+            and existing["executionEnvelope"] == value["executionEnvelope"])
+    return True
+
+
+def _validate_dispatch_namespace_for_insert(value):
+    if (value["idempotencyKey"].startswith(DISPATCH_KEY_PREFIX)
+            and value["schemaVersion"] != DISPATCH_JOB_SCHEMA_VERSION):
+        raise MediaJobConflictError("dispatch Grant idempotency namespace is reserved")
 
 
 def _validate_artifact_commit_intent(
@@ -1105,6 +1145,7 @@ def _validate_job_update(
             (LEGACY_JOB_SCHEMA_VERSION, JOB_SCHEMA_VERSION),
             (JOB_SCHEMA_VERSION, JOB_SCHEMA_VERSION),
             (METHOD_AWARE_JOB_SCHEMA_VERSION, METHOD_AWARE_JOB_SCHEMA_VERSION),
+            (DISPATCH_JOB_SCHEMA_VERSION, DISPATCH_JOB_SCHEMA_VERSION),
         }
         or any(
             current.get(field) != value.get(field)
@@ -1112,6 +1153,11 @@ def _validate_job_update(
         )
     ):
         raise MediaJobStateError("immutable media job identity changed")
+    if current["schemaVersion"] == DISPATCH_JOB_SCHEMA_VERSION and (
+            current.get("dispatchGrantBinding") != value.get("dispatchGrantBinding")
+            or value["attempts"] != current["attempts"]
+            or value.get("lease") != current.get("lease")):
+        raise MediaJobStateError("Grant-bound Job consumption is unavailable in this package")
     if schema_transition == (LEGACY_JOB_SCHEMA_VERSION, JOB_SCHEMA_VERSION) and (
         (current.get("state"), value.get("state"))
         not in {("QUEUED", "LEASED"), ("LEASED", "RUNNING")}
@@ -1290,10 +1336,10 @@ class InMemoryMediaJobAdapter:
             existing_ref = self._idem.get(idem)
             if existing_ref is not None:
                 existing = self._jobs[(idem[0], idem[1], existing_ref)]
-                if (existing["requestDigest"] != value["requestDigest"] or any(
-                    existing.get(key) != value.get(key) for key in ("backendBinding", "executionContext"))):
+                if not _same_dispatch_replay(existing, value):
                     raise MediaJobConflictError("media dispatch idempotency conflict")
                 return deepcopy(existing), True
+            _validate_dispatch_namespace_for_insert(value)
             if key in self._jobs:
                 raise MediaJobConflictError("duplicate media job ref")
             self._jobs[key] = value
@@ -1445,7 +1491,8 @@ class SqliteMediaJobAdapter:
             raise MediaJobError("media job database is unavailable") from exc
 
     def _connect(self) -> sqlite3.Connection:
-        connection = sqlite3.connect(self.path, timeout=10)
+        from .generation_dispatch_jobs import connect_storage
+        connection = connect_storage(self.path, self, timeout=10)
         connection.row_factory = sqlite3.Row
         return connection
 
@@ -1621,11 +1668,11 @@ class SqliteMediaJobAdapter:
             ).fetchone()
             if existing is not None:
                 restored = self._decode(existing)
-                if (restored["requestDigest"] != value["requestDigest"] or any(
-                    restored.get(key) != value.get(key) for key in ("backendBinding", "executionContext"))):
+                if not _same_dispatch_replay(restored, value):
                     raise MediaJobConflictError("media dispatch idempotency conflict")
                 connection.rollback()
                 return deepcopy(restored), True
+            _validate_dispatch_namespace_for_insert(value)
             connection.execute(
                 "INSERT INTO v4_media_jobs VALUES (?,?,?,?,?,?,?,?)",
                 (
@@ -2482,6 +2529,8 @@ class MediaJobCoordinator:
         execution_context: Mapping[str, Any] | None = None,
     ) -> tuple[dict[str, Any], bool]:
         _validate_request(request)
+        if request.get("schemaVersion") == DISPATCH_REQUEST_SCHEMA:
+            raise MediaJobError("Grant-bound requests require the verified V5 dispatch boundary")
         if not isinstance(idempotency_key, str) or not idempotency_key:
             raise MediaJobError("dispatch idempotency key is invalid")
         now = self._clock()
@@ -2574,7 +2623,7 @@ class MediaJobCoordinator:
                 else [j for j in self.repository.list(workspace_ref, run_ref)
                       if j["schemaVersion"] != METHOD_AWARE_JOB_SCHEMA_VERSION])
         for job in jobs:
-            if job is None:
+            if job is None or job["schemaVersion"] == DISPATCH_JOB_SCHEMA_VERSION:
                 continue
             pending_cleanup = job.get("artifactCommitIntent")
             if job["state"] in {"FAILED", "CANCELLED"} and isinstance(
@@ -2695,7 +2744,7 @@ class MediaJobCoordinator:
     ) -> dict[str, Any] | None:
         self.recover_expired(workspace_ref, run_ref)
         for job in self.repository.list(workspace_ref, run_ref):
-            if job["state"] != "QUEUED" or job["schemaVersion"] == METHOD_AWARE_JOB_SCHEMA_VERSION:
+            if job["state"] != "QUEUED" or job["schemaVersion"] in {METHOD_AWARE_JOB_SCHEMA_VERSION, DISPATCH_JOB_SCHEMA_VERSION}:
                 continue
             if len(job["attempts"]) >= job["maxAttempts"]:
                 expected = job["revision"]
@@ -2784,9 +2833,13 @@ class MediaJobCoordinator:
         return self.repository.save(job, expected)
 
     def run_leased(self, job: Mapping[str, Any], worker_ref: str) -> dict[str, Any]:
+        if job.get("schemaVersion") == DISPATCH_JOB_SCHEMA_VERSION:
+            raise MediaJobStateError("Grant-bound Job consumption is unavailable in this package")
         current = self.repository.get(
             job["workspaceRef"], job["productionRunRef"], job["jobRef"]
         )
+        if current is not None and current["schemaVersion"] == DISPATCH_JOB_SCHEMA_VERSION:
+            raise MediaJobStateError("Grant-bound Job consumption is unavailable in this package")
         supplied_lease = job.get("lease")
         current_lease = current.get("lease") if current is not None else None
         if (

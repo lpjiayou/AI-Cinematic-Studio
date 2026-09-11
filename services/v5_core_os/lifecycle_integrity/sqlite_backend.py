@@ -21,7 +21,8 @@ class SqliteLifecycleState:
             f"assembly-{uuid4().hex}", BackendKind.SQLITE_LOCAL, f"sqlite:{path}"
         )
         self._issuer_ref = f"issuer-{uuid4().hex}"
-        self._lock = RLock()
+        from services.v4_platform.generation_dispatch_jobs import storage_access_lock
+        self._lock = storage_access_lock(self, "database_path")
         self._thread = local()
         self._active: dict[str, LifecycleLeaseView] = {}
         self._state = AssemblyState.READY
@@ -65,12 +66,15 @@ class SqliteLifecycleState:
                 connection.rollback()
         finally:
             self._thread.read_connection = None
-            if connection is not None:
-                connection.close()
-            self._lock.release()
+            try:
+                if connection is not None:
+                    connection.close()
+            finally:
+                self._lock.release()
 
     def _connect(self) -> sqlite3.Connection:
-        connection = sqlite3.connect(self.database_path, timeout=10, isolation_level=None)
+        from services.v4_platform.generation_dispatch_jobs import connect_storage
+        connection = connect_storage(self.database_path, self, timeout=10, isolation_level=None)
         connection.row_factory = sqlite3.Row
         connection.execute("PRAGMA foreign_keys = ON")
         connection.execute("PRAGMA busy_timeout = 10000")
@@ -124,9 +128,11 @@ class SqliteLifecycleState:
                 self._active.pop(lease.nonce, None)
             self._thread.lease = None
             self._thread.connection = None
-            if connection is not None:
-                connection.close()
-            self._lock.release()
+            try:
+                if connection is not None:
+                    connection.close()
+            finally:
+                self._lock.release()
 
     def _poison(self, error: BaseException) -> None:
         self._state = AssemblyState.POISONED

@@ -289,8 +289,29 @@ def _load_bootstrap_receipt(root: Path) -> tuple[Mapping[str, Any], Path, str]:
     ):
         raise ApiVerificationError("bootstrap_database_inventory_names_invalid")
 
+    verified_storage_leases: list[dict[str, str]] = []
+    for filename in bootstrap.STORAGE_LEASE_FILENAMES:
+        lease_path = root / filename
+        try:
+            metadata = lease_path.lstat()
+        except OSError:
+            raise ApiVerificationError("bootstrap_storage_lease_invalid") from None
+        if (
+            lease_path.is_symlink()
+            or not stat.S_ISREG(metadata.st_mode)
+            or stat.S_IMODE(metadata.st_mode) != 0o600
+            or metadata.st_uid != os.geteuid()
+            or metadata.st_nlink != 1
+            or metadata.st_size != 0
+        ):
+            raise ApiVerificationError("bootstrap_storage_lease_invalid")
+        verified_storage_leases.append(
+            {"path": filename, "sha256": _file_sha256(lease_path)}
+        )
+
     expected_root_entries = {
         *expected_names,
+        *bootstrap.STORAGE_LEASE_FILENAMES,
         bootstrap.RECEIPT_FILENAME,
         bootstrap.INVENTORY_FILENAME,
     }
@@ -319,6 +340,7 @@ def _load_bootstrap_receipt(root: Path) -> tuple[Mapping[str, Any], Path, str]:
         for item in sorted(
             [
                 *verified_entries,
+                *verified_storage_leases,
                 {"path": bootstrap.RECEIPT_FILENAME, "sha256": receipt_sha256},
             ],
             key=lambda item: item["path"],

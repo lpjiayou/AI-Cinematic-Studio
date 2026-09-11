@@ -288,7 +288,8 @@ class SqliteAiDirectorCandidateCommandStore:
     def _session(self, *, write=False, validate=True):
         connection = None
         try:
-            connection = sqlite3.connect(self.database_path, timeout=10, isolation_level=None)
+            from services.v4_platform.generation_dispatch_jobs import connect_storage
+            connection = connect_storage(self.database_path, self, timeout=10, isolation_level=None)
             connection.row_factory = sqlite3.Row
             connection.execute("PRAGMA foreign_keys = ON")
             connection.execute("PRAGMA busy_timeout = 10000")
