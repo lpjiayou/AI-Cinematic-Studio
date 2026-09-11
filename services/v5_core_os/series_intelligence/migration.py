@@ -84,7 +84,8 @@ class SeriesIntelligenceMigrationError(RuntimeError):
 
 
 def _connect(path: Path) -> sqlite3.Connection:
-    connection = sqlite3.connect(path, timeout=10, isolation_level=None)
+    from services.v4_platform.generation_dispatch_jobs import connect_storage
+    connection = connect_storage(path, None, timeout=10, isolation_level=None)
     connection.row_factory = sqlite3.Row
     connection.execute("PRAGMA foreign_keys = ON")
     connection.execute("PRAGMA busy_timeout = 10000")

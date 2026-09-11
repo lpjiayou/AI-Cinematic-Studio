@@ -350,8 +350,9 @@ class SqliteProjectFoundationStore:
         self._initialize()
 
     def _connect(self) -> sqlite3.Connection:
-        connection = sqlite3.connect(
-            self.database_path,
+        from services.v4_platform.generation_dispatch_jobs import connect_storage
+        connection = connect_storage(
+            self.database_path, self,
             timeout=10,
             isolation_level=None,
         )

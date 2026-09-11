@@ -141,6 +141,7 @@ deliberately isolated and do not authorize current execution.
 
 ## IMPLEMENTATION_EVIDENCE
 
+- [`docs/status/ADR_0022_PKG2_CPU_ACCEPTANCE_2026-09-11.md`](status/ADR_0022_PKG2_CPU_ACCEPTANCE_2026-09-11.md) — `RECORDED`
 - [`docs/status/ADR_0022_PKG1_CPU_ACCEPTANCE_2026-09-10.md`](status/ADR_0022_PKG1_CPU_ACCEPTANCE_2026-09-10.md) — `RECORDED`
 - [`docs/archive/AGENTS_ARCHIVE_MIGRATION_MANIFEST.json`](archive/AGENTS_ARCHIVE_MIGRATION_MANIFEST.json) — `RECORDED`
 - [`design-qa.md`](../design-qa.md) — `RECORDED`

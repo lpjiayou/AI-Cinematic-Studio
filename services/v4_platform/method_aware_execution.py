@@ -13,6 +13,11 @@ from .backend_registry import (BackendValidationError, canonical, digest, exact,
 
 EXECUTION_ENVELOPE_SCHEMA = "v4.method-aware-media-execution-envelope.v1"
 METHOD_AWARE_JOB_SCHEMA_VERSION = "v4.media-job.v3"
+DISPATCH_EXECUTION_ENVELOPE_SCHEMA = "v4.method-aware-media-execution-envelope.v2"
+DISPATCH_JOB_SCHEMA_VERSION = "v4.media-job.v4"
+DISPATCH_REQUEST_SCHEMA = "v5.method-aware-video-generation-request.v2"
+DISPATCH_BINDING_FIELDS = {"generationDispatchGrantRef", "generationDispatchGrantDigest",
+    "subjectDigest", "approvedPlanDigest"}
 SCOPE_FIELDS = {"workspaceRef", "projectRef", "seriesRef", "episodeRef", "productionRunRef"}
 LINEAGE_FIELDS = {"generationRequestRef", "generationRequestDigest", "creativeShotVersionRef",
                   "creativeShotVersionDigest", "beatRef", "beatDigest"}
@@ -60,10 +65,21 @@ def validate_source(value: Any) -> None:
         integer(value[name], "source " + name, maximum=16384)
 
 
+def validate_dispatch_grant_binding(value: Any) -> dict[str, Any]:
+    exact(value, DISPATCH_BINDING_FIELDS, "dispatch grant binding")
+    ref(value["generationDispatchGrantRef"], "generationDispatchGrantRef")
+    for name in DISPATCH_BINDING_FIELDS - {"generationDispatchGrantRef"}:
+        hex_digest(value[name], name)
+    return deepcopy(dict(value))
+
+
 def validate_envelope(value: Any, request: Mapping[str, Any] | None = None) -> dict[str, Any]:
-    exact(value, ENVELOPE_FIELDS, "execution envelope")
-    if value["schemaVersion"] != EXECUTION_ENVELOPE_SCHEMA:
+    bound = isinstance(value, Mapping) and value.get("schemaVersion") == DISPATCH_EXECUTION_ENVELOPE_SCHEMA
+    exact(value, ENVELOPE_FIELDS | ({"dispatchGrantBinding"} if bound else set()), "execution envelope")
+    if value["schemaVersion"] not in {EXECUTION_ENVELOPE_SCHEMA, DISPATCH_EXECUTION_ENVELOPE_SCHEMA}:
         raise BackendValidationError("execution envelope schema is invalid")
+    if bound:
+        validate_dispatch_grant_binding(value["dispatchGrantBinding"])
     if value["envelopeDigest"] != digest({k:v for k,v in value.items() if k != "envelopeDigest"}):
         raise BackendValidationError("execution envelope digest mismatch")
     for key in SCOPE_FIELDS | LINEAGE_FIELDS:
@@ -99,6 +115,10 @@ def validate_envelope(value: Any, request: Mapping[str, Any] | None = None) -> d
         # Reuse the existing closed public DTO without adding execution fields.
         from .media_jobs import _validate_method_aware_video_request
         _validate_method_aware_video_request(request)
+        if (request.get("schemaVersion") == DISPATCH_REQUEST_SCHEMA) != bound:
+            raise BackendValidationError("request/envelope version mismatch")
+        if bound and request["dispatchGrantBinding"] != value["dispatchGrantBinding"]:
+            raise BackendValidationError("request/envelope grant binding mismatch")
         for key in SCOPE_FIELDS | {"generationRequestRef", "creativeShotVersionRef", "creativeShotVersionDigest", "beatRef", "beatDigest", "executionClass", "executionMethod"}:
             if request[key] != value[key]:
                 raise BackendValidationError("execution envelope request lineage mismatch")
@@ -136,6 +156,30 @@ class MethodAwareExecutionEnvelopeBuilder:
                 "sourceAction": {**deepcopy(request["sourceAction"]), "sourceText": context["sourceText"]},
                 "frameRange": deepcopy(request["frameRange"])},
             "outputConstraints": deepcopy(context["outputConstraints"]), "backendBinding": deepcopy(decision)}
+        value["envelopeDigest"] = digest(value)
+        return validate_envelope(value, request)
+
+    def build_dispatch_bound(self, request, source_asset, decision, profile, context):
+        """Build the explicit v2 closed shape without projecting it into v1."""
+        if request.get("schemaVersion") != DISPATCH_REQUEST_SCHEMA:
+            raise BackendValidationError("Grant-bound request v2 is required")
+        validate_decision(decision)
+        validate_context(request, context)
+        validate_source(source_asset)
+        if digest(profile) != decision["backendProfileDigest"]:
+            raise BackendValidationError("backend profile digest mismatch")
+        value = {"schemaVersion": DISPATCH_EXECUTION_ENVELOPE_SCHEMA,
+            **{k: request[k] for k in SCOPE_FIELDS},
+            **{k: request[k] for k in LINEAGE_FIELDS - {"generationRequestDigest"}},
+            "generationRequestDigest": request["payloadDigest"],
+            "executionClass": request["executionClass"], "executionMethod": request["executionMethod"],
+            "sourceAsset": deepcopy(source_asset),
+            "semanticIntent": {"cameraInstruction": deepcopy(request["cameraInstruction"]),
+                "sourceAction": {**deepcopy(request["sourceAction"]), "sourceText": context["sourceText"]},
+                "frameRange": deepcopy(request["frameRange"])},
+            "outputConstraints": deepcopy(context["outputConstraints"]),
+            "backendBinding": deepcopy(decision),
+            "dispatchGrantBinding": validate_dispatch_grant_binding(request["dispatchGrantBinding"])}
         value["envelopeDigest"] = digest(value)
         return validate_envelope(value, request)
 

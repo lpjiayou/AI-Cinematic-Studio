@@ -493,110 +493,12 @@ class ComfyUIWan22VideoAdapter:
         start_image_name: str | None = None,
         latent_frame_count: int | None = None,
     ) -> dict[str, Any]:
-        parameters = generation_request["parameters"]
-        selected_prompt = prompt_text or parameters.get("prompt")
-        if not isinstance(selected_prompt, str) or not selected_prompt.strip():
-            raise ComfyUIConfigurationError("Wan2.2 prompt is unavailable")
-        selected_negative_prompt = (
-            negative_prompt_text or parameters.get("negativePrompt")
+        return compile_wan_workflow(
+            generation_request, unet_name=self.config.unet_name,
+            clip_name=self.config.clip_name, vae_name=self.config.vae_name,
+            prompt_text=prompt_text, negative_prompt_text=negative_prompt_text,
+            start_image_name=start_image_name, latent_frame_count=latent_frame_count,
         )
-        if (
-            not isinstance(selected_negative_prompt, str)
-            or not selected_negative_prompt.strip()
-        ):
-            raise ComfyUIConfigurationError(
-                "Wan2.2 negative prompt is unavailable"
-            )
-        length = (
-            parameters["durationFrames"]
-            if latent_frame_count is None
-            else latent_frame_count
-        )
-        if isinstance(length, bool) or not isinstance(length, int) or length < 1:
-            raise ComfyUIConfigurationError("Wan2.2 latent frame count is invalid")
-        if start_image_name is not None:
-            image_name = PurePosixPath(start_image_name)
-            if (
-                image_name.is_absolute()
-                or ".." in image_name.parts
-                or image_name.suffix.lower() != ".png"
-            ):
-                raise ComfyUIConfigurationError("start image name is unsafe")
-        prefix_digest = sha256(
-            str(generation_request["generationRequestRef"]).encode("utf-8")
-        ).hexdigest()[:24]
-        workflow = {
-            "1": {
-                "class_type": "UNETLoader",
-                "inputs": {"unet_name": self.config.unet_name, "weight_dtype": "default"},
-            },
-            "2": {
-                "class_type": "CLIPLoader",
-                "inputs": {"clip_name": self.config.clip_name, "type": "wan", "device": "default"},
-            },
-            "3": {"class_type": "VAELoader", "inputs": {"vae_name": self.config.vae_name}},
-            "4": {
-                "class_type": "ModelSamplingSD3",
-                "inputs": {"model": ["1", 0], "shift": parameters["modelShift"]},
-            },
-            "5": {
-                "class_type": "CLIPTextEncode",
-                "inputs": {"text": selected_prompt, "clip": ["2", 0]},
-            },
-            "6": {
-                "class_type": "CLIPTextEncode",
-                "inputs": {"text": selected_negative_prompt, "clip": ["2", 0]},
-            },
-            "7": {
-                "class_type": "Wan22ImageToVideoLatent",
-                "inputs": {
-                    "vae": ["3", 0],
-                    "width": parameters["width"],
-                    "height": parameters["height"],
-                    "length": length,
-                    "batch_size": 1,
-                },
-            },
-            "8": {
-                "class_type": "KSampler",
-                "inputs": {
-                    "model": ["4", 0],
-                    "seed": parameters["seed"],
-                    "steps": parameters["steps"],
-                    "cfg": parameters["cfg"],
-                    "sampler_name": parameters["samplerName"],
-                    "scheduler": parameters["scheduler"],
-                    "positive": ["5", 0],
-                    "negative": ["6", 0],
-                    "latent_image": ["7", 0],
-                    "denoise": 1.0,
-                },
-            },
-            "9": {
-                "class_type": "VAEDecode",
-                "inputs": {"samples": ["8", 0], "vae": ["3", 0]},
-            },
-            "10": {
-                "class_type": "CreateVideo",
-                "inputs": {"images": ["9", 0], "fps": parameters["frameRate"], "bit_depth": 8},
-            },
-            "11": {
-                "class_type": "SaveVideo",
-                "inputs": {
-                    "video": ["10", 0],
-                    "filename_prefix": f"acs-k2/{prefix_digest}",
-                    "format": "mp4",
-                    "codec": "h264",
-                },
-            },
-        }
-        if start_image_name is not None:
-            workflow["12"] = {
-                "class_type": "LoadImage",
-                "inputs": {"image": start_image_name},
-            }
-            workflow["7"]["inputs"]["start_image"] = ["12", 0]
-        return workflow
 
     @staticmethod
     def _prompt_ref(payload: Mapping[str, Any]) -> str:
@@ -1408,3 +1310,116 @@ def create_comfyui_wan22_adapter_from_environment(
     token = str(values.get("COMFYUI_BEARER_TOKEN", "")).strip()
     kwargs["bearer_token"] = token or None
     return ComfyUIWan22VideoAdapter(ComfyUIWan22Config(**kwargs))
+
+
+def compile_wan_workflow(
+    generation_request: Mapping[str, Any], *, unet_name: str, clip_name: str,
+    vae_name: str, prompt_text: str | None = None,
+    negative_prompt_text: str | None = None, start_image_name: str | None = None,
+    latent_frame_count: int | None = None,
+) -> dict[str, Any]:
+    """Original Wan API graph construction only; no files, processes or transport."""
+    parameters = generation_request["parameters"]
+    selected_prompt = prompt_text or parameters.get("prompt")
+    if not isinstance(selected_prompt, str) or not selected_prompt.strip():
+        raise ComfyUIConfigurationError("Wan2.2 prompt is unavailable")
+    selected_negative_prompt = (
+        negative_prompt_text or parameters.get("negativePrompt")
+    )
+    if (
+        not isinstance(selected_negative_prompt, str)
+        or not selected_negative_prompt.strip()
+    ):
+        raise ComfyUIConfigurationError(
+            "Wan2.2 negative prompt is unavailable"
+        )
+    length = (
+        parameters["durationFrames"]
+        if latent_frame_count is None
+        else latent_frame_count
+    )
+    if isinstance(length, bool) or not isinstance(length, int) or length < 1:
+        raise ComfyUIConfigurationError("Wan2.2 latent frame count is invalid")
+    if start_image_name is not None:
+        image_name = PurePosixPath(start_image_name)
+        if (
+            image_name.is_absolute()
+            or ".." in image_name.parts
+            or image_name.suffix.lower() != ".png"
+        ):
+            raise ComfyUIConfigurationError("start image name is unsafe")
+    prefix_digest = sha256(
+        str(generation_request["generationRequestRef"]).encode("utf-8")
+    ).hexdigest()[:24]
+    workflow = {
+        "1": {
+            "class_type": "UNETLoader",
+            "inputs": {"unet_name": unet_name, "weight_dtype": "default"},
+        },
+        "2": {
+            "class_type": "CLIPLoader",
+            "inputs": {"clip_name": clip_name, "type": "wan", "device": "default"},
+        },
+        "3": {"class_type": "VAELoader", "inputs": {"vae_name": vae_name}},
+        "4": {
+            "class_type": "ModelSamplingSD3",
+            "inputs": {"model": ["1", 0], "shift": parameters["modelShift"]},
+        },
+        "5": {
+            "class_type": "CLIPTextEncode",
+            "inputs": {"text": selected_prompt, "clip": ["2", 0]},
+        },
+        "6": {
+            "class_type": "CLIPTextEncode",
+            "inputs": {"text": selected_negative_prompt, "clip": ["2", 0]},
+        },
+        "7": {
+            "class_type": "Wan22ImageToVideoLatent",
+            "inputs": {
+                "vae": ["3", 0],
+                "width": parameters["width"],
+                "height": parameters["height"],
+                "length": length,
+                "batch_size": 1,
+            },
+        },
+        "8": {
+            "class_type": "KSampler",
+            "inputs": {
+                "model": ["4", 0],
+                "seed": parameters["seed"],
+                "steps": parameters["steps"],
+                "cfg": parameters["cfg"],
+                "sampler_name": parameters["samplerName"],
+                "scheduler": parameters["scheduler"],
+                "positive": ["5", 0],
+                "negative": ["6", 0],
+                "latent_image": ["7", 0],
+                "denoise": 1.0,
+            },
+        },
+        "9": {
+            "class_type": "VAEDecode",
+            "inputs": {"samples": ["8", 0], "vae": ["3", 0]},
+        },
+        "10": {
+            "class_type": "CreateVideo",
+            "inputs": {"images": ["9", 0], "fps": parameters["frameRate"], "bit_depth": 8},
+        },
+        "11": {
+            "class_type": "SaveVideo",
+            "inputs": {
+                "video": ["10", 0],
+                "filename_prefix": f"acs-k2/{prefix_digest}",
+                "format": "mp4",
+                "codec": "h264",
+            },
+        },
+    }
+    if start_image_name is not None:
+        workflow["12"] = {
+            "class_type": "LoadImage",
+            "inputs": {"image": start_image_name},
+        }
+        workflow["7"]["inputs"]["start_image"] = ["12", 0]
+    return workflow

@@ -496,11 +496,13 @@ class SqliteSeriesPlanCandidateReceiptStore:
     def __init__(self, database_path: Path | str) -> None:
         self.database_path = Path(database_path).resolve()
         self.database_path.parent.mkdir(parents=True, exist_ok=True)
-        self._lock = RLock()
+        from services.v4_platform.generation_dispatch_jobs import storage_access_lock
+        self._lock = storage_access_lock(self, "database_path")
         self._initialize()
 
     def _connect(self) -> sqlite3.Connection:
-        connection = sqlite3.connect(self.database_path, timeout=10)
+        from services.v4_platform.generation_dispatch_jobs import connect_storage
+        connection = connect_storage(self.database_path, self, timeout=10)
         connection.row_factory = sqlite3.Row
         connection.execute("PRAGMA foreign_keys = ON")
         connection.execute("PRAGMA busy_timeout = 10000")

@@ -9,8 +9,21 @@ from .generation_dispatch_foundation import GenerationDispatchFoundation
 
 
 class GenerationDispatchPublicBoundary:
-    def __init__(self, foundation: GenerationDispatchFoundation | None = None):
+    def __init__(self, foundation: GenerationDispatchFoundation | None = None, *, preparation=None):
         self._foundation = foundation if foundation is not None else GenerationDispatchFoundation()
+        self._preparation = preparation
+
+    def prepare(self, command: Mapping) -> dict:
+        try:
+            c.validate_command("PREPARE", command)
+            c.require(self._preparation is not None, "CURRENTNESS_FENCE_UNAVAILABLE")
+            return deepcopy(self._preparation.prepare(command))
+        except c.DispatchError as exc:
+            return {"schemaVersion": c.PREFIX + "error.v1", "operation": "PREPARE_ONLY",
+                "code": exc.code, "writesCommitted": 0, "sendPermission": "NONE"}
+        except Exception:
+            return {"schemaVersion": c.PREFIX + "error.v1", "operation": "PREPARE_ONLY",
+                "code": "PERSISTENCE_UNAVAILABLE", "writesCommitted": 0, "sendPermission": "NONE"}
 
     def _call(self, operation: str, command: Mapping) -> dict:
         try:

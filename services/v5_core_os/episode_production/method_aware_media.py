@@ -1611,12 +1611,19 @@ class M10M11MethodAwareMediaService:
         self, workspace: str, run_ref: str
     ) -> list[tuple[dict[str, Any], dict[str, Any]]]:
         result = []
-        for expected, record in enumerate(
-            self.evidence_repository.list_records(
-                workspace, run_ref, record_kind=VIDEO_METHOD_ROUTE_RECORD_KIND
-            ),
-            start=1,
-        ):
+        for record in self.evidence_repository.list_records(
+                workspace, run_ref, record_kind=VIDEO_METHOD_ROUTE_RECORD_KIND):
+            if record.get("payload", {}).get("schemaVersion") == "v5.video-method-route-plan.v2":
+                # The operation-specific v2 stream has its own currentness and
+                # replay boundary; it does not advance the legacy v1 selector.
+                from .generation_dispatch_routing import validate_route_plan
+                bound = validate_route_plan(_payload(record))
+                if (record.get("recordRef") != bound["videoMethodRouteRef"]
+                        or record.get("recordVersion") != bound["routingVersion"]
+                        or record.get("payloadDigest") != bound["payloadDigest"]):
+                    raise RepositoryUnavailableError("stored bound M11 route envelope is invalid")
+                continue
+            expected = len(result) + 1
             payload = self._validate_route_payload(_payload(record))
             if (
                 record.get("recordKind") != VIDEO_METHOD_ROUTE_RECORD_KIND

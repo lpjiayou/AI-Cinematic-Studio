@@ -27,7 +27,18 @@ class GenerationDispatchPublicContractTests(unittest.TestCase):
             self.assertNotIn(str(x.root), c.canonical(result).decode())
             self.assertNotIn("continuation", result)
         self.assertFalse(hasattr(x.public, "consume"))
-        self.assertFalse(hasattr(x.public, "prepare"))
+        # Package 2 exposes prepare only with explicit dependencies; the old
+        # Package 1 assembly still cannot prepare or grant another operation.
+        command = x.command()
+        prepared = x.public.prepare({**{key: command[key] for key in (
+            "workspaceRef", "productionRunRef", "methodAwareInputPlanVersionRef",
+            "creativeShotVersionRef", "beatRef", "inputAssetVersionRef", "backendRef")},
+            "executionConfigRef": x.package["materials"]["executionConfig"]["configRef"],
+            "costBasisRef": x.package["materials"]["costBasis"]["costBasisRef"],
+            "limits": x.package["plan"]["limits"]})
+        self.assertEqual(prepared["code"], "CURRENTNESS_FENCE_UNAVAILABLE")
+        self.assertEqual(prepared["sendPermission"], "NONE")
+        self.assertEqual(prepared["writesCommitted"], 0)
         self.assertFalse(hasattr(x.service, "consume"))
 
     def test_default_and_every_missing_trusted_dependency_rejects(self):

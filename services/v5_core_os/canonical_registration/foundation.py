@@ -385,10 +385,12 @@ class SqliteCanonicalRegistrationRepository:
     def __init__(self, database_path: Path | str, *, lifecycle_state) -> None:
         self.database_path = Path(database_path).resolve()
         self._lifecycle_state = lifecycle_state
-        self._lock = RLock()
+        from services.v4_platform.generation_dispatch_jobs import storage_access_lock
+        self._lock = storage_access_lock(self, "database_path")
 
     def _connect(self) -> sqlite3.Connection:
-        connection = sqlite3.connect(self.database_path, timeout=10)
+        from services.v4_platform.generation_dispatch_jobs import connect_storage
+        connection = connect_storage(self.database_path, self, timeout=10)
         connection.row_factory = sqlite3.Row
         connection.execute("PRAGMA foreign_keys=ON")
         if connection.execute("PRAGMA foreign_keys").fetchone()[0] != 1:
