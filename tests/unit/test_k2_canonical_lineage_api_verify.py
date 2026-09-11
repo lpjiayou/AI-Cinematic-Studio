@@ -226,6 +226,15 @@ class K2CanonicalLineageApiVerifyTests(unittest.TestCase):
                 api_verify._load_bootstrap_receipt(target)
             self.assertEqual(caught.exception.code, "bootstrap_database_digest_mismatch")
 
+    def test_storage_lease_tamper_is_rejected_before_any_api_request(self):
+        with tempfile.TemporaryDirectory() as directory:
+            target, _, _ = applied_root(Path(directory))
+            lease = target / bootstrap.STORAGE_LEASE_FILENAMES[0]
+            lease.write_bytes(b"UNCERTAIN\n")
+            with self.assertRaises(api_verify.ApiVerificationError) as caught:
+                api_verify._load_bootstrap_receipt(target)
+            self.assertEqual(caught.exception.code, "bootstrap_storage_lease_invalid")
+
     def test_non_loopback_origin_is_rejected(self):
         with self.assertRaises(api_verify.ApiVerificationError) as caught:
             api_verify._validate_origin("https://example.com")

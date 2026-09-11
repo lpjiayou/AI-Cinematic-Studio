@@ -74,6 +74,16 @@ DATABASE_FILENAMES = {
     "providerExperiments": "episode-production.sqlite3.provider-experiments.sqlite3",
     "voiceLocks": "episode-production.sqlite3.voice-locks.sqlite3",
 }
+STORAGE_LEASE_DATABASE_KEYS = (
+    "lifecycle",
+    "episodeProduction",
+    "episodeEvidence",
+    "productionPolicy",
+)
+STORAGE_LEASE_FILENAMES = tuple(
+    DATABASE_FILENAMES[key] + ".dispatch-lock"
+    for key in STORAGE_LEASE_DATABASE_KEYS
+)
 SHA256_PATTERN = re.compile(r"^[0-9a-f]{64}$")
 COMMIT_PATTERN = re.compile(r"^[0-9a-f]{40}$")
 REF_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:-]{1,199}$")
@@ -967,6 +977,53 @@ def _database_inventory(paths: BootstrapPaths) -> list[dict[str, str]]:
     return result
 
 
+def _storage_lease_inventory(paths: BootstrapPaths) -> list[dict[str, str]]:
+    expected = set(STORAGE_LEASE_FILENAMES)
+    try:
+        observed = {
+            path.name
+            for path in paths.root.iterdir()
+            if path.name.endswith(".dispatch-lock")
+        }
+    except OSError:
+        raise BootstrapApplyError("storage_lease_inventory_failed") from None
+    if observed != expected:
+        raise BootstrapApplyError("storage_lease_inventory_invalid")
+    result: list[dict[str, str]] = []
+    for filename in sorted(expected):
+        path = paths.root / filename
+        try:
+            metadata = path.lstat()
+        except OSError:
+            raise BootstrapApplyError("storage_lease_file_missing") from None
+        if (
+            path.is_symlink()
+            or not stat.S_ISREG(metadata.st_mode)
+            or stat.S_IMODE(metadata.st_mode) != 0o600
+            or metadata.st_uid != os.geteuid()
+            or metadata.st_nlink != 1
+            or metadata.st_size != 0
+        ):
+            raise BootstrapApplyError("storage_lease_file_invalid")
+        result.append({"path": filename, "sha256": _sha256_file(path)})
+    return result
+
+
+def _validate_staging_inventory(root: Path) -> None:
+    expected = {
+        *DATABASE_FILENAMES.values(),
+        *STORAGE_LEASE_FILENAMES,
+        RECEIPT_FILENAME,
+        INVENTORY_FILENAME,
+    }
+    try:
+        observed = {path.name for path in root.iterdir()}
+    except OSError:
+        raise BootstrapApplyError("staging_inventory_failed") from None
+    if observed != expected:
+        raise BootstrapApplyError("staging_inventory_invalid")
+
+
 def _build_receipt(
     specification: ValidatedSpecification,
     repository_commit: str,
@@ -1186,6 +1243,7 @@ def apply_bootstrap(
         scan = _readonly_scan_verify(paths, restarted["productionRun"])
         _set_private_permissions(staging)
         databases = _database_inventory(paths)
+        storage_leases = _storage_lease_inventory(paths)
         receipt = _build_receipt(
             specification,
             repository_commit,
@@ -1199,6 +1257,7 @@ def apply_bootstrap(
         _write_private(receipt_path, receipt_bytes)
         inventory_entries = [
             *databases,
+            *storage_leases,
             {"path": RECEIPT_FILENAME, "sha256": sha256(receipt_bytes).hexdigest()},
         ]
         inventory_content = "".join(
@@ -1208,6 +1267,7 @@ def apply_bootstrap(
         inventory_path = staging / INVENTORY_FILENAME
         _write_private(inventory_path, inventory_content)
         _set_private_permissions(staging)
+        _validate_staging_inventory(staging)
         _fsync_tree(staging)
         _fsync_directory(parent)
         _rename_noreplace(staging, target)
