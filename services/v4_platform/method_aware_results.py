@@ -14,7 +14,7 @@ from .media_jobs import (
     _validate_job, verify_media_against_request,
 )
 from .method_aware_execution import (
-    METHOD_AWARE_JOB_SCHEMA_VERSION, output_probe_request, validate_envelope,
+    METHOD_AWARE_JOB_SCHEMA_VERSION, DISPATCH_JOB_SCHEMA_VERSION, output_probe_request, validate_envelope,
     validate_execution_result,
 )
 
@@ -77,7 +77,8 @@ class MethodAwareMediaJobResultReader:
                 workspace_ref, production_run_ref, media_job_ref
             ):
                 raise MethodAwareJobResultError("method_aware_job_scope_mismatch")
-            if value.get("schemaVersion") != METHOD_AWARE_JOB_SCHEMA_VERSION or value.get("state") not in STATES:
+            if (value.get("schemaVersion") not in {METHOD_AWARE_JOB_SCHEMA_VERSION, DISPATCH_JOB_SCHEMA_VERSION}
+                    or value.get("state") not in STATES):
                 raise MethodAwareJobResultError()
             _validate_job(value)
             return deepcopy(value)

@@ -10,6 +10,7 @@ from copy import deepcopy
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 import os
+import time
 from threading import RLock, get_ident
 from typing import Any, Mapping, Protocol
 from weakref import WeakKeyDictionary
@@ -310,13 +311,21 @@ class GenerationDispatchConsumer:
             GenerationDispatchTransportError, make_transport_request,
             validate_transport_submission, validate_transport_result,
         )
-        if (getattr(transport, "TEST_ONLY", None) is not True
-                or getattr(transport, "CPU_ISOLATED", None) is not True):
+        from services.v4_platform.comfyui_staged_transport import is_trusted_staged_transport
+        from services.v4_platform.generation_dispatch_live_contracts import (
+            LiveGenerationDispatchTransportError, make_live_transport_request,
+            validate_live_transport_submission, validate_live_transport_result,
+            MAY_HAVE_BEEN_SENT, LOCAL_WRITE_COMPLETE,
+        )
+        live = is_trusted_staged_transport(transport)
+        if (not live and (getattr(transport, "TEST_ONLY", None) is not True
+                or getattr(transport, "CPU_ISOLATED", None) is not True)):
             state.spent = True
             raise c.DispatchError("CONFIG_CHANGED")
         f = self._foundation
         submission = None
         exchange = None
+        commit_entered = False
         try:
             with f._gate(state.command["workspaceRef"]) as lease:
                 state.spent = True
@@ -356,7 +365,33 @@ class GenerationDispatchConsumer:
                     "ATTEMPT_OR_LEASE_CHANGED")
                 envelope = observation.job["executionEnvelope"]
                 request = observation.job["request"]
-                transport_request = make_transport_request(
+                extra = {}
+                if live:
+                    from services.v4_platform.generation_dispatch_a14b_profile import A14B_PROFILE_SCHEMA
+                    profile = selected.plan_package["materials"]["backendProfile"]
+                    if profile["schemaVersion"] == A14B_PROFILE_SCHEMA:
+                        native = profile["parameters"]["nativeOutput"]
+                        folder, _, prefix = native["filenamePrefix"].rpartition("/")
+                        output_binding = {"nodeId": native["nodeId"], "outputKey": "images",
+                            "mediaType": native["mediaType"], "frameCount": native["frameCount"],
+                            "filenamePrefix": prefix, "subfolder": folder}
+                        post = profile["parameters"]["postprocess"]
+                        postprocess_binding = {"profileId": post["profileId"],
+                            "keepIndices": post["keptZeroBasedIndices"],
+                            "dropIndices": post["droppedZeroBasedIndices"], "frameRate": post["frameRate"]}
+                    else:
+                        folder, _, prefix = state.workflow["11"]["inputs"]["filename_prefix"].rpartition("/")
+                        output_binding = {"nodeId": "11", "outputKey": "images", "mediaType": "video/mp4",
+                            "frameCount": 1, "filenamePrefix": prefix, "subfolder": folder}
+                        postprocess_binding = None
+                    extra = {"history_timeout_ms": config["historyTimeoutMs"],
+                        "postprocess_timeout_ms": config["postprocessTimeoutMs"],
+                        "endpoint_digest": config["baseUrlDigest"],
+                        "execution_config_digest": state.grant["executionBinding"]["executionConfigDigest"],
+                        "runtime_binding_digest": c.digest(state.grant["executionBinding"]["runtimeBinding"]),
+                        "backend_decision_digest": state.grant["executionBinding"]["backendDecisionDigest"],
+                        "output_binding": output_binding, "postprocess_binding": postprocess_binding}
+                transport_request = (make_live_transport_request if live else make_transport_request)(
                     workspace_ref=state.command["workspaceRef"],
                     production_run_ref=state.command["productionRunRef"],
                     worker_ref=state.worker_identity["workerRef"],
@@ -372,28 +407,86 @@ class GenerationDispatchConsumer:
                     workflow=state.workflow,
                     connection_timeout_ms=config["connectionTimeoutMs"],
                     request_timeout_ms=config["requestTimeoutMs"],
-                    transport_policy=config["transportPolicy"])
-                exchange = transport.open_exchange(transport_request)
-                submission = validate_transport_submission(
+                    transport_policy=config["transportPolicy"], **extra)
+                if live:
+                    # The transport's clock has a process-local epoch; transfer only
+                    # the remaining approved duration, never restart that duration.
+                    observed_now = c.utc(f._now())
+                    remaining = min(
+                        state.execution_deadline_monotonic - float(self._clock.monotonic()),
+                        (c.utc(state.grant["limits"]["expiresAt"]) - observed_now).total_seconds(),
+                        (wall_deadline - observed_now).total_seconds())
+                    send_remaining = min(remaining,
+                        (_v4_utc(observation.job["lease"]["expiresAt"]) - observed_now).total_seconds())
+                    c.require(send_remaining > 0, "ATTEMPT_OR_LEASE_CHANGED")
+                    transport_now = time.monotonic()
+                    exchange = transport.open_exchange(transport_request,
+                        deadline_monotonic=transport_now + max(0.0, remaining),
+                        send_deadline_monotonic=transport_now + send_remaining)
+                    permit = {"next": "CONNECT"}
+                    def authorize_write(phase):
+                        f._held(lease)
+                        with self._capability_lock:
+                            c.require(self._capabilities.get(capability) is state
+                                and state.invoked and state.spent and phase == permit["next"]
+                                and os.getpid() == state.worker_identity["processId"]
+                                and get_ident() == state.worker_identity["threadId"],
+                                "ATTEMPT_OR_LEASE_CHANGED")
+                            permit["next"] = "WRITE" if phase == "CONNECT" else None
+                        current_now = f._now()
+                        c.require(c.utc(state.grant["limits"]["notBefore"]) <= c.utc(current_now)
+                            < min(wall_deadline, c.utc(state.grant["limits"]["expiresAt"]))
+                            and float(self._clock.monotonic()) < state.execution_deadline_monotonic,
+                            "OUTSIDE_VALIDITY_WINDOW")
+                        # Reuse the original V4 lease validator immediately before
+                        # connect and first request bytes; a process pause cannot
+                        # turn the earlier L2 read into a fresh lease window.
+                        at_write = self._job_port.read_current(state.command, state.grant,
+                            state.worker_identity, current_now, lease, phase="SEND")
+                        c.require(at_write.stable_binding_digest == observation.stable_binding_digest
+                            and at_write.lease_token == observation.lease_token,
+                            "ATTEMPT_OR_LEASE_CHANGED")
+                    transport._authorize_exchange(exchange, authorize_write)
+                else:
+                    exchange = transport.open_exchange(transport_request)
+                commit_entered = True
+                submission = (validate_live_transport_submission if live else validate_transport_submission)(
                     transport.commit_request_once(exchange))
                 if submission["requestDigest"] != transport_request["payloadDigest"]:
                     raise c.DispatchError("ATTEMPT_OR_LEASE_CHANGED")
             # Response waiting and result reads are deliberately outside the gate.
             result = transport.read_result(exchange, submission)
-            receipt = validate_transport_result(result.receipt)
+            receipt = (validate_live_transport_result if live else validate_transport_result)(result.receipt)
             if (result.submission != submission
                     or receipt["requestDigest"] != submission["requestDigest"]
                     or receipt["transportSubmissionRef"] != submission["transportSubmissionRef"]
                     or receipt["transportSubmissionDigest"] != submission["payloadDigest"]):
+                if live:
+                    raise LiveGenerationDispatchTransportError("TRANSPORT_RESULT_BINDING_CHANGED",
+                        "SUBMISSION_OUTCOME_UNKNOWN", request_write_state=LOCAL_WRITE_COMPLETE,
+                        submission=submission)
                 raise GenerationDispatchTransportError("TRANSPORT_RESULT_BINDING_CHANGED",
                     "SUBMISSION_OUTCOME_UNKNOWN", request_committed=True,
                     submission=submission)
             return result
-        except GenerationDispatchTransportError:
+        except (GenerationDispatchTransportError, LiveGenerationDispatchTransportError):
             raise
-        except c.DispatchError:
+        except c.DispatchError as exc:
+            if live and commit_entered:
+                raise LiveGenerationDispatchTransportError("TRANSPORT_RESULT_BINDING_CHANGED",
+                    "SUBMISSION_OUTCOME_UNKNOWN",
+                    request_write_state=LOCAL_WRITE_COMPLETE if submission else MAY_HAVE_BEEN_SENT,
+                    submission=submission) from exc
             raise
         except Exception as exc:
+            if live:
+                from services.v4_platform.generation_dispatch_live_contracts import ZERO_BYTES_PROVEN
+                raise LiveGenerationDispatchTransportError(
+                    "TRANSPORT_RESPONSE_UNAVAILABLE" if commit_entered else "TRANSPORT_NOT_COMMITTED",
+                    "SUBMISSION_OUTCOME_UNKNOWN" if commit_entered else "REQUEST_BYTES_NOT_COMMITTED",
+                    request_write_state=(LOCAL_WRITE_COMPLETE if submission else MAY_HAVE_BEEN_SENT)
+                        if commit_entered else ZERO_BYTES_PROVEN,
+                    submission=submission) from exc
             if submission is not None:
                 raise GenerationDispatchTransportError("TRANSPORT_RESPONSE_UNAVAILABLE",
                     "SUBMISSION_OUTCOME_UNKNOWN", request_committed=True,

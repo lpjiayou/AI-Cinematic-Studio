@@ -20,6 +20,10 @@ def compile_generation_dispatch_workflow(*, generation_request_ref, source_text,
             or len(source_text) > 4000 or source_asset["mediaType"] != "image/png"):
         raise BackendValidationError("exact I2V source is unavailable")
     exact(backend_profile, {"schemaVersion", "parameters", "modelFiles"}, "profile")
+    from .generation_dispatch_a14b_profile import A14B_PROFILE_SCHEMA, compile_a14b_workflow
+    if backend_profile["schemaVersion"] == A14B_PROFILE_SCHEMA:
+        return compile_a14b_workflow(generation_request_ref=generation_request_ref,
+            source_asset=source_asset, backend_profile=backend_profile, output_constraints=output_constraints)
     if backend_profile["schemaVersion"] != "v4.comfyui-i2v-backend-profile.v1":
         raise BackendValidationError("I2V profile version is unavailable")
     parameters = exact(backend_profile["parameters"],

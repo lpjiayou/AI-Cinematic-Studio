@@ -24,6 +24,17 @@ Reviewed documentation baseline: `3bf2e7a5152a7bd9c1087571aab6413a53a43bb6`; dat
 
 Package 1 acceptance registration baseline: `521439dad61bad49c415059f8503727d2d95d233`; date: `2026-09-10`. Package 2 acceptance registration baseline: `230bde8ac53a4d7d02ef02f8eea85efe6f1afc13`; date: `2026-09-11`. Package 3 acceptance registration is authored against baseline `ccb8cd2649a00ed9e16382b8ce3d95e09b065642`; date: `2026-09-12`; publication is not yet merged at authoring. The implementation-evidence records preserve bounded Owner decisions and exact CPU candidate identities; they do not grant runtime authority. Existing documentation review baselines retain their historical scope.
 
+R2 + F01 acceptance registration: `2026-09-12`; exact accepted commit
+`d0344a11709b8424a13b268545abfb8e580d17af`, tree
+`a67a3e6a0db1e527de00ee86f7e78b74c1c9038d`; original base
+`ad7349ff493baaa1e0bc831810ea28b3dd2b2dce`. The Project Lead / Repository Governance
+Owner accepted CPU/fixture-owned loopback engineering only and closed F01 for this
+candidate. Publication is authorized through one PR, FULL_SUITE checks and protected
+squash merge, but is not yet merged at document authoring. ADR-0022 v1.3 and Package
+1/2/3 history are unchanged. SH09 exact binding and Spike-0 remain blocked; runtime
+binding and prompt authorization remain false. This projection records the supplied
+Owner decision; it does not issue a live Grant or authorize deployment.
+
 ## Classification totals
 
 | Class | Count | Current-state claims allowed |
@@ -34,7 +45,7 @@ Package 1 acceptance registration baseline: `521439dad61bad49c415059f8503727d2d9
 | `CURRENT_STATUS` | 19 | yes |
 | `CAPABILITY_MATRIX` | 1 | yes |
 | `OPERATIONAL_RUNBOOK` | 18 | no |
-| `IMPLEMENTATION_EVIDENCE` | 24 | no |
+| `IMPLEMENTATION_EVIDENCE` | 25 | no |
 | `HISTORICAL_EVIDENCE` | 40 | no |
 | `SUPERSEDED` | 9 | no |
 | `DRAFT` | 3 | no |
@@ -184,6 +195,7 @@ Package 1 acceptance registration baseline: `521439dad61bad49c415059f8503727d2d9
 | Document | Status | Owner |
 | --- | --- | --- |
 | [`docs/status/ADR_0022_PKG3_CPU_ACCEPTANCE_2026-09-12.md`](../status/ADR_0022_PKG3_CPU_ACCEPTANCE_2026-09-12.md) | `RECORDED` | Project Lead / Package 3 Owner / Repository Governance Owner |
+| [`docs/status/A14B_STAGED_TRANSPORT_IMPLEMENTATION_2026-09-12.md`](../status/A14B_STAGED_TRANSPORT_IMPLEMENTATION_2026-09-12.md) | `RECORDED / ACCEPTED_WITHIN_SCOPE_CPU_AND_FIXTURE_LOOPBACK` | Project Lead / Generation Dispatch Authority Owner / Repository Governance Owner |
 | [`docs/status/ADR_0022_PKG2_CPU_ACCEPTANCE_2026-09-11.md`](../status/ADR_0022_PKG2_CPU_ACCEPTANCE_2026-09-11.md) | `RECORDED` | Project Lead / Core Architecture Owner / Repository Governance Owner |
 | [`docs/status/ADR_0022_PKG1_CPU_ACCEPTANCE_2026-09-10.md`](../status/ADR_0022_PKG1_CPU_ACCEPTANCE_2026-09-10.md) | `RECORDED` | Project Lead / Core Architecture Owner / Repository Governance Owner |
 | [`docs/archive/AGENTS_ARCHIVE_MIGRATION_MANIFEST.json`](../archive/AGENTS_ARCHIVE_MIGRATION_MANIFEST.json) | `RECORDED` | Repository Governance Owner / CI Governance Owner |

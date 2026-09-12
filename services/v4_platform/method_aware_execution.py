@@ -232,6 +232,10 @@ def output_probe_request(envelope: Mapping[str, Any]) -> dict[str, Any]:
 
 
 def validate_execution_result(execution: Any, envelope: Mapping[str, Any]) -> dict[str, Any]:
+    if (isinstance(execution, Mapping)
+            and execution.get("schemaVersion") == "v4.generation-dispatch-live-execution-result.v1"):
+        from .generation_dispatch_live_result import validate_live_execution_result
+        return validate_live_execution_result(execution, envelope)
     fields = {"schemaVersion", "backendBindingDigest", "providerId", "modelId", "region", "endpointClass",
         "adapterIdentity", "providerRequestRef", "costCurrency", "costMinor", "runtimeAttestationRef",
         "runtimeAttestationDigest", "executionEvidenceDigest", "executionEvidence", "executionDevice", "gpuUsed"}

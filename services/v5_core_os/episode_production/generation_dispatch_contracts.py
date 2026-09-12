@@ -1,4 +1,4 @@
-"""ADR-0022 v1.2 data contracts. Pure validation; no runtime composition.
+"""ADR-0022 v1.3 data contracts. Pure validation; no runtime composition.
 
 Canonical V4 values retain their original canonical encoder and validators.
 These functions validate evidence, never the trustworthiness of its issuer.
@@ -494,11 +494,17 @@ def validate_read_set_proof_bindings(read_set: dict, plan_package: dict) -> None
 
 def request_identity(plan: dict) -> dict:
     binding = plan["executionBinding"]
+    from services.v4_platform.generation_dispatch_a14b_profile import (
+        A14B_ADAPTER_IDENTITY, A14B_COMPILER_IDENTITY,
+    )
+    compiler = (A14B_COMPILER_IDENTITY
+        if binding["backendDecision"]["adapterIdentity"] == A14B_ADAPTER_IDENTITY
+        else "comfyui-i2v-api-graph-v1")
     return {"schemaVersion": PREFIX + "request-identity.v1", "scope": deepcopy(plan["scope"]),
         "subjectDigest": subject_digest(plan), "backendProfileRef": binding["executionProfile"]["ref"],
         "backendProfileDigest": binding["executionProfile"]["digest"], "executionConfigDigest": binding["executionConfigDigest"],
         "executionCode": deepcopy(binding["executionCode"]), "outputConstraints": deepcopy(plan["subject"]["outputConstraints"]),
-        "workflowCompilerRef": "comfyui-i2v-api-graph-v1"}
+        "workflowCompilerRef": compiler}
 
 
 def _profile(value: Any) -> None:
@@ -506,6 +512,12 @@ def _profile(value: Any) -> None:
     # I2V parameter bounds are those of ComfyUI.validate_method_aware_envelope;
     # that transport adapter's instance method also probes files and is not called.
     try:
+        from services.v4_platform.generation_dispatch_a14b_profile import (
+            A14B_PROFILE_SCHEMA, validate_a14b_profile,
+        )
+        if type(value) is dict and value.get("schemaVersion") == A14B_PROFILE_SCHEMA:
+            validate_a14b_profile(value)
+            return
         backend.exact(value, {"schemaVersion", "parameters", "modelFiles"}, "backend profile")
         require(value["schemaVersion"] == "v4.comfyui-i2v-backend-profile.v1")
         p = backend.exact(value["parameters"], {"seed", "steps", "cfg", "samplerName", "scheduler", "modelShift", "negativePrompt"}, "I2V parameters")
@@ -533,6 +545,17 @@ def _workflow(plan: dict, materials: dict) -> None:
     graph = materials["workflow"]
     require(type(graph) is dict)
     try:
+        from services.v4_platform.generation_dispatch_a14b_profile import (
+            A14B_PROFILE_SCHEMA, validate_a14b_workflow,
+        )
+        if materials["backendProfile"]["schemaVersion"] == A14B_PROFILE_SCHEMA:
+            validate_a14b_workflow(graph,
+                generation_request_ref="generation-request-" + digest(request_identity(plan)),
+                source_asset={k: v for k, v in plan["subject"]["inputAsset"].items()
+                              if k != "inputRole"},
+                backend_profile=materials["backendProfile"],
+                output_constraints=plan["subject"]["outputConstraints"])
+            return
         text = graph["5"]["inputs"]["text"]
         suffix = "; framing: MEDIUM_CLOSE_UP; movement: LOCKED"
         require(type(text) is str and text.endswith(suffix))
@@ -561,7 +584,9 @@ def _workflow(plan: dict, materials: dict) -> None:
             "12": node("LoadImage", image="acs-k2-m11/" + plan["subject"]["inputAsset"]["contentDigest"] + ".png"),
         }
         require(canonical(graph) == canonical(expected), "APPROVAL_PLAN_MISMATCH")
-    except (KeyError, TypeError, UnicodeError) as exc:
+    except DispatchError:
+        raise
+    except (KeyError, TypeError, UnicodeError, ValueError) as exc:
         raise DispatchError() from exc
 
 
@@ -576,6 +601,18 @@ def validate_plan_package(value: Any) -> dict:
     for item in exact(m["prerequisiteEvidence"], PREREQUISITES).values():
         pinned(item)
     binding, limits = plan["executionBinding"], plan["limits"]
+    from services.v4_platform.generation_dispatch_a14b_profile import (
+        A14B_PROFILE_SCHEMA, A14B_ADAPTER_IDENTITY, A14B_CAPABILITY,
+    )
+    a14b = m["backendProfile"]["schemaVersion"] == A14B_PROFILE_SCHEMA
+    decision = binding["backendDecision"]
+    require(a14b == (decision["adapterIdentity"] == A14B_ADAPTER_IDENTITY))
+    if a14b:
+        # This engineering template is never an exact SH09 or live deployment binding.
+        require(decision["endpointClass"] == "TEST_ONLY_LOOPBACK"
+                and decision["adapterCapability"] == A14B_CAPABILITY)
+        require(binding["executionCode"]["comfyuiCommit"]
+                == m["backendProfile"]["parameters"]["comfyuiCommit"])
     require(backend.digest(m["backendProfile"]) == binding["executionProfile"]["digest"], "APPROVAL_PLAN_MISMATCH")
     require(config["backendRef"] == binding["backendDecision"]["backendRef"] and config["credentialSourceRef"] == binding["backendDecision"]["credentialSourceRef"])
     require(digest(config) == binding["executionConfigDigest"] and digest(process) == binding["runtimeBinding"]["processIdentityDigest"])

@@ -97,15 +97,26 @@ def validate_material_proof_originals(contribution, plan_package):
         c.require(actual == proof, "SOURCE_CHANGED")
         if proof["objectKind"] == "RuntimeAttestation":
             from services.v4_platform.comfyui import ComfyUIConfigurationError, validate_runtime_attestation
+            from services.v4_platform.generation_dispatch_a14b_profile import A14B_PROFILE_SCHEMA
+            from services.v4_platform.comfyui_a14b_runtime import (
+                A14B_CAPABILITY_MODE, validate_a14b_runtime_attestation,
+            )
+            materials = plan_package["materials"]
+            a14b = materials["backendProfile"]["schemaVersion"] == A14B_PROFILE_SCHEMA
             try:
-                facts = validate_runtime_attestation(observed.original)
+                facts = (validate_a14b_runtime_attestation(observed.original,
+                    backend_profile=materials["backendProfile"],
+                    process_identity=materials["processIdentity"],
+                    execution_config=materials["executionConfig"])
+                    if a14b else validate_runtime_attestation(observed.original))
             except (ComfyUIConfigurationError, ValueError, TypeError, KeyError, AttributeError) as exc:
                 raise c.DispatchError("RUNTIME_CHANGED") from exc
             binding = plan_package["plan"]["executionBinding"]
             decision = binding["backendDecision"]
             c.require(observed.digest_field == "payloadDigest"
                       and observed.original["attestationRef"] == proof["objectRef"]
-                      and observed.original.get("capabilityMode") == "IMAGE_TO_VIDEO"
+                      and observed.original.get("capabilityMode") ==
+                          (A14B_CAPABILITY_MODE if a14b else "IMAGE_TO_VIDEO")
                       and c.canonical(facts["modelFiles"]) ==
                           c.canonical(plan_package["materials"]["backendProfile"]["modelFiles"]),
                       "RUNTIME_CHANGED")
