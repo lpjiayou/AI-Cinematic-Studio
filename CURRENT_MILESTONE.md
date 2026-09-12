@@ -1,6 +1,6 @@
 # AI Cinematic Studio — Current Execution State
 
-Status: `CURRENT / EVIDENCE-BACKED / FAIL-CLOSED`; last reviewed: `2026-09-11`
+Status: `CURRENT / EVIDENCE-BACKED / FAIL-CLOSED`; last reviewed: `2026-09-12`
 ## 1. Closed K2 cutover baselines
 The production behavior, acceptance evidence and compatible Frontend pin are:
 ```text
@@ -174,7 +174,7 @@ E4_RUNTIME_EVIDENCE=VERIFIED_TECHNICAL_ONLY
 E4_V2_I2V_ATTESTATION=CREATED_AND_VALIDATED
 E4_EXACT_BINDING_REVIEW=COMPLETED_WITH_EXECUTION_AUTHORITY_CONFLICTS
 GENERATION_DISPATCH_MECHANISM_AT_AUDITED_COMMIT=NOT_IMPLEMENTED
-GENERATION_DISPATCH_DESIGN_DIRECTION=INDEPENDENT_IMMUTABLE_GRANT_CONFIRMED
+GENERATION_DISPATCH_DESIGN_DIRECTION=INDEPENDENT_IMMUTABLE_GRANT_CONFIRMED; FULL_DISPATCH_MECHANISM_READY=false
 ADR_0022_STATUS=ACCEPTED
 ADR_0022_FULL_ACCEPTANCE=ACCEPTED_ARCHITECTURE_ONLY
 ADR_0022_ACCEPTED_VERSION=1.2
@@ -183,13 +183,13 @@ PKG1_R1_F01=OWNER_CLOSED_FOR_ACCEPTED_CANDIDATE
 PACKAGE_2_OWNER_ACCEPTANCE=ACCEPTED_WITHIN_SCOPE_CPU_ISOLATED_WITH_RESIDUAL_EVIDENCE_RISK
 PKG2_FINAL_R1_01_OWNER_CLOSURE=CLOSED_FOR_ACCEPTED_CANDIDATE
 PKG2_R1_F01_OWNER_CLOSURE=CLOSED_FOR_ACCEPTED_CANDIDATE
-PACKAGE_3_AUTHORIZED=false
+PACKAGE_3_OWNER_ACCEPTANCE=ACCEPTED_WITHIN_SCOPE_CPU_ISOLATED; PACKAGE_3_CPU_CLOSED_LOOP=PASS_FOR_EXACT_CPU_ISOLATED_CANDIDATE; PACKAGE_3_PUBLICATION=NOT_YET_MERGED_AT_DOCUMENT_AUTHORING
 GENERATION_AUTHORIZATION_APPLICATION_SUBMITTED=false
 METHOD_AWARE_INPUT_CONFIG_E3G_AND_MANIFEST_V2_APPEND_E3H=IMPLEMENTED_AND_VERIFIED
 SUPERSEDED_VALIDATOR_M12_G0_3_STATE=ENVIRONMENT_HOLD
 SUPERSEDED_VALIDATOR_NEXT_TASK=LOCAL_WSL2_HANDOFF_AND_M12_C3_PREFLIGHT
 ```
-The prior receipts through [E3H](docs/status/M10_MANIFEST_V2_TECHNICAL_INPUT_APPEND_AUTHORITY_E3H_2026-09-08.md) and [post-E3H R6](docs/status/M10_M11_SPIKE_0_ELIGIBLE_LINEAGE_E3_R6_POST_E3H_2026-09-08.md) remain unchanged: eligible input lineage is PREPARED_AND_VERIFIED; the old 409 failure and historical E4_STARTED=false retain their 2026-09-08 meaning. No upstream fact was updated/deleted or recreated in that input-only resume. Later [E4 runtime evidence](docs/status/M10_M11_SPIKE_0_E4_RUNTIME_PREFLIGHT_2026-09-09.md) records the completed 632-file snapshot and validated v2 I2V proof; [exact binding](docs/status/M10_M11_SPIKE_0_E4_EXACT_BINDING_REVIEW_2026-09-09.md) retains C1/C2. The [dispatch audit](docs/status/M10_M11_GENERATION_DISPATCH_AUTHORITY_AUDIT_2026-09-09.md) remains historical for audited commit f007ab3e. [ADR-0022](governance/ADR-0022-generation-dispatch-grant.md) v1.2 remains accepted architecture only. The [Package 1 record](docs/status/ADR_0022_PKG1_CPU_ACCEPTANCE_2026-09-10.md) registers its CPU-isolated Grant foundation; the [Package 2 record](docs/status/ADR_0022_PKG2_CPU_ACCEPTANCE_2026-09-11.md) registers the exact CPU-isolated binding candidate, its two candidate-specific closures and accepted residual evidence risk. The historical B25, selection, QC, read-one-to-zero, timeout and index-drift causes remain undetermined. Package 3, live Grant issuance/consumption, Attempt, SendCapability, transport/GPU sending and real generation remain unauthorized; Spike-0 stays blocked and the full dispatch mechanism is not ready. See the [evidence index](docs/status/M10_M11_SPIKE_0_E4_EVIDENCE_INDEX_2026-09-09.md). The five historical fields remain false / NOT_VERIFIED / NOT_READY / false / false; no runtime metadata or compatibility token grants current execution authority, and the E4 execution pin remains unchanged.
+The prior receipts through [E3H](docs/status/M10_MANIFEST_V2_TECHNICAL_INPUT_APPEND_AUTHORITY_E3H_2026-09-08.md) and [post-E3H R6](docs/status/M10_M11_SPIKE_0_ELIGIBLE_LINEAGE_E3_R6_POST_E3H_2026-09-08.md) remain unchanged: eligible input lineage is PREPARED_AND_VERIFIED; the old 409 failure and historical E4_STARTED=false retain their 2026-09-08 meaning. No upstream fact was updated/deleted or recreated in that input-only resume. Later [E4 runtime evidence](docs/status/M10_M11_SPIKE_0_E4_RUNTIME_PREFLIGHT_2026-09-09.md) records the completed 632-file snapshot and validated v2 I2V proof; [exact binding](docs/status/M10_M11_SPIKE_0_E4_EXACT_BINDING_REVIEW_2026-09-09.md) retains C1/C2. The [dispatch audit](docs/status/M10_M11_GENERATION_DISPATCH_AUTHORITY_AUDIT_2026-09-09.md) remains historical for audited commit f007ab3e. [ADR-0022](governance/ADR-0022-generation-dispatch-grant.md) v1.2 remains accepted architecture only. The [Package 1 record](docs/status/ADR_0022_PKG1_CPU_ACCEPTANCE_2026-09-10.md) registers its CPU-isolated Grant foundation; the [Package 2 record](docs/status/ADR_0022_PKG2_CPU_ACCEPTANCE_2026-09-11.md) registers the exact CPU-isolated binding candidate, its two candidate-specific closures and accepted residual evidence risk; the [Package 3 record](docs/status/ADR_0022_PKG3_CPU_ACCEPTANCE_2026-09-12.md) registers the exact CPU-isolated closed-loop candidate, its 168/168 bounded regression and the Owner's scope-limited acceptance. Package 1/2 history and the undetermined historical B25, selection, QC, read-one-to-zero, timeout and index-drift causes remain unchanged. Package 3 publication is not yet merged at document authoring. Live Grant issuance/consumption, real transport, execution configuration deployment, ComfyUI, GPU and prompt submission remain unauthorized; Spike-0 stays blocked and the full dispatch mechanism is not ready. See the [evidence index](docs/status/M10_M11_SPIKE_0_E4_EVIDENCE_INDEX_2026-09-09.md). The five historical fields remain false / NOT_VERIFIED / NOT_READY / false / false; no runtime metadata or compatibility token grants current execution authority, and the E4 execution pin remains unchanged.
 ## 7. Immutable history
 The former archived material remains byte-for-byte in [CURRENT_MILESTONE_HISTORY_THROUGH_2026-09-02.md](CURRENT_MILESTONE_HISTORY_THROUGH_2026-09-02.md).
 ```text

@@ -954,6 +954,9 @@ def _validate_job(job: Mapping[str, Any]) -> None:
     _validate_request(request)
     if (request.get("schemaVersion") == DISPATCH_REQUEST_SCHEMA) != (job["schemaVersion"] == DISPATCH_JOB_SCHEMA_VERSION):
         raise MediaJobError("Grant-bound request/Job version mismatch")
+    if (job["schemaVersion"] != DISPATCH_JOB_SCHEMA_VERSION
+            and job.get("dispatchResult") is not None):
+        raise MediaJobError("legacy media Job cannot contain a dispatch result")
     if (
         job.get("workspaceRef") != request.get("workspaceRef")
         or job.get("productionRunRef") != request.get("productionRunRef")
@@ -1022,12 +1025,69 @@ def _validate_job(job: Mapping[str, Any]) -> None:
                     raise BackendValidationError("attempt identity mismatch")
                 if attempt["state"] == "FAILED" and attempt.get("nonRetryable") is not True:
                     raise BackendValidationError("method-aware failure must be non-retryable")
+                if dispatch_bound and not _hex_digest(
+                        attempt.get("workerProcessIdentityDigest")):
+                    raise BackendValidationError(
+                        "dispatch Attempt process identity is invalid"
+                    )
                 if "providerExecution" in attempt:
                     validate_execution_result(attempt["providerExecution"], envelope)
             if job.get("artifact") is not None:
                 validate_execution_result(job["artifact"].get("providerExecution"), envelope)
+            if dispatch_bound:
+                from .generation_dispatch_transport import validate_dispatch_result
+                result = job.get("dispatchResult")
+                if result is None and job["state"] in {"SUCCEEDED", "FAILED"}:
+                    raise BackendValidationError(
+                        "terminal dispatch Job has no result"
+                    )
+                if result is not None:
+                    result = validate_dispatch_result(result, job=job)
+                    latest = job["attempts"][-1] if job["attempts"] else None
+                    if (
+                        not isinstance(latest, Mapping)
+                        or (
+                            job["state"] != "RUNNING"
+                            and latest.get("dispatchResultDigest")
+                            != result["payloadDigest"]
+                        )
+                    ):
+                        raise BackendValidationError(
+                            "dispatch result/Attempt binding is invalid"
+                        )
+                    if job["state"] == "SUCCEEDED" and (
+                        result["outcome"] != "SUCCEEDED"
+                        or job["artifact"].get("dispatchResultDigest")
+                        != result["payloadDigest"]
+                    ):
+                        raise BackendValidationError(
+                            "dispatch success result is invalid"
+                        )
+                    if job["state"] == "RUNNING" and (
+                        result["outcome"] != "SUCCEEDED"
+                        or not isinstance(job.get("artifactCommitIntent"), Mapping)
+                        or job["artifactCommitIntent"].get("artifact", {}).get(
+                            "dispatchResultDigest"
+                        ) != result["payloadDigest"]
+                    ):
+                        raise BackendValidationError(
+                            "dispatch commit-intent result is invalid"
+                        )
+                    if (
+                        job["state"] == "FAILED"
+                        and result["outcome"] not in {"FAILED", "UNKNOWN"}
+                    ):
+                        raise BackendValidationError(
+                            "dispatch failure result is invalid"
+                        )
+                    if job["state"] not in {"RUNNING", "SUCCEEDED", "FAILED"}:
+                        raise BackendValidationError(
+                            "dispatch result is invalid for Job state"
+                        )
         except (BackendValidationError, KeyError, TypeError) as exc:
             raise MediaJobError("invalid method-aware job binding") from exc
+        except ValueError as exc:
+            raise MediaJobError("invalid dispatch result binding") from exc
     _validate_job_state_shape(job)
 
 
@@ -1154,10 +1214,9 @@ def _validate_job_update(
     ):
         raise MediaJobStateError("immutable media job identity changed")
     if current["schemaVersion"] == DISPATCH_JOB_SCHEMA_VERSION and (
-            current.get("dispatchGrantBinding") != value.get("dispatchGrantBinding")
-            or value["attempts"] != current["attempts"]
-            or value.get("lease") != current.get("lease")):
-        raise MediaJobStateError("Grant-bound Job consumption is unavailable in this package")
+            current.get("dispatchGrantBinding")
+            != value.get("dispatchGrantBinding")):
+        raise MediaJobStateError("Grant-bound Job binding changed")
     if schema_transition == (LEGACY_JOB_SCHEMA_VERSION, JOB_SCHEMA_VERSION) and (
         (current.get("state"), value.get("state"))
         not in {("QUEUED", "LEASED"), ("LEASED", "RUNNING")}
@@ -1168,7 +1227,10 @@ def _validate_job_update(
         and current["state"] == "LEASED" and value["state"] == "RUNNING"
     ):
         raise MediaJobStateError("execution envelope is immutable after validation")
-    if current["schemaVersion"] == METHOD_AWARE_JOB_SCHEMA_VERSION and (
+    if current["schemaVersion"] in {
+        METHOD_AWARE_JOB_SCHEMA_VERSION,
+        DISPATCH_JOB_SCHEMA_VERSION,
+    } and (
         value["state"] == "RETRYING" or
         (value["state"] in {"QUEUED", "LEASED"} and current["attempts"])
     ):
@@ -1318,6 +1380,13 @@ def _validate_job_update(
     if value["state"] == "SUCCEEDED":
         if not isinstance(current_intent, Mapping) or next_intent is not None:
             raise MediaJobStateError("artifact success requires a consumed commit intent")
+    if current["schemaVersion"] == DISPATCH_JOB_SCHEMA_VERSION:
+        current_result = current.get("dispatchResult")
+        next_result = value.get("dispatchResult")
+        if current_result is not None and next_result != current_result:
+            raise MediaJobStateError(
+                "dispatch result is immutable once recorded"
+            )
 
 
 class InMemoryMediaJobAdapter:
@@ -2321,7 +2390,10 @@ class MediaJobCoordinator:
         probe = verify_media_against_request(final_path, self._probe_request(job))
         if probe != artifact.get("probe"):
             raise ArtifactVerificationError("artifact commit probe changed")
-        if job["schemaVersion"] == METHOD_AWARE_JOB_SCHEMA_VERSION:
+        if job["schemaVersion"] in {
+            METHOD_AWARE_JOB_SCHEMA_VERSION,
+            DISPATCH_JOB_SCHEMA_VERSION,
+        }:
             try:
                 validate_execution_result(artifact.get("providerExecution"), job["executionEnvelope"])
             except BackendValidationError as exc:
@@ -2570,7 +2642,10 @@ class MediaJobCoordinator:
 
     @staticmethod
     def _probe_request(job):
-        if job["schemaVersion"] == METHOD_AWARE_JOB_SCHEMA_VERSION:
+        if job["schemaVersion"] in {
+            METHOD_AWARE_JOB_SCHEMA_VERSION,
+            DISPATCH_JOB_SCHEMA_VERSION,
+        }:
             return output_probe_request(job["executionEnvelope"])
         return job["request"]
 
@@ -2822,6 +2897,8 @@ class MediaJobCoordinator:
         job = self.repository.get(workspace_ref, run_ref, job_ref)
         if job is None or job["state"] != "FAILED":
             raise MediaJobStateError("only failed media jobs may retry")
+        if job["schemaVersion"] == DISPATCH_JOB_SCHEMA_VERSION:
+            raise MediaJobStateError("Grant-bound Job retry is forbidden")
         if isinstance(job.get("artifactCommitIntent"), Mapping):
             raise MediaJobStateError(
                 "media job artifact cleanup must finish before retry"

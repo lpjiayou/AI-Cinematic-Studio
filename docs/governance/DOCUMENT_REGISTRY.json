@@ -3594,6 +3594,24 @@
       "lastReviewedAt": "2026-09-11",
       "linkedFromIndex": true,
       "notes": "HISTORICAL_PATH_NOT_EXECUTION_AUTHORITY=true; records the supplied Owner decision, CPU-isolated A110/B38 evidence and bounded R4 streaming-export risk. Does not authorize live Grant issuance/consumption, Package 3, deployment, GPU sending or generation."
+    },
+    {
+      "path": "docs/status/ADR_0022_PKG3_CPU_ACCEPTANCE_2026-09-12.md",
+      "repository": "Core",
+      "documentClass": "IMPLEMENTATION_EVIDENCE",
+      "status": "RECORDED",
+      "owner": "Project Lead / Package 3 Owner / Repository Governance Owner",
+      "authoritativeFor": [
+        "Historical record of bounded Package 3 CPU-isolated Owner acceptance, exact accepted closed-loop candidate identity and final bounded regression; not runtime grant authority."
+      ],
+      "supersedes": [],
+      "supersededBy": [],
+      "currentStateClaimsAllowed": false,
+      "historicalMutationPolicy": "IMMUTABLE_ONCE_RECORDED",
+      "lastReviewedBaseline": "ccb8cd2649a00ed9e16382b8ce3d95e09b065642",
+      "lastReviewedAt": "2026-09-12",
+      "linkedFromIndex": true,
+      "notes": "HISTORICAL_PATH_NOT_EXECUTION_AUTHORITY=true; records the supplied Owner decision, exact 15-path CPU-isolated candidate, 168/168 bounded regression and TEST_ONLY_IN_PROCESS_MOCK_NO_LIVE_SUBMISSION history. Does not authorize live Grant use, real transport, deployment, ComfyUI, GPU, prompt submission, Spike-0 or paid generation."
     }
   ]
 }
