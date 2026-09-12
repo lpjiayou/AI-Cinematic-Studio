@@ -627,7 +627,7 @@ def validate_plan_package(value: Any) -> dict:
         # Offline candidates can be compiled, but cannot enter the Grant pipeline.
         require(m["backendProfile"]["parameters"]["evidenceClass"] == "TEST_ONLY"
             and decision["endpointClass"] == "TEST_ONLY_LOOPBACK"
-            and decision["adapterCapability"] == EXACT_CAPABILITY, "CAMERA_PROMPT_APPROVAL_PENDING")
+            and decision["adapterCapability"] == EXACT_CAPABILITY, "APPROVAL_UNAVAILABLE")
         require(binding["executionCode"]["comfyuiCommit"] == m["backendProfile"]["parameters"]["comfyuiCommit"])
     require(a14b == (decision["adapterIdentity"] == A14B_ADAPTER_IDENTITY))
     if a14b:
