@@ -46,8 +46,10 @@ INTEGRATION_SHARD_LIMIT_SECONDS = 1200
 INTEGRATION_SHARDS: dict[str, tuple[str, ...]] = {
     "shard-1": (
         "tests/integration/test_m13_r2_full_cpu_backend.py",
+        "tests/integration/test_generation_dispatch_a14b_cpu.py",
     ),
     "shard-2": (
+        "tests/integration/test_generation_dispatch_live_result_cpu.py",
         "tests/integration/test_creator_ai_director_candidate_idempotency_e3c.py",
         "tests/integration/test_creator_clean_state_public_api_e2e.py",
         "tests/integration/test_creator_creative_plan_confirmation_idempotency_e3b.py",
@@ -77,6 +79,7 @@ INTEGRATION_SHARDS: dict[str, tuple[str, ...]] = {
         "tests/integration/test_m9_m12_clone_lineage_bridge.py",
     ),
     "shard-3": (
+        "tests/integration/test_comfyui_staged_transport_loopback.py",
         "tests/integration/test_ai_director_project_draft_flow.py",
         "tests/integration/test_creator_dynamic_media_preflight_http.py",
         "tests/integration/test_creator_execution_method_planning_m8_m9.py",
@@ -110,9 +113,6 @@ INTEGRATION_SHARDS: dict[str, tuple[str, ...]] = {
         "tests/integration/test_generation_dispatch_consume_send_cpu.py",
         "tests/integration/test_generation_dispatch_at_most_once_cpu.py",
         "tests/integration/test_generation_dispatch_result_recovery_cpu.py",
-        "tests/integration/test_generation_dispatch_a14b_cpu.py",
-        "tests/integration/test_comfyui_staged_transport_loopback.py",
-        "tests/integration/test_generation_dispatch_live_result_cpu.py",
         "tests/integration/test_generic_upstream_method_closure.py",
         "tests/integration/test_m12_voice_profile_lineage_sqlite.py",
         "tests/integration/test_m13_e1_timeline_effect_binding.py",
