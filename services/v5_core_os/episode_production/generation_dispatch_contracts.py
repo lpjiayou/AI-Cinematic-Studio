@@ -706,6 +706,10 @@ def validate_command(operation: str, value: Any) -> dict:
             "expectedSubjectDigest", "expectedApprovedPlanDigest", "authorityDecisionRef", "idempotencyKey", "snapshotTokens"}
     elif operation == "INSPECT":
         fields = common | {"generationDispatchGrantRef"}
+    elif operation == "CONSUME":
+        fields = common | {"generationDispatchGrantRef", "generationDispatchGrantDigest",
+            "mediaJobRef", "attemptRef", "workerRef", "expectedJobRevision",
+            "expectedLeaseTokenDigest", "idempotencyKey", "snapshotTokens"}
     elif operation == "REVOKE":
         fields = common | {"generationDispatchGrantRef", "generationDispatchGrantDigest", "authorityDecisionRef", "idempotencyKey", "snapshotTokens"}
     else:
@@ -716,10 +720,25 @@ def validate_command(operation: str, value: Any) -> dict:
             validate_limits(item)
         elif key == "snapshotTokens":
             tokens(item)
+        elif key == "expectedJobRevision":
+            integer(item)
         elif key.endswith("Digest"):
             sha(item)
         else:
             ref(item)
+    return deepcopy(value)
+
+
+def validate_consume_receipt(value: Any) -> dict:
+    exact(value, {"schemaVersion", "operation", "terminal", "recordReplay",
+        "eligibility", "sendPermission"})
+    require(value["schemaVersion"] == PREFIX + "consume-result.v1"
+        and value["operation"] == "CONSUME"
+        and type(value["recordReplay"]) is bool
+        and value["eligibility"] == "CONSUMED"
+        and value["sendPermission"] == "NONE")
+    terminal = validate_terminal(value["terminal"])
+    require(terminal["kind"] == "CONSUMPTION_COMMITTED")
     return deepcopy(value)
 
 

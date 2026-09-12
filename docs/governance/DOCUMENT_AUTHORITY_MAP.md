@@ -22,7 +22,7 @@ and historical evidence cannot authorize current execution.
 
 Reviewed documentation baseline: `3bf2e7a5152a7bd9c1087571aab6413a53a43bb6`; date: `2026-09-10`. PR #84 established the five E4 classification-index links in `docs/README.md`; this update separately records ADR-0022 v1.2 architecture acceptance. Neither navigation update changes the E4 execution pin or clears runtime blockers.
 
-Package 1 acceptance registration baseline: `521439dad61bad49c415059f8503727d2d95d233`; date: `2026-09-10`. Package 2 acceptance registration baseline: `230bde8ac53a4d7d02ef02f8eea85efe6f1afc13`; date: `2026-09-11`. The implementation-evidence records preserve bounded Owner decisions and exact CPU candidate identities; they do not grant runtime authority. Existing documentation review baselines retain their historical scope.
+Package 1 acceptance registration baseline: `521439dad61bad49c415059f8503727d2d95d233`; date: `2026-09-10`. Package 2 acceptance registration baseline: `230bde8ac53a4d7d02ef02f8eea85efe6f1afc13`; date: `2026-09-11`. Package 3 acceptance registration is authored against baseline `ccb8cd2649a00ed9e16382b8ce3d95e09b065642`; date: `2026-09-12`; publication is not yet merged at authoring. The implementation-evidence records preserve bounded Owner decisions and exact CPU candidate identities; they do not grant runtime authority. Existing documentation review baselines retain their historical scope.
 
 ## Classification totals
 
@@ -34,7 +34,7 @@ Package 1 acceptance registration baseline: `521439dad61bad49c415059f8503727d2d9
 | `CURRENT_STATUS` | 19 | yes |
 | `CAPABILITY_MATRIX` | 1 | yes |
 | `OPERATIONAL_RUNBOOK` | 18 | no |
-| `IMPLEMENTATION_EVIDENCE` | 23 | no |
+| `IMPLEMENTATION_EVIDENCE` | 24 | no |
 | `HISTORICAL_EVIDENCE` | 40 | no |
 | `SUPERSEDED` | 9 | no |
 | `DRAFT` | 3 | no |
@@ -183,6 +183,7 @@ Package 1 acceptance registration baseline: `521439dad61bad49c415059f8503727d2d9
 
 | Document | Status | Owner |
 | --- | --- | --- |
+| [`docs/status/ADR_0022_PKG3_CPU_ACCEPTANCE_2026-09-12.md`](../status/ADR_0022_PKG3_CPU_ACCEPTANCE_2026-09-12.md) | `RECORDED` | Project Lead / Package 3 Owner / Repository Governance Owner |
 | [`docs/status/ADR_0022_PKG2_CPU_ACCEPTANCE_2026-09-11.md`](../status/ADR_0022_PKG2_CPU_ACCEPTANCE_2026-09-11.md) | `RECORDED` | Project Lead / Core Architecture Owner / Repository Governance Owner |
 | [`docs/status/ADR_0022_PKG1_CPU_ACCEPTANCE_2026-09-10.md`](../status/ADR_0022_PKG1_CPU_ACCEPTANCE_2026-09-10.md) | `RECORDED` | Project Lead / Core Architecture Owner / Repository Governance Owner |
 | [`docs/archive/AGENTS_ARCHIVE_MIGRATION_MANIFEST.json`](../archive/AGENTS_ARCHIVE_MIGRATION_MANIFEST.json) | `RECORDED` | Repository Governance Owner / CI Governance Owner |

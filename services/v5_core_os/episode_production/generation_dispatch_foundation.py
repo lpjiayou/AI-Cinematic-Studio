@@ -211,15 +211,16 @@ class GenerationDispatchFoundation:
         c.require(all(command[k] == expected[k] for k in ("workspaceRef", "productionRunRef")), "SCOPE_MISMATCH")
         c.require(all(command[k] == v for k, v in expected.items()), "APPROVAL_PLAN_MISMATCH")
 
-    def _current(self, selected, lease):
+    def _current(self, selected, lease, *, phase="ISSUE"):
         self._held(lease)
         package = selected.plan_package
         plan, materials = package["plan"], package["materials"]
         binding = plan["executionBinding"]
         for reader in (self.source_reader, self.backend_reader, self.runtime_reader, self.cost_reader):
             c.require(reader is not None, "CURRENTNESS_FENCE_UNAVAILABLE")
-        read_set = self.source_reader.read_current(deepcopy(package), deepcopy(selected.approval), "ISSUE", lease)
-        read_set = c.validate_read_set(read_set, expected_scope=plan["scope"], phase="ISSUE")
+        c.require(phase in {"ISSUE", "CONSUME", "SEND"})
+        read_set = self.source_reader.read_current(deepcopy(package), deepcopy(selected.approval), phase, lease)
+        read_set = c.validate_read_set(read_set, expected_scope=plan["scope"], phase=phase)
         c.validate_read_set_bindings(read_set, plan, selected.approval)
         c.require(read_set["coordinationEpoch"] == lease.epoch, "CURRENTNESS_FENCE_UNAVAILABLE")
         observed = self.backend_reader.read_current(deepcopy(package), lease)
