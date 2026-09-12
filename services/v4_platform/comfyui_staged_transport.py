@@ -117,6 +117,10 @@ class _DeadlineResponseReader:
         self._timeout()
         return self.stream.read1(size)
 
+    def flush(self):
+        # HTTPResponse.close() flushes a still-attached response reader.
+        self.stream.flush()
+
     def close(self):
         self.stream.close()
 

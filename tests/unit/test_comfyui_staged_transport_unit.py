@@ -1,7 +1,10 @@
 """Isolated client mechanics, separate from the V5 capability integration gate."""
 from copy import copy, deepcopy
+from contextlib import contextmanager
+import http.client
 import pickle
 import os
+import socket
 import subprocess
 import sys
 import threading
@@ -202,6 +205,101 @@ print('INERT_IMPORT_PASS')
         original = (exchange.request_deadline, exchange.history_deadline, exchange.postprocess_deadline)
         self.assertLessEqual(exchange.postprocess_deadline, exchange.deadline)
         self.assertEqual(original, (exchange.request_deadline, exchange.history_deadline, exchange.postprocess_deadline))
+
+
+class ResponseCleanupRegressionTests(unittest.TestCase):
+    """F01: real HTTPResponse cleanup must preserve the original outcome."""
+
+    @contextmanager
+    def response_connection(self):
+        # Socketpair is owned by this test: no TCP listener or existing service.
+        receiver, peer = socket.socketpair()
+        connection = http.client.HTTPConnection("127.0.0.1", 49157)
+        connection.sock = receiver
+        try:
+            # Use the real request state machine, without connecting to a host.
+            connection.putrequest("GET", "/test-only-response")
+            connection.endheaders()
+            yield connection, peer
+        finally:
+            try:
+                connection.close()
+            finally:
+                receiver.close()
+                peer.close()
+            self.assertEqual(receiver.fileno(), -1)
+            self.assertEqual(peer.fileno(), -1)
+
+    def test_slow_headers_preserve_absolute_timeout_through_real_response_close(self):
+        with self.response_connection() as (connection, peer):
+            peer.sendall(b"HTTP/1.1 200 OK\r\nX-Slow: ")
+            stop = threading.Event()
+            sent = []
+
+            def drip_header():
+                try:
+                    while not stop.wait(0.01):
+                        peer.sendall(b"a")
+                        sent.append(1)
+                except OSError:
+                    return
+
+            started = time.monotonic()
+            response = staged._DeadlineHTTPResponse(connection.sock,
+                deadline=started + 0.25)
+            reader = response.fp
+            thread = threading.Thread(target=drip_header, name="f01-header-drip")
+            try:
+                thread.start()
+                with self.assertRaises(TimeoutError):
+                    try:
+                        response.begin()
+                    finally:
+                        # Real stdlib close -> flush -> wrapped reader; no mock.
+                        response.close()
+                self.assertGreater(len(sent), 1)
+                self.assertLess(time.monotonic() - started, 2)
+                self.assertTrue(response.closed)
+                self.assertTrue(reader.stream.closed)
+                response.close()  # Cleanup is also safe when repeated.
+            finally:
+                stop.set()
+                if thread.ident is not None:
+                    thread.join(timeout=2)
+                try:
+                    response.close()
+                finally:
+                    self.assertFalse(thread.is_alive())
+
+    def test_unread_503_body_preserves_non_success_status_through_close(self):
+        transport, _ = make_loopback_client("http://127.0.0.1:49157/")
+        with self.response_connection() as (connection, peer):
+            peer.sendall(b"HTTP/1.1 503 Service Unavailable\r\n"
+                         b"Content-Type: application/json\r\nContent-Length: 2\r\n\r\n{}")
+            result = transport._read_body(connection,
+                deadline=time.monotonic() + 1, max_bytes=128,
+                expected_media_type="application/json")
+            self.assertEqual(result, (503, b""))
+            response = connection._HTTPConnection__response
+            self.assertEqual(response.length, 2)  # Body was not consumed.
+            self.assertTrue(response.closed)
+            self.assertTrue(response.isclosed())
+            response.close()
+
+    def test_incomplete_200_body_preserves_timeout_not_success_or_cleanup_error(self):
+        transport, _ = make_loopback_client("http://127.0.0.1:49157/")
+        with self.response_connection() as (connection, peer):
+            # Keep peer open: this is a body timeout, not EOF/truncation.
+            peer.sendall(b"HTTP/1.1 200 OK\r\nContent-Type: application/json\r\n"
+                         b"Content-Length: 20\r\n\r\n{}")
+            with self.assertRaises(TimeoutError):
+                transport._read_body(connection, deadline=time.monotonic() + 0.2,
+                    max_bytes=128, expected_media_type="application/json")
+            response = connection._HTTPConnection__response
+            self.assertEqual(response.length, 18)
+            self.assertTrue(response.closed)
+            self.assertTrue(response.isclosed())
+            response.close()
 
 
 if __name__ == "__main__":
