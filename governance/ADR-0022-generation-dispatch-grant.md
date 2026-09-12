@@ -5,7 +5,7 @@
 | 字段 | 值 |
 | --- | --- |
 | ADR ID | ADR-0022 |
-| 文档版本 | 1.3；保留 v1.2 控制面，增加 §5.6 的狭义 A14B 版本化兼容 |
+| 文档版本 | 1.4；保留 v1.2 控制面及 §5.6，增加 §5.7 的 R3 狭义原图/runtime/编码兼容 |
 | Status | Accepted — Architecture Contract Only |
 | 完整 ADR 审批状态 | ACCEPTED_ARCHITECTURE_ONLY；Project Lead 已明确接受全文，不等于实现或生成许可 |
 | 已确认设计方向 | 独立、不可变 Grant；不覆盖历史五字段，不迁移历史摘要 |
@@ -457,6 +457,35 @@ profile 的顶层仍恰为 schemaVersion、parameters、modelFiles；新 paramet
 
 本节不批准任何真实配置、采集器、运行时证明、正式数据库、真实 Grant、GPU 或 /prompt。当前本地实现及证据状态由当前里程碑中的精确候选记录投影，Owner 验收与发布另行授权。
 
+### 5.7 v1.4 R3 原图、历史前像和完整编码增量
+
+2026-09-13 Project Lead 明确授权
+`ACS-SH09-EXACT-OFFLINE-BINDING-AND-RUNTIME-SEAM-R3-20260913` A01—A06
+及本节狭义规范增量。仅允许本地实现、CPU/fixture-owned loopback 验证和候选提交；
+不是 Camera 候选、精确绑定或生成批准。v1.2 Grant/Terminal/CAS、readSet、L1/L2、
+lease/revoke/clock、原 Job/Attempt、准入及发布权限保持不变。
+
+- 原 v1 TEST_ONLY profile/compiler/runtime/request/编码继续闭集，不能重解释旧摘要。
+  新 profile `v4.comfyui-a14b-i2v-backend-profile.v2`、compiler v2、adapter v2
+  重建固定原图 16 节点，输出 41；CLIPLoader 不补写原件未填写的 device。
+  不能以任意图或任意 hash 代替完整重建比较。
+- 原 Camera 句到 LOCKED 的单指针变化属于待复核候选。原件不变；新 profile、workflow、
+  request identity 和计划摘要重新计算，旧批准不可复用。原件来源候选被 Grant 边界拒绝，
+  仅明确 TEST_ONLY 的隔离材料可进入当前 CPU 验证路径。
+- Runtime v2 分离 ComfyUI 版本 0.35.0 与 commit；历史前像映射使用独立
+  `v4.a14b-historical-source-map.v1`，不是当前 attestation。argv U+001F 原 hash、
+  原环境字典、原模型数组顺序与新合同 canonical 前像均单独保存并验证；不将历史
+  PID、启动时刻或模型元数据升级为当前进程/权重实测证据。
+- request v2 绑定完整 `v4.a14b-native49-encoding.v2`：49 张原帧中保留 0—47、
+  丢弃 48；704×1280、48 帧、24fps；libx264/mp4/yuv420p/CRF16。
+  原命令省略的 preset/movflags 以固定工具观察解析为显式 medium/0 候选；
+  显式 threads=1 是新增可复现性候选，不伪称原件指定。工具 SHA、索引映射及
+  全部参数在发送前被 profile/plan/request 摘要绑定，结果 derivation v2 再验证。
+  原 native 序列摘要和 MP4 摘要分开。安全临时目录、-nostdin、file/pipe、-n 保留。
+- 构造/import/open 不联网；现有受控 composition 默认关闭，不创建第二队列、数据库、
+  Provider 或自动启动入口。fixture 仍不得指向 8188 或真实服务。未知费用/设备不填零。
+  发布、现场只读采集、配置部署、真实 Grant 和一次 /prompt 各需后续单独授权。
+
 ## 6. Operator 与内部端口闭集（R1、R3）
 
 以下是未来实现的领域合同，不是本轮可执行命令。首版无新 Frontend 或公共 HTTP 写路由；Operator 身份来自可信本地操作边界，不能由请求 actor/role 字段自报。
@@ -711,6 +740,7 @@ InputPlan、InputAssetVersion、InputAppendAuthority 和旧 v2 runtime attestati
 | 1.2 | F01 保留 UUID＋新服务端幂等键；F02 原 Owner/selector 完整映射；F03 lease/deadline/释放与收尾；F04 精确时间字段 | 仅单文件文档修订获批；待独立复审，全文 Accepted/实现/生成均未批准 |
 | 1.2 接受及发布元数据 | 2026-09-10 Project Lead 全文回复 Accepted；随后另行授权状态回填及文档入库；第 1—13 节原字节不变 | ACCEPTED_ARCHITECTURE_ONLY；历史行仅记录其编制阶段；实现、真实 Grant 和生成仍未批准 |
 | 1.3 R2 狭义兼容 | 2026-09-12 Project Lead 明确批准 §5.6 的独立 A14B profile/compiler/runtime 与 staged transport 本地 CPU 增量；其余控制面语义保留 | 狭义设计及白名单本地实现获批；实现 Owner 验收待定，发布、真实 ComfyUI/GPU/Grant/数据库/生成未授权 |
+| 1.4 R3 狭义兼容 | 2026-09-13 Project Lead 授权 A01—A06 与 §5.7 版本化原图、runtime 前像、完整编码及直接依赖接线 | 仅本地 CPU/fixture 候选；Camera/精确绑定 Owner 验收、发布与现场执行仍待后续授权 |
 
 以下 [S] 项只支持对旧仓库行为的陈述，不表示新增规范已经实现：
 

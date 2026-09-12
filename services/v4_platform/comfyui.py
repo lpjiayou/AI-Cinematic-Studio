@@ -771,8 +771,8 @@ COMFYUI_I2V_RUNTIME_ATTESTATION_SCHEMA = "v4.comfyui-runtime-attestation.v2"
 def validate_runtime_attestation(value: Mapping[str, Any]) -> Mapping[str, Any]:
     """Explicit legacy/A14B type dispatch, without files or network access."""
     from .backend_registry import exact, hex_digest, integer, digest
-    from .comfyui_a14b_runtime import A14B_RUNTIME_ATTESTATION_SCHEMA, validate_a14b_runtime_attestation
-    if value.get("schemaVersion") == A14B_RUNTIME_ATTESTATION_SCHEMA:
+    from .comfyui_a14b_runtime import A14B_RUNTIME_ATTESTATION_SCHEMA, EXACT_RUNTIME_ATTESTATION_SCHEMA, validate_a14b_runtime_attestation
+    if value.get("schemaVersion") in {A14B_RUNTIME_ATTESTATION_SCHEMA, EXACT_RUNTIME_ATTESTATION_SCHEMA}:
         return validate_a14b_runtime_attestation(value)
     fields = {"schemaVersion", "attestationRef", "observedAt", "factsDigest", "facts",
               "authorityState", "publicationAllowed", "payloadDigest"}

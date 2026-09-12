@@ -98,11 +98,12 @@ def validate_material_proof_originals(contribution, plan_package):
         if proof["objectKind"] == "RuntimeAttestation":
             from services.v4_platform.comfyui import ComfyUIConfigurationError, validate_runtime_attestation
             from services.v4_platform.generation_dispatch_a14b_profile import A14B_PROFILE_SCHEMA
+            from services.v4_platform.generation_dispatch_a14b_exact import EXACT_PROFILE_SCHEMA
             from services.v4_platform.comfyui_a14b_runtime import (
                 A14B_CAPABILITY_MODE, validate_a14b_runtime_attestation,
             )
             materials = plan_package["materials"]
-            a14b = materials["backendProfile"]["schemaVersion"] == A14B_PROFILE_SCHEMA
+            a14b = materials["backendProfile"]["schemaVersion"] in {A14B_PROFILE_SCHEMA, EXACT_PROFILE_SCHEMA}
             try:
                 facts = (validate_a14b_runtime_attestation(observed.original,
                     backend_profile=materials["backendProfile"],

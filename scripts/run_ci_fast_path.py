@@ -100,6 +100,7 @@ INTEGRATION_SHARDS: dict[str, tuple[str, ...]] = {
         "tests/integration/test_m13_timeline_editing_sqlite.py",
     ),
     "shard-4": (
+        "tests/integration/test_generation_dispatch_a14b_exact_cpu.py",
         "tests/integration/test_creator_canonical_registration_http.py",
         "tests/integration/test_creator_episode_production_k2.py",
         "tests/integration/test_creator_explicit_audio_bridge_m9_m12.py",

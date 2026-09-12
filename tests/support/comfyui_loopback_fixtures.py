@@ -42,7 +42,10 @@ class LoopbackComfyUI:
     def __init__(self, *, status=200, receipt_raw=None, response_delay=0.0,
                  truncate=False, pending_reads=0, history_mutation=None, frames=None,
                  redirect_url=None, content_length=None, block_response=False, drip_headers=False,
-                 scenario=None, header_line_bytes=0, header_count=0):
+                 scenario=None, header_line_bytes=0, header_count=0, output_node="16", start_number=0):
+        if output_node not in {"16", "41"} or start_number not in {0, 1}:
+            raise ValueError("unknown test topology")
+        self.output_node, self.start_number = output_node, start_number
         self.status, self.receipt_raw, self.response_delay = status, receipt_raw, response_delay
         self.truncate, self.pending_reads, self.history_mutation = truncate, pending_reads, history_mutation
         self.frames = tuple(frames) if frames is not None else None
@@ -137,13 +140,13 @@ class LoopbackComfyUI:
                     native_count = len(fixture.frames) if fixture.frames is not None else 1
                     suffix = "png" if fixture.frames is not None else "mp4"
                     body = fixture.body
-                    graph_prefix = body["prompt"]["16"]["inputs"]["filename_prefix"]
+                    graph_prefix = body["prompt"][fixture.output_node]["inputs"]["filename_prefix"]
                     subfolder, _, filename_prefix = graph_prefix.rpartition("/")
-                    descriptors = [{"filename": f"{filename_prefix}_{i:05d}_.{suffix}", "subfolder": subfolder, "type": "output"}
+                    descriptors = [{"filename": f"{filename_prefix}_{i + fixture.start_number:05d}_.{suffix}", "subfolder": subfolder, "type": "output"}
                                    for i in range(native_count)]
                     history = {PROMPT_ID: {"prompt": [1, PROMPT_ID, body["prompt"],
-                        {**body["extra_data"], "client_id": body["client_id"], "create_time": 1}, ["16"]],
-                        "outputs": {"16": {"images": descriptors}},
+                        {**body["extra_data"], "client_id": body["client_id"], "create_time": 1}, [fixture.output_node]],
+                        "outputs": {fixture.output_node: {"images": descriptors}},
                         "status": {"status_str": "success", "completed": True, "messages": []}}}
                     if fixture.history_mutation:
                         fixture.history_mutation(history)
@@ -153,7 +156,7 @@ class LoopbackComfyUI:
                         fixture.view_count += 1
                     query = parse_qs(parsed.query)
                     index = int(re.search(r"_([0-9]+)_\.(?:png|mp4)$", query["filename"][0]).group(1))
-                    raw = fixture.frames[index] if fixture.frames is not None else SYNTHETIC_MP4_BYTES
+                    raw = fixture.frames[index - fixture.start_number] if fixture.frames is not None else SYNTHETIC_MP4_BYTES
                     self.reply(200, raw, "image/png" if fixture.frames is not None else "video/mp4")
                 else:
                     self.reply(404, b"{}")

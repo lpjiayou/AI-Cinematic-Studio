@@ -100,7 +100,9 @@ def make_a14b_package():
     return package, attestation
 
 
-def make_a14b_execution_fixture(case, endpoint):
+def make_a14b_execution_fixture(case, endpoint, *, profile_factory=make_a14b_profile,
+        runtime_factory=make_a14b_runtime, adapter_identity=A14B_ADAPTER_IDENTITY,
+        adapter_capability=A14B_CAPABILITY):
     """Original upstream/SQLite/Grant composition with inert model originals.
 
     This factory's monkeypatch changes only an existing TEST_ONLY external-owner
@@ -121,7 +123,7 @@ def make_a14b_execution_fixture(case, endpoint):
         def __init__(self, fixture):
             super().__init__(fixture)
             materials, binding = self.template["materials"], self.template["plan"]["executionBinding"]
-            profile = make_a14b_profile(fixture.content_digest)
+            profile = profile_factory(fixture.content_digest)
             self.input_path = fixture.source_root / profile["parameters"]["input"]["imageName"]
             self.input_path.parent.mkdir()
             self.input_path.write_bytes(fixture.content)
@@ -140,7 +142,7 @@ def make_a14b_execution_fixture(case, endpoint):
             for key, path in (("sourceRoot", fixture.source_root), ("modelRoot", model_root),
                     ("inputRoot", fixture.source_root), ("artifactRoot", fixture.root / "artifacts")):
                 config[key]["absolutePathDigest"] = digest(str(path))
-            self.attestation = make_a14b_runtime(profile, materials["processIdentity"], config)
+            self.attestation = runtime_factory(profile, materials["processIdentity"], config)
             old_reference = self.proof_roles["attestation"]
             self.proof_files.pop(old_reference)
             self.proof_originals.pop(old_reference)
@@ -148,7 +150,7 @@ def make_a14b_execution_fixture(case, endpoint):
             self._store_proof("attestation", self.attestation["attestationRef"], self.attestation,
                 "RUNTIME_PROCESS", "RuntimeAttestation", self.attestation["payloadDigest"])
             decision = binding["backendDecision"]
-            decision.update(adapterIdentity=A14B_ADAPTER_IDENTITY, adapterCapability=A14B_CAPABILITY,
+            decision.update(adapterIdentity=adapter_identity, adapterCapability=adapter_capability,
                 endpointClass="TEST_ONLY_LOOPBACK", modelId="test-a14b-model", backendProfileRef="test-a14b-profile",
                 backendProfileDigest=digest(profile), runtimeAttestationRef=self.attestation["attestationRef"],
                 runtimeAttestationDigest=self.attestation["payloadDigest"])

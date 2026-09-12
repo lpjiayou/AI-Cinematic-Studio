@@ -368,15 +368,16 @@ class GenerationDispatchConsumer:
                 extra = {}
                 if live:
                     from services.v4_platform.generation_dispatch_a14b_profile import A14B_PROFILE_SCHEMA
+                    from services.v4_platform.generation_dispatch_a14b_exact import EXACT_PROFILE_SCHEMA
                     profile = selected.plan_package["materials"]["backendProfile"]
-                    if profile["schemaVersion"] == A14B_PROFILE_SCHEMA:
+                    if profile["schemaVersion"] in {A14B_PROFILE_SCHEMA, EXACT_PROFILE_SCHEMA}:
                         native = profile["parameters"]["nativeOutput"]
                         folder, _, prefix = native["filenamePrefix"].rpartition("/")
                         output_binding = {"nodeId": native["nodeId"], "outputKey": "images",
                             "mediaType": native["mediaType"], "frameCount": native["frameCount"],
                             "filenamePrefix": prefix, "subfolder": folder}
                         post = profile["parameters"]["postprocess"]
-                        postprocess_binding = {"profileId": post["profileId"],
+                        postprocess_binding = deepcopy(post) if profile["schemaVersion"] == EXACT_PROFILE_SCHEMA else {"profileId": post["profileId"],
                             "keepIndices": post["keptZeroBasedIndices"],
                             "dropIndices": post["droppedZeroBasedIndices"], "frameRate": post["frameRate"]}
                     else:
