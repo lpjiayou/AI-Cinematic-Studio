@@ -3530,7 +3530,7 @@
       "status": "ACCEPTED",
       "owner": "Project Lead / Core Architecture Owner / Generation Dispatch Authority Owner / Spike-0 Execution Gate Owner",
       "authoritativeFor": [
-        "v1.3 exact technical-subject generation-dispatch architecture with the Project Lead authorized narrow R2 A14B compatibility increment; no live execution permission"
+        "v1.4 exact technical-subject generation-dispatch architecture with the Project Lead authorized narrow R2 and R3 compatibility increments; no live execution permission"
       ],
       "supersedes": [],
       "supersededBy": [],
@@ -3630,6 +3630,22 @@
       "lastReviewedAt": "2026-09-12",
       "linkedFromIndex": true,
       "notes": "HISTORICAL_PATH_NOT_EXECUTION_AUTHORITY=true; ACCEPTED_WITHIN_SCOPE_CPU_AND_FIXTURE_LOOPBACK; F01 CLOSED_FOR_EXACT_ACCEPTED_CANDIDATE. Accepted tree a67a3e6a0db1e527de00ee86f7e78b74c1c9038d. Parent-tree 311 tests, accepted-candidate 38 tests and independent 3 component probes are separate evidence. PUBLICATION=NOT_YET_MERGED_AT_DOCUMENT_AUTHORING. SH09 exact binding and Spike-0 remain blocked; SYSTEM_RUNTIME_BOUND=false; PROMPT_SUBMISSION_AUTHORIZED=false. Raw artifacts remain outside the public repository."
+    },
+    {
+      "path": "docs/status/SH09_EXACT_OFFLINE_BINDING_R3_2026-09-13.md",
+      "repository": "Core",
+      "documentClass": "IMPLEMENTATION_EVIDENCE",
+      "status": "RECORDED",
+      "owner": "Project Lead / Generation Dispatch Authority Owner",
+      "authoritativeFor": ["Bounded R3 local candidate evidence and source/contract separation, not acceptance or live authority"],
+      "supersedes": [],
+      "supersededBy": [],
+      "currentStateClaimsAllowed": false,
+      "historicalMutationPolicy": "IMMUTABLE_ONCE_RECORDED",
+      "lastReviewedBaseline": "3e5b8d08d3eef26506a69be99c42c90f38826cc0",
+      "lastReviewedAt": "2026-09-13",
+      "linkedFromIndex": true,
+      "notes": "HISTORICAL_PATH_NOT_EXECUTION_AUTHORITY=true; R3 A01-A06 local-only candidate; original availability resolved; Camera and exact binding Owner acceptance pending; live currentness not checked; runtimeBound=false; promptAuthorized=false; Spike-0 remains blocked. Private source evidence stays outside Git."
     }
   ]
 }

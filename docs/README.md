@@ -142,6 +142,7 @@ deliberately isolated and do not authorize current execution.
 ## IMPLEMENTATION_EVIDENCE
 
 - [`docs/status/A14B_STAGED_TRANSPORT_IMPLEMENTATION_2026-09-12.md`](status/A14B_STAGED_TRANSPORT_IMPLEMENTATION_2026-09-12.md) — `RECORDED / ACCEPTED_WITHIN_SCOPE_CPU_AND_FIXTURE_LOOPBACK`; F01 closed for the exact candidate; publication not yet merged at authoring; no live runtime authority.
+- [`docs/status/SH09_EXACT_OFFLINE_BINDING_R3_2026-09-13.md`](status/SH09_EXACT_OFFLINE_BINDING_R3_2026-09-13.md) — `RECORDED / CANDIDATE / OWNER REVIEW PENDING`; offline exact mapping and CPU/fixture-only evidence, not live authority.
 - [`docs/status/ADR_0022_PKG3_CPU_ACCEPTANCE_2026-09-12.md`](status/ADR_0022_PKG3_CPU_ACCEPTANCE_2026-09-12.md) — `RECORDED`
 - [`docs/status/ADR_0022_PKG2_CPU_ACCEPTANCE_2026-09-11.md`](status/ADR_0022_PKG2_CPU_ACCEPTANCE_2026-09-11.md) — `RECORDED`
 - [`docs/status/ADR_0022_PKG1_CPU_ACCEPTANCE_2026-09-10.md`](status/ADR_0022_PKG1_CPU_ACCEPTANCE_2026-09-10.md) — `RECORDED`

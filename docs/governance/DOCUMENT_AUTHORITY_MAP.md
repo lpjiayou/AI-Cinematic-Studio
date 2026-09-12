@@ -316,6 +316,10 @@ Owner decision; it does not issue a live Grant or authorize deployment.
 
 ## Historical isolation
 
+R3 bounded candidate evidence: [SH09 exact offline binding](../status/SH09_EXACT_OFFLINE_BINDING_R3_2026-09-13.md),
+`IMPLEMENTATION_EVIDENCE / RECORDED`; Project Lead / Generation Dispatch Authority Owner.
+It does not accept a prompt, authorize live execution or supersede the R2/F01 acceptance record.
+
 Every `IMPLEMENTATION_EVIDENCE`, `HISTORICAL_EVIDENCE` and `SUPERSEDED` entry
 is non-authoritative for current execution and carries
 `HISTORICAL_PATH_NOT_EXECUTION_AUTHORITY=true` in the registry. Drafts and

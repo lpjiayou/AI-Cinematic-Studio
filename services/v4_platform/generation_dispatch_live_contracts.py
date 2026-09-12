@@ -92,10 +92,11 @@ def _postprocess(value: Any, output: Mapping[str, Any]) -> None:
 
 
 def validate_live_transport_request(value: Any) -> dict:
+    from .generation_dispatch_a14b_exact import EXACT_REQUEST_SCHEMA, validate_exact_request_binding
     _exact(value, {"schemaVersion", "workspaceRef", "productionRunRef", "workerRef",
         *_LINEAGE_FIELDS, *_PIN_FIELDS, *_TIMEOUT_FIELDS, "workflow", "outputConstraints",
         "outputBinding", "postprocessBinding", "transportPolicy", "payloadDigest"})
-    if value["schemaVersion"] != LIVE_REQUEST_SCHEMA:
+    if value["schemaVersion"] not in {LIVE_REQUEST_SCHEMA, EXACT_REQUEST_SCHEMA}:
         raise ValueError("not a live transport request")
     _lineage(value)
     for name in ("workspaceRef", "productionRunRef", "workerRef"):
@@ -115,7 +116,10 @@ def validate_live_transport_request(value: Any) -> dict:
     for name in ("width", "height", "durationFrames", "frameRate"):
         _positive(constraints[name])
     output = validate_output_binding(value["outputBinding"])
-    _postprocess(value["postprocessBinding"], output)
+    if value["schemaVersion"] == EXACT_REQUEST_SCHEMA:
+        validate_exact_request_binding(value)
+    else:
+        _postprocess(value["postprocessBinding"], output)
     if output["mediaType"] == "image/png" and tuple(constraints[n] for n in
             ("width", "height", "durationFrames", "frameRate")) != (704, 1280, 48, 24):
         raise ValueError("native frame derivation final shape mismatch")
@@ -153,6 +157,9 @@ def make_live_transport_request(*, workspace_ref: str, production_run_ref: str,
         "executionConfigDigest": execution_config_digest, "runtimeBindingDigest": runtime_binding_digest,
         "backendDecisionDigest": backend_decision_digest, "outputBinding": dict(output_binding),
         "postprocessBinding": dict(postprocess_binding) if postprocess_binding is not None else None}
+    from .generation_dispatch_a14b_exact import ENCODING_SCHEMA, EXACT_REQUEST_SCHEMA
+    if postprocess_binding is not None and postprocess_binding.get("schemaVersion") == ENCODING_SCHEMA:
+        value["schemaVersion"] = EXACT_REQUEST_SCHEMA
     return validate_live_transport_request(_sealed(value))
 
 
@@ -213,6 +220,9 @@ def validate_native_artifacts(value: Any) -> list:
 
 
 def validate_derivation(value: Any, native_artifacts: list, artifact_digest: str | None) -> dict | None:
+    from .generation_dispatch_a14b_exact import EXACT_DERIVATION_SCHEMA, validate_exact_derivation
+    if type(value) is dict and value.get("schemaVersion") == EXACT_DERIVATION_SCHEMA:
+        return validate_exact_derivation(value, native_artifacts, artifact_digest)
     if value is None:
         if len(native_artifacts) == 49:
             raise ValueError("native frame derivation missing")
@@ -402,6 +412,13 @@ class LiveTransportReadResult:
                     raise ValueError("native frame bytes mismatch")
                 if receipt["derivation"]["profileId"] != request["postprocessBinding"]["profileId"]:
                     raise ValueError("derivation profile mismatch")
+                from .generation_dispatch_a14b_exact import EXACT_REQUEST_SCHEMA, EXACT_DERIVATION_SCHEMA
+                if request["schemaVersion"] == EXACT_REQUEST_SCHEMA:
+                    if (receipt["derivation"]["schemaVersion"] != EXACT_DERIVATION_SCHEMA
+                            or receipt["derivation"]["encodingDigest"] != digest(request["postprocessBinding"])):
+                        raise ValueError("complete encoding request/result binding changed")
+                elif receipt["derivation"]["schemaVersion"] == EXACT_DERIVATION_SCHEMA:
+                    raise ValueError("v1 request cannot consume v2 derivation")
             elif self.native_frames or native[0]["sha256"] != receipt["artifactDigest"]:
                 raise ValueError("direct native output mismatch")
             output = request["outputBinding"]

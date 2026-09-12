@@ -251,6 +251,16 @@ class ComfyUIStagedTransport:
             "extra_data": {"acs_dispatch": correlation}})
         if len(body) > _MAX_REQUEST_BYTES or digest(_json(body)["prompt"]) != request["workflowDigest"]:
             raise ValueError("encoded workflow mismatch or body too large")
+        from .generation_dispatch_a14b_exact import EXACT_REQUEST_SCHEMA
+        if request["schemaVersion"] == EXACT_REQUEST_SCHEMA:
+            from .generation_dispatch_live_result import encoder_tool_identity
+            # Local material verification precedes the network request budget.
+            # The original absolute execution/send deadlines are NOT restarted.
+            if encoder_tool_identity() != request["postprocessBinding"]["toolIdentity"]:
+                raise ValueError("encoding tool changed before initial request")
+            _remaining(deadline_monotonic)
+            if send_deadline_monotonic is not None:
+                _remaining(send_deadline_monotonic)
         exchange = _Exchange(self, request, body, correlation, deadline_monotonic, send_deadline_monotonic)
         self._exchanges.add(exchange)
         return exchange

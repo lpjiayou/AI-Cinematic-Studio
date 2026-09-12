@@ -500,6 +500,9 @@ def request_identity(plan: dict) -> dict:
     compiler = (A14B_COMPILER_IDENTITY
         if binding["backendDecision"]["adapterIdentity"] == A14B_ADAPTER_IDENTITY
         else "comfyui-i2v-api-graph-v1")
+    from services.v4_platform.generation_dispatch_a14b_exact import EXACT_ADAPTER_IDENTITY, EXACT_COMPILER_IDENTITY
+    if binding["backendDecision"]["adapterIdentity"] == EXACT_ADAPTER_IDENTITY:
+        compiler = EXACT_COMPILER_IDENTITY
     return {"schemaVersion": PREFIX + "request-identity.v1", "scope": deepcopy(plan["scope"]),
         "subjectDigest": subject_digest(plan), "backendProfileRef": binding["executionProfile"]["ref"],
         "backendProfileDigest": binding["executionProfile"]["digest"], "executionConfigDigest": binding["executionConfigDigest"],
@@ -512,6 +515,10 @@ def _profile(value: Any) -> None:
     # I2V parameter bounds are those of ComfyUI.validate_method_aware_envelope;
     # that transport adapter's instance method also probes files and is not called.
     try:
+        from services.v4_platform.generation_dispatch_a14b_exact import EXACT_PROFILE_SCHEMA, validate_exact_profile
+        if type(value) is dict and value.get("schemaVersion") == EXACT_PROFILE_SCHEMA:
+            validate_exact_profile(value)
+            return
         from services.v4_platform.generation_dispatch_a14b_profile import (
             A14B_PROFILE_SCHEMA, validate_a14b_profile,
         )
@@ -545,6 +552,13 @@ def _workflow(plan: dict, materials: dict) -> None:
     graph = materials["workflow"]
     require(type(graph) is dict)
     try:
+        from services.v4_platform.generation_dispatch_a14b_exact import EXACT_PROFILE_SCHEMA, validate_exact_workflow
+        if materials["backendProfile"]["schemaVersion"] == EXACT_PROFILE_SCHEMA:
+            validate_exact_workflow(graph,
+                generation_request_ref="generation-request-" + digest(request_identity(plan)),
+                source_asset={k: v for k, v in plan["subject"]["inputAsset"].items() if k != "inputRole"},
+                backend_profile=materials["backendProfile"], output_constraints=plan["subject"]["outputConstraints"])
+            return
         from services.v4_platform.generation_dispatch_a14b_profile import (
             A14B_PROFILE_SCHEMA, validate_a14b_workflow,
         )
@@ -606,6 +620,15 @@ def validate_plan_package(value: Any) -> dict:
     )
     a14b = m["backendProfile"]["schemaVersion"] == A14B_PROFILE_SCHEMA
     decision = binding["backendDecision"]
+    from services.v4_platform.generation_dispatch_a14b_exact import EXACT_PROFILE_SCHEMA, EXACT_ADAPTER_IDENTITY, EXACT_CAPABILITY
+    exact_a14b = m["backendProfile"]["schemaVersion"] == EXACT_PROFILE_SCHEMA
+    require(exact_a14b == (decision["adapterIdentity"] == EXACT_ADAPTER_IDENTITY))
+    if exact_a14b:
+        # Offline candidates can be compiled, but cannot enter the Grant pipeline.
+        require(m["backendProfile"]["parameters"]["evidenceClass"] == "TEST_ONLY"
+            and decision["endpointClass"] == "TEST_ONLY_LOOPBACK"
+            and decision["adapterCapability"] == EXACT_CAPABILITY, "APPROVAL_UNAVAILABLE")
+        require(binding["executionCode"]["comfyuiCommit"] == m["backendProfile"]["parameters"]["comfyuiCommit"])
     require(a14b == (decision["adapterIdentity"] == A14B_ADAPTER_IDENTITY))
     if a14b:
         # This engineering template is never an exact SH09 or live deployment binding.

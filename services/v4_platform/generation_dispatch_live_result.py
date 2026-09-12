@@ -10,6 +10,7 @@ from copy import deepcopy
 from hashlib import sha256
 from math import isfinite
 import os
+import shutil
 from pathlib import Path
 import struct
 import subprocess
@@ -27,6 +28,17 @@ LIVE_EXECUTION_SCHEMA = "v4.generation-dispatch-live-execution-result.v1"
 LIVE_EVIDENCE_SCHEMA = "v4.generation-dispatch-live-execution-evidence.v1"
 DERIVATION_SCHEMA = "v4.generation-dispatch-frame-derivation.v1"
 POSTPROCESS_PROFILE = "ACS-SPIKE0-POST-49TO48-24FPS-R1"
+
+
+def encoder_tool_identity():
+    """Explicit local CPU tool observation; never run on import/construction."""
+    result = {}
+    for tool in ("ffmpeg", "ffprobe"):
+        path = shutil.which(tool)
+        if path is None:
+            raise ArtifactVerificationError("fixed encoder tool is unavailable")
+        result[tool + "Sha256"] = _file_digest_and_size(Path(path))[0]
+    return result
 
 
 def _remaining(deadline: float) -> float:
@@ -100,11 +112,13 @@ def process_native_frames(native_frames: tuple[bytes, ...],
     _remaining(deadline_monotonic)
     output, binding, post = (request["outputConstraints"], request["outputBinding"],
         request["postprocessBinding"])
+    from .generation_dispatch_a14b_exact import EXACT_REQUEST_SCHEMA, EXACT_DERIVATION_SCHEMA
+    is_exact = request["schemaVersion"] == EXACT_REQUEST_SCHEMA
     if (output != {"mediaKind": "video", "mediaType": "video/mp4", "width": 704,
             "height": 1280, "durationFrames": 48, "frameRate": 24}
             or binding["mediaType"] != "image/png" or binding["frameCount"] != 49
-            or post != {"profileId": POSTPROCESS_PROFILE, "keepIndices": list(range(48)),
-                "dropIndices": [48], "frameRate": 24}
+            or (not is_exact and post != {"profileId": POSTPROCESS_PROFILE, "keepIndices": list(range(48)),
+                "dropIndices": [48], "frameRate": 24})
             or type(native_frames) is not tuple or len(native_frames) != 49
             or type(native_artifacts) is not list or len(native_artifacts) != 49):
         raise ArtifactVerificationError("native-frame derivation contract changed")
@@ -124,6 +138,8 @@ def process_native_frames(native_frames: tuple[bytes, ...],
                 or item["sha256"] != sha256(data).hexdigest()):
             raise ArtifactVerificationError("native frame lineage or order changed")
         seen.add(item["filename"])
+        if is_exact and item["filename"] != f"{binding['filenamePrefix']}_{index + 1:05d}_.png":
+            raise ArtifactVerificationError("original one-based source counter changed")
         _validate_png(data, 704, 1280)
     with tempfile.TemporaryDirectory(prefix="acs-dispatch-frame-derivation-") as directory:
         root = Path(directory)
@@ -138,6 +154,16 @@ def process_native_frames(native_frames: tuple[bytes, ...],
             "-map", "0:v:0", "-an", "-frames:v", "48", "-c:v", "libx264",
             "-preset", "fast", "-crf", "18", "-pix_fmt", "yuv420p",
             "-movflags", "+faststart", "-n", str(destination)]
+        if is_exact:
+            if encoder_tool_identity() != post["toolIdentity"]:
+                raise ArtifactVerificationError("encoding tool identity changed")
+            command = [str(Path(shutil.which("ffmpeg")).resolve()), "-v", "error", "-nostdin",
+                "-protocol_whitelist", "file,pipe", "-framerate", str(post["frameRate"]),
+                "-start_number", str(post["temporaryStartNumber"]), "-i", str(root / "frame-%03d.png"),
+                "-map", "0:v:0", "-an", "-frames:v", str(post["frameCount"]), "-c:v", post["codec"],
+                "-preset", post["preset"], "-crf", str(post["crf"]), "-pix_fmt", post["pixelFormat"],
+                "-threads", str(post["threads"]), "-movflags", post["movflags"], "-f", post["container"],
+                "-n", str(destination)]
         try:
             subprocess.run(command, check=True, capture_output=True,
                 timeout=_remaining(deadline_monotonic))
@@ -149,12 +175,19 @@ def process_native_frames(native_frames: tuple[bytes, ...],
             fresh_probe=True, deadline_monotonic=deadline_monotonic)
         if float(probe["durationSeconds"]) != 2.0:
             raise ArtifactVerificationError("derived duration is not exactly two seconds")
+        if is_exact and encoder_tool_identity() != post["toolIdentity"]:
+            raise ArtifactVerificationError("encoding tool identity changed during derivation")
         _remaining(deadline_monotonic)
         content = destination.read_bytes()
-    return content, {"schemaVersion": DERIVATION_SCHEMA, "profileId": POSTPROCESS_PROFILE,
+    derivation = {"schemaVersion": DERIVATION_SCHEMA, "profileId": POSTPROCESS_PROFILE,
         "nativeSequenceDigest": digest(native_artifacts), "keptIndices": list(range(48)),
         "droppedIndices": [48], "frameRate": 24, "width": 704, "height": 1280,
         "frameCount": 48, "outputSha256": sha256(content).hexdigest()}
+    if is_exact:
+        derivation.update(schemaVersion=EXACT_DERIVATION_SCHEMA, profileId=post["profileId"],
+            encoding=deepcopy(post), encodingDigest=digest(post),
+            sourceToTemporaryToOutput=[[i + 1, i, i] for i in range(48)])
+    return content, derivation
 
 
 def validate_live_execution_result(execution: Any, envelope: Mapping[str, Any]) -> dict[str, Any]:
