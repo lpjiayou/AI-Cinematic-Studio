@@ -3539,7 +3539,7 @@
       "lastReviewedBaseline": "3bf2e7a5152a7bd9c1087571aab6413a53a43bb6",
       "lastReviewedAt": "2026-09-10",
       "linkedFromIndex": true,
-      "notes": "Historical accepted v1.2 SHA-256 b963c12a07dea8816516752a40470df035e275714909a302ee8087963d4af75f and publication SHA-256 ecb896012ec1a501b1883d6239ba22514c07d61adab06062d453f441c1573f60 retain their exact historical identities. R2 on 2026-09-12 explicitly authorizes the narrow v1.3 compatibility increment and bounded local CPU implementation; candidate Owner review and publication remain pending. No live Grant, runtime, GPU or generation authority. Other accepted decisions and historical facts remain intact."
+      "notes": "Historical accepted v1.2 SHA-256 b963c12a07dea8816516752a40470df035e275714909a302ee8087963d4af75f and publication SHA-256 ecb896012ec1a501b1883d6239ba22514c07d61adab06062d453f441c1573f60 retain their exact historical identities. R2 on 2026-09-12 explicitly authorizes the narrow v1.3 compatibility increment. The supplied Owner decision accepts d0344a11709b8424a13b268545abfb8e580d17af for CPU/fixture-owned loopback engineering and closes F01 for that exact candidate; protected code publication is authorized but not yet merged at authoring. No ADR body change, live Grant, runtime, GPU or generation authority. Other accepted decisions and historical facts remain intact."
     },
     {
       "path": "docs/status/ADR_0022_V1_2_ARCHITECTURE_ACCEPTANCE_2026-09-10.md",
@@ -3617,19 +3617,19 @@
       "path": "docs/status/A14B_STAGED_TRANSPORT_IMPLEMENTATION_2026-09-12.md",
       "repository": "Core",
       "documentClass": "IMPLEMENTATION_EVIDENCE",
-      "status": "CANDIDATE",
+      "status": "RECORDED",
       "owner": "Project Lead / Generation Dispatch Authority Owner / Repository Governance Owner",
       "authoritativeFor": [
-        "Bounded R2 engineering candidate and its evidence limits; not Owner acceptance, publication or live runtime authority."
+        "Record of the supplied bounded R2 + F01 CPU/fixture-owned loopback Owner acceptance, exact candidate identity, F01 closure and evidence limits; not live runtime authority or proof of completed publication."
       ],
       "supersedes": [],
       "supersededBy": [],
       "currentStateClaimsAllowed": false,
       "historicalMutationPolicy": "IMMUTABLE_ONCE_RECORDED",
-      "lastReviewedBaseline": "ad7349ff493baaa1e0bc831810ea28b3dd2b2dce",
+      "lastReviewedBaseline": "d0344a11709b8424a13b268545abfb8e580d17af",
       "lastReviewedAt": "2026-09-12",
       "linkedFromIndex": true,
-      "notes": "HISTORICAL_PATH_NOT_EXECUTION_AUTHORITY=true; TEST_ONLY engineering template, CPU and fixture-owned loopback only. SH09 originals missing; exact binding remains blocked. Final candidate identity and raw logs are in the external evidence archive."
+      "notes": "HISTORICAL_PATH_NOT_EXECUTION_AUTHORITY=true; ACCEPTED_WITHIN_SCOPE_CPU_AND_FIXTURE_LOOPBACK; F01 CLOSED_FOR_EXACT_ACCEPTED_CANDIDATE. Accepted tree a67a3e6a0db1e527de00ee86f7e78b74c1c9038d. Parent-tree 311 tests, accepted-candidate 38 tests and independent 3 component probes are separate evidence. PUBLICATION=NOT_YET_MERGED_AT_DOCUMENT_AUTHORING. SH09 exact binding and Spike-0 remain blocked; SYSTEM_RUNTIME_BOUND=false; PROMPT_SUBMISSION_AUTHORIZED=false. Raw artifacts remain outside the public repository."
     }
   ]
 }
