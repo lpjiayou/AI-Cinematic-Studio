@@ -3530,7 +3530,7 @@
       "status": "ACCEPTED",
       "owner": "Project Lead / Core Architecture Owner / Generation Dispatch Authority Owner / Spike-0 Execution Gate Owner",
       "authoritativeFor": [
-        "v1.2 exact technical-subject generation-dispatch architecture contract only; no implementation or live execution permission"
+        "v1.3 exact technical-subject generation-dispatch architecture with the Project Lead authorized narrow R2 A14B compatibility increment; no live execution permission"
       ],
       "supersedes": [],
       "supersededBy": [],
@@ -3539,7 +3539,7 @@
       "lastReviewedBaseline": "3bf2e7a5152a7bd9c1087571aab6413a53a43bb6",
       "lastReviewedAt": "2026-09-10",
       "linkedFromIndex": true,
-      "notes": "Project Lead accepted exact v1.2 SHA-256 b963c12a07dea8816516752a40470df035e275714909a302ee8087963d4af75f; publication SHA-256 ecb896012ec1a501b1883d6239ba22514c07d61adab06062d453f441c1573f60 maps acceptance metadata only, with sections 1-13 unchanged. ACCEPTED_ARCHITECTURE_ONLY; no implementation, live Grant, runtime or generation authority. Scope-limited ADR-0014 Decision 10 amendment is defined in section 2.3; other accepted decisions and historical facts remain intact."
+      "notes": "Historical accepted v1.2 SHA-256 b963c12a07dea8816516752a40470df035e275714909a302ee8087963d4af75f and publication SHA-256 ecb896012ec1a501b1883d6239ba22514c07d61adab06062d453f441c1573f60 retain their exact historical identities. R2 on 2026-09-12 explicitly authorizes the narrow v1.3 compatibility increment and bounded local CPU implementation; candidate Owner review and publication remain pending. No live Grant, runtime, GPU or generation authority. Other accepted decisions and historical facts remain intact."
     },
     {
       "path": "docs/status/ADR_0022_V1_2_ARCHITECTURE_ACCEPTANCE_2026-09-10.md",
@@ -3612,6 +3612,24 @@
       "lastReviewedAt": "2026-09-12",
       "linkedFromIndex": true,
       "notes": "HISTORICAL_PATH_NOT_EXECUTION_AUTHORITY=true; records the supplied Owner decision, exact 15-path CPU-isolated candidate, 168/168 bounded regression and TEST_ONLY_IN_PROCESS_MOCK_NO_LIVE_SUBMISSION history. Does not authorize live Grant use, real transport, deployment, ComfyUI, GPU, prompt submission, Spike-0 or paid generation."
+    },
+    {
+      "path": "docs/status/A14B_STAGED_TRANSPORT_IMPLEMENTATION_2026-09-12.md",
+      "repository": "Core",
+      "documentClass": "IMPLEMENTATION_EVIDENCE",
+      "status": "CANDIDATE",
+      "owner": "Project Lead / Generation Dispatch Authority Owner / Repository Governance Owner",
+      "authoritativeFor": [
+        "Bounded R2 engineering candidate and its evidence limits; not Owner acceptance, publication or live runtime authority."
+      ],
+      "supersedes": [],
+      "supersededBy": [],
+      "currentStateClaimsAllowed": false,
+      "historicalMutationPolicy": "IMMUTABLE_ONCE_RECORDED",
+      "lastReviewedBaseline": "ad7349ff493baaa1e0bc831810ea28b3dd2b2dce",
+      "lastReviewedAt": "2026-09-12",
+      "linkedFromIndex": true,
+      "notes": "HISTORICAL_PATH_NOT_EXECUTION_AUTHORITY=true; TEST_ONLY engineering template, CPU and fixture-owned loopback only. SH09 originals missing; exact binding remains blocked. Final candidate identity and raw logs are in the external evidence archive."
     }
   ]
 }

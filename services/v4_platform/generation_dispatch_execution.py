@@ -1,9 +1,10 @@
-"""Dedicated CPU-isolated Package 3 executor for Grant-bound Job v4 records.
+"""Original-Attempt executor for Grant-bound Job v4 records.
 
 The legacy worker remains unchanged and continues to reject Job v4.  This
 module claims the original queue row with its original revision CAS, creates
-one original Attempt, invokes V5 consume, and records a TEST_ONLY result on the
-same Job/Attempt.  It contains no provider, ComfyUI, GPU, HTTP or socket code.
+one original Attempt and invokes V5 consume. Default composition retains the
+strict TEST_ONLY Fake path. Explicit trusted live composition delegates the
+single exchange and persists its versioned result on the same Job/Attempt.
 """
 from __future__ import annotations
 
@@ -27,6 +28,9 @@ from .generation_dispatch_transport import (
     REQUEST_BYTES_NOT_COMMITTED, RESPONSE_RECEIVED,
     SUBMISSION_OUTCOME_UNKNOWN, GenerationDispatchTransportError,
     TransportReadResult, make_dispatch_result, validate_transport_result,
+)
+from .generation_dispatch_live_contracts import (
+    LiveGenerationDispatchTransportError, validate_live_transport_result,
 )
 from services.v5_core_os.episode_production import generation_dispatch_contracts as c
 from services.v5_core_os.episode_production.generation_dispatch_consumption import (
@@ -325,18 +329,28 @@ class GenerationDispatchResultBoundary:
         return self.repository.get(workspace_ref, production_run_ref, media_job_ref)
 
 
+_LIVE_COMPOSITION = object()
+
+
 class GenerationDispatchExecutor:
     """One bounded execution of an already-routed Grant-bound Job v4."""
 
     def __init__(self, *, coordinator: MediaJobCoordinator, consumer,
                  worker_context, transport, clock, coordination,
                  result_boundary: GenerationDispatchResultBoundary,
-                 job_port: MediaJobGenerationDispatchPort):
+                 job_port: MediaJobGenerationDispatchPort, _live_composition=False):
+        live = False
+        if _live_composition is _LIVE_COMPOSITION:
+            from .comfyui_staged_transport import is_trusted_staged_transport
+            from .generation_dispatch_live_result import GenerationDispatchLiveResultBoundary
+            live = (is_trusted_staged_transport(transport)
+                and type(result_boundary) is GenerationDispatchLiveResultBoundary)
         if (coordinator is None or consumer is None or worker_context is None
                 or transport is None or clock is None or coordination is None
                 or result_boundary is None or job_port is None
-                or getattr(transport, "TEST_ONLY", None) is not True
-                or getattr(transport, "CPU_ISOLATED", None) is not True
+                or (not live and (getattr(transport, "TEST_ONLY", None) is not True
+                    or getattr(transport, "CPU_ISOLATED", None) is not True))
+                or (_live_composition is not False and not live)
                 or job_port.coordinator is not coordinator
                 or job_port.repository is not coordinator.repository
                 or job_port.coordination is not coordination
@@ -353,6 +367,12 @@ class GenerationDispatchExecutor:
         self.worker_context, self.transport = worker_context, transport
         self.clock, self.coordination = clock, coordination
         self.result_boundary, self.job_port = result_boundary, job_port
+        self._live = live
+
+    @classmethod
+    def compose_live(cls, **dependencies):
+        """Explicit trusted-internal opt-in; never invoked by default composition."""
+        return cls(**dependencies, _live_composition=_LIVE_COMPOSITION)
 
     def execute(self, workspace_ref: str, production_run_ref: str,
                 media_job_ref: str) -> dict[str, Any]:
@@ -386,6 +406,16 @@ class GenerationDispatchExecutor:
                 identity["workerRef"], claimed["attempts"][-1]["attemptRef"])
             try:
                 transport_result = capability.send_once(self.transport)
+            except LiveGenerationDispatchTransportError as exc:
+                current = self.coordinator._stop_lease_heartbeat(heartbeat, claimed,
+                    identity["workerRef"], claimed["attempts"][-1]["attemptRef"])
+                heartbeat = None
+                if not self._live:
+                    raise
+                return self.result_boundary.record_failure(current,
+                    workflow_digest=workflow_digest, code=exc.code, phase=exc.phase,
+                    submission=exc.submission, request_write_state=exc.request_write_state,
+                    provider_prompt_id=exc.provider_prompt_id)
             except GenerationDispatchTransportError as exc:
                 current = self.coordinator._stop_lease_heartbeat(heartbeat, claimed,
                     identity["workerRef"], claimed["attempts"][-1]["attemptRef"])
@@ -403,12 +433,15 @@ class GenerationDispatchExecutor:
             current = self.coordinator._stop_lease_heartbeat(heartbeat, claimed,
                 identity["workerRef"], claimed["attempts"][-1]["attemptRef"])
             heartbeat = None
-            receipt = validate_transport_result(transport_result.receipt)
+            receipt = (validate_live_transport_result(transport_result.receipt) if self._live
+                else validate_transport_result(transport_result.receipt))
             if receipt["outcome"] != "SUCCEEDED":
                 return self.result_boundary.record_failure(current,
                     workflow_digest=workflow_digest,
                     code=receipt["failureCode"], phase=receipt["phase"],
-                    submission=transport_result.submission)
+                    submission=transport_result.submission,
+                    **({"request_write_state": receipt["requestWriteState"],
+                        "provider_prompt_id": receipt["providerPromptId"]} if self._live else {}))
             return self.result_boundary.record_success(current, transport_result,
                 workflow_digest=workflow_digest)
         finally:

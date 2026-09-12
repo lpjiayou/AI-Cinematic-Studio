@@ -769,8 +769,11 @@ COMFYUI_I2V_RUNTIME_ATTESTATION_SCHEMA = "v4.comfyui-runtime-attestation.v2"
 
 
 def validate_runtime_attestation(value: Mapping[str, Any]) -> Mapping[str, Any]:
-    """Exact v1 T2V / v2 capability-mode validation, without network access."""
+    """Explicit legacy/A14B type dispatch, without files or network access."""
     from .backend_registry import exact, hex_digest, integer, digest
+    from .comfyui_a14b_runtime import A14B_RUNTIME_ATTESTATION_SCHEMA, validate_a14b_runtime_attestation
+    if value.get("schemaVersion") == A14B_RUNTIME_ATTESTATION_SCHEMA:
+        return validate_a14b_runtime_attestation(value)
     fields = {"schemaVersion", "attestationRef", "observedAt", "factsDigest", "facts",
               "authorityState", "publicationAllowed", "payloadDigest"}
     version = value.get("schemaVersion")
@@ -904,7 +907,8 @@ class ComfyUIWan22ImageToVideoAdapter(ComfyUIWan22VideoAdapter):
             raise ComfyUIConfigurationError("I2V sampler profile is unsupported")
         _text(parameters["negativePrompt"], "negativePrompt", maximum=4000)
         facts = validate_runtime_attestation(self.runtime_attestation)
-        if (self.runtime_attestation.get("capabilityMode") != "IMAGE_TO_VIDEO"
+        if (self.runtime_attestation.get("schemaVersion") != COMFYUI_I2V_RUNTIME_ATTESTATION_SCHEMA
+                or self.runtime_attestation.get("capabilityMode") != "IMAGE_TO_VIDEO"
                 or self.runtime_attestation["attestationRef"] != binding["runtimeAttestationRef"]
                 or self.runtime_attestation["payloadDigest"] != binding["runtimeAttestationDigest"]
                 or profile["modelFiles"] != facts["modelFiles"]):

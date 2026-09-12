@@ -5,7 +5,7 @@
 | 字段 | 值 |
 | --- | --- |
 | ADR ID | ADR-0022 |
-| 文档版本 | 1.2；已接受规范的文档发布版，规范内容不变 |
+| 文档版本 | 1.3；保留 v1.2 控制面，增加 §5.6 的狭义 A14B 版本化兼容 |
 | Status | Accepted — Architecture Contract Only |
 | 完整 ADR 审批状态 | ACCEPTED_ARCHITECTURE_ONLY；Project Lead 已明确接受全文，不等于实现或生成许可 |
 | 已确认设计方向 | 独立、不可变 Grant；不覆盖历史五字段，不迁移历史摘要 |
@@ -17,7 +17,7 @@
 | Decision Ref | ACS-M10-M11-IMMUTABLE-GENERATION-DISPATCH-GRANT-ADR |
 | 决策人 | 蔺鹏：Project Lead / Core Architecture Owner / Generation Dispatch Authority Owner / Spike-0 Execution Gate Owner |
 | 编制人 | ChatGPT，审核窗口；不担任批准人或生产代码执行器 |
-| 日期 | 2026-09-10 |
+| 日期 | 2026-09-12；v1.2 接受日期仍为 2026-09-10 |
 | 文档对照基线 | 3bf2e7a5152a7bd9c1087571aab6413a53a43bb6 |
 | v1.0 对照 Git blob | 07e225bf3745c2e961007477a296e19a7ff07ea9 |
 | v1.1 未提交候选 SHA-256 | 91d01b94cf1c1312093a612a6b3b9815dc159655e09b859681310a5a8d5e3276 |
@@ -27,11 +27,11 @@
 | Narrowly amends, architecture only | ADR-0014 Decision 10 中完整 ShotPlan/camera 批准的技术试验前置要求，且仅限 §2.3 定义的局部例外；Decision 7 的历史事实不变 |
 | Supersedes / Superseded by | 无 / 无 |
 | 文档登记分类 | ACCEPTED_DECISION；currentStateClaimsAllowed=false |
-| 实现、部署、真实签发、消费或生成许可 | 均 NOT_GRANTED |
+| 实现、部署、真实签发、消费或生成许可 | R2 白名单本地 CPU/隔离 loopback 实现已另行授权；发布、部署、真实签发/消费/生成均 NOT_GRANTED |
 
-本文已由 Project Lead 明确接受为架构合同，不是已实现能力或已经签发的运行授权实例。Accepted 的批准效果仅为架构合同通过；编码、正式数据库写入、执行配置变更、实际费用及任何 /prompt 调用仍需分别取得适用的后续批准。本次另行批准的只有 Accepted 元数据回填与文档发布，不能由此推导其他许可。[S1][S2]
+本文已由 Project Lead 明确接受为架构合同，不是已实现能力或已经签发的运行授权实例。v1.2 的元数据发布不授权编码或执行。2026-09-12 Project Lead 签发 `ACS-A14B-CONTRACT-COMPATIBILITY-AND-STAGED-TRANSPORT-R2-20260912`，另行批准 §5.6 狭义设计增量及本地 CPU/夹具独占 loopback 实现。正式数据库、执行配置部署、真实费用及真实 ComfyUI `/prompt` 仍未授权；本地实现候选不等于 Owner 验收或发布。[S1][S2]
 
-接受对象是 SHA-256 为 `b963c12a07dea8816516752a40470df035e275714909a302ee8087963d4af75f` 的 v1.2 原候选。第 1—13 节逐字节保持该接受对象不变；其中“本次修订”“待审议”“后续决定”等表述保留候选编制阶段含义，当前架构接受状态以本节和独立接受记录为准。这一时点说明不改变任何规范义务，也不把实现、部署、费用或执行验收条件解释为已满足。发布版摘要另行记录，不沿用原候选摘要。
+v1.2 接受对象的 SHA-256 为 `b963c12a07dea8816516752a40470df035e275714909a302ee8087963d4af75f`；其发布原文保存在 Git 基线 `ad7349ff493baaa1e0bc831810ea28b3dd2b2dce`。v1.3 仅增加 §5.6 及必要交叉引用，不改既有控制面语义；旧单模型分支仍受 v1.2 原约束。其中“本次修订”“待审议”等历史表述保留编制阶段含义。新文件摘要另行计算，不能沿用 v1.2 接受摘要或声称新增实现已验收。
 
 v1.0 已随 PR #84 入库；v1.1 是已落稿但未提交的候选。此次在该候选原字节上只修订 F01—F04 及其直接依赖，不改写已封存的 E3/E4、v1.0/v1.1 审核或夜间回执。未变条款沿用 v1.1，不把旧纸面审查结果重新记成 v1.2 的验证结果。[S1][S9][S14]
 
@@ -203,7 +203,7 @@ prerequisiteEvidenceDigest : Digest = H(materials.prerequisiteEvidence)
 
 executionProfile.ref/digest 必须等于 backendDecision.backendProfileRef/Digest，H(materials.backendProfile) 必须匹配该 digest。模型集合属于 profile.modelFiles，通过 profile 摘要绑定；不得在原 backendDecision 增加 modelFiles。[S7]
 
-backendDecision 的 runtimeAttestationRef/Digest 仍指原 v2 I2V attestation 的 Ref/payloadDigest；attestationFileSha256 是原文件字节摘要，三者不得混用。已有 E4 元数据 profile 不变；新的 executionProfile 必须是另行选定并批准的实际生成 profile。
+旧分支 backendDecision 的 runtimeAttestationRef/Digest 仍指原 v2 I2V attestation 的 Ref/payloadDigest；A14B 仅使用 §5.6 独立新类型。attestationFileSha256 是原文件字节摘要，三者不得混用。已有 E4 元数据 profile 不变；新的 executionProfile 必须是另行选定并批准的实际生成 profile。
 
 executionCode 必须是将来经批准且包含新消费者的固定 commit/tree。f007ab3e 是审计基线，不具备新机制；文档 main 也不自动成为执行 pin。换代码、profile、模型、workflow、运行进程或成本依据，不得沿用不同内容的批准。
 
@@ -268,7 +268,7 @@ CurrentSubjectReadSet 的原文内嵌在该不可变证据中，digest=H(readSet
 
 | materials 字段 | 完整对象及来源 | 与 plan 的关系 |
 | --- | --- | --- |
-| backendProfile | 现有 `v4.comfyui-i2v-backend-profile.v1`，原 backend resolver.profile 返回 | H(profile)=executionProfile.digest=backendDecision.backendProfileDigest |
+| backendProfile | 原 backend resolver.profile 返回：旧 `v4.comfyui-i2v-backend-profile.v1` 或 §5.6 独立 A14B 类型 | H(profile)=executionProfile.digest=backendDecision.backendProfileDigest |
 | executionConfig | 下述 `v5.generation-dispatch-execution-config.v1`，服务端配置 reader 的安全投影 | H(config)=executionConfigDigest |
 | processIdentity | 下述 `v5.generation-dispatch-runtime-process.v1`，受信任本地 runtime reader 返回 | H(identity)=runtimeBinding.processIdentityDigest |
 | workflow | 固定代码纯编译出的 ComfyUI API graph，按 §5.5 验证完整精确值 | H(graph)=workflowDigest |
@@ -410,13 +410,52 @@ outputConstraints
 workflowCompilerRef
 ```
 
-workflowCompilerRef=`comfyui-i2v-api-graph-v1`，其实现字节由 executionCode 固定。`generationRequestRef="generation-request-"+H(RequestIdentityMaterial)`；`generationRequestVersionRef=generationRequestRef+":v2"`。不得使用时钟、PID、随机 UUID、Grant Ref/Digest、approvedPlanDigest 或 Terminal 生成 requestRef。
+旧分支 workflowCompilerRef=`comfyui-i2v-api-graph-v1`，A14B 分支使用 §5.6 的独立标识；实现字节均由 executionCode 固定。`generationRequestRef="generation-request-"+H(RequestIdentityMaterial)`；`generationRequestVersionRef=generationRequestRef+":v2"`。不得使用时钟、PID、随机 UUID、Grant Ref/Digest、approvedPlanDigest 或 Terminal 生成 requestRef。
 
 固定代码的纯 compiler 接收完整原 sourceAction 文本、cameraInstruction、source PNG contentDigest、profile.parameters、profile.modelFiles、outputConstraints、generationRequestRef。输入 staging 名称严格为 `acs-k2-m11/<contentDigest>.png`；SaveVideo 前缀严格由 generationRequestRef 构造，不依赖当前时间。正面提示词沿用确定的 sourceText 加 framing/movement 组合；负面提示词和全部采样数值来自选定 profile。length=durationFrames+1。所有其他节点参数必须由固定 compiler 原样、显式输出，不接受执行期默认值补齐。[S8]
 
 compiler 只返回 API graph 数据，不能调用现有有写入副作用的 staging/generate 方法。graph 按固定 compiler 输出整体相等验证；没有接受额外节点/输入键的通用 graph 审批入口。图内每个模型文件、LoadImage、采样参数、尺寸、帧数、fps、codec/format 都须与计划和原节点合同匹配。
 
 依赖顺序固定为：原事实与材料 → request identity → requestRef → workflow → workflowDigest → plan → approvedPlanDigest → 独立 approval → Grant → 带 Grant 的 request/envelope → Terminal。workflow 不包含 Grant，因而无 Grant/workflow/request 摘要循环；实际 POST 体中的 API graph 必须与批准 graph 整体相等，client correlation 元数据不进入 graph，也不能影响生成语义。
+
+### 5.6 v1.3 狭义 A14B 兼容增量
+
+本节来自 Project Lead 对 R2 第 3 节的明确批准。它只增加 profile、compiler、runtime 与技术结果的版本分派，不重开 Package 1/2/3，不改变 Grant/Terminal、原 request/envelope 版本、槽位、permissions、费用上限/时钟、snapshot/CAS、L1/L2、共享 gate、存储独占、一次性能力及无重试/无 fallback 合同。
+
+#### 5.6.1 类型判别与旧分支保持
+
+- 新 profile：`v4.comfyui-a14b-i2v-backend-profile.v1`。
+- 新 backend adapter identity：`v4.comfyui-wan22-a14b-image-to-video.v1`。
+- 新 compiler identity：`v4.generation-dispatch-a14b-compiler.v1`。
+- 新 runtime attestation：`v4.comfyui-a14b-runtime-attestation.v1`，capabilityMode 为 `A14B_IMAGE_TO_VIDEO`。
+
+profile 的顶层仍恰为 schemaVersion、parameters、modelFiles；新 parameters 与六角色模型项分别严格封闭。分派依据已摘要绑定的显式 schema/adapter identity，不靠模型名、模型数量或调用方 bool 推断。旧三模型 schema 不接受六模型，新 schema 不接受三模型；旧 attestation 不被重新封装为新硬件证明。旧固定输入的 request identity、graph、digest 和重放保持原值。
+
+六角色必须唯一完整：high-noise expert、low-noise expert、text encoder、VAE、high-noise LightX2V LoRA、low-noise LightX2V LoRA；名称、摘要、字节数与 expert/LoRA 配对均有明确材料。模型只属于 profile，不复制到 backendDecision 形成第二权威。只支持单 GPU、MICRO_MOTION / SINGLE_ANCHOR_I2V。
+
+#### 5.6.2 精确提示词、拓扑和原生输出
+
+新 parameters 绑定 compiler/template identity、材料证明分类、固定 ComfyUI commit、完整正负 prompt、seed、总 steps、CFG、采样器/调度器、两段模型/LoRA 配对及 strength/model shift/start/end/noise/leftover 设置、输入 imageName/contentDigest、原生输出节点/前缀/规格、后处理规则和资源要求。缺少字段不补执行期默认值。
+
+原 sourceAction/sourceSpan/sourceTextDigest 继续由 ScriptVersion 正式 reader 核对；英文 prompt 不是剧本事实。新正面 prompt 不再追加旧机位 suffix，其与 subject 的对应关系必须由独立冻结材料及实际生成批准覆盖。
+
+编译器只返回固定拓扑的完整 API graph；验证必须与编译器预期图整体相等，而非仅计算任意输入 graph 的 hash。双专家 high→low latent 传递、各自 LoRA/conditioning/noise 语义及输出节点都受闭集约束。图中不出现 Grant/Terminal/approvedPlanDigest；新增 compiler identity、profile、模型、prompt、采样或后处理变化改变 request/plan 摘要，不允许沿用不同内容的批准。
+
+原生输出是 49 帧 PNG 序列，独立于最终 48 帧、24fps、2 秒、704×1280 MP4。批准前像明确 `KEEP_FIRST_48_DROP_LAST`：保留原索引 0..47，排除 48。原生文件、来源顺序、派生产物各自记录摘要；有损编码输出不冒充与原 PNG 字节相同。§5.5 的旧 LoadImage 路径、sourceText suffix、SaveVideo 布局不强加给新分支；新输入定位和输出前缀必须被显式材料绑定。
+
+原始冻结材料不足时，固定工程模板只能标记 TEST_ONLY，不能冒充 SH09 模板。它只能在绑定为 `TEST_ONLY_LOOPBACK` 的隔离工程装配中使用，不能绑定正常生产 backend。SH09 exact binding 保持缺证据，生产装配缺原件及批准则拒绝。模板测试通过不是当前硬件证明。
+
+#### 5.6.3 运行时、请求与结果边界
+
+新 runtime 类型必须验证完整六模型及各自来源、required nodes/inputs、设备资源、固定代码、进程/启动配置，以及与已批准 profile 的精确相等。原件 reader 的受信来源要求不变，文件原 SHA、canonical JSON digest、模型集合 digest、业务绑定 digest、包 SHA 分列；自报 pin 不能成为现场证明。
+
+新增独立 live request/submission/result 类型不得放宽旧 TEST_ONLY schema。live 默认不装配；endpoint 只由受信内部装配提供并与原 executionConfig.baseUrlDigest/runtime/backendDecision 核对。import、构造、open_exchange 无 DNS/socket/文件读取/后台启动；唯一 commit_request_once 承担有界连接和首次写入，response/history/artifact/postprocess 在 gate 释放后进行。
+
+写入证据区分未进入写路径、可证明零字节、可能已写、完整本地写入；partial write 或无回执不得因为本地 submission 变量尚空就推断未提交。局部 transport submission ref 与 Provider prompt ID 分开，收到 prompt ID 不等于生成完成。严禁重试 POST、跟随重定向、fallback、上传输入或管理性 POST；未知状态仍消耗原能力。
+
+技术结果继续使用原 Job/Attempt、Candidate、artifact commit intent、durable replace、probe 与恢复路径。未知实际费用/设备/GPU 使用在独立新结果类型中保留未知，不能沿用 Fake 的 0/false；旧结果类型继续严格校验。只读结果恢复不重新 claim/consume/send，不自动接纳 AssetVersion、Master、Export 或 publication。
+
+本节不批准任何真实配置、采集器、运行时证明、正式数据库、真实 Grant、GPU 或 /prompt。当前本地实现及证据状态由当前里程碑中的精确候选记录投影，Owner 验收与发布另行授权。
 
 ## 6. Operator 与内部端口闭集（R1、R3）
 
@@ -603,7 +642,7 @@ internalDispatchKey = "generation-dispatch-job-v1:" + H(InternalDispatchIdentity
 
 旧 worker CLI 在新模式下只能委托同一受控 composition 内的 worker，不允许单独进程拿 Terminal 当发送凭证。本节只是受审议的新有界合同，不是本轮 CLI 或队列代码修改许可。
 
-InputPlan、InputAssetVersion、InputAppendAuthority 和 v2 runtime attestation 不因此升版。输出仍技术候选；不追加输出 AssetVersion/Admission/Master/Export，也不把新 Grant 作为 E2 结果准入许可。确有其他闭集需要新字段，须在实现任务申请中逐项列明版本，未批准前不编码。
+InputPlan、InputAssetVersion、InputAppendAuthority 和旧 v2 runtime attestation 不因此升版；§5.6 的 A14B attestation 是独立新类型，不迁移旧原件。输出仍技术候选；不追加输出 AssetVersion/Admission/Master/Export，也不把新 Grant 作为 E2 结果准入许可。§5.6 之外确有其他闭集需要新字段，仍须逐项获得批准。
 
 ## 10. CAS 与竞争情景的唯一结果
 
@@ -671,6 +710,7 @@ InputPlan、InputAssetVersion、InputAppendAuthority 和 v2 runtime attestation 
 | 1.1 | R1 完整批准材料；R2 单进程协调与 L1/L2；R3 规范材料/端口；R4 ADR-0014 局部例外 | 已落稿未提交；N1 与独立复审要求修订 F01—F04；不重写历史结论 |
 | 1.2 | F01 保留 UUID＋新服务端幂等键；F02 原 Owner/selector 完整映射；F03 lease/deadline/释放与收尾；F04 精确时间字段 | 仅单文件文档修订获批；待独立复审，全文 Accepted/实现/生成均未批准 |
 | 1.2 接受及发布元数据 | 2026-09-10 Project Lead 全文回复 Accepted；随后另行授权状态回填及文档入库；第 1—13 节原字节不变 | ACCEPTED_ARCHITECTURE_ONLY；历史行仅记录其编制阶段；实现、真实 Grant 和生成仍未批准 |
+| 1.3 R2 狭义兼容 | 2026-09-12 Project Lead 明确批准 §5.6 的独立 A14B profile/compiler/runtime 与 staged transport 本地 CPU 增量；其余控制面语义保留 | 狭义设计及白名单本地实现获批；实现 Owner 验收待定，发布、真实 ComfyUI/GPU/Grant/数据库/生成未授权 |
 
 以下 [S] 项只支持对旧仓库行为的陈述，不表示新增规范已经实现：
 

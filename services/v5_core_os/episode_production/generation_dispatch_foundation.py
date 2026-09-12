@@ -234,12 +234,22 @@ class GenerationDispatchFoundation:
             and runtime.attestation_file_sha256 == binding["runtimeBinding"]["attestationFileSha256"], "RUNTIME_CHANGED")
         # Reuse the original pure attestation validator, never probe/start the adapter.
         from services.v4_platform.comfyui import validate_runtime_attestation
+        from services.v4_platform.generation_dispatch_a14b_profile import A14B_PROFILE_SCHEMA
+        from services.v4_platform.comfyui_a14b_runtime import (
+            A14B_CAPABILITY_MODE, validate_a14b_runtime_attestation,
+        )
+        a14b = materials["backendProfile"]["schemaVersion"] == A14B_PROFILE_SCHEMA
         try:
-            facts = validate_runtime_attestation(runtime.attestation)
+            facts = (validate_a14b_runtime_attestation(runtime.attestation,
+                backend_profile=materials["backendProfile"],
+                process_identity=materials["processIdentity"],
+                execution_config=materials["executionConfig"])
+                if a14b else validate_runtime_attestation(runtime.attestation))
         except Exception as exc:
             raise c.DispatchError("RUNTIME_CHANGED") from exc
         d = binding["backendDecision"]
-        c.require(runtime.attestation.get("capabilityMode") == "IMAGE_TO_VIDEO" and runtime.attestation["attestationRef"] == d["runtimeAttestationRef"]
+        c.require(runtime.attestation.get("capabilityMode") ==
+            (A14B_CAPABILITY_MODE if a14b else "IMAGE_TO_VIDEO") and runtime.attestation["attestationRef"] == d["runtimeAttestationRef"]
             and runtime.attestation["payloadDigest"] == d["runtimeAttestationDigest"]
             and c.canonical(facts["modelFiles"]) == c.canonical(materials["backendProfile"]["modelFiles"]), "RUNTIME_CHANGED")
         for key in ("providerId", "modelId", "region", "endpointClass"):

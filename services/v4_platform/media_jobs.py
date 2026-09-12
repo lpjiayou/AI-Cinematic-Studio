@@ -14,6 +14,7 @@ import re
 import sqlite3
 import stat
 import subprocess
+import time
 from threading import Event, RLock, Thread
 from typing import Any, Callable, Mapping, Protocol
 
@@ -1037,12 +1038,51 @@ def _validate_job(job: Mapping[str, Any]) -> None:
             if dispatch_bound:
                 from .generation_dispatch_transport import validate_dispatch_result
                 result = job.get("dispatchResult")
+                if (isinstance(result, Mapping) and result.get("schemaVersion")
+                        == "v4.generation-dispatch-live-result.v1"):
+                    from .generation_dispatch_live_contracts import validate_live_dispatch_result
+                    validate_dispatch_result = validate_live_dispatch_result
                 if result is None and job["state"] in {"SUCCEEDED", "FAILED"}:
                     raise BackendValidationError(
                         "terminal dispatch Job has no result"
                     )
                 if result is not None:
                     result = validate_dispatch_result(result, job=job)
+                    live_result = result["schemaVersion"] == "v4.generation-dispatch-live-result.v1"
+                    expected_execution_schema = ("v4.generation-dispatch-live-execution-result.v1"
+                        if live_result else "v4.method-aware-execution-result.v1")
+                    for attempt in job["attempts"]:
+                        if ("providerExecution" in attempt and attempt["providerExecution"].get("schemaVersion")
+                                != expected_execution_schema):
+                            raise BackendValidationError("dispatch execution schema branch mismatch")
+                    for stored_artifact in (job.get("artifact"),
+                            (job.get("artifactCommitIntent") or {}).get("artifact")):
+                        if (stored_artifact is not None and (
+                                not isinstance(stored_artifact.get("providerExecution"), Mapping)
+                                or stored_artifact["providerExecution"].get("schemaVersion") != expected_execution_schema)):
+                            raise BackendValidationError("dispatch artifact schema branch mismatch")
+                    if live_result:
+                        for stored_artifact in (job.get("artifact"),
+                                (job.get("artifactCommitIntent") or {}).get("artifact")):
+                            if stored_artifact is None:
+                                continue
+                            execution = stored_artifact.get("providerExecution")
+                            validate_execution_result(execution, envelope)
+                            if any("providerExecution" in attempt and attempt["providerExecution"] != execution
+                                    for attempt in job["attempts"]):
+                                raise BackendValidationError("live Attempt and artifact execution lineage disagree")
+                            evidence = execution.get("executionEvidence", {})
+                            if (execution.get("schemaVersion") != "v4.generation-dispatch-live-execution-result.v1"
+                                    or stored_artifact.get("provenance") != "TECHNICAL_EVIDENCE_ONLY"
+                                    or stored_artifact.get("executionDevice") != "UNKNOWN"
+                                    or stored_artifact.get("gpuUsed") is not None
+                                    or stored_artifact.get("sha256") != result["artifactDigest"]
+                                    or stored_artifact.get("dispatchResultDigest") != result["payloadDigest"]
+                                    or evidence.get("dispatchResultDigest") != result["payloadDigest"]
+                                    or any(evidence.get(key) != result[key] for key in (
+                                        "artifactDigest", "transportSubmissionRef", "transportSubmissionDigest",
+                                        "transportResultDigest", "providerPromptId", "nativeArtifacts", "derivation"))):
+                                raise BackendValidationError("live artifact execution lineage is invalid")
                     latest = job["attempts"][-1] if job["attempts"] else None
                     if (
                         not isinstance(latest, Mapping)
@@ -1878,12 +1918,16 @@ def _probe_media_cache_key(path: Path) -> tuple[str, int]:
     return digest.hexdigest(), size
 
 
-def probe_media(path: Path, *, fresh: bool = False) -> dict[str, Any]:
+def probe_media(path: Path, *, fresh: bool = False,
+                deadline_monotonic: float | None = None) -> dict[str, Any]:
     cache_key = _probe_media_cache_key(path)
     with _PROBE_MEDIA_CACHE_LOCK:
         cached = _PROBE_MEDIA_CACHE.get(cache_key)
     if cached is not None and not fresh:
         return deepcopy(cached)
+    timeout = 30.0 if deadline_monotonic is None else min(30.0, deadline_monotonic - time.monotonic())
+    if timeout <= 0:
+        raise ArtifactVerificationError("ffprobe deadline expired")
     try:
         result = subprocess.run(
             [
@@ -1895,7 +1939,7 @@ def probe_media(path: Path, *, fresh: bool = False) -> dict[str, Any]:
             check=True,
             capture_output=True,
             text=True,
-            timeout=30,
+            timeout=timeout,
         )
         payload = json.loads(result.stdout)
     except (FileNotFoundError, subprocess.SubprocessError, json.JSONDecodeError) as exc:
@@ -1932,8 +1976,12 @@ def probe_media(path: Path, *, fresh: bool = False) -> dict[str, Any]:
 
 def verify_media_against_request(
     path: Path, request: Mapping[str, Any], *, fresh_probe: bool = False,
+    deadline_monotonic: float | None = None,
 ) -> dict[str, Any]:
-    probe = probe_media(path, fresh=True) if fresh_probe else probe_media(path)
+    if deadline_monotonic is None:
+        probe = probe_media(path, fresh=True) if fresh_probe else probe_media(path)
+    else:
+        probe = probe_media(path, fresh=True, deadline_monotonic=deadline_monotonic)
     parameters = request["parameters"]
     kind = request["mediaKind"]
     matches = [item for item in probe["streams"] if item.get("codec_type") == kind]
@@ -2350,7 +2398,8 @@ class MediaJobCoordinator:
         return claimed, True
 
     def _verify_final_from_intent(
-        self, job: Mapping[str, Any], intent: Mapping[str, Any]
+        self, job: Mapping[str, Any], intent: Mapping[str, Any], *,
+        deadline_monotonic: float | None = None,
     ) -> dict[str, Any]:
         _validate_artifact_commit_intent(intent, job)
         attempt_number = intent["attemptNumber"]
@@ -2387,7 +2436,9 @@ class MediaJobCoordinator:
             or content_size != artifact.get("byteSize")
         ):
             raise ArtifactVerificationError("artifact commit bytes changed")
-        probe = verify_media_against_request(final_path, self._probe_request(job))
+        probe = verify_media_against_request(final_path, self._probe_request(job),
+            **({"fresh_probe": True, "deadline_monotonic": deadline_monotonic}
+               if deadline_monotonic is not None else {}))
         if probe != artifact.get("probe"):
             raise ArtifactVerificationError("artifact commit probe changed")
         if job["schemaVersion"] in {

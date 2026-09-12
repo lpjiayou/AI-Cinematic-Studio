@@ -122,8 +122,7 @@ The concise [AGENTS.md](AGENTS.md), its immutable archive and the [single-call C
 A100_START_AUTHORIZED=false
 A100_FUTURE_START_AUTHORIZED=false
 A100_GPU_EXECUTION_AUTHORIZED=false
-GPU_CALLS_ALLOWED=false
-PROVIDER_CALLS_ALLOWED=false
+GPU_CALLS_ALLOWED=false; PROVIDER_CALLS_ALLOWED=false
 OUTPUT_ASSET_ADMISSION_ALLOWED=false
 PUBLICATION_ALLOWED=false
 M14_M15_IMPLEMENTATION=NOT_AUTHORIZED
@@ -177,7 +176,7 @@ GENERATION_DISPATCH_MECHANISM_AT_AUDITED_COMMIT=NOT_IMPLEMENTED
 GENERATION_DISPATCH_DESIGN_DIRECTION=INDEPENDENT_IMMUTABLE_GRANT_CONFIRMED; FULL_DISPATCH_MECHANISM_READY=false
 ADR_0022_STATUS=ACCEPTED
 ADR_0022_FULL_ACCEPTANCE=ACCEPTED_ARCHITECTURE_ONLY
-ADR_0022_ACCEPTED_VERSION=1.2
+ADR_0022_ACCEPTED_VERSION=1.3_NARROW_R2_INCREMENT; HISTORICAL_ACCEPTED_VERSION=1.2
 PACKAGE_1_OWNER_ACCEPTANCE=ACCEPTED_WITHIN_SCOPE_CPU_ISOLATED
 PKG1_R1_F01=OWNER_CLOSED_FOR_ACCEPTED_CANDIDATE
 PACKAGE_2_OWNER_ACCEPTANCE=ACCEPTED_WITHIN_SCOPE_CPU_ISOLATED_WITH_RESIDUAL_EVIDENCE_RISK
@@ -190,6 +189,7 @@ SUPERSEDED_VALIDATOR_M12_G0_3_STATE=ENVIRONMENT_HOLD
 SUPERSEDED_VALIDATOR_NEXT_TASK=LOCAL_WSL2_HANDOFF_AND_M12_C3_PREFLIGHT
 ```
 The prior receipts through [E3H](docs/status/M10_MANIFEST_V2_TECHNICAL_INPUT_APPEND_AUTHORITY_E3H_2026-09-08.md) and [post-E3H R6](docs/status/M10_M11_SPIKE_0_ELIGIBLE_LINEAGE_E3_R6_POST_E3H_2026-09-08.md) remain unchanged: eligible input lineage is PREPARED_AND_VERIFIED; the old 409 failure and historical E4_STARTED=false retain their 2026-09-08 meaning. No upstream fact was updated/deleted or recreated in that input-only resume. Later [E4 runtime evidence](docs/status/M10_M11_SPIKE_0_E4_RUNTIME_PREFLIGHT_2026-09-09.md) records the completed 632-file snapshot and validated v2 I2V proof; [exact binding](docs/status/M10_M11_SPIKE_0_E4_EXACT_BINDING_REVIEW_2026-09-09.md) retains C1/C2. The [dispatch audit](docs/status/M10_M11_GENERATION_DISPATCH_AUTHORITY_AUDIT_2026-09-09.md) remains historical for audited commit f007ab3e. [ADR-0022](governance/ADR-0022-generation-dispatch-grant.md) v1.2 remains accepted architecture only. The [Package 1 record](docs/status/ADR_0022_PKG1_CPU_ACCEPTANCE_2026-09-10.md) registers its CPU-isolated Grant foundation; the [Package 2 record](docs/status/ADR_0022_PKG2_CPU_ACCEPTANCE_2026-09-11.md) registers the exact CPU-isolated binding candidate, its two candidate-specific closures and accepted residual evidence risk; the [Package 3 record](docs/status/ADR_0022_PKG3_CPU_ACCEPTANCE_2026-09-12.md) registers the exact CPU-isolated closed-loop candidate, its 168/168 bounded regression and the Owner's scope-limited acceptance. Package 1/2 history and the undetermined historical B25, selection, QC, read-one-to-zero, timeout and index-drift causes remain unchanged. Package 3 publication is not yet merged at document authoring. Live Grant issuance/consumption, real transport, execution configuration deployment, ComfyUI, GPU and prompt submission remain unauthorized; Spike-0 stays blocked and the full dispatch mechanism is not ready. See the [evidence index](docs/status/M10_M11_SPIKE_0_E4_EVIDENCE_INDEX_2026-09-09.md). The five historical fields remain false / NOT_VERIFIED / NOT_READY / false / false; no runtime metadata or compatibility token grants current execution authority, and the E4 execution pin remains unchanged.
+R2 override within its bounded scope: `CURRENT_TASK=ACS-A14B-CONTRACT-COMPATIBILITY-AND-STAGED-TRANSPORT-R2-20260912`; `R2_LOCAL_IMPLEMENTATION=AUTHORIZED`; `OWNER_ACCEPTANCE=PENDING`. The Project Lead authorizes ADR-0022 v1.3's narrow increment, local CPU/fixture-owned loopback work and local commit against `ad7349ff493baaa1e0bc831810ea28b3dd2b2dce`, tree `a1f0f68ad69ea90d9c9cd96c2ed2ae33df4b2c93`. This replaces only the R1 whitelist, not Package 1/2/3 history. `SH09_EXACT_BINDING=BLOCKED_MISSING_ORIGINAL_EVIDENCE`; `SYSTEM_RUNTIME_BOUND=false`; `PROMPT_SUBMISSION_AUTHORIZED=false`; `R2_PUSH_PR_CI_MERGE=NOT_AUTHORIZED`; `R2_REAL_COMFYUI_GPU_FORMAL_DATABASE=NOT_AUTHORIZED`; `SPIKE_0_READINESS=BLOCKED`. The [candidate record](docs/status/A14B_STAGED_TRANSPORT_IMPLEMENTATION_2026-09-12.md) separates engineering evidence from missing freeze originals; new transport remains default-off with no public route or deployment.
 ## 7. Immutable history
 The former archived material remains byte-for-byte in [CURRENT_MILESTONE_HISTORY_THROUGH_2026-09-02.md](CURRENT_MILESTONE_HISTORY_THROUGH_2026-09-02.md).
 ```text
