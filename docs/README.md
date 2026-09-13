@@ -6,9 +6,20 @@ and authority metadata are defined by the
 [Document Registry](governance/DOCUMENT_REGISTRY.json) and
 [Document Authority Map](governance/DOCUMENT_AUTHORITY_MAP.md).
 
-Only the `CURRENT_STATUS` and `CAPABILITY_MATRIX` sections project current
-execution state. Historical, implementation, superseded and draft sections are
-deliberately isolated and do not authorize current execution.
+Start with [the active task](../CURRENT_MILESTONE.md), [AGENTS.md](../AGENTS.md)
+and only the Accepted contracts required by that task. This complete index is not
+a default reading checklist. `CURRENT_MILESTONE.md` is the global execution
+projection; the other current records have only their named pin or M12 host scope.
+
+Dated implementation receipts and historical documents are cold evidence. Their
+original headings and outcomes are preserved, but their checkpoint-local wording
+does not authorize today's work. This includes dated files under `docs/status/`;
+directory names alone do not determine authority.
+
+Class sections below are generated from the existing registry. After an authorized
+registry change, run `python scripts/validate_document_supersession.py --write`;
+the default validator checks both projections without writing. Do not maintain
+three independent classification lists.
 
 ## ACCEPTED_DECISION
 
@@ -61,8 +72,8 @@ deliberately isolated and do not authorize current execution.
 - [`architecture/K2_GOLDEN_EPISODE_PRODUCTION_CONTRACT.md`](../architecture/K2_GOLDEN_EPISODE_PRODUCTION_CONTRACT.md) — `ACTIVE`
 - [`architecture/K2_INTERNAL_IMAGE_FIRST_REAL_MEDIA_REVISION_CONTRACT.md`](../architecture/K2_INTERNAL_IMAGE_FIRST_REAL_MEDIA_REVISION_CONTRACT.md) — `ACTIVE`
 - [`architecture/K2_INTERNAL_SELF_HOSTED_P1_CONTRACT.md`](../architecture/K2_INTERNAL_SELF_HOSTED_P1_CONTRACT.md) — `ACTIVE`
-- [`architecture/M3_M11_UPSTREAM_METHOD_CLOSURE_CONTRACT.md`](../architecture/M3_M11_UPSTREAM_METHOD_CLOSURE_CONTRACT.md) — `ACTIVE`
 - [`architecture/M10_MANIFEST_V2_TECHNICAL_INPUT_APPEND_AUTHORITY_CONTRACT.md`](../architecture/M10_MANIFEST_V2_TECHNICAL_INPUT_APPEND_AUTHORITY_CONTRACT.md) — `ACTIVE`
+- [`architecture/M3_M11_UPSTREAM_METHOD_CLOSURE_CONTRACT.md`](../architecture/M3_M11_UPSTREAM_METHOD_CLOSURE_CONTRACT.md) — `ACTIVE`
 - [`architecture/M6_SERIES_INTELLIGENCE_CONSUMER_CONTRACT.md`](../architecture/M6_SERIES_INTELLIGENCE_CONSUMER_CONTRACT.md) — `ACTIVE`
 - [`architecture/M6_SERIES_INTELLIGENCE_DOMAIN_CONTRACT.md`](../architecture/M6_SERIES_INTELLIGENCE_DOMAIN_CONTRACT.md) — `ACTIVE`
 - [`architecture/M6_SERIES_INTELLIGENCE_SQLITE_CONTRACT.md`](../architecture/M6_SERIES_INTELLIGENCE_SQLITE_CONTRACT.md) — `ACTIVE`
@@ -89,30 +100,9 @@ deliberately isolated and do not authorize current execution.
 
 ## CURRENT_STATUS
 
-- [`docs/status/M10_M11_SPIKE_0_ELIGIBLE_LINEAGE_E3_R6_POST_E3H_2026-09-08.md`](status/M10_M11_SPIKE_0_ELIGIBLE_LINEAGE_E3_R6_POST_E3H_2026-09-08.md) — `CURRENT`
-- [`docs/status/M10_MANIFEST_V2_TECHNICAL_INPUT_APPEND_AUTHORITY_E3H_2026-09-08.md`](status/M10_MANIFEST_V2_TECHNICAL_INPUT_APPEND_AUTHORITY_E3H_2026-09-08.md) — `CURRENT`
-- [`docs/status/M10_INPUT_ARTIFACT_EXECUTION_CONFIG_DECOUPLING_E3G_2026-09-08.md`](status/M10_INPUT_ARTIFACT_EXECUTION_CONFIG_DECOUPLING_E3G_2026-09-08.md) — `CURRENT`
-- [`docs/status/M5_M7_LEGAL_ENTRYPOINT_CLOSURE_E3E_2026-09-07.md`](status/M5_M7_LEGAL_ENTRYPOINT_CLOSURE_E3E_2026-09-07.md) — `CURRENT`
-- [`docs/status/M3_SCRIPT_GENERATION_AND_CONFIRMATION_RECOVERY_E3F_2026-09-07.md`](status/M3_SCRIPT_GENERATION_AND_CONFIRMATION_RECOVERY_E3F_2026-09-07.md) — `CURRENT`
-
-- [`docs/status/M5_SERIES_PLAN_COMMAND_IDEMPOTENCY_E3D_2026-09-07.md`](status/M5_SERIES_PLAN_COMMAND_IDEMPOTENCY_E3D_2026-09-07.md) — `CURRENT`
-
-- [`docs/status/M1_AI_DIRECTOR_CANDIDATE_IDEMPOTENCY_E3C_2026-09-07.md`](status/M1_AI_DIRECTOR_CANDIDATE_IDEMPOTENCY_E3C_2026-09-07.md) — `CURRENT`
-
-- [`docs/status/M1_CREATIVE_PLAN_CONFIRMATION_IDEMPOTENCY_E3B_2026-09-06.md`](status/M1_CREATIVE_PLAN_CONFIRMATION_IDEMPOTENCY_E3B_2026-09-06.md) — `CURRENT`
-
 - [`CURRENT_MILESTONE.md`](../CURRENT_MILESTONE.md) — `CURRENT`
 - [`architecture/M12_C3_DEDICATED_LINUX_CPU_BUILD_HOST_SPECIFICATION.md`](../architecture/M12_C3_DEDICATED_LINUX_CPU_BUILD_HOST_SPECIFICATION.md) — `CURRENT`
-- [`docs/status/CORE_CLEAN_STATE_PUBLIC_API_E2E_2026-09-06.md`](status/CORE_CLEAN_STATE_PUBLIC_API_E2E_2026-09-06.md) — `CURRENT`
-- [`docs/status/CORE_PUBLIC_JSON_AND_NUMERIC_INTEGRITY_HARDENING_2026-09-05.md`](status/CORE_PUBLIC_JSON_AND_NUMERIC_INTEGRITY_HARDENING_2026-09-05.md) — `CURRENT`
-- [`docs/status/CORE_RECOVERABLE_PROJECT_FOUNDATION_COMMAND_2026-09-05.md`](status/CORE_RECOVERABLE_PROJECT_FOUNDATION_COMMAND_2026-09-05.md) — `CURRENT`
-- [`docs/status/CORE_SERIES_PLANNING_SCOPE_AND_CANDIDATE_BINDING_HARDENING_2026-09-05.md`](status/CORE_SERIES_PLANNING_SCOPE_AND_CANDIDATE_BINDING_HARDENING_2026-09-05.md) — `CURRENT`
 - [`docs/status/CROSS_REPOSITORY_BASELINE.md`](status/CROSS_REPOSITORY_BASELINE.md) — `CURRENT`
-- [`docs/status/M12_A100_BUILD_HOST_REFLIGHT_2026-09-03.md`](status/M12_A100_BUILD_HOST_REFLIGHT_2026-09-03.md) — `CURRENT`
-
-- [`docs/status/M10_M11_METHOD_AWARE_WORKER_SEAM_CORRECTIVE_E1_2026-09-06.md`](status/M10_M11_METHOD_AWARE_WORKER_SEAM_CORRECTIVE_E1_2026-09-06.md) — `CURRENT`
-- [`docs/status/M10_M11_METHOD_AWARE_JOB_RESULT_INTAKE_CORRECTIVE_E2_2026-09-06.md`](status/M10_M11_METHOD_AWARE_JOB_RESULT_INTAKE_CORRECTIVE_E2_2026-09-06.md) — `CURRENT`
-- [`docs/status/M10_METHOD_AWARE_SINGLE_INPUT_IMAGE_ADMISSION_E3A_2026-09-06.md`](status/M10_METHOD_AWARE_SINGLE_INPUT_IMAGE_ADMISSION_E3A_2026-09-06.md) — `CURRENT`
 
 ## CAPABILITY_MATRIX
 
@@ -120,7 +110,6 @@ deliberately isolated and do not authorize current execution.
 
 ## OPERATIONAL_RUNBOOK
 
-- [`docs/governance/CI_WAITING_RUNBOOK.md`](governance/CI_WAITING_RUNBOOK.md) — `ACTIVE`
 - [`docs/08-compute/k2-comfyui-wan22-operator-runbook.md`](08-compute/k2-comfyui-wan22-operator-runbook.md) — `ACTIVE`
 - [`docs/11-testing/release-validation.md`](11-testing/release-validation.md) — `ACTIVE`
 - [`docs/11-testing/test-evidence-standard.md`](11-testing/test-evidence-standard.md) — `ACTIVE`
@@ -129,6 +118,7 @@ deliberately isolated and do not authorize current execution.
 - [`docs/11-testing/verification-gates.md`](11-testing/verification-gates.md) — `ACTIVE`
 - [`docs/16-k2-production/K2-G2-AUTHORITY-PREPARATION-RUNBOOK.md`](16-k2-production/K2-G2-AUTHORITY-PREPARATION-RUNBOOK.md) — `ACTIVE`
 - [`docs/16-k2-production/K2-INTERNAL-SELF-HOSTED-P1-RUNBOOK.md`](16-k2-production/K2-INTERNAL-SELF-HOSTED-P1-RUNBOOK.md) — `ACTIVE`
+- [`docs/governance/CI_WAITING_RUNBOOK.md`](governance/CI_WAITING_RUNBOOK.md) — `ACTIVE`
 - [`experiments/k2-002-ep01-i2v/RUNBOOK.md`](../experiments/k2-002-ep01-i2v/RUNBOOK.md) — `ACTIVE`
 - [`governance/BASELINE_RELEASE_PROCESS.md`](../governance/BASELINE_RELEASE_PROCESS.md) — `ACTIVE`
 - [`governance/BRANCH_PROTECTION.md`](../governance/BRANCH_PROTECTION.md) — `ACTIVE`
@@ -141,15 +131,30 @@ deliberately isolated and do not authorize current execution.
 
 ## IMPLEMENTATION_EVIDENCE
 
-- [`docs/status/A14B_STAGED_TRANSPORT_IMPLEMENTATION_2026-09-12.md`](status/A14B_STAGED_TRANSPORT_IMPLEMENTATION_2026-09-12.md) — `RECORDED / ACCEPTED_WITHIN_SCOPE_CPU_AND_FIXTURE_LOOPBACK`; F01 closed for the exact candidate; publication not yet merged at authoring; no live runtime authority.
-- [`docs/status/SH09_EXACT_OFFLINE_BINDING_R3_2026-09-13.md`](status/SH09_EXACT_OFFLINE_BINDING_R3_2026-09-13.md) — `RECORDED / CANDIDATE / OWNER REVIEW PENDING`; offline exact mapping and CPU/fixture-only evidence, not live authority.
-- [`docs/status/ADR_0022_PKG3_CPU_ACCEPTANCE_2026-09-12.md`](status/ADR_0022_PKG3_CPU_ACCEPTANCE_2026-09-12.md) — `RECORDED`
-- [`docs/status/ADR_0022_PKG2_CPU_ACCEPTANCE_2026-09-11.md`](status/ADR_0022_PKG2_CPU_ACCEPTANCE_2026-09-11.md) — `RECORDED`
-- [`docs/status/ADR_0022_PKG1_CPU_ACCEPTANCE_2026-09-10.md`](status/ADR_0022_PKG1_CPU_ACCEPTANCE_2026-09-10.md) — `RECORDED`
-- [`docs/archive/AGENTS_ARCHIVE_MIGRATION_MANIFEST.json`](archive/AGENTS_ARCHIVE_MIGRATION_MANIFEST.json) — `RECORDED`
 - [`design-qa.md`](../design-qa.md) — `RECORDED`
 - [`docs/04-interface-contract/v5-v3-vertical-slice-review.md`](04-interface-contract/v5-v3-vertical-slice-review.md) — `RECORDED`
 - [`docs/14-application-design/REFERENCE_VIDEO_CAPABILITY_AND_WORKSPACE_MERGED_BASELINE.md`](14-application-design/REFERENCE_VIDEO_CAPABILITY_AND_WORKSPACE_MERGED_BASELINE.md) — `RECORDED`
+- [`docs/archive/AGENTS_ARCHIVE_MIGRATION_MANIFEST.json`](archive/AGENTS_ARCHIVE_MIGRATION_MANIFEST.json) — `RECORDED`
+- [`docs/status/A14B_STAGED_TRANSPORT_IMPLEMENTATION_2026-09-12.md`](status/A14B_STAGED_TRANSPORT_IMPLEMENTATION_2026-09-12.md) — `RECORDED`
+- [`docs/status/ADR_0022_PKG1_CPU_ACCEPTANCE_2026-09-10.md`](status/ADR_0022_PKG1_CPU_ACCEPTANCE_2026-09-10.md) — `RECORDED`
+- [`docs/status/ADR_0022_PKG2_CPU_ACCEPTANCE_2026-09-11.md`](status/ADR_0022_PKG2_CPU_ACCEPTANCE_2026-09-11.md) — `RECORDED`
+- [`docs/status/ADR_0022_PKG3_CPU_ACCEPTANCE_2026-09-12.md`](status/ADR_0022_PKG3_CPU_ACCEPTANCE_2026-09-12.md) — `RECORDED`
+- [`docs/status/CORE_CLEAN_STATE_PUBLIC_API_E2E_2026-09-06.md`](status/CORE_CLEAN_STATE_PUBLIC_API_E2E_2026-09-06.md) — `RECORDED`
+- [`docs/status/CORE_PUBLIC_JSON_AND_NUMERIC_INTEGRITY_HARDENING_2026-09-05.md`](status/CORE_PUBLIC_JSON_AND_NUMERIC_INTEGRITY_HARDENING_2026-09-05.md) — `RECORDED`
+- [`docs/status/CORE_RECOVERABLE_PROJECT_FOUNDATION_COMMAND_2026-09-05.md`](status/CORE_RECOVERABLE_PROJECT_FOUNDATION_COMMAND_2026-09-05.md) — `RECORDED`
+- [`docs/status/CORE_SERIES_PLANNING_SCOPE_AND_CANDIDATE_BINDING_HARDENING_2026-09-05.md`](status/CORE_SERIES_PLANNING_SCOPE_AND_CANDIDATE_BINDING_HARDENING_2026-09-05.md) — `RECORDED`
+- [`docs/status/M10_INPUT_ARTIFACT_EXECUTION_CONFIG_DECOUPLING_E3G_2026-09-08.md`](status/M10_INPUT_ARTIFACT_EXECUTION_CONFIG_DECOUPLING_E3G_2026-09-08.md) — `RECORDED`
+- [`docs/status/M10_M11_METHOD_AWARE_JOB_RESULT_INTAKE_CORRECTIVE_E2_2026-09-06.md`](status/M10_M11_METHOD_AWARE_JOB_RESULT_INTAKE_CORRECTIVE_E2_2026-09-06.md) — `RECORDED`
+- [`docs/status/M10_M11_METHOD_AWARE_WORKER_SEAM_CORRECTIVE_E1_2026-09-06.md`](status/M10_M11_METHOD_AWARE_WORKER_SEAM_CORRECTIVE_E1_2026-09-06.md) — `RECORDED`
+- [`docs/status/M10_M11_SPIKE_0_ELIGIBLE_LINEAGE_E3_R6_POST_E3H_2026-09-08.md`](status/M10_M11_SPIKE_0_ELIGIBLE_LINEAGE_E3_R6_POST_E3H_2026-09-08.md) — `RECORDED`
+- [`docs/status/M10_MANIFEST_V2_TECHNICAL_INPUT_APPEND_AUTHORITY_E3H_2026-09-08.md`](status/M10_MANIFEST_V2_TECHNICAL_INPUT_APPEND_AUTHORITY_E3H_2026-09-08.md) — `RECORDED`
+- [`docs/status/M10_METHOD_AWARE_SINGLE_INPUT_IMAGE_ADMISSION_E3A_2026-09-06.md`](status/M10_METHOD_AWARE_SINGLE_INPUT_IMAGE_ADMISSION_E3A_2026-09-06.md) — `RECORDED`
+- [`docs/status/M1_AI_DIRECTOR_CANDIDATE_IDEMPOTENCY_E3C_2026-09-07.md`](status/M1_AI_DIRECTOR_CANDIDATE_IDEMPOTENCY_E3C_2026-09-07.md) — `RECORDED`
+- [`docs/status/M1_CREATIVE_PLAN_CONFIRMATION_IDEMPOTENCY_E3B_2026-09-06.md`](status/M1_CREATIVE_PLAN_CONFIRMATION_IDEMPOTENCY_E3B_2026-09-06.md) — `RECORDED`
+- [`docs/status/M3_SCRIPT_GENERATION_AND_CONFIRMATION_RECOVERY_E3F_2026-09-07.md`](status/M3_SCRIPT_GENERATION_AND_CONFIRMATION_RECOVERY_E3F_2026-09-07.md) — `RECORDED`
+- [`docs/status/M5_M7_LEGAL_ENTRYPOINT_CLOSURE_E3E_2026-09-07.md`](status/M5_M7_LEGAL_ENTRYPOINT_CLOSURE_E3E_2026-09-07.md) — `RECORDED`
+- [`docs/status/M5_SERIES_PLAN_COMMAND_IDEMPOTENCY_E3D_2026-09-07.md`](status/M5_SERIES_PLAN_COMMAND_IDEMPOTENCY_E3D_2026-09-07.md) — `RECORDED`
+- [`docs/status/SH09_EXACT_OFFLINE_BINDING_R3_2026-09-13.md`](status/SH09_EXACT_OFFLINE_BINDING_R3_2026-09-13.md) — `RECORDED`
 - [`experiments/ccv-r1/CHARACTER_CONSISTENCY_VALIDATION_REPORT_R1.md`](../experiments/ccv-r1/CHARACTER_CONSISTENCY_VALIDATION_REPORT_R1.md) — `RECORDED`
 - [`experiments/ccv-r1/README.md`](../experiments/ccv-r1/README.md) — `RECORDED`
 - [`experiments/ccv-r1/evidence/README.md`](../experiments/ccv-r1/evidence/README.md) — `RECORDED`
@@ -170,14 +175,7 @@ deliberately isolated and do not authorize current execution.
 
 ## HISTORICAL_EVIDENCE
 
-- [`docs/status/ADR_0022_V1_2_ARCHITECTURE_ACCEPTANCE_2026-09-10.md`](status/ADR_0022_V1_2_ARCHITECTURE_ACCEPTANCE_2026-09-10.md) — `RECORDED`
-- [`docs/status/M10_M11_SPIKE_0_E4_RUNTIME_PREFLIGHT_2026-09-09.md`](status/M10_M11_SPIKE_0_E4_RUNTIME_PREFLIGHT_2026-09-09.md) — `RECORDED`
-- [`docs/status/M10_M11_SPIKE_0_E4_EXACT_BINDING_REVIEW_2026-09-09.md`](status/M10_M11_SPIKE_0_E4_EXACT_BINDING_REVIEW_2026-09-09.md) — `RECORDED`
-- [`docs/status/M10_M11_GENERATION_DISPATCH_AUTHORITY_AUDIT_2026-09-09.md`](status/M10_M11_GENERATION_DISPATCH_AUTHORITY_AUDIT_2026-09-09.md) — `RECORDED`
 - [`CURRENT_MILESTONE_HISTORY_THROUGH_2026-09-02.md`](../CURRENT_MILESTONE_HISTORY_THROUGH_2026-09-02.md) — `HISTORICAL`
-- [`docs/archive/AGENTS_HISTORICAL_EXECUTION_RECORDS_THROUGH_2026-09-03.md`](archive/AGENTS_HISTORICAL_EXECUTION_RECORDS_THROUGH_2026-09-03.md) — `HISTORICAL`
-- [`docs/status/M12_A100_BUILD_HOST_PREFLIGHT_2026-09-03.md`](status/M12_A100_BUILD_HOST_PREFLIGHT_2026-09-03.md) — `HISTORICAL`
-- [`docs/status/M12_C3_WSL2_CPU_BUILD_HOST_PREFLIGHT_2026-09-04.md`](status/M12_C3_WSL2_CPU_BUILD_HOST_PREFLIGHT_2026-09-04.md) — `HISTORICAL`
 - [`docs/12-release/baseline-asset-acceptance-decision-record.md`](12-release/baseline-asset-acceptance-decision-record.md) — `HISTORICAL`
 - [`docs/12-release/baseline-v0.1.0-candidate-manifest.md`](12-release/baseline-v0.1.0-candidate-manifest.md) — `HISTORICAL`
 - [`docs/12-release/investor-readiness-acceptance-record.md`](12-release/investor-readiness-acceptance-record.md) — `HISTORICAL`
@@ -193,7 +191,15 @@ deliberately isolated and do not authorize current execution.
 - [`docs/15-investor-readiness/milestones/M004-v5-project-asset-relationship-foundation.md`](15-investor-readiness/milestones/M004-v5-project-asset-relationship-foundation.md) — `HISTORICAL`
 - [`docs/16-k2-production/K2-001-HISTORICAL-VALIDATION-ARCHIVE.md`](16-k2-production/K2-001-HISTORICAL-VALIDATION-ARCHIVE.md) — `HISTORICAL`
 - [`docs/16-k2-production/k2-002-changan/K2-002-CHANGAN-SERIES-AND-EP01-03-v1.4.md`](16-k2-production/k2-002-changan/K2-002-CHANGAN-SERIES-AND-EP01-03-v1.4.md) — `HISTORICAL`
+- [`docs/archive/AGENTS_HISTORICAL_EXECUTION_RECORDS_THROUGH_2026-09-03.md`](archive/AGENTS_HISTORICAL_EXECUTION_RECORDS_THROUGH_2026-09-03.md) — `HISTORICAL`
 - [`docs/governance/DOCUMENT_AUDIT_REPORT_2026-09-02.md`](governance/DOCUMENT_AUDIT_REPORT_2026-09-02.md) — `HISTORICAL`
+- [`docs/status/ADR_0022_V1_2_ARCHITECTURE_ACCEPTANCE_2026-09-10.md`](status/ADR_0022_V1_2_ARCHITECTURE_ACCEPTANCE_2026-09-10.md) — `RECORDED`
+- [`docs/status/M10_M11_GENERATION_DISPATCH_AUTHORITY_AUDIT_2026-09-09.md`](status/M10_M11_GENERATION_DISPATCH_AUTHORITY_AUDIT_2026-09-09.md) — `RECORDED`
+- [`docs/status/M10_M11_SPIKE_0_E4_EXACT_BINDING_REVIEW_2026-09-09.md`](status/M10_M11_SPIKE_0_E4_EXACT_BINDING_REVIEW_2026-09-09.md) — `RECORDED`
+- [`docs/status/M10_M11_SPIKE_0_E4_RUNTIME_PREFLIGHT_2026-09-09.md`](status/M10_M11_SPIKE_0_E4_RUNTIME_PREFLIGHT_2026-09-09.md) — `RECORDED`
+- [`docs/status/M12_A100_BUILD_HOST_PREFLIGHT_2026-09-03.md`](status/M12_A100_BUILD_HOST_PREFLIGHT_2026-09-03.md) — `HISTORICAL`
+- [`docs/status/M12_A100_BUILD_HOST_REFLIGHT_2026-09-03.md`](status/M12_A100_BUILD_HOST_REFLIGHT_2026-09-03.md) — `RECORDED`
+- [`docs/status/M12_C3_WSL2_CPU_BUILD_HOST_PREFLIGHT_2026-09-04.md`](status/M12_C3_WSL2_CPU_BUILD_HOST_PREFLIGHT_2026-09-04.md) — `HISTORICAL`
 - [`governance/ACS-ARCH-R1-V5-TEXT-GENERATION-G0.md`](../governance/ACS-ARCH-R1-V5-TEXT-GENERATION-G0.md) — `HISTORICAL`
 - [`governance/ACS-ARCH-R1-V5-TEXT-GENERATION-G1-R1-AUTHORIZATION.md`](../governance/ACS-ARCH-R1-V5-TEXT-GENERATION-G1-R1-AUTHORIZATION.md) — `HISTORICAL`
 - [`governance/ACS-ARCH-R1-V5-TEXT-GENERATION-G1-R1-CLOSEOUT-M6-P3-G0-OWNER-REVIEW.md`](../governance/ACS-ARCH-R1-V5-TEXT-GENERATION-G1-R1-CLOSEOUT-M6-P3-G0-OWNER-REVIEW.md) — `HISTORICAL`
@@ -231,11 +237,10 @@ deliberately isolated and do not authorize current execution.
 
 ## DEPRECATED
 
-_No documents currently classified in this category._
+No documents registered in this class.
 
 ## GENERATED_REFERENCE
 
-- [`docs/status/M10_M11_SPIKE_0_E4_EVIDENCE_INDEX_2026-09-09.md`](status/M10_M11_SPIKE_0_E4_EVIDENCE_INDEX_2026-09-09.md) — `REFERENCE`
 - [`README.md`](../README.md) — `REFERENCE`
 - [`docs/03-data-design/README.md`](03-data-design/README.md) — `REFERENCE`
 - [`docs/04-interface-contract/README.md`](04-interface-contract/README.md) — `REFERENCE`
@@ -249,11 +254,6 @@ _No documents currently classified in this category._
 - [`docs/governance/DOCUMENT_AUTHORITY_MAP.md`](governance/DOCUMENT_AUTHORITY_MAP.md) — `REFERENCE`
 - [`docs/governance/DOCUMENT_REGISTRY.json`](governance/DOCUMENT_REGISTRY.json) — `REFERENCE`
 - [`docs/governance/DOCUMENT_SUPERSESSION_MAP.md`](governance/DOCUMENT_SUPERSESSION_MAP.md) — `REFERENCE`
+- [`docs/status/M10_M11_SPIKE_0_E4_EVIDENCE_INDEX_2026-09-09.md`](status/M10_M11_SPIKE_0_E4_EVIDENCE_INDEX_2026-09-09.md) — `REFERENCE`
 - [`tests/README.md`](../tests/README.md) — `REFERENCE`
 - [`tests/fixtures/v5_fonts/README.md`](../tests/fixtures/v5_fonts/README.md) — `REFERENCE`
-
-## Inventory boundary
-
-This index contains 169 Core documents reviewed at `b109ba6c625cac20eac798f4b2528c63f0b7c42e` on
-`2026-09-03`. See the registry for owners, supersession edges, mutation policy
-and scope notes.

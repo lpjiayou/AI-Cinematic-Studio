@@ -1,200 +1,157 @@
 # AI Cinematic Studio — Current Execution State
 
-Status: `CURRENT / EVIDENCE-BACKED / FAIL-CLOSED`; last reviewed: `2026-09-13`
-## 1. Closed K2 cutover baselines
-The production behavior, acceptance evidence and compatible Frontend pin are:
+Status: `CURRENT / EVIDENCE-BACKED / FAIL-CLOSED`; reviewed: `2026-09-13`
+
+## 1. Active task and boundaries
+
+Only the block below is the machine-checked current execution projection.
+Dated receipts retain their original checkpoint meaning; they are not additional
+current-task overrides. This update records progress and existing authorization,
+not a new Grant, feature acceptance or production-readiness decision.
+
+<!-- CURRENT_STATE:BEGIN -->
 ```text
-CORE_BEHAVIOR_MAIN=e21789d265c4e936b0e0b29921746a4c205889b8
-CORE_BEHAVIOR_TREE=086f37ed4e5412d1d6608c4ee856ac75d61625e9
-CORE_ACCEPTANCE_MAIN=aba10bebfa4d6184c6151b24befff9100e6bc70a
-CORE_ACCEPTANCE_TREE=b3d0d07160e49c316a1f0bfaf8fecd3b64d0d544
-FRONTEND_MAIN=4d295718975c0ddb3d2e5d6099d4dea4d63acb54
-FRONTEND_TREE=4214fa4a4c5ddf8a61583d94f5ae89248d684da1
-FRONTEND_PIN_CORE_SHA=e21789d265c4e936b0e0b29921746a4c205889b8
-FRONTEND_PIN_CORE_TREE=086f37ed4e5412d1d6608c4ee856ac75d61625e9
-FRONTEND_PIN_MATCHES_CORE_BEHAVIOR=true
-FRONTEND_LEGACY_HISTORY_COMPATIBILITY_GATE=PASS
-FRONTEND_CORE_BEHAVIOR_PIN=PASS
-FRONTEND_METHOD_AWARE_PRODUCT_SURFACE=INCOMPLETE
-FRONTEND_PUSH_TRIGGER_REMOVED=true
-FRONTEND_WORKFLOW_DISPATCH_ENABLED=true
-FRONTEND_CONTROL_PLANE_FFMPEG_CONDITIONAL=true
-POST_MERGE_PUSH_CI_RUN_COUNT=0
-M13_BASE_TAG=m13-base-backend-v1
-M13_BASE_TAG_OBJECT=b2d086b622bdb5456f6af325e458aa3771e43e80
-M13_BASE_TAG_TARGET=a455c8e76427d53d75bb7f15259b9875d9768914
-M13_BASE_TAG_IMMUTABLE=true
-```
-`CORE_BEHAVIOR_MAIN` is the last production change in this K2 cutover baseline; `CORE_ACCEPTANCE_MAIN` is its acceptance-only descendant. This document does not predict its own merge SHA. Frontend PR #25 proves compatibility only. See the [cross-repository baseline](docs/status/CROSS_REPOSITORY_BASELINE.md) and [capability matrix](docs/status/M1-M19-CAPABILITY-STATUS.md).
-## 2. Upstream method closure
-```text
-UPSTREAM_METHOD_CLOSURE=PASS
-GENERIC_NON_K2_VERTICAL_SLICE=PASS
-M3_M6_CONSUMER_BINDING=IMPLEMENTED
-M7_NARRATIVE_VALIDATION=IMPLEMENTED_BOUNDED
-M8_ACTION_EXECUTION_BEATS=IMPLEMENTED
-M8_EXECUTION_CLASS=IMPLEMENTED
-M9_THREE_AXIS_REQUIREMENTS=IMPLEMENTED
-M10_METHOD_AWARE_PLANNING_AND_MANIFEST_V2_TECHNICAL_APPEND=IMPLEMENTED_BOUNDED
-M11_METHOD_CAPABILITY_BOUNDARY=IMPLEMENTED
-M9_M12_AUDIO_BRIDGE=IMPLEMENTED
-K2_METHOD_AWARE_PUBLIC_CUTOVER=PASS
-K2_OPERATIONAL_THREE_AXIS_ROUTING=PASS
-LEGACY_G4_NEW_WRITES=DISABLED
-LEGACY_G5_NEW_WRITES=DISABLED
-LEGACY_G4_EXACT_REPLAY=PASS
-LEGACY_G5_EXACT_REPLAY=PASS
-LEGACY_G4_G5_READ_REPLAY=SUPPORTED
-K2_002_METHOD_AWARE_SUCCESSOR_REQUIRED=true
-UNCONDITIONAL_VIDEO_REQUESTS=0
-UNCONDITIONAL_AUDIO_REQUESTS=0
-WAN_CONTACT_FALLBACK=0
-WAN_GAIT_FALLBACK=0
-WAN_DETERMINISTIC_EVENT_FALLBACK=0
-SQLITE_RESTART=PASS
-EXACT_REPLAY=PASS
-CHANGED_REPLAY_CONFLICT=PASS
-STALE_INPUT_REJECTION=PASS
-FOREIGN_WORKSPACE_REJECTION=PASS
-M11_CONTACT_RUNTIME=NOT_INSTALLED
-M11_GAIT_RUNTIME=NOT_INSTALLED
-```
-Evidence is Core PRs #54–#59 (upstream method chain), #63 (public cutover), #64 (acceptance), and Frontend PR #25 (pin and immutable-history compatibility gate). Historical v1 facts remain readable. Contact and Gait are explicitly unavailable instead of falling back to Wan. Runtime installation, live production and publication are not implied by this closure. Future K2-002 production must create an additive method-aware successor; it may not reinterpret or upgrade historic G4/G5 facts.
-## 3. M12 and M13 boundary
-```text
-M12_DOMAIN_CONTRACT=MERGED
-M12_RUNTIME_PROTOCOL=MERGED
-M9_M12_EXPLICIT_AUDIO_BRIDGE=IMPLEMENTED_BOUNDED_FAIL_CLOSED
-M12_AUDIO_REQUEST_RUNTIME_DISPATCH=NOT_AUTHORIZED
+CURRENT_TASK=ACS-D1-SH09-LIVE-OPERATOR-AND-ONE-RESULT-20260913
+CURRENT_ACTION=BOUNDED_AUDIT_STATE_AND_VALIDATOR_REMEDIATION
+NEXT_TASK=D1_READ_ONLY_PREPARE_AND_EXACT_RUN_REQUEST
+REVIEWED_MAIN=1e62786ea75823869c97934b18e22d722b7949f9
+REVIEWED_TREE=ddf58ea25feb8e64cce453a25c81b3233e72f48b
+ADR_0022_ACCEPTED_VERSION=1.5_NARROW_D1_INCREMENT
+R2_F01_ENGINEERING=ACCEPTED_WITHIN_CPU_FIXTURE_SCOPE_AND_MERGED
+R3_F01_ENGINEERING=MERGED
+D1_OPERATOR_CODE=MERGED
+D1_SEVEN_STORE_BINDING_FIX=MERGED
+ORIGINAL_EVIDENCE_AVAILABILITY=RESOLVED
+D1_BOUNDED_DEPLOYMENT=OWNER_AUTHORIZED
+D1_EXISTING_DATA_BINDING=READ_ONLY
+D1_SELECTED_SSH_FORWARD_TARGET=127.0.0.1:8188
+D1_RUNTIME_OBSERVATION=DATED_READ_ONLY_METADATA_ONLY
+D1_EXACT_RUN_REQUEST=NOT_YET_FULLY_BOUND
+D1_COMPLETE=false
+SYSTEM_RUNTIME_BOUND=false
+PROMPT_SUBMISSION_AUTHORIZED=false
+SPIKE_0_EXECUTED=false
+SPIKE_0_READINESS=BLOCKED_PENDING_EXACT_RUN_GATES
+FORMAL_DATABASE_WRITES_AUTHORIZED=false
+LIVE_GRANT_ISSUED=false
+LIVE_GRANT_CONSUMED=false
+OUTPUT_ASSET_ADMISSION_ALLOWED=false
+PUBLICATION_ALLOWED=false
+D2_D3=QUEUED_NOT_AUTHORIZED
+FRONTEND_IMPLEMENTATION_IN_THIS_TASK=NOT_AUTHORIZED
+PRODUCTION_READY=false
 M12_RUNTIME_INSTALLED=false
 M12_RUNTIME_G0=NOT_COMPLETE
 M12_G0_3_STATE=DEDICATED_CPU_VM_SELECTION_HOLD
-M12_BUILD_HOST_ARCHITECTURE_CORRECTION=ACCEPTED
-ADR_0015_STATUS=ACCEPTED_AND_CONTROLLING
-ADR_0019_AND_ADR_0021_STATUS=ACCEPTED
-ADR_0019_SECTION_10=PARTIALLY_SUPERSEDED_BY_ADR_0020
-ADR_0019_A100_C3_ASSUMPTION=SUPERSEDED_BY_ADR_0020
-ARCHITECTURE_CONFLICT_RESOLVED=true
-M12_C3_HOST_CLASS=NON_A100_LINUX_X86_64_CPU_BUILD_HOST
-M12_C3_A100_ALLOWED=false
-M12_C4_HOST_CLASS=A100_OFFLINE_CONSUMER
-M12_RUNTIME_G0_HOST_CLASS=A100_GPU_RUNTIME
-A100_C4_HARD_OFFLINE_ISOLATION_REQUIRED=true
-A100_C4_OFFLINE_ISOLATION_CURRENTLY_PROVEN=false
-M12_A100_BUILD_HOST_REFLIGHT=FAIL
-M12_A100_BUILD_HOST_REFLIGHT_EVIDENCE_SHA256=93c1c96dc3d852581857d1f213d158f03063cc6da47379dc7a24774be8dea1ce
-WSL2_CPU_BUILD_HOST_PREFLIGHT=FAIL
-WSL2_CANDIDATE_DISPOSITION=REJECTED_FOR_CURRENT_M12_C3_WAVE
-WSL2_FAILURE_EVIDENCE_SHA256=801e4e8cd44e5cf7dd2072c411808f624e9b2be214c8fb4b4faa8884469dd7ed
-M12_C3_HOST_SELECTED=NONE
-M12_C3_READY_TO_REQUEST_AUTHORIZATION=false
 M12_C3_READY_TO_START=false
 M12_C3_AUTHORIZED=false
 M12_C4_AUTHORIZED=false
-M12_C3_PREIMPLEMENTATION_BLOCKER=DEDICATED_CPU_VM_PROVIDER_SELECTION_AND_PREFLIGHT_PENDING
-M13_BASE_ARCHITECTURE=ACCEPTED
+M12_NEXT_TASK=ACS-M12-C3-DEDICATED-LINUX-CPU-VM-PROVIDER-SELECTION-AND-PREFLIGHT
 M13_BASE_BACKEND=COMPLETE
-M13_BASE_RUNTIME_CPU=VERIFIED
 M13_BASE_CLOSEOUT=ACCEPTED
-M13_RENDER_CANDIDATE_RESOURCE_PROJECTED=true
-M13_FRONTEND_PRODUCT_SURFACE=INCOMPLETE
-M13_EXTENSION_CATALOG=NOT_AUTHORIZED
+M13_PRODUCT_CAPABILITY_COMPLETE=false
 M13_EXTENSION_G0_AUTHORIZED=false
 M13_EXTENSION_IMPLEMENTATION_AUTHORIZED=false
-M13_M14_M15_INTEGRATION=NOT_AUTHORIZED
-M13_PUBLICATION=NOT_AUTHORIZED
-M13_PRODUCT_CAPABILITY_COMPLETE=false
-```
-## 4. Repository and CI governance
-```text
+A100_START_AUTHORIZED=false
 DOCUMENT_GOVERNANCE_VALIDATION=IMPLEMENTED
 DOCS_ONLY_CI_FAST_PATH=IMPLEMENTED
 REQUIRED_CHECK_CONTEXTS=5_UNCHANGED
 PROTECTED_CHANGE_FULL_SUITE=ENFORCED
 POST_MERGE_DUPLICATE_FULL_CI=REMOVED
-CI_WAITING_RULE=ACTIVE
-BRANCH_CONSOLIDATION=PASS
-UNRESOLVED_BRANCHES=0
 ```
-The concise [AGENTS.md](AGENTS.md), its immutable archive and the [single-call CI waiter](docs/governance/CI_WAITING_RUNBOOK.md) remain authoritative within their declared scopes.
-## 5. Explicit prohibitions
-```text
-A100_START_AUTHORIZED=false
-A100_FUTURE_START_AUTHORIZED=false
-A100_GPU_EXECUTION_AUTHORIZED=false
-GPU_CALLS_ALLOWED=false; PROVIDER_CALLS_ALLOWED=false
-OUTPUT_ASSET_ADMISSION_ALLOWED=false
-PUBLICATION_ALLOWED=false
-M14_M15_IMPLEMENTATION=NOT_AUTHORIZED
-SECOND_AUTHORITY_DATABASE_OR_QUEUE_CREATED=false
-SECOND_RUNTIME_AUTHORITY_CREATED=false
-SECOND_AUDIO_AUTHORITY_CREATED=false
-K2_HARDCODED_PRODUCTION_BRANCHES=0
-```
-截至 2026-09-08 的 E3 回执记录：GPU/Provider、ComfyUI 启动、prompt、输出准入、Episode Master、Export 均为 0，技术输入准入为 1。这些是该历史范围的计数；后期 E4 服务采集分阶段记账，不声称全期间累计为零。
-## 6. Current Core closure and E4 evidence
-```text
-CORE_SERIES_PLANNING_SCOPE_AND_CANDIDATE_BINDING=IMPLEMENTED_AND_VERIFIED
-B2_SERIES_PLANNING_SCOPE_ERROR=CLOSED
-F4_FRONTEND_VECTOR_CLOSED=true
-F4_CORE_CANDIDATE_SOURCE_BINDING=CLOSED
-F4_FULLY_CLOSED=true
-CORE_CLEAN_STATE_PUBLIC_API_E2E=PASS
-I6_CORE_PUBLIC_API_VECTOR_CLOSED=true
-I6_BROWSER_VECTOR_CLOSED=false
-I6_FULLY_CLOSED=false
-CURRENT_FRONTEND_BODY_WITHOUT_CANDIDATE_REF=SUPPORTED_SECURELY
-GLOBAL_LIFECYCLE_SCHEMA_VERSION_DIFF=0
-DATABASE_SCHEMA_DIFF=ADDITIVE_OPTIONAL_APPLICATION_COMPONENTS_ONLY
-CORE_RECOVERABLE_PROJECT_FOUNDATION_COMMAND=IMPLEMENTED_AND_VERIFIED
-I4_CORE_VECTOR_CLOSED=true
-I4_FRONTEND_VECTOR_CLOSED=false
-I4_FULLY_CLOSED=false
-CURRENT_FRONTEND_STILL_USES_LEGACY_MULTI_POST=true
-FRONTEND_CUTOVER_REQUIRED=true
-METHOD_AWARE_WORKER_SEAM_E1=IMPLEMENTED_AND_VERIFIED
-METHOD_AWARE_JOB_RESULT_INTAKE_E2=IMPLEMENTED_AND_VERIFIED
-CURRENT_SINGLE_INPUT_IMAGE_ADMISSION_E3A=IMPLEMENTED_AND_VERIFIED
-CREATIVE_PLAN_CONFIRMATION_IDEMPOTENCY_E3B=IMPLEMENTED_AND_VERIFIED
-AI_DIRECTOR_CANDIDATE_IDEMPOTENCY_E3C=IMPLEMENTED_AND_VERIFIED
-M5_SERIES_PLAN_CANDIDATE_IDEMPOTENCY_E3D=IMPLEMENTED_AND_VERIFIED
-M5_SERIES_PLAN_CONFIRMATION_IDEMPOTENCY_E3D=IMPLEMENTED_AND_VERIFIED
-M5_BINDING_OPERATOR_ENTRYPOINT=IMPLEMENTED_AND_VERIFIED
-M7_VALIDATION_PUBLIC_HTTP=IMPLEMENTED_AND_VERIFIED
-M3_GENERATION_RECOVERY=IMPLEMENTED_AND_VERIFIED
-M3_CONFIRMATION_STABILITY=IMPLEMENTED_AND_VERIFIED
-M5_CONFIRM_VERSION_HISTORICAL_RECEIPT=UNPROVEN_CONTRACT_DECISION_PENDING
-SPIKE_0_EXECUTED=false
-R6_RESUMED=true
-SPIKE_0_ELIGIBLE_LINEAGE_E3=PREPARED_AND_VERIFIED
-LINEAGE_READINESS=READY_FOR_A100_RUNTIME_AND_COST_PREFLIGHT
-SPIKE_0_READINESS=BLOCKED
-E4_RUNTIME_EVIDENCE=VERIFIED_TECHNICAL_ONLY
-E4_V2_I2V_ATTESTATION=CREATED_AND_VALIDATED
-E4_EXACT_BINDING_REVIEW=COMPLETED_WITH_EXECUTION_AUTHORITY_CONFLICTS
-GENERATION_DISPATCH_MECHANISM_AT_AUDITED_COMMIT=NOT_IMPLEMENTED
-GENERATION_DISPATCH_DESIGN_DIRECTION=INDEPENDENT_IMMUTABLE_GRANT_CONFIRMED; FULL_DISPATCH_MECHANISM_READY=false
-ADR_0022_STATUS=ACCEPTED
-ADR_0022_FULL_ACCEPTANCE=ACCEPTED_ARCHITECTURE_ONLY
-ADR_0022_ACCEPTED_VERSION=1.3_NARROW_R2_INCREMENT; HISTORICAL_ACCEPTED_VERSION=1.2
-PACKAGE_1_OWNER_ACCEPTANCE=ACCEPTED_WITHIN_SCOPE_CPU_ISOLATED
-PKG1_R1_F01=OWNER_CLOSED_FOR_ACCEPTED_CANDIDATE
-PACKAGE_2_OWNER_ACCEPTANCE=ACCEPTED_WITHIN_SCOPE_CPU_ISOLATED_WITH_RESIDUAL_EVIDENCE_RISK
-PKG2_FINAL_R1_01_OWNER_CLOSURE=CLOSED_FOR_ACCEPTED_CANDIDATE
-PKG2_R1_F01_OWNER_CLOSURE=CLOSED_FOR_ACCEPTED_CANDIDATE
-PACKAGE_3_OWNER_ACCEPTANCE=ACCEPTED_WITHIN_SCOPE_CPU_ISOLATED; PACKAGE_3_CPU_CLOSED_LOOP=PASS_FOR_EXACT_CPU_ISOLATED_CANDIDATE; PACKAGE_3_PUBLICATION=NOT_YET_MERGED_AT_DOCUMENT_AUTHORING
-GENERATION_AUTHORIZATION_APPLICATION_SUBMITTED=false
-METHOD_AWARE_INPUT_CONFIG_E3G_AND_MANIFEST_V2_APPEND_E3H=IMPLEMENTED_AND_VERIFIED
-SUPERSEDED_VALIDATOR_M12_G0_3_STATE=ENVIRONMENT_HOLD
-SUPERSEDED_VALIDATOR_NEXT_TASK=LOCAL_WSL2_HANDOFF_AND_M12_C3_PREFLIGHT
-```
-The prior receipts through [E3H](docs/status/M10_MANIFEST_V2_TECHNICAL_INPUT_APPEND_AUTHORITY_E3H_2026-09-08.md) and [post-E3H R6](docs/status/M10_M11_SPIKE_0_ELIGIBLE_LINEAGE_E3_R6_POST_E3H_2026-09-08.md) remain unchanged: eligible input lineage is PREPARED_AND_VERIFIED; the old 409 failure and historical E4_STARTED=false retain their 2026-09-08 meaning. No upstream fact was updated/deleted or recreated in that input-only resume. Later [E4 runtime evidence](docs/status/M10_M11_SPIKE_0_E4_RUNTIME_PREFLIGHT_2026-09-09.md) records the completed 632-file snapshot and validated v2 I2V proof; [exact binding](docs/status/M10_M11_SPIKE_0_E4_EXACT_BINDING_REVIEW_2026-09-09.md) retains C1/C2. The [dispatch audit](docs/status/M10_M11_GENERATION_DISPATCH_AUTHORITY_AUDIT_2026-09-09.md) remains historical for audited commit f007ab3e. [ADR-0022](governance/ADR-0022-generation-dispatch-grant.md) v1.2 remains accepted architecture only. The [Package 1 record](docs/status/ADR_0022_PKG1_CPU_ACCEPTANCE_2026-09-10.md) registers its CPU-isolated Grant foundation; the [Package 2 record](docs/status/ADR_0022_PKG2_CPU_ACCEPTANCE_2026-09-11.md) registers the exact CPU-isolated binding candidate, its two candidate-specific closures and accepted residual evidence risk; the [Package 3 record](docs/status/ADR_0022_PKG3_CPU_ACCEPTANCE_2026-09-12.md) registers the exact CPU-isolated closed-loop candidate, its 168/168 bounded regression and the Owner's scope-limited acceptance. Package 1/2 history and the undetermined historical B25, selection, QC, read-one-to-zero, timeout and index-drift causes remain unchanged. Package 3 publication is not yet merged at document authoring. Live Grant issuance/consumption, real transport, execution configuration deployment, ComfyUI, GPU and prompt submission remain unauthorized; Spike-0 stays blocked and the full dispatch mechanism is not ready. See the [evidence index](docs/status/M10_M11_SPIKE_0_E4_EVIDENCE_INDEX_2026-09-09.md). The five historical fields remain false / NOT_VERIFIED / NOT_READY / false / false; no runtime metadata or compatibility token grants current execution authority, and the E4 execution pin remains unchanged.
-R2 publication override within its bounded scope: `CURRENT_TASK=ACS-A14B-TRANSPORT-R2-F01-ACCEPTED-CODE-PUBLICATION-R1-20260912`; `R2_ENGINEERING_OWNER_ACCEPTANCE=ACCEPTED_WITHIN_SCOPE_CPU_AND_FIXTURE_LOOPBACK`; `F01_OWNER_CLOSURE=CLOSED_FOR_EXACT_ACCEPTED_CANDIDATE`; `R2_ENGINEERING_CANDIDATE=d0344a11709b8424a13b268545abfb8e580d17af`, tree `a67a3e6a0db1e527de00ee86f7e78b74c1c9038d`. On `2026-09-12`, the Project Lead / Repository Governance Owner explicitly accepted this exact R2 + F01 CPU/fixture-owned loopback candidate and authorized its five-document registration, push, one PR, FULL_SUITE required checks and protected squash merge. `PUBLICATION=NOT_YET_MERGED_AT_DOCUMENT_AUTHORING`; `R2_PUSH_PR_CI_MERGE=AUTHORIZED_WITHIN_THIS_TASK_ONLY`. The original base remains `ad7349ff493baaa1e0bc831810ea28b3dd2b2dce`, tree `a1f0f68ad69ea90d9c9cd96c2ed2ae33df4b2c93`; ADR-0022 v1.3's narrow increment and Package 1/2/3 history are unchanged. `SH09_EXACT_BINDING=BLOCKED_MISSING_ORIGINAL_EVIDENCE`; `SYSTEM_RUNTIME_BOUND=false`; `PROMPT_SUBMISSION_AUTHORIZED=false`; `R2_REAL_COMFYUI_GPU_FORMAL_DATABASE=NOT_AUTHORIZED`; `SPIKE_0_READINESS=BLOCKED`. The [acceptance record](docs/status/A14B_STAGED_TRANSPORT_IMPLEMENTATION_2026-09-12.md) distinguishes the parent-tree 311 tests, accepted-candidate 38 tests and independent three component probes. Transport remains default-off, with no public route, deployment, live Grant, output admission, Master/Export or paid runtime authority. Final publication evidence belongs in the external receipt, not a predicted merge SHA here. R3 current bounded override (2026-09-13): `CURRENT_TASK=ACS-SH09-EXACT-OFFLINE-BINDING-AND-RUNTIME-SEAM-R3-20260913`; `BASE_MAIN=3e5b8d08d3eef26506a69be99c42c90f38826cc0`; `BASE_TREE=a644acd1bfc9f1304e1389d5d442acc96d5251a2`. PR #89 is merged at this base; R2/F01 and Package 1/2/3 historical acceptance is not reopened. `ADR_0022_ACCEPTED_VERSION=1.4_NARROW_R3_INCREMENT`; `ORIGINAL_EVIDENCE_AVAILABILITY=RESOLVED`; `R3_SCOPE=A01_A06_LOCAL_CPU_FIXTURE_ONLY`; `SH09_CAMERA_PROMPT=PROPOSED_PENDING_OWNER_ACCEPTANCE`; `SH09_EXACT_BINDING_OWNER_ACCEPTANCE=PENDING`; `LIVE_CURRENTNESS=NOT_CHECKED`; `SYSTEM_RUNTIME_BOUND=false`; `PROMPT_SUBMISSION_AUTHORIZED=false`; `SPIKE_0_EXECUTED=false`; `SPIKE_0_READINESS=BLOCKED`; `PUSH_PR_CI_MERGE=NOT_AUTHORIZED_FOR_R3`. The [R3 candidate record](docs/status/SH09_EXACT_OFFLINE_BINDING_R3_2026-09-13.md) separates original-byte availability, offline compiler evidence, synthetic CPU/loopback verification and future live gates. The earlier missing-original statement is historical only. B—G remains planning, not implementation authority.
-D1 current bounded override (2026-09-13): `CURRENT_TASK=ACS-D1-SH09-LIVE-OPERATOR-AND-ONE-RESULT-20260913`; `BASE_MAIN=0b3a0653794656658abac8a7455eeed5801802fe`; `BASE_TREE=f245c053c60696e304b64e5b2d8addf08ab5c92f`; `ADR_0022_ACCEPTED_VERSION=1.5_NARROW_D1_INCREMENT`; `D1_A=LOCAL_IMPLEMENTATION_CANDIDATE`; `D1_B=READ_ONLY_METADATA_VERIFIED_SERVICE_AND_INPUT_NOT_READY`; `D1_COMPLETE=false`. PR86–90/R2/F01/R3/F01 and original-package verification are reused, not reopened. Explicit live v3 and the original existing-store Operator are candidates for isolated verification, not current GPU proof. The current task allows local commits and bounded read-only metadata of the approved instance; `PUSH_PR_CI_MERGE=NOT_AUTHORIZED_FOR_D1`; `DEPLOYMENT_FORMAL_DATABASE_GRANT_PROMPT=NOT_AUTHORIZED`; `SYSTEM_RUNTIME_BOUND=false`; `PROMPT_SUBMISSION_AUTHORIZED=false`; `SPIKE_0_EXECUTED=false`; `D2_D3=QUEUED_NOT_AUTHORIZED`. The Owner-confirmed new locator was inspected read-only on 2026-09-13; no selected ComfyUI process/listener or target anchor file was present. This is not a live runtime binding, deployment or generation approval. Camera/complete plan/cost/window and deployment/one-generation permission remain independent decisions; missing operational values remain null. No Frontend or GPU implementation wave is opened.
+<!-- CURRENT_STATE:END -->
 
-## 7. Immutable history
+The Owner supplied a rate of RMB 6.9/hour, a total budget of RMB 1,000 and a
+five-hour maximum followed by shutdown. These are authorized limits, not proof of
+the platform's current bill, a started execution window or an issued dispatch Grant.
+The exact single-run request must bind the approved plan, instance, cost/window,
+current runtime and existing records through the original Operator before sending.
+Failure/UNKNOWN does not authorize an automatic second submission.
 
-The former archived material remains byte-for-byte in [CURRENT_MILESTONE_HISTORY_THROUGH_2026-09-02.md](CURRENT_MILESTONE_HISTORY_THROUGH_2026-09-02.md). Historical uses of “current”, “next”, “authorized” or local paths retain only their original checkpoint meaning.
+The current action does not contact the GPU, operate the database, start generation
+or open another implementation wave. The selected Blackwell instance's bounded
+deployment/read-only authorization does not authorize the separate M12 A100 wave.
+
+## 2. Merged engineering evidence — do not redo
+
+| Scope | Published checkpoint | What it proves / what it does not prove |
+| --- | --- | --- |
+| R2/F01, PR #89 | `3e5b8d08d3eef26506a69be99c42c90f38826cc0` | Accepted CPU/fixture-owned loopback engineering; not a live SH09 result |
+| R3/F01, PR #90 | `0b3a0653794656658abac8a7455eeed5801802fe` | Exact offline binding/runtime seam and bounded correction; not current GPU binding |
+| D1, PR #91 | `2c42645a173840d6e17e2eb3541f00f47b2881b5` | Original live Operator and bounded recovery path; not execution approval |
+| D1 binding fix, PR #92 | `1e62786ea75823869c97934b18e22d722b7949f9` | Seven existing-store reader binding; not a real Grant or generated result |
+
+These are observed merged commits, not predicted SHAs for this maintenance change.
+Use the [R2 record](docs/status/A14B_STAGED_TRANSPORT_IMPLEMENTATION_2026-09-12.md),
+[R3 record](docs/status/SH09_EXACT_OFFLINE_BINDING_R3_2026-09-13.md) and
+[ADR-0022](governance/ADR-0022-generation-dispatch-grant.md) for exact scope.
+Package 1/2/3 and their candidate-specific failures/closures remain historical
+evidence. No new implementation or acceptance of those packages is required.
+
+## 3. Runtime observation versus remaining D1 gates
+
+The 2026-09-13 deployment/read-only receipts record service/input/model/node
+metadata, the bounded SSH forwarding correction and HTTP GET connectivity.
+At 11:27:59 UTC the observed queue contained one running item and zero pending
+items; its origin was not established. This is a timestamped observation, not a
+current empty-queue guarantee or permission to interrupt somebody else's job.
+
+The earlier D1 statement that the service and anchor were absent is superseded as
+a current observation, not erased from its original evidence. Metadata and SSH
+reachability do not establish `SYSTEM_RUNTIME_BOUND`, exact Camera/plan approval,
+complete cost/window enforcement, a live Grant, SH09 output or Spike-0 PASS.
+
+Next in the same D1: complete the original Operator's read-only prepare and exact
+single-run application; resolve any missing approval/configuration field explicitly.
+Do not rebuild transport, invent a parallel worker, repeat frozen-package searches
+or use synthetic tests as live-generation evidence.
+
+## 4. Audit debt disposition
+
+The 2026-09-13 full-project audit is retained as dated evidence. This table records
+disposition, not new implementation authority or final Owner acceptance.
+
+| Finding | Present disposition | Bounded follow-up |
+| --- | --- | --- |
+| AUD-001: dispatch consumer gap | Code connected in PR #91/#92; live proof still open | Finish D1's original Operator prepare/run gates, not a new dispatch stack |
+| AUD-002: Frontend method-aware islands | Open; eight adapter functions were unused at audit time | One separately authorized real product consumer slice |
+| AUD-003: Project foundation multi-POST | Core recoverable command exists; Frontend cutover open | Consume existing command; no second Project domain |
+| AUD-004: experimental patches | Preserved, not blanket-approved or merged | Reuse only a demonstrated dependency; defer VACE/Phantom expansion |
+| AUD-005: old engines/tombstone | Not evidence of a second active production authority | No broad deletion/refactor before the real vertical slice |
+| AUD-006: redirected UI remnants | Open Frontend-only cleanup debt | Remove only after checking consumers/tests; preserve compatibility redirects |
+| AUD-007: stale task/substring validator | Corrected in this working candidate | Exact current records, duplicate rejection and regression tests |
+| AUD-008: dated receipts treated as current | Corrected in this working candidate | Registry classifications; generated index/map; one active task block |
+| AUD-009: cold documentation in default reading | Hot-path navigation corrected; history retained | Read only applicable authority and required evidence, not every archived receipt |
+| AUD-010: oversized domain modules | Deferred maintenance; not a proven SH09 blocker | Extract only while changing a demonstrated defect |
+| AUD-011: Frontend build/CI duplication | Unmeasured optimization debt; no CI weakened | Measure separately before altering build or required checks |
+| AUD-012: code/live/approval conflation | Current status wording corrected | Repository PASS, runtime observation and approved result remain distinct |
+| AUD-013: commercial security/operations | Open product-readiness work | Existing bearer/workspace guards are not complete SaaS security; no public-production claim |
+
+Nearest sequence: finish this small maintenance candidate; resume the existing D1
+read-only prepare and exact run request; after the authorized real result, seek one
+Frontend script-to-shot consumer slice. M12 audio, M14/M15 approval/master and
+commercial operations remain explicit gaps, not prerequisites invented for the
+bounded silent SH09 technical experiment and not silently declared implemented.
+
+## 5. Scoped baselines and immutable history
+
+The [capability matrix](docs/status/M1-M19-CAPABILITY-STATUS.md) separates architecture,
+backend, runtime, Frontend, product and production. The
+[cross-repository baseline](docs/status/CROSS_REPOSITORY_BASELINE.md) preserves the
+closed K2 compatibility pin and immutable M13 behavior tag; neither is advertised
+as today's Core or Frontend branch HEAD. No Frontend pin is changed here.
+
+Earlier current-state projections remain recoverable in
+[the pre-maintenance Git revision](https://github.com/lpjiayou/AI-Cinematic-Studio/blob/1e62786ea75823869c97934b18e22d722b7949f9/CURRENT_MILESTONE.md).
+The [original history](CURRENT_MILESTONE_HISTORY_THROUGH_2026-09-02.md) remains
+byte-for-byte unchanged, including its failures and checkpoint-scoped permissions.
+
 ```text
-HISTORICAL_SECTION_SHA256=5e05b68e83ed55f90b342aee627001a7bbf66cf59f92e5106270175b07f61f6a; HISTORICAL_DOCUMENT_GRANTS_CURRENT_AUTHORITY=false; HISTORICAL_PATH_NOT_EXECUTION_AUTHORITY=true
+HISTORICAL_SECTION_SHA256=5e05b68e83ed55f90b342aee627001a7bbf66cf59f92e5106270175b07f61f6a
+HISTORICAL_DOCUMENT_GRANTS_CURRENT_AUTHORITY=false
+HISTORICAL_PATH_NOT_EXECUTION_AUTHORITY=true
 ```
+
+Repository checks and scoped testing follow [AGENTS.md](AGENTS.md). This mixed
+documentation/validator change is not the docs-only CI fast path; required contexts
+and fail-closed safety checks remain unchanged.

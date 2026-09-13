@@ -114,10 +114,10 @@
       "supersededBy": [],
       "currentStateClaimsAllowed": true,
       "historicalMutationPolicy": "UPDATE_FROM_MERGED_EVIDENCE_ONLY",
-      "lastReviewedBaseline": "3bf2e7a5152a7bd9c1087571aab6413a53a43bb6",
-      "lastReviewedAt": "2026-09-10",
+      "lastReviewedBaseline": "1e62786ea75823869c97934b18e22d722b7949f9",
+      "lastReviewedAt": "2026-09-13",
       "linkedFromIndex": true,
-      "notes": "Current claims require merged evidence and may not override Accepted ADRs."
+      "notes": "Single active execution projection; exact current records only. Merged engineering, dated runtime observations and unresolved execution gates remain separate; no Accepted ADR override."
     },
     {
       "path": "CURRENT_MILESTONE_HISTORY_THROUGH_2026-09-02.md",
@@ -1751,74 +1751,74 @@
     {
       "path": "docs/status/CORE_CLEAN_STATE_PUBLIC_API_E2E_2026-09-06.md",
       "repository": "Core",
-      "documentClass": "CURRENT_STATUS",
-      "status": "CURRENT",
+      "documentClass": "IMPLEMENTATION_EVIDENCE",
+      "status": "RECORDED",
       "owner": "Project Lead / Creator Public HTTP Acceptance Owner / Clean-State E2E Owner",
       "authoritativeFor": [
         "evidence-backed clean-state Creator public HTTP acceptance state"
       ],
       "supersedes": [],
       "supersededBy": [],
-      "currentStateClaimsAllowed": true,
-      "historicalMutationPolicy": "UPDATE_FROM_MERGED_EVIDENCE_ONLY",
+      "currentStateClaimsAllowed": false,
+      "historicalMutationPolicy": "IMMUTABLE_EXCEPT_METADATA_OR_LINKS",
       "lastReviewedBaseline": "40540e95be170f4f74fb3d5d7266226e2da2bd86",
       "lastReviewedAt": "2026-09-06",
       "linkedFromIndex": true,
-      "notes": "Records only public-only clean-state M1-M5 plus pre-M6 Script acceptance; browser, Frontend cutover, M6 activation, Provider/GPU, M7/M8 readiness, admission and publication remain outside scope."
+      "notes": "Records only public-only clean-state M1-M5 plus pre-M6 Script acceptance; browser, Frontend cutover, M6 activation, Provider/GPU, M7/M8 readiness, admission and publication remain outside scope. HISTORICAL_PATH_NOT_EXECUTION_AUTHORITY=true. Classification corrected against 1e62786ea75823869c97934b18e22d722b7949f9 on 2026-09-13; content, evidence baseline and original outcome are unchanged. Current/next-task language is checkpoint-scoped only."
     },
     {
       "path": "docs/status/CORE_PUBLIC_JSON_AND_NUMERIC_INTEGRITY_HARDENING_2026-09-05.md",
       "repository": "Core",
-      "documentClass": "CURRENT_STATUS",
-      "status": "CURRENT",
+      "documentClass": "IMPLEMENTATION_EVIDENCE",
+      "status": "RECORDED",
       "owner": "Project Lead / Creator Public Contract Owner / V5 Domain Owners",
       "authoritativeFor": [
         "evidence-backed bounded Creator public JSON and numeric integrity hardening state"
       ],
       "supersedes": [],
       "supersededBy": [],
-      "currentStateClaimsAllowed": true,
-      "historicalMutationPolicy": "UPDATE_FROM_MERGED_EVIDENCE_ONLY",
+      "currentStateClaimsAllowed": false,
+      "historicalMutationPolicy": "IMMUTABLE_EXCEPT_METADATA_OR_LINKS",
       "lastReviewedBaseline": "6b10166532c3cac9b8976a5d8986a4e8c1cfd7fc",
       "lastReviewedAt": "2026-09-05",
       "linkedFromIndex": true,
-      "notes": "Records only the bounded Core public JSON and numeric integrity closure; it does not authorize Provider, GPU, M12, M13, Frontend, admission or publication work."
+      "notes": "Records only the bounded Core public JSON and numeric integrity closure; it does not authorize Provider, GPU, M12, M13, Frontend, admission or publication work. HISTORICAL_PATH_NOT_EXECUTION_AUTHORITY=true. Classification corrected against 1e62786ea75823869c97934b18e22d722b7949f9 on 2026-09-13; content, evidence baseline and original outcome are unchanged. Current/next-task language is checkpoint-scoped only."
     },
     {
       "path": "docs/status/CORE_SERIES_PLANNING_SCOPE_AND_CANDIDATE_BINDING_HARDENING_2026-09-05.md",
       "repository": "Core",
-      "documentClass": "CURRENT_STATUS",
-      "status": "CURRENT",
+      "documentClass": "IMPLEMENTATION_EVIDENCE",
+      "status": "RECORDED",
       "owner": "Project Lead / Creator Public Contract Owner / M5 Domain Owner",
       "authoritativeFor": [
         "evidence-backed bounded M5 Series scope and candidate provenance hardening state"
       ],
       "supersedes": [],
       "supersededBy": [],
-      "currentStateClaimsAllowed": true,
-      "historicalMutationPolicy": "UPDATE_FROM_MERGED_EVIDENCE_ONLY",
+      "currentStateClaimsAllowed": false,
+      "historicalMutationPolicy": "IMMUTABLE_EXCEPT_METADATA_OR_LINKS",
       "lastReviewedBaseline": "cc678988ede3f9b02dd9be828ac4b34bd7affe15",
       "lastReviewedAt": "2026-09-05",
       "linkedFromIndex": true,
-      "notes": "Records only the B2/F4 Core closure and optional application candidate-receipt component; it grants no V5 canonical, Provider, GPU, Frontend, admission or publication authority."
+      "notes": "Records only the B2/F4 Core closure and optional application candidate-receipt component; it grants no V5 canonical, Provider, GPU, Frontend, admission or publication authority. HISTORICAL_PATH_NOT_EXECUTION_AUTHORITY=true. Classification corrected against 1e62786ea75823869c97934b18e22d722b7949f9 on 2026-09-13; content, evidence baseline and original outcome are unchanged. Current/next-task language is checkpoint-scoped only."
     },
     {
       "path": "docs/status/CORE_RECOVERABLE_PROJECT_FOUNDATION_COMMAND_2026-09-05.md",
       "repository": "Core",
-      "documentClass": "CURRENT_STATUS",
-      "status": "CURRENT",
+      "documentClass": "IMPLEMENTATION_EVIDENCE",
+      "status": "RECORDED",
       "owner": "Project Lead / Creator Public Contract Owner / Project Foundation Command Owner",
       "authoritativeFor": [
         "evidence-backed bounded Core recoverable Project foundation command state"
       ],
       "supersedes": [],
       "supersededBy": [],
-      "currentStateClaimsAllowed": true,
-      "historicalMutationPolicy": "UPDATE_FROM_MERGED_EVIDENCE_ONLY",
+      "currentStateClaimsAllowed": false,
+      "historicalMutationPolicy": "IMMUTABLE_EXCEPT_METADATA_OR_LINKS",
       "lastReviewedBaseline": "84d5d71b1b01ef17f4e5def080deacd0faea6bd8",
       "lastReviewedAt": "2026-09-05",
       "linkedFromIndex": true,
-      "notes": "Records only the Core I4 recovery-command closure and optional application intent/receipt component; Frontend cutover, Provider/GPU, canonical authority, admission and publication remain outside scope."
+      "notes": "Records only the Core I4 recovery-command closure and optional application intent/receipt component; Frontend cutover, Provider/GPU, canonical authority, admission and publication remain outside scope. HISTORICAL_PATH_NOT_EXECUTION_AUTHORITY=true. Classification corrected against 1e62786ea75823869c97934b18e22d722b7949f9 on 2026-09-13; content, evidence baseline and original outcome are unchanged. Current/next-task language is checkpoint-scoped only."
     },
     {
       "path": "docs/status/CROSS_REPOSITORY_BASELINE.md",
@@ -1827,16 +1827,16 @@
       "status": "CURRENT",
       "owner": "Documentation Governance Owner",
       "authoritativeFor": [
-        "evidence-backed current status projection"
+        "closed K2 behavior and Frontend compatibility pin projection; not global current execution"
       ],
       "supersedes": [],
       "supersededBy": [],
       "currentStateClaimsAllowed": true,
       "historicalMutationPolicy": "UPDATE_FROM_MERGED_EVIDENCE_ONLY",
-      "lastReviewedBaseline": "3eaaeabf79fdb85581a15069ff6fe5f330445416",
-      "lastReviewedAt": "2026-09-04",
+      "lastReviewedBaseline": "1e62786ea75823869c97934b18e22d722b7949f9",
+      "lastReviewedAt": "2026-09-13",
       "linkedFromIndex": true,
-      "notes": "Current claims require merged evidence and may not override Accepted ADRs."
+      "notes": "Closed K2 cutover/Frontend pin compatibility scope only; not today's repository HEAD. Pin values retain their original 2026-09-04 evidence. This review clarifies scope without revalidating or moving the external Frontend pin."
     },
     {
       "path": "docs/status/M12_A100_BUILD_HOST_PREFLIGHT_2026-09-03.md",
@@ -1861,8 +1861,8 @@
     {
       "path": "docs/status/M12_A100_BUILD_HOST_REFLIGHT_2026-09-03.md",
       "repository": "Core",
-      "documentClass": "CURRENT_STATUS",
-      "status": "CURRENT",
+      "documentClass": "HISTORICAL_EVIDENCE",
+      "status": "RECORDED",
       "owner": "Project Lead / Infrastructure Owner / Architecture Owner / M12 Domain Owner",
       "authoritativeFor": [
         "evidence-backed M12 A100 build-host reflight failure, blockers and accepted architecture conflict projection"
@@ -1871,12 +1871,12 @@
         "docs/status/M12_A100_BUILD_HOST_PREFLIGHT_2026-09-03.md"
       ],
       "supersededBy": [],
-      "currentStateClaimsAllowed": true,
-      "historicalMutationPolicy": "UPDATE_FROM_MERGED_EVIDENCE_ONLY",
+      "currentStateClaimsAllowed": false,
+      "historicalMutationPolicy": "IMMUTABLE_EXCEPT_METADATA_OR_LINKS",
       "lastReviewedBaseline": "b109ba6c625cac20eac798f4b2528c63f0b7c42e",
       "lastReviewedAt": "2026-09-03",
       "linkedFromIndex": true,
-      "notes": "Reports the failed reflight and ADR-0015/ADR-0019 conflict without amending either Accepted ADR or authorizing M12-C3/C4."
+      "notes": "Reports the failed reflight and ADR-0015/ADR-0019 conflict without amending either Accepted ADR or authorizing M12-C3/C4. HISTORICAL_PATH_NOT_EXECUTION_AUTHORITY=true. Classification corrected against 1e62786ea75823869c97934b18e22d722b7949f9 on 2026-09-13; content, evidence baseline and original outcome are unchanged. Current/next-task language is checkpoint-scoped only."
     },
     {
       "path": "docs/status/M12_C3_WSL2_CPU_BUILD_HOST_PREFLIGHT_2026-09-04.md",
@@ -3256,200 +3256,200 @@
     {
       "path": "docs/status/M10_M11_METHOD_AWARE_WORKER_SEAM_CORRECTIVE_E1_2026-09-06.md",
       "repository": "Core",
-      "documentClass": "CURRENT_STATUS",
-      "status": "CURRENT",
+      "documentClass": "IMPLEMENTATION_EVIDENCE",
+      "status": "RECORDED",
       "owner": "Project Lead / V4 Media Job Owner / M10-M11 Method-Aware Owner",
       "authoritativeFor": [
         "evidence-backed bounded method-aware V4 worker seam status"
       ],
       "supersedes": [],
       "supersededBy": [],
-      "currentStateClaimsAllowed": true,
-      "historicalMutationPolicy": "UPDATE_FROM_MERGED_EVIDENCE_ONLY",
+      "currentStateClaimsAllowed": false,
+      "historicalMutationPolicy": "IMMUTABLE_EXCEPT_METADATA_OR_LINKS",
       "lastReviewedBaseline": "35d48ab2a00e8c0580b798b0d4fea8890cda24f8",
       "lastReviewedAt": "2026-09-06",
       "linkedFromIndex": true,
-      "notes": "E1 technical worker/adapter evidence only; result intake, live Spike, GPU, Frontend and admission remain outside scope."
+      "notes": "E1 technical worker/adapter evidence only; result intake, live Spike, GPU, Frontend and admission remain outside scope. HISTORICAL_PATH_NOT_EXECUTION_AUTHORITY=true. Classification corrected against 1e62786ea75823869c97934b18e22d722b7949f9 on 2026-09-13; content, evidence baseline and original outcome are unchanged. Current/next-task language is checkpoint-scoped only."
     },
     {
       "path": "docs/status/M10_M11_METHOD_AWARE_JOB_RESULT_INTAKE_CORRECTIVE_E2_2026-09-06.md",
       "repository": "Core",
-      "documentClass": "CURRENT_STATUS",
-      "status": "CURRENT",
+      "documentClass": "IMPLEMENTATION_EVIDENCE",
+      "status": "RECORDED",
       "owner": "Project Lead / V4 Media Job Owner / M10-M11 Result Intake Owner",
       "authoritativeFor": [
         "evidence-backed bounded method-aware V4 result to V5 technical Candidate handoff status"
       ],
       "supersedes": [],
       "supersededBy": [],
-      "currentStateClaimsAllowed": true,
-      "historicalMutationPolicy": "UPDATE_FROM_MERGED_EVIDENCE_ONLY",
+      "currentStateClaimsAllowed": false,
+      "historicalMutationPolicy": "IMMUTABLE_EXCEPT_METADATA_OR_LINKS",
       "lastReviewedBaseline": "d6c60f9de11c5bf4df559f71c43f86b40e8211ad",
       "lastReviewedAt": "2026-09-06",
       "linkedFromIndex": true,
-      "notes": "E2 neutral read/technical-intake evidence only; no live Spike, GPU, Frontend, selection, admission or new authority."
+      "notes": "E2 neutral read/technical-intake evidence only; no live Spike, GPU, Frontend, selection, admission or new authority. HISTORICAL_PATH_NOT_EXECUTION_AUTHORITY=true. Classification corrected against 1e62786ea75823869c97934b18e22d722b7949f9 on 2026-09-13; content, evidence baseline and original outcome are unchanged. Current/next-task language is checkpoint-scoped only."
     },
     {
       "path": "docs/status/M10_METHOD_AWARE_SINGLE_INPUT_IMAGE_ADMISSION_E3A_2026-09-06.md",
       "repository": "Core",
-      "documentClass": "CURRENT_STATUS",
-      "status": "CURRENT",
+      "documentClass": "IMPLEMENTATION_EVIDENCE",
+      "status": "RECORDED",
       "owner": "Project Lead / M10 Input Asset Owner / Candidate Lifecycle Owner",
       "authoritativeFor": [
         "bounded current single-input image intake and admission implementation evidence"
       ],
       "supersedes": [],
       "supersededBy": [],
-      "currentStateClaimsAllowed": true,
-      "historicalMutationPolicy": "UPDATE_FROM_MERGED_EVIDENCE_ONLY",
+      "currentStateClaimsAllowed": false,
+      "historicalMutationPolicy": "IMMUTABLE_EXCEPT_METADATA_OR_LINKS",
       "lastReviewedBaseline": "ccb624eb222fba703573018a433acdebc645bbfd",
       "lastReviewedAt": "2026-09-06",
       "linkedFromIndex": true,
-      "notes": "E3A current image input evidence only; E3 lineage resume, live execution, Frontend and publication remain gated."
+      "notes": "E3A current image input evidence only; E3 lineage resume, live execution, Frontend and publication remain gated. HISTORICAL_PATH_NOT_EXECUTION_AUTHORITY=true. Classification corrected against 1e62786ea75823869c97934b18e22d722b7949f9 on 2026-09-13; content, evidence baseline and original outcome are unchanged. Current/next-task language is checkpoint-scoped only."
     },
     {
       "path": "docs/status/M1_CREATIVE_PLAN_CONFIRMATION_IDEMPOTENCY_E3B_2026-09-06.md",
       "repository": "Core",
-      "documentClass": "CURRENT_STATUS",
-      "status": "CURRENT",
+      "documentClass": "IMPLEMENTATION_EVIDENCE",
+      "status": "RECORDED",
       "owner": "Project Lead / M1 Creative Plan Confirmation Owner / Lifecycle Integrity Owner",
       "authoritativeFor": [
         "bounded durable Creative Plan confirmation replay evidence and E3 partial-evidence quarantine"
       ],
       "supersedes": [],
       "supersededBy": [],
-      "currentStateClaimsAllowed": true,
-      "historicalMutationPolicy": "UPDATE_FROM_MERGED_EVIDENCE_ONLY",
+      "currentStateClaimsAllowed": false,
+      "historicalMutationPolicy": "IMMUTABLE_EXCEPT_METADATA_OR_LINKS",
       "lastReviewedBaseline": "617a25218e4e290ddf924ea158b87c7d67b622e7",
       "lastReviewedAt": "2026-09-06",
       "linkedFromIndex": true,
-      "notes": "E3B bounded product corrective; no DDL changes, E3 execution, visual reinspection, GPU, Provider or Frontend authority."
+      "notes": "E3B bounded product corrective; no DDL changes, E3 execution, visual reinspection, GPU, Provider or Frontend authority. HISTORICAL_PATH_NOT_EXECUTION_AUTHORITY=true. Classification corrected against 1e62786ea75823869c97934b18e22d722b7949f9 on 2026-09-13; content, evidence baseline and original outcome are unchanged. Current/next-task language is checkpoint-scoped only."
     },
     {
       "path": "docs/status/M5_SERIES_PLAN_COMMAND_IDEMPOTENCY_E3D_2026-09-07.md",
       "repository": "Core",
-      "documentClass": "CURRENT_STATUS",
-      "status": "CURRENT",
+      "documentClass": "IMPLEMENTATION_EVIDENCE",
+      "status": "RECORDED",
       "owner": "Project Lead / Creator Application Owner / M5 Series Planning Owner",
       "authoritativeFor": [
         "bounded M5 candidate pre-call reservation, unified receipt compatibility, deterministic confirmation replay and optional application component evidence"
       ],
       "supersedes": [],
       "supersededBy": [],
-      "currentStateClaimsAllowed": true,
-      "historicalMutationPolicy": "UPDATE_FROM_MERGED_EVIDENCE_ONLY",
+      "currentStateClaimsAllowed": false,
+      "historicalMutationPolicy": "IMMUTABLE_EXCEPT_METADATA_OR_LINKS",
       "lastReviewedBaseline": "85ddf84a6a59059020407b96001823659039c462",
       "lastReviewedAt": "2026-09-07",
       "linkedFromIndex": true,
-      "notes": "E3D changes only authorized M5 recovery and its exact optional allowlist. R5 valid-prefix evidence is quarantined; R6 requires fresh staging/database/token and separate authorization. No live GPU, Provider, visual reinspection or Frontend authority."
+      "notes": "E3D changes only authorized M5 recovery and its exact optional allowlist. R5 valid-prefix evidence is quarantined; R6 requires fresh staging/database/token and separate authorization. No live GPU, Provider, visual reinspection or Frontend authority. HISTORICAL_PATH_NOT_EXECUTION_AUTHORITY=true. Classification corrected against 1e62786ea75823869c97934b18e22d722b7949f9 on 2026-09-13; content, evidence baseline and original outcome are unchanged. Current/next-task language is checkpoint-scoped only."
     },
     {
       "path": "docs/status/M1_AI_DIRECTOR_CANDIDATE_IDEMPOTENCY_E3C_2026-09-07.md",
       "repository": "Core",
-      "documentClass": "CURRENT_STATUS",
-      "status": "CURRENT",
+      "documentClass": "IMPLEMENTATION_EVIDENCE",
+      "status": "RECORDED",
       "owner": "Project Lead / Creator Application Owner / M1 AI Director Owner",
       "authoritativeFor": [
         "bounded AI Director candidate command replay, issuance binding and optional application recovery schema evidence"
       ],
       "supersedes": [],
       "supersededBy": [],
-      "currentStateClaimsAllowed": true,
-      "historicalMutationPolicy": "UPDATE_FROM_MERGED_EVIDENCE_ONLY",
+      "currentStateClaimsAllowed": false,
+      "historicalMutationPolicy": "IMMUTABLE_EXCEPT_METADATA_OR_LINKS",
       "lastReviewedBaseline": "7c14b0da0146e00dfdebfb94b53b069051032def",
       "lastReviewedAt": "2026-09-07",
       "linkedFromIndex": true,
-      "notes": "E3C adds application metadata only; E3 R4 remains quarantined and R5 requires fresh staging and separate authorization. No GPU, Provider, visual reinspection or Frontend authority."
+      "notes": "E3C adds application metadata only; E3 R4 remains quarantined and R5 requires fresh staging and separate authorization. No GPU, Provider, visual reinspection or Frontend authority. HISTORICAL_PATH_NOT_EXECUTION_AUTHORITY=true. Classification corrected against 1e62786ea75823869c97934b18e22d722b7949f9 on 2026-09-13; content, evidence baseline and original outcome are unchanged. Current/next-task language is checkpoint-scoped only."
     },
     {
       "path": "docs/status/M5_M7_LEGAL_ENTRYPOINT_CLOSURE_E3E_2026-09-07.md",
       "repository": "Core",
-      "documentClass": "CURRENT_STATUS",
-      "status": "CURRENT",
+      "documentClass": "IMPLEMENTATION_EVIDENCE",
+      "status": "RECORDED",
       "owner": "Project Lead / M5 Binding Owner / M7 Narrative Validation Owner / Creator Public HTTP Owner",
       "authoritativeFor": [
         "bounded Core-only M5 binding operator and existing current M7 authenticated HTTP create/read verification"
       ],
       "supersedes": [],
       "supersededBy": [],
-      "currentStateClaimsAllowed": true,
-      "historicalMutationPolicy": "UPDATE_FROM_MERGED_EVIDENCE_ONLY",
+      "currentStateClaimsAllowed": false,
+      "historicalMutationPolicy": "IMMUTABLE_EXCEPT_METADATA_OR_LINKS",
       "lastReviewedBaseline": "4755c73330d775591d479966f007e8fa39996d54",
       "lastReviewedAt": "2026-09-07",
       "linkedFromIndex": true,
-      "notes": "E3E preserves the immutable audit, M3 pending E3F observations and M5 UNPROVEN historical confirmation recovery. No domain/schema/Script/Frontend change or live R6/provider/GPU authority."
+      "notes": "E3E preserves the immutable audit, M3 pending E3F observations and M5 UNPROVEN historical confirmation recovery. No domain/schema/Script/Frontend change or live R6/provider/GPU authority. HISTORICAL_PATH_NOT_EXECUTION_AUTHORITY=true. Classification corrected against 1e62786ea75823869c97934b18e22d722b7949f9 on 2026-09-13; content, evidence baseline and original outcome are unchanged. Current/next-task language is checkpoint-scoped only."
     },
     {
       "path": "docs/status/M3_SCRIPT_GENERATION_AND_CONFIRMATION_RECOVERY_E3F_2026-09-07.md",
       "repository": "Core",
-      "documentClass": "CURRENT_STATUS",
-      "status": "CURRENT",
+      "documentClass": "IMPLEMENTATION_EVIDENCE",
+      "status": "RECORDED",
       "owner": "Project Lead / M3 Script Studio Owner / Creator Application Recovery Owner / Lifecycle Transaction Integrity Owner",
       "authoritativeFor": [
         "bounded M3 keyed generation recovery and guarded current-target confirmation no-op/CAS verification for V1 and M6_BOUND_V2"
       ],
       "supersedes": [],
       "supersededBy": [],
-      "currentStateClaimsAllowed": true,
-      "historicalMutationPolicy": "UPDATE_FROM_MERGED_EVIDENCE_ONLY",
+      "currentStateClaimsAllowed": false,
+      "historicalMutationPolicy": "IMMUTABLE_EXCEPT_METADATA_OR_LINKS",
       "lastReviewedBaseline": "710687ec402482da0d3d2352d5c3b2b66333ec48",
       "lastReviewedAt": "2026-09-07",
       "linkedFromIndex": true,
-      "notes": "E3F adds optional application recovery metadata and a bounded confirmation CAS contract. Original audit, Script domain schemas, M5 UNPROVEN historical recovery and live R6/provider/GPU restrictions remain. Frontend switch CAS wiring is not implemented."
+      "notes": "E3F adds optional application recovery metadata and a bounded confirmation CAS contract. Original audit, Script domain schemas, M5 UNPROVEN historical recovery and live R6/provider/GPU restrictions remain. Frontend switch CAS wiring is not implemented. HISTORICAL_PATH_NOT_EXECUTION_AUTHORITY=true. Classification corrected against 1e62786ea75823869c97934b18e22d722b7949f9 on 2026-09-13; content, evidence baseline and original outcome are unchanged. Current/next-task language is checkpoint-scoped only."
     },
     {
       "path": "docs/status/M10_INPUT_ARTIFACT_EXECUTION_CONFIG_DECOUPLING_E3G_2026-09-08.md",
       "repository": "Core",
-      "documentClass": "CURRENT_STATUS",
-      "status": "CURRENT",
+      "documentClass": "IMPLEMENTATION_EVIDENCE",
+      "status": "RECORDED",
       "owner": "Project Lead / Core Architecture Owner / M10 Input Asset Owner / M11 Execution Configuration Owner",
       "authoritativeFor": [
         "bounded exact separation of E3A input artifact configuration from M11 execution backend enablement"
       ],
       "supersedes": [],
       "supersededBy": [],
-      "currentStateClaimsAllowed": true,
-      "historicalMutationPolicy": "UPDATE_FROM_MERGED_EVIDENCE_ONLY",
+      "currentStateClaimsAllowed": false,
+      "historicalMutationPolicy": "IMMUTABLE_EXCEPT_METADATA_OR_LINKS",
       "lastReviewedBaseline": "9c367c476b0486639444435f296407caf1b01bf8",
       "lastReviewedAt": "2026-09-08",
       "linkedFromIndex": true,
-      "notes": "E3G corrects only the input/execution configuration ownership predicate. Public schemas, DDL, routing and worker execution contracts remain unchanged; R6 valid-prefix state is preserved and not resumed."
+      "notes": "E3G corrects only the input/execution configuration ownership predicate. Public schemas, DDL, routing and worker execution contracts remain unchanged; R6 valid-prefix state is preserved and not resumed. HISTORICAL_PATH_NOT_EXECUTION_AUTHORITY=true. Classification corrected against 1e62786ea75823869c97934b18e22d722b7949f9 on 2026-09-13; content, evidence baseline and original outcome are unchanged. Current/next-task language is checkpoint-scoped only."
     },
     {
       "path": "docs/status/M10_MANIFEST_V2_TECHNICAL_INPUT_APPEND_AUTHORITY_E3H_2026-09-08.md",
       "repository": "Core",
-      "documentClass": "CURRENT_STATUS",
-      "status": "CURRENT",
+      "documentClass": "IMPLEMENTATION_EVIDENCE",
+      "status": "RECORDED",
       "owner": "Project Lead / Core Architecture Owner / M10 Canonical Input Append Owner / Candidate Review and Admission Owner",
       "authoritativeFor": [
         "evidence-backed bounded E3H implementation status, isolated verification and explicit R6 non-issuance boundary"
       ],
       "supersedes": [],
       "supersededBy": [],
-      "currentStateClaimsAllowed": true,
-      "historicalMutationPolicy": "UPDATE_FROM_MERGED_EVIDENCE_ONLY",
+      "currentStateClaimsAllowed": false,
+      "historicalMutationPolicy": "IMMUTABLE_EXCEPT_METADATA_OR_LINKS",
       "lastReviewedBaseline": "1ce0c7a32624d8899e70c192d72755aeef600f2c",
       "lastReviewedAt": "2026-09-08",
       "linkedFromIndex": true,
-      "notes": "Records exact manifest-v2 technical-input append, persistent receipt lineage and zero-execution tests. It issues no R6 grant and does not resume the preserved prefix."
+      "notes": "Records exact manifest-v2 technical-input append, persistent receipt lineage and zero-execution tests. It issues no R6 grant and does not resume the preserved prefix. HISTORICAL_PATH_NOT_EXECUTION_AUTHORITY=true. Classification corrected against 1e62786ea75823869c97934b18e22d722b7949f9 on 2026-09-13; content, evidence baseline and original outcome are unchanged. Current/next-task language is checkpoint-scoped only."
     },
     {
       "path": "docs/status/M10_M11_SPIKE_0_ELIGIBLE_LINEAGE_E3_R6_POST_E3H_2026-09-08.md",
       "repository": "Core",
-      "documentClass": "CURRENT_STATUS",
-      "status": "CURRENT",
+      "documentClass": "IMPLEMENTATION_EVIDENCE",
+      "status": "RECORDED",
       "owner": "Project Lead / Core Architecture Owner / M10 Input Admission Owner / Spike-0 Evidence Custody Owner",
       "authoritativeFor": [
         "evidence-backed post-E3H exact input grant, preserved-prefix input lifecycle, restart and transferable eligible-lineage status"
       ],
       "supersedes": [],
       "supersededBy": [],
-      "currentStateClaimsAllowed": true,
-      "historicalMutationPolicy": "UPDATE_FROM_MERGED_EVIDENCE_ONLY",
+      "currentStateClaimsAllowed": false,
+      "historicalMutationPolicy": "IMMUTABLE_EXCEPT_METADATA_OR_LINKS",
       "lastReviewedBaseline": "7081f9dbfbda2664f539a59e20b30f079d039dc4",
       "lastReviewedAt": "2026-09-08",
       "linkedFromIndex": true,
-      "notes": "Records one exact manifest-v2 technical-input suffix and verified handoff bundle. Run, camera, dispatch, Provider, media execution and publication remain blocked."
+      "notes": "Records one exact manifest-v2 technical-input suffix and verified handoff bundle. Run, camera, dispatch, Provider, media execution and publication remain blocked. HISTORICAL_PATH_NOT_EXECUTION_AUTHORITY=true. Classification corrected against 1e62786ea75823869c97934b18e22d722b7949f9 on 2026-09-13; content, evidence baseline and original outcome are unchanged. Current/next-task language is checkpoint-scoped only."
     },
     {
       "path": "docs/status/M10_M11_SPIKE_0_E4_RUNTIME_PREFLIGHT_2026-09-09.md",

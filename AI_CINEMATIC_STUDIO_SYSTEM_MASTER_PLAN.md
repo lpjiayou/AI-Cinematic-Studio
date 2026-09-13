@@ -3119,7 +3119,12 @@ STOP。
 
 # 62. Current System State
 
-## 62.1 Current architecture overlay — through 2026-09-03
+Current execution, merged checkpoints and blockers are projected only by
+[CURRENT_MILESTONE.md](CURRENT_MILESTONE.md). The dated overlays below preserve
+architecture decisions and observations at their stated dates; their task-status
+sentences do not override later accepted changes or current bounded authorization.
+
+## 62.1 Dated architecture overlay — through 2026-09-03
 
 The 2026-09-03 architecture correction
 [`ADR-0020`](governance/ADR-0020-m12-cpu-build-host-and-a100-offline-consumer.md)
