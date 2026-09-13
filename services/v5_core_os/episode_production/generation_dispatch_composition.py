@@ -224,12 +224,14 @@ def open_existing_live_operator(*, storage_root, lifecycle_path, run_path, queue
         artifact_root, lifecycle_authorities, episode_authorities, selection,
         endpoint, technical_target_id, clock, worker_context, approval_reader,
         prerequisite_reader, material_reader, backend_reader, runtime_reader,
-        cost_reader, issuer_service_ref):
+        cost_reader, issuer_service_ref, production_policy_database_path=None):
     """Explicit hosting seam. Validate/open existing stores, never bootstrap.
 
     This function is called only after independent deployment authorization.
     Construction of the CLI/host description does not call it. The usual Creator
     environment factory (which may initialize optional stores) is not used.
+    An explicit policy path binds the original store without renaming facts;
+    omission preserves the original sibling-path convention.
     """
     from pathlib import Path
     from uuid import uuid4
@@ -246,8 +248,10 @@ def open_existing_live_operator(*, storage_root, lifecycle_path, run_path, queue
     root = Path(storage_root)
     c.require(root.is_absolute() and root.is_dir() and not root.is_symlink(), "PERSISTENCE_UNAVAILABLE")
     lifecycle_path, run_path, queue_path = map(Path, (lifecycle_path, run_path, queue_path))
+    policy_path = (Path(production_policy_database_path) if production_policy_database_path is not None
+        else Path(str(run_path) + ".production-policy.sqlite3"))
     owned_paths = [lifecycle_path, run_path, Path(str(run_path) + ".evidence.sqlite3"),
-        Path(str(run_path) + ".production-policy.sqlite3"), queue_path]
+        policy_path, queue_path]
     # Optional existing service adapters are opened by the original public
     # factory, but have no D1 consumer. Still require them present: no implicit DDL.
     required_paths = owned_paths + [Path(str(run_path) + suffix)
@@ -258,7 +262,8 @@ def open_existing_live_operator(*, storage_root, lifecycle_path, run_path, queue
     c.require(len(set(p.resolve() for p in required_paths)) == len(required_paths), "PERSISTENCE_UNAVAILABLE")
     c.require(Path(artifact_root).is_absolute() and Path(artifact_root).is_dir()
         and not Path(artifact_root).is_symlink(), "PERSISTENCE_UNAVAILABLE")
-    lifecycle = LifecycleAssembly.sqlite(lifecycle_path, initialize_or_upgrade=False, **lifecycle_authorities)
+    lifecycle = LifecycleAssembly.sqlite(lifecycle_path, initialize_or_upgrade=False,
+        existing_only=True, **lifecycle_authorities)
     queue = SqliteMediaJobAdapter(queue_path, initialize_if_missing=False)
 
     class NoOrdinaryGenerate:
@@ -270,7 +275,7 @@ def open_existing_live_operator(*, storage_root, lifecycle_path, run_path, queue
     boundary = create_local_development_boundary(run_path,
         project_boundary=lifecycle.project_context, series_episode_boundary=lifecycle.series_episode,
         series_planning_boundary=lifecycle.series_planning, script_studio_boundary=lifecycle.script_studio,
-        initialize_if_missing=False, **episode_authorities)
+        production_policy_database_path=policy_path, initialize_if_missing=False, **episode_authorities)
     domain = ControlledStorageDomain(root, owned_paths)
     try:
         operator = compose_live_operator(selection=selection, endpoint=endpoint, worker_context=worker_context,

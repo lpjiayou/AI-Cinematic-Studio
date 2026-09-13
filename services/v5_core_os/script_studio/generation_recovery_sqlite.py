@@ -95,25 +95,30 @@ def validate_generation_connection(connection):
 
 
 class SqliteGenerationStore:
-    def __init__(self, database_path, *, lifecycle_state):
+    def __init__(self, database_path, *, lifecycle_state, initialize_if_missing: bool = True):
         self.database_path = Path(database_path)
+        if not initialize_if_missing and not self.database_path.is_file():
+            raise GenerationStorageError()
         from services.v4_platform.generation_dispatch_jobs import connect_storage
         self._state = lifecycle_state
         try:
             with closing(connect_storage(self.database_path, self, timeout=10, isolation_level=None)) as connection:
                 connection.row_factory = sqlite3.Row
-                connection.execute("BEGIN IMMEDIATE")
+                if initialize_if_missing:
+                    connection.execute("BEGIN IMMEDIATE")
                 names = connection.execute("SELECT name FROM sqlite_master WHERE name IN (?,?,?)",
                                            (MARKER_TABLE, TABLE, INDEX)).fetchall()
                 try:
-                    if not names:
+                    if not names and initialize_if_missing:
                         for sql in statements().values():
                             connection.execute(sql)
                         connection.execute(f"INSERT INTO {MARKER_TABLE} VALUES (?,?)", (COMPONENT, 1))
                     validate_generation_connection(connection)
-                    connection.commit()
+                    if initialize_if_missing:
+                        connection.commit()
                 except BaseException:
-                    connection.rollback()
+                    if initialize_if_missing:
+                        connection.rollback()
                     raise
         except (sqlite3.DatabaseError, OSError) as exc:
             raise GenerationStorageError() from exc
