@@ -5,6 +5,7 @@ from __future__ import annotations
 from hashlib import sha256
 from pathlib import Path
 import re
+import subprocess
 
 
 CURRENT = Path("CURRENT_MILESTONE.md")
@@ -14,18 +15,18 @@ BASELINE = Path("docs/status/CROSS_REPOSITORY_BASELINE.md")
 EXPECTED_HISTORY_SHA256 = "5e05b68e83ed55f90b342aee627001a7bbf66cf59f92e5106270175b07f61f6a"
 
 REQUIRED_BASELINE_VALUES = {
-    "CORE_MAIN": "a455c8e76427d53d75bb7f15259b9875d9768914",
-    "CORE_TREE": "d92159d5c3c5d3896d1fe9e56b896413277fe4e8",
+    "M13_FROZEN_CORE_MAIN": "a455c8e76427d53d75bb7f15259b9875d9768914",
+    "M13_FROZEN_CORE_TREE": "d92159d5c3c5d3896d1fe9e56b896413277fe4e8",
     "M13_BASE_TAG": "m13-base-backend-v1",
     "M13_BASE_TAG_OBJECT": "b2d086b622bdb5456f6af325e458aa3771e43e80",
     "M13_BASE_TAG_TARGET": "a455c8e76427d53d75bb7f15259b9875d9768914",
-    "FRONTEND_MAIN": "a0be9edc91437bf0e7c5dd14883e656e750b3aee",
-    "FRONTEND_TREE": "c25b9e3744d561c93fed26d0a07e59a1915a6071",
+    "PRE_PIN_FRONTEND_MAIN": "a0be9edc91437bf0e7c5dd14883e656e750b3aee",
+    "PRE_PIN_FRONTEND_TREE": "c25b9e3744d561c93fed26d0a07e59a1915a6071",
 }
 REQUIRED_CURRENT = {
     "M12_RUNTIME_INSTALLED": "false",
     "M12_RUNTIME_G0": "NOT_COMPLETE",
-    "M12_G0_3_STATE": "ENVIRONMENT_HOLD",
+    "M12_G0_3_STATE": "DEDICATED_CPU_VM_SELECTION_HOLD",
     "M12_C3_READY_TO_START": "false",
     "M13_BASE_BACKEND": "COMPLETE",
     "M13_BASE_CLOSEOUT": "ACCEPTED",
@@ -34,7 +35,6 @@ REQUIRED_CURRENT = {
     "M13_EXTENSION_IMPLEMENTATION_AUTHORIZED": "false",
     "A100_START_AUTHORIZED": "false",
     "PUBLICATION_ALLOWED": "false",
-    "NEXT_TASK": "LOCAL_WSL2_HANDOFF_AND_M12_C3_PREFLIGHT",
 }
 REQUIRED_CI_GOVERNANCE = {
     "DOCUMENT_GOVERNANCE_VALIDATION": "IMPLEMENTED",
@@ -54,8 +54,75 @@ MATRIX_DIMENSIONS = {
 
 
 def require_pair(text: str, key: str, value: str, path: Path, errors: list[str]) -> None:
-    if f"{key}={value}" not in text:
-        errors.append(f"{path}: missing {key}={value}")
+    values = [line[len(key) + 1 :] for line in text.splitlines() if line.startswith(f"{key}=")]
+    if values != [value]:
+        errors.append(f"{path}: expected exactly one complete {key}={value} record; found {values!r}")
+
+
+STATE_BEGIN = "<!-- CURRENT_STATE:BEGIN -->"
+STATE_END = "<!-- CURRENT_STATE:END -->"
+
+
+def validate_current_projection(text: str, errors: list[str]) -> str:
+    """Only the explicit active block can satisfy current execution predicates."""
+    if text.count(STATE_BEGIN) != 1 or text.count(STATE_END) != 1:
+        errors.append(f"{CURRENT}: expected exactly one current-state block")
+        return ""
+    start, end = text.index(STATE_BEGIN), text.index(STATE_END)
+    if start >= end:
+        errors.append(f"{CURRENT}: current-state markers are reversed")
+        return ""
+    block = text[start + len(STATE_BEGIN) : end].strip()
+    if not block.startswith("```text\n") or not block.endswith("\n```"):
+        errors.append(f"{CURRENT}: current-state block must contain one text fence")
+        return ""
+    block = block[len("```text\n") : -len("\n```")]
+    fields: dict[str, str] = {}
+    for line in block.splitlines():
+        if not line:
+            continue
+        match = re.fullmatch(r"([A-Z][A-Z0-9_]*)=([^\s;`]+)", line)
+        if not match:
+            errors.append(f"{CURRENT}: invalid current-state record {line!r}")
+            continue
+        key, value = match.groups()
+        if key in fields:
+            errors.append(f"{CURRENT}: duplicate current-state key {key}")
+        fields[key] = value
+        if key.startswith("SUPERSEDED_VALIDATOR_"):
+            errors.append(f"{CURRENT}: historical validator alias is not a current field")
+    for key, value in {**REQUIRED_CURRENT, **REQUIRED_CI_GOVERNANCE}.items():
+        require_pair(block, key, value, CURRENT, errors)
+    # Next actions change with accepted progress; do not hard-code an obsolete host task.
+    for key in ("CURRENT_TASK", "NEXT_TASK"):
+        if not re.fullmatch(r"[A-Z0-9][A-Z0-9_.-]*", fields.get(key, "")):
+            errors.append(f"{CURRENT}: missing or invalid {key}")
+    return block
+
+
+def history_section(data: bytes) -> bytes:
+    start = data.find(b"\n## 0A.")
+    if start < 0:
+        raise ValueError("historical section marker is missing")
+    return data[start + 1 :]
+
+
+def validate_history(path: Path, errors: list[str]) -> None:
+    """Preserve Git evidence bytes without rewriting an autocrlf checkout."""
+    try:
+        section = history_section(path.read_bytes())
+        if sha256(section).hexdigest() == EXPECTED_HISTORY_SHA256:
+            return
+        # Only accept the checkout conversion actually declared by this repository.
+        # Arbitrary CRLF normalization would hide an unapproved evidence edit.
+        ref = f"HEAD:{path.as_posix()}"
+        committed = history_section(subprocess.check_output(["git", "cat-file", "blob", ref]))
+        checkout = history_section(subprocess.check_output(["git", "cat-file", "--filters", ref]))
+        if sha256(committed).hexdigest() == EXPECTED_HISTORY_SHA256 and section == checkout:
+            return
+        errors.append(f"{path}: historical content differs from the immutable Git evidence")
+    except (OSError, ValueError, subprocess.CalledProcessError) as error:
+        errors.append(f"{path}: cannot verify historical evidence: {error}")
 
 
 def main() -> None:
@@ -63,28 +130,19 @@ def main() -> None:
     current_text = CURRENT.read_text(encoding="utf-8")
     matrix_text = MATRIX.read_text(encoding="utf-8")
     baseline_text = BASELINE.read_text(encoding="utf-8")
-    history_bytes = HISTORY.read_bytes()
 
     if len(current_text.splitlines()) > 200:
         errors.append(f"{CURRENT}: must remain concise (maximum 200 lines)")
+    if any(len(line) > 800 for line in current_text.splitlines()):
+        errors.append(f"{CURRENT}: oversized execution-history paragraph (maximum 800 characters per line)")
     if re.search(r"(?m)^## 0A\.", current_text):
         errors.append(f"{CURRENT}: unarchived historical section 0A found")
 
-    marker = b"\n## 0A."
-    start = history_bytes.find(marker)
-    if start < 0:
-        errors.append(f"{HISTORY}: historical section marker is missing")
-    else:
-        digest = sha256(history_bytes[start + 1 :]).hexdigest()
-        if digest != EXPECTED_HISTORY_SHA256:
-            errors.append(f"{HISTORY}: historical bytes digest {digest} != {EXPECTED_HISTORY_SHA256}")
+    validate_history(HISTORY, errors)
 
     for key, value in REQUIRED_BASELINE_VALUES.items():
         require_pair(baseline_text, key, value, BASELINE, errors)
-    for key, value in REQUIRED_CURRENT.items():
-        require_pair(current_text, key, value, CURRENT, errors)
-    for key, value in REQUIRED_CI_GOVERNANCE.items():
-        require_pair(current_text, key, value, CURRENT, errors)
+    current_block = validate_current_projection(current_text, errors)
 
     for forbidden in (
         "M13_BASE_CLOSEOUT_ACCEPTED=false",
@@ -96,7 +154,7 @@ def main() -> None:
         "A100_START_AUTHORIZED=true",
         "PUBLICATION_ALLOWED=true",
     ):
-        if forbidden in current_text or forbidden in baseline_text or forbidden in matrix_text:
+        if any(forbidden in text.splitlines() for text in (current_block, baseline_text, matrix_text)):
             errors.append(f"current projection contains forbidden state {forbidden}")
 
     matrix_current = matrix_text.split("## 3.", maxsplit=1)[0]

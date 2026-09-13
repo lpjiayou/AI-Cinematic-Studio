@@ -20,20 +20,15 @@ the policy and source documents remain controlling within their declared scopes.
 Scope always matters. `CURRENT_MILESTONE.md` cannot override an Accepted ADR,
 and historical evidence cannot authorize current execution.
 
-Reviewed documentation baseline: `3bf2e7a5152a7bd9c1087571aab6413a53a43bb6`; date: `2026-09-10`. PR #84 established the five E4 classification-index links in `docs/README.md`; this update separately records ADR-0022 v1.2 architecture acceptance. Neither navigation update changes the E4 execution pin or clears runtime blockers.
+Current execution and observed merged checkpoints belong only in
+[CURRENT_MILESTONE.md](../../CURRENT_MILESTONE.md). Candidate identities and dated
+acceptance records remain in the implementation-evidence section; this navigation
+map does not duplicate their old task-status prose.
 
-Package 1 acceptance registration baseline: `521439dad61bad49c415059f8503727d2d95d233`; date: `2026-09-10`. Package 2 acceptance registration baseline: `230bde8ac53a4d7d02ef02f8eea85efe6f1afc13`; date: `2026-09-11`. Package 3 acceptance registration is authored against baseline `ccb8cd2649a00ed9e16382b8ce3d95e09b065642`; date: `2026-09-12`; publication is not yet merged at authoring. The implementation-evidence records preserve bounded Owner decisions and exact CPU candidate identities; they do not grant runtime authority. Existing documentation review baselines retain their historical scope.
-
-R2 + F01 acceptance registration: `2026-09-12`; exact accepted commit
-`d0344a11709b8424a13b268545abfb8e580d17af`, tree
-`a67a3e6a0db1e527de00ee86f7e78b74c1c9038d`; original base
-`ad7349ff493baaa1e0bc831810ea28b3dd2b2dce`. The Project Lead / Repository Governance
-Owner accepted CPU/fixture-owned loopback engineering only and closed F01 for this
-candidate. Publication is authorized through one PR, FULL_SUITE checks and protected
-squash merge, but is not yet merged at document authoring. ADR-0022 v1.3 and Package
-1/2/3 history are unchanged. SH09 exact binding and Spike-0 remain blocked; runtime
-binding and prompt authorization remain false. This projection records the supplied
-Owner decision; it does not issue a live Grant or authorize deployment.
+The tables below are generated from the registry by
+`python scripts/validate_document_supersession.py --write`. The ordinary validator
+checks for projection drift without writing. Registry review dates describe the
+scope of each record, not a claim that all product capabilities were re-accepted.
 
 ## Classification totals
 
@@ -42,11 +37,11 @@ Owner decision; it does not issue a live Grant or authorize deployment.
 | `ACCEPTED_DECISION` | 22 | no |
 | `NORMATIVE_ARCHITECTURE` | 14 | no |
 | `NORMATIVE_CONTRACT` | 32 | no |
-| `CURRENT_STATUS` | 19 | yes |
+| `CURRENT_STATUS` | 3 | yes |
 | `CAPABILITY_MATRIX` | 1 | yes |
 | `OPERATIONAL_RUNBOOK` | 18 | no |
-| `IMPLEMENTATION_EVIDENCE` | 25 | no |
-| `HISTORICAL_EVIDENCE` | 40 | no |
+| `IMPLEMENTATION_EVIDENCE` | 41 | no |
+| `HISTORICAL_EVIDENCE` | 41 | no |
 | `SUPERSEDED` | 9 | no |
 | `DRAFT` | 3 | no |
 | `DEPRECATED` | 0 | no |
@@ -91,12 +86,12 @@ Owner decision; it does not issue a live Grant or authorize deployment.
 | [`architecture/module-responsibility-matrix.md`](../../architecture/module-responsibility-matrix.md) | `ACTIVE` | Architecture Owner |
 | [`architecture/system-context.md`](../../architecture/system-context.md) | `ACTIVE` | Architecture Owner |
 | [`architecture/system-overview.md`](../../architecture/system-overview.md) | `ACTIVE` | Architecture Owner |
-| [`docs/03-data-design/data-domain-model.md`](../03-data-design/data-domain-model.md) | `ACTIVE` | Data Architecture Owner |
-| [`docs/03-data-design/data-ownership.md`](../03-data-design/data-ownership.md) | `ACTIVE` | Data Architecture Owner |
-| [`docs/07-v3-render-core/render-core-boundary.md`](../07-v3-render-core/render-core-boundary.md) | `ACTIVE` | Runtime Owner |
-| [`docs/14-application-design/application-layer-overview.md`](../14-application-design/application-layer-overview.md) | `ACTIVE` | Application Owner |
-| [`docs/14-application-design/ui-domain-mapping.md`](../14-application-design/ui-domain-mapping.md) | `ACTIVE` | Application Owner |
-| [`docs/14-application-design/user-flow-mapping.md`](../14-application-design/user-flow-mapping.md) | `ACTIVE` | Application Owner |
+| [`docs/03-data-design/data-domain-model.md`](../../docs/03-data-design/data-domain-model.md) | `ACTIVE` | Data Architecture Owner |
+| [`docs/03-data-design/data-ownership.md`](../../docs/03-data-design/data-ownership.md) | `ACTIVE` | Data Architecture Owner |
+| [`docs/07-v3-render-core/render-core-boundary.md`](../../docs/07-v3-render-core/render-core-boundary.md) | `ACTIVE` | Runtime Owner |
+| [`docs/14-application-design/application-layer-overview.md`](../../docs/14-application-design/application-layer-overview.md) | `ACTIVE` | Application Owner |
+| [`docs/14-application-design/ui-domain-mapping.md`](../../docs/14-application-design/ui-domain-mapping.md) | `ACTIVE` | Application Owner |
+| [`docs/14-application-design/user-flow-mapping.md`](../../docs/14-application-design/user-flow-mapping.md) | `ACTIVE` | Application Owner |
 
 ## NORMATIVE_CONTRACT
 
@@ -109,27 +104,27 @@ Owner decision; it does not issue a live Grant or authorize deployment.
 | [`architecture/K2_GOLDEN_EPISODE_PRODUCTION_CONTRACT.md`](../../architecture/K2_GOLDEN_EPISODE_PRODUCTION_CONTRACT.md) | `ACTIVE` | Architecture Owner |
 | [`architecture/K2_INTERNAL_IMAGE_FIRST_REAL_MEDIA_REVISION_CONTRACT.md`](../../architecture/K2_INTERNAL_IMAGE_FIRST_REAL_MEDIA_REVISION_CONTRACT.md) | `ACTIVE` | Architecture Owner |
 | [`architecture/K2_INTERNAL_SELF_HOSTED_P1_CONTRACT.md`](../../architecture/K2_INTERNAL_SELF_HOSTED_P1_CONTRACT.md) | `ACTIVE` | Architecture Owner |
-| [`architecture/M3_M11_UPSTREAM_METHOD_CLOSURE_CONTRACT.md`](../../architecture/M3_M11_UPSTREAM_METHOD_CLOSURE_CONTRACT.md) | `ACTIVE` | Architecture Owner / M3-M12 Domain Owners |
 | [`architecture/M10_MANIFEST_V2_TECHNICAL_INPUT_APPEND_AUTHORITY_CONTRACT.md`](../../architecture/M10_MANIFEST_V2_TECHNICAL_INPUT_APPEND_AUTHORITY_CONTRACT.md) | `ACTIVE` | Project Lead / Core Architecture Owner / M10 Canonical Input Append Owner |
+| [`architecture/M3_M11_UPSTREAM_METHOD_CLOSURE_CONTRACT.md`](../../architecture/M3_M11_UPSTREAM_METHOD_CLOSURE_CONTRACT.md) | `ACTIVE` | Architecture Owner / M3-M12 Domain Owners |
 | [`architecture/M6_SERIES_INTELLIGENCE_CONSUMER_CONTRACT.md`](../../architecture/M6_SERIES_INTELLIGENCE_CONSUMER_CONTRACT.md) | `ACTIVE` | Architecture Owner |
 | [`architecture/M6_SERIES_INTELLIGENCE_DOMAIN_CONTRACT.md`](../../architecture/M6_SERIES_INTELLIGENCE_DOMAIN_CONTRACT.md) | `ACTIVE` | Architecture Owner |
 | [`architecture/M6_SERIES_INTELLIGENCE_SQLITE_CONTRACT.md`](../../architecture/M6_SERIES_INTELLIGENCE_SQLITE_CONTRACT.md) | `ACTIVE` | Architecture Owner |
 | [`architecture/V5_TEXT_GENERATION_CAPABILITY_CONTRACT.md`](../../architecture/V5_TEXT_GENERATION_CAPABILITY_CONTRACT.md) | `ACTIVE` | Architecture Owner |
-| [`docs/03-data-design/asset-lifecycle.md`](../03-data-design/asset-lifecycle.md) | `ACTIVE` | Data Architecture Owner |
-| [`docs/03-data-design/data-consistency-rules.md`](../03-data-design/data-consistency-rules.md) | `ACTIVE` | Data Architecture Owner |
-| [`docs/03-data-design/data-storage-abstraction.md`](../03-data-design/data-storage-abstraction.md) | `ACTIVE` | Data Architecture Owner |
-| [`docs/04-interface-contract/application-v5-contract.md`](../04-interface-contract/application-v5-contract.md) | `ACTIVE` | Public Contract Owner |
-| [`docs/04-interface-contract/creator-public-http-v1.md`](../04-interface-contract/creator-public-http-v1.md) | `ACTIVE` | Public Contract Owner |
-| [`docs/04-interface-contract/error-code-standard.md`](../04-interface-contract/error-code-standard.md) | `ACTIVE` | Public Contract Owner |
-| [`docs/04-interface-contract/event-contract.md`](../04-interface-contract/event-contract.md) | `ACTIVE` | Public Contract Owner |
-| [`docs/04-interface-contract/v3-compute-contract.md`](../04-interface-contract/v3-compute-contract.md) | `ACTIVE` | Public Contract Owner |
-| [`docs/04-interface-contract/v4-v3-contract.md`](../04-interface-contract/v4-v3-contract.md) | `ACTIVE` | Public Contract Owner |
-| [`docs/04-interface-contract/v5-v4-contract.md`](../04-interface-contract/v5-v4-contract.md) | `ACTIVE` | Public Contract Owner |
-| [`docs/14-application-design/application-command-contract.md`](../14-application-design/application-command-contract.md) | `ACTIVE` | Application Owner |
-| [`docs/14-application-design/internal-content-lab-ui-scope.md`](../14-application-design/internal-content-lab-ui-scope.md) | `ACTIVE` | Application Owner |
-| [`docs/governance/CI_DOCS_ONLY_FAST_PATH_VALIDATION_2026-09-02.md`](CI_DOCS_ONLY_FAST_PATH_VALIDATION_2026-09-02.md) | `ACTIVE` | Architecture Owner / Documentation Governance Owner |
-| [`docs/governance/CI_REQUIRED_CHECK_FAST_PATH_POLICY.md`](CI_REQUIRED_CHECK_FAST_PATH_POLICY.md) | `ACTIVE` | Architecture Owner / Documentation Governance Owner |
-| [`docs/governance/DOCUMENTATION_GOVERNANCE_POLICY.md`](DOCUMENTATION_GOVERNANCE_POLICY.md) | `ACTIVE` | Architecture Owner / Documentation Governance Owner |
+| [`docs/03-data-design/asset-lifecycle.md`](../../docs/03-data-design/asset-lifecycle.md) | `ACTIVE` | Data Architecture Owner |
+| [`docs/03-data-design/data-consistency-rules.md`](../../docs/03-data-design/data-consistency-rules.md) | `ACTIVE` | Data Architecture Owner |
+| [`docs/03-data-design/data-storage-abstraction.md`](../../docs/03-data-design/data-storage-abstraction.md) | `ACTIVE` | Data Architecture Owner |
+| [`docs/04-interface-contract/application-v5-contract.md`](../../docs/04-interface-contract/application-v5-contract.md) | `ACTIVE` | Public Contract Owner |
+| [`docs/04-interface-contract/creator-public-http-v1.md`](../../docs/04-interface-contract/creator-public-http-v1.md) | `ACTIVE` | Public Contract Owner |
+| [`docs/04-interface-contract/error-code-standard.md`](../../docs/04-interface-contract/error-code-standard.md) | `ACTIVE` | Public Contract Owner |
+| [`docs/04-interface-contract/event-contract.md`](../../docs/04-interface-contract/event-contract.md) | `ACTIVE` | Public Contract Owner |
+| [`docs/04-interface-contract/v3-compute-contract.md`](../../docs/04-interface-contract/v3-compute-contract.md) | `ACTIVE` | Public Contract Owner |
+| [`docs/04-interface-contract/v4-v3-contract.md`](../../docs/04-interface-contract/v4-v3-contract.md) | `ACTIVE` | Public Contract Owner |
+| [`docs/04-interface-contract/v5-v4-contract.md`](../../docs/04-interface-contract/v5-v4-contract.md) | `ACTIVE` | Public Contract Owner |
+| [`docs/14-application-design/application-command-contract.md`](../../docs/14-application-design/application-command-contract.md) | `ACTIVE` | Application Owner |
+| [`docs/14-application-design/internal-content-lab-ui-scope.md`](../../docs/14-application-design/internal-content-lab-ui-scope.md) | `ACTIVE` | Application Owner |
+| [`docs/governance/CI_DOCS_ONLY_FAST_PATH_VALIDATION_2026-09-02.md`](../../docs/governance/CI_DOCS_ONLY_FAST_PATH_VALIDATION_2026-09-02.md) | `ACTIVE` | Architecture Owner / Documentation Governance Owner |
+| [`docs/governance/CI_REQUIRED_CHECK_FAST_PATH_POLICY.md`](../../docs/governance/CI_REQUIRED_CHECK_FAST_PATH_POLICY.md) | `ACTIVE` | Architecture Owner / Documentation Governance Owner |
+| [`docs/governance/DOCUMENTATION_GOVERNANCE_POLICY.md`](../../docs/governance/DOCUMENTATION_GOVERNANCE_POLICY.md) | `ACTIVE` | Architecture Owner / Documentation Governance Owner |
 | [`governance/AI_CINEMATIC_STUDIO_DELIVERY_GOVERNANCE_PACKAGE_V1.md`](../../governance/AI_CINEMATIC_STUDIO_DELIVERY_GOVERNANCE_PACKAGE_V1.md) | `ACTIVE` | Architecture Owner / Documentation Governance Owner |
 | [`governance/ARCHITECTURE_CHANGE_PROCESS.md`](../../governance/ARCHITECTURE_CHANGE_PROCESS.md) | `ACTIVE` | Architecture Owner / Documentation Governance Owner |
 | [`governance/ARCHITECTURE_GUARD.md`](../../governance/ARCHITECTURE_GUARD.md) | `ACTIVE` | Architecture Owner / Documentation Governance Owner |
@@ -139,47 +134,29 @@ Owner decision; it does not issue a live Grant or authorize deployment.
 
 | Document | Status | Owner |
 | --- | --- | --- |
-| [`docs/status/M10_M11_SPIKE_0_ELIGIBLE_LINEAGE_E3_R6_POST_E3H_2026-09-08.md`](../status/M10_M11_SPIKE_0_ELIGIBLE_LINEAGE_E3_R6_POST_E3H_2026-09-08.md) | `CURRENT` | Project Lead / Core Architecture Owner / M10 Input Admission Owner / Spike-0 Evidence Custody Owner |
-| [`docs/status/M10_MANIFEST_V2_TECHNICAL_INPUT_APPEND_AUTHORITY_E3H_2026-09-08.md`](../status/M10_MANIFEST_V2_TECHNICAL_INPUT_APPEND_AUTHORITY_E3H_2026-09-08.md) | `CURRENT` | Project Lead / Core Architecture Owner / M10 Canonical Input Append Owner / Candidate Review and Admission Owner |
-| [`docs/status/M10_INPUT_ARTIFACT_EXECUTION_CONFIG_DECOUPLING_E3G_2026-09-08.md`](../status/M10_INPUT_ARTIFACT_EXECUTION_CONFIG_DECOUPLING_E3G_2026-09-08.md) | `CURRENT` | Project Lead / Core Architecture Owner / M10 Input Asset Owner / M11 Execution Configuration Owner |
-| [`docs/status/M5_M7_LEGAL_ENTRYPOINT_CLOSURE_E3E_2026-09-07.md`](../status/M5_M7_LEGAL_ENTRYPOINT_CLOSURE_E3E_2026-09-07.md) | `CURRENT` | Project Lead / M5 Binding Owner / M7 Narrative Validation Owner / Creator Public HTTP Owner |
-| [`docs/status/M3_SCRIPT_GENERATION_AND_CONFIRMATION_RECOVERY_E3F_2026-09-07.md`](../status/M3_SCRIPT_GENERATION_AND_CONFIRMATION_RECOVERY_E3F_2026-09-07.md) | `CURRENT` | Project Lead / M3 Script Studio Owner / Creator Application Recovery Owner / Lifecycle Transaction Integrity Owner |
-| [`docs/status/M5_SERIES_PLAN_COMMAND_IDEMPOTENCY_E3D_2026-09-07.md`](../status/M5_SERIES_PLAN_COMMAND_IDEMPOTENCY_E3D_2026-09-07.md) | `CURRENT` | Project Lead / Creator Application Owner / M5 Series Planning Owner |
-| [`docs/status/M1_AI_DIRECTOR_CANDIDATE_IDEMPOTENCY_E3C_2026-09-07.md`](../status/M1_AI_DIRECTOR_CANDIDATE_IDEMPOTENCY_E3C_2026-09-07.md) | `CURRENT` | Project Lead / Creator Application Owner / M1 AI Director Owner |
-| [`docs/status/M1_CREATIVE_PLAN_CONFIRMATION_IDEMPOTENCY_E3B_2026-09-06.md`](../status/M1_CREATIVE_PLAN_CONFIRMATION_IDEMPOTENCY_E3B_2026-09-06.md) | `CURRENT` | Project Lead / M1 Creative Plan Confirmation Owner / Lifecycle Integrity Owner |
 | [`CURRENT_MILESTONE.md`](../../CURRENT_MILESTONE.md) | `CURRENT` | Project Lead / Documentation Governance Owner |
 | [`architecture/M12_C3_DEDICATED_LINUX_CPU_BUILD_HOST_SPECIFICATION.md`](../../architecture/M12_C3_DEDICATED_LINUX_CPU_BUILD_HOST_SPECIFICATION.md) | `CURRENT` | Project Lead / Architecture Owner / Infrastructure Owner / Repository Governance Owner / M12 Domain Owner |
-| [`docs/status/CORE_CLEAN_STATE_PUBLIC_API_E2E_2026-09-06.md`](../status/CORE_CLEAN_STATE_PUBLIC_API_E2E_2026-09-06.md) | `CURRENT` | Project Lead / Creator Public HTTP Acceptance Owner / Clean-State E2E Owner |
-| [`docs/status/CORE_PUBLIC_JSON_AND_NUMERIC_INTEGRITY_HARDENING_2026-09-05.md`](../status/CORE_PUBLIC_JSON_AND_NUMERIC_INTEGRITY_HARDENING_2026-09-05.md) | `CURRENT` | Project Lead / Creator Public Contract Owner / V5 Domain Owners |
-| [`docs/status/CORE_RECOVERABLE_PROJECT_FOUNDATION_COMMAND_2026-09-05.md`](../status/CORE_RECOVERABLE_PROJECT_FOUNDATION_COMMAND_2026-09-05.md) | `CURRENT` | Project Lead / Creator Public Contract Owner / Project Foundation Command Owner |
-| [`docs/status/CORE_SERIES_PLANNING_SCOPE_AND_CANDIDATE_BINDING_HARDENING_2026-09-05.md`](../status/CORE_SERIES_PLANNING_SCOPE_AND_CANDIDATE_BINDING_HARDENING_2026-09-05.md) | `CURRENT` | Project Lead / Creator Public Contract Owner / M5 Domain Owner |
-| [`docs/status/CROSS_REPOSITORY_BASELINE.md`](../status/CROSS_REPOSITORY_BASELINE.md) | `CURRENT` | Documentation Governance Owner |
-| [`docs/status/M12_A100_BUILD_HOST_REFLIGHT_2026-09-03.md`](../status/M12_A100_BUILD_HOST_REFLIGHT_2026-09-03.md) | `CURRENT` | Project Lead / Infrastructure Owner / Architecture Owner / M12 Domain Owner |
-
-| [`docs/status/M10_M11_METHOD_AWARE_WORKER_SEAM_CORRECTIVE_E1_2026-09-06.md`](../status/M10_M11_METHOD_AWARE_WORKER_SEAM_CORRECTIVE_E1_2026-09-06.md) | `CURRENT` | Project Lead / V4 Media Job Owner / M10-M11 Method-Aware Owner |
-| [`docs/status/M10_M11_METHOD_AWARE_JOB_RESULT_INTAKE_CORRECTIVE_E2_2026-09-06.md`](../status/M10_M11_METHOD_AWARE_JOB_RESULT_INTAKE_CORRECTIVE_E2_2026-09-06.md) | `CURRENT` | Project Lead / V4 Media Job Owner / M10-M11 Result Intake Owner |
-
-| [`docs/status/M10_METHOD_AWARE_SINGLE_INPUT_IMAGE_ADMISSION_E3A_2026-09-06.md`](../status/M10_METHOD_AWARE_SINGLE_INPUT_IMAGE_ADMISSION_E3A_2026-09-06.md) | `CURRENT` | Project Lead / M10 Input Asset Owner / Candidate Lifecycle Owner |
+| [`docs/status/CROSS_REPOSITORY_BASELINE.md`](../../docs/status/CROSS_REPOSITORY_BASELINE.md) | `CURRENT` | Documentation Governance Owner |
 
 ## CAPABILITY_MATRIX
 
 | Document | Status | Owner |
 | --- | --- | --- |
-| [`docs/status/M1-M19-CAPABILITY-STATUS.md`](../status/M1-M19-CAPABILITY-STATUS.md) | `CURRENT` | Documentation Governance Owner |
+| [`docs/status/M1-M19-CAPABILITY-STATUS.md`](../../docs/status/M1-M19-CAPABILITY-STATUS.md) | `CURRENT` | Documentation Governance Owner |
 
 ## OPERATIONAL_RUNBOOK
 
 | Document | Status | Owner |
 | --- | --- | --- |
-| [`docs/governance/CI_WAITING_RUNBOOK.md`](CI_WAITING_RUNBOOK.md) | `ACTIVE` | Repository Governance Owner / CI Governance Owner |
-| [`docs/08-compute/k2-comfyui-wan22-operator-runbook.md`](../08-compute/k2-comfyui-wan22-operator-runbook.md) | `ACTIVE` | Runtime Owner |
-| [`docs/11-testing/release-validation.md`](../11-testing/release-validation.md) | `ACTIVE` | Verification Owner |
-| [`docs/11-testing/test-evidence-standard.md`](../11-testing/test-evidence-standard.md) | `ACTIVE` | Verification Owner |
-| [`docs/11-testing/test-levels.md`](../11-testing/test-levels.md) | `ACTIVE` | Verification Owner |
-| [`docs/11-testing/testing-strategy.md`](../11-testing/testing-strategy.md) | `ACTIVE` | Verification Owner |
-| [`docs/11-testing/verification-gates.md`](../11-testing/verification-gates.md) | `ACTIVE` | Verification Owner |
-| [`docs/16-k2-production/K2-G2-AUTHORITY-PREPARATION-RUNBOOK.md`](../16-k2-production/K2-G2-AUTHORITY-PREPARATION-RUNBOOK.md) | `ACTIVE` | K2 Domain Owner |
-| [`docs/16-k2-production/K2-INTERNAL-SELF-HOSTED-P1-RUNBOOK.md`](../16-k2-production/K2-INTERNAL-SELF-HOSTED-P1-RUNBOOK.md) | `ACTIVE` | K2 Domain Owner |
+| [`docs/08-compute/k2-comfyui-wan22-operator-runbook.md`](../../docs/08-compute/k2-comfyui-wan22-operator-runbook.md) | `ACTIVE` | Runtime Owner |
+| [`docs/11-testing/release-validation.md`](../../docs/11-testing/release-validation.md) | `ACTIVE` | Verification Owner |
+| [`docs/11-testing/test-evidence-standard.md`](../../docs/11-testing/test-evidence-standard.md) | `ACTIVE` | Verification Owner |
+| [`docs/11-testing/test-levels.md`](../../docs/11-testing/test-levels.md) | `ACTIVE` | Verification Owner |
+| [`docs/11-testing/testing-strategy.md`](../../docs/11-testing/testing-strategy.md) | `ACTIVE` | Verification Owner |
+| [`docs/11-testing/verification-gates.md`](../../docs/11-testing/verification-gates.md) | `ACTIVE` | Verification Owner |
+| [`docs/16-k2-production/K2-G2-AUTHORITY-PREPARATION-RUNBOOK.md`](../../docs/16-k2-production/K2-G2-AUTHORITY-PREPARATION-RUNBOOK.md) | `ACTIVE` | K2 Domain Owner |
+| [`docs/16-k2-production/K2-INTERNAL-SELF-HOSTED-P1-RUNBOOK.md`](../../docs/16-k2-production/K2-INTERNAL-SELF-HOSTED-P1-RUNBOOK.md) | `ACTIVE` | K2 Domain Owner |
+| [`docs/governance/CI_WAITING_RUNBOOK.md`](../../docs/governance/CI_WAITING_RUNBOOK.md) | `ACTIVE` | Repository Governance Owner / CI Governance Owner |
 | [`experiments/k2-002-ep01-i2v/RUNBOOK.md`](../../experiments/k2-002-ep01-i2v/RUNBOOK.md) | `ACTIVE` | Experiment Owner |
 | [`governance/BASELINE_RELEASE_PROCESS.md`](../../governance/BASELINE_RELEASE_PROCESS.md) | `ACTIVE` | Architecture Owner / Documentation Governance Owner |
 | [`governance/BRANCH_PROTECTION.md`](../../governance/BRANCH_PROTECTION.md) | `ACTIVE` | Architecture Owner / Documentation Governance Owner |
@@ -194,14 +171,30 @@ Owner decision; it does not issue a live Grant or authorize deployment.
 
 | Document | Status | Owner |
 | --- | --- | --- |
-| [`docs/status/ADR_0022_PKG3_CPU_ACCEPTANCE_2026-09-12.md`](../status/ADR_0022_PKG3_CPU_ACCEPTANCE_2026-09-12.md) | `RECORDED` | Project Lead / Package 3 Owner / Repository Governance Owner |
-| [`docs/status/A14B_STAGED_TRANSPORT_IMPLEMENTATION_2026-09-12.md`](../status/A14B_STAGED_TRANSPORT_IMPLEMENTATION_2026-09-12.md) | `RECORDED / ACCEPTED_WITHIN_SCOPE_CPU_AND_FIXTURE_LOOPBACK` | Project Lead / Generation Dispatch Authority Owner / Repository Governance Owner |
-| [`docs/status/ADR_0022_PKG2_CPU_ACCEPTANCE_2026-09-11.md`](../status/ADR_0022_PKG2_CPU_ACCEPTANCE_2026-09-11.md) | `RECORDED` | Project Lead / Core Architecture Owner / Repository Governance Owner |
-| [`docs/status/ADR_0022_PKG1_CPU_ACCEPTANCE_2026-09-10.md`](../status/ADR_0022_PKG1_CPU_ACCEPTANCE_2026-09-10.md) | `RECORDED` | Project Lead / Core Architecture Owner / Repository Governance Owner |
-| [`docs/archive/AGENTS_ARCHIVE_MIGRATION_MANIFEST.json`](../archive/AGENTS_ARCHIVE_MIGRATION_MANIFEST.json) | `RECORDED` | Repository Governance Owner / CI Governance Owner |
 | [`design-qa.md`](../../design-qa.md) | `RECORDED` | Documentation Governance Owner |
-| [`docs/04-interface-contract/v5-v3-vertical-slice-review.md`](../04-interface-contract/v5-v3-vertical-slice-review.md) | `RECORDED` | Public Contract Owner |
-| [`docs/14-application-design/REFERENCE_VIDEO_CAPABILITY_AND_WORKSPACE_MERGED_BASELINE.md`](../14-application-design/REFERENCE_VIDEO_CAPABILITY_AND_WORKSPACE_MERGED_BASELINE.md) | `RECORDED` | Application Owner |
+| [`docs/04-interface-contract/v5-v3-vertical-slice-review.md`](../../docs/04-interface-contract/v5-v3-vertical-slice-review.md) | `RECORDED` | Public Contract Owner |
+| [`docs/14-application-design/REFERENCE_VIDEO_CAPABILITY_AND_WORKSPACE_MERGED_BASELINE.md`](../../docs/14-application-design/REFERENCE_VIDEO_CAPABILITY_AND_WORKSPACE_MERGED_BASELINE.md) | `RECORDED` | Application Owner |
+| [`docs/archive/AGENTS_ARCHIVE_MIGRATION_MANIFEST.json`](../../docs/archive/AGENTS_ARCHIVE_MIGRATION_MANIFEST.json) | `RECORDED` | Repository Governance Owner / CI Governance Owner |
+| [`docs/status/A14B_STAGED_TRANSPORT_IMPLEMENTATION_2026-09-12.md`](../../docs/status/A14B_STAGED_TRANSPORT_IMPLEMENTATION_2026-09-12.md) | `RECORDED` | Project Lead / Generation Dispatch Authority Owner / Repository Governance Owner |
+| [`docs/status/ADR_0022_PKG1_CPU_ACCEPTANCE_2026-09-10.md`](../../docs/status/ADR_0022_PKG1_CPU_ACCEPTANCE_2026-09-10.md) | `RECORDED` | Project Lead / Core Architecture Owner / Repository Governance Owner |
+| [`docs/status/ADR_0022_PKG2_CPU_ACCEPTANCE_2026-09-11.md`](../../docs/status/ADR_0022_PKG2_CPU_ACCEPTANCE_2026-09-11.md) | `RECORDED` | Project Lead / Core Architecture Owner / Repository Governance Owner |
+| [`docs/status/ADR_0022_PKG3_CPU_ACCEPTANCE_2026-09-12.md`](../../docs/status/ADR_0022_PKG3_CPU_ACCEPTANCE_2026-09-12.md) | `RECORDED` | Project Lead / Package 3 Owner / Repository Governance Owner |
+| [`docs/status/CORE_CLEAN_STATE_PUBLIC_API_E2E_2026-09-06.md`](../../docs/status/CORE_CLEAN_STATE_PUBLIC_API_E2E_2026-09-06.md) | `RECORDED` | Project Lead / Creator Public HTTP Acceptance Owner / Clean-State E2E Owner |
+| [`docs/status/CORE_PUBLIC_JSON_AND_NUMERIC_INTEGRITY_HARDENING_2026-09-05.md`](../../docs/status/CORE_PUBLIC_JSON_AND_NUMERIC_INTEGRITY_HARDENING_2026-09-05.md) | `RECORDED` | Project Lead / Creator Public Contract Owner / V5 Domain Owners |
+| [`docs/status/CORE_RECOVERABLE_PROJECT_FOUNDATION_COMMAND_2026-09-05.md`](../../docs/status/CORE_RECOVERABLE_PROJECT_FOUNDATION_COMMAND_2026-09-05.md) | `RECORDED` | Project Lead / Creator Public Contract Owner / Project Foundation Command Owner |
+| [`docs/status/CORE_SERIES_PLANNING_SCOPE_AND_CANDIDATE_BINDING_HARDENING_2026-09-05.md`](../../docs/status/CORE_SERIES_PLANNING_SCOPE_AND_CANDIDATE_BINDING_HARDENING_2026-09-05.md) | `RECORDED` | Project Lead / Creator Public Contract Owner / M5 Domain Owner |
+| [`docs/status/M10_INPUT_ARTIFACT_EXECUTION_CONFIG_DECOUPLING_E3G_2026-09-08.md`](../../docs/status/M10_INPUT_ARTIFACT_EXECUTION_CONFIG_DECOUPLING_E3G_2026-09-08.md) | `RECORDED` | Project Lead / Core Architecture Owner / M10 Input Asset Owner / M11 Execution Configuration Owner |
+| [`docs/status/M10_M11_METHOD_AWARE_JOB_RESULT_INTAKE_CORRECTIVE_E2_2026-09-06.md`](../../docs/status/M10_M11_METHOD_AWARE_JOB_RESULT_INTAKE_CORRECTIVE_E2_2026-09-06.md) | `RECORDED` | Project Lead / V4 Media Job Owner / M10-M11 Result Intake Owner |
+| [`docs/status/M10_M11_METHOD_AWARE_WORKER_SEAM_CORRECTIVE_E1_2026-09-06.md`](../../docs/status/M10_M11_METHOD_AWARE_WORKER_SEAM_CORRECTIVE_E1_2026-09-06.md) | `RECORDED` | Project Lead / V4 Media Job Owner / M10-M11 Method-Aware Owner |
+| [`docs/status/M10_M11_SPIKE_0_ELIGIBLE_LINEAGE_E3_R6_POST_E3H_2026-09-08.md`](../../docs/status/M10_M11_SPIKE_0_ELIGIBLE_LINEAGE_E3_R6_POST_E3H_2026-09-08.md) | `RECORDED` | Project Lead / Core Architecture Owner / M10 Input Admission Owner / Spike-0 Evidence Custody Owner |
+| [`docs/status/M10_MANIFEST_V2_TECHNICAL_INPUT_APPEND_AUTHORITY_E3H_2026-09-08.md`](../../docs/status/M10_MANIFEST_V2_TECHNICAL_INPUT_APPEND_AUTHORITY_E3H_2026-09-08.md) | `RECORDED` | Project Lead / Core Architecture Owner / M10 Canonical Input Append Owner / Candidate Review and Admission Owner |
+| [`docs/status/M10_METHOD_AWARE_SINGLE_INPUT_IMAGE_ADMISSION_E3A_2026-09-06.md`](../../docs/status/M10_METHOD_AWARE_SINGLE_INPUT_IMAGE_ADMISSION_E3A_2026-09-06.md) | `RECORDED` | Project Lead / M10 Input Asset Owner / Candidate Lifecycle Owner |
+| [`docs/status/M1_AI_DIRECTOR_CANDIDATE_IDEMPOTENCY_E3C_2026-09-07.md`](../../docs/status/M1_AI_DIRECTOR_CANDIDATE_IDEMPOTENCY_E3C_2026-09-07.md) | `RECORDED` | Project Lead / Creator Application Owner / M1 AI Director Owner |
+| [`docs/status/M1_CREATIVE_PLAN_CONFIRMATION_IDEMPOTENCY_E3B_2026-09-06.md`](../../docs/status/M1_CREATIVE_PLAN_CONFIRMATION_IDEMPOTENCY_E3B_2026-09-06.md) | `RECORDED` | Project Lead / M1 Creative Plan Confirmation Owner / Lifecycle Integrity Owner |
+| [`docs/status/M3_SCRIPT_GENERATION_AND_CONFIRMATION_RECOVERY_E3F_2026-09-07.md`](../../docs/status/M3_SCRIPT_GENERATION_AND_CONFIRMATION_RECOVERY_E3F_2026-09-07.md) | `RECORDED` | Project Lead / M3 Script Studio Owner / Creator Application Recovery Owner / Lifecycle Transaction Integrity Owner |
+| [`docs/status/M5_M7_LEGAL_ENTRYPOINT_CLOSURE_E3E_2026-09-07.md`](../../docs/status/M5_M7_LEGAL_ENTRYPOINT_CLOSURE_E3E_2026-09-07.md) | `RECORDED` | Project Lead / M5 Binding Owner / M7 Narrative Validation Owner / Creator Public HTTP Owner |
+| [`docs/status/M5_SERIES_PLAN_COMMAND_IDEMPOTENCY_E3D_2026-09-07.md`](../../docs/status/M5_SERIES_PLAN_COMMAND_IDEMPOTENCY_E3D_2026-09-07.md) | `RECORDED` | Project Lead / Creator Application Owner / M5 Series Planning Owner |
+| [`docs/status/SH09_EXACT_OFFLINE_BINDING_R3_2026-09-13.md`](../../docs/status/SH09_EXACT_OFFLINE_BINDING_R3_2026-09-13.md) | `RECORDED` | Project Lead / Generation Dispatch Authority Owner |
 | [`experiments/ccv-r1/CHARACTER_CONSISTENCY_VALIDATION_REPORT_R1.md`](../../experiments/ccv-r1/CHARACTER_CONSISTENCY_VALIDATION_REPORT_R1.md) | `RECORDED` | Experiment Owner |
 | [`experiments/ccv-r1/README.md`](../../experiments/ccv-r1/README.md) | `RECORDED` | Experiment Owner |
 | [`experiments/ccv-r1/evidence/README.md`](../../experiments/ccv-r1/evidence/README.md) | `RECORDED` | Experiment Owner |
@@ -224,30 +217,31 @@ Owner decision; it does not issue a live Grant or authorize deployment.
 
 | Document | Status | Owner |
 | --- | --- | --- |
-| [`docs/status/ADR_0022_V1_2_ARCHITECTURE_ACCEPTANCE_2026-09-10.md`](../status/ADR_0022_V1_2_ARCHITECTURE_ACCEPTANCE_2026-09-10.md) | `RECORDED` | Project Lead / Core Architecture Owner / Generation Dispatch Authority Owner / Spike-0 Execution Gate Owner |
-| [`docs/status/M10_M11_GENERATION_DISPATCH_AUTHORITY_AUDIT_2026-09-09.md`](../status/M10_M11_GENERATION_DISPATCH_AUTHORITY_AUDIT_2026-09-09.md) | `RECORDED` | Project Lead / Core Architecture Owner / Generation Dispatch Authority Owner |
-| [`docs/status/M10_M11_SPIKE_0_E4_EXACT_BINDING_REVIEW_2026-09-09.md`](../status/M10_M11_SPIKE_0_E4_EXACT_BINDING_REVIEW_2026-09-09.md) | `RECORDED` | Project Lead / Core Architecture Owner / Spike-0 Execution Gate Owner |
-| [`docs/status/M10_M11_SPIKE_0_E4_RUNTIME_PREFLIGHT_2026-09-09.md`](../status/M10_M11_SPIKE_0_E4_RUNTIME_PREFLIGHT_2026-09-09.md) | `RECORDED` | Project Lead / Core Architecture Owner / Spike-0 Execution Gate Owner |
 | [`CURRENT_MILESTONE_HISTORY_THROUGH_2026-09-02.md`](../../CURRENT_MILESTONE_HISTORY_THROUGH_2026-09-02.md) | `HISTORICAL` | Documentation Governance Owner |
-| [`docs/archive/AGENTS_HISTORICAL_EXECUTION_RECORDS_THROUGH_2026-09-03.md`](../archive/AGENTS_HISTORICAL_EXECUTION_RECORDS_THROUGH_2026-09-03.md) | `HISTORICAL` | Documentation Governance Owner |
-| [`docs/status/M12_A100_BUILD_HOST_PREFLIGHT_2026-09-03.md`](../status/M12_A100_BUILD_HOST_PREFLIGHT_2026-09-03.md) | `HISTORICAL` | Project Lead / Repository Governance Owner / M12 Domain Owner |
-| [`docs/status/M12_C3_WSL2_CPU_BUILD_HOST_PREFLIGHT_2026-09-04.md`](../status/M12_C3_WSL2_CPU_BUILD_HOST_PREFLIGHT_2026-09-04.md) | `HISTORICAL` | Project Lead / Architecture Owner / Infrastructure Owner / M12 Domain Owner |
-| [`docs/12-release/baseline-asset-acceptance-decision-record.md`](../12-release/baseline-asset-acceptance-decision-record.md) | `HISTORICAL` | Release Owner |
-| [`docs/12-release/baseline-v0.1.0-candidate-manifest.md`](../12-release/baseline-v0.1.0-candidate-manifest.md) | `HISTORICAL` | Release Owner |
-| [`docs/12-release/investor-readiness-acceptance-record.md`](../12-release/investor-readiness-acceptance-record.md) | `HISTORICAL` | Release Owner |
-| [`docs/12-release/phase-0-exit-record.md`](../12-release/phase-0-exit-record.md) | `HISTORICAL` | Release Owner |
-| [`docs/12-release/phase-1-execution-authorization.md`](../12-release/phase-1-execution-authorization.md) | `HISTORICAL` | Release Owner |
-| [`docs/12-release/phase-1-production-validation-plan.md`](../12-release/phase-1-production-validation-plan.md) | `HISTORICAL` | Release Owner |
-| [`docs/12-release/phase-1-responsibility-assignment.md`](../12-release/phase-1-responsibility-assignment.md) | `HISTORICAL` | Release Owner |
-| [`docs/12-release/phase-1-scope-approval.md`](../12-release/phase-1-scope-approval.md) | `HISTORICAL` | Release Owner |
-| [`docs/12-release/phase-1-vertical-slice-authorization.md`](../12-release/phase-1-vertical-slice-authorization.md) | `HISTORICAL` | Release Owner |
-| [`docs/15-investor-readiness/milestones/M001-v5-identity-engine-foundation.md`](../15-investor-readiness/milestones/M001-v5-identity-engine-foundation.md) | `HISTORICAL` | Project Lead |
-| [`docs/15-investor-readiness/milestones/M002-v5-project-engine-foundation.md`](../15-investor-readiness/milestones/M002-v5-project-engine-foundation.md) | `HISTORICAL` | Project Lead |
-| [`docs/15-investor-readiness/milestones/M003-v5-asset-registry-foundation.md`](../15-investor-readiness/milestones/M003-v5-asset-registry-foundation.md) | `HISTORICAL` | Project Lead |
-| [`docs/15-investor-readiness/milestones/M004-v5-project-asset-relationship-foundation.md`](../15-investor-readiness/milestones/M004-v5-project-asset-relationship-foundation.md) | `HISTORICAL` | Project Lead |
-| [`docs/16-k2-production/K2-001-HISTORICAL-VALIDATION-ARCHIVE.md`](../16-k2-production/K2-001-HISTORICAL-VALIDATION-ARCHIVE.md) | `HISTORICAL` | K2 Domain Owner |
-| [`docs/16-k2-production/k2-002-changan/K2-002-CHANGAN-SERIES-AND-EP01-03-v1.4.md`](../16-k2-production/k2-002-changan/K2-002-CHANGAN-SERIES-AND-EP01-03-v1.4.md) | `HISTORICAL` | K2 Domain Owner |
-| [`docs/governance/DOCUMENT_AUDIT_REPORT_2026-09-02.md`](DOCUMENT_AUDIT_REPORT_2026-09-02.md) | `HISTORICAL` | Architecture Owner / Documentation Governance Owner |
+| [`docs/12-release/baseline-asset-acceptance-decision-record.md`](../../docs/12-release/baseline-asset-acceptance-decision-record.md) | `HISTORICAL` | Release Owner |
+| [`docs/12-release/baseline-v0.1.0-candidate-manifest.md`](../../docs/12-release/baseline-v0.1.0-candidate-manifest.md) | `HISTORICAL` | Release Owner |
+| [`docs/12-release/investor-readiness-acceptance-record.md`](../../docs/12-release/investor-readiness-acceptance-record.md) | `HISTORICAL` | Release Owner |
+| [`docs/12-release/phase-0-exit-record.md`](../../docs/12-release/phase-0-exit-record.md) | `HISTORICAL` | Release Owner |
+| [`docs/12-release/phase-1-execution-authorization.md`](../../docs/12-release/phase-1-execution-authorization.md) | `HISTORICAL` | Release Owner |
+| [`docs/12-release/phase-1-production-validation-plan.md`](../../docs/12-release/phase-1-production-validation-plan.md) | `HISTORICAL` | Release Owner |
+| [`docs/12-release/phase-1-responsibility-assignment.md`](../../docs/12-release/phase-1-responsibility-assignment.md) | `HISTORICAL` | Release Owner |
+| [`docs/12-release/phase-1-scope-approval.md`](../../docs/12-release/phase-1-scope-approval.md) | `HISTORICAL` | Release Owner |
+| [`docs/12-release/phase-1-vertical-slice-authorization.md`](../../docs/12-release/phase-1-vertical-slice-authorization.md) | `HISTORICAL` | Release Owner |
+| [`docs/15-investor-readiness/milestones/M001-v5-identity-engine-foundation.md`](../../docs/15-investor-readiness/milestones/M001-v5-identity-engine-foundation.md) | `HISTORICAL` | Project Lead |
+| [`docs/15-investor-readiness/milestones/M002-v5-project-engine-foundation.md`](../../docs/15-investor-readiness/milestones/M002-v5-project-engine-foundation.md) | `HISTORICAL` | Project Lead |
+| [`docs/15-investor-readiness/milestones/M003-v5-asset-registry-foundation.md`](../../docs/15-investor-readiness/milestones/M003-v5-asset-registry-foundation.md) | `HISTORICAL` | Project Lead |
+| [`docs/15-investor-readiness/milestones/M004-v5-project-asset-relationship-foundation.md`](../../docs/15-investor-readiness/milestones/M004-v5-project-asset-relationship-foundation.md) | `HISTORICAL` | Project Lead |
+| [`docs/16-k2-production/K2-001-HISTORICAL-VALIDATION-ARCHIVE.md`](../../docs/16-k2-production/K2-001-HISTORICAL-VALIDATION-ARCHIVE.md) | `HISTORICAL` | K2 Domain Owner |
+| [`docs/16-k2-production/k2-002-changan/K2-002-CHANGAN-SERIES-AND-EP01-03-v1.4.md`](../../docs/16-k2-production/k2-002-changan/K2-002-CHANGAN-SERIES-AND-EP01-03-v1.4.md) | `HISTORICAL` | K2 Domain Owner |
+| [`docs/archive/AGENTS_HISTORICAL_EXECUTION_RECORDS_THROUGH_2026-09-03.md`](../../docs/archive/AGENTS_HISTORICAL_EXECUTION_RECORDS_THROUGH_2026-09-03.md) | `HISTORICAL` | Documentation Governance Owner |
+| [`docs/governance/DOCUMENT_AUDIT_REPORT_2026-09-02.md`](../../docs/governance/DOCUMENT_AUDIT_REPORT_2026-09-02.md) | `HISTORICAL` | Architecture Owner / Documentation Governance Owner |
+| [`docs/status/ADR_0022_V1_2_ARCHITECTURE_ACCEPTANCE_2026-09-10.md`](../../docs/status/ADR_0022_V1_2_ARCHITECTURE_ACCEPTANCE_2026-09-10.md) | `RECORDED` | Project Lead / Core Architecture Owner / Generation Dispatch Authority Owner / Spike-0 Execution Gate Owner |
+| [`docs/status/M10_M11_GENERATION_DISPATCH_AUTHORITY_AUDIT_2026-09-09.md`](../../docs/status/M10_M11_GENERATION_DISPATCH_AUTHORITY_AUDIT_2026-09-09.md) | `RECORDED` | Project Lead / Core Architecture Owner / Generation Dispatch Authority Owner |
+| [`docs/status/M10_M11_SPIKE_0_E4_EXACT_BINDING_REVIEW_2026-09-09.md`](../../docs/status/M10_M11_SPIKE_0_E4_EXACT_BINDING_REVIEW_2026-09-09.md) | `RECORDED` | Project Lead / Core Architecture Owner / Spike-0 Execution Gate Owner |
+| [`docs/status/M10_M11_SPIKE_0_E4_RUNTIME_PREFLIGHT_2026-09-09.md`](../../docs/status/M10_M11_SPIKE_0_E4_RUNTIME_PREFLIGHT_2026-09-09.md) | `RECORDED` | Project Lead / Core Architecture Owner / Spike-0 Execution Gate Owner |
+| [`docs/status/M12_A100_BUILD_HOST_PREFLIGHT_2026-09-03.md`](../../docs/status/M12_A100_BUILD_HOST_PREFLIGHT_2026-09-03.md) | `HISTORICAL` | Project Lead / Repository Governance Owner / M12 Domain Owner |
+| [`docs/status/M12_A100_BUILD_HOST_REFLIGHT_2026-09-03.md`](../../docs/status/M12_A100_BUILD_HOST_REFLIGHT_2026-09-03.md) | `RECORDED` | Project Lead / Infrastructure Owner / Architecture Owner / M12 Domain Owner |
+| [`docs/status/M12_C3_WSL2_CPU_BUILD_HOST_PREFLIGHT_2026-09-04.md`](../../docs/status/M12_C3_WSL2_CPU_BUILD_HOST_PREFLIGHT_2026-09-04.md) | `HISTORICAL` | Project Lead / Architecture Owner / Infrastructure Owner / M12 Domain Owner |
 | [`governance/ACS-ARCH-R1-V5-TEXT-GENERATION-G0.md`](../../governance/ACS-ARCH-R1-V5-TEXT-GENERATION-G0.md) | `HISTORICAL` | Architecture Owner / Documentation Governance Owner |
 | [`governance/ACS-ARCH-R1-V5-TEXT-GENERATION-G1-R1-AUTHORIZATION.md`](../../governance/ACS-ARCH-R1-V5-TEXT-GENERATION-G1-R1-AUTHORIZATION.md) | `HISTORICAL` | Architecture Owner / Documentation Governance Owner |
 | [`governance/ACS-ARCH-R1-V5-TEXT-GENERATION-G1-R1-CLOSEOUT-M6-P3-G0-OWNER-REVIEW.md`](../../governance/ACS-ARCH-R1-V5-TEXT-GENERATION-G1-R1-CLOSEOUT-M6-P3-G0-OWNER-REVIEW.md) | `HISTORICAL` | Architecture Owner / Documentation Governance Owner |
@@ -270,11 +264,11 @@ Owner decision; it does not issue a live Grant or authorize deployment.
 | Document | Status | Owner |
 | --- | --- | --- |
 | [`architecture/K2_PUBLISHABLE_MEDIA_PRODUCTION_CONTRACT.md`](../../architecture/K2_PUBLISHABLE_MEDIA_PRODUCTION_CONTRACT.md) | `SUPERSEDED` | Architecture Owner |
-| [`docs/16-k2-production/K2-001-PREPRODUCTION-CANDIDATE.md`](../16-k2-production/K2-001-PREPRODUCTION-CANDIDATE.md) | `SUPERSEDED` | K2 Domain Owner |
-| [`docs/16-k2-production/K2-P1-PREBOOT-TO-LIVE-RUNBOOK.md`](../16-k2-production/K2-P1-PREBOOT-TO-LIVE-RUNBOOK.md) | `SUPERSEDED` | K2 Domain Owner |
-| [`docs/16-k2-production/k2-002-changan/K2-002-CHANGAN-SERIES-AND-EP01-03-v1.3.md`](../16-k2-production/k2-002-changan/K2-002-CHANGAN-SERIES-AND-EP01-03-v1.3.md) | `SUPERSEDED` | K2 Domain Owner |
-| [`docs/16-k2-production/k2-002-changan/source/K2-002-CHANGAN-SOURCE-v1.2.md`](../16-k2-production/k2-002-changan/source/K2-002-CHANGAN-SOURCE-v1.2.md) | `SUPERSEDED` | K2 Domain Owner |
-| [`docs/16-k2-production/k2-002-changan/source/K2-002-CHANGAN-UPLOADED-OWNER-REVISION-v1.4.md`](../16-k2-production/k2-002-changan/source/K2-002-CHANGAN-UPLOADED-OWNER-REVISION-v1.4.md) | `SUPERSEDED` | K2 Domain Owner |
+| [`docs/16-k2-production/K2-001-PREPRODUCTION-CANDIDATE.md`](../../docs/16-k2-production/K2-001-PREPRODUCTION-CANDIDATE.md) | `SUPERSEDED` | K2 Domain Owner |
+| [`docs/16-k2-production/K2-P1-PREBOOT-TO-LIVE-RUNBOOK.md`](../../docs/16-k2-production/K2-P1-PREBOOT-TO-LIVE-RUNBOOK.md) | `SUPERSEDED` | K2 Domain Owner |
+| [`docs/16-k2-production/k2-002-changan/K2-002-CHANGAN-SERIES-AND-EP01-03-v1.3.md`](../../docs/16-k2-production/k2-002-changan/K2-002-CHANGAN-SERIES-AND-EP01-03-v1.3.md) | `SUPERSEDED` | K2 Domain Owner |
+| [`docs/16-k2-production/k2-002-changan/source/K2-002-CHANGAN-SOURCE-v1.2.md`](../../docs/16-k2-production/k2-002-changan/source/K2-002-CHANGAN-SOURCE-v1.2.md) | `SUPERSEDED` | K2 Domain Owner |
+| [`docs/16-k2-production/k2-002-changan/source/K2-002-CHANGAN-UPLOADED-OWNER-REVISION-v1.4.md`](../../docs/16-k2-production/k2-002-changan/source/K2-002-CHANGAN-UPLOADED-OWNER-REVISION-v1.4.md) | `SUPERSEDED` | K2 Domain Owner |
 | [`governance/K2_P1_PREBOOT_OFFLINE_PACKAGE.md`](../../governance/K2_P1_PREBOOT_OFFLINE_PACKAGE.md) | `SUPERSEDED` | Architecture Owner / Documentation Governance Owner |
 | [`governance/K2_PUBLISHABLE_P0_EXTERNAL_HOLD.md`](../../governance/K2_PUBLISHABLE_P0_EXTERNAL_HOLD.md) | `SUPERSEDED` | Architecture Owner / Documentation Governance Owner |
 | [`governance/K2_PUBLISHABLE_PRODUCTION_EXECUTION_PACKAGE.md`](../../governance/K2_PUBLISHABLE_PRODUCTION_EXECUTION_PACKAGE.md) | `SUPERSEDED` | Architecture Owner / Documentation Governance Owner |
@@ -289,38 +283,25 @@ Owner decision; it does not issue a live Grant or authorize deployment.
 
 ## DEPRECATED
 
-| Document | Status | Owner |
-| --- | --- | --- |
-| _None_ | — | — |
+No documents registered in this class.
 
 ## GENERATED_REFERENCE
 
 | Document | Status | Owner |
 | --- | --- | --- |
-| [`docs/status/M10_M11_SPIKE_0_E4_EVIDENCE_INDEX_2026-09-09.md`](../status/M10_M11_SPIKE_0_E4_EVIDENCE_INDEX_2026-09-09.md) | `REFERENCE` | Project Lead / Documentation Governance Owner |
 | [`README.md`](../../README.md) | `REFERENCE` | Project Lead / Documentation Governance Owner |
-| [`docs/03-data-design/README.md`](../03-data-design/README.md) | `REFERENCE` | Data Architecture Owner |
-| [`docs/04-interface-contract/README.md`](../04-interface-contract/README.md) | `REFERENCE` | Public Contract Owner |
-| [`docs/07-v3-render-core/README.md`](../07-v3-render-core/README.md) | `REFERENCE` | Runtime Owner |
-| [`docs/11-testing/README.md`](../11-testing/README.md) | `REFERENCE` | Verification Owner |
-| [`docs/14-application-design/README.md`](../14-application-design/README.md) | `REFERENCE` | Application Owner |
-| [`docs/15-investor-readiness/README.md`](../15-investor-readiness/README.md) | `REFERENCE` | Project Lead |
-| [`docs/16-k2-production/README.md`](../16-k2-production/README.md) | `REFERENCE` | K2 Domain Owner |
-| [`docs/16-k2-production/k2-002-changan/README.md`](../16-k2-production/k2-002-changan/README.md) | `REFERENCE` | K2 Domain Owner |
-| [`docs/README.md`](../README.md) | `REFERENCE` | Documentation Governance Owner |
-| [`docs/governance/DOCUMENT_AUTHORITY_MAP.md`](DOCUMENT_AUTHORITY_MAP.md) | `REFERENCE` | Architecture Owner / Documentation Governance Owner |
-| [`docs/governance/DOCUMENT_REGISTRY.json`](DOCUMENT_REGISTRY.json) | `REFERENCE` | Architecture Owner / Documentation Governance Owner |
-| [`docs/governance/DOCUMENT_SUPERSESSION_MAP.md`](DOCUMENT_SUPERSESSION_MAP.md) | `REFERENCE` | Architecture Owner / Documentation Governance Owner |
+| [`docs/03-data-design/README.md`](../../docs/03-data-design/README.md) | `REFERENCE` | Data Architecture Owner |
+| [`docs/04-interface-contract/README.md`](../../docs/04-interface-contract/README.md) | `REFERENCE` | Public Contract Owner |
+| [`docs/07-v3-render-core/README.md`](../../docs/07-v3-render-core/README.md) | `REFERENCE` | Runtime Owner |
+| [`docs/11-testing/README.md`](../../docs/11-testing/README.md) | `REFERENCE` | Verification Owner |
+| [`docs/14-application-design/README.md`](../../docs/14-application-design/README.md) | `REFERENCE` | Application Owner |
+| [`docs/15-investor-readiness/README.md`](../../docs/15-investor-readiness/README.md) | `REFERENCE` | Project Lead |
+| [`docs/16-k2-production/README.md`](../../docs/16-k2-production/README.md) | `REFERENCE` | K2 Domain Owner |
+| [`docs/16-k2-production/k2-002-changan/README.md`](../../docs/16-k2-production/k2-002-changan/README.md) | `REFERENCE` | K2 Domain Owner |
+| [`docs/README.md`](../../docs/README.md) | `REFERENCE` | Documentation Governance Owner |
+| [`docs/governance/DOCUMENT_AUTHORITY_MAP.md`](../../docs/governance/DOCUMENT_AUTHORITY_MAP.md) | `REFERENCE` | Architecture Owner / Documentation Governance Owner |
+| [`docs/governance/DOCUMENT_REGISTRY.json`](../../docs/governance/DOCUMENT_REGISTRY.json) | `REFERENCE` | Architecture Owner / Documentation Governance Owner |
+| [`docs/governance/DOCUMENT_SUPERSESSION_MAP.md`](../../docs/governance/DOCUMENT_SUPERSESSION_MAP.md) | `REFERENCE` | Architecture Owner / Documentation Governance Owner |
+| [`docs/status/M10_M11_SPIKE_0_E4_EVIDENCE_INDEX_2026-09-09.md`](../../docs/status/M10_M11_SPIKE_0_E4_EVIDENCE_INDEX_2026-09-09.md) | `REFERENCE` | Project Lead / Documentation Governance Owner |
 | [`tests/README.md`](../../tests/README.md) | `REFERENCE` | Verification Owner |
 | [`tests/fixtures/v5_fonts/README.md`](../../tests/fixtures/v5_fonts/README.md) | `REFERENCE` | Verification Owner |
-
-## Historical isolation
-
-R3 bounded candidate evidence: [SH09 exact offline binding](../status/SH09_EXACT_OFFLINE_BINDING_R3_2026-09-13.md),
-`IMPLEMENTATION_EVIDENCE / RECORDED`; Project Lead / Generation Dispatch Authority Owner.
-It does not accept a prompt, authorize live execution or supersede the R2/F01 acceptance record.
-
-Every `IMPLEMENTATION_EVIDENCE`, `HISTORICAL_EVIDENCE` and `SUPERSEDED` entry
-is non-authoritative for current execution and carries
-`HISTORICAL_PATH_NOT_EXECUTION_AUTHORITY=true` in the registry. Drafts and
-generated references likewise create no architecture or execution authority.

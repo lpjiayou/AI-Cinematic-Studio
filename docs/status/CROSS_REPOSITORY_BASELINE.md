@@ -4,7 +4,12 @@ Status: `CURRENT / METHOD-AWARE PUBLIC CUTOVER VERIFIED`
 
 Reviewed: `2026-09-04`
 
-## 1. Current repository and behavior values
+## 1. Closed K2 cutover behavior and compatibility pin
+
+The values below describe the verified 2026-09-04 cutover/pin, not current Core or
+Frontend branch HEADs. Current execution is in
+[CURRENT_MILESTONE.md](../../CURRENT_MILESTONE.md). Later Core engineering merges
+do not silently move this Frontend pin or the immutable M13 tag.
 
 ```text
 CORE_BEHAVIOR_MAIN=e21789d265c4e936b0e0b29921746a4c205889b8
@@ -23,8 +28,8 @@ M13_BASE_TAG_OBJECT=b2d086b622bdb5456f6af325e458aa3771e43e80
 M13_BASE_TAG_TARGET=a455c8e76427d53d75bb7f15259b9875d9768914
 ```
 
-`CORE_BEHAVIOR_MAIN` is the final production-behavior commit and the immutable
-Frontend dependency. `CORE_ACCEPTANCE_MAIN` is its acceptance-only descendant.
+`CORE_BEHAVIOR_MAIN` is the final behavior commit of this closed cutover and its
+immutable Frontend dependency. `CORE_ACCEPTANCE_MAIN` is its acceptance-only descendant.
 This document does not predict the future squash SHA of its own docs-only PR.
 
 ## 2. Closed upstream wave
@@ -100,9 +105,9 @@ completion, M14 QC/Approval, M15 Master/Export or publication.
 
 ## 5. Preserved predecessor snapshots
 
-The following values preserve the earlier M13 closeout and pre-pin Frontend snapshots
-for the already-merged documentation validator. They are historical compatibility
-facts, not current branch refs:
+The following values preserve the earlier M13 closeout and pre-pin Frontend snapshots.
+The validator checks these complete, scope-qualified keys; no substring alias can
+substitute for a current field. These are historical facts, not current branch refs:
 
 ```text
 M13_FROZEN_CORE_MAIN=a455c8e76427d53d75bb7f15259b9875d9768914
@@ -158,7 +163,7 @@ A100_GPU_EXECUTION_AUTHORIZED=false
 GPU_CALLS_ALLOWED=false
 PROVIDER_CALLS_ALLOWED=false
 PUBLICATION_ALLOWED=false
-NEXT_TASK=ACS-M12-C3-DEDICATED-LINUX-CPU-VM-PROVIDER-SELECTION-AND-PREFLIGHT
+M12_NEXT_TASK=ACS-M12-C3-DEDICATED-LINUX-CPU-VM-PROVIDER-SELECTION-AND-PREFLIGHT
 ```
 
 The WSL2 candidate failed the current wave after its one network-remediation attempt;

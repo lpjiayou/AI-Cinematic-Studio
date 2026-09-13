@@ -2,7 +2,8 @@
 
 Status: `CURRENT / SIX-DIMENSIONAL / FAIL-CLOSED`
 
-Reviewed: `2026-09-08`
+Baseline projection: `2026-09-08`; M10/M11 dispatch and reading-scope correction:
+`2026-09-13`, against `1e62786ea75823869c97934b18e22d722b7949f9`.
 
 ## 1. Reading rules
 
@@ -11,6 +12,11 @@ independently. Repository implementation evidence does not establish a live Prov
 GPU, human Approval, product-complete surface or publication fact. Project-specific
 K2 evidence does not prove a general milestone product. The immutable M13 tag proves
 only its accepted base backend.
+
+The global active task is only in [CURRENT_MILESTONE.md](../../CURRENT_MILESTONE.md).
+Older PR ledgers and dated receipts below retain checkpoint-local meaning; they do
+not assign today's next task. Frontend compatibility values are the recorded closed
+cutover pin, not a fresh observation of the external repository.
 
 ## 2. Six-dimensional matrix
 
@@ -26,7 +32,7 @@ only its accepted base backend.
 | M8 | `ADR_0019_ACCEPTED` | `IMPLEMENTED_ACTION_EXECUTION_BEATS_V2_PUBLIC_CUTOVER` | `SQLITE_RESTART_VERIFIED` | `LEGACY_HISTORY_GATE_COMPATIBLE_METHOD_AWARE_UI_INCOMPLETE` | `IMPLEMENTED_BOUNDED` | `NOT_AUTHORIZED` |
 | M9 | `ADR_0019_ACCEPTED` | `IMPLEMENTED_THREE_AXIS_REQUIREMENTS_LEGACY_G4_WRITE_FROZEN` | `SQLITE_RESTART_VERIFIED` | `LEGACY_HISTORY_GATE_COMPATIBLE_METHOD_AWARE_UI_INCOMPLETE` | `IMPLEMENTED_BOUNDED` | `NOT_AUTHORIZED` |
 | M10 | `ADR_0019_0021_ACCEPTED` | `IMPLEMENTED_METHOD_AWARE_INPUT_PLANNING_AND_EXACT_MANIFEST_V2_TECHNICAL_APPEND` | `SQLITE_RESTART_VERIFIED_NO_MODEL_CALL` | `BEHAVIOR_PIN_COMPATIBLE_METHOD_AWARE_UI_INCOMPLETE` | `IMPLEMENTED_BOUNDED` | `NOT_AUTHORIZED` |
-| M11 | `ADR_0019_ACCEPTED_FAIL_CLOSED_METHOD_BOUNDARY` | `IMPLEMENTED_CLOSED_METHOD_ROUTING_LEGACY_G5_WRITE_FROZEN` | `WAN_MICRO_QUEUE_ONLY_CONTACT_GAIT_UNAVAILABLE` | `BEHAVIOR_PIN_COMPATIBLE_METHOD_AWARE_UI_INCOMPLETE` | `IMPLEMENTED_BOUNDED_HISTORICAL_QC_FAILURE_PRESERVED` | `NOT_AUTHORIZED` |
+| M11 | `ADR_0019_AND_ADR_0022_V1_5_ACCEPTED_BOUNDED` | `DISPATCH_GRANT_STAGED_TRANSPORT_AND_ORIGINAL_LIVE_OPERATOR_MERGED` | `CPU_FIXTURE_VERIFIED_SH09_LIVE_RESULT_NOT_VERIFIED_CONTACT_GAIT_UNAVAILABLE` | `BEHAVIOR_PIN_COMPATIBLE_METHOD_AWARE_UI_INCOMPLETE` | `BOUNDED_ENGINEERING_NOT_PRODUCT_COMPLETE` | `NOT_AUTHORIZED` |
 | M12 | `ADR_0015_0020_ACCEPTED_DEDICATED_CPU_VM_SELECTION_HOLD` | `EXPLICIT_M9_REQUIREMENT_BRIDGE_IMPLEMENTED` | `A100_AND_WSL2_BUILD_HOST_PREFLIGHTS_FAILED_HOST_UNSELECTED` | `V1_ADAPTER_COMPATIBLE_BEHAVIOR_PINNED` | `NOT_COMPLETE` | `NOT_AUTHORIZED` |
 | M13 | `BASE_ACCEPTED` | `BASE_BACKEND_COMPLETE_RENDER_CANDIDATE_PROJECTED` | `DETERMINISTIC_CPU_VERIFIED` | `PIN_ONLY_PRODUCT_SURFACE_INCOMPLETE` | `NOT_COMPLETE` | `NOT_AUTHORIZED` |
 | M14 | `PLANNED_AND_BOUNDARY_CONSTRAINED` | `NOT_AUTHORIZED` | `NOT_STARTED` | `UNVERIFIED` | `NOT_COMPLETE` | `NOT_AUTHORIZED` |
@@ -103,8 +109,8 @@ database was created.
 | M6 | ADR-0003/0004/0005/0019 | #55 and #59 | production authority absent | upstream prerequisite closed |
 | M7 | ADR-0019 | #55 and #59 | no automatic rewrite or WARN waiver | upstream prerequisite closed |
 | M8–M9 | ADR-0019 | #56, #58, #63 and #64; Frontend #25 | live asset production/admission not authorized | method-aware successor required |
-| M10 | ADR-0019, ADR-0021 | #57/#63/#64, E1/E2, E3A/E3G/E3H and post-E3H R6 exact-grant input suffix; one receipt-v2 Candidate, evidence-bound QC, external HumanSelection, admission/AssetVersion and CURRENT InputPlan survived exact replay, restart and transfer roundtrip | exact technical input lineage only; live runtime/cost, execution and Frontend remain absent | read-only A100 runtime and cost preflight under separate E4 authorization |
-| M11 | ADR-0019, ADR-0021 | E1 exact worker, E2 verified result/status, E3G unavailable-backend separation, E3H pre-route rejection and post-E3H transferable eligible input lineage | Run remains preflight-only; camera not ready; dispatch/provider/publication false; Contact/Gait unavailable; no Route/Job/Attempt | read-only A100 runtime and cost preflight; M11 execution remains blocked |
+| M10 | ADR-0019, ADR-0021 | E1/E2/E3A/E3G/E3H and R6 input lifecycle, restart/replay/transfer evidence; D1 seven-existing-store reader wiring in PR #92 | Input lineage is not a live runtime, approved video output or Frontend consumer | Same D1 read-only prepare and exact run request; no input reconstruction |
+| M11 | ADR-0019, ADR-0022 v1.5 | PR #86–#90 bounded CPU/loopback dispatch/transport/R3 evidence; PR #91 original live Operator; PR #92 binding fix | Real SH09 result, exact runtime/run approval and currentness remain unproven; Contact/Gait unavailable | Resume the existing D1 Operator, not another worker or global audit |
 | M12 | ADR-0015, ADR-0019, ADR-0020 | #20/#21, #58/#63/#64; A100 evidence `93c1c96d…a1ce`; WSL2 evidence `801e4e8c…7ed`; dedicated VM specification | WSL2 rejected for this wave; dedicated CPU VM/provider unselected; A100 C4 isolation unproven; Runtime G0 incomplete | `ACS-M12-C3-DEDICATED-LINUX-CPU-VM-PROVIDER-SELECTION-AND-PREFLIGHT` |
 | M13 | ADR-0016/0017/0018/0019 | immutable base tag, #48/#63/#64; Frontend #25 | product surface, M14/M15 and publication incomplete | Extension G0 requires separate authorization |
 | M14–M19 | System Master Plan and applicable M13 boundary | no authorized implementation | prerequisite and authority gates absent | no current implementation authority |
@@ -184,7 +190,7 @@ M12_C3_PREIMPLEMENTATION_BLOCKER=DEDICATED_CPU_VM_PROVIDER_SELECTION_AND_PREFLIG
 A100_GPU_EXECUTION_AUTHORIZED=false
 A100_START_AUTHORIZED=false
 A100_FUTURE_START_AUTHORIZED=false
-NEXT_TASK=ACS-M10-M11-CORE-COMFYUI-PROTOCOL-SPIKE-0-READINESS-AND-AUTHORIZATION-CHECKPOINT
+M12_NEXT_TASK=ACS-M12-C3-DEDICATED-LINUX-CPU-VM-PROVIDER-SELECTION-AND-PREFLIGHT
 ```
 
 ## 6. Required Frontend projection
@@ -204,7 +210,7 @@ FRONTEND_CONTROL_PLANE_FFMPEG_CONDITIONAL=true
 POST_MERGE_PUSH_CI_RUN_COUNT=0
 ```
 
-The pin and legacy-history gate prove compatibility only. They do not establish a
+The recorded cutover pin and legacy-history gate prove compatibility only. They do not establish a
 method-aware planning UI, Contact/Gait runtime, M12/M13 product completion or
 publication authority.
 
@@ -223,6 +229,14 @@ M13_M14_M15_INTEGRATION=NOT_AUTHORIZED
 M13_PUBLICATION=NOT_AUTHORIZED
 M13_PRODUCT_CAPABILITY_COMPLETE=false
 ```
+
+## 8. Dated implementation receipt ledger — not current next-task authority
+
+The following paragraphs preserve what each checkpoint proved or still lacked at
+its date. Later input/dispatch/Operator closures do not rewrite those receipts.
+For merged R2/R3/D1 identities and remaining live gates, use
+[CURRENT_MILESTONE.md](../../CURRENT_MILESTONE.md). Names such as `compose_live`
+or `real_image_candidates` do not themselves prove that GPU generation ran.
 
 The [E1 worker seam receipt](M10_M11_METHOD_AWARE_WORKER_SEAM_CORRECTIVE_E1_2026-09-06.md) records fake-only execution and legacy compatibility. [`E2 result intake`](M10_M11_METHOD_AWARE_JOB_RESULT_INTAKE_CORRECTIVE_E2_2026-09-06.md) adds current exact result verification and atomic technical Candidates, verified with fake CPU artifacts. `SPIKE_0_READINESS=BLOCKED`; no real GPU/provider execution, automatic QC/selection/admission, production auto-routing or E3 was started.
 

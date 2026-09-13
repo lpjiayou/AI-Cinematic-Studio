@@ -5,7 +5,14 @@ HTTP/API boundary, deterministic orchestration and evidence-backed media executi
 The commercial Frontend remains a separate repository and may reach Core only through
 the authenticated Creator Public API.
 
-## Current behavior baseline
+## Start here
+
+Read [Current Milestone](CURRENT_MILESTONE.md) for the active task, observed merged
+checkpoints, blockers and next action, then [AGENTS.md](AGENTS.md) and the Accepted
+contracts applicable to that task. This README does not duplicate mutable task
+flags or claim that an old behavior pin is the latest repository HEAD.
+
+## Frozen M13 base evidence
 
 ```text
 CORE_COMMIT=a455c8e76427d53d75bb7f15259b9875d9768914
@@ -17,33 +24,22 @@ FRONTEND_COMMIT=a0be9edc91437bf0e7c5dd14883e656e750b3aee
 FRONTEND_TREE=c25b9e3744d561c93fed26d0a07e59a1915a6071
 ```
 
-Documentation-only governance merges may advance `main`; they do not move this
-behavior tag or change the frozen product behavior. See the
+These are the frozen M13 base and early Frontend checkpoint, not current branch
+HEADs. Later behavior and governance commits do not rewrite this tag. See the
 [cross-repository baseline](docs/status/CROSS_REPOSITORY_BASELINE.md).
 
 ## Current state
 
-```text
-M13_BASE_BACKEND_COMPLETE=true
-M13_BASE_CLOSEOUT_ACCEPTED=true
-M13_PRODUCT_CAPABILITY_COMPLETE=false
-M13_EXTENSION_G0_AUTHORIZED=false
-M13_EXTENSION_IMPLEMENTATION_AUTHORIZED=false
-
-M12_RUNTIME_G0=NOT_COMPLETE
-M12_G0_3_STATE=ENVIRONMENT_HOLD
-M12_C3_READY_TO_START=false
-
-A100_START_AUTHORIZED=false
-PUBLICATION_ALLOWED=false
-```
+The single active execution projection is in [Current Milestone](CURRENT_MILESTONE.md).
+Do not infer live deployment, GPU success or publication approval from a merged PR.
 
 M13 currently ends at `PreviewCandidate`, non-publishing `RenderCandidate` and
 `RenderManifest`. It does not create `ExportCandidate`, `EpisodeMaster` or
 `ExportArtifact`. Machine QC is not human Approval.
 
-M12's domain and isolated-runtime protocols are merged, but neither runtime is
-installed and Runtime G0 is not complete. The persistent CPU build root remains absent.
+M12's domain and isolated-runtime protocols are merged; its runtime remains a
+separate unfinished workstream. D1's Linux control host does not by itself satisfy
+M12's isolated audio build/runtime gates.
 
 The complete six-dimensional M1–M19 projection is
 [M1–M19 Capability Status](docs/status/M1-M19-CAPABILITY-STATUS.md). The concise current
@@ -110,6 +106,9 @@ Follow [`AGENTS.md`](AGENTS.md). For a pure documentation diff, run only:
 ```bash
 python scripts/validate_markdown.py
 python scripts/validate_doc_links.py
+python scripts/validate_document_registry.py
+python scripts/validate_current_state.py
+python scripts/validate_document_supersession.py
 ```
 
 The protected repository workflow retains exactly five required jobs: Markdown,
@@ -117,10 +116,6 @@ Documentation Links, Unit Tests, Contract Tests and Integration Tests.
 
 ## Next legal project boundary
 
-```text
-NEXT_TASK=LOCAL_WSL2_HANDOFF_AND_M12_C3_PREFLIGHT
-```
-
-This is a handoff/preflight boundary only. It does not authorize M12-C3/C4, A100, model
-downloads, GPU/provider execution, M13 Extension G0, Asset Admission, Master/Export or
-publication.
+Follow the next action in [Current Milestone](CURRENT_MILESTONE.md), not a dated
+receipt's `NEXT_TASK`. The [documentation index](docs/README.md) separates active
+authority from cold evidence; the complete index is not a required startup checklist.
