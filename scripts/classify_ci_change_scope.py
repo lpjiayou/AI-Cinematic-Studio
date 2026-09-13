@@ -1,4 +1,4 @@
-"""Classify a Git commit range as DOCS_ONLY or FULL_SUITE, fail closed."""
+"""Classify a Git range using closed documentation/test allowlists, fail closed."""
 
 from __future__ import annotations
 
@@ -13,11 +13,36 @@ import subprocess
 from typing import Callable, Sequence
 
 
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
 DOCS_ONLY = "DOCS_ONLY"
+AFFECTED_TESTS = "AFFECTED_TESTS"
 FULL_SUITE = "FULL_SUITE"
-ALLOWED_EVENTS = {"pull_request", "workflow_dispatch"}
+ALLOWED_EVENTS = {"pull_request", "workflow_dispatch", "schedule"}
 HEX_SHA = re.compile(r"[0-9a-f]{40}")
+
+# Only existing, isolated test modules qualify. Production, shared fixtures and
+# CI changes remain FULL_SUITE. Expanding this list itself requires FULL_SUITE.
+AFFECTED_TEST_ALLOWLIST = frozenset({
+    "tests/integration/test_ai_director_project_draft_flow.py",
+    "tests/integration/test_creator_project_context.py",
+    "tests/integration/test_creator_series_episode.py",
+    "tests/integration/test_creator_script_studio.py",
+    "tests/integration/test_creator_series_planning.py",
+})
+CRITICAL_INTEGRATION_SMOKE = (
+    "tests/integration/test_creator_lifecycle_sqlite_p2.py",
+    "tests/integration/test_creator_public_http_v1.py",
+    "tests/integration/test_creator_narrative_currentness_m7.py",
+)
+
+
+def selected_integration_files(changes: Sequence[ChangedFile]) -> tuple[str, ...]:
+    """All five upstream slices plus lifecycle/API/currentness smoke; no guesses."""
+    tests = {path for change in changes for path in change.paths
+             if path in AFFECTED_TEST_ALLOWLIST}
+    if not tests:
+        return ()
+    return tuple(sorted(AFFECTED_TEST_ALLOWLIST | set(CRITICAL_INTEGRATION_SMOKE)))
 
 ROOT_DOCUMENTS = {
     "AGENTS.md",
@@ -212,6 +237,8 @@ def _payload(
         "protectedMatches": sorted(set(protected_matches)),
         "unknownMatches": sorted(set(unknown_matches)),
         "classificationReason": reason,
+        "selectedIntegrationFiles": list(selected_integration_files(changed_files))
+        if classification == AFFECTED_TESTS else [],
     }
     result["payloadDigest"] = payload_digest(result)
     return result
@@ -225,7 +252,7 @@ def classify_records(
 ) -> ClassificationOutcome:
     """Classify already-parsed changes. Inputs must be commit SHAs."""
 
-    if event_name == "workflow_dispatch":
+    if event_name in {"workflow_dispatch", "schedule"}:
         return ClassificationOutcome(
             _payload(
                 event_name=event_name,
@@ -233,9 +260,9 @@ def classify_records(
                 head_sha=head_sha,
                 classification=FULL_SUITE,
                 changed_files=changed_files,
-                protected_matches=["<event:workflow_dispatch>"],
+                protected_matches=[f"<event:{event_name}>"],
                 unknown_matches=[],
-                reason="WORKFLOW_DISPATCH_ALWAYS_FULL_SUITE",
+                reason=f"{event_name.upper()}_ALWAYS_FULL_SUITE",
             )
         )
     if event_name != "pull_request":
@@ -298,6 +325,23 @@ def classify_records(
                 protected_matches.add(f"{path} [{reason}]")
             else:
                 unknown_matches.add(f"{path} [{reason}]")
+
+    affected = selected_integration_files(changed_files)
+    if affected and not mode_or_type_change and not unknown_matches and all(
+        change.status == "M"
+        and change.old_path == change.new_path
+        and change.old_mode == change.new_mode
+        and change.old_mode in {"100644", "100755"}
+        and all(path in AFFECTED_TEST_ALLOWLIST or path_class(path)[0] == "DOCS"
+                for path in change.paths)
+        for change in changed_files
+    ):
+        return ClassificationOutcome(_payload(
+            event_name=event_name, base_sha=base_sha, head_sha=head_sha,
+            classification=AFFECTED_TESTS, changed_files=changed_files,
+            protected_matches=[], unknown_matches=[],
+            reason="ISOLATED_TEST_ALLOWLIST_PROVEN",
+        ))
 
     if protected_matches or unknown_matches:
         if docs_paths:
@@ -466,7 +510,7 @@ def classify_repository_change(
             ),
             failed=True,
         )
-    if event_name == "workflow_dispatch":
+    if event_name in {"workflow_dispatch", "schedule"}:
         return classify_records(event_name, base_sha, head_sha, [])
     try:
         changes = diff_reader(repo_root, base_sha, head_sha)
@@ -484,7 +528,31 @@ def classify_repository_change(
             ),
             failed=True,
         )
-    return classify_records(event_name, base_sha, head_sha, changes)
+    outcome = classify_records(event_name, base_sha, head_sha, changes)
+    if outcome.payload["classification"] == AFFECTED_TESTS:
+        # A test reused by another module is no longer isolated. Literal name
+        # references (including comments) conservatively force a full run. This
+        # guard is repeated by every job, and never executes candidate code.
+        try:
+            touched = {path for change in changes for path in change.paths
+                       if path in AFFECTED_TEST_ALLOWLIST}
+            for selected in outcome.payload["selectedIntegrationFiles"]:
+                if not (repo_root / selected).is_file():
+                    raise ValueError("missing selected test")
+            for root in ("apps", "services", "tests"):
+                for source in (repo_root / root).rglob("*.py"):
+                    relative = source.relative_to(repo_root).as_posix()
+                    text = source.read_text(encoding="utf-8")
+                    if any(relative != path and Path(path).stem in text for path in touched):
+                        raise ValueError("selected test has consumers")
+        except (OSError, UnicodeError, ValueError):
+            return ClassificationOutcome(_payload(
+                event_name=event_name, base_sha=base_sha, head_sha=head_sha,
+                classification=FULL_SUITE, changed_files=changes,
+                protected_matches=["<non-isolated-or-unavailable-test>"], unknown_matches=[],
+                reason="AFFECTED_TEST_ISOLATION_NOT_PROVEN",
+            ))
+    return outcome
 
 
 def verify_payload(payload: dict[str, object]) -> None:
@@ -498,14 +566,19 @@ def verify_payload(payload: dict[str, object]) -> None:
         "protectedMatches",
         "unknownMatches",
         "classificationReason",
+        "selectedIntegrationFiles",
         "payloadDigest",
     }
     if set(payload) != required:
         raise ValueError("classification payload fields are not the closed schema")
     if payload["schemaVersion"] != SCHEMA_VERSION:
         raise ValueError("unsupported classification schemaVersion")
-    if payload["classification"] not in {DOCS_ONLY, FULL_SUITE}:
+    if payload["classification"] not in {DOCS_ONLY, AFFECTED_TESTS, FULL_SUITE}:
         raise ValueError("invalid CI scope classification")
+    selected = payload["selectedIntegrationFiles"]
+    expected = sorted(AFFECTED_TEST_ALLOWLIST | set(CRITICAL_INTEGRATION_SMOKE))
+    if selected != (expected if payload["classification"] == AFFECTED_TESTS else []):
+        raise ValueError("invalid selected Integration files")
     if payload["payloadDigest"] != payload_digest(payload):
         raise ValueError("classification payload digest mismatch")
 

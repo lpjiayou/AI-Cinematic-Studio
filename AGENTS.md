@@ -215,8 +215,14 @@ FULL_SUITE_EXECUTED=false
 FFMPEG_INSTALL_EXECUTED=false
 ```
 
-Any mixed, protected, unknown, empty, invalid-mode or classifier/workflow change is
-`FULL_SUITE`. Classification failure is fail-closed.
+The bounded `AFFECTED_TESTS` exception permits only modifications of existing,
+isolated tests on the policy's exact allowlist (optionally with documentation).
+It runs complete Unit/Contract suites plus the declared Integration slices and
+lifecycle/API/currentness smoke. Production code, shared fixtures, CI controls,
+unknown paths, additions/deletions/renames and invalid modes remain `FULL_SUITE`.
+Classification or isolation uncertainty falls back to full execution or fails.
+Daily scheduled and manual runs remain full; no test is removed or weakened. See
+[the CI scope policy](docs/governance/CI_REQUIRED_CHECK_FAST_PATH_POLICY.md).
 
 ### CI Waiting
 
@@ -240,7 +246,7 @@ Any mixed, protected, unknown, empty, invalid-mode or classifier/workflow change
 - Fail fast when any required check fails, is cancelled, is timed out or is otherwise
   terminal without success.
 - Maximum blocking time is 10 minutes for `DOCS_ONLY` and 60 minutes for
-  `FULL_SUITE`.
+  `AFFECTED_TESTS` or `FULL_SUITE`.
 - Return exactly one terminal result: `PASS`, `FAIL`, `TIMEOUT` or
   `API_ERROR`.
 - A failed tree must not be rerun. Correct the cause and create a new tree first.

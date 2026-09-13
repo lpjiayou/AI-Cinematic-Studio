@@ -28,7 +28,7 @@ Resolve and freeze before starting the waiter:
 
 - repository in `owner/name` form;
 - the exact PR head commit SHA and tree;
-- `CI_SCOPE=DOCS_ONLY|FULL_SUITE`;
+- `CI_SCOPE=DOCS_ONLY|AFFECTED_TESTS|FULL_SUITE`;
 - an already configured GitHub token with read access to checks;
 - confirmation that no waiter has already been started for this head tree.
 
@@ -54,8 +54,8 @@ run with the greatest numeric check-run `id`.
 ## 4. Standard-library REST waiter
 
 The following reference uses only the Python standard library. Run it once inside one
-blocking tool call. Pass `DOCS_ONLY` for a 10-minute deadline or `FULL_SUITE` for a
-60-minute deadline. It prints exactly one JSON result at termination and never prints
+blocking tool call. Pass `DOCS_ONLY` for a 10-minute deadline or `AFFECTED_TESTS` /
+`FULL_SUITE` for a 60-minute deadline. It prints exactly one JSON result at termination and never prints
 polling progress.
 
 ```python
@@ -77,7 +77,7 @@ REQUIRED = (
     "Contract Tests",
     "Integration Tests",
 )
-DEADLINE_SECONDS = {"DOCS_ONLY": 600, "FULL_SUITE": 3600}
+DEADLINE_SECONDS = {"DOCS_ONLY": 600, "AFFECTED_TESTS": 3600, "FULL_SUITE": 3600}
 POLL_SECONDS = 15
 API_VERSION = "2022-11-28"
 
@@ -156,7 +156,7 @@ def main() -> int:
         return terminal(
             "API_ERROR",
             sha="UNKNOWN",
-            detail="usage: waiter.py OWNER/REPO HEAD_SHA DOCS_ONLY|FULL_SUITE",
+            detail="usage: waiter.py OWNER/REPO HEAD_SHA DOCS_ONLY|AFFECTED_TESTS|FULL_SUITE",
         )
     repository, sha, scope = sys.argv[1:]
     token = os.environ.get("GITHUB_TOKEN", "")

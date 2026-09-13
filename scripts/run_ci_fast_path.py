@@ -18,6 +18,7 @@ import unittest
 try:
     from classify_ci_change_scope import (
         DOCS_ONLY,
+        AFFECTED_TESTS,
         FULL_SUITE,
         classify_repository_change,
         verify_payload,
@@ -26,6 +27,7 @@ try:
 except ModuleNotFoundError:  # Imported as scripts.run_ci_fast_path by unit tests.
     from scripts.classify_ci_change_scope import (
         DOCS_ONLY,
+        AFFECTED_TESTS,
         FULL_SUITE,
         classify_repository_change,
         verify_payload,
@@ -45,89 +47,93 @@ INTEGRATION_TEST_ROOT = Path("tests/integration")
 INTEGRATION_SHARD_LIMIT_SECONDS = 1200
 INTEGRATION_SHARDS: dict[str, tuple[str, ...]] = {
     "shard-1": (
-        "tests/integration/test_generation_dispatch_d1_operator_cpu.py",
-        "tests/integration/test_generation_dispatch_prepare_operator.py",
         "tests/integration/test_m13_r2_full_cpu_backend.py",
-        "tests/integration/test_generation_dispatch_a14b_cpu.py",
+        "tests/integration/test_m13_masked_surface_v2_full_resolution.py",
+        "tests/integration/test_m13_e2_timeline_v3_preview.py",
+        "tests/integration/test_creator_method_aware_job_result_intake_e2.py",
+        "tests/integration/test_m13_masked_surface_v3.py",
+        "tests/integration/test_m13_e3_deterministic_overlays_v3.py",
+        "tests/integration/test_creator_series_plan_idempotency_e3d.py",
+        "tests/integration/test_creator_lifecycle_sqlite_p2.py",
+        "tests/integration/test_creator_series_planning.py",
+        "tests/integration/test_m13_v3_media_conformance.py",
+        "tests/integration/test_creator_narrative_currentness_m7.py",
+        "tests/integration/test_ai_director_project_draft_flow.py",
     ),
     "shard-2": (
-        "tests/integration/test_generation_dispatch_live_result_cpu.py",
-        "tests/integration/test_creator_ai_director_candidate_idempotency_e3c.py",
-        "tests/integration/test_creator_clean_state_public_api_e2e.py",
-        "tests/integration/test_creator_creative_plan_confirmation_idempotency_e3b.py",
-        "tests/integration/test_creator_lifecycle_sqlite_p2.py",
-        "tests/integration/test_creator_m12_m13_preview_http.py",
-        "tests/integration/test_creator_method_aware_media_m10_m11.py",
-        "tests/integration/test_creator_method_aware_worker_e1.py",
-        "tests/integration/test_creator_method_aware_job_result_intake_e2.py",
-        "tests/integration/test_creator_method_aware_single_input_admission_e3a.py",
-        "tests/integration/test_creator_input_only_composition_e3g.py",
-        "tests/integration/test_creator_manifest_v2_input_append_authority_e3h.py",
-        "tests/integration/test_creator_public_http_v1.py",
-        "tests/integration/test_creator_public_json_numeric_integrity.py",
-        "tests/integration/test_creator_project_foundation_http.py",
-        "tests/integration/test_creator_script_studio.py",
-        "tests/integration/test_creator_series_plan_candidate_receipts.py",
-        "tests/integration/test_creator_series_plan_idempotency_e3d.py",
-        "tests/integration/test_creator_series_intelligence.py",
-        "tests/integration/test_creator_series_planning.py",
-        "tests/integration/test_m12_audio_execution.py",
-        "tests/integration/test_m12_audio_technical_validation.py",
-        "tests/integration/test_m12_m13_minimal_preview.py",
-        "tests/integration/test_m13_e1_timeline_v3_preview.py",
+        "tests/integration/test_generation_dispatch_a14b_cpu.py",
+        "tests/integration/test_m13_r1a_composition_render_manifest.py",
+        "tests/integration/test_generation_dispatch_job_identity_cpu.py",
+        "tests/integration/test_m13_e3_currentness.py",
         "tests/integration/test_m13_e4_distance_state_v3.py",
-        "tests/integration/test_m13_r1b_render_candidate.py",
-        "tests/integration/test_m13_v3_media_conformance.py",
-        "tests/integration/test_m9_m12_clone_lineage_bridge.py",
+        "tests/integration/test_creator_series_plan_candidate_receipts.py",
+        "tests/integration/test_creator_series_episode.py",
+        "tests/integration/test_m13_e2_deterministic_effects_http.py",
+        "tests/integration/test_creator_ai_director_candidate_idempotency_e3c.py",
+        "tests/integration/test_comfyui_staged_transport_loopback.py",
+        "tests/integration/test_creator_explicit_audio_bridge_m9_m12.py",
+        "tests/integration/test_m12_audio_technical_validation.py",
+        "tests/integration/test_creator_project_context.py",
     ),
     "shard-3": (
         "tests/integration/test_generation_dispatch_a14b_exact_cpu.py",
-        "tests/integration/test_comfyui_staged_transport_loopback.py",
-        "tests/integration/test_ai_director_project_draft_flow.py",
-        "tests/integration/test_creator_dynamic_media_preflight_http.py",
-        "tests/integration/test_creator_execution_method_planning_m8_m9.py",
-        "tests/integration/test_creator_narrative_currentness_m7.py",
-        "tests/integration/test_creator_m5_m7_entrypoints_e3e_http.py",
-        "tests/integration/test_creator_script_recovery_e3f_http.py",
-        "tests/integration/test_creator_project_context.py",
-        "tests/integration/test_creator_series_episode.py",
-        "tests/integration/test_creator_series_intelligence_consumer.py",
-        "tests/integration/test_m12_dialogue_audio_domain.py",
-        "tests/integration/test_m12_isolated_speech_runtime.py",
-        "tests/integration/test_m12_programmatic_audio_execution.py",
-        "tests/integration/test_m13_e3_currentness.py",
+        "tests/integration/test_generation_dispatch_result_recovery_cpu.py",
         "tests/integration/test_m13_e3_timeline_v3_preview.py",
-        "tests/integration/test_m13_flame_smoke_v3_full_resolution.py",
-        "tests/integration/test_m13_glyph_reveal_v2_composition.py",
-        "tests/integration/test_m13_masked_surface_v3.py",
-        "tests/integration/test_m13_timeline_editing_sqlite.py",
+        "tests/integration/test_m12_m13_minimal_preview.py",
+        "tests/integration/test_creator_script_recovery_e3f_http.py",
+        "tests/integration/test_creator_project_foundation_http.py",
+        "tests/integration/test_m13_r1b_render_candidate_v3_security.py",
+        "tests/integration/test_generic_upstream_method_closure.py",
+        "tests/integration/test_creator_manifest_v2_input_append_authority_e3h.py",
+        "tests/integration/test_creator_clean_state_public_api_e2e.py",
+        "tests/integration/test_generation_dispatch_isolation.py",
+        "tests/integration/test_m9_m12_clone_lineage_bridge.py",
+        "tests/integration/test_creator_execution_method_planning_m8_m9.py",
+        "tests/integration/test_m12_dialogue_audio_domain.py",
     ),
     "shard-4": (
-        "tests/integration/test_creator_canonical_registration_http.py",
-        "tests/integration/test_creator_episode_production_k2.py",
-        "tests/integration/test_creator_explicit_audio_bridge_m9_m12.py",
-        "tests/integration/test_creator_method_aware_cutover_http.py",
-        "tests/integration/test_creator_series_intelligence_sqlite_p2.py",
-        "tests/integration/test_generation_dispatch_isolation.py",
-        "tests/integration/test_generation_dispatch_journal.py",
         "tests/integration/test_generation_dispatch_binding_cpu.py",
-        "tests/integration/test_generation_dispatch_coordination_cpu.py",
-        "tests/integration/test_generation_dispatch_job_identity_cpu.py",
-        "tests/integration/test_generation_dispatch_consume_send_cpu.py",
         "tests/integration/test_generation_dispatch_at_most_once_cpu.py",
-        "tests/integration/test_generation_dispatch_result_recovery_cpu.py",
-        "tests/integration/test_generic_upstream_method_closure.py",
-        "tests/integration/test_m12_voice_profile_lineage_sqlite.py",
-        "tests/integration/test_m13_e1_timeline_effect_binding.py",
-        "tests/integration/test_m13_e2_deterministic_effects_http.py",
-        "tests/integration/test_m13_e2_timeline_v3_preview.py",
-        "tests/integration/test_m13_e3_deterministic_overlays_v3.py",
         "tests/integration/test_m13_e4_timeline_v3_preview.py",
+        "tests/integration/test_m13_glyph_reveal_v2_composition.py",
+        "tests/integration/test_creator_method_aware_cutover_http.py",
+        "tests/integration/test_m12_programmatic_audio_execution.py",
+        "tests/integration/test_creator_m12_m13_preview_http.py",
+        "tests/integration/test_creator_public_http_v1.py",
+        "tests/integration/test_creator_script_studio.py",
+        "tests/integration/test_creator_canonical_registration_http.py",
+        "tests/integration/test_creator_creative_plan_confirmation_idempotency_e3b.py",
+        "tests/integration/test_m12_audio_execution.py",
+        "tests/integration/test_creator_input_only_composition_e3g.py",
+    ),
+    "shard-5": (
+        "tests/integration/test_generation_dispatch_d1_operator_cpu.py",
+        "tests/integration/test_m13_flame_smoke_v3_full_resolution.py",
         "tests/integration/test_m13_glyph_reveal_composition.py",
-        "tests/integration/test_m13_masked_surface_v2_full_resolution.py",
-        "tests/integration/test_m13_r1a_composition_render_manifest.py",
+        "tests/integration/test_generation_dispatch_coordination_cpu.py",
+        "tests/integration/test_creator_episode_production_k2.py",
+        "tests/integration/test_creator_method_aware_single_input_admission_e3a.py",
+        "tests/integration/test_creator_series_intelligence_sqlite_p2.py",
+        "tests/integration/test_creator_method_aware_worker_e1.py",
+        "tests/integration/test_m13_timeline_editing_sqlite.py",
+        "tests/integration/test_m12_isolated_speech_runtime.py",
+        "tests/integration/test_creator_method_aware_media_m10_m11.py",
+        "tests/integration/test_m12_voice_profile_lineage_sqlite.py",
+        "tests/integration/test_creator_dynamic_media_preflight_http.py",
+    ),
+    "shard-6": (
+        "tests/integration/test_m13_r1b_render_candidate.py",
+        "tests/integration/test_generation_dispatch_live_result_cpu.py",
+        "tests/integration/test_generation_dispatch_consume_send_cpu.py",
+        "tests/integration/test_generation_dispatch_prepare_operator.py",
+        "tests/integration/test_m13_e1_timeline_v3_preview.py",
+        "tests/integration/test_creator_m5_m7_entrypoints_e3e_http.py",
+        "tests/integration/test_creator_public_json_numeric_integrity.py",
+        "tests/integration/test_generation_dispatch_journal.py",
+        "tests/integration/test_m13_e1_timeline_effect_binding.py",
+        "tests/integration/test_creator_series_intelligence.py",
         "tests/integration/test_m13_r1b_render_candidate_http.py",
-        "tests/integration/test_m13_r1b_render_candidate_v3_security.py",
+        "tests/integration/test_creator_series_intelligence_consumer.py",
     ),
 }
 ALLOWED_INTEGRATION_SKIPS = frozenset(
@@ -317,7 +323,10 @@ def discover_suite(root: Path) -> unittest.TestSuite:
     absolute = REPO_ROOT / root
     if not absolute.is_dir():
         raise SystemExit(f"{root.as_posix()} does not exist in the repository checkout")
-    suite = unittest.defaultTestLoader.discover(str(root), pattern="test_*.py")
+    loader = unittest.TestLoader()
+    suite = loader.discover(str(root), pattern="test_*.py")
+    if loader.errors:
+        raise SystemExit("Test discovery failed:\n" + "\n".join(loader.errors))
     if suite.countTestCases() == 0:
         raise SystemExit(f"No tests were discovered under {root.as_posix()}")
     return suite
@@ -371,12 +380,11 @@ def discover_integration_files(files: tuple[str, ...]) -> unittest.TestSuite:
         candidate = Path(path)
         if candidate.parent != INTEGRATION_TEST_ROOT or not candidate.name.startswith("test_"):
             raise SystemExit(f"Invalid integration shard path: {path}")
-        suites.append(
-            unittest.defaultTestLoader.discover(
-                str(INTEGRATION_TEST_ROOT),
-                pattern=candidate.name,
-            )
-        )
+        loader = unittest.TestLoader()
+        discovered = loader.discover(str(INTEGRATION_TEST_ROOT), pattern=candidate.name)
+        if loader.errors:
+            raise SystemExit("Integration discovery failed:\n" + "\n".join(loader.errors))
+        suites.append(discovered)
     suite = unittest.TestSuite(suites)
     if suite.countTestCases() == 0:
         raise SystemExit("No integration tests were discovered for the shard")
@@ -531,7 +539,7 @@ def command_run_job(args: argparse.Namespace) -> None:
     try:
         if scope == DOCS_ONLY:
             run_docs_only_job(args.job)
-        elif scope == FULL_SUITE:
+        elif scope in {FULL_SUITE, AFFECTED_TESTS}:
             run_full_suite(args.job)
         else:  # verify_payload already prevents this
             raise SystemExit(f"Unsupported CI scope {scope}")
@@ -543,7 +551,7 @@ def command_run_job(args: argparse.Namespace) -> None:
             print("FULL_SUITE_EXECUTED=false")
             print("FFMPEG_INSTALL_EXECUTED=false")
         else:
-            print("FULL_SUITE_EXECUTED=true")
+            print(f"FULL_SUITE_EXECUTED={'true' if scope == FULL_SUITE else 'false'}")
             print(
                 "FFMPEG_INSTALL_EXECUTED="
                 f"{os.environ.get('FFMPEG_INSTALL_EXECUTED', 'false')}"
@@ -551,7 +559,7 @@ def command_run_job(args: argparse.Namespace) -> None:
 
 
 def command_run_integration_shard(args: argparse.Namespace) -> None:
-    scope, _ = load_and_verify_scope()
+    scope, payload = load_and_verify_scope()
     started_epoch = required_epoch("JOB_START_EPOCH")
     test_started = time.monotonic()
     succeeded = False
@@ -561,15 +569,21 @@ def command_run_integration_shard(args: argparse.Namespace) -> None:
             print("INTEGRATION_SHARD_EXECUTED=false")
             succeeded = True
             return
-        if scope != FULL_SUITE:  # verify_payload already prevents this
+        if scope not in {FULL_SUITE, AFFECTED_TESTS}:
             raise SystemExit(f"Unsupported CI scope {scope}")
 
         require_complete_integration_shard_plan()
-        full_count, shard_counts = integration_test_counts()
-        expected_count = shard_counts[args.shard]
-        suite = discover_integration_files(INTEGRATION_SHARDS[args.shard])
+        files = integration_files_for_scope(scope, payload, args.shard)
+        print(f"SELECTED_INTEGRATION_FILES={json.dumps(files, separators=(',', ':'))}")
+        if not files:
+            print("SHARD_DISCOVERED_TEST_COUNT=0")
+            print("SHARDED_EXECUTED_TEST_COUNT=0")
+            print("EMPTY_AFFECTED_SHARD=true")
+            succeeded = True
+            return
+        suite = discover_integration_files(files)
+        expected_count = suite.countTestCases()
         print(f"INTEGRATION_SHARD={args.shard}")
-        print(f"DISCOVERED_INTEGRATION_TEST_COUNT={full_count}")
         print(f"SHARD_DISCOVERED_TEST_COUNT={expected_count}")
 
         stop = threading.Event()
@@ -634,7 +648,7 @@ def command_run_integration_shard(args: argparse.Namespace) -> None:
             print("FULL_SUITE_EXECUTED=false")
             print("FFMPEG_INSTALL_EXECUTED=false")
         else:
-            print("FULL_SUITE_EXECUTED=true")
+            print(f"FULL_SUITE_EXECUTED={'true' if scope == FULL_SUITE else 'false'}")
             print(
                 "FFMPEG_INSTALL_EXECUTED="
                 f"{os.environ.get('FFMPEG_INSTALL_EXECUTED', 'false')}"
@@ -642,7 +656,7 @@ def command_run_integration_shard(args: argparse.Namespace) -> None:
 
 
 def command_aggregate_integration(args: argparse.Namespace) -> None:
-    scope, _ = load_and_verify_scope()
+    scope, payload = load_and_verify_scope()
     started_epoch = required_epoch("JOB_START_EPOCH")
     test_started = time.monotonic()
     succeeded = False
@@ -661,6 +675,16 @@ def command_aggregate_integration(args: argparse.Namespace) -> None:
             print(f"SHARDED_EXECUTED_TEST_COUNT={sharded_count}")
             print(f"COUNT_MATCH={'true' if full_count == sharded_count else 'false'}")
             print("TEST_SKIP_COUNT_NOT_INCREASED=true")
+        elif scope == AFFECTED_TESTS:
+            require_complete_integration_shard_plan()
+            selected = tuple(payload["selectedIntegrationFiles"])
+            assigned = tuple(path for shard in INTEGRATION_SHARDS
+                             for path in integration_files_for_scope(scope, payload, shard))
+            if Counter(assigned) != Counter(selected):
+                raise SystemExit("Affected Integration coverage mismatch")
+            print(f"SELECTED_INTEGRATION_FILES={json.dumps(selected, separators=(',', ':'))}")
+            print(f"SELECTED_INTEGRATION_TEST_COUNT={discover_integration_files(selected).countTestCases()}")
+            print("AFFECTED_INTEGRATION_COVERAGE=PASS")
         else:  # verify_payload already prevents this
             raise SystemExit(f"Unsupported CI scope {scope}")
         print(f"INTEGRATION_WORKERS_RESULT={args.workers_result}")
@@ -673,8 +697,20 @@ def command_aggregate_integration(args: argparse.Namespace) -> None:
             print("FULL_SUITE_EXECUTED=false")
             print("FFMPEG_INSTALL_EXECUTED=false")
         else:
-            print("FULL_SUITE_EXECUTED=true")
+            print(f"FULL_SUITE_EXECUTED={'true' if scope == FULL_SUITE else 'false'}")
             print("FFMPEG_INSTALL_EXECUTED=false")
+
+
+def integration_files_for_scope(
+    scope: str, payload: dict[str, object], shard: str,
+) -> tuple[str, ...]:
+    if scope == FULL_SUITE:
+        return INTEGRATION_SHARDS[shard]
+    if scope == AFFECTED_TESTS:
+        verify_payload(payload)
+        selected = set(payload["selectedIntegrationFiles"])
+        return tuple(path for path in INTEGRATION_SHARDS[shard] if path in selected)
+    raise ValueError(f"Unsupported integration selection scope: {scope}")
 
 
 def parse_args() -> argparse.Namespace:

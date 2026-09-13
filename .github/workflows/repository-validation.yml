@@ -5,6 +5,8 @@ on:
     branches:
       - main
   workflow_dispatch:
+  schedule:
+    - cron: '19 19 * * *'
 
 permissions:
   contents: read
@@ -113,7 +115,7 @@ jobs:
         run: python scripts/run_ci_fast_path.py mark-setup
 
       - name: Install deterministic media runtime for full suite
-        if: env.CI_SCOPE == 'FULL_SUITE'
+        if: env.CI_SCOPE != 'DOCS_ONLY'
         shell: bash
         run: |
           started="$(date +%s)"
@@ -164,7 +166,7 @@ jobs:
         run: python scripts/run_ci_fast_path.py mark-setup
 
       - name: Install deterministic media runtime for full suite
-        if: env.CI_SCOPE == 'FULL_SUITE'
+        if: env.CI_SCOPE != 'DOCS_ONLY'
         shell: bash
         run: |
           started="$(date +%s)"
@@ -200,6 +202,10 @@ jobs:
             check_name: Integration Shard 3
           - shard: shard-4
             check_name: Integration Shard 4
+          - shard: shard-5
+            check_name: Integration Shard 5
+          - shard: shard-6
+            check_name: Integration Shard 6
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
@@ -240,7 +246,7 @@ jobs:
           echo "INTEGRATION_SHARD_TEMP=$shard_temp"
 
       - name: Ensure deterministic media runtime for full suite
-        if: env.CI_SCOPE == 'FULL_SUITE'
+        if: env.CI_SCOPE != 'DOCS_ONLY'
         shell: bash
         run: |
           started="$(date +%s)"
