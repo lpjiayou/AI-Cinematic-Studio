@@ -102,7 +102,8 @@ def make_a14b_package():
 
 def make_a14b_execution_fixture(case, endpoint, *, profile_factory=make_a14b_profile,
         runtime_factory=make_a14b_runtime, adapter_identity=A14B_ADAPTER_IDENTITY,
-        adapter_capability=A14B_CAPABILITY, endpoint_class="TEST_ONLY_LOOPBACK", use_operator=False):
+        adapter_capability=A14B_CAPABILITY, endpoint_class="TEST_ONLY_LOOPBACK", use_operator=False,
+        prepare_only=False):
     """Original upstream/SQLite/Grant composition with inert model originals.
 
     This factory's monkeypatch changes only an existing TEST_ONLY external-owner
@@ -212,10 +213,15 @@ def make_a14b_execution_fixture(case, endpoint, *, profile_factory=make_a14b_pro
                 from services.v5_core_os.episode_production.generation_dispatch_operator import ExistingStoreOperatorDeployment, OperatorSelection
                 from tests.integration.test_generic_upstream_method_closure import GenericScopeAuthority, GenericApprovalAuthority
                 from types import SimpleNamespace
-                prepared = self.prepare()
-                self.approved_issue_command(prepared)
-                selection = OperatorSelection(self.prepare_command(), prepared["approvedPlanDigest"],
-                    self.approval["authorityDecisionRef"], "test-pkg2-grant", "test-operator-route")
+                if prepare_only:
+                    # Start at the actual Operator, without a prior private
+                    # prepare call, synthetic approval, Grant or Job.
+                    selection = OperatorSelection(self.prepare_command(), None, None, None, None)
+                else:
+                    prepared = self.prepare()
+                    self.approved_issue_command(prepared)
+                    selection = OperatorSelection(self.prepare_command(), prepared["approvedPlanDigest"],
+                        self.approval["authorityDecisionRef"], "test-pkg2-grant", "test-operator-route")
                 approval_reader = self.dispatch.selections["approval"]._port
                 from services.v5_core_os.episode_production.generation_dispatch_live_sources import OriginalFile, LiveRuntimeCurrentReader, PinnedLiveMaterials
                 from services.v4_platform.generation_dispatch_live_result import encoder_tool_identity
@@ -238,6 +244,24 @@ def make_a14b_execution_fixture(case, endpoint, *, profile_factory=make_a14b_pro
                     runtime_original=OriginalFile(runtime_file["path"], runtime_file["sha256"]), runtime_current=current_runtime,
                     cost_owner=SimpleNamespace(read_current=self.external.cost,
                         proof_originals=lambda package, lease: self.external._cost_proof_observations(package, lease, self.external.proof_files)))
+                prerequisites = SimpleNamespace(prepare=self.external.prepare_prerequisites,
+                    read_current=self.external.current_prerequisites)
+                if prepare_only:
+                    from services.v5_core_os.episode_production.generation_dispatch_live_sources import PinnedPrerequisiteOriginals
+                    from services.v5_core_os.episode_production.generation_dispatch_readers import VerifiedOriginalObservation
+                    originals, verifiers = {}, {}
+                    for kind, (owner, _) in PinnedPrerequisiteOriginals._owners.items():
+                        path = self.root / ("test-d1-prerequisite-" + kind + ".json")
+                        raw = c.canonical(self.external.originals[kind])
+                        path.write_bytes(raw)
+                        originals[kind] = OriginalFile(path, sha256(raw).hexdigest())
+                        def verify(original, resolved, lease, kind=kind, owner=owner):
+                            expected = self.external.verify_subject(resolved, lease)["originals"][kind]
+                            c.require(original == expected, "SOURCE_CHANGED")
+                            return VerifiedOriginalObservation(owner, kind, "test-" + kind, original)
+                        verifiers[kind] = verify
+                    prerequisites = PinnedPrerequisiteOriginals(originals=originals, verifiers=verifiers,
+                        approval_original=None, approval_evidence=None)
                 self.domain.close()
                 self.deployment = ExistingStoreOperatorDeployment(storage_root=self.root,
                     lifecycle_path=self.root / "lifecycle.sqlite3", run_path=self.root / "runs.sqlite3",
@@ -252,7 +276,7 @@ def make_a14b_execution_fixture(case, endpoint, *, profile_factory=make_a14b_pro
                         "method_aware_input_append_authority": self.input_append_authority},
                     selection=selection, endpoint=endpoint, technical_target_id="test-pkg2-single-anchor",
                     clock=self.clock, worker_context=self.worker_context, approval_reader=approval_reader,
-                    prerequisite_reader=SimpleNamespace(prepare=self.external.prepare_prerequisites, read_current=self.external.current_prerequisites),
+                    prerequisite_reader=prerequisites,
                     material_reader=self.live_materials,
                     backend_reader=SimpleNamespace(read_current=self.live_materials.backend),
                     runtime_reader=SimpleNamespace(read_current=self.live_materials.runtime),
@@ -263,6 +287,8 @@ def make_a14b_execution_fixture(case, endpoint, *, profile_factory=make_a14b_pro
                 self.dispatch = self.operator._assembly
                 self.coordinators = [self.operator._coordinator]
                 self.queues = [self.operator._coordinator.repository]
+                if prepare_only:
+                    return
                 issued = execute_command(self.operator, "issue-approved")
             else:
                 issued = self.issue()

@@ -2,7 +2,8 @@
 
 The hosting composition supplies original Owner ports and original participants;
 commands cannot choose an endpoint, approve content, or construct an observation.
-An operator is bound to exactly one prepare subject and one approved plan.
+An operator is bound to one prepare subject, then optionally one approved plan.
+An unapproved selection permits only PREPARE; it cannot issue or execute.
 """
 from copy import deepcopy
 from dataclasses import dataclass
@@ -16,13 +17,20 @@ from .generation_dispatch_consumption import GenerationDispatchConsumer
 @dataclass(frozen=True)
 class OperatorSelection:
     prepare_command: dict
-    approved_plan_digest: str
-    authority_decision_ref: str
-    issue_idempotency_key: str
-    route_idempotency_key: str
+    approved_plan_digest: str | None = None
+    authority_decision_ref: str | None = None
+    issue_idempotency_key: str | None = None
+    route_idempotency_key: str | None = None
 
-    def validate(self):
+    def validate(self, *, require_approval=False):
         c.validate_command("PREPARE", self.prepare_command)
+        values = (self.approved_plan_digest, self.authority_decision_ref,
+            self.issue_idempotency_key, self.route_idempotency_key)
+        if all(value is None for value in values):
+            c.require(not require_approval, "APPROVAL_UNAVAILABLE")
+            return
+        # Partial approval configuration is never a pre-approval selection.
+        c.require(all(value is not None for value in values), "APPROVAL_UNAVAILABLE")
         c.sha(self.approved_plan_digest)
         for value in (self.authority_decision_ref, self.issue_idempotency_key,
                 self.route_idempotency_key):
@@ -52,6 +60,7 @@ class GenerationDispatchOperator:
         return c.validate_plan_package(package)
 
     def _selected(self):
+        self._selection.validate(require_approval=True)
         selected = self._assembly.selections["approval"].resolve(self._selection.authority_decision_ref)
         self._require_live(selected.plan_package)
         c.require(c.digest(selected.plan_package["plan"]) == self._selection.approved_plan_digest,
@@ -68,6 +77,7 @@ class GenerationDispatchOperator:
         return selected
 
     def inspect(self, grant_ref):
+        self._selection.validate(require_approval=True)
         command = self._selection.prepare_command
         result = self._assembly.boundary.inspect({"workspaceRef": command["workspaceRef"],
             "productionRunRef": command["productionRunRef"], "generationDispatchGrantRef": c.ref(grant_ref)})

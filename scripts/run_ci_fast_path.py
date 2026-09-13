@@ -46,6 +46,7 @@ INTEGRATION_SHARD_LIMIT_SECONDS = 1200
 INTEGRATION_SHARDS: dict[str, tuple[str, ...]] = {
     "shard-1": (
         "tests/integration/test_generation_dispatch_d1_operator_cpu.py",
+        "tests/integration/test_generation_dispatch_prepare_operator.py",
         "tests/integration/test_m13_r2_full_cpu_backend.py",
         "tests/integration/test_generation_dispatch_a14b_cpu.py",
     ),
