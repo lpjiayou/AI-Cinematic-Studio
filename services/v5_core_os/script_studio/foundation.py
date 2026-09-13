@@ -1068,13 +1068,21 @@ class InMemoryScriptStudioAdapter:
 class SqliteScriptStudioAdapter:
     """SQLite local-development durable adapter; not a production database."""
 
-    def __init__(self, database_path: Path | str, *, lifecycle_state=None) -> None:
+    def __init__(self, database_path: Path | str, *, lifecycle_state=None,
+                 initialize_if_missing: bool = True) -> None:
         self.database_path = Path(database_path).resolve()
-        self.database_path.parent.mkdir(parents=True, exist_ok=True)
+        if initialize_if_missing:
+            self.database_path.parent.mkdir(parents=True, exist_ok=True)
+        elif not self.database_path.is_file():
+            raise RuntimeError("existing SQLite database is required")
         from services.v4_platform.generation_dispatch_jobs import storage_access_lock
         self._lock = storage_access_lock(self, "database_path")
         self._lifecycle_state = lifecycle_state
-        self._initialize()
+        if initialize_if_missing:
+            self._initialize()
+        else:
+            with self._lock, self._session() as connection:
+                self._validate_schema(connection)
 
     def _connect(self) -> sqlite3.Connection:
         from services.v4_platform.generation_dispatch_jobs import connect_storage
@@ -1167,12 +1175,16 @@ class SqliteScriptStudioAdapter:
                 "INSERT OR IGNORE INTO v5_script_studio_schema VALUES (?, ?)",
                 ("script_studio", SQLITE_SCHEMA_VERSION),
             )
-            row = connection.execute(
-                "SELECT schema_version FROM v5_script_studio_schema WHERE component = ?",
-                ("script_studio",),
-            ).fetchone()
-            if row is None or row["schema_version"] not in {SQLITE_SCHEMA_VERSION, 2}:
-                raise RuntimeError("unsupported Script Studio local-development schema version")
+            self._validate_schema(connection)
+
+    @staticmethod
+    def _validate_schema(connection) -> None:
+        row = connection.execute(
+            "SELECT schema_version FROM v5_script_studio_schema WHERE component = ?",
+            ("script_studio",),
+        ).fetchone()
+        if row is None or row["schema_version"] not in {SQLITE_SCHEMA_VERSION, 2}:
+            raise RuntimeError("unsupported Script Studio local-development schema version")
 
     @staticmethod
     def _script(row: sqlite3.Row) -> ScriptRecord:

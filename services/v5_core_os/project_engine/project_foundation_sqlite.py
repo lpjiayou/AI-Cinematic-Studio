@@ -343,11 +343,15 @@ def validate_project_foundation_connection(
 class SqliteProjectFoundationStore:
     """Durable store sharing the Lifecycle SQLite connection during Phase B."""
 
-    def __init__(self, database_path: Path | str, *, lifecycle_state=None) -> None:
+    def __init__(self, database_path: Path | str, *, lifecycle_state=None,
+                 initialize_if_missing: bool = True) -> None:
         self.database_path = Path(database_path).resolve()
-        self.database_path.parent.mkdir(parents=True, exist_ok=True)
+        if initialize_if_missing:
+            self.database_path.parent.mkdir(parents=True, exist_ok=True)
+        elif not self.database_path.is_file():
+            raise ProjectFoundationStorageError("existing SQLite database is required")
         self._lifecycle_state = lifecycle_state
-        self._initialize()
+        self._initialize(initialize_if_missing=initialize_if_missing)
 
     def _connect(self) -> sqlite3.Connection:
         from services.v4_platform.generation_dispatch_jobs import connect_storage
@@ -404,11 +408,11 @@ class SqliteProjectFoundationStore:
         ).fetchone() is not None
         return tables, index_present
 
-    def _initialize(self) -> None:
+    def _initialize(self, *, initialize_if_missing: bool = True) -> None:
         try:
-            with self._session(write=True, shared=False) as connection:
+            with self._session(write=initialize_if_missing, shared=False) as connection:
                 tables, index_present = self._presence(connection)
-                if not tables and not index_present:
+                if not tables and not index_present and initialize_if_missing:
                     connection.execute(table_statement())
                     connection.execute(index_statement())
                     connection.execute(marker_statement())

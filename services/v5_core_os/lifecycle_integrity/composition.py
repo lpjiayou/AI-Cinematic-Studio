@@ -359,6 +359,7 @@ class LifecycleAssembly:
         ref_factory=None,
         clock=None,
         initialize_or_upgrade: bool = False,
+        existing_only: bool = False,
         transaction_hook=None,
         m6_scope_authority=None,
         m6_approval_authority=None,
@@ -368,16 +369,23 @@ class LifecycleAssembly:
         canonical_target_ref=None,
         canonical_registration_fault_hook=None,
     ) -> "LifecycleAssembly":
+        if existing_only and initialize_or_upgrade:
+            raise ValueError("existing-only assembly cannot initialize or upgrade")
         if initialize_or_upgrade:
             migrate_lifecycle_database(database_path, allow_upgrade=True)
         else:
             validate_lifecycle_database(database_path)
         state = SqliteLifecycleState(database_path, transaction_hook=transaction_hook)
         identity = state.identity
-        series_repository = SqliteSeriesEpisodeAdapter(database_path, lifecycle_state=state)
-        project_repository = SqliteProjectAdapter(database_path, lifecycle_state=state)
-        script_repository = SqliteScriptStudioAdapter(database_path, lifecycle_state=state)
-        planning_repository = SqliteSeriesPlanningAdapter(database_path, lifecycle_state=state)
+        # Opening an existing assembly must not bootstrap participant schemas.
+        # The lifecycle schema has already been validated above.
+        # Keep the established local-development optional-store bootstrap default;
+        # D1 explicitly opts out of all participant initialization.
+        participant_options = dict(lifecycle_state=state, initialize_if_missing=not existing_only)
+        series_repository = SqliteSeriesEpisodeAdapter(database_path, **participant_options)
+        project_repository = SqliteProjectAdapter(database_path, **participant_options)
+        script_repository = SqliteScriptStudioAdapter(database_path, **participant_options)
+        planning_repository = SqliteSeriesPlanningAdapter(database_path, **participant_options)
         registration_repository = SqliteCanonicalRegistrationRepository(
             database_path, lifecycle_state=state
         )
@@ -439,9 +447,9 @@ class LifecycleAssembly:
         )
         project_foundation_store = SqliteProjectFoundationStore(
             database_path,
-            lifecycle_state=state,
+            **participant_options,
         )
-        script_boundary._bind_generation_store(SqliteGenerationStore(database_path, lifecycle_state=state))
+        script_boundary._bind_generation_store(SqliteGenerationStore(database_path, **participant_options))
         script_boundary._bind_m6_episode_baseline_reader(
             intelligence_boundary._active_m6_baseline_reader_or_none()
         )
