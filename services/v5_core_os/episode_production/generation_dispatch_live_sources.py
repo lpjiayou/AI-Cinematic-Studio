@@ -23,6 +23,44 @@ class OriginalFile:
         return c.strict_json(read_pinned_file(Path(self.path), self.file_sha256))
 
 
+class PinnedCostOriginal:
+    """Bind a complete existing cost decision to its actual source files.
+
+    The installed cost Owner verifier validates provenance/current applicability;
+    this adapter cannot derive a decision from rates or fill unknown fees with 0.
+    It performs no I/O until a held original coordination lease requests a read.
+    """
+    def __init__(self, *, basis, proofs, verifier):
+        c.require(type(basis) is OriginalFile and type(proofs) is dict
+            and all(type(value) is OriginalFile for value in proofs.values())
+            and callable(verifier), "COST_BOUND_UNVERIFIED")
+        self._basis, self._proofs, self._verify = basis, dict(proofs), verifier
+
+    def _read(self, package, lease):
+        lease.assert_held()
+        cost = c.validate_cost(self._basis.read())
+        pins = [*cost["sourceEvidence"], cost["billingResponsibility"]["continuingChargesEvidence"]]
+        expected = {}
+        for pin in pins:
+            c.require(pin["ref"] not in expected or expected[pin["ref"]] == pin["digest"], "COST_BOUND_UNVERIFIED")
+            expected[pin["ref"]] = pin["digest"]
+        c.require(set(expected) == set(self._proofs), "COST_BOUND_UNVERIFIED")
+        proofs = {ref: file.read() for ref, file in self._proofs.items()}
+        c.require(all(c.digest(proofs[ref]) == digest for ref, digest in expected.items()), "COST_BOUND_UNVERIFIED")
+        verified = self._verify(deepcopy(cost), deepcopy(proofs), deepcopy(package), lease)
+        c.require(type(verified) is dict and c.canonical(verified) == c.canonical(cost), "COST_BOUND_UNVERIFIED")
+        lease.assert_held()
+        return cost, proofs
+
+    def read_current(self, package, lease):
+        return self._read(package, lease)[0]
+
+    def proof_originals(self, package, lease):
+        _, proofs = self._read(package, lease)
+        return tuple(VerifiedOriginalObservation("V4_BACKEND_CONFIG", "CostEvidence", ref, original)
+            for ref, original in sorted(proofs.items()))
+
+
 class LiveRuntimeCurrentReader:
     """Observe through the host's authenticated metadata/original-file ports.
 
