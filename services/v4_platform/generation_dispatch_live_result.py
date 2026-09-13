@@ -113,7 +113,8 @@ def process_native_frames(native_frames: tuple[bytes, ...],
     output, binding, post = (request["outputConstraints"], request["outputBinding"],
         request["postprocessBinding"])
     from .generation_dispatch_a14b_exact import EXACT_REQUEST_SCHEMA, EXACT_DERIVATION_SCHEMA
-    is_exact = request["schemaVersion"] == EXACT_REQUEST_SCHEMA
+    from .generation_dispatch_a14b_live import LIVE_REQUEST_SCHEMA
+    is_exact = request["schemaVersion"] in {EXACT_REQUEST_SCHEMA, LIVE_REQUEST_SCHEMA}
     if (output != {"mediaKind": "video", "mediaType": "video/mp4", "width": 704,
             "height": 1280, "durationFrames": 48, "frameRate": 24}
             or binding["mediaType"] != "image/png" or binding["frameCount"] != 49

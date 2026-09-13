@@ -93,10 +93,11 @@ def _postprocess(value: Any, output: Mapping[str, Any]) -> None:
 
 def validate_live_transport_request(value: Any) -> dict:
     from .generation_dispatch_a14b_exact import EXACT_REQUEST_SCHEMA, validate_exact_request_binding
+    from .generation_dispatch_a14b_live import LIVE_REQUEST_SCHEMA as D1_REQUEST_SCHEMA, validate_live_request_binding
     _exact(value, {"schemaVersion", "workspaceRef", "productionRunRef", "workerRef",
         *_LINEAGE_FIELDS, *_PIN_FIELDS, *_TIMEOUT_FIELDS, "workflow", "outputConstraints",
         "outputBinding", "postprocessBinding", "transportPolicy", "payloadDigest"})
-    if value["schemaVersion"] not in {LIVE_REQUEST_SCHEMA, EXACT_REQUEST_SCHEMA}:
+    if value["schemaVersion"] not in {LIVE_REQUEST_SCHEMA, EXACT_REQUEST_SCHEMA, D1_REQUEST_SCHEMA}:
         raise ValueError("not a live transport request")
     _lineage(value)
     for name in ("workspaceRef", "productionRunRef", "workerRef"):
@@ -116,7 +117,9 @@ def validate_live_transport_request(value: Any) -> dict:
     for name in ("width", "height", "durationFrames", "frameRate"):
         _positive(constraints[name])
     output = validate_output_binding(value["outputBinding"])
-    if value["schemaVersion"] == EXACT_REQUEST_SCHEMA:
+    if value["schemaVersion"] == D1_REQUEST_SCHEMA:
+        validate_live_request_binding(value)
+    elif value["schemaVersion"] == EXACT_REQUEST_SCHEMA:
         validate_exact_request_binding(value)
     else:
         _postprocess(value["postprocessBinding"], output)
@@ -141,7 +144,7 @@ def make_live_transport_request(*, workspace_ref: str, production_run_ref: str,
         postprocess_timeout_ms: int, transport_policy: Mapping[str, Any],
         endpoint_digest: str, execution_config_digest: str, runtime_binding_digest: str,
         backend_decision_digest: str, output_binding: Mapping[str, Any],
-        postprocess_binding: Mapping[str, Any] | None) -> dict:
+        postprocess_binding: Mapping[str, Any] | None, live_profile_schema=None) -> dict:
     value = {"schemaVersion": LIVE_REQUEST_SCHEMA, "workspaceRef": workspace_ref,
         "productionRunRef": production_run_ref, "workerRef": worker_ref,
         "generationDispatchGrantRef": generation_dispatch_grant_ref,
@@ -160,6 +163,11 @@ def make_live_transport_request(*, workspace_ref: str, production_run_ref: str,
     from .generation_dispatch_a14b_exact import ENCODING_SCHEMA, EXACT_REQUEST_SCHEMA
     if postprocess_binding is not None and postprocess_binding.get("schemaVersion") == ENCODING_SCHEMA:
         value["schemaVersion"] = EXACT_REQUEST_SCHEMA
+    if live_profile_schema is not None:
+        from .generation_dispatch_a14b_live import LIVE_PROFILE_SCHEMA, LIVE_REQUEST_SCHEMA as D1_REQUEST_SCHEMA
+        if live_profile_schema != LIVE_PROFILE_SCHEMA:
+            raise ValueError("unknown live profile version")
+        value["schemaVersion"] = D1_REQUEST_SCHEMA
     return validate_live_transport_request(_sealed(value))
 
 
@@ -413,7 +421,8 @@ class LiveTransportReadResult:
                 if receipt["derivation"]["profileId"] != request["postprocessBinding"]["profileId"]:
                     raise ValueError("derivation profile mismatch")
                 from .generation_dispatch_a14b_exact import EXACT_REQUEST_SCHEMA, EXACT_DERIVATION_SCHEMA
-                if request["schemaVersion"] == EXACT_REQUEST_SCHEMA:
+                from .generation_dispatch_a14b_live import LIVE_REQUEST_SCHEMA as D1_REQUEST_SCHEMA
+                if request["schemaVersion"] in {EXACT_REQUEST_SCHEMA, D1_REQUEST_SCHEMA}:
                     if (receipt["derivation"]["schemaVersion"] != EXACT_DERIVATION_SCHEMA
                             or receipt["derivation"]["encodingDigest"] != digest(request["postprocessBinding"])):
                         raise ValueError("complete encoding request/result binding changed")

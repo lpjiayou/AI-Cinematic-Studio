@@ -252,7 +252,8 @@ class ComfyUIStagedTransport:
         if len(body) > _MAX_REQUEST_BYTES or digest(_json(body)["prompt"]) != request["workflowDigest"]:
             raise ValueError("encoded workflow mismatch or body too large")
         from .generation_dispatch_a14b_exact import EXACT_REQUEST_SCHEMA
-        if request["schemaVersion"] == EXACT_REQUEST_SCHEMA:
+        from .generation_dispatch_a14b_live import LIVE_REQUEST_SCHEMA
+        if request["schemaVersion"] in {EXACT_REQUEST_SCHEMA, LIVE_REQUEST_SCHEMA}:
             from .generation_dispatch_live_result import encoder_tool_identity
             # Local material verification precedes the network request budget.
             # The original absolute execution/send deadlines are NOT restarted.
@@ -521,6 +522,33 @@ class ComfyUIStagedTransport:
         finally:
             if exchange.connection is not None:
                 exchange.connection.close()
+
+    def recover_result_read_only(self, request, provider_prompt_id, *, deadline_monotonic):
+        """Read one known prompt only; never reconstruct a submission authority.
+
+        The trusted Operator obtains the prompt ID from the original Job result
+        and reconstructs the exact request from the approved package and Attempt.
+        The exchange has no write authorizer and is already spent. Returned bytes
+        are an observation, not a replacement Grant/Terminal or successful Job.
+        """
+        prompt_id = validate_prompt_id(provider_prompt_id)
+        exchange = self.open_exchange(request, deadline_monotonic=deadline_monotonic)
+        exchange.spent = exchange.read_started = True
+        exchange.provider_prompt_id = prompt_id
+        exchange.history_deadline = min(deadline_monotonic,
+            time.monotonic() + request["historyTimeoutMs"] / 1000)
+        history = self._history(exchange)
+        native, blobs = self._artifacts(exchange, history)
+        exchange.postprocess_deadline = min(exchange.postprocess_deadline,
+            time.monotonic() + request["postprocessTimeoutMs"] / 1000)
+        from .generation_dispatch_live_result import process_native_frames
+        final_bytes, derivation = process_native_frames(blobs, native, request,
+            deadline_monotonic=exchange.postprocess_deadline)
+        _remaining(exchange.postprocess_deadline)
+        return {"requestDigest": request["payloadDigest"], "providerPromptId": prompt_id,
+            "nativeArtifacts": native, "derivation": derivation,
+            "artifactSha256": sha256(final_bytes).hexdigest(), "artifactByteSize": len(final_bytes),
+            "artifactBytes": final_bytes, "sendAttempted": False}
 
 
 def is_trusted_staged_transport(value: Any) -> bool:

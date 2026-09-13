@@ -369,15 +369,16 @@ class GenerationDispatchConsumer:
                 if live:
                     from services.v4_platform.generation_dispatch_a14b_profile import A14B_PROFILE_SCHEMA
                     from services.v4_platform.generation_dispatch_a14b_exact import EXACT_PROFILE_SCHEMA
+                    from services.v4_platform.generation_dispatch_a14b_live import LIVE_PROFILE_SCHEMA
                     profile = selected.plan_package["materials"]["backendProfile"]
-                    if profile["schemaVersion"] in {A14B_PROFILE_SCHEMA, EXACT_PROFILE_SCHEMA}:
+                    if profile["schemaVersion"] in {A14B_PROFILE_SCHEMA, EXACT_PROFILE_SCHEMA, LIVE_PROFILE_SCHEMA}:
                         native = profile["parameters"]["nativeOutput"]
                         folder, _, prefix = native["filenamePrefix"].rpartition("/")
                         output_binding = {"nodeId": native["nodeId"], "outputKey": "images",
                             "mediaType": native["mediaType"], "frameCount": native["frameCount"],
                             "filenamePrefix": prefix, "subfolder": folder}
                         post = profile["parameters"]["postprocess"]
-                        postprocess_binding = deepcopy(post) if profile["schemaVersion"] == EXACT_PROFILE_SCHEMA else {"profileId": post["profileId"],
+                        postprocess_binding = deepcopy(post) if profile["schemaVersion"] in {EXACT_PROFILE_SCHEMA, LIVE_PROFILE_SCHEMA} else {"profileId": post["profileId"],
                             "keepIndices": post["keptZeroBasedIndices"],
                             "dropIndices": post["droppedZeroBasedIndices"], "frameRate": post["frameRate"]}
                     else:
@@ -392,6 +393,8 @@ class GenerationDispatchConsumer:
                         "runtime_binding_digest": c.digest(state.grant["executionBinding"]["runtimeBinding"]),
                         "backend_decision_digest": state.grant["executionBinding"]["backendDecisionDigest"],
                         "output_binding": output_binding, "postprocess_binding": postprocess_binding}
+                    if profile["schemaVersion"] == LIVE_PROFILE_SCHEMA:
+                        extra["live_profile_schema"] = LIVE_PROFILE_SCHEMA
                 transport_request = (make_live_transport_request if live else make_transport_request)(
                     workspace_ref=state.command["workspaceRef"],
                     production_run_ref=state.command["productionRunRef"],

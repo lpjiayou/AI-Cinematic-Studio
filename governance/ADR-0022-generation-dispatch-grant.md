@@ -5,7 +5,7 @@
 | 字段 | 值 |
 | --- | --- |
 | ADR ID | ADR-0022 |
-| 文档版本 | 1.4；保留 v1.2 控制面及 §5.6，增加 §5.7 的 R3 狭义原图/runtime/编码兼容 |
+| 文档版本 | 1.5；保留 v1.2 控制面及 §5.6–5.7，增加 §5.8 的 D1 live 分支与可信内部 Operator |
 | Status | Accepted — Architecture Contract Only |
 | 完整 ADR 审批状态 | ACCEPTED_ARCHITECTURE_ONLY；Project Lead 已明确接受全文，不等于实现或生成许可 |
 | 已确认设计方向 | 独立、不可变 Grant；不覆盖历史五字段，不迁移历史摘要 |
@@ -486,6 +486,36 @@ lease/revoke/clock、原 Job/Attempt、准入及发布权限保持不变。
   Provider 或自动启动入口。fixture 仍不得指向 8188 或真实服务。未知费用/设备不填零。
   发布、现场只读采集、配置部署、真实 Grant 和一次 /prompt 各需后续单独授权。
 
+### 5.8 v1.5 D1 live 分支与可信内部 Operator 狭义增量
+
+2026-09-13 Project Lead 签发 `ACS-D1-SH09-LIVE-OPERATOR-AND-ONE-RESULT-20260913`，
+批准本节狭义合同和 A/B 的本地实施、隔离 CPU/fixture-owned loopback 验证及已选实例当前只读核验。
+不改变 §2.1 历史字段、Owner、Grant/Terminal、原事务/CAS、L1/L2、一次发送或失败不补发语义。
+以下明确版本不放宽单模型、A14B v1 或 exact v2 的旧接受域：
+
+| 对象 | D1 显式版本 |
+| --- | --- |
+| Profile | `v4.comfyui-a14b-i2v-backend-profile.v3`；`LIVE_CONFIGURATION` 不是运行批准 |
+| Adapter / capability | `v4.comfyui-wan22-a14b-image-to-video.v3` / `self-hosted-wan22-a14b-image-to-video-v3` |
+| Compiler / template | `v4.generation-dispatch-a14b-compiler.v3` / `comfyui-a14b-original-topology-png49-v3` |
+| Runtime | `v4.comfyui-a14b-runtime-attestation.v3`；`CURRENT_RUNTIME_OBSERVATION`、`CONTROLLED_SELF_HOSTED` |
+| Request | `v4.generation-dispatch-live-transport-request.v3`；原一次发送 policy 不变 |
+
+纯结构编译复用 §5.7，不能产生现场证明或发送资格。Camera 保持独立 Owner 决定，六角色、完整图、
+source/negative prompt、进程/launch、输入路径和当前执行主机编码工具均须经独立原件/pin 与当前 reader 验证。
+未配置原 Owner verifier、可信当前实例 reader、成本原件或端点身份时必须拒绝；命令行不得提供它们的替身。
+所选六模型必须核验字节或已有可信不可变保留原件，不能仅以名称/mtime 代替 SHA。
+
+`ExistingStoreOperatorDeployment.open()` 是显式主机入口，复用 `compose_generation_dispatch()` 与
+`GenerationDispatchExecutor.compose_live()`。只打开已批准的既有原库和控制域，不迁移/初始化，不创建第二事实源。
+`prepare` / `inspect`、`issue-approved` / `route-approved`、`execute-one` 和 `recover` 分别处理一个选定目标；
+import、构造、help、`check-offline` 默认无数据库/网络/Grant 副作用。外部部署依赖由可信主机安装，不由 JSON CLI 自报。
+
+UNKNOWN 禁止补发但不禁止原有效期内查询已记录的 prompt ID；没有 prompt ID 不扫描猜测。
+只读恢复重新绑定原 Job/Attempt、精确图、端点/进程、编码和批准期限，仅允许 GET。
+恢复观察不能篡改原 UNKNOWN 记录为成功，也不自动准入；durable artifact intent 继续由原结果回收机制负责。
+新版本不是运行许可：发布、部署、正式库访问、真实 Grant、`/prompt`、费用、D2/D3 均须相应独立批准。
+
 ## 6. Operator 与内部端口闭集（R1、R3）
 
 以下是未来实现的领域合同，不是本轮可执行命令。首版无新 Frontend 或公共 HTTP 写路由；Operator 身份来自可信本地操作边界，不能由请求 actor/role 字段自报。
@@ -741,6 +771,7 @@ InputPlan、InputAssetVersion、InputAppendAuthority 和旧 v2 runtime attestati
 | 1.2 接受及发布元数据 | 2026-09-10 Project Lead 全文回复 Accepted；随后另行授权状态回填及文档入库；第 1—13 节原字节不变 | ACCEPTED_ARCHITECTURE_ONLY；历史行仅记录其编制阶段；实现、真实 Grant 和生成仍未批准 |
 | 1.3 R2 狭义兼容 | 2026-09-12 Project Lead 明确批准 §5.6 的独立 A14B profile/compiler/runtime 与 staged transport 本地 CPU 增量；其余控制面语义保留 | 狭义设计及白名单本地实现获批；实现 Owner 验收待定，发布、真实 ComfyUI/GPU/Grant/数据库/生成未授权 |
 | 1.4 R3 狭义兼容 | 2026-09-13 Project Lead 授权 A01—A06 与 §5.7 版本化原图、runtime 前像、完整编码及直接依赖接线 | 仅本地 CPU/fixture 候选；Camera/精确绑定 Owner 验收、发布与现场执行仍待后续授权 |
+| 1.5 D1 狭义 live 接线 | 2026-09-13 Project Lead 批准 §5.8 及任务 A/B | 本地工程和限定只读核验；不是候选验收、部署或真实生成批准 |
 
 以下 [S] 项只支持对旧仓库行为的陈述，不表示新增规范已经实现：
 

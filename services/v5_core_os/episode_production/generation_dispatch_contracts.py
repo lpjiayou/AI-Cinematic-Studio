@@ -503,6 +503,9 @@ def request_identity(plan: dict) -> dict:
     from services.v4_platform.generation_dispatch_a14b_exact import EXACT_ADAPTER_IDENTITY, EXACT_COMPILER_IDENTITY
     if binding["backendDecision"]["adapterIdentity"] == EXACT_ADAPTER_IDENTITY:
         compiler = EXACT_COMPILER_IDENTITY
+    from services.v4_platform.generation_dispatch_a14b_live import LIVE_ADAPTER_IDENTITY, LIVE_COMPILER_IDENTITY
+    if binding["backendDecision"]["adapterIdentity"] == LIVE_ADAPTER_IDENTITY:
+        compiler = LIVE_COMPILER_IDENTITY
     return {"schemaVersion": PREFIX + "request-identity.v1", "scope": deepcopy(plan["scope"]),
         "subjectDigest": subject_digest(plan), "backendProfileRef": binding["executionProfile"]["ref"],
         "backendProfileDigest": binding["executionProfile"]["digest"], "executionConfigDigest": binding["executionConfigDigest"],
@@ -516,6 +519,10 @@ def _profile(value: Any) -> None:
     # that transport adapter's instance method also probes files and is not called.
     try:
         from services.v4_platform.generation_dispatch_a14b_exact import EXACT_PROFILE_SCHEMA, validate_exact_profile
+        from services.v4_platform.generation_dispatch_a14b_live import LIVE_PROFILE_SCHEMA, validate_live_profile
+        if type(value) is dict and value.get("schemaVersion") == LIVE_PROFILE_SCHEMA:
+            validate_live_profile(value)
+            return
         if type(value) is dict and value.get("schemaVersion") == EXACT_PROFILE_SCHEMA:
             validate_exact_profile(value)
             return
@@ -553,6 +560,14 @@ def _workflow(plan: dict, materials: dict) -> None:
     require(type(graph) is dict)
     try:
         from services.v4_platform.generation_dispatch_a14b_exact import EXACT_PROFILE_SCHEMA, validate_exact_workflow
+        from services.v4_platform.generation_dispatch_a14b_live import LIVE_PROFILE_SCHEMA, validate_live_workflow
+        if materials["backendProfile"]["schemaVersion"] == LIVE_PROFILE_SCHEMA:
+            validate_live_workflow(graph,
+                generation_request_ref="generation-request-" + digest(request_identity(plan)),
+                source_asset={k: v for k, v in plan["subject"]["inputAsset"].items() if k != "inputRole"},
+                backend_profile=materials["backendProfile"],
+                output_constraints=plan["subject"]["outputConstraints"])
+            return
         if materials["backendProfile"]["schemaVersion"] == EXACT_PROFILE_SCHEMA:
             validate_exact_workflow(graph,
                 generation_request_ref="generation-request-" + digest(request_identity(plan)),
@@ -620,6 +635,14 @@ def validate_plan_package(value: Any) -> dict:
     )
     a14b = m["backendProfile"]["schemaVersion"] == A14B_PROFILE_SCHEMA
     decision = binding["backendDecision"]
+    from services.v4_platform.generation_dispatch_a14b_live import (
+        LIVE_PROFILE_SCHEMA, LIVE_ADAPTER_IDENTITY, LIVE_CAPABILITY, LIVE_ENDPOINT_CLASS)
+    live_a14b = m["backendProfile"]["schemaVersion"] == LIVE_PROFILE_SCHEMA
+    require(live_a14b == (decision["adapterIdentity"] == LIVE_ADAPTER_IDENTITY))
+    if live_a14b:
+        require(decision["endpointClass"] == LIVE_ENDPOINT_CLASS
+            and decision["adapterCapability"] == LIVE_CAPABILITY, "APPROVAL_UNAVAILABLE")
+        require(binding["executionCode"]["comfyuiCommit"] == m["backendProfile"]["parameters"]["comfyuiCommit"])
     from services.v4_platform.generation_dispatch_a14b_exact import EXACT_PROFILE_SCHEMA, EXACT_ADAPTER_IDENTITY, EXACT_CAPABILITY
     exact_a14b = m["backendProfile"]["schemaVersion"] == EXACT_PROFILE_SCHEMA
     require(exact_a14b == (decision["adapterIdentity"] == EXACT_ADAPTER_IDENTITY))
