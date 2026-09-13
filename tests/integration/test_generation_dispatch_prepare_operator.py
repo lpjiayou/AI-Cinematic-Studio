@@ -97,3 +97,84 @@ class PrepareOperatorTests(unittest.TestCase):
         self.assertEqual(stopped.exception.code, "SOURCE_CHANGED")
         self.assertEqual(self.store_hashes(f), before)
         self.assertEqual(f.jobs(), [])
+
+
+class HostInputBindingTests(unittest.TestCase):
+    """New wiring uses the unchanged real entrypoint and original temporary stores."""
+    fixture = PrepareOperatorTests.fixture
+    store_hashes = PrepareOperatorTests.store_hashes
+
+    def host(self, f):
+        from services.v5_core_os.episode_production.generation_dispatch_host import D1OperatorHost
+        from services.v5_core_os.episode_production.generation_dispatch_live_sources import OriginalFile, PinnedCostOriginal
+        args = dict(f.deployment._dependencies)
+        materials = args.pop("material_reader")
+        prerequisites = args.pop("prerequisite_reader")
+        approval = args.pop("approval_reader")
+        selection = args.pop("selection")
+        for key in ("backend_reader", "runtime_reader", "cost_reader"):
+            args.pop(key)
+        cost = f.external.template["materials"]["costBasis"]
+        raw = c.canonical(cost)
+        path = f.root / "test-host-cost-basis.json"
+        path.write_bytes(raw)
+        proof_pins = [*cost["sourceEvidence"], cost["billingResponsibility"]["continuingChargesEvidence"]]
+        proofs = {pin["ref"]: OriginalFile(f.external.proof_files[pin["ref"]]["path"],
+            f.external.proof_files[pin["ref"]]["sha256"]) for pin in proof_pins}
+        cost_reader = PinnedCostOriginal(basis=OriginalFile(path, sha256(raw).hexdigest()), proofs=proofs,
+            verifier=lambda value, originals, package, lease: f.external.cost(package, lease))
+        f.operator_context.__exit__(None, None, None)
+        return D1OperatorHost(configuration=materials._configuration,
+            input_image=OriginalFile(f.external.input_path, sha256(f.external.input_path.read_bytes()).hexdigest()),
+            selection=selection, runtime_original=materials._runtime_file,
+            runtime_current=materials._runtime_current, cost_owner=cost_reader,
+            prerequisite_originals=prerequisites._originals, prerequisite_verifiers=prerequisites._verifiers,
+            approval_reader=approval, store_arguments=args)
+
+    def test_host_bound_main_prepare_reads_pinned_inputs_and_complete_cost_without_writes(self):
+        from apps.creator_workspace_mvp.generation_dispatch_operator import main
+        from contextlib import redirect_stdout
+        from io import StringIO
+        import json
+        f = self.fixture()
+        host = self.host(f)
+        before = self.store_hashes(f)
+        with patch("socket.socket", side_effect=AssertionError("network forbidden")):
+            offline = host.check_inputs()
+            self.assertEqual(offline["missingBindings"], [])
+            self.assertFalse(offline["liveCurrentnessChecked"])
+            self.assertFalse(offline["operatorPrepareCompleted"])
+            out = StringIO()
+            with redirect_stdout(out):
+                self.assertEqual(main(["prepare"], host=host), 0)
+            result = json.loads(out.getvalue())
+            self.assertIn("planPackage", result, result)
+            c.validate_plan_package(result["planPackage"])
+            self.assertEqual(result["sendPermission"], "NONE")
+            self.assertEqual(len(result["currentSubjectReadSet"]["selectors"]), 15)
+            self.assertEqual(result["planPackage"]["materials"]["costBasis"], f.external.template["materials"]["costBasis"])
+        self.assertEqual(self.store_hashes(f), before)
+        self.assertFalse((f.root / "test-generation-approval.json").exists())
+
+    def test_host_rejects_local_anchor_change_before_opening_stores(self):
+        f = self.fixture()
+        host = self.host(f)
+        host.input_image.path.write_bytes(b"changed fixture input")
+        with patch("sqlite3.connect", side_effect=AssertionError("must not open stores")), \
+                patch("socket.socket", side_effect=AssertionError("must not contact runtime")):
+            with self.assertRaises(c.DispatchError) as stopped:
+                host.deployment()
+        self.assertEqual(stopped.exception.code, "APPROVAL_UNAVAILABLE")
+
+    def test_host_missing_verifier_is_named_offline_and_never_becomes_permission(self):
+        f = self.fixture()
+        host = self.host(f)
+        host.verifiers.pop("rightsEvaluation")
+        with patch("sqlite3.connect", side_effect=AssertionError("stores forbidden")), \
+                patch("socket.socket", side_effect=AssertionError("network forbidden")):
+            result = host.check_inputs()
+            self.assertIn("prerequisite_verifier:rightsEvaluation", result["missingBindings"])
+            self.assertEqual(result["sendPermission"], "NONE")
+            with self.assertRaises(c.DispatchError) as stopped:
+                host.deployment()
+        self.assertEqual(stopped.exception.code, "CURRENTNESS_FENCE_UNAVAILABLE")

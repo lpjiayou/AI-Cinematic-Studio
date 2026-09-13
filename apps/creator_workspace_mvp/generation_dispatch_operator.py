@@ -25,16 +25,37 @@ def execute_command(operator, operation, target_ref=None):
     raise ValueError("unsupported Operator mode")
 
 
-def main(argv=None, *, deployment=None):
+def main(argv=None, *, deployment=None, host=None):
     parser = argparse.ArgumentParser(description="D1 trusted internal single-subject Operator (default disabled)")
-    parser.add_argument("operation", choices=("check-offline", "prepare", "inspect", "issue-approved",
+    parser.add_argument("operation", choices=("check-offline", "check-inputs", "prepare", "inspect", "issue-approved",
         "route-approved", "execute-one", "recover"))
     parser.add_argument("--target-ref")
     args = parser.parse_args(argv)
+    if host is not None:
+        from services.v5_core_os.episode_production.generation_dispatch_host import D1OperatorHost
+        if type(host) is not D1OperatorHost or deployment is not None:
+            print(json.dumps({"code": "APPROVAL_UNAVAILABLE", "reason": "INVALID_TRUSTED_HOST_BINDING",
+                "sendPermission": "NONE"}))
+            return 2
     if args.operation == "check-offline":
         print(json.dumps({"operation": "CHECK_OFFLINE", "deploymentConfigured": deployment is not None,
             "storesOpened": False, "sendPermission": "NONE"}))
         return 0
+    if args.operation == "check-inputs":
+        if host is None:
+            print(json.dumps({"code": "APPROVAL_UNAVAILABLE", "reason": "TRUSTED_HOST_DEPLOYMENT_NOT_INSTALLED",
+                "sendPermission": "NONE"}))
+            return 2
+        from services.v5_core_os.episode_production.generation_dispatch_contracts import DispatchError
+        try:
+            print(json.dumps(host.check_inputs(), ensure_ascii=False))
+            return 0
+        except (DispatchError, ValueError, OSError) as exc:
+            print(json.dumps({"code": getattr(exc, "code", "CONFIG_CHANGED"),
+                "reason": "PINNED_INPUT_VALIDATION_FAILED", "sendPermission": "NONE"}))
+            return 2
+    if host is not None:
+        deployment = host
     if deployment is None:
         print(json.dumps({"code": "APPROVAL_UNAVAILABLE", "reason": "TRUSTED_HOST_DEPLOYMENT_NOT_INSTALLED",
             "sendPermission": "NONE"}))
