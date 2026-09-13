@@ -20,6 +20,11 @@ def compile_generation_dispatch_workflow(*, generation_request_ref, source_text,
             or len(source_text) > 4000 or source_asset["mediaType"] != "image/png"):
         raise BackendValidationError("exact I2V source is unavailable")
     exact(backend_profile, {"schemaVersion", "parameters", "modelFiles"}, "profile")
+    from .generation_dispatch_a14b_live import LIVE_PROFILE_SCHEMA, compile_live_workflow
+    if backend_profile["schemaVersion"] == LIVE_PROFILE_SCHEMA:
+        return compile_live_workflow(generation_request_ref=generation_request_ref,
+            source_asset=source_asset, backend_profile=backend_profile,
+            output_constraints=output_constraints)
     from .generation_dispatch_a14b_profile import A14B_PROFILE_SCHEMA, compile_a14b_workflow
     from .generation_dispatch_a14b_exact import EXACT_PROFILE_SCHEMA, compile_exact_workflow
     if backend_profile["schemaVersion"] == EXACT_PROFILE_SCHEMA:

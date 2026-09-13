@@ -102,7 +102,7 @@ def make_a14b_package():
 
 def make_a14b_execution_fixture(case, endpoint, *, profile_factory=make_a14b_profile,
         runtime_factory=make_a14b_runtime, adapter_identity=A14B_ADAPTER_IDENTITY,
-        adapter_capability=A14B_CAPABILITY):
+        adapter_capability=A14B_CAPABILITY, endpoint_class="TEST_ONLY_LOOPBACK", use_operator=False):
     """Original upstream/SQLite/Grant composition with inert model originals.
 
     This factory's monkeypatch changes only an existing TEST_ONLY external-owner
@@ -151,7 +151,7 @@ def make_a14b_execution_fixture(case, endpoint, *, profile_factory=make_a14b_pro
                 "RUNTIME_PROCESS", "RuntimeAttestation", self.attestation["payloadDigest"])
             decision = binding["backendDecision"]
             decision.update(adapterIdentity=adapter_identity, adapterCapability=adapter_capability,
-                endpointClass="TEST_ONLY_LOOPBACK", modelId="test-a14b-model", backendProfileRef="test-a14b-profile",
+                endpointClass=endpoint_class, modelId="test-a14b-model", backendProfileRef="test-a14b-profile",
                 backendProfileDigest=digest(profile), runtimeAttestationRef=self.attestation["attestationRef"],
                 runtimeAttestationDigest=self.attestation["payloadDigest"])
             binding.update(backendDecisionDigest=digest(decision), executionProfile={"ref": "test-a14b-profile", "digest": digest(profile)},
@@ -189,7 +189,7 @@ def make_a14b_execution_fixture(case, endpoint, *, profile_factory=make_a14b_pro
                 raise c.DispatchError("RUNTIME_CHANGED") from exc
             decision = self.template["plan"]["executionBinding"]["backendDecision"]
             c.require(original["attestationRef"] == reference and original["payloadDigest"] == decision["runtimeAttestationDigest"]
-                and facts["endpointClass"] == "TEST_ONLY_LOOPBACK", "RUNTIME_CHANGED")
+                and facts["endpointClass"] == endpoint_class, "RUNTIME_CHANGED")
             self.proof_read_observations.append({"reference": reference, "stage": "A14B_ORIGINAL_VALIDATED",
                 "validator": "services.v4_platform.comfyui_a14b_runtime.validate_a14b_runtime_attestation",
                 "objectDigest": original["payloadDigest"], "fileSha256": file_sha, "TEST_ONLY": True})
@@ -206,11 +206,71 @@ def make_a14b_execution_fixture(case, endpoint, *, profile_factory=make_a14b_pro
                 super().__init__(case)
             self.clock.monotonic_value = 1000.0
             self.clock.monotonic = lambda: self.clock.monotonic_value
-            issued = self.issue()
+            self.worker_context = TestWorkerExecutionContext("test-a14b-worker")
+            if use_operator:
+                from apps.creator_workspace_mvp.generation_dispatch_operator import execute_command
+                from services.v5_core_os.episode_production.generation_dispatch_operator import ExistingStoreOperatorDeployment, OperatorSelection
+                from tests.integration.test_generic_upstream_method_closure import GenericScopeAuthority, GenericApprovalAuthority
+                from types import SimpleNamespace
+                prepared = self.prepare()
+                self.approved_issue_command(prepared)
+                selection = OperatorSelection(self.prepare_command(), prepared["approvedPlanDigest"],
+                    self.approval["authorityDecisionRef"], "test-pkg2-grant", "test-operator-route")
+                approval_reader = self.dispatch.selections["approval"]._port
+                from services.v5_core_os.episode_production.generation_dispatch_live_sources import OriginalFile, LiveRuntimeCurrentReader, PinnedLiveMaterials
+                from services.v4_platform.generation_dispatch_live_result import encoder_tool_identity
+                configuration = {**{k: self.external.template["materials"][k] for k in
+                    ("backendProfile", "executionConfig", "processIdentity")},
+                    **{k: self.external.template["plan"]["executionBinding"][k] for k in ("backendDecision", "executionCode")}}
+                configuration_path = self.root / "test-d1-independent-config.json"
+                raw = c.canonical(configuration)
+                configuration_path.write_bytes(raw)
+                runtime_ref = self.external.attestation["attestationRef"]
+                runtime_file = self.external.proof_files[runtime_ref]
+                current_runtime = LiveRuntimeCurrentReader(
+                    host_observer=lambda config, lease: self.external._runtime_original(lease, self.external.proof_files)[0],
+                    input_observer=lambda config, lease: {"inputName": config["backendProfile"]["parameters"]["input"]["imageName"],
+                        "contentDigest": sha256(self.external.input_path.read_bytes()).hexdigest(),
+                        "inputRootDigest": digest(str(self.source_root)), "outputRootDigest": digest(str(self.root / "artifacts")),
+                        "outputPrefixAbsent": True},
+                    tool_observer=encoder_tool_identity)
+                self.live_materials = PinnedLiveMaterials(configuration=OriginalFile(configuration_path, sha256(raw).hexdigest()),
+                    runtime_original=OriginalFile(runtime_file["path"], runtime_file["sha256"]), runtime_current=current_runtime,
+                    cost_owner=SimpleNamespace(read_current=self.external.cost,
+                        proof_originals=lambda package, lease: self.external._cost_proof_observations(package, lease, self.external.proof_files)))
+                self.domain.close()
+                self.deployment = ExistingStoreOperatorDeployment(storage_root=self.root,
+                    lifecycle_path=self.root / "lifecycle.sqlite3", run_path=self.root / "runs.sqlite3",
+                    queue_path=self.queue_path, artifact_root=self.root / "artifacts",
+                    lifecycle_authorities={"m6_scope_authority": GenericScopeAuthority(),
+                        "m6_approval_authority": GenericApprovalAuthority(), "m6_identity_authority": None,
+                        "script_acceptance_authority": None, "canonical_target_ref": "test-pkg2-canonical-target"},
+                    episode_authorities={"identity_reference_authority": None, "identity_reference_current_reader": None,
+                        "rights_evidence_authority": None, "provider_policy_authority": None,
+                        "media_selection_approval_authority": self.selection_authority,
+                        "method_aware_input_artifact_evidence": self.port,
+                        "method_aware_input_append_authority": self.input_append_authority},
+                    selection=selection, endpoint=endpoint, technical_target_id="test-pkg2-single-anchor",
+                    clock=self.clock, worker_context=self.worker_context, approval_reader=approval_reader,
+                    prerequisite_reader=SimpleNamespace(prepare=self.external.prepare_prerequisites, read_current=self.external.current_prerequisites),
+                    material_reader=self.live_materials,
+                    backend_reader=SimpleNamespace(read_current=self.live_materials.backend),
+                    runtime_reader=SimpleNamespace(read_current=self.live_materials.runtime),
+                    cost_reader=SimpleNamespace(read_current=self.live_materials.cost), issuer_service_ref="test-cpu-v5-issuer")
+                self.operator_context = self.deployment.open()
+                self.operator = self.operator_context.__enter__()
+                case.addCleanup(self.operator_context.__exit__, None, None, None)
+                self.dispatch = self.operator._assembly
+                self.coordinators = [self.operator._coordinator]
+                self.queues = [self.operator._coordinator.repository]
+                issued = execute_command(self.operator, "issue-approved")
+            else:
+                issued = self.issue()
             if "grant" not in issued:
                 raise AssertionError(issued)
             self.grant = issued["grant"]
-            self.route_result = self.route(self.grant)
+            self.route_result = (execute_command(self.operator, "route-approved", self.grant["generationDispatchGrantRef"])
+                if use_operator else self.route(self.grant))
             self.job = self.jobs()[0]
             self.worker_context = TestWorkerExecutionContext("test-a14b-worker")
             self.job_port = MediaJobGenerationDispatchPort(coordinator=self.coordinators[0],

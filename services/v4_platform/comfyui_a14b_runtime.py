@@ -59,8 +59,11 @@ def validate_a14b_runtime_attestation(value, *, backend_profile=None, process_id
         "authorityState", "publicationAllowed", "payloadDigest", "capabilityMode"}, "A14B attestation")
     from .generation_dispatch_a14b_exact import (EXACT_COMPILER_IDENTITY, EXACT_TEMPLATE_REF,
         EXACT_NODE_INPUT_CONTRACTS, validate_exact_profile)
-    is_exact = value["schemaVersion"] == EXACT_RUNTIME_ATTESTATION_SCHEMA
-    _require(value["schemaVersion"] in {A14B_RUNTIME_ATTESTATION_SCHEMA, EXACT_RUNTIME_ATTESTATION_SCHEMA} and value["capabilityMode"] == A14B_CAPABILITY_MODE,
+    from .generation_dispatch_a14b_live import (LIVE_RUNTIME_SCHEMA, LIVE_COMPILER_IDENTITY,
+        LIVE_TEMPLATE_REF, LIVE_ENDPOINT_CLASS, validate_live_profile)
+    is_live = value["schemaVersion"] == LIVE_RUNTIME_SCHEMA
+    is_exact = is_live or value["schemaVersion"] == EXACT_RUNTIME_ATTESTATION_SCHEMA
+    _require(value["schemaVersion"] in {A14B_RUNTIME_ATTESTATION_SCHEMA, EXACT_RUNTIME_ATTESTATION_SCHEMA, LIVE_RUNTIME_SCHEMA} and value["capabilityMode"] == A14B_CAPABILITY_MODE,
         "A14B runtime type changed")
     ref(value["attestationRef"], "attestationRef")
     timestamp = value["observedAt"]
@@ -80,11 +83,12 @@ def validate_a14b_runtime_attestation(value, *, backend_profile=None, process_id
         "comfyuiCommit", "processIdentity", "processIdentityDigest", "launchConfiguration", "launchConfigDigest"}, "A14B facts")
     for key in ("providerId", "modelId", "region", "endpointClass", "comfyuiVersion", "pythonVersion", "pytorchVersion", "deviceName"):
         _text(facts[key], key)
-    _require(facts["endpointClass"] == "TEST_ONLY_LOOPBACK" and facts["evidenceClass"] == "TEST_ONLY",
-        "only isolated synthetic A14B runtime evidence is supported")
+    _require((facts["endpointClass"], facts["evidenceClass"]) ==
+        ((LIVE_ENDPOINT_CLASS, "CURRENT_RUNTIME_OBSERVATION") if is_live else ("TEST_ONLY_LOOPBACK", "TEST_ONLY")),
+        "runtime evidence class and endpoint do not match version")
     _require(facts["comfyuiCommit"] == COMFYUI_COMMIT and facts["comfyuiVersion"] == ("0.35.0" if is_exact else COMFYUI_COMMIT)
-        and facts["compilerIdentity"] == (EXACT_COMPILER_IDENTITY if is_exact else A14B_COMPILER_IDENTITY)
-        and facts["templateRef"] == (EXACT_TEMPLATE_REF if is_exact else A14B_TEMPLATE_REF),
+        and facts["compilerIdentity"] == (LIVE_COMPILER_IDENTITY if is_live else EXACT_COMPILER_IDENTITY if is_exact else A14B_COMPILER_IDENTITY)
+        and facts["templateRef"] == (LIVE_TEMPLATE_REF if is_live else EXACT_TEMPLATE_REF if is_exact else A14B_TEMPLATE_REF),
         "A14B runtime code/compiler/template mismatch")
     _require(facts["requiredNodes"] == list(A14B_REQUIRED_NODES)
         and canonical(facts["nodeInputContracts"]) == canonical(EXACT_NODE_INPUT_CONTRACTS if is_exact else A14B_NODE_INPUT_CONTRACTS), "A14B node inputs changed")
@@ -105,8 +109,9 @@ def validate_a14b_runtime_attestation(value, *, backend_profile=None, process_id
         and facts["launchConfigDigest"] == digest(facts["launchConfiguration"])
         and facts["processIdentity"]["launchConfigDigest"] == facts["launchConfigDigest"], "A14B process/launch correspondence changed")
     if backend_profile is not None:
-        profile = (validate_exact_profile if is_exact else validate_a14b_profile)(backend_profile)
-        _require(profile["parameters"]["evidenceClass"] == "TEST_ONLY", "historical evidence is not a current observation")
+        profile = (validate_live_profile if is_live else validate_exact_profile if is_exact else validate_a14b_profile)(backend_profile)
+        _require(profile["parameters"]["evidenceClass"] == ("LIVE_CONFIGURATION" if is_live else "TEST_ONLY"),
+            "historical evidence is not a current observation")
         _require(facts["backendProfileDigest"] == digest(profile)
             and canonical(facts["modelFiles"]) == canonical(profile["modelFiles"]), "A14B runtime/profile originals differ")
         _require(facts["vramTotalBytes"] >= profile["parameters"]["resourceRequirements"]["minimumVramBytes"],

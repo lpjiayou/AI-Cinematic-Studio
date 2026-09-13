@@ -218,3 +218,72 @@ def compose_generation_dispatch(*, lifecycle, root_service, method_media,
     coordination.activate(required)
     routing = GenerationDispatchRouting(foundation=foundation, source_reader=source, coordinator=queue_coordinators[0])
     return GenerationDispatchAssembly(boundary, routing, source, coordination, selections, tuple(coverage))
+
+
+def open_existing_live_operator(*, storage_root, lifecycle_path, run_path, queue_path,
+        artifact_root, lifecycle_authorities, episode_authorities, selection,
+        endpoint, technical_target_id, clock, worker_context, approval_reader,
+        prerequisite_reader, material_reader, backend_reader, runtime_reader,
+        cost_reader, issuer_service_ref):
+    """Explicit hosting seam. Validate/open existing stores, never bootstrap.
+
+    This function is called only after independent deployment authorization.
+    Construction of the CLI/host description does not call it. The usual Creator
+    environment factory (which may initialize optional stores) is not used.
+    """
+    from pathlib import Path
+    from uuid import uuid4
+    from .public import create_local_development_boundary
+    from .generation_dispatch_operator import compose_live_operator
+
+    lifecycle_keys = {"m6_scope_authority", "m6_approval_authority", "m6_identity_authority",
+        "script_acceptance_authority", "canonical_target_ref"}
+    episode_keys = {"identity_reference_authority", "identity_reference_current_reader",
+        "rights_evidence_authority", "provider_policy_authority", "media_selection_approval_authority",
+        "method_aware_input_artifact_evidence", "method_aware_input_append_authority"}
+    c.require(set(lifecycle_authorities) == lifecycle_keys and set(episode_authorities) == episode_keys,
+        "CURRENTNESS_FENCE_UNAVAILABLE")
+    root = Path(storage_root)
+    c.require(root.is_absolute() and root.is_dir() and not root.is_symlink(), "PERSISTENCE_UNAVAILABLE")
+    lifecycle_path, run_path, queue_path = map(Path, (lifecycle_path, run_path, queue_path))
+    owned_paths = [lifecycle_path, run_path, Path(str(run_path) + ".evidence.sqlite3"),
+        Path(str(run_path) + ".production-policy.sqlite3"), queue_path]
+    # Optional existing service adapters are opened by the original public
+    # factory, but have no D1 consumer. Still require them present: no implicit DDL.
+    required_paths = owned_paths + [Path(str(run_path) + suffix)
+        for suffix in (".provider-experiments.sqlite3", ".voice-locks.sqlite3")]
+    for path in required_paths:
+        c.require(path.is_absolute() and path.is_file() and not path.is_symlink()
+            and path.resolve().is_relative_to(root.resolve()), "PERSISTENCE_UNAVAILABLE")
+    c.require(len(set(p.resolve() for p in required_paths)) == len(required_paths), "PERSISTENCE_UNAVAILABLE")
+    c.require(Path(artifact_root).is_absolute() and Path(artifact_root).is_dir()
+        and not Path(artifact_root).is_symlink(), "PERSISTENCE_UNAVAILABLE")
+    lifecycle = LifecycleAssembly.sqlite(lifecycle_path, initialize_or_upgrade=False, **lifecycle_authorities)
+    queue = SqliteMediaJobAdapter(queue_path, initialize_if_missing=False)
+
+    class NoOrdinaryGenerate:
+        def generate(self, *args, **kwargs):
+            raise c.DispatchError("APPROVAL_UNAVAILABLE")
+
+    coordinator = MediaJobCoordinator(queue, NoOrdinaryGenerate(), artifact_root=artifact_root,
+        ref_factory=lambda prefix: prefix + "-" + uuid4().hex, clock=clock.now, max_attempts=1)
+    boundary = create_local_development_boundary(run_path,
+        project_boundary=lifecycle.project_context, series_episode_boundary=lifecycle.series_episode,
+        series_planning_boundary=lifecycle.series_planning, script_studio_boundary=lifecycle.script_studio,
+        initialize_if_missing=False, **episode_authorities)
+    domain = ControlledStorageDomain(root, owned_paths)
+    try:
+        operator = compose_live_operator(selection=selection, endpoint=endpoint, worker_context=worker_context,
+            lifecycle=lifecycle, root_service=boundary._EpisodeProductionPublicBoundary__service,
+            method_media=boundary._EpisodeProductionPublicBoundary__method_aware_media,
+            input_assets=boundary._EpisodeProductionPublicBoundary__method_aware_input_assets,
+            policy_service=boundary._EpisodeProductionPublicBoundary__production_policy,
+            queue_coordinators=[coordinator], storage_domain=domain,
+            workspace_ref=selection.prepare_command["workspaceRef"], technical_target_id=technical_target_id,
+            clock=clock, approval_reader=approval_reader, prerequisite_reader=prerequisite_reader,
+            material_reader=material_reader, backend_reader=backend_reader, runtime_reader=runtime_reader,
+            cost_reader=cost_reader, issuer_service_ref=issuer_service_ref)
+    except BaseException:
+        domain.close()
+        raise
+    return operator, domain
