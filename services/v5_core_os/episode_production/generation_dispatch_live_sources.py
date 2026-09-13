@@ -184,12 +184,13 @@ class PinnedPrerequisiteOriginals:
         "rightsEvaluation": ("V5_RIGHTS", "CURRENT_RIGHTS_EVALUATION"),
         "providerPolicyEvaluation": ("V5_PROVIDER_POLICY", "CURRENT_PROVIDER_POLICY")}
 
-    def __init__(self, *, originals, verifiers, approval_original, approval_evidence):
+    def __init__(self, *, originals, verifiers, approval_original=None, approval_evidence=None):
         c.require(set(originals) == set(verifiers) == set(self._owners)
             and all(type(v) is OriginalFile for v in originals.values())
             and all(callable(v) for v in verifiers.values())
-            and type(approval_original) is PinnedOwnerOriginal
-            and type(approval_evidence) is OriginalFile, "APPROVAL_UNAVAILABLE")
+            and ((approval_original is None and approval_evidence is None)
+                or (type(approval_original) is PinnedOwnerOriginal
+                    and type(approval_evidence) is OriginalFile)), "APPROVAL_UNAVAILABLE")
         self._originals, self._verifiers = dict(originals), dict(verifiers)
         self._approval_original, self._approval_evidence = approval_original, approval_evidence
 
@@ -211,6 +212,11 @@ class PinnedPrerequisiteOriginals:
             for k, o in self._read(resolved, lease).items()}
 
     def read_current(self, resolved, package, approval, phase, lease):
+        # PREPARE builds the plan before its independent approval exists. Every
+        # later gate still requires the original approval pair, before any I/O.
+        if phase != "PREPARE":
+            c.require(approval is not None and self._approval_original is not None
+                and self._approval_evidence is not None, "APPROVAL_UNAVAILABLE")
         records = self._read(resolved, lease)
         selectors = {}
         for kind, observation in records.items():
