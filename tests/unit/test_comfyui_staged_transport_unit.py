@@ -207,6 +207,82 @@ print('INERT_IMPORT_PASS')
         self.assertEqual(original, (exchange.request_deadline, exchange.history_deadline, exchange.postprocess_deadline))
 
 
+class ReadOnlyRecoveryDeadlineTests(unittest.TestCase):
+    """Deterministic phase budgets on the real recovery entry, without I/O."""
+
+    def recover(self, *, ceiling=110.0, encode_seconds=0.0, check_encoder=True):
+        from services.v4_platform import generation_dispatch_live_result as results
+        from tests.support.comfyui_loopback_fixtures import PROMPT_ID
+        transport, request = make_loopback_client("http://127.0.0.1:49157/", native_frames=True)
+        original = deepcopy(request)
+        clock = [100.0]
+        seen = {}
+
+        def history(exchange):
+            seen["exchange"] = exchange
+            clock[0] += 0.125
+            return {"test": "history"}
+
+        def artifacts(exchange, value):
+            self.assertIs(exchange, seen["exchange"])
+            self.assertEqual(value, {"test": "history"})
+            clock[0] += 0.125
+            return [], ()
+
+        def encode(blobs, native, bound_request, *, deadline_monotonic):
+            self.assertEqual((blobs, native), ((), []))
+            self.assertEqual(bound_request, original)
+            seen["encodingDeadline"] = deadline_monotonic
+            clock[0] += encode_seconds
+            if check_encoder:
+                results._remaining(deadline_monotonic)
+            return b"synthetic-observation", {"TEST_ONLY": True}
+
+        with patch.object(staged.time, "monotonic", side_effect=lambda: clock[0]), \
+             patch.object(staged.ComfyUIStagedTransport, "_history", side_effect=history), \
+             patch.object(staged.ComfyUIStagedTransport, "_artifacts", side_effect=artifacts), \
+             patch.object(results, "process_native_frames", side_effect=encode), \
+             patch.object(staged.ComfyUIStagedTransport, "commit_request_once", side_effect=AssertionError("POST forbidden")) as send, \
+             patch("socket.socket", side_effect=AssertionError("network forbidden")):
+            try:
+                observed = transport.recover_result_read_only(request, PROMPT_ID,
+                    deadline_monotonic=ceiling)
+            finally:
+                send.assert_not_called()
+                self.assertEqual(request, original)
+                self.assertTrue(seen["exchange"].spent)
+                self.assertTrue(seen["exchange"].read_started)
+                self.assertIsNone(seen["exchange"].send_authority)
+                self.assertIsNone(seen["exchange"].submission)
+        self.assertFalse(observed["sendAttempted"])
+        self.assertEqual(observed["providerPromptId"], PROMPT_ID)
+        self.assertEqual(observed["artifactBytes"], b"synthetic-observation")
+        return seen
+
+    def test_encoding_cannot_borrow_unused_request_or_history_budget(self):
+        seen = self.recover()
+        self.assertEqual(seen["encodingDeadline"], 101.25)
+        self.assertEqual(seen["exchange"].postprocess_deadline, 101.25)
+
+    def test_encoding_preserves_shorter_absolute_recovery_ceiling(self):
+        seen = self.recover(ceiling=100.75)
+        self.assertEqual(seen["encodingDeadline"], 100.75)
+
+    def test_phase_expiry_reaches_encoder_as_exact_bounded_deadline(self):
+        from services.v4_platform.media_jobs import ArtifactVerificationError
+        with self.assertRaisesRegex(ArtifactVerificationError, "result deadline expired"):
+            self.recover(encode_seconds=1.0)
+
+    def test_absolute_expiry_is_not_renewed_at_encoding_start(self):
+        from services.v4_platform.media_jobs import ArtifactVerificationError
+        with self.assertRaisesRegex(ArtifactVerificationError, "result deadline expired"):
+            self.recover(ceiling=100.75, encode_seconds=0.5)
+
+    def test_late_encoder_return_cannot_become_recovery_observation(self):
+        with self.assertRaisesRegex(TimeoutError, "bounded transport deadline expired"):
+            self.recover(encode_seconds=1.0, check_encoder=False)
+
+
 class ResponseCleanupRegressionTests(unittest.TestCase):
     """F01: real HTTPResponse cleanup must preserve the original outcome."""
 

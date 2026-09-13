@@ -539,9 +539,12 @@ class ComfyUIStagedTransport:
             time.monotonic() + request["historyTimeoutMs"] / 1000)
         history = self._history(exchange)
         native, blobs = self._artifacts(exchange, history)
+        exchange.postprocess_deadline = min(exchange.postprocess_deadline,
+            time.monotonic() + request["postprocessTimeoutMs"] / 1000)
         from .generation_dispatch_live_result import process_native_frames
         final_bytes, derivation = process_native_frames(blobs, native, request,
             deadline_monotonic=exchange.postprocess_deadline)
+        _remaining(exchange.postprocess_deadline)
         return {"requestDigest": request["payloadDigest"], "providerPromptId": prompt_id,
             "nativeArtifacts": native, "derivation": derivation,
             "artifactSha256": sha256(final_bytes).hexdigest(), "artifactByteSize": len(final_bytes),
