@@ -4,10 +4,14 @@ from __future__ import annotations
 
 from pathlib import Path
 import subprocess
+import tempfile
 import unittest
 
 from scripts.classify_ci_change_scope import (
     ChangedFile,
+    AFFECTED_TESTS,
+    AFFECTED_TEST_ALLOWLIST,
+    CRITICAL_INTEGRATION_SMOKE,
     DOCS_ONLY,
     FULL_SUITE,
     classify_records,
@@ -187,6 +191,86 @@ class ChangeScopeClassifierTests(unittest.TestCase):
         outcome = classify(changed("docs/policy.md"), event="push")
         self.assertTrue(outcome.failed)
         self.assertEqual(FULL_SUITE, outcome.payload["classification"])
+
+
+class AffectedScopeTests(unittest.TestCase):
+    path = sorted(AFFECTED_TEST_ALLOWLIST)[0]
+
+    def test_each_isolated_test_selects_all_upstream_slices_and_smoke(self):
+        for path in sorted(AFFECTED_TEST_ALLOWLIST):
+            with self.subTest(path=path):
+                payload = classify(changed(path)).payload
+                verify_payload(payload)
+                self.assertEqual(AFFECTED_TESTS, payload["classification"])
+                self.assertEqual(sorted(AFFECTED_TEST_ALLOWLIST | set(CRITICAL_INTEGRATION_SMOKE)),
+                                 payload["selectedIntegrationFiles"])
+
+    def test_docs_can_accompany_only_the_closed_test_allowlist(self):
+        self.assertEqual(AFFECTED_TESTS, classify(changed(self.path), changed("README.md")).payload["classification"])
+
+    def test_production_shared_fixture_ci_unknown_or_dependency_forces_full(self):
+        for path in ("apps/creator_workspace_mvp/server.py",
+                     "services/v5_core_os/episode_production/generation_dispatch_host.py",
+                     "services/v5_core_os/lifecycle_integrity/contracts.py",
+                     "tests/support/fixture.py", "tests/integration/support.py",
+                     "tests/unit/test_ci_change_scope_classifier.py",
+                     "scripts/run_ci_fast_path.py", "docs/requirements.txt",
+                     ".github/workflows/repository-validation.yml", "unmapped.txt"):
+            with self.subTest(path=path):
+                self.assertEqual(FULL_SUITE, classify(changed(self.path), changed(path)).payload["classification"])
+
+    def test_new_deleted_renamed_copied_and_mode_changed_tests_force_full(self):
+        records = [changed(self.path, status="A"), changed(self.path, status="D"),
+                   changed(self.path, status="T"), changed(self.path, new_mode="120000"),
+                   changed(self.path, new_mode="100755"),
+                   changed(self.path, status="R100", old_path=sorted(AFFECTED_TEST_ALLOWLIST)[1]),
+                   changed(self.path, status="C100", old_path="tests/support/fixture.py"),
+                   changed(self.path, old_mode=None, new_mode=None)]
+        for record in records:
+            with self.subTest(record=record):
+                self.assertEqual(FULL_SUITE, classify(record).payload["classification"])
+
+    def test_nightly_and_manual_runs_never_use_affected_selection(self):
+        for event in ("schedule", "workflow_dispatch"):
+            self.assertEqual(FULL_SUITE, classify(changed(self.path), event=event).payload["classification"])
+
+    def test_tampered_selection_rejected_even_with_recomputed_digest(self):
+        for selected in ([], [self.path], ["tests/integration/unknown.py"]):
+            payload = classify(changed(self.path)).payload
+            payload["selectedIntegrationFiles"] = selected
+            payload["payloadDigest"] = payload_digest(payload)
+            with self.assertRaises(ValueError):
+                verify_payload(payload)
+
+    def test_full_and_docs_payloads_cannot_smuggle_a_selection(self):
+        for path in ("README.md", "services/unknown.py"):
+            payload = classify(changed(path)).payload
+            payload["selectedIntegrationFiles"] = [self.path]
+            payload["payloadDigest"] = payload_digest(payload)
+            with self.assertRaises(ValueError):
+                verify_payload(payload)
+
+    def test_missing_selected_test_or_a_new_consumer_forces_full(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            def classify_local():
+                return classify_repository_change(repo_root=root, event_name="pull_request",
+                    base_sha=BASE, head_sha=HEAD, diff_reader=lambda *_: [changed(self.path)])
+            self.assertEqual(FULL_SUITE, classify_local().payload["classification"])
+            for path in AFFECTED_TEST_ALLOWLIST | set(CRITICAL_INTEGRATION_SMOKE):
+                target = root / path
+                target.parent.mkdir(parents=True, exist_ok=True)
+                target.write_text("# isolated fixture\n", encoding="utf-8")
+            self.assertEqual(AFFECTED_TESTS, classify_local().payload["classification"])
+            consumer = root / "tests/integration/consumer.py"
+            consumer.write_text(f"from tests.integration import {Path(self.path).stem}\n", encoding="utf-8")
+            self.assertEqual(FULL_SUITE, classify_local().payload["classification"])
+
+    def test_current_repository_has_no_consumers_of_allowlisted_tests(self):
+        for path in sorted(AFFECTED_TEST_ALLOWLIST):
+            outcome = classify_repository_change(repo_root=Path.cwd(), event_name="pull_request",
+                base_sha=BASE, head_sha=HEAD, diff_reader=lambda *_, p=path: [changed(p)])
+            self.assertEqual(AFFECTED_TESTS, outcome.payload["classification"], outcome.payload)
 
 
 if __name__ == "__main__":

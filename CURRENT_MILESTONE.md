@@ -11,11 +11,11 @@ not a new Grant, feature acceptance or production-readiness decision.
 
 <!-- CURRENT_STATE:BEGIN -->
 ```text
-CURRENT_TASK=ACS-D1-SH09-LIVE-OPERATOR-AND-ONE-RESULT-20260913
-CURRENT_ACTION=BOUNDED_AUDIT_STATE_AND_VALIDATOR_REMEDIATION
+CURRENT_TASK=ACS-CI-SCOPED-TESTS-AND-BALANCED-SHARDS
+CURRENT_ACTION=BOUNDED_CI_OPTIMIZATION
 NEXT_TASK=D1_READ_ONLY_PREPARE_AND_EXACT_RUN_REQUEST
-REVIEWED_MAIN=1e62786ea75823869c97934b18e22d722b7949f9
-REVIEWED_TREE=ddf58ea25feb8e64cce453a25c81b3233e72f48b
+REVIEWED_MAIN=c4c30eb785a5c342e92ae359e50bd8e482048350
+REVIEWED_TREE=e07a467abfbfd51f8fa8e0fc7e7043acc1cdaa12
 ADR_0022_ACCEPTED_VERSION=1.5_NARROW_D1_INCREMENT
 R2_F01_ENGINEERING=ACCEPTED_WITHIN_CPU_FIXTURE_SCOPE_AND_MERGED
 R3_F01_ENGINEERING=MERGED
@@ -57,6 +57,8 @@ DOCUMENT_GOVERNANCE_VALIDATION=IMPLEMENTED
 DOCS_ONLY_CI_FAST_PATH=IMPLEMENTED
 REQUIRED_CHECK_CONTEXTS=5_UNCHANGED
 PROTECTED_CHANGE_FULL_SUITE=ENFORCED
+ISOLATED_TEST_CI_FAST_PATH=IMPLEMENTED_CANDIDATE
+INTEGRATION_SHARDS=6
 POST_MERGE_DUPLICATE_FULL_CI=REMOVED
 ```
 <!-- CURRENT_STATE:END -->
@@ -67,6 +69,12 @@ the platform's current bill, a started execution window or an issued dispatch Gr
 The exact single-run request must bind the approved plan, instance, cost/window,
 current runtime and existing records through the original Operator before sending.
 Failure/UNKNOWN does not authorize an automatic second submission.
+
+The Owner authorized bounded CI optimization after PR #95 passed all five required
+checks and merged. Only an exact isolated-test allowlist may use affected selection;
+production and CI changes still run full suites. Six workers rebalance full
+Integration coverage without removing tests. D1 host/input wiring is merged at
+`c4c30eb785a5c342e92ae359e50bd8e482048350`; this is not a live result.
 
 The current action does not contact the GPU, operate the database, start generation
 or open another implementation wave. The selected Blackwell instance's bounded
