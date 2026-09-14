@@ -113,7 +113,8 @@ class GenerationDispatchFoundation:
                  runtime_reader: RuntimeIdentityPort | None = None,
                  cost_reader: CostEvidencePort | None = None,
                  coordination: GenerationDispatchCoordinationPort | None = None,
-                 clock: TrustedClockPort | None = None, issuer_service_ref: str | None = None):
+                 clock: TrustedClockPort | None = None, issuer_service_ref: str | None = None,
+                 failure_reader=None):
         self.repository = repository
         self.approval_reader = approval_reader if approval_reader is not None else RejectingApprovalReader()
         self.revocation_reader = revocation_reader if revocation_reader is not None else RejectingApprovalReader()
@@ -121,6 +122,7 @@ class GenerationDispatchFoundation:
         self.runtime_reader, self.cost_reader = runtime_reader, cost_reader
         self.coordination, self.clock = coordination, clock
         self.issuer_service_ref = issuer_service_ref
+        self.failure_reader = failure_reader
 
     def _repository(self):
         c.require(self.repository is not None, "PERSISTENCE_UNAVAILABLE")
@@ -336,7 +338,35 @@ class GenerationDispatchFoundation:
             raise c.CommitOutcomeUnknown() from exc
 
     def issue(self, command: Mapping) -> dict:
-        command = c.validate_command("ISSUE", command)
+        return self._issue(command, replacement=False)
+
+    def issue_replacement(self, command: Mapping) -> dict:
+        """Trusted Operator only. No Public/HTTP/CLI dispatch or automatic retry."""
+        return self._issue(command, replacement=True)
+
+    def _replacement_proof(self, command, selected, lease):
+        plan = selected.plan_package["plan"]
+        original = self._grant({**plan["scope"], "generationDispatchGrantRef": c.grant_ref(plan)})
+        c.validate_replacement_plan(original, plan, selected.approval)
+        terminal = self._terminal(original)
+        c.require(terminal is not None, "APPROVAL_UNAVAILABLE")
+        c.require(terminal["kind"] == "REVOKED", "ALREADY_CONSUMED")
+        c.require(all(terminal["revocationApproval"][key] == selected.approval[key]
+            for key in ("authorityRef", "actorRef")), "APPROVAL_UNAVAILABLE")
+        # A durable revocation is final; its original approval is reverified,
+        # not reconstructed from a caller's statement about zero sends.
+        revoked = self._selected(terminal["revocationApproval"]["authorityDecisionRef"], revocation=True)
+        c.require(revoked.approval == terminal["revocationApproval"], "APPROVAL_UNAVAILABLE")
+        c.require(self.failure_reader is not None, "CURRENTNESS_FENCE_UNAVAILABLE")
+        observed = self.failure_reader.read_zero_send_failure(command["workspaceRef"],
+            command["productionRunRef"], command["predecessorJobRef"], original, lease)
+        return c.validate_replacement_proof({**observed,
+            "originalGrantRef": original["generationDispatchGrantRef"],
+            "originalGrantDigest": original["payloadDigest"],
+            "revokedTerminalDigest": terminal["payloadDigest"]}, plan)
+
+    def _issue(self, command, *, replacement):
+        command = c.validate_command("REPLACE_UNCONSUMED" if replacement else "ISSUE", command)
         repo = self._repository()
         workspace, run = command["workspaceRef"], command["productionRunRef"]
         outcome = {"stored": False}
@@ -350,16 +380,22 @@ class GenerationDispatchFoundation:
             selected = self._selected(command["authorityDecisionRef"])
             plan = selected.plan_package["plan"]
             self._matches_issue(command, plan, selected.approval)
-            c.require(repo.get_record(workspace, run, c.grant_ref(plan), 1) is None, "GRANT_SUBJECT_ALREADY_RECORDED")
+            target_ref = c.replacement_grant_ref(plan) if replacement else c.grant_ref(plan)
+            c.require(repo.get_record(workspace, run, target_ref, 1) is None, "GRANT_SUBJECT_ALREADY_RECORDED")
+            proof = self._replacement_proof(command, selected, lease) if replacement else None
             c.require(self._snapshot_tokens(workspace, run) == command["snapshotTokens"], "SNAPSHOT_CHANGED")
             read_set = self._current(selected, lease)
+            if replacement:
+                c.require(proof == self._replacement_proof(command, selected, lease), "ATTEMPT_OR_LEASE_CHANGED")
             now = self._now()
             c.require(c.utc(selected.approval["decidedAt"]) <= c.utc(now)
                 and c.utc(plan["limits"]["notBefore"]) <= c.utc(now) < c.utc(plan["limits"]["expiresAt"]), "OUTSIDE_VALIDITY_WINDOW")
             c.require(self.issuer_service_ref is not None, "CURRENTNESS_FENCE_UNAVAILABLE")
             c.ref(self.issuer_service_ref)
             request_digest = c.issue_request_digest(command, selected.approval)
-            grant = c.sealed({"schemaVersion": c.GRANT_SCHEMA, "generationDispatchGrantRef": c.grant_ref(plan), "version": 1,
+            grant = c.sealed({"schemaVersion": c.REPLACEMENT_GRANT_SCHEMA if replacement else c.GRANT_SCHEMA,
+                "generationDispatchGrantRef": target_ref, "version": 1,
+                **({"replacementOf": proof} if replacement else {}),
                 **plan["scope"], **{k: deepcopy(plan[k]) for k in ("subject", "executionBinding", "permissions", "limits")},
                 "subjectDigest": c.subject_digest(plan), "approval": deepcopy(selected.approval), "issuanceEvidence": {
                     "issuerServiceRef": self.issuer_service_ref, "requestDigest": request_digest, "approvalBundleSha256": selected.bundle_sha256,

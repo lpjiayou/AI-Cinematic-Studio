@@ -1,6 +1,6 @@
 # AI Cinematic Studio — Current Execution State
 
-Status: `CURRENT / EVIDENCE-BACKED / FAIL-CLOSED`; reviewed: `2026-09-13`
+Status: `CURRENT / EVIDENCE-BACKED / FAIL-CLOSED`; reviewed: `2026-09-15`
 
 ## 1. Active task and boundaries
 
@@ -11,29 +11,29 @@ not a new Grant, feature acceptance or production-readiness decision.
 
 <!-- CURRENT_STATE:BEGIN -->
 ```text
-CURRENT_TASK=ACS-CI-SCOPED-TESTS-AND-BALANCED-SHARDS
-CURRENT_ACTION=BOUNDED_CI_OPTIMIZATION
-NEXT_TASK=D1_READ_ONLY_PREPARE_AND_EXACT_RUN_REQUEST
-REVIEWED_MAIN=c4c30eb785a5c342e92ae359e50bd8e482048350
-REVIEWED_TREE=e07a467abfbfd51f8fa8e0fc7e7043acc1cdaa12
-ADR_0022_ACCEPTED_VERSION=1.5_NARROW_D1_INCREMENT
+CURRENT_TASK=ACS-D1-PRE-SEND-FAILURE-RECOVERY
+CURRENT_ACTION=BOUNDED_ZERO_SEND_REPLACEMENT_AND_PUBLICATION
+NEXT_TASK=D1_PUBLISHED_FIX_AND_ONE_APPROVED_SH09
+REVIEWED_MAIN=5c8cd918912710fb8c4e23629200753062aebd7d
+REVIEWED_TREE=59e1383d7885617e294c2fc75eb8c5a7eb5a6525
+ADR_0022_ACCEPTED_VERSION=1.6_ZERO_SEND_REPLACEMENT_EXCEPTION
 R2_F01_ENGINEERING=ACCEPTED_WITHIN_CPU_FIXTURE_SCOPE_AND_MERGED
 R3_F01_ENGINEERING=MERGED
 D1_OPERATOR_CODE=MERGED
 D1_SEVEN_STORE_BINDING_FIX=MERGED
 ORIGINAL_EVIDENCE_AVAILABILITY=RESOLVED
 D1_BOUNDED_DEPLOYMENT=OWNER_AUTHORIZED
-D1_EXISTING_DATA_BINDING=READ_ONLY
+D1_EXISTING_DATA_BINDING=ORIGINAL_CUSTODY_WORKSET_BOUNDED_AUTHORIZATION
 D1_SELECTED_SSH_FORWARD_TARGET=127.0.0.1:8188
 D1_RUNTIME_OBSERVATION=DATED_READ_ONLY_METADATA_ONLY
-D1_EXACT_RUN_REQUEST=NOT_YET_FULLY_BOUND
+D1_EXACT_RUN_REQUEST=ORIGINAL_APPROVED_PLAN_REQUIRES_PUBLISHED_FIX_REBINDING
 D1_COMPLETE=false
 SYSTEM_RUNTIME_BOUND=false
 PROMPT_SUBMISSION_AUTHORIZED=false
 SPIKE_0_EXECUTED=false
 SPIKE_0_READINESS=BLOCKED_PENDING_EXACT_RUN_GATES
 FORMAL_DATABASE_WRITES_AUTHORIZED=false
-LIVE_GRANT_ISSUED=false
+LIVE_GRANT_ISSUED=true
 LIVE_GRANT_CONSUMED=false
 OUTPUT_ASSET_ADMISSION_ALLOWED=false
 PUBLICATION_ALLOWED=false
@@ -57,18 +57,21 @@ DOCUMENT_GOVERNANCE_VALIDATION=IMPLEMENTED
 DOCS_ONLY_CI_FAST_PATH=IMPLEMENTED
 REQUIRED_CHECK_CONTEXTS=5_UNCHANGED
 PROTECTED_CHANGE_FULL_SUITE=ENFORCED
-ISOLATED_TEST_CI_FAST_PATH=IMPLEMENTED_CANDIDATE
+ISOLATED_TEST_CI_FAST_PATH=MERGED
 INTEGRATION_SHARDS=6
 POST_MERGE_DUPLICATE_FULL_CI=REMOVED
 ```
 <!-- CURRENT_STATE:END -->
 
-The Owner supplied a rate of RMB 6.9/hour, a total budget of RMB 1,000 and a
-five-hour maximum followed by shutdown. These are authorized limits, not proof of
-the platform's current bill, a started execution window or an issued dispatch Grant.
-The exact single-run request must bind the approved plan, instance, cost/window,
-current runtime and existing records through the original Operator before sending.
-Failure/UNKNOWN does not authorize an automatic second submission.
+The original exact SH09 plan was approved and one Grant/Attempt was created, but
+the pre-consumption failure produced no confirmed send or video. Preserve the
+original records. The Owner authorized failure-only cleanup and the ADR-0022
+section 8.5 single-replacement exception; consumed/UNKNOWN cases remain excluded.
+The replacement must bind the published repair and current runtime through the
+original Operator. Its send permission is not active until those gates pass.
+The approved five-hour window, two-hour execution budget and RMB 1,000 cap are not
+silently extended. The later Owner instruction is to leave the GPU powered on;
+storage is billed even when off. No formal 8765 database operation is authorized.
 
 The Owner authorized bounded CI optimization after PR #95 passed all five required
 checks and merged. Only an exact isolated-test allowlist may use affected selection;
@@ -76,9 +79,9 @@ production and CI changes still run full suites. Six workers rebalance full
 Integration coverage without removing tests. D1 host/input wiring is merged at
 `c4c30eb785a5c342e92ae359e50bd8e482048350`; this is not a live result.
 
-The current action does not contact the GPU, operate the database, start generation
-or open another implementation wave. The selected Blackwell instance's bounded
-deployment/read-only authorization does not authorize the separate M12 A100 wave.
+Current work is the bounded D1 repair, direct CPU validation and protected
+publication, followed by the already authorized exact-run gates. It does not open
+another implementation wave or authorize the separate M12 A100 wave.
 
 ## 2. Merged engineering evidence — do not redo
 

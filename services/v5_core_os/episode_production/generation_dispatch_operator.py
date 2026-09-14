@@ -108,6 +108,48 @@ class GenerationDispatchOperator:
         return self._assembly.routing.route_for_grant(command["workspaceRef"], command["productionRunRef"],
             grant_ref, idempotency_key=self._selection.route_idempotency_key)
 
+    def replace_unconsumed_failure(self, predecessor_job_ref, *, revocation_decision_ref):
+        """Explicit one-child replacement; does not route, claim or send.
+
+        Two independently resolved Owner decisions are required: revoke the
+        exact original Grant, and approve the exact repaired-code plan. The
+        failed original Job/Attempt remains untouched. No replacement of v2.
+        """
+        selected = self._selected()
+        plan = selected.plan_package["plan"]
+        command = self._selection.prepare_command
+        f = self._assembly.boundary._foundation
+        with self._assembly.coordination.critical_section(command["workspaceRef"]) as lease:
+            original = f._grant({**plan["scope"], "generationDispatchGrantRef": c.grant_ref(plan)})
+            c.validate_replacement_plan(original, plan, selected.approval)
+            c.require(f.failure_reader is not None, "CURRENTNESS_FENCE_UNAVAILABLE")
+            f.failure_reader.read_zero_send_failure(command["workspaceRef"], command["productionRunRef"],
+                predecessor_job_ref, original, lease)
+            terminal = f._terminal(original)
+            if terminal is not None:
+                c.require(terminal["kind"] == "REVOKED", "ALREADY_CONSUMED")
+                c.require(terminal["revocationApproval"]["authorityDecisionRef"] == revocation_decision_ref,
+                    "APPROVAL_UNAVAILABLE")
+            else:
+                f.revoke({"workspaceRef": command["workspaceRef"], "productionRunRef": command["productionRunRef"],
+                    "generationDispatchGrantRef": original["generationDispatchGrantRef"],
+                    "generationDispatchGrantDigest": original["payloadDigest"],
+                    "authorityDecisionRef": c.ref(revocation_decision_ref),
+                    "idempotencyKey": "replacement-revoke-" + c.digest(original["generationDispatchGrantRef"]),
+                    "snapshotTokens": f._snapshot_tokens(command["workspaceRef"], command["productionRunRef"])})
+            # Revocation may commit even if the following issue fails. That is
+            # safe and preserved; an uncertain write must be inspected, not retried.
+            prepared = self.prepare()
+            c.require("planPackage" in prepared, prepared.get("code", "APPROVAL_UNAVAILABLE"))
+            c.require(c.canonical(prepared["planPackage"]) == c.canonical(selected.plan_package), "SOURCE_CHANGED")
+            issue = {k: v for k, v in command.items() if k not in {"limits", "executionConfigRef", "costBasisRef"}}
+            issue.update(expectedSubjectDigest=prepared["subjectDigest"],
+                expectedApprovedPlanDigest=self._selection.approved_plan_digest,
+                authorityDecisionRef=self._selection.authority_decision_ref,
+                idempotencyKey=self._selection.issue_idempotency_key,
+                snapshotTokens=prepared["snapshotTokens"], predecessorJobRef=c.ref(predecessor_job_ref))
+            return f.issue_replacement(issue)
+
     def _executor(self, media_job_ref):
         from services.v4_platform.generation_dispatch_execution import GenerationDispatchExecutor, MediaJobGenerationDispatchPort
         from services.v4_platform.generation_dispatch_live_result import GenerationDispatchLiveResultBoundary
@@ -134,6 +176,16 @@ class GenerationDispatchOperator:
     def execute_one(self, media_job_ref):
         command = self._selection.prepare_command
         return self._executor(media_job_ref).execute(command["workspaceRef"], command["productionRunRef"], media_job_ref)
+
+    def finalize_unconsumed_expired(self, media_job_ref):
+        """Explicit trusted-host failure cleanup, never a retry or send command.
+
+        The original read-only recover/HTTP/CLI contracts are unchanged. This
+        cannot grant another Attempt, resurrect a lease or recover a capability.
+        """
+        command = self._selection.prepare_command
+        return self._executor(media_job_ref).finalize_unconsumed_expired(
+            command["workspaceRef"], command["productionRunRef"], media_job_ref)
 
     def recover(self, media_job_ref):
         """Original Job/Terminal and bounded GET recovery, never a new Attempt.

@@ -12,6 +12,38 @@ from tests.support.generation_dispatch_fixtures import fault_at
 
 
 class GenerationDispatchConsumptionUnitTests(unittest.TestCase):
+    def test_failure_evidence_is_original_history_not_send_permission(self):
+        f = LightweightConsumptionFixture(self)
+        grant = f.grant
+        binding = {"generationDispatchGrantRef": grant["generationDispatchGrantRef"],
+            "generationDispatchGrantDigest": grant["payloadDigest"],
+            "subjectDigest": grant["subjectDigest"],
+            "approvedPlanDigest": grant["approval"]["approvedPlanDigest"]}
+        evidence = f.consumer.read_failure_evidence(grant["workspaceRef"],
+            grant["productionRunRef"], binding)
+        self.assertEqual(evidence, {"workflowDigest": grant["executionBinding"]["workflowDigest"],
+            "terminal": None})
+        terminal = f.consume()["receipt"]["terminal"]
+        records = f.grants.records()
+        self.assertEqual(f.consumer.read_failure_evidence(grant["workspaceRef"],
+            grant["productionRunRef"], binding)["terminal"], terminal)
+        self.assertEqual(f.grants.records(), records)
+
+    def test_failure_evidence_rejects_changed_binding_and_scope(self):
+        f = LightweightConsumptionFixture(self)
+        grant = f.grant
+        binding = {"generationDispatchGrantRef": grant["generationDispatchGrantRef"],
+            "generationDispatchGrantDigest": grant["payloadDigest"],
+            "subjectDigest": grant["subjectDigest"],
+            "approvedPlanDigest": grant["approval"]["approvedPlanDigest"]}
+        for field in ("generationDispatchGrantDigest", "subjectDigest", "approvedPlanDigest"):
+            with self.subTest(field=field), self.assertRaises(c.DispatchError) as stopped:
+                f.consumer.read_failure_evidence(grant["workspaceRef"], grant["productionRunRef"],
+                    {**binding, field: c.digest("not the original binding")})
+            self.assertEqual(stopped.exception.code, "SCOPE_MISMATCH")
+        with self.assertRaises(c.DispatchError):
+            f.consumer.read_failure_evidence("other-workspace", grant["productionRunRef"], binding)
+
     def test_linux_worker_identity_is_trusted_local_process_and_current_thread(self):
         context = LocalWorkerExecutionContext("test-pkg3-linux-worker",
             core_commit="b" * 40)

@@ -209,10 +209,13 @@ def compose_generation_dispatch(*, lifecycle, root_service, method_media,
     source = GenerationDispatchOwnerReaders(root_service=root_service, method_media=method_media,
         input_assets=input_assets, coordination=coordination, technical_target_id=technical_target_id,
         prerequisite_reader=selections["prerequisites"], material_reader=selections["materials"])
+    from services.v4_platform.generation_dispatch_execution import MediaJobGenerationDispatchPort
+    failure_reader = MediaJobGenerationDispatchPort(coordinator=queue_coordinators[0],
+        coordination=coordination, clock=clock)
     foundation = GenerationDispatchFoundation(repository=evidence, clock=clock, coordination=coordination,
         issuer_service_ref=issuer_service_ref, revocation_reader=revocation_reader,
         approval_reader=selections["approval"], source_reader=source, backend_reader=selections["backend"],
-        runtime_reader=selections["runtime"], cost_reader=selections["cost"])
+        runtime_reader=selections["runtime"], cost_reader=selections["cost"], failure_reader=failure_reader)
     preparation = GenerationDispatchPreparation(source_reader=source, repository=evidence, coordination=coordination)
     boundary = GenerationDispatchPublicBoundary(foundation, preparation=preparation)
     coordination.activate(required)
@@ -224,7 +227,7 @@ def open_existing_live_operator(*, storage_root, lifecycle_path, run_path, queue
         artifact_root, lifecycle_authorities, episode_authorities, selection,
         endpoint, technical_target_id, clock, worker_context, approval_reader,
         prerequisite_reader, material_reader, backend_reader, runtime_reader,
-        cost_reader, issuer_service_ref, production_policy_database_path=None):
+        cost_reader, issuer_service_ref, production_policy_database_path=None, revocation_reader=None):
     """Explicit hosting seam. Validate/open existing stores, never bootstrap.
 
     This function is called only after independent deployment authorization.
@@ -287,7 +290,7 @@ def open_existing_live_operator(*, storage_root, lifecycle_path, run_path, queue
             workspace_ref=selection.prepare_command["workspaceRef"], technical_target_id=technical_target_id,
             clock=clock, approval_reader=approval_reader, prerequisite_reader=prerequisite_reader,
             material_reader=material_reader, backend_reader=backend_reader, runtime_reader=runtime_reader,
-            cost_reader=cost_reader, issuer_service_ref=issuer_service_ref)
+            cost_reader=cost_reader, issuer_service_ref=issuer_service_ref, revocation_reader=revocation_reader)
     except BaseException:
         domain.close()
         raise
