@@ -135,6 +135,16 @@ class GenerationDispatchOperator:
         command = self._selection.prepare_command
         return self._executor(media_job_ref).execute(command["workspaceRef"], command["productionRunRef"], media_job_ref)
 
+    def finalize_unconsumed_expired(self, media_job_ref):
+        """Explicit trusted-host failure cleanup, never a retry or send command.
+
+        The original read-only recover/HTTP/CLI contracts are unchanged. This
+        cannot grant another Attempt, resurrect a lease or recover a capability.
+        """
+        command = self._selection.prepare_command
+        return self._executor(media_job_ref).finalize_unconsumed_expired(
+            command["workspaceRef"], command["productionRunRef"], media_job_ref)
+
     def recover(self, media_job_ref):
         """Original Job/Terminal and bounded GET recovery, never a new Attempt.
 

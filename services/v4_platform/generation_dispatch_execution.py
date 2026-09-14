@@ -25,7 +25,7 @@ from .media_jobs import (ARTIFACT_SCHEMA_VERSION, ArtifactRecoveryStoreError,
 from .method_aware_execution import (DISPATCH_JOB_SCHEMA_VERSION,
     validate_envelope, validate_execution_result)
 from .generation_dispatch_transport import (
-    REQUEST_BYTES_NOT_COMMITTED, RESPONSE_RECEIVED,
+    CONNECT_NOT_STARTED, REQUEST_BYTES_NOT_COMMITTED, RESPONSE_RECEIVED,
     SUBMISSION_OUTCOME_UNKNOWN, GenerationDispatchTransportError,
     TransportReadResult, make_dispatch_result, validate_transport_result,
 )
@@ -377,6 +377,14 @@ class GenerationDispatchExecutor:
     def execute(self, workspace_ref: str, production_run_ref: str,
                 media_job_ref: str) -> dict[str, Any]:
         identity = validate_worker_identity(self.worker_context.current())
+        # An unavailable currentness snapshot must not burn the sole Attempt.
+        # L1 still repeats every authoritative check after the actual claim.
+        tokens = self.consumer.snapshot_tokens(workspace_ref, production_run_ref)
+        queued = self.result_boundary.read_only(workspace_ref, production_run_ref, media_job_ref)
+        if queued is None:
+            raise MediaJobStateError("Package 3 Job was not found")
+        evidence = self.consumer.read_failure_evidence(workspace_ref,
+            production_run_ref, queued["dispatchGrantBinding"])
         claimed = self.job_port.claim(workspace_ref, production_run_ref,
             media_job_ref, identity)
         binding = claimed["dispatchGrantBinding"]
@@ -393,12 +401,19 @@ class GenerationDispatchExecutor:
                 + c.digest({"grant": binding["generationDispatchGrantRef"],
                     "job": claimed["jobRef"],
                     "attempt": claimed["attempts"][-1]["attemptRef"]}),
-            "snapshotTokens": self.consumer.snapshot_tokens(workspace_ref,
-                production_run_ref)}
-        decision = self.consumer.consume(command)
-        capability = decision["continuation"]
-        if capability is None:
-            raise MediaJobStateError("consume replay cannot execute transport")
+            "snapshotTokens": tokens}
+        try:
+            decision = self.consumer.consume(command)
+            capability = decision["continuation"]
+            if capability is None:
+                raise MediaJobStateError("consume replay cannot execute transport")
+        except Exception as exc:
+            # No send has been invoked in this call, even if L1 committed and
+            # then lost its return value. Never undo/replace a Terminal.
+            code = exc.code if isinstance(exc, c.DispatchError) else "PRE_CONSUMPTION_FAILED"
+            self._close_before_send(claimed, evidence["workflowDigest"], code,
+                worker_identity=identity)
+            raise
         heartbeat = None
         workflow_digest = decision["receipt"]["terminal"]["attemptBinding"]["workflowDigest"]
         try:
@@ -449,6 +464,80 @@ class GenerationDispatchExecutor:
                 heartbeat[0].set()
                 heartbeat[1].join(timeout=max(1.0,
                     min(self.coordinator.heartbeat_interval_seconds * 2, 15.0)))
+
+    def _close_before_send(self, observed, workflow_digest, code, *, worker_identity=None):
+        """Original V4 CAS only. No lease resurrection or worker substitution."""
+        with self.coordination.critical_section(observed["workspaceRef"]) as gate:
+            gate.assert_held()
+            current = self.job_port.repository.get(observed["workspaceRef"],
+                observed["productionRunRef"], observed["jobRef"])
+            if (current is None or current["schemaVersion"] != DISPATCH_JOB_SCHEMA_VERSION
+                    or current["state"] != "RUNNING" or len(current["attempts"]) != 1
+                    or current["attempts"][0] != observed["attempts"][0]
+                    or current["dispatchGrantBinding"] != observed["dispatchGrantBinding"]
+                    or current.get("dispatchResult") is not None
+                    or current.get("artifactCommitIntent") is not None
+                    or current.get("artifact") is not None
+                    or current.get("lease") is None
+                    or current["lease"]["leaseToken"] != observed["lease"]["leaseToken"]):
+                raise MediaJobStateError("pre-send failure original Attempt changed")
+            now = self.clock.now()
+            expired = _parse_time(current["lease"]["expiresAt"]) <= _parse_time(now)
+            if worker_identity is not None:
+                actual = validate_worker_identity(self.worker_context.current())
+                if (expired or actual != worker_identity
+                        or current["lease"]["workerRef"] != actual["workerRef"]
+                        or current["attempts"][0]["workerRef"] != actual["workerRef"]
+                        or current["attempts"][0]["workerProcessIdentityDigest"]
+                            != actual["workerProcessIdentityDigest"]):
+                    raise MediaJobStateError("pre-send failure needs original active worker")
+            else:
+                if not expired:
+                    raise MediaJobStateError("pre-send recovery cannot interrupt an active lease")
+                evidence = self.consumer.read_failure_evidence(current["workspaceRef"],
+                    current["productionRunRef"], current["dispatchGrantBinding"])
+                if evidence["terminal"] is not None or evidence["workflowDigest"] != workflow_digest:
+                    raise MediaJobStateError("pre-send recovery requires proven unconsumed history")
+            fields = dict(outcome="FAILED", phase=CONNECT_NOT_STARTED, job=current,
+                submission=None, workflow_digest=workflow_digest, artifact_digest=None,
+                failure_code=code, created_at=now)
+            if self._live:
+                from .generation_dispatch_live_contracts import make_live_dispatch_result
+                result = make_live_dispatch_result(**fields, request_write_state="ZERO_BYTES_PROVEN")
+            else:
+                result = make_dispatch_result(**fields)
+            expected = current["revision"]
+            current["dispatchResult"] = result
+            current["attempts"][0].update(state="FAILED", finishedAt=now,
+                errorCode=code, failureClass=code, nonRetryable=True,
+                dispatchResultDigest=result["payloadDigest"], quarantineStorageKeys=[])
+            current.update(state="FAILED", lease=None, updatedAt=now)
+            return self.job_port.repository.save(current, expected)
+
+    def finalize_unconsumed_expired(self, workspace_ref, production_run_ref, media_job_ref):
+        """Explicit failure-only recovery; does not change read-only recover.
+
+        Same gate covers terminal absence, lease expiry, original identity and
+        final queue CAS. A consumed/unknown attempt can never use this path.
+        """
+        for value in (workspace_ref, production_run_ref, media_job_ref):
+            c.ref(value)
+        with self.coordination.critical_section(workspace_ref) as gate:
+            gate.assert_held()
+            job = self.result_boundary.read_only(workspace_ref, production_run_ref, media_job_ref)
+            if job is None or job["schemaVersion"] != DISPATCH_JOB_SCHEMA_VERSION:
+                raise MediaJobStateError("pre-send recovery Job was not found")
+            evidence = self.consumer.read_failure_evidence(workspace_ref,
+                production_run_ref, job["dispatchGrantBinding"])
+            if evidence["terminal"] is not None:
+                raise MediaJobStateError("pre-send recovery cannot recover a terminal Grant")
+            result = job.get("dispatchResult")
+            if (job["state"] == "FAILED" and result is not None
+                    and result["failureCode"] == "PRE_CONSUMPTION_LEASE_EXPIRED"
+                    and result["phase"] == CONNECT_NOT_STARTED):
+                return job
+            return self._close_before_send(job, evidence["workflowDigest"],
+                "PRE_CONSUMPTION_LEASE_EXPIRED")
 
     def recover_read_only(self, workspace_ref: str, production_run_ref: str,
                           media_job_ref: str) -> dict[str, Any]:

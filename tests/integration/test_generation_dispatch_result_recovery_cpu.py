@@ -1,10 +1,184 @@
 from copy import deepcopy
 import unittest
+from unittest.mock import patch
 
 from services.v4_platform.media_jobs import MediaJobStateError, _validate_job
 from tests.support.generation_dispatch_execution_fixtures import (
     ExecutionFixture, export_pkg3_evidence,
 )
+from services.v5_core_os.episode_production import generation_dispatch_contracts as c
+
+
+class GenerationDispatchPreSendRecoveryTests(unittest.TestCase):
+    def recover(self, fixture):
+        return fixture.executor.finalize_unconsumed_expired(
+            fixture.scope["workspaceRef"], fixture.scope["productionRunRef"],
+            fixture.job["jobRef"])
+
+    def assert_unsent_failure(self, fixture, job, code):
+        _validate_job(job)
+        self.assertEqual(job["state"], "FAILED")
+        self.assertEqual(len(job["attempts"]), 1)
+        self.assertTrue(job["attempts"][0]["nonRetryable"])
+        self.assertEqual(job["dispatchResult"]["failureCode"], code)
+        self.assertEqual(job["dispatchResult"]["phase"], "CONNECT_NOT_STARTED")
+        self.assertFalse(job["dispatchResult"]["committedRequestBytes"])
+        self.assertIsNone(job["lease"])
+        self.assertEqual(fixture.transport.open_count, 0)
+        self.assertEqual(fixture.transport.commit_count, 0)
+
+    def test_snapshot_failure_before_claim_preserves_queued_job(self):
+        f = ExecutionFixture(self)
+        before = f.current_job()
+        with patch.object(f.consumer, "snapshot_tokens", side_effect=c.DispatchError("RUNTIME_CHANGED")):
+            with self.assertRaises(c.DispatchError) as failed:
+                f.execute()
+        self.assertEqual(failed.exception.code, "RUNTIME_CHANGED")
+        self.assertEqual(f.current_job(), before)
+        self.assertEqual(f.transport.open_count, 0)
+
+    def test_consume_failure_closes_original_attempt_without_send(self):
+        f = ExecutionFixture(self)
+        with patch.object(f.consumer, "consume", side_effect=c.DispatchError("RUNTIME_CHANGED")):
+            with self.assertRaises(c.DispatchError) as failed:
+                f.execute()
+        self.assertEqual(failed.exception.code, "RUNTIME_CHANGED")
+        self.assert_unsent_failure(f, f.current_job(), "RUNTIME_CHANGED")
+        self.assertIsNone(f.consumer.read_consumption_receipt(f.scope["workspaceRef"],
+            f.scope["productionRunRef"], f.grant["generationDispatchGrantRef"]))
+        with self.assertRaises(MediaJobStateError):
+            f.execute()
+
+    def test_unexpected_consume_error_is_sanitized_and_not_retried(self):
+        f = ExecutionFixture(self)
+        with patch.object(f.consumer, "consume", side_effect=OSError("private-secret-not-for-result")):
+            with self.assertRaises(OSError):
+                f.execute()
+        self.assert_unsent_failure(f, f.current_job(), "PRE_CONSUMPTION_FAILED")
+        self.assertNotIn("private-secret", str(f.current_job()))
+
+    def test_consumption_committed_then_exception_never_refunds_terminal(self):
+        f = ExecutionFixture(self)
+        consume = f.consumer.consume
+        def fail_after_commit(command):
+            consume(command)
+            raise OSError("return path failed before any send")
+        with patch.object(f.consumer, "consume", side_effect=fail_after_commit):
+            with self.assertRaises(OSError):
+                f.execute()
+        self.assert_unsent_failure(f, f.current_job(), "PRE_CONSUMPTION_FAILED")
+        self.assertIsNotNone(f.consumer.read_consumption_receipt(f.scope["workspaceRef"],
+            f.scope["productionRunRef"], f.grant["generationDispatchGrantRef"]))
+        f.advance(60)
+        before = f.current_job()
+        with self.assertRaises(MediaJobStateError):
+            self.recover(f)
+        self.assertEqual(f.current_job(), before)
+
+    def test_expired_unconsumed_attempt_is_closed_not_reclaimed(self):
+        f = ExecutionFixture(self)
+        claimed, _ = f.claim_command()
+        before_identity = deepcopy(claimed["attempts"][0])
+        f.advance(60)
+        # Recovery must not impersonate or require the exited worker.
+        f.worker_context.process_digest = c.digest("different-recovery-process")
+        closed = self.recover(f)
+        self.assert_unsent_failure(f, closed, "PRE_CONSUMPTION_LEASE_EXPIRED")
+        for key, value in before_identity.items():
+            if key != "state":
+                self.assertEqual(closed["attempts"][0][key], value)
+        self.assertEqual(self.recover(f), closed)
+        with self.assertRaises(MediaJobStateError):
+            f.execute()
+
+    def test_unexpired_attempt_cannot_be_finalized(self):
+        f = ExecutionFixture(self)
+        f.claim_command()
+        before = f.current_job()
+        with self.assertRaises(MediaJobStateError):
+            self.recover(f)
+        self.assertEqual(f.current_job(), before)
+
+    def test_consumed_attempt_never_reclassified_as_unsent(self):
+        f = ExecutionFixture(self)
+        f.claim_and_consume()
+        f.advance(60)
+        before = f.current_job()
+        with self.assertRaises(MediaJobStateError):
+            self.recover(f)
+        self.assertEqual(f.current_job(), before)
+        self.assertEqual(f.transport.open_count, 0)
+
+    def test_expiry_during_consume_does_not_revive_lease(self):
+        f = ExecutionFixture(self)
+        def expire(command):
+            f.advance(60)
+            raise c.DispatchError("RUNTIME_CHANGED")
+        with patch.object(f.consumer, "consume", side_effect=expire):
+            with self.assertRaises(MediaJobStateError):
+                f.execute()
+        self.assertEqual(f.current_job()["state"], "RUNNING")
+        closed = self.recover(f)
+        self.assert_unsent_failure(f, closed, "PRE_CONSUMPTION_LEASE_EXPIRED")
+
+    def test_expired_recovery_journal_failure_does_not_assume_no_consumption(self):
+        f = ExecutionFixture(self)
+        f.claim_command()
+        f.advance(60)
+        before = f.current_job()
+        with patch.object(f.consumer, "read_failure_evidence", side_effect=OSError("journal unavailable")):
+            with self.assertRaises(OSError):
+                self.recover(f)
+        self.assertEqual(f.current_job(), before)
+
+    def test_failure_save_rejects_stale_cas_and_leaves_recoverable_evidence(self):
+        from services.v4_platform import generation_dispatch_execution as execution
+        f = ExecutionFixture(self)
+        make_result = execution.make_dispatch_result
+        advanced = []
+        def advance_revision_before_failure_save(**fields):
+            result = make_result(**fields)
+            # Inject a competing revision through the real registered SQLite
+            # writer. Never replace its fenced save method or fake its CAS.
+            current = f.current_job()
+            advanced.append(f.queues[0].save(current, current["revision"]))
+            return result
+        with patch.object(f.consumer, "consume", side_effect=c.DispatchError("RUNTIME_CHANGED")), \
+                patch.object(execution, "make_dispatch_result",
+                    side_effect=advance_revision_before_failure_save):
+            with self.assertRaisesRegex(MediaJobStateError, "^media job revision changed$"):
+                f.execute()
+        self.assertEqual(len(advanced), 1)
+        self.assertEqual(f.current_job(), advanced[0])
+        self.assertEqual(f.current_job()["state"], "RUNNING")
+        self.assertIsNone(f.current_job()["dispatchResult"])
+        self.assertEqual(f.transport.open_count, 0)
+        f.advance(60)
+        self.assert_unsent_failure(f, self.recover(f), "PRE_CONSUMPTION_LEASE_EXPIRED")
+
+    def test_late_consume_and_expired_cleanup_share_gate_without_send(self):
+        from concurrent.futures import ThreadPoolExecutor
+        from threading import Barrier
+        f = ExecutionFixture(self)
+        _, command = f.claim_command()
+        f.advance(60)
+        ready = Barrier(2)
+        def late_consume():
+            ready.wait(timeout=10)
+            try:
+                return f.consumer.consume(command)
+            except c.DispatchError as exc:
+                return exc.code
+        def close():
+            ready.wait(timeout=10)
+            return self.recover(f)
+        with ThreadPoolExecutor(max_workers=2) as pool:
+            consuming = pool.submit(late_consume)
+            closing = pool.submit(close)
+            self.assertEqual(consuming.result(timeout=60), "ATTEMPT_OR_LEASE_CHANGED")
+            self.assert_unsent_failure(f, closing.result(timeout=60), "PRE_CONSUMPTION_LEASE_EXPIRED")
+        self.assertIsNone(f.consumer.read_consumption_receipt(f.scope["workspaceRef"],
+            f.scope["productionRunRef"], f.grant["generationDispatchGrantRef"]))
 
 
 class GenerationDispatchResultRecoveryCpuIntegrationTests(unittest.TestCase):

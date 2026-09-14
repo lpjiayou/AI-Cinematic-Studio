@@ -30,6 +30,49 @@ class D1OperatorCpuTests(unittest.TestCase):
             adapter_identity=LIVE_ADAPTER_IDENTITY, adapter_capability=LIVE_CAPABILITY,
             endpoint_class=LIVE_ENDPOINT_CLASS, use_operator=True)
 
+    def test_live_presend_failure_records_zero_bytes_on_original_attempt(self):
+        from services.v5_core_os.episode_production.generation_dispatch_consumption import GenerationDispatchConsumer
+        with LoopbackComfyUI(output_node="41") as server:
+            f = self.fixture(server)
+            with patch.object(GenerationDispatchConsumer, "consume", side_effect=c.DispatchError("RUNTIME_CHANGED")):
+                with self.assertRaises(c.DispatchError) as stopped:
+                    execute_command(f.operator, "execute-one", f.job["jobRef"])
+            self.assertEqual(stopped.exception.code, "RUNTIME_CHANGED")
+            saved = f.jobs()[0]
+            self.assertEqual(saved["state"], "FAILED")
+            self.assertEqual(saved["dispatchResult"]["requestWriteState"], "ZERO_BYTES_PROVEN")
+            self.assertEqual(saved["dispatchResult"]["phase"], "CONNECT_NOT_STARTED")
+            self.assertEqual(saved["dispatchResult"]["failureCode"], "RUNTIME_CHANGED")
+            self.assertIsNone(saved["dispatchResult"]["providerPromptId"])
+            self.assertEqual(len(saved["attempts"]), 1)
+            self.assertTrue(saved["attempts"][0]["nonRetryable"])
+            recovered = execute_command(f.operator, "recover", saved["jobRef"])
+            self.assertEqual(recovered["job"], saved)
+            self.assertIsNone(recovered["consumption"])
+            self.assertEqual(server.paths, [])
+
+    def test_live_expired_cleanup_preserves_job_identity_and_readonly_recover(self):
+        from services.v4_platform.media_jobs import MediaJobStateError
+        with LoopbackComfyUI(output_node="41") as server:
+            f = self.fixture(server)
+            claimed, _ = f.claim_command()
+            f.clock.value = "2030-01-01T00:01:20.000000Z"
+            before = execute_command(f.operator, "recover", claimed["jobRef"])
+            self.assertEqual(before["job"], claimed)
+            self.assertEqual(f.jobs()[0], claimed)
+            saved = f.operator.finalize_unconsumed_expired(claimed["jobRef"])
+            self.assertEqual(saved["state"], "FAILED")
+            self.assertEqual(saved["dispatchResult"]["requestWriteState"], "ZERO_BYTES_PROVEN")
+            self.assertEqual(saved["dispatchResult"]["failureCode"], "PRE_CONSUMPTION_LEASE_EXPIRED")
+            self.assertEqual(saved["attempts"][0]["attemptRef"], claimed["attempts"][0]["attemptRef"])
+            self.assertEqual(saved["attempts"][0]["workerProcessIdentityDigest"],
+                claimed["attempts"][0]["workerProcessIdentityDigest"])
+            self.assertEqual(saved["dispatchGrantBinding"], claimed["dispatchGrantBinding"])
+            self.assertEqual(f.operator.finalize_unconsumed_expired(saved["jobRef"]), saved)
+            with self.assertRaises(MediaJobStateError):
+                execute_command(f.operator, "execute-one", saved["jobRef"])
+            self.assertEqual(server.paths, [])
+
     def test_application_operator_live_version_one_post_and_original_result(self):
         from services.v4_platform import generation_dispatch_live_result as result_module
         requests = []

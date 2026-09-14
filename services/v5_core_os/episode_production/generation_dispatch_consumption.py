@@ -285,6 +285,28 @@ class GenerationDispatchConsumer:
             return None
         return {"receipt": self._receipt(terminal, True), "continuation": None}
 
+    def read_failure_evidence(self, workspace_ref: str, production_run_ref: str,
+                              grant_binding: Mapping[str, Any]) -> dict[str, Any]:
+        """Original journal evidence for non-sending V4 failure finalization.
+
+        Missing/unreadable history is an error, never evidence of no consumption.
+        This grants no continuation, retry, lease or new Attempt permission.
+        """
+        for value in (workspace_ref, production_run_ref):
+            c.ref(value)
+        with self._foundation._gate(workspace_ref) as lease:
+            self._foundation._held(lease)
+            grant = self._foundation._grant({"workspaceRef": workspace_ref,
+                "productionRunRef": production_run_ref,
+                "generationDispatchGrantRef": c.ref(grant_binding["generationDispatchGrantRef"])})
+            expected = {"generationDispatchGrantRef": grant["generationDispatchGrantRef"],
+                "generationDispatchGrantDigest": grant["payloadDigest"],
+                "subjectDigest": grant["subjectDigest"],
+                "approvedPlanDigest": grant["approval"]["approvedPlanDigest"]}
+            c.require(dict(grant_binding) == expected, "SCOPE_MISMATCH")
+            return {"workflowDigest": grant["executionBinding"]["workflowDigest"],
+                "terminal": deepcopy(self._foundation._terminal(grant))}
+
     def _capability_spent(self, capability: SendCapability) -> bool:
         with self._capability_lock:
             state = self._capabilities.get(capability)
