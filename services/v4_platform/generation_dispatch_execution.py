@@ -99,6 +99,48 @@ class MediaJobGenerationDispatchPort:
             lease.pop("expiresAt", None)
         return c.digest(value)
 
+    def read_zero_send_failure(self, workspace_ref, production_run_ref, job_ref, grant, lease):
+        """Trusted original queue observation, not caller-supplied failure evidence.
+
+        A zero-send result alone is insufficient: V5 must independently prove
+        that the original Grant has a REVOKED (never consumed) Terminal.
+        """
+        lease.assert_held()
+        job = self.repository.get(workspace_ref, production_run_ref, c.ref(job_ref))
+        try:
+            c.require(job is not None, "ATTEMPT_OR_LEASE_CHANGED")
+            _validate_job(job)
+            from .generation_dispatch_jobs import internal_dispatch_key
+            expected = {"generationDispatchGrantRef": grant["generationDispatchGrantRef"],
+                "generationDispatchGrantDigest": grant["payloadDigest"],
+                "subjectDigest": grant["subjectDigest"],
+                "approvedPlanDigest": grant["approval"]["approvedPlanDigest"]}
+            result = job.get("dispatchResult")
+            c.require(job["schemaVersion"] == DISPATCH_JOB_SCHEMA_VERSION
+                and job["workspaceRef"] == workspace_ref and job["productionRunRef"] == production_run_ref
+                and job["jobRef"] == job_ref and job["dispatchGrantBinding"] == expected
+                and job["idempotencyKey"] == internal_dispatch_key(workspace_ref,
+                    production_run_ref, grant["generationDispatchGrantRef"])
+                and job["state"] == "FAILED" and job["maxAttempts"] == 1
+                and job["lease"] is None and len(job["attempts"]) == 1
+                and job["artifact"] is None and job["artifactCommitIntent"] is None
+                and result is not None, "ATTEMPT_OR_LEASE_CHANGED")
+            attempt = job["attempts"][0]
+            c.require(attempt["state"] == "FAILED" and attempt.get("nonRetryable") is True
+                and not attempt.get("quarantineStorageKeys")
+                and attempt["dispatchResultDigest"] == result["payloadDigest"]
+                and result["outcome"] == "FAILED" and result["phase"] == CONNECT_NOT_STARTED
+                and result["workflowDigest"] == grant["executionBinding"]["workflowDigest"]
+                and result["transportSubmissionRef"] is None and result["transportSubmissionDigest"] is None
+                and result["artifactDigest"] is None and result.get("providerPromptId") is None
+                and result.get("requestWriteState", "ZERO_BYTES_PROVEN") == "ZERO_BYTES_PROVEN",
+                "ATTEMPT_OR_LEASE_CHANGED")
+        except (KeyError, TypeError, ValueError, MediaJobError) as exc:
+            raise c.DispatchError("ATTEMPT_OR_LEASE_CHANGED") from exc
+        lease.assert_held()
+        return {"mediaJobRef": job["jobRef"], "attemptRef": attempt["attemptRef"],
+            "jobDigest": c.digest(job), "dispatchResultDigest": result["payloadDigest"]}
+
     def claim(self, workspace_ref: str, production_run_ref: str, media_job_ref: str,
               worker_identity: Mapping[str, Any]) -> dict[str, Any]:
         identity = validate_worker_identity(worker_identity)

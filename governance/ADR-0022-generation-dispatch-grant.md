@@ -5,7 +5,7 @@
 | 字段 | 值 |
 | --- | --- |
 | ADR ID | ADR-0022 |
-| 文档版本 | 1.5；保留 v1.2 控制面及 §5.6–5.7，增加 §5.8 的 D1 live 分支与可信内部 Operator |
+| 文档版本 | 1.6；保留既有控制面，增加 §8.5 的零发送失败单次替代例外 |
 | Status | Accepted — Architecture Contract Only |
 | 完整 ADR 审批状态 | ACCEPTED_ARCHITECTURE_ONLY；Project Lead 已明确接受全文，不等于实现或生成许可 |
 | 已确认设计方向 | 独立、不可变 Grant；不覆盖历史五字段，不迁移历史摘要 |
@@ -652,6 +652,52 @@ L1 后回执丢失、控制进程退出、lease 失效、L2 前校验失败、PO
 
 此协议保证的是符合受控部署和消费者规则的应用路径至多一次提交，允许崩溃窗口零次发送，不承诺恰好一次成功生成。单次 capability 和两个决策点的实现及并发证明尚未存在；不能靠只设置 maxAttempts=1 宣布达标。
 
+### 8.5 v1.6：已证明未消费、零发送失败的唯一替代
+
+Project Lead 于 2026-09-15 明确授权本狭义例外的实现与发布，并在原 D1
+已批准单次运行范围内续接。它不允许重置历史、第二次真实提交或静默延长窗口。
+本节仅修订 §4.2、§7.1、§9.1、§10 的“同槽位绝无第二 Grant”默认规则；
+所有 v1 普通签发、L1 后不返还额度、UNKNOWN 不重发、L2 及输出边界保持不变。
+
+唯一新内部入口为原 `GenerationDispatchOperator.replace_unconsumed_failure`。
+不增加 Public HTTP、CLI 命令、数据库、队列或新的业务 Owner。方法只签发，
+不自动 route、claim 或发送；后续仍使用原消费者、原 Job/Attempt CAS 和 L1/L2。
+
+前提在原 workspace gate 和原存储独占内逐项验证：原 v1 Grant、原内部队列键、
+唯一 FAILED/nonRetryable Attempt、无 lease/产物/intent、原结果 CONNECT_NOT_STARTED、
+无 submission/prompt ID、零请求字节。只凭 FAILED、错误日志或调用方声明不成立。
+另须有同一 Project Lead 的独立原件批准撤销该 Grant，原 Terminal 必须为 REVOKED，
+绝不能为 CONSUMPTION_COMMITTED；撤销与消费继续竞争同一原子 Terminal 槽位。
+活跃、QUEUED、LEASED、RUNNING、UNKNOWN、已消费、缺失或不可读记录均不适用。
+
+先经原撤销接口提交 REVOKED，再签发新的不可变 `v5.generation-dispatch-grant.v2`。
+两步不是跨库事务：中断可留下旧 Grant 已撤销而没有替代 Grant，不能退回撤销。
+不明提交结果继续按 COMMIT_OUTCOME_UNKNOWN 处理，只读查原幂等键。
+原 Grant、Terminal、Job、Attempt、版本及摘要永久保留，不修改旧 Run/Shot/Beat 身份。
+
+v2 的 recordVersion/version 仍为 1；除新增 `replacementOf` 外沿用 v1 闭集。
+`replacementOf` 恰为 `{originalGrantRef,originalGrantDigest,revokedTerminalDigest,
+mediaJobRef,attemptRef,jobDigest,dispatchResultDigest}`：前三项绑定原 v1 Grant 和撤销
+Terminal，后四项由受控原 V4 reader 在 gate 内读取真实失败记录，不接收命令提供的证明。
+类型分别为 Ref/Digest/Digest/Ref/Ref/Digest/Digest。原始记录和原件批准在签发时重验。
+
+唯一替代 Ref 为 `generation-dispatch-grant-` 加
+`H({schemaVersion:"v5.generation-dispatch-grant.v2",originalGrantRef:原槽位v1Ref,replacementNumber:1})`。
+不同幂等键仍命中同一替代槽位，禁止 v2 再替代及替代链。内部签发请求为原 ISSUE 闭集
+加 `predecessorJobRef`，纳入原 issueRequestDigest；相同幂等重放只返回历史，无发送能力。
+新 Job 仍由该新 Grant 的原内部队列键唯一保留，maxAttempts=1。
+
+新计划必须有独立精确批准，且 authorityRef/actorRef 与原批准及撤销批准一致、
+authorityDecisionRef 不同。scope、完整 subject、模型/profile、输入、camera、permissions、
+成本与 limits、配置、runtime binding 均保持原值；只容许重新固定已发布修复的 Core
+commit/tree 和因此确定性改变的 request-prefix/workflowDigest，ComfyUI commit 不变。
+仍由原纯编译器整体验证 workflow。批准期或预算不足即停止，不以替代延长或增加额度。
+签发在 currentness 全量读取前后重复读取失败证明，最后沿用原 journal CAS 和期限核验。
+
+全槽位最多一张可消费 Grant：旧 Grant 在新签发之前已永久撤销，替代 Grant 消费后
+仍不可重发。即使替代也零发送失败，亦无第三张 Grant。技术失败关闭、例外授权和真实
+发送是不同事实；测试通过不代表真实 SH09、Owner 输出验收或 publication 通过。
+
 ## 9. V5→V4 接线与版本边界
 
 原 manifest v2 无 Grant 的路径继续拒绝。带 Grant 的新路线先完整验证旧对象及其 false/NOT_READY 不变量，再经 V5 验证独立权威；新的 request.executionMode 可为 INTERNAL_SELF_HOSTED，但不得更改历史 Run.executionMode。
@@ -772,6 +818,7 @@ InputPlan、InputAssetVersion、InputAppendAuthority 和旧 v2 runtime attestati
 | 1.3 R2 狭义兼容 | 2026-09-12 Project Lead 明确批准 §5.6 的独立 A14B profile/compiler/runtime 与 staged transport 本地 CPU 增量；其余控制面语义保留 | 狭义设计及白名单本地实现获批；实现 Owner 验收待定，发布、真实 ComfyUI/GPU/Grant/数据库/生成未授权 |
 | 1.4 R3 狭义兼容 | 2026-09-13 Project Lead 授权 A01—A06 与 §5.7 版本化原图、runtime 前像、完整编码及直接依赖接线 | 仅本地 CPU/fixture 候选；Camera/精确绑定 Owner 验收、发布与现场执行仍待后续授权 |
 | 1.5 D1 狭义 live 接线 | 2026-09-13 Project Lead 批准 §5.8 及任务 A/B | 本地工程和限定只读核验；不是候选验收、部署或真实生成批准 |
+| 1.6 零发送失败替代 | 2026-09-15 Project Lead 授权 §8.5 狭义例外、直接回归及受保护发布 | 原记录保留，单次替代；既定真实运行仍受精确计划、时限、预算及一次提交约束 |
 
 以下 [S] 项只支持对旧仓库行为的陈述，不表示新增规范已经实现：
 

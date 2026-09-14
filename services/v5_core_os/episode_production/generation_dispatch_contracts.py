@@ -17,6 +17,7 @@ from services.v4_platform.method_aware_execution import validate_output, validat
 
 PREFIX = "v5.generation-dispatch-"
 GRANT_SCHEMA = PREFIX + "grant.v1"
+REPLACEMENT_GRANT_SCHEMA = PREFIX + "grant.v2"
 TERMINAL_SCHEMA = PREFIX + "grant-terminal.v1"
 APPROVAL_SCHEMA = PREFIX + "approval-bundle.v1"
 REVOCATION_SCHEMA = PREFIX + "revocation-bundle.v1"
@@ -293,6 +294,42 @@ def grant_ref(plan: dict) -> str:
         "productionRunRef": plan["scope"]["productionRunRef"],
         "creativeShotVersionRef": plan["subject"]["creativeShotVersion"]["ref"],
         "beatRef": plan["subject"]["actionExecutionBeat"]["ref"]})
+
+
+def replacement_grant_ref(plan: dict) -> str:
+    """One child slot only; never derive an unbounded chain from a failed child."""
+    return "generation-dispatch-grant-" + digest({"schemaVersion": REPLACEMENT_GRANT_SCHEMA,
+        "originalGrantRef": grant_ref(plan), "replacementNumber": 1})
+
+
+def validate_replacement_proof(value: Any, plan: dict) -> dict:
+    exact(value, {"originalGrantRef", "originalGrantDigest", "revokedTerminalDigest",
+        "mediaJobRef", "attemptRef", "jobDigest", "dispatchResultDigest"})
+    for key in ("originalGrantRef", "mediaJobRef", "attemptRef"):
+        ref(value[key])
+    for key in ("originalGrantDigest", "revokedTerminalDigest", "jobDigest", "dispatchResultDigest"):
+        sha(value[key])
+    require(value["originalGrantRef"] == grant_ref(plan), "SCOPE_MISMATCH")
+    return deepcopy(value)
+
+
+def validate_replacement_plan(original: dict, plan: dict, approval: dict) -> None:
+    """The exception changes deployed Core bytes, not the approved operation."""
+    require(original["schemaVersion"] == GRANT_SCHEMA, "GRANT_SUBJECT_ALREADY_RECORDED")
+    previous = plan_from_grant(original)
+    for key in ("scope", "subject", "permissions", "limits"):
+        require(canonical(previous[key]) == canonical(plan[key]), "APPROVAL_PLAN_MISMATCH")
+    def unchanged_binding(value):
+        value = deepcopy(value)
+        value.pop("workflowDigest")  # deterministic request-prefix changes with the code pin
+        value["executionCode"].pop("coreCommit")
+        value["executionCode"].pop("coreTree")
+        return value
+    require(unchanged_binding(previous["executionBinding"]) == unchanged_binding(plan["executionBinding"]),
+        "APPROVAL_PLAN_MISMATCH")
+    require(all(approval[key] == original["approval"][key] for key in ("authorityRef", "actorRef"))
+        and approval["authorityDecisionRef"] != original["approval"]["authorityDecisionRef"],
+        "APPROVAL_UNAVAILABLE")
 
 
 def validate_approval(value: Any, *, plan: dict | None = None, revocation: bool = False) -> dict:
@@ -698,11 +735,17 @@ def plan_from_grant(grant: dict) -> dict:
 
 
 def validate_grant(value: Any) -> dict:
+    replacement = isinstance(value, dict) and value.get("schemaVersion") == REPLACEMENT_GRANT_SCHEMA
     exact(value, SCOPE_FIELDS | {"schemaVersion", "generationDispatchGrantRef", "version", "subject", "subjectDigest",
-        "executionBinding", "permissions", "limits", "approval", "issuanceEvidence", "publicationAllowed", "createdAt", "payloadDigest"})
-    require(value["schemaVersion"] == GRANT_SCHEMA and type(value["version"]) is int and value["version"] == 1 and value["publicationAllowed"] is False)
+        "executionBinding", "permissions", "limits", "approval", "issuanceEvidence", "publicationAllowed", "createdAt", "payloadDigest"}
+        | ({"replacementOf"} if replacement else set()))
+    require(value["schemaVersion"] in {GRANT_SCHEMA, REPLACEMENT_GRANT_SCHEMA}
+        and type(value["version"]) is int and value["version"] == 1 and value["publicationAllowed"] is False)
     plan = validate_plan(plan_from_grant(value))
-    require(value["subjectDigest"] == subject_digest(plan) and value["generationDispatchGrantRef"] == grant_ref(plan))
+    if replacement:
+        validate_replacement_proof(value["replacementOf"], plan)
+    require(value["subjectDigest"] == subject_digest(plan) and value["generationDispatchGrantRef"]
+        == (replacement_grant_ref(plan) if replacement else grant_ref(plan)))
     validate_approval(value["approval"], plan=plan)
     created = utc(value["createdAt"])
     require(utc(value["approval"]["decidedAt"]) <= created)
@@ -721,6 +764,8 @@ def validate_grant(value: Any) -> dict:
         "inputAssetVersionRef": value["subject"]["inputAsset"]["assetVersionRef"], "backendRef": value["executionBinding"]["backendDecision"]["backendRef"],
         "expectedSubjectDigest": value["subjectDigest"], "expectedApprovedPlanDigest": value["approval"]["approvedPlanDigest"],
         "authorityDecisionRef": value["approval"]["authorityDecisionRef"]}
+    if replacement:
+        command["predecessorJobRef"] = value["replacementOf"]["mediaJobRef"]
     require(evidence["requestDigest"] == issue_request_digest(command, value["approval"]))
     verify_seal(value)
     return deepcopy(value)
@@ -784,9 +829,11 @@ def validate_command(operation: str, value: Any) -> dict:
     if operation == "PREPARE":
         fields = common | {"methodAwareInputPlanVersionRef", "creativeShotVersionRef", "beatRef",
             "inputAssetVersionRef", "backendRef", "executionConfigRef", "costBasisRef", "limits"}
-    elif operation == "ISSUE":
+    elif operation in {"ISSUE", "REPLACE_UNCONSUMED"}:
         fields = common | {"methodAwareInputPlanVersionRef", "creativeShotVersionRef", "beatRef", "inputAssetVersionRef", "backendRef",
             "expectedSubjectDigest", "expectedApprovedPlanDigest", "authorityDecisionRef", "idempotencyKey", "snapshotTokens"}
+        if operation == "REPLACE_UNCONSUMED":
+            fields.add("predecessorJobRef")
     elif operation == "INSPECT":
         fields = common | {"generationDispatchGrantRef"}
     elif operation == "CONSUME":
