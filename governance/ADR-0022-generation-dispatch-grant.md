@@ -5,7 +5,7 @@
 | 字段 | 值 |
 | --- | --- |
 | ADR ID | ADR-0022 |
-| 文档版本 | 1.7；§8.6 限定文件枚举兼容证明与独立批准的窗口平移，其他控制面不变 |
+| 文档版本 | 1.8；§8.7 集中修正同服务重启恢复与无关模型枚举兼容，其他控制面不变 |
 | Status | Accepted — Architecture Contract Only |
 | 完整 ADR 审批状态 | ACCEPTED_ARCHITECTURE_ONLY；Project Lead 已明确接受全文，不等于实现或生成许可 |
 | 已确认设计方向 | 独立、不可变 Grant；不覆盖历史五字段，不迁移历史摘要 |
@@ -734,6 +734,46 @@ SHA，与持久化原 Grant 对应；同时验证新完整计划及其独立批�
 延长执行超时或更换来源。拒绝路径零新 Grant；原撤销、唯一子槽位、CAS、L1/L2、
 UNKNOWN 不重发及非发布边界保持不变。
 
+### 8.7 v1.8：同服务正常重启及未选用模型新增
+
+2026-09-15 Project Lead 明确授权一次集中修正、直接回归、受保护发布后续接原
+SH09。该授权明确修订 §8.5/§8.6 的进程及枚举绝对相等限制；不是隐式豁免、
+新生成入口或第二次发送许可，不改变已有费用、窗口上限、输出和非发布边界。
+
+仅在 §8.5 的原零发送、未消费失败资格已经由原 reader 证明时，新精确批准的
+唯一替代计划可绑定同服务的新进程。原 Grant、Attempt、旧批准包均不可变。
+原完整批准包须由独立 ApprovalReader 重新读取并匹配原签发 bundle SHA；
+不能用调用方提供的旧摘要或空材料作为证明。旧、新计划均执行完整材料验证。
+
+允许变化仅为 processIdentity 的 comfyuiPid、processStartTicks，以及当前观察
+派生的 runtimeBinding.processIdentityDigest、attestationFileSha256、backendDecision
+的 runtimeAttestationRef、runtimeAttestationDigest、registryVersion、registryDigest
+及其 backendDecisionDigest。进程确实变化时，新 start ticks 必须大于旧值；
+同一进程仅刷新独立观察原件也可以重新绑定，但不改变原批准记录。
+
+instanceRef、hostBootIdDigest、pidNamespaceIdDigest、ComfyUI commit、完整启动
+argv/环境、全部执行配置（含端点、凭据来源、路径、timeouts、configRef/version）、
+选定 profile/模型字节、前置权威材料及 backend 的其他字段必须保持相等。
+费用和窗口只沿用 §8.6；scope、subject、permissions 及所有次数/额度限制不变。
+新进程和原件仍在 ISSUE/CONSUME/SEND 经可信现场 reader 独立验证；新批准后
+再次重启仍使该批准失配，不能沿用旧 PID、伪造摘要或跳过当前性检查。
+
+§8.6 的四处媒体文件选项比较扩展到以下四处加载器选项：
+
+- `UNETLoader.input.required.unet_name[0]`
+- `CLIPLoader.input.required.clip_name[0]`
+- `VAELoader.input.required.vae_name[0]`
+- `LoraLoaderModelOnly.input.required.lora_name[0]`
+
+这八处都只允许不重复字符串的新增，旧列表和相对顺序必须保留。加载器在两份
+完整前像均不存在时不凭空创建；单侧缺失或结构不符仍拒绝。其余完整节点结构、
+选中的模型/profile/输入和其他 runtime facts 仍独立严格验证。真实原件及当前
+摘要原样保留，归一化仅用于比较副本，不用新增模型名称推断所选权重未变。
+
+没有旧包、新精确批准、当前可信 runtime 或零发送失败证明时继续拒绝；
+UNKNOWN、已消费、活跃 Attempt、第二个替代及自动 POST 重试均继续禁止。
+正常重启恢复不是重新批准模型/内容/预算，也不要求重做未变工程主体。
+
 ## 9. V5→V4 接线与版本边界
 
 原 manifest v2 无 Grant 的路径继续拒绝。带 Grant 的新路线先完整验证旧对象及其 false/NOT_READY 不变量，再经 V5 验证独立权威；新的 request.executionMode 可为 INTERNAL_SELF_HOSTED，但不得更改历史 Run.executionMode。
@@ -856,6 +896,7 @@ InputPlan、InputAssetVersion、InputAppendAuthority 和旧 v2 runtime attestati
 | 1.5 D1 狭义 live 接线 | 2026-09-13 Project Lead 批准 §5.8 及任务 A/B | 本地工程和限定只读核验；不是候选验收、部署或真实生成批准 |
 | 1.6 零发送失败替代 | 2026-09-15 Project Lead 授权 §8.5 狭义例外、直接回归及受保护发布 | 原记录保留，单次替代；既定真实运行仍受精确计划、时限、预算及一次提交约束 |
 | 1.7 文件枚举与新窗口 | 2026-09-15 Project Lead 授权狭义兼容修正并明确确认新的五小时窗口，其他限制不变 | 仅 §8.6 的完整证明及时间平移；不授权忽略真实进程变化或增加发送次数 |
+| 1.8 正常重启与模型枚举 | 2026-09-15 Project Lead 明确授权集中修正原 Operator、直接回归及发布后续接原 SH09 | §8.7 同服务新进程精确重绑及未选用模型新增；旧记录、当前性、唯一替代和一次提交限制保留 |
 
 以下 [S] 项只支持对旧仓库行为的陈述，不表示新增规范已经实现：
 

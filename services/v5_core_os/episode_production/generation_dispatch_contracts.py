@@ -315,13 +315,14 @@ def validate_replacement_proof(value: Any, plan: dict) -> dict:
 
 def validate_replacement_plan(original: dict, plan: dict, approval: dict, *,
                               original_package=None, replacement_package=None) -> None:
-    """The exception changes deployed Core bytes, not the approved operation."""
+    """Rebind a freshly approved same-service recovery, never the old Grant."""
     require(original["schemaVersion"] == GRANT_SCHEMA, "GRANT_SUBJECT_ALREADY_RECORDED")
     previous = plan_from_grant(original)
     for key in ("scope", "subject", "permissions"):
         require(canonical(previous[key]) == canonical(plan[key]), "APPROVAL_PLAN_MISMATCH")
     renewed = previous["limits"] != plan["limits"]
-    if renewed:
+    rebound = previous["executionBinding"]["runtimeBinding"] != plan["executionBinding"]["runtimeBinding"]
+    if renewed or rebound:
         # A separately approved later window is not a timeout/fee increase. Old
         # material must be independently resolved by the foundation, not supplied
         # as a command field. Missing original material preserves v1.6 rejection.
@@ -329,6 +330,22 @@ def validate_replacement_plan(original: dict, plan: dict, approval: dict, *,
         old_package = validate_plan_package(original_package)
         new_package = validate_plan_package(replacement_package)
         require(old_package["plan"] == previous and new_package["plan"] == plan, "APPROVAL_PLAN_MISMATCH")
+    if rebound:
+        old_material, new_material = old_package["materials"], new_package["materials"]
+        # Restart is a new immutable observation, not permission to change the
+        # machine, selected models, endpoint, launch, credentials or timeouts.
+        for field in ("backendProfile", "executionConfig", "prerequisiteEvidence"):
+            require(canonical(old_material[field]) == canonical(new_material[field]), "APPROVAL_PLAN_MISMATCH")
+        old_process, new_process = old_material["processIdentity"], new_material["processIdentity"]
+        volatile = {"comfyuiPid", "processStartTicks"}
+        require({k: v for k, v in old_process.items() if k not in volatile}
+            == {k: v for k, v in new_process.items() if k not in volatile}, "APPROVAL_PLAN_MISMATCH")
+        require(old_process == new_process or int(new_process["processStartTicks"]) > int(old_process["processStartTicks"]),
+            "APPROVAL_PLAN_MISMATCH")
+        # The new runtime original and route pins are independently read under
+        # the existing gate before issue/consume/send. No command-supplied trust
+        # flag, old PID substitution, or weakening of that currentness check.
+    if renewed:
         old_limits, new_limits = validate_limits(previous["limits"]), validate_limits(plan["limits"])
         require({k: v for k, v in old_limits.items() if k not in {"notBefore", "expiresAt"}}
             == {k: v for k, v in new_limits.items() if k not in {"notBefore", "expiresAt"}}, "APPROVAL_PLAN_MISMATCH")
@@ -349,6 +366,14 @@ def validate_replacement_plan(original: dict, plan: dict, approval: dict, *,
         value["executionCode"].pop("coreTree")
         if renewed:
             value.pop("costBasis")  # complete old/new cost provenance compared above
+        if rebound:
+            # Only observation and derived registry pins change. Every backend
+            # identity, policy, resource, fee and selected profile field remains.
+            value["runtimeBinding"].pop("processIdentityDigest")
+            value["runtimeBinding"].pop("attestationFileSha256")
+            value.pop("backendDecisionDigest")
+            for field in ("runtimeAttestationRef", "runtimeAttestationDigest", "registryVersion", "registryDigest"):
+                value["backendDecision"].pop(field)
         return value
     require(unchanged_binding(previous["executionBinding"]) == unchanged_binding(plan["executionBinding"]),
         "APPROVAL_PLAN_MISMATCH")

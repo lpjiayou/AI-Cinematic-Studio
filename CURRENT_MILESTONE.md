@@ -12,11 +12,11 @@ not a new Grant, feature acceptance or production-readiness decision.
 <!-- CURRENT_STATE:BEGIN -->
 ```text
 CURRENT_TASK=ACS-D1-PRE-SEND-FAILURE-RECOVERY
-CURRENT_ACTION=BOUNDED_RUNTIME_INVENTORY_AND_EXPLICIT_WINDOW_RENEWAL
+CURRENT_ACTION=SAME_SERVICE_RESTART_AND_UNSELECTED_MODEL_INVENTORY_RECOVERY
 NEXT_TASK=D1_PUBLISHED_FIX_AND_ONE_APPROVED_SH09
-REVIEWED_MAIN=f481180264a360fe18aa2cfb13e2c20ca1c75244
-REVIEWED_TREE=8696dbecdad155856fd022ec8487ea6c392261ba
-ADR_0022_ACCEPTED_VERSION=1.7_BOUNDED_INVENTORY_AND_EXPLICIT_WINDOW
+REVIEWED_MAIN=20aca1d669214cd9ce6c8dcd2ef4aece0a4e4f43
+REVIEWED_TREE=23a3e80f567ceebc70b1a43f2eec8ad574aadeec
+ADR_0022_ACCEPTED_VERSION=1.8_SAME_SERVICE_RESTART_AND_UNSELECTED_MODEL_ADDITIONS
 R2_F01_ENGINEERING=ACCEPTED_WITHIN_CPU_FIXTURE_SCOPE_AND_MERGED
 R3_F01_ENGINEERING=MERGED
 D1_OPERATOR_CODE=MERGED
@@ -73,8 +73,13 @@ The old approved window expired. The Owner explicitly confirmed one new five-hou
 window after publication and current preparation, with the two-hour execution and
 RMB 1,000 cap unchanged. Its exact times must be recorded, not silently extended.
 Leave the GPU on; storage remains billed. No formal 8765 database access is allowed.
-The inventory correction permits only proven unrelated file-list additions; real
-process drift still blocks until separately resolved. No new live send is recorded.
+The Owner explicitly authorized one consolidated correction and publication before
+continuing the original SH09: proven unrelated media/model-list additions and a
+freshly approved same-service restart binding under ADR-0022 section 8.7. Selected
+model bytes, input, launch/configuration, scope, budget and the one-send limit remain
+unchanged. Old records remain immutable; consumed/UNKNOWN cases cannot be retried.
+Current runtime evidence must match the new exact binding before permission becomes
+active. No new live send is recorded by this implementation checkpoint.
 
 The Owner authorized bounded CI optimization after PR #95 passed all five required
 checks and merged. Only an exact isolated-test allowlist may use affected selection;

@@ -28,7 +28,10 @@ class RuntimeInventoryCompatibilityTests(unittest.TestCase):
             "LoadImageMask": {"input": {"required": {"image": [["anchor.png"], {"image_upload": True}]}}},
             "LoadAudio": {"input": {"required": {"audio": ["COMBO", {"options": ["old.wav"]}]}}},
             "LoadVideo": {"input": {"required": {"file": ["COMBO", {"options": ["old.mp4"]}]}}},
-            "UNETLoader": {"input": {"required": {"unet_name": [["selected.safetensors"]]}}},
+            "UNETLoader": {"input": {"required": {"unet_name": [["selected.safetensors", "retained.safetensors"]]}}},
+            "CLIPLoader": {"input": {"required": {"clip_name": [["text.safetensors"]]}}},
+            "VAELoader": {"input": {"required": {"vae_name": [["vae.safetensors"]]}}},
+            "LoraLoaderModelOnly": {"input": {"required": {"lora_name": [["lora.safetensors"]]}}},
         }
         profile = live_profile()
         original = live_runtime(profile)
@@ -84,6 +87,47 @@ class RuntimeInventoryCompatibilityTests(unittest.TestCase):
     def test_default_reader_without_original_inventory_remains_strict(self):
         self.assert_rejected(self.fixture(enable=False))
 
+    def test_unselected_model_additions_on_each_loader_keep_selected_runtime_strict(self):
+        for node, field in (("UNETLoader", "unet_name"), ("CLIPLoader", "clip_name"),
+                ("VAELoader", "vae_name"), ("LoraLoaderModelOnly", "lora_name")):
+            f = self.fixture()
+            original = deepcopy(f.original)
+            f.current[node]["input"]["required"][field][0].append("unrelated-model.safetensors")
+            with self.subTest(node=node):
+                self.assertEqual(f.materials.runtime(None, f.lease).attestation, original)
+                self.assertEqual(f.reader.read_current(f.configuration, f.lease)["objectInfoDigest"], c.digest(f.current))
+
+    def test_model_removal_reordering_duplicate_and_loader_schema_still_rejected(self):
+        for fault in ("remove", "reorder", "duplicate", "type", "schema"):
+            f = self.fixture()
+            fields = f.current["UNETLoader"]["input"]["required"]
+            if fault == "remove":
+                fields["unet_name"][0].clear()
+            elif fault == "reorder":
+                fields["unet_name"][0].reverse()
+            elif fault == "duplicate":
+                fields["unet_name"][0].append("selected.safetensors")
+            elif fault == "type":
+                fields["unet_name"][0].append(1)
+            else:
+                fields["weight_dtype"] = [["changed"]]
+            with self.subTest(fault=fault):
+                self.assert_rejected(f)
+
+    def test_added_models_do_not_hide_selected_weight_bytes_or_process_changes(self):
+        for fault in ("model", "process"):
+            f = self.fixture()
+            f.current["UNETLoader"]["input"]["required"]["unet_name"][0].append("unrelated")
+            if fault == "model":
+                files = deepcopy(f.configuration["backendProfile"]["modelFiles"])
+                files[0]["sha256"] = "f" * 64
+                f.facts_delta["modelFiles"] = files
+            else:
+                process = {**f.configuration["processIdentity"], "comfyuiPid": 991}
+                f.facts_delta.update(processIdentity=process, processIdentityDigest=c.digest(process))
+            with self.subTest(fault=fault):
+                self.assert_rejected(f)
+
     def test_all_four_file_lists_allow_additions_only(self):
         for node, key, tail in (("LoadImage", "image", None), ("LoadImageMask", "image", None),
                 ("LoadAudio", "audio", "options"), ("LoadVideo", "file", "options")):
@@ -99,7 +143,7 @@ class RuntimeInventoryCompatibilityTests(unittest.TestCase):
                 lambda n: n["LoadImage"]["input"]["required"]["image"][0].append("anchor.png"),
                 lambda n: n["LoadImage"]["input"]["required"].update(image="invalid"),
                 lambda n: n["LoadImage"]["input"]["required"]["image"][1].update(image_upload=False),
-                lambda n: n["UNETLoader"]["input"]["required"]["unet_name"][0].append("other-model"),
+                lambda n: n["UNETLoader"]["input"]["required"].update(weight_dtype=[["changed"]]),
                 lambda n: n.update(NewNode={}), lambda n: n.pop("LoadVideo")):
             f = self.fixture()
             mutation(f.current)

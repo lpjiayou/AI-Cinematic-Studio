@@ -368,7 +368,8 @@ class GenerationDispatchFoundation:
     def _validate_replacement_selected(self, original, selected):
         plan = selected.plan_package["plan"]
         materials = {}
-        if original["limits"] != plan["limits"]:
+        if (original["limits"] != plan["limits"] or
+                original["executionBinding"]["runtimeBinding"] != plan["executionBinding"]["runtimeBinding"]):
             prior = self._selected(original["approval"]["authorityDecisionRef"])
             c.require(prior.approval == original["approval"]
                 and prior.bundle_sha256 == original["issuanceEvidence"]["approvalBundleSha256"], "APPROVAL_UNAVAILABLE")

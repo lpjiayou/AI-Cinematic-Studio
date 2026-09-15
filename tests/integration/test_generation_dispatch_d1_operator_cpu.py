@@ -114,6 +114,12 @@ class D1OperatorCpuTests(unittest.TestCase):
         self._replacement_vertical(renew_window=False)
 
     def test_expired_zero_send_replacement_new_window_original_operator_one_post(self):
+        self._standing_terms_vertical(restart_service=False)
+
+    def test_restarted_service_and_new_window_same_operator_one_post_original_preserved(self):
+        self._standing_terms_vertical(restart_service=True)
+
+    def _standing_terms_vertical(self, *, restart_service):
         from tests.support.generation_dispatch_binding_fixtures import TestOnlyExternalOwners
         original = TestOnlyExternalOwners._cost_original
         def standing_terms(owner, reference, cost):
@@ -125,9 +131,9 @@ class D1OperatorCpuTests(unittest.TestCase):
             result["schemaVersion"] = "test-only.standing-cost-evidence.v1"
             return result
         with patch.object(TestOnlyExternalOwners, "_cost_original", standing_terms):
-            self._replacement_vertical(renew_window=True)
+            self._replacement_vertical(renew_window=True, restart_service=restart_service)
 
-    def _replacement_vertical(self, *, renew_window):
+    def _replacement_vertical(self, *, renew_window, restart_service=False):
         from dataclasses import replace
         from hashlib import sha256
         from types import SimpleNamespace
@@ -176,6 +182,29 @@ class D1OperatorCpuTests(unittest.TestCase):
                 original_path.write_bytes((f.root / "test-generation-approval.json").read_bytes())
                 original_reader = PinnedApprovalReader(original_path,
                     sha256(original_path.read_bytes()).hexdigest(), original=f.originals)
+                if restart_service:
+                    from services.v5_core_os.episode_production.generation_dispatch_live_sources import OriginalFile
+                    materials = f.external.template["materials"]
+                    process = materials["processIdentity"]
+                    process.update(comfyuiPid=777, processStartTicks=str(int(process["processStartTicks"]) + 100))
+                    runtime = live_runtime(materials["backendProfile"], process, materials["executionConfig"])
+                    runtime = c.sealed({**runtime, "attestationRef": "test-runtime-after-service-restart"})
+                    f.external.attestation = runtime
+                    f.external._store_proof("restart-attestation", runtime["attestationRef"], runtime,
+                        "RUNTIME_PROCESS", "RuntimeAttestation", runtime["payloadDigest"])
+                    proof = f.external.proof_files[runtime["attestationRef"]]
+                    binding = f.external.template["plan"]["executionBinding"]
+                    binding["runtimeBinding"].update(processIdentityDigest=c.digest(process), attestationFileSha256=proof["sha256"])
+                    binding["backendDecision"].update(runtimeAttestationRef=runtime["attestationRef"], runtimeAttestationDigest=runtime["payloadDigest"])
+                    binding["backendDecisionDigest"] = c.digest(binding["backendDecision"])
+                    configuration = {**{k: materials[k] for k in ("backendProfile", "executionConfig", "processIdentity")},
+                        **{k: binding[k] for k in ("backendDecision", "executionCode")}}
+                    path = f.root / "test-restarted-independent-config.json"
+                    path.write_bytes(c.canonical(configuration))
+                    # Test-only host installation of new immutable originals;
+                    # original Grant/bundle and old runtime file are preserved.
+                    f.live_materials._configuration = OriginalFile(path, sha256(path.read_bytes()).hexdigest())
+                    f.live_materials._runtime_file = OriginalFile(proof["path"], proof["sha256"])
                 limits = {**package["plan"]["limits"], "notBefore": "2030-01-02T00:00:00.000000Z",
                     "expiresAt": "2030-01-02T01:00:00.000000Z"}
                 f.external.template["plan"]["limits"] = limits
@@ -210,6 +239,9 @@ class D1OperatorCpuTests(unittest.TestCase):
             child = result["grant"]
             self.assertEqual(child["schemaVersion"], c.REPLACEMENT_GRANT_SCHEMA)
             self.assertEqual(child["limits"], package["plan"]["limits"])
+            if restart_service:
+                self.assertNotEqual(child["executionBinding"]["runtimeBinding"], f.grant["executionBinding"]["runtimeBinding"])
+                self.assertEqual(child["executionBinding"]["runtimeBinding"], package["plan"]["executionBinding"]["runtimeBinding"])
             self.assertEqual(child["replacementOf"]["jobDigest"], c.digest(original_job))
             self.assertEqual(foundation._terminal(f.grant)["kind"], "REVOKED")
             self.assertEqual(server.complete_post_count, 0)
