@@ -203,6 +203,76 @@ class GenerationDispatchReplacementTests(unittest.TestCase):
         f.readers.package = deepcopy(f.package)
         f.clock.value = "2030-01-02T00:00:10.000000Z"
 
+    def restart(self, f):
+        process = f.package["materials"]["processIdentity"]
+        process.update(comfyuiPid=29, processStartTicks="456")
+        binding = f.package["plan"]["executionBinding"]
+        f.readers.attestation = c.sealed({**f.attestation, "attestationRef": "test-restarted-attestation"})
+        binding["runtimeBinding"].update(processIdentityDigest=c.digest(process),
+            attestationFileSha256=sha256(c.canonical(f.readers.attestation)).hexdigest())
+        decision = binding["backendDecision"]
+        decision.update(runtimeAttestationRef="test-restarted-attestation", runtimeAttestationDigest=f.readers.attestation["payloadDigest"],
+            registryVersion="test-restarted-registry", registryDigest="7" * 64)
+        binding["backendDecisionDigest"] = c.digest(decision)
+        f.approval = approval_for(f.package, decision_ref="test-restart-approved")
+        current = f.write_approval()
+        f.service.approval_reader = SimpleNamespace(resolve=lambda ref: (
+            f.original_reader if ref == f.old["approval"]["authorityDecisionRef"] else current).resolve(ref))
+        f.readers.package = deepcopy(f.package)
+
+    def test_same_service_restart_rebinds_new_child_not_original_grant(self):
+        f = self.fixture()
+        before = deepcopy(f.records())
+        self.restart(f)
+        grant = f.service.issue_replacement(self.command(f))["grant"]
+        self.assertNotEqual(grant["executionBinding"]["runtimeBinding"], f.old["executionBinding"]["runtimeBinding"])
+        self.assertEqual(grant["executionBinding"]["runtimeBinding"], f.package["plan"]["executionBinding"]["runtimeBinding"])
+        self.assertTrue(all(row in f.records() for row in before))
+        self.assertEqual(len(f.records()), 3)
+
+    def test_restart_without_original_package_or_with_stale_approval_is_rejected(self):
+        for fault in ("reader", "approval"):
+            f = self.fixture()
+            self.restart(f)
+            before = deepcopy(f.records())
+            if fault == "reader":
+                f.service.approval_reader = f.write_approval()
+            else:
+                f.approval["approvedPlanDigest"] = c.digest(f.old_package["plan"])
+                f.approval = c.sealed(f.approval, "authorityDecisionDigest")
+                f.service.approval_reader = f.write_approval()
+            with self.subTest(fault=fault), self.assertRaises(c.DispatchError):
+                f.service.issue_replacement(self.command(f))
+            self.assertEqual(f.records(), before)
+
+    def test_restart_cannot_change_instance_boot_namespace_launch_or_regress_start_ticks(self):
+        for field, value in (("instanceRef", "other-instance"), ("hostBootIdDigest", "1" * 64),
+                ("pidNamespaceIdDigest", "2" * 64), ("launchConfigDigest", "3" * 64),
+                ("comfyuiCommit", "4" * 40), ("processStartTicks", "1")):
+            f = self.fixture()
+            self.restart(f)
+            package = deepcopy(f.package)
+            process = package["materials"]["processIdentity"]
+            process[field] = value
+            package["plan"]["executionBinding"]["runtimeBinding"].update(
+                instanceRef=process["instanceRef"], processIdentityDigest=c.digest(process))
+            with self.subTest(field=field), self.assertRaises(c.DispatchError):
+                c.validate_replacement_plan(f.old, package["plan"], approval_for(package, decision_ref="test-bad-restart"),
+                    original_package=f.old_package, replacement_package=package)
+
+    def test_restart_cannot_smuggle_backend_policy_or_price_change(self):
+        for field, value in (("providerId", "other-provider"), ("policyRef", "other-policy"),
+                ("policyDigest", "a" * 64), ("maxCostMinor", 1999)):
+            f = self.fixture()
+            self.restart(f)
+            package = deepcopy(f.package)
+            decision = package["plan"]["executionBinding"]["backendDecision"]
+            decision[field] = value
+            package["plan"]["executionBinding"]["backendDecisionDigest"] = c.digest(decision)
+            with self.subTest(field=field), self.assertRaises(c.DispatchError):
+                c.validate_replacement_plan(f.old, package["plan"], approval_for(package, decision_ref="test-bad-policy"),
+                    original_package=f.old_package, replacement_package=package)
+
     def test_independently_approved_later_window_preserves_all_caps_and_old_records(self):
         f = self.fixture()
         before = deepcopy(f.records())

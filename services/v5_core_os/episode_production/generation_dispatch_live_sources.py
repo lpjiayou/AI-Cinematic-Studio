@@ -105,6 +105,14 @@ class LiveRuntimeCurrentReader:
             ("LoadImageMask", "input", "required", "image", 0),
             ("LoadAudio", "input", "required", "audio", 1, "options"),
             ("LoadVideo", "input", "required", "file", 1, "options"))
+        # Known loader enumerations are inventories, not the selected weights.
+        # The full selected model bytes/profile, node schemas and process are
+        # still independently verified on every read. No arbitrary field ignore.
+        model_paths = (("UNETLoader", "input", "required", "unet_name", 0),
+            ("CLIPLoader", "input", "required", "clip_name", 0),
+            ("VAELoader", "input", "required", "vae_name", 0),
+            ("LoraLoaderModelOnly", "input", "required", "lora_name", 0))
+        paths += tuple(path for path in model_paths if path[0] in before or path[0] in after)
         for path in paths:
             try:
                 old_parent, new_parent = before, after
@@ -115,7 +123,7 @@ class LiveRuntimeCurrentReader:
                     and all(type(v) is str and v and "\0" not in v for v in old + new), "RUNTIME_CHANGED")
                 c.require(len(set(old)) == len(old) and len(set(new)) == len(new)
                     and [v for v in new if v in set(old)] == old, "RUNTIME_CHANGED")
-                # Only these four additive enumerations are normalized. Original
+                # Only these closed additive enumerations are normalized. Original
                 # observations/digests are not rewritten or represented as fresh.
                 new_parent[path[-1]] = deepcopy(old)
             except (KeyError, IndexError, TypeError) as exc:
