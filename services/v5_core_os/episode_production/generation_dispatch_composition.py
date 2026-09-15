@@ -26,6 +26,7 @@ CORE_SELECTORS = frozenset({
     "CURRENT_CONFIRMED_SCRIPT", "ACTIVE_M6_BINDING",
 })
 INPUT_KINDS = frozenset({"MethodAwareInputPlanVersion", "MethodAwareInputArtifact",
+    "UserImageVideoInput",
     "MethodAwareInputAppendAuthority", "Candidate", "TechnicalValidation",
     "SemanticVisualQCDecision", "HumanSelectionDecision", "AssetAdmission", "AssetVersion"})
 
@@ -58,6 +59,7 @@ class GenerationDispatchAssembly:
     coordination: GenerationDispatchCoordination
     selections: dict
     coverage: tuple
+    image_video: object = None
 
 
 def _cleanup_failed_takeover(operation):
@@ -83,7 +85,7 @@ def compose_generation_dispatch(*, lifecycle, root_service, method_media,
         input_assets, policy_service, queue_coordinators, storage_domain,
         workspace_ref, technical_target_id, clock, approval_reader,
         prerequisite_reader, material_reader, backend_reader, runtime_reader,
-        cost_reader, issuer_service_ref, revocation_reader=None):
+        cost_reader, issuer_service_ref, revocation_reader=None, image_video_installation=None):
     """Enroll concrete original SQLite participants for one private workspace.
 
     External authority/configuration ports remain independent. None is read
@@ -193,6 +195,17 @@ def compose_generation_dispatch(*, lifecycle, root_service, method_media,
     c.require({path for _, _, path in coordination._storage_bindings} == set(storage_domain.paths),
         "CURRENTNESS_FENCE_UNAVAILABLE")
 
+    image_video = None
+    if image_video_installation is not None:
+        from .image_video import ImageVideoRuntime, ImageVideoPort
+        c.require(image_video_installation.policy["scope"]["workspaceRef"] == workspace_ref, "SCOPE_MISMATCH")
+        image_video = ImageVideoRuntime(image_video_installation, evidence=evidence,
+            root=root_service, coordination=coordination, clock=clock)
+        approval_reader = ImageVideoPort(approval_reader, image_video, "approval")
+        material_reader = ImageVideoPort(material_reader, image_video, "materials")
+        backend_reader = ImageVideoPort(backend_reader, image_video, "backend")
+        runtime_reader = ImageVideoPort(runtime_reader, image_video, "runtime")
+        cost_reader = ImageVideoPort(cost_reader, image_video, "cost")
     ports = {"approval": (approval_reader, ("CURRENT_OWNER_APPROVAL",)),
         "prerequisites": (prerequisite_reader, ("CURRENT_IDENTITY_REFERENCE", "CURRENT_RIGHTS_EVALUATION",
             "CURRENT_PROVIDER_POLICY", "CURRENT_CONFIRMED_SCRIPT")),
@@ -209,6 +222,9 @@ def compose_generation_dispatch(*, lifecycle, root_service, method_media,
     source = GenerationDispatchOwnerReaders(root_service=root_service, method_media=method_media,
         input_assets=input_assets, coordination=coordination, technical_target_id=technical_target_id,
         prerequisite_reader=selections["prerequisites"], material_reader=selections["materials"])
+    if image_video is not None:
+        from .image_video import ImageVideoSource
+        source = ImageVideoSource(source, image_video)
     from services.v4_platform.generation_dispatch_execution import MediaJobGenerationDispatchPort
     failure_reader = MediaJobGenerationDispatchPort(coordinator=queue_coordinators[0],
         coordination=coordination, clock=clock)
@@ -220,14 +236,15 @@ def compose_generation_dispatch(*, lifecycle, root_service, method_media,
     boundary = GenerationDispatchPublicBoundary(foundation, preparation=preparation)
     coordination.activate(required)
     routing = GenerationDispatchRouting(foundation=foundation, source_reader=source, coordinator=queue_coordinators[0])
-    return GenerationDispatchAssembly(boundary, routing, source, coordination, selections, tuple(coverage))
+    return GenerationDispatchAssembly(boundary, routing, source, coordination, selections, tuple(coverage), image_video)
 
 
 def open_existing_live_operator(*, storage_root, lifecycle_path, run_path, queue_path,
         artifact_root, lifecycle_authorities, episode_authorities, selection,
         endpoint, technical_target_id, clock, worker_context, approval_reader,
         prerequisite_reader, material_reader, backend_reader, runtime_reader,
-        cost_reader, issuer_service_ref, production_policy_database_path=None, revocation_reader=None):
+        cost_reader, issuer_service_ref, production_policy_database_path=None, revocation_reader=None,
+        image_video_installation=None):
     """Explicit hosting seam. Validate/open existing stores, never bootstrap.
 
     This function is called only after independent deployment authorization.
@@ -294,7 +311,8 @@ def open_existing_live_operator(*, storage_root, lifecycle_path, run_path, queue
             workspace_ref=selection.prepare_command["workspaceRef"], technical_target_id=technical_target_id,
             clock=clock, approval_reader=approval_reader, prerequisite_reader=prerequisite_reader,
             material_reader=material_reader, backend_reader=backend_reader, runtime_reader=runtime_reader,
-            cost_reader=cost_reader, issuer_service_ref=issuer_service_ref, revocation_reader=revocation_reader)
+            cost_reader=cost_reader, issuer_service_ref=issuer_service_ref, revocation_reader=revocation_reader,
+            image_video_installation=image_video_installation)
     except BaseException:
         domain.close()
         raise

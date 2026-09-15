@@ -18,6 +18,8 @@ from services.v4_platform.method_aware_execution import validate_output, validat
 PREFIX = "v5.generation-dispatch-"
 GRANT_SCHEMA = PREFIX + "grant.v1"
 REPLACEMENT_GRANT_SCHEMA = PREFIX + "grant.v2"
+USER_IMAGE_VIDEO_GRANT_SCHEMA = PREFIX + "grant.v3"
+USER_IMAGE_VIDEO_SUBJECT_SCHEMA = "v5.user-image-video-subject.v1"
 TERMINAL_SCHEMA = PREFIX + "grant-terminal.v1"
 APPROVAL_SCHEMA = PREFIX + "approval-bundle.v1"
 REVOCATION_SCHEMA = PREFIX + "revocation-bundle.v1"
@@ -203,6 +205,9 @@ def validate_limits(value: Any) -> dict:
 
 
 def validate_subject(value: Any) -> dict:
+    if type(value) is dict and value.get("schemaVersion") == USER_IMAGE_VIDEO_SUBJECT_SCHEMA:
+        from .image_video_contracts import validate_subject as validate_technical_subject
+        return validate_technical_subject(value)
     pins = {"scriptVersion", "consistencyValidationVersion", "executionMethodPlanVersion",
         "methodAwareInputPlanVersion", "creativeShotVersion", "actionExecutionBeat", "visualExecutionRequirement"}
     exact(value, pins | {"technicalTargetId", "productionRunPayloadDigest", "manifestDigest", "m6Binding", "inputAsset",
@@ -279,8 +284,12 @@ def validate_plan(value: Any) -> dict:
     scope(value["scope"])
     validate_subject(value["subject"])
     validate_binding(value["executionBinding"])
-    exact(value["permissions"], PERMISSIONS)
-    require(canonical(value["permissions"]) == canonical(PERMISSIONS))
+    permissions = PERMISSIONS
+    if value["subject"].get("schemaVersion") == USER_IMAGE_VIDEO_SUBJECT_SCHEMA:
+        from .image_video_contracts import PERMISSIONS as technical_permissions
+        permissions = technical_permissions
+    exact(value["permissions"], permissions)
+    require(canonical(value["permissions"]) == canonical(permissions))
     validate_limits(value["limits"])
     return deepcopy(value)
 
@@ -290,6 +299,9 @@ def subject_digest(plan: dict) -> str:
 
 
 def grant_ref(plan: dict) -> str:
+    if plan["subject"].get("schemaVersion") == USER_IMAGE_VIDEO_SUBJECT_SCHEMA:
+        from .image_video_contracts import grant_ref as technical_grant_ref
+        return technical_grant_ref(plan)
     return "generation-dispatch-grant-" + digest({"workspaceRef": plan["scope"]["workspaceRef"],
         "productionRunRef": plan["scope"]["productionRunRef"],
         "creativeShotVersionRef": plan["subject"]["creativeShotVersion"]["ref"],
@@ -383,6 +395,11 @@ def validate_replacement_plan(original: dict, plan: dict, approval: dict, *,
 
 
 def validate_approval(value: Any, *, plan: dict | None = None, revocation: bool = False) -> dict:
+    if (not revocation and type(value) is dict
+            and (value.get("approvalKind") == "USER_IMAGE_VIDEO_EXECUTION"
+                or (plan is not None and plan["subject"].get("schemaVersion") == USER_IMAGE_VIDEO_SUBJECT_SCHEMA))):
+        from .image_video_contracts import validate_approval as validate_technical_approval
+        return validate_technical_approval(value, plan=plan)
     exact(value, REVOCATION_FIELDS if revocation else APPROVAL_FIELDS)
     for key in ("approvalRef", "authorityRef", "authorityDecisionRef", "actorRef", "approvalEvidenceRef"):
         ref(value[key])
@@ -478,6 +495,9 @@ def cost_bound(cost: dict, limits: dict) -> int:
 
 
 def validate_read_set(value: Any, *, expected_scope: dict | None = None, phase: str | None = None) -> dict:
+    if type(value) is dict and value.get("schemaVersion") == PREFIX + "read-set.v2":
+        from .image_video_contracts import validate_read_set as validate_technical_read_set
+        return validate_technical_read_set(value, expected_scope=expected_scope, phase=phase)
     exact(value, {"schemaVersion", "scope", "phase", "coordinationEpoch", "objects", "selectors"})
     require(value["schemaVersion"] == PREFIX + "read-set.v1")
     scope(value["scope"])
@@ -514,6 +534,10 @@ def validate_read_set(value: Any, *, expected_scope: dict | None = None, phase: 
 
 def validate_read_set_bindings(read_set: dict, plan: dict, approval: dict) -> None:
     """Check the audit references we can derive; original Owner semantics stay in ports."""
+    if plan["subject"].get("schemaVersion") == USER_IMAGE_VIDEO_SUBJECT_SCHEMA:
+        from .image_video_contracts import validate_read_set_bindings as validate_technical_bindings
+        return validate_technical_bindings(read_set, plan, approval)
+    require(read_set["schemaVersion"] == PREFIX + "read-set.v1")
     s, b = plan["subject"], plan["executionBinding"]
     selected = {item["selectorKind"]: item for item in read_set["selectors"]}
     for kind, key in (("CURRENT_PROJECT", "projectRef"), ("CURRENT_SERIES", "seriesRef"), ("CURRENT_EPISODE", "episodeRef")):
@@ -645,6 +669,10 @@ def _workflow(plan: dict, materials: dict) -> None:
     """Exact data comparison with the fixed existing I2V graph, no staging/adapter."""
     graph = materials["workflow"]
     require(type(graph) is dict)
+    if plan["subject"].get("schemaVersion") == USER_IMAGE_VIDEO_SUBJECT_SCHEMA:
+        from .image_video_contracts import compile_workflow
+        require(canonical(graph) == canonical(compile_workflow(plan, materials)), "APPROVAL_PLAN_MISMATCH")
+        return
     try:
         from services.v4_platform.generation_dispatch_a14b_exact import EXACT_PROFILE_SCHEMA, validate_exact_workflow
         from services.v4_platform.generation_dispatch_a14b_live import LIVE_PROFILE_SCHEMA, validate_live_workflow
@@ -714,7 +742,12 @@ def validate_plan_package(value: Any) -> dict:
     config = validate_execution_config(m["executionConfig"])
     process = validate_process(m["processIdentity"])
     cost = validate_cost(m["costBasis"])
-    for item in exact(m["prerequisiteEvidence"], PREREQUISITES).values():
+    prerequisites = PREREQUISITES
+    technical = plan["subject"].get("schemaVersion") == USER_IMAGE_VIDEO_SUBJECT_SCHEMA
+    if technical:
+        from .image_video_contracts import PREREQUISITES as technical_prerequisites
+        prerequisites = technical_prerequisites
+    for item in exact(m["prerequisiteEvidence"], prerequisites).values():
         pinned(item)
     binding, limits = plan["executionBinding"], plan["limits"]
     from services.v4_platform.generation_dispatch_a14b_profile import (
@@ -775,6 +808,9 @@ def validate_bundle(value: Any, *, revocation: bool = False) -> dict:
         exact(entries[0], {"planPackage", "approval"})
         package = validate_plan_package(entries[0]["planPackage"])
         approval = validate_approval(entries[0]["approval"], plan=package["plan"])
+        if package["plan"]["subject"].get("schemaVersion") == USER_IMAGE_VIDEO_SUBJECT_SCHEMA:
+            from .image_video_contracts import validate_package_approval
+            validate_package_approval(package, approval)
     require(value["authorityRef"] == approval["authorityRef"], "APPROVAL_UNAVAILABLE")
     return deepcopy(value)
 
@@ -785,12 +821,16 @@ def plan_from_grant(grant: dict) -> dict:
 
 
 def validate_grant(value: Any) -> dict:
+    if type(value) is dict and value.get("schemaVersion") == USER_IMAGE_VIDEO_GRANT_SCHEMA:
+        from .image_video_contracts import validate_grant as validate_technical_grant
+        return validate_technical_grant(value)
     replacement = isinstance(value, dict) and value.get("schemaVersion") == REPLACEMENT_GRANT_SCHEMA
     exact(value, SCOPE_FIELDS | {"schemaVersion", "generationDispatchGrantRef", "version", "subject", "subjectDigest",
         "executionBinding", "permissions", "limits", "approval", "issuanceEvidence", "publicationAllowed", "createdAt", "payloadDigest"}
         | ({"replacementOf"} if replacement else set()))
     require(value["schemaVersion"] in {GRANT_SCHEMA, REPLACEMENT_GRANT_SCHEMA}
         and type(value["version"]) is int and value["version"] == 1 and value["publicationAllowed"] is False)
+    require(type(value["subject"]) is dict and "schemaVersion" not in value["subject"])
     plan = validate_plan(plan_from_grant(value))
     if replacement:
         validate_replacement_proof(value["replacementOf"], plan)
@@ -894,6 +934,10 @@ def validate_command(operation: str, value: Any) -> dict:
         fields = common | {"generationDispatchGrantRef", "generationDispatchGrantDigest", "authorityDecisionRef", "idempotencyKey", "snapshotTokens"}
     else:
         raise DispatchError()
+    if type(value) is dict and "generationRef" in value:
+        require(operation in {"PREPARE", "ISSUE"})
+        fields -= {"methodAwareInputPlanVersionRef", "creativeShotVersionRef", "beatRef", "inputAssetVersionRef"}
+        fields.add("generationRef")
     exact(value, fields)
     for key, item in value.items():
         if key == "limits":

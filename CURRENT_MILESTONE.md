@@ -11,12 +11,12 @@ not a new Grant, feature acceptance or production-readiness decision.
 
 <!-- CURRENT_STATE:BEGIN -->
 ```text
-CURRENT_TASK=ACS-D1-UI-INTEGRATION
-CURRENT_ACTION=AUTHORIZED_CORE_FRONTEND_PUBLICATION_AND_EXISTING_JOB_PLAYBACK_BINDING
-NEXT_TASK=VERIFY_PUBLISHED_UI_READ_ONLY_SH09_PLAYBACK
-REVIEWED_MAIN=3b49476705f2e9e92ae74c5afca4d6a70ea6392c
-REVIEWED_TREE=dccee15227d5cf8cc9db6507400dbbcc5a482f7d
-ADR_0022_ACCEPTED_VERSION=1.9_BOUNDED_UI_ADAPTER
+CURRENT_TASK=ACS-IMAGE-DESCRIPTION-VIDEO-LOOP
+CURRENT_ACTION=IMPLEMENTED_CPU_AND_HTTP_BROWSER_VERIFIED_CANDIDATE
+NEXT_TASK=PUBLISH_AND_BIND_BOUNDED_IMAGE_VIDEO_INSTALLATION_WHEN_AUTHORIZED
+REVIEWED_MAIN=06a28c8de086a30db2d33b28f1ee34b7890973ac
+REVIEWED_TREE=a6cbc9b431c9ff1ff65d5261448e3259721c0eea
+ADR_0022_ACCEPTED_VERSION=1.10_BOUNDED_IMAGE_DESCRIPTION_VIDEO
 R2_F01_ENGINEERING=ACCEPTED_WITHIN_CPU_FIXTURE_SCOPE_AND_MERGED
 R3_F01_ENGINEERING=MERGED
 D1_OPERATOR_CODE=MERGED
@@ -28,7 +28,12 @@ D1_SELECTED_SSH_FORWARD_TARGET=127.0.0.1:8188
 D1_RUNTIME_OBSERVATION=DATED_READ_ONLY_METADATA_ONLY
 D1_EXACT_RUN_REQUEST=EXECUTED_ONCE_ORIGINAL_JOB_SUCCEEDED
 SH09_TECHNICAL_VIDEO=OWNER_ACCEPTED
-D1_UI=PUBLICATION_AND_READ_ONLY_EXISTING_JOB_BINDING_AUTHORIZED
+D1_UI=PUBLISHED_EXISTING_SH09_PLAYBACK_VERIFIED
+IMAGE_DESCRIPTION_VIDEO=IMPLEMENTED_CPU_LOOPBACK_AND_BROWSER_VERIFIED_NOT_LIVE_DEPLOYED
+IMAGE_VIDEO_OPERATOR=REUSE_ORIGINAL_NO_SECOND_QUEUE
+IMAGE_VIDEO_NEW_LIVE_WINDOW=NOT_INSTALLED_OR_ISSUED_BY_THIS_RECORD
+IMAGE_VIDEO_FAILURE_AUTO_RETRY=false
+ORIGINAL_SH09=IMMUTABLE_NO_REGENERATION
 D1_COMPLETE=false
 SYSTEM_RUNTIME_BOUND=false
 PROMPT_SUBMISSION_AUTHORIZED=false
@@ -40,7 +45,7 @@ LIVE_GRANT_CONSUMED=true
 OUTPUT_ASSET_ADMISSION_ALLOWED=false
 PUBLICATION_ALLOWED=false
 D2_D3=QUEUED_NOT_AUTHORIZED
-FRONTEND_IMPLEMENTATION_IN_THIS_TASK=BOUNDED_GENERATION_WORKSPACE_AUTHORIZED
+FRONTEND_IMPLEMENTATION_IN_THIS_TASK=IMAGE_DESCRIPTION_GENERATE_PLAYBACK_AUTHORIZED
 PRODUCTION_READY=false
 M12_RUNTIME_INSTALLED=false
 M12_RUNTIME_G0=NOT_COMPLETE
@@ -74,14 +79,22 @@ and the minimal ADR-0022 amendment. It is not Asset admission, Master/Export,
 publication approval, or permission for another GPU submission. Prior failures,
 revocation, replacement and UNKNOWN records remain immutable historical evidence.
 
-Current work connects the existing Frontend to authenticated Core projection,
-explicit original-Operator preparation/execution and original-artifact playback.
-Only isolated CPU/loopback data is used for implementation/browser validation.
-The host reuses the original participants; it does not start a second store writer.
-The Owner subsequently authorized publication of the Core/Frontend candidate and
-bounded host binding of the existing successful SH09 Job for read-only playback.
-This adds no live run, Grant consumption or database mutation authority. Leave the
-GPU on; bind the original custody workset without accessing the formal 8765 database.
+Core PR #100 and Frontend PR #33 published the authenticated original-job UI;
+the existing SH09 video plays through that chain without another generation.
+The Owner now expressly authorizes the minimal ADR-0022/direct-contract amendment
+and image + description → independent Job → original Operator → playback slice.
+Reuse the original queue, lifecycle, result and cost boundaries; preserve SH09.
+Host-installed bounded policy plus an authenticated, exact-input click must still
+pass currentness, cost and one-attempt checks. This record creates no paid window
+or Grant. Validate with isolated CPU/loopback data; no formal 8765 database access.
+
+The candidate now implements authenticated image upload and description binding,
+an independent Job through the original Operator, bounded cost reservation,
+one-attempt execution and same-page playback. CPU/fixture-owned loopback and real
+HTTP browser checks passed, including refresh and restart recovery; this is not
+new GPU output evidence. Failed or uncertain jobs are not automatically resent.
+The original SH09 remains unchanged. Publication, deployed installation and a new
+paid execution window are not established by these candidate checks.
 
 The Owner authorized bounded CI optimization after PR #95 passed all five required
 checks and merged. Only an exact isolated-test allowlist may use affected selection;
@@ -123,10 +136,10 @@ a current observation, not erased from its original evidence. Metadata and SSH
 reachability do not establish `SYSTEM_RUNTIME_BOUND`, exact Camera/plan approval,
 complete cost/window enforcement, a live Grant, SH09 output or Spike-0 PASS.
 
-These old observations are not the current SH09 result. Next in the same D1 is
-review/publication and bounded host binding of the UI candidate, not another live
-run request. Do not rebuild transport, repeat frozen-package searches or use
-synthetic browser tests as live-generation evidence.
+These old observations are not the current SH09 result. The existing video is
+already bound to the published UI. Current work creates separate technical inputs
+and Jobs, never reuses or regenerates SH09. Do not rebuild transport, repeat frozen
+package searches or use synthetic browser tests as live-generation evidence.
 
 ## 4. Audit debt disposition
 
@@ -149,11 +162,11 @@ disposition, not new implementation authority or final Owner acceptance.
 | AUD-012: code/live/approval conflation | Current status wording corrected | Repository PASS, runtime observation and approved result remain distinct |
 | AUD-013: commercial security/operations | Open product-readiness work | Existing bearer/workspace guards are not complete SaaS security; no public-production claim |
 
-Nearest sequence: publish the authorized UI candidate with its compatible Core pin;
-bind the existing successful Job for read-only UI status/playback. The broader script-to-shot
-consumer slice, M12 audio, M14/M15 approval/master and
-commercial operations remain explicit gaps, not prerequisites invented for the
-bounded silent SH09 technical experiment and not silently declared implemented.
+Nearest sequence: implement and directly validate the authorized image/description
+input through the existing Operator and result playback, preserving cost and
+duplicate-submit limits. The broader script-to-shot consumer, M12 audio, M14/M15
+approval/master and commercial operations remain explicit gaps; they are neither
+prerequisites for this bounded technical slice nor silently declared implemented.
 
 ## 5. Scoped baselines and immutable history
 

@@ -200,11 +200,19 @@ class GenerationDispatchFoundation:
         else:
             package = c.validate_plan_package(selected.plan_package)
             c.validate_approval(approval, plan=package["plan"])
+            if package["plan"]["subject"].get("schemaVersion") == "v5.user-image-video-subject.v1":
+                from .image_video_contracts import validate_package_approval
+                validate_package_approval(package, approval)
         return deepcopy(selected)
 
     @staticmethod
     def _matches_issue(command, plan, approval):
         s = plan["subject"]
+        if s.get("schemaVersion") == "v5.user-image-video-subject.v1":
+            from .image_video_contracts import issue_command_identity
+            expected = issue_command_identity(plan, approval)
+            c.require(all(command.get(k) == v for k, v in expected.items()), "APPROVAL_PLAN_MISMATCH")
+            return
         expected = {"workspaceRef": plan["scope"]["workspaceRef"], "productionRunRef": plan["scope"]["productionRunRef"],
             "methodAwareInputPlanVersionRef": s["methodAwareInputPlanVersion"]["ref"], "creativeShotVersionRef": s["creativeShotVersion"]["ref"],
             "beatRef": s["actionExecutionBeat"]["ref"], "inputAssetVersionRef": s["inputAsset"]["assetVersionRef"],
@@ -404,7 +412,10 @@ class GenerationDispatchFoundation:
             c.require(self.issuer_service_ref is not None, "CURRENTNESS_FENCE_UNAVAILABLE")
             c.ref(self.issuer_service_ref)
             request_digest = c.issue_request_digest(command, selected.approval)
-            grant = c.sealed({"schemaVersion": c.REPLACEMENT_GRANT_SCHEMA if replacement else c.GRANT_SCHEMA,
+            technical = plan["subject"].get("schemaVersion") == "v5.user-image-video-subject.v1"
+            c.require(not (technical and replacement), "APPROVAL_UNAVAILABLE")
+            schema = c.USER_IMAGE_VIDEO_GRANT_SCHEMA if technical else c.REPLACEMENT_GRANT_SCHEMA if replacement else c.GRANT_SCHEMA
+            grant = c.sealed({"schemaVersion": schema,
                 "generationDispatchGrantRef": target_ref, "version": 1,
                 **({"replacementOf": proof} if replacement else {}),
                 **plan["scope"], **{k: deepcopy(plan[k]) for k in ("subject", "executionBinding", "permissions", "limits")},

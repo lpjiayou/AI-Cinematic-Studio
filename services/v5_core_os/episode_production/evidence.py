@@ -73,6 +73,9 @@ ALLOWED_EVIDENCE_RECORD_KINDS = frozenset(
         "MethodAwareInputAppendAuthority",
         "GenerationDispatchGrant",
         "GenerationDispatchGrantTerminal",
+        "UserImageVideoInput",
+        "UserImageVideoApproval",
+        "UserImageVideoFailure",
         "AudioRequirementRouteVersion",
         "TechnicalValidation",
         "SemanticVisualQCDecision",
@@ -543,6 +546,12 @@ def _validate_record(record: EvidenceRecord) -> None:
         raise EpisodeProductionError("record embedded payload digest is invalid")
     if _digest(digest_payload) != record.payloadDigest:
         raise EpisodeProductionError("record payload digest is invalid")
+    if record.recordKind in {"UserImageVideoInput", "UserImageVideoApproval", "UserImageVideoFailure"}:
+        from .image_video import validate_image_video_record
+        try:
+            validate_image_video_record(record)
+        except (ValueError, KeyError, TypeError) as exc:
+            raise EpisodeProductionError("image/video record is invalid") from exc
     if record.recordKind in {"GenerationDispatchGrant", "GenerationDispatchGrantTerminal"}:
         from .generation_dispatch_contracts import DispatchError, validate_record_envelope
         try:

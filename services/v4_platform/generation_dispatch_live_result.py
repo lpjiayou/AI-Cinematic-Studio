@@ -192,6 +192,7 @@ def process_native_frames(native_frames: tuple[bytes, ...],
 
 
 def validate_live_execution_result(execution: Any, envelope: Mapping[str, Any]) -> dict[str, Any]:
+    from .image_video_execution import USER_IMAGE_VIDEO_ENVELOPE_SCHEMA
     fields = {"schemaVersion", "backendBindingDigest", "providerId", "modelId", "region",
         "endpointClass", "adapterIdentity", "providerRequestRef", "costCurrency", "costMinor",
         "runtimeAttestationRef", "runtimeAttestationDigest", "executionEvidenceDigest",
@@ -199,7 +200,7 @@ def validate_live_execution_result(execution: Any, envelope: Mapping[str, Any]) 
     exact(execution, fields, "live execution result")
     binding = envelope["backendBinding"]
     if (execution["schemaVersion"] != LIVE_EXECUTION_SCHEMA
-            or envelope.get("schemaVersion") != "v4.method-aware-media-execution-envelope.v2"
+            or envelope.get("schemaVersion") not in {"v4.method-aware-media-execution-envelope.v2", USER_IMAGE_VIDEO_ENVELOPE_SCHEMA}
             or execution["backendBindingDigest"] != digest(binding)
             or execution["costStatus"] != "UNKNOWN" or execution["costMinor"] is not None
             or execution["deviceStatus"] != "UNKNOWN" or execution["gpuUsed"] is not None

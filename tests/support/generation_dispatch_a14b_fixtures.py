@@ -103,7 +103,7 @@ def make_a14b_package():
 def make_a14b_execution_fixture(case, endpoint, *, profile_factory=make_a14b_profile,
         runtime_factory=make_a14b_runtime, adapter_identity=A14B_ADAPTER_IDENTITY,
         adapter_capability=A14B_CAPABILITY, endpoint_class="TEST_ONLY_LOOPBACK", use_operator=False,
-        prepare_only=False):
+        prepare_only=False, image_video_factory=None):
     """Original upstream/SQLite/Grant composition with inert model originals.
 
     This factory's monkeypatch changes only an existing TEST_ONLY external-owner
@@ -280,7 +280,9 @@ def make_a14b_execution_fixture(case, endpoint, *, profile_factory=make_a14b_pro
                     material_reader=self.live_materials,
                     backend_reader=SimpleNamespace(read_current=self.live_materials.backend),
                     runtime_reader=SimpleNamespace(read_current=self.live_materials.runtime),
-                    cost_reader=SimpleNamespace(read_current=self.live_materials.cost), issuer_service_ref="test-cpu-v5-issuer")
+                    cost_reader=SimpleNamespace(read_current=self.live_materials.cost), issuer_service_ref="test-cpu-v5-issuer",
+                    image_video_installation=(image_video_factory(deepcopy(self.scope), deepcopy(self.external.template), self.clock)
+                        if image_video_factory is not None else None))
                 self.operator_context = self.deployment.open()
                 self.operator = self.operator_context.__enter__()
                 case.addCleanup(self.operator_context.__exit__, None, None, None)

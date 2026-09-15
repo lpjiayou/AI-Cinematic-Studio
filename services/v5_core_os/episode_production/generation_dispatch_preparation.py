@@ -36,7 +36,10 @@ class GenerationDispatchPreparation:
                 and backend.decision["backendRef"] == command["backendRef"], "CONFIG_CHANGED")
             c.require(cost["costBasisRef"] == command["costBasisRef"], "COST_BOUND_UNVERIFIED")
             prerequisites = self.source.prerequisites.prepare(resolved, command, lease)
-            c.exact(prerequisites, c.PREREQUISITES)
+            technical = resolved.subject.get("schemaVersion") == "v5.user-image-video-subject.v1"
+            if technical:
+                from . import image_video_contracts as image_video
+            c.exact(prerequisites, image_video.PREREQUISITES if technical else c.PREREQUISITES)
             for item in prerequisites.values():
                 c.pinned(item)
             # The request identity does not depend on workflow/approval/Grant.
@@ -50,13 +53,17 @@ class GenerationDispatchPreparation:
                 "costBasis": {"ref": cost["costBasisRef"], "digest": cost["payloadDigest"]},
                 "prerequisiteEvidenceDigest": c.digest(prerequisites)}
             plan = {"scope": deepcopy(resolved.scope), "subject": deepcopy(resolved.subject),
-                "executionBinding": binding, "permissions": deepcopy(c.PERMISSIONS),
+                "executionBinding": binding, "permissions": deepcopy(image_video.PERMISSIONS if technical else c.PERMISSIONS),
                 "limits": deepcopy(command["limits"])}
             request_ref = "generation-request-" + c.digest(c.request_identity(plan))
-            workflow = compile_generation_dispatch_workflow(generation_request_ref=request_ref,
-                source_text=resolved.source_text, camera_instruction=resolved.subject["cameraInstruction"],
-                source_asset={k: v for k, v in resolved.subject["inputAsset"].items() if k != "inputRole"},
-                backend_profile=backend.profile, output_constraints=resolved.subject["outputConstraints"])
+            if technical:
+                workflow = image_video.compile_workflow(plan, {"backendProfile": backend.profile,
+                    "prerequisiteEvidence": prerequisites})
+            else:
+                workflow = compile_generation_dispatch_workflow(generation_request_ref=request_ref,
+                    source_text=resolved.source_text, camera_instruction=resolved.subject["cameraInstruction"],
+                    source_asset={k: v for k, v in resolved.subject["inputAsset"].items() if k != "inputRole"},
+                    backend_profile=backend.profile, output_constraints=resolved.subject["outputConstraints"])
             binding["workflowDigest"] = c.digest(workflow)
             package = {"plan": plan, "materials": {"backendProfile": deepcopy(backend.profile),
                 "executionConfig": config, "processIdentity": process, "workflow": workflow,

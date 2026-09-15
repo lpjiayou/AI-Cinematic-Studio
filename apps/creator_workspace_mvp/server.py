@@ -763,6 +763,7 @@ class CreatorRequestHandler(BaseHTTPRequestHandler):
         allow_internal_routes: bool,
         generation_workspace_boundary=None,
         generation_only=False,
+        image_video_boundary=None,
         **kwargs: Any,
     ) -> None:
         self.ai_director_service = ai_director_service
@@ -784,6 +785,7 @@ class CreatorRequestHandler(BaseHTTPRequestHandler):
         self.allow_internal_routes = allow_internal_routes
         self.generation_workspace_boundary = generation_workspace_boundary
         self.generation_only = generation_only
+        self.image_video_boundary = image_video_boundary
         self.authenticated_principal: PublicApiPrincipal | None = None
         super().__init__(*args, **kwargs)
 
@@ -791,6 +793,9 @@ class CreatorRequestHandler(BaseHTTPRequestHandler):
         parsed = urlsplit(self.path)
         requested_path = parsed.path
         if not self._authorize_route_class(requested_path):
+            return
+        from .image_video_http import handle_image_video
+        if handle_image_video(self, parsed):
             return
         from .generation_workspace_http import handle_generation_workspace
         if handle_generation_workspace(self, parsed):
@@ -1385,6 +1390,9 @@ class CreatorRequestHandler(BaseHTTPRequestHandler):
         parsed = urlsplit(self.path)
         if not self._authorize_route_class(parsed.path):
             return
+        from .image_video_http import handle_image_video
+        if handle_image_video(self, parsed):
+            return
         if self.generation_only:
             self._send_application_error(403, "generation_operation_not_authorized")
             return
@@ -1457,6 +1465,9 @@ class CreatorRequestHandler(BaseHTTPRequestHandler):
         parsed = urlsplit(self.path)
         requested_path = parsed.path
         if not self._authorize_route_class(requested_path):
+            return
+        from .image_video_http import handle_image_video
+        if handle_image_video(self, parsed):
             return
         from .generation_workspace_http import handle_generation_workspace
         if handle_generation_workspace(self, parsed):
@@ -2275,6 +2286,12 @@ class CreatorRequestHandler(BaseHTTPRequestHandler):
 
     def _send_application_error(self, status: int, code: str) -> None:
         messages = {
+            "image_video_unavailable": "图片生成入口尚未连接，请稍后刷新。",
+            "generation_policy_expired": "本次生成授权窗口已到期，未提交生成，请等待更新后刷新。",
+            "payload_too_large": "上传内容过大，请选择不超过 8 MB 的图片。",
+            "unsupported_media_type": "上传格式不受支持，请使用 PNG 或 JPEG 图片。",
+            "request_timeout": "图片上传超时，本次未提交生成，请检查网络后重试。",
+            "method_not_allowed": "当前接口不支持此操作。",
             "generation_operator_unavailable": "生成入口尚未绑定当前服务，请完成主机接线后刷新。",
             "generation_operation_not_authorized": "当前身份仅可查看结果，不能执行生成。",
             "generation_target_not_found": "当前项目没有匹配的生成作业。",
@@ -2530,6 +2547,7 @@ def create_server(
     ai_director_candidate_receipt_service: AiDirectorCandidateReceiptService | None = None,
     generation_workspace_boundary=None,
     generation_only=False,
+    image_video_boundary=None,
 ) -> ThreadingHTTPServer:
     series_boundary = series_episode_boundary or create_in_memory_series_boundary()
     projects = project_boundary or create_in_memory_project_boundary(series_boundary)
@@ -2587,6 +2605,7 @@ def create_server(
         allow_internal_routes=allow_internal_routes,
         generation_workspace_boundary=generation_workspace_boundary,
         generation_only=generation_only,
+        image_video_boundary=image_video_boundary,
     )
     server = ThreadingHTTPServer(address, handler)
     server.daemon_threads = True

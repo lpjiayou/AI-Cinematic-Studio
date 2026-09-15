@@ -21,7 +21,7 @@ from .backend_registry import (BackendValidationError, attempt_binding,
 from .media_jobs import (ARTIFACT_SCHEMA_VERSION, ArtifactRecoveryStoreError,
     ArtifactVerificationError, MediaJobCoordinator, MediaJobError,
     MediaJobStateError, _file_digest_and_size, _format_time, _parse_time,
-    _validate_job, verify_media_against_request)
+    _validate_job, verify_media_against_request, DISPATCH_JOB_SCHEMAS)
 from .method_aware_execution import (DISPATCH_JOB_SCHEMA_VERSION,
     validate_envelope, validate_execution_result)
 from .generation_dispatch_transport import (
@@ -116,7 +116,7 @@ class MediaJobGenerationDispatchPort:
                 "subjectDigest": grant["subjectDigest"],
                 "approvedPlanDigest": grant["approval"]["approvedPlanDigest"]}
             result = job.get("dispatchResult")
-            c.require(job["schemaVersion"] == DISPATCH_JOB_SCHEMA_VERSION
+            c.require(job["schemaVersion"] in DISPATCH_JOB_SCHEMAS
                 and job["workspaceRef"] == workspace_ref and job["productionRunRef"] == production_run_ref
                 and job["jobRef"] == job_ref and job["dispatchGrantBinding"] == expected
                 and job["idempotencyKey"] == internal_dispatch_key(workspace_ref,
@@ -149,7 +149,7 @@ class MediaJobGenerationDispatchPort:
         with self.coordination.critical_section(workspace_ref) as lease:
             lease.assert_held()
             current = self.repository.get(workspace_ref, production_run_ref, media_job_ref)
-            if (current is None or current.get("schemaVersion") != DISPATCH_JOB_SCHEMA_VERSION
+            if (current is None or current.get("schemaVersion") not in DISPATCH_JOB_SCHEMAS
                     or current.get("state") != "QUEUED" or current.get("attempts")
                     or current.get("maxAttempts") != 1):
                 raise MediaJobStateError("Grant-bound Job is not uniquely claimable")
@@ -198,7 +198,7 @@ class MediaJobGenerationDispatchPort:
             validate_envelope(envelope, request)
             attempt = job["attempts"][-1] if job["attempts"] else None
             job_lease = job.get("lease")
-            if (job["schemaVersion"] != DISPATCH_JOB_SCHEMA_VERSION
+            if (job["schemaVersion"] not in DISPATCH_JOB_SCHEMAS
                     or binding != expected_binding
                     or any(request[key] != grant[key] for key in c.SCOPE_FIELDS)
                     or job["workspaceRef"] != grant["workspaceRef"]
@@ -513,7 +513,7 @@ class GenerationDispatchExecutor:
             gate.assert_held()
             current = self.job_port.repository.get(observed["workspaceRef"],
                 observed["productionRunRef"], observed["jobRef"])
-            if (current is None or current["schemaVersion"] != DISPATCH_JOB_SCHEMA_VERSION
+            if (current is None or current["schemaVersion"] not in DISPATCH_JOB_SCHEMAS
                     or current["state"] != "RUNNING" or len(current["attempts"]) != 1
                     or current["attempts"][0] != observed["attempts"][0]
                     or current["dispatchGrantBinding"] != observed["dispatchGrantBinding"]
@@ -567,7 +567,7 @@ class GenerationDispatchExecutor:
         with self.coordination.critical_section(workspace_ref) as gate:
             gate.assert_held()
             job = self.result_boundary.read_only(workspace_ref, production_run_ref, media_job_ref)
-            if job is None or job["schemaVersion"] != DISPATCH_JOB_SCHEMA_VERSION:
+            if job is None or job["schemaVersion"] not in DISPATCH_JOB_SCHEMAS:
                 raise MediaJobStateError("pre-send recovery Job was not found")
             evidence = self.consumer.read_failure_evidence(workspace_ref,
                 production_run_ref, job["dispatchGrantBinding"])

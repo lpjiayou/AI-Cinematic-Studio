@@ -5,7 +5,7 @@
 | 字段 | 值 |
 | --- | --- |
 | ADR ID | ADR-0022 |
-| 文档版本 | 1.9；§6.3 增加经授权的 UI 狭义适配；§8.7 及其余控制面不变 |
+| 文档版本 | 1.10；§6.4 增加经授权的图片＋描述技术生成闭环；旧版及 §8.7 控制面保留 |
 | Status | Accepted — Architecture Contract Only |
 | 完整 ADR 审批状态 | ACCEPTED_ARCHITECTURE_ONLY；Project Lead 已明确接受全文，不等于实现或生成许可 |
 | 已确认设计方向 | 独立、不可变 Grant；不覆盖历史五字段，不迁移历史摘要 |
@@ -518,7 +518,7 @@ UNKNOWN 禁止补发但不禁止原有效期内查询已记录的 prompt ID；�
 
 ## 6. Operator 与内部端口闭集（R1、R3）
 
-首版不提供 Frontend 或公共 HTTP 写路由。2026-09-15 Project Lead 在接受 SH09 技术视频后明确授权 UI 接入，并确认公开接口接线及本 ADR 的最小修订；只开放 §6.3 的狭义适配。Operator 身份继续来自可信本地操作边界，不能由请求 actor/role 字段自报。
+首版不提供 Frontend 或公共 HTTP 写路由。2026-09-15 Project Lead 在接受 SH09 技术视频后明确授权 §6.3 的 UI 狭义适配，随后明确批准 §6.4 的图片＋描述闭环及直接依赖合同修订。Operator 身份继续来自可信本地操作边界，不能由请求 actor/role 字段自报。
 
 ### 6.1 prepare / issue / inspect
 
@@ -561,6 +561,74 @@ revoke 请求恰为 `{workspaceRef,productionRunRef,generationDispatchGrantRef,g
 HTTP 后台线程仅监督原 Operator 调用，不引入新队列或持久化状态。活动标记不是 Job 事实。重复点击不追加 worker；刷新或服务重启从原 Job/Attempt 读回；RUNNING/FAILED/UNKNOWN/SUCCEEDED 不自动重试。主机必须保持 §8 的单控制进程和独占工作集，关闭时等待原调用收尾。不得为 API 另开一个写相同七库的服务。
 
 前端只走同源 Experience Adapter；不得通过 SSH、CLI、ComfyUI 或数据库旁路。结果继续为 TECHNICAL_EVIDENCE_ONLY / publicationAllowed=false。缺主机装配显示未连接；测试夹具不得被称为现场 GPU 接通。UI、部署、真实运行和最终 Owner 验收分别报告。
+
+### 6.4 图片＋描述的独立技术生成闭环（v1.10）
+
+2026-09-15 Project Lead 明确授权本 ADR 及直接依赖合同的这一有界增量：
+图片＋描述 → 独立新作业 → 原 Operator 单次执行 → 原作业视频播放。
+该授权允许连续实施与验证，不等待中间逐项审核；不重做 SH09 或扩大为完整出片。
+§2.2、§6.3 中首个固定 SH09 subject 和只选原 Job 的限制保留在原分支；
+仅下列显式新 schema 使用本节，不通过改变旧 schema、历史摘要或权限值绕过。
+
+技术输入不是 AssetVersion、Script、Shot 或生产许可。五项 scope 仍必须指向真实
+已有 Workspace/Project/Series/Episode/ProductionRun，并由权威 reader 校验归属；
+它们仅确定本次访问分区，不继承 SH09、剧本、M6/M7、Shot 或输入 AssetVersion 事实。
+新 `generationRef` 与原作业隔离，只有新技术输入和本次明确描述参与生成。
+
+版本合同：
+
+- Grant 为 `v5.generation-dispatch-grant.v3`；顶层沿用 v1 字段，version=1，
+  不接受 v2 的 replacementOf；旧 v1/v2 的校验和唯一替代合同不变。
+- subject 恰为 `{schemaVersion:v5.user-image-video-subject.v1,generationRef,inputDigest,inputImage,description,descriptionDigest,cameraInstruction,outputConstraints,executionClass,executionMethod}`。
+  inputImage 恰为 `{inputRef,contentDigest,mediaType:image/png,byteSize,width,height}`；
+  description 为非空、最多 4000 字符且无控制字符的 UTF-8 文本，其摘要来自精确字节。
+- cameraInstruction 固定 `{framing:MEDIUM_CLOSE_UP,movement:LOCKED}`，
+  executionClass / executionMethod 固定 MICRO_MOTION / SINGLE_ANCHOR_I2V。
+  outputConstraints 固定 `{mediaKind:video,mediaType:video/mp4,width:704,height:1280,durationFrames:48,frameRate:24}`；
+  原 A14B 六模型、49 原生帧 → 48 封装帧的受控编译/编码链复用，不引入第二生成栈。
+- permissions 恰为 `{dispatchAllowed:true,inputSubjectProcessingAuthorized:true,inputImageProcessingAuthorized:true}`；
+  仅作用于本次技术输入，不修改历史 InputAuthoritySubject 或 InputAssetVersion。
+- approval 沿用原闭集；actorKind=HUMAN、actorRole=AUTHORIZED_CREATOR、
+  approvalKind=USER_IMAGE_VIDEO_EXECUTION。身份来自主机可信 credential 映射，
+  客户端不能提交 actor、role、Grant、材料路径或批准对象。
+  approvalEvidenceRef/digest 指向主机安装的有界执行 policy；明确点击绑定精确输入、
+  描述、输出规格及 expectedPolicyDigest，不把普通认证本身当作执行许可。
+- materials.prerequisiteEvidence 恰为 `{inputConsent,executionPolicy,costReview}`；
+  主机 policy 必须约束 scope、credential、有效窗口、单次和总费用/次数上限、
+  已选执行配置与 backend，未配置或漂移时拒绝，不回用原 SH09 的历史预算和窗口。
+- V4 请求为 `v5.user-image-video-generation-request.v1`，不可变 version=1；
+  execution envelope 为 `v4.user-image-video-execution-envelope.v1`，Job 为 `v4.media-job.v5`。
+  精确输入、描述、五 scope、Grant/plan 摘要和 backend decision 全程绑定。
+
+在原认证边界内新增闭集 HTTP：
+
+- `GET /creator/api/v1/episode-production-runs/{runRef}/image-video-generations`：
+  projectRef/seriesRef/episodeRef 查询；返回 `{ok:true,workspace}`。
+- 同一路径 `POST`：JSON 恰为 `{projectRef,seriesRef,episodeRef,description,imageBase64,imageMediaType,idempotencyKey,expectedPolicyDigest}`；返回 `202 {ok:true,generation}`。
+- `GET /creator/api/v1/episode-production-runs/{runRef}/image-video-generations/{generationRef}`：
+  相同三项 scope 查询；返回 `{ok:true,generation}`，读进度不触发执行。
+- `GET /creator/api/v1/episode-production-runs/{runRef}/image-video-generations/{generationRef}/content`：
+  相同 scope 加 sha256；匹配成功 Job 和结果摘要后返回 video/mp4，不暴露存储路径。
+
+workspaceRef/credentialRef 只从认证上下文注入；新增 adapter 的注入为空时 503。
+上传只接受 PNG/JPEG 字节，原始解码上限 8 MiB，专用 JSON body 上限 12 MiB；
+普通 API body 上限不变。拒绝路径、URL、重复 JSON 键、未知字段及不明确 HTTP framing。
+服务验证实际图片后正规化为 PNG，不信任扩展名、声明 MIME 或浏览器验证结果。
+获主机 policy 校验的显式操作先在既有可信 literal endpoint 精确读取内容地址；
+已存在且字节、大小、摘要完全一致时只读复用，404 才允许一次
+`POST /upload/image`：固定 `acs-user-image-video/{contentDigest}.png`、overwrite=false；
+闭集返回 name/subfolder/type 必须与目标一致，随后 `GET /view` 回读验证精确摘要。
+不跟随重定向、不自动重试、不调用 /prompt；构造与 verify_current 不上传。
+新 profile 仅变正向描述、输入名称/摘要和 generationRef 唯一输出前缀；模型、负向提示、
+采样、编码和执行配置不变。当前 runtime 事实另形成新技术观察，不重写 SH09 冻结原件。
+
+每个新 generationRef 只有一个永久 Grant 槽位和一个原队列 Job；
+maxAttempts=1、maxPromptSubmissions=1、retryAllowed=false、fallbackAllowed=false。
+相同幂等键精确重放返回原记录，异输入冲突；刷新、超时、失败和 UNKNOWN 不换键重发。
+原 Operator 的 lease/consumer/SendCapability/currentness/费用检查继续位于原装配；
+上传接口不直接发送 /prompt，GET 不 issue/consume/recover。服务恢复仅查询原 Job。
+结果继续 TECHNICAL_EVIDENCE_ONLY / publicationAllowed=false，不自动准入、Master/Export。
+本节不是新付费运行窗口已安装、Grant 已签发或视频已生成的证明；现场状态另据实报告。
 
 ## 7. 两个不可变记录的原子性与 CAS
 
@@ -913,6 +981,8 @@ InputPlan、InputAssetVersion、InputAppendAuthority 和旧 v2 runtime attestati
 | 1.6 零发送失败替代 | 2026-09-15 Project Lead 授权 §8.5 狭义例外、直接回归及受保护发布 | 原记录保留，单次替代；既定真实运行仍受精确计划、时限、预算及一次提交约束 |
 | 1.7 文件枚举与新窗口 | 2026-09-15 Project Lead 授权狭义兼容修正并明确确认新的五小时窗口，其他限制不变 | 仅 §8.6 的完整证明及时间平移；不授权忽略真实进程变化或增加发送次数 |
 | 1.8 正常重启与模型枚举 | 2026-09-15 Project Lead 明确授权集中修正原 Operator、直接回归及发布后续接原 SH09 | §8.7 同服务新进程精确重绑及未选用模型新增；旧记录、当前性、唯一替代和一次提交限制保留 |
+| 1.9 原作业 UI 适配 | 2026-09-15 Project Lead 接受 SH09 技术视频并授权 Core/Frontend 发布与既有结果播放 | §6.3 原 Job 查询、明确 Operator 操作和摘要校验播放；不新建自由输入作业 |
+| 1.10 图片＋描述技术闭环 | 2026-09-15 Project Lead 明确授权最小 ADR/直接依赖修订及连续实现验证 | §6.4 新版本技术 subject、独立 Job、可信有界 policy 和认证点击；原 SH09 不变，保留费用/幂等/失败不重发，不预造现场执行或 Owner 验收 |
 
 以下 [S] 项只支持对旧仓库行为的陈述，不表示新增规范已经实现：
 
