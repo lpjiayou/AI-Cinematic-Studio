@@ -74,6 +74,54 @@ class LiveRuntimeCurrentReader:
         c.require(all(callable(p) for p in (host_observer, input_observer, tool_observer)),
             "CURRENTNESS_FENCE_UNAVAILABLE")
         self._host, self._input, self._tools = host_observer, input_observer, tool_observer
+        self._inventory_original, self._inventory_observer = None, None
+
+    def with_file_inventory_baseline(self, original, observer):
+        """Explicit host installation; neither a command option nor a trust flag.
+
+        The full pinned preimage and the current full inventory must prove the
+        comparison. The default reader remains exact. Every use re-reads both.
+        """
+        c.require(type(original) is OriginalFile and callable(observer), "RUNTIME_CHANGED")
+        reader = LiveRuntimeCurrentReader(host_observer=self._host,
+            input_observer=self._input, tool_observer=self._tools)
+        reader._inventory_original, reader._inventory_observer = original, observer
+        return reader
+
+    def assert_matches_original(self, configuration, original, observed, lease):
+        lease.assert_held()
+        if c.canonical(original) == c.canonical(observed):
+            return
+        c.require(type(observed) is dict and self._inventory_original is not None, "RUNTIME_CHANGED")
+        expected, actual = deepcopy(original), deepcopy(observed)
+        expected_digest, actual_digest = expected.pop("objectInfoDigest"), actual.pop("objectInfoDigest", None)
+        c.require(c.canonical(expected) == c.canonical(actual), "RUNTIME_CHANGED")
+        before = self._inventory_original.read()
+        after = self._inventory_observer(deepcopy(configuration), lease)
+        c.require(type(before) is dict and type(after) is dict
+            and c.digest(before) == expected_digest and c.digest(after) == actual_digest, "RUNTIME_CHANGED")
+        before, after = deepcopy(before), deepcopy(after)
+        paths = (("LoadImage", "input", "required", "image", 0),
+            ("LoadImageMask", "input", "required", "image", 0),
+            ("LoadAudio", "input", "required", "audio", 1, "options"),
+            ("LoadVideo", "input", "required", "file", 1, "options"))
+        for path in paths:
+            try:
+                old_parent, new_parent = before, after
+                for key in path[:-1]:
+                    old_parent, new_parent = old_parent[key], new_parent[key]
+                old, new = old_parent[path[-1]], new_parent[path[-1]]
+                c.require(type(old) is list and type(new) is list
+                    and all(type(v) is str and v and "\0" not in v for v in old + new), "RUNTIME_CHANGED")
+                c.require(len(set(old)) == len(old) and len(set(new)) == len(new)
+                    and [v for v in new if v in set(old)] == old, "RUNTIME_CHANGED")
+                # Only these four additive enumerations are normalized. Original
+                # observations/digests are not rewritten or represented as fresh.
+                new_parent[path[-1]] = deepcopy(old)
+            except (KeyError, IndexError, TypeError) as exc:
+                raise c.DispatchError("RUNTIME_CHANGED") from exc
+        c.require(c.canonical(before) == c.canonical(after), "RUNTIME_CHANGED")
+        lease.assert_held()
 
     def read_current(self, configuration, lease):
         from services.v4_platform.generation_dispatch_a14b_live import LIVE_RUNTIME_SCHEMA
@@ -177,7 +225,10 @@ originals. Configuration cannot substitute for either independent port.
         # The current reader returns full facts, not a trusted=True flag. It must
         # check process/launch, six model bytes or trusted immutable retention,
         # node contracts, source/input reachability and tool/host identity.
-        c.require(type(observed) is dict and c.canonical(observed) == c.canonical(facts), "RUNTIME_CHANGED")
+        c.require(type(observed) is dict, "RUNTIME_CHANGED")
+        if c.canonical(observed) != c.canonical(facts):
+            c.require(type(self._runtime_current) is LiveRuntimeCurrentReader, "RUNTIME_CHANGED")
+            self._runtime_current.assert_matches_original(value, facts, observed, lease)
         lease.assert_held()
         return RuntimeObservation(value["processIdentity"], self._runtime_file.file_sha256, original)
 

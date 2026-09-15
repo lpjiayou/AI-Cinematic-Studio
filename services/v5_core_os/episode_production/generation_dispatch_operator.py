@@ -121,7 +121,7 @@ class GenerationDispatchOperator:
         f = self._assembly.boundary._foundation
         with self._assembly.coordination.critical_section(command["workspaceRef"]) as lease:
             original = f._grant({**plan["scope"], "generationDispatchGrantRef": c.grant_ref(plan)})
-            c.validate_replacement_plan(original, plan, selected.approval)
+            f._validate_replacement_selected(original, selected)
             c.require(f.failure_reader is not None, "CURRENTNESS_FENCE_UNAVAILABLE")
             f.failure_reader.read_zero_send_failure(command["workspaceRef"], command["productionRunRef"],
                 predecessor_job_ref, original, lease)

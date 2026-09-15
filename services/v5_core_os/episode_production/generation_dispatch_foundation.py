@@ -347,7 +347,7 @@ class GenerationDispatchFoundation:
     def _replacement_proof(self, command, selected, lease):
         plan = selected.plan_package["plan"]
         original = self._grant({**plan["scope"], "generationDispatchGrantRef": c.grant_ref(plan)})
-        c.validate_replacement_plan(original, plan, selected.approval)
+        self._validate_replacement_selected(original, selected)
         terminal = self._terminal(original)
         c.require(terminal is not None, "APPROVAL_UNAVAILABLE")
         c.require(terminal["kind"] == "REVOKED", "ALREADY_CONSUMED")
@@ -364,6 +364,16 @@ class GenerationDispatchFoundation:
             "originalGrantRef": original["generationDispatchGrantRef"],
             "originalGrantDigest": original["payloadDigest"],
             "revokedTerminalDigest": terminal["payloadDigest"]}, plan)
+
+    def _validate_replacement_selected(self, original, selected):
+        plan = selected.plan_package["plan"]
+        materials = {}
+        if original["limits"] != plan["limits"]:
+            prior = self._selected(original["approval"]["authorityDecisionRef"])
+            c.require(prior.approval == original["approval"]
+                and prior.bundle_sha256 == original["issuanceEvidence"]["approvalBundleSha256"], "APPROVAL_UNAVAILABLE")
+            materials = {"original_package": prior.plan_package, "replacement_package": selected.plan_package}
+        c.validate_replacement_plan(original, plan, selected.approval, **materials)
 
     def _issue(self, command, *, replacement):
         command = c.validate_command("REPLACE_UNCONSUMED" if replacement else "ISSUE", command)
