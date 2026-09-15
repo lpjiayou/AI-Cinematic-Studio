@@ -72,6 +72,7 @@ class ImageVideoMaterialsTests(unittest.TestCase):
             "ref": "test-continuing", "digest": c.digest(self.proof_values["test-continuing"])}
         self.cost = c.sealed(self.cost)
         self.stages, self.observations = [], []
+        self.input_observations = 0
         self.output_absent, self.runtime_changed, self.tools_changed = True, False, False
         self.held = True
         self.lease = SimpleNamespace(assert_held=self.assert_held)
@@ -105,6 +106,7 @@ class ImageVideoMaterialsTests(unittest.TestCase):
         return result
 
     def input_observe(self, configuration, lease):
+        self.input_observations += 1
         source = configuration["backendProfile"]["parameters"]["input"]
         return {"inputName": source["imageName"], "contentDigest": source["contentDigest"],
             "inputRootDigest": configuration["executionConfig"]["inputRoot"]["absolutePathDigest"],
@@ -154,6 +156,7 @@ class ImageVideoMaterialsTests(unittest.TestCase):
             "comfyuiVersion": "0.35.0",
         })
         self.assertEqual(len(self.observations), 1)
+        self.assertEqual(self.input_observations, 0)
         self.assertEqual(self.stages, [])
         self.assertNotIn("endpoint", result)
         self.assertNotIn("modelFiles", result)

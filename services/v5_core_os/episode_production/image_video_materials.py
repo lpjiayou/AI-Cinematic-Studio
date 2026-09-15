@@ -146,7 +146,7 @@ class ImageVideoMaterials:
             and decision["backendProfileDigest"] == c.digest(profile)
             and value["executionConfig"]["backendRef"] == decision["backendRef"],
             "CONFIG_CHANGED")
-        facts = self._runtime.read_current(deepcopy(value), lease)
+        facts = self._runtime.read_environment(deepcopy(value), lease)
         observed_at = self._clock()
         c.utc(observed_at)
         lease.assert_held()
