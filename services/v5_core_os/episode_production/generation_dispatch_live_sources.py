@@ -132,6 +132,27 @@ class LiveRuntimeCurrentReader:
         lease.assert_held()
 
     def read_current(self, configuration, lease):
+        facts = self.read_environment(configuration, lease)
+        profile = configuration["backendProfile"]
+        source = self._input(deepcopy(configuration), lease)
+        c.exact(source, {"inputName", "contentDigest", "inputRootDigest", "outputRootDigest", "outputPrefixAbsent"})
+        c.require(source["inputName"] == profile["parameters"]["input"]["imageName"]
+            and source["contentDigest"] == profile["parameters"]["input"]["contentDigest"]
+            and source["inputRootDigest"] == configuration["executionConfig"]["inputRoot"]["absolutePathDigest"]
+            and source["outputRootDigest"] == configuration["executionConfig"]["artifactRoot"]["absolutePathDigest"]
+            and type(source["outputPrefixAbsent"]) is bool, "SOURCE_CHANGED")
+        c.require(c.canonical(self._tools()) == c.canonical(profile["parameters"]["postprocess"]["toolIdentity"]),
+            "RUNTIME_CHANGED")
+        lease.assert_held()
+        return facts
+
+    def read_environment(self, configuration, lease):
+        """Observe the runtime without requiring a generation input to exist.
+
+        Environment status is available before a user stages an image. The full
+        execution currentness fence remains in ``read_current`` and still checks
+        the selected input plus encoding tools before any generation work.
+        """
         from services.v4_platform.generation_dispatch_a14b_live import LIVE_RUNTIME_SCHEMA
         from services.v4_platform.comfyui_a14b_runtime import validate_a14b_runtime_attestation
         lease.assert_held()
@@ -144,16 +165,6 @@ class LiveRuntimeCurrentReader:
                 execution_config=configuration["executionConfig"])
         except (ValueError, KeyError, TypeError) as exc:
             raise c.DispatchError("RUNTIME_CHANGED") from exc
-        profile = configuration["backendProfile"]
-        source = self._input(deepcopy(configuration), lease)
-        c.exact(source, {"inputName", "contentDigest", "inputRootDigest", "outputRootDigest", "outputPrefixAbsent"})
-        c.require(source["inputName"] == profile["parameters"]["input"]["imageName"]
-            and source["contentDigest"] == profile["parameters"]["input"]["contentDigest"]
-            and source["inputRootDigest"] == configuration["executionConfig"]["inputRoot"]["absolutePathDigest"]
-            and source["outputRootDigest"] == configuration["executionConfig"]["artifactRoot"]["absolutePathDigest"]
-            and type(source["outputPrefixAbsent"]) is bool, "SOURCE_CHANGED")
-        c.require(c.canonical(self._tools()) == c.canonical(profile["parameters"]["postprocess"]["toolIdentity"]),
-            "RUNTIME_CHANGED")
         lease.assert_held()
         return facts
 

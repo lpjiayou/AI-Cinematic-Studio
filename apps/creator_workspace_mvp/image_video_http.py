@@ -18,6 +18,7 @@ from .public_contract import PUBLIC_EPISODE_PRODUCTION_RUNS_ENDPOINT
 
 
 IMAGE_VIDEO_RESOURCE = "image-video-generations"
+RUNTIME_ENVIRONMENT_RESOURCE = "runtime-environment"
 MAX_IMAGE_VIDEO_REQUEST_BYTES = 12 * 1024 * 1024
 IMAGE_VIDEO_BODY_TIMEOUT_SECONDS = 15
 _SCOPE_FIELDS = frozenset({"projectRef", "seriesRef", "episodeRef"})
@@ -103,9 +104,9 @@ def handle_image_video(handler, parsed):
                 or (len(parts) == 4 and parts[3] != "content")):
             raise GenerationWorkspaceError("not_found", 404)
         run_ref = _reference(unquote(parts[0], errors="strict"))
-        generation_ref = (
-            _reference(unquote(parts[2], errors="strict")) if len(parts) >= 3 else None
-        )
+        environment_request = len(parts) == 3 and parts[2] == RUNTIME_ENVIRONMENT_RESOURCE
+        generation_ref = (_reference(unquote(parts[2], errors="strict"))
+            if len(parts) >= 3 and not environment_request else None)
         if handler.command not in {"GET", "POST"} or (
                 handler.command == "POST" and len(parts) != 2):
             raise GenerationWorkspaceError("method_not_allowed", 405)
@@ -139,6 +140,10 @@ def handle_image_video(handler, parsed):
         elif len(parts) == 2:
             handler._send_json(200, {
                 "ok": True, "workspace": boundary.workspace(scope, credential_ref),
+            })
+        elif environment_request:
+            handler._send_json(200, {
+                "ok": True, "environment": boundary.environment(scope, credential_ref),
             })
         elif len(parts) == 3:
             handler._send_json(200, {

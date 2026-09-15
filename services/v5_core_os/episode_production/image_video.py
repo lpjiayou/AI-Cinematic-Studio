@@ -150,6 +150,7 @@ class ImageVideoRuntime:
         self.evidence, self.root, self.coordination, self.clock = evidence, root, coordination, clock
         self.scope = deepcopy(self.policy["scope"])
         self._lock, self._thread, self._active = RLock(), None, None
+        self._display_lock, self._display = RLock(), None
         self._pending_materials = {}
         self.operator = None
         # These interfaces are injected as original controlled source ports.
@@ -342,24 +343,90 @@ class ImageVideoRuntime:
             "errorCode": failure["payload"]["errorCode"] if failure else ((job or {}).get("dispatchResult") or {}).get("failureCode"),
             "artifact": artifact, "publicationAllowed": False, "automaticRetryAllowed": False}
 
+    def _cache_progress(self, lease):
+        # Display-only preimage of already committed INPUT/Job facts. This is
+        # never consumed by a write, approval, budget or execution decision.
+        lease.assert_held()
+        generations = [self._projection(row["recordRef"]) for row in self._inputs()]
+        with self._display_lock:
+            self._display = deepcopy(generations)
+
+    def _read_progress(self):
+        # This short lock is ALWAYS released before waiting for a workspace
+        # gate. The worker can publish while owning that gate without inversion.
+        with self._display_lock:
+            return deepcopy(self._display)
+
+    def _workspace_view(self, generations, *, available, reason):
+        limits = self.policy["limits"]
+        return {"schemaVersion": "creator.image-video-workspace.v1",
+            **{k: v for k, v in self.scope.items() if k != "workspaceRef"},
+            "policy": {"policyDigest": self.policy["payloadDigest"], "maxInputBytes": MAX_INPUT,
+                "maxDescriptionChars": 1000, "output": {k: OUTPUT[k] for k in ("width", "height", "durationFrames", "frameRate")},
+                "maxCostMinor": limits["maxCostMinor"], "currency": "CNY", "executionTimeoutSeconds": limits["executionTimeoutSeconds"]},
+            "available": available, "reason": reason, "generations": generations}
+
     def workspace(self, scope, credential_ref):
         self._auth(scope, credential_ref)
-        with self._lock, self.coordination.critical_section(scope["workspaceRef"]) as lease:
-            self._parents(lease)
-            generations = [self._projection(row["recordRef"]) for row in self._inputs()]
+        generations = self._read_progress()
+        if generations is not None:
+            return self._workspace_view(generations, available=False, reason="generation_already_active")
+        with self._lock:
+            # Creation may have published progress while this reader waited
+            # for _lock. Recheck before acquiring the long generation gate.
+            generations = self._read_progress()
+            if generations is not None:
+                return self._workspace_view(generations, available=False, reason="generation_already_active")
+            with self.coordination.critical_section(scope["workspaceRef"]) as lease:
+                self._parents(lease)
+                generations = [self._projection(row["recordRef"]) for row in self._inputs()]
+                try:
+                    self._current_policy()
+                    self._capacity(generations)
+                    available, reason = True, None
+                except (c.DispatchError, GenerationWorkspaceError) as exc:
+                    available, reason = False, exc.code
+                return self._workspace_view(generations, available=available, reason=reason)
+
+    def environment(self, scope, credential_ref):
+        """Project a sanitized runtime status without creating execution facts."""
+        self._auth(scope, credential_ref)
+        operator_state = "READY" if self.operator is not None else "UNAVAILABLE"
+        queue = {"state": "UNAVAILABLE", "runningCount": None, "pendingCount": None}
+        if self.operator is not None:
             try:
-                self._current_policy()
-                self._capacity(generations)
-                available, reason = True, None
-            except (c.DispatchError, GenerationWorkspaceError) as exc:
-                available, reason = False, exc.code
-            limits = self.policy["limits"]
-            return {"schemaVersion": "creator.image-video-workspace.v1",
-                **{k: v for k, v in scope.items() if k != "workspaceRef"},
-                "policy": {"policyDigest": self.policy["payloadDigest"], "maxInputBytes": MAX_INPUT,
-                    "maxDescriptionChars": 1000, "output": {k: OUTPUT[k] for k in ("width", "height", "durationFrames", "frameRate")},
-                    "maxCostMinor": limits["maxCostMinor"], "currency": "CNY", "executionTimeoutSeconds": limits["executionTimeoutSeconds"]},
-                "available": available, "reason": reason, "generations": generations}
+                jobs = self.operator._coordinator.repository.list(
+                    self.scope["workspaceRef"], self.scope["productionRunRef"])
+                running = sum(job.get("state") in {"LEASED", "RUNNING"} for job in jobs)
+                pending = sum(job.get("state") == "QUEUED" for job in jobs)
+                queue = {"state": "BUSY" if running or pending else "IDLE",
+                    "runningCount": running, "pendingCount": pending}
+            except (c.DispatchError, GenerationWorkspaceError):
+                pass
+
+        observed_at = None
+        runtime_state = "UNAVAILABLE"
+        observer = getattr(self.material_port, "read_environment", None)
+        if callable(observer):
+            try:
+                with self.coordination.critical_section(scope["workspaceRef"]) as lease:
+                    self._parents(lease)
+                    observed = observer(lease)
+                c.exact(observed, {"observedAt", "evidenceClass", "gpuCount",
+                    "deviceType", "comfyuiVersion"})
+                c.utc(observed["observedAt"])
+                c.require(observed["evidenceClass"] == "CURRENT_RUNTIME_OBSERVATION"
+                    and observed["gpuCount"] == 1 and observed["deviceType"] == "cuda"
+                    and type(observed["comfyuiVersion"]) is str
+                    and bool(observed["comfyuiVersion"]), "RUNTIME_CHANGED")
+                observed_at, runtime_state = observed["observedAt"], "CONNECTED"
+            except (c.DispatchError, GenerationWorkspaceError):
+                pass
+        return {"schemaVersion": "creator.runtime-environment.v1",
+            **{key: value for key, value in self.scope.items() if key != "workspaceRef"},
+            "observedAt": observed_at, "core": "CONNECTED",
+            "operator": operator_state, "gpu": runtime_state,
+            "comfyui": runtime_state, "queue": queue, "readOnly": True}
 
     def _capacity(self, generations):
         inputs = [row for row in self._inputs() if row["payload"]["input"]["policyDigest"] == self.policy["payloadDigest"]]
@@ -414,11 +481,14 @@ class ImageVideoRuntime:
             self._append(INPUT, reference, {"schemaVersion": "v5.user-image-video-input.v1", "input": meta,
                 "pngBase64": base64.b64encode(png).decode("ascii"), "createdAt": created}, key, request_digest)
             self._active = reference
+            self._cache_progress(lease)
             self._thread = Thread(target=self._work, args=(reference,), name="creator-image-video-operator", daemon=False)
             try:
                 self._thread.start()
             except Exception:
                 self._active, self._thread = None, None
+                with self._display_lock:
+                    self._display = None
                 self._failure(reference, "generation_start_failed")
             return self._projection(reference)
 
@@ -477,6 +547,7 @@ class ImageVideoRuntime:
                 c.require("grant" in issued, issued.get("code", "APPROVAL_UNAVAILABLE"))
                 routed = operator.route(issued["grant"]["generationDispatchGrantRef"])
                 job_ref = routed["queuedJobs"][0]["mediaJobRef"]
+                self._cache_progress(lease)
             # No workspace lock over GPU wait; original Executor owns claim and
             # L1/L2 fences. Thread supervision is not another queue/authority.
             operator.execute_one(job_ref)
@@ -492,14 +563,37 @@ class ImageVideoRuntime:
             with self._lock:
                 self._pending_materials.pop(generation_ref, None)
                 self._active = None
+                with self._display_lock:
+                    self._display = None
 
     def get(self, scope, credential_ref, generation_ref):
         self._auth(scope, credential_ref)
-        with self._lock, self.coordination.critical_section(scope["workspaceRef"]):
-            try:
-                return self._projection(generation_ref)
-            except c.DispatchError as exc:
-                raise GenerationWorkspaceError("generation_result_not_found", 404) from exc
+        try:
+            c.ref(generation_ref)
+        except c.DispatchError as exc:
+            raise GenerationWorkspaceError("generation_result_not_found", 404) from exc
+
+        def progress():
+            generations = self._read_progress()
+            if generations is None:
+                return None
+            for value in generations:
+                if value["generationRef"] == generation_ref:
+                    return value
+            raise GenerationWorkspaceError("generation_result_not_found", 404)
+
+        value = progress()
+        if value is not None:
+            return value
+        with self._lock:
+            value = progress()
+            if value is not None:
+                return value
+            with self.coordination.critical_section(scope["workspaceRef"]):
+                try:
+                    return self._projection(generation_ref)
+                except c.DispatchError as exc:
+                    raise GenerationWorkspaceError("generation_result_not_found", 404) from exc
 
     def content(self, scope, credential_ref, generation_ref, sha256):
         self._auth(scope, credential_ref)

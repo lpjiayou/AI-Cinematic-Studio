@@ -10,7 +10,7 @@ from copy import deepcopy
 from hashlib import sha256
 from pathlib import Path
 from tempfile import TemporaryDirectory
-from threading import Barrier, Thread
+from threading import Barrier, Event, Thread
 from types import SimpleNamespace
 from uuid import uuid4
 import unittest
@@ -36,7 +36,7 @@ class ImageVideoOperatorTests(unittest.TestCase):
         cls.tools = encoder_tool_identity()
         cls.frames = tuple(synthetic_png(index) for index in range(49))
 
-    def fixture(self, server, *, stage_failure=False, max_generations=4, total_cost=4000):
+    def fixture(self, server, *, stage_failure=False, max_generations=4, total_cost=4000, stage_events=None):
         temporary = TemporaryDirectory(prefix="test-image-video-material-port-")
         self.addCleanup(temporary.cleanup)
         root = Path(temporary.name)
@@ -62,6 +62,11 @@ class ImageVideoOperatorTests(unittest.TestCase):
 
             def stage(config, raw, lease):
                 lease.assert_held()
+                if stage_events is not None:
+                    entered, release = stage_events
+                    entered.set()
+                    if not release.wait(10):
+                        raise AssertionError("fixture staging release was not signalled")
                 if stage_failure:
                     raise c.DispatchError("SOURCE_CHANGED")
                 name = config["backendProfile"]["parameters"]["input"]["imageName"]
@@ -119,6 +124,14 @@ class ImageVideoOperatorTests(unittest.TestCase):
             runtime = fixture.operator.image_video_boundary()
             old_job = deepcopy(fixture.job)
             original_package = deepcopy(fixture.operator._selected().plan_package)
+            environment = runtime.environment(fixture.scope, "test-ui-writer")
+            self.assertEqual((environment["core"], environment["operator"],
+                environment["gpu"], environment["comfyui"]),
+                ("CONNECTED", "READY", "CONNECTED", "CONNECTED"))
+            self.assertEqual(environment["queue"], {
+                "state": "BUSY", "runningCount": 0, "pendingCount": 1})
+            self.assertTrue(environment["readOnly"])
+            self.assertEqual(server.complete_post_count, 0)
             command = self.command(runtime)
             created = runtime.create(fixture.scope, "test-ui-writer", command)
             result = self.finish(fixture, created)
@@ -168,6 +181,68 @@ class ImageVideoOperatorTests(unittest.TestCase):
             self.assertEqual(result["state"], "UNKNOWN", result)
             self.assertEqual(len(runtime.workspace(fixture.scope, "test-ui-writer")["generations"]), 1)
             self.assertEqual(server.complete_post_count, 1)
+
+    def test_progress_reads_during_blocked_prepare_and_send_then_return_durable_terminal(self):
+        entered, release = Event(), Event()
+        with LoopbackComfyUI(frames=self.frames, output_node="41", start_number=1,
+                block_response=True) as server:
+            fixture = self.fixture(server, stage_events=(entered, release))
+            runtime = fixture.operator.image_video_boundary()
+            old_job = deepcopy(fixture.job)
+            results, failures = [], []
+
+            def read_progress():
+                done = Event()
+                def read():
+                    try:
+                        results.append((runtime.get(fixture.scope, "test-ui-writer", created["generationRef"]),
+                            runtime.workspace(fixture.scope, "test-ui-writer")))
+                    except Exception as exc:
+                        failures.append(exc)
+                    finally:
+                        done.set()
+                reader = Thread(target=read)
+                reader.start()
+                try:
+                    self.assertTrue(done.wait(1), "progress read waited for slow external preparation/execution")
+                finally:
+                    if not done.is_set():
+                        release.set()
+                        server.release_response.set()
+                    reader.join(10)
+                self.assertFalse(reader.is_alive())
+                self.assertEqual(failures, [])
+                view, workspace = results[-1]
+                self.assertFalse(workspace["available"])
+                self.assertEqual(workspace["reason"], "generation_already_active")
+                self.assertEqual(workspace["generations"], [view])
+                return view
+
+            try:
+                created = runtime.create(fixture.scope, "test-ui-writer", self.command(runtime))
+                self.assertTrue(entered.wait(10))
+                self.assertEqual(read_progress(), created)
+                self.assertFalse(release.is_set())
+                release.set()
+                self.assertTrue(server.accepted.wait(20), "original Operator must reach its single fixture-owned submission")
+                routed = read_progress()
+                self.assertEqual(routed["state"], "QUEUED")
+                self.assertIsNotNone(routed["mediaJobRef"])
+                self.assertNotEqual(routed["mediaJobRef"], old_job["jobRef"])
+                self.assertEqual(server.complete_post_count, 1)
+            finally:
+                release.set()
+                server.release_response.set()
+                runtime.close()
+            final = runtime.get(fixture.scope, "test-ui-writer", created["generationRef"])
+            self.assertEqual((final["state"], final["attemptCount"]), ("SUCCEEDED", 1), final)
+            self.assertEqual(final["mediaJobRef"], routed["mediaJobRef"])
+            self.assertEqual(runtime.workspace(fixture.scope, "test-ui-writer")["generations"], [final])
+            self.assertEqual((server.complete_post_count, server.view_count), (1, 49))
+            self.assertEqual(len(runtime._inputs()), 1)
+            self.assertEqual(fixture.operator._coordinator.repository.get(fixture.scope["workspaceRef"],
+                fixture.scope["productionRunRef"], old_job["jobRef"]), old_job)
+            print("IMAGE_VIDEO_PROGRESS_CPU: prepare_event=PASS send_event=PASS nonblocking_reads=PASS durable_terminal=PASS original_job_unchanged=PASS prompt=1")
 
     def test_same_key_different_image_conflicts_without_second_attempt(self):
         with LoopbackComfyUI(output_node="41") as server:
