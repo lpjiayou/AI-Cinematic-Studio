@@ -26,16 +26,19 @@ def open_generation_workspace_server(*, deployment, media_job_ref, public_authen
         participants = operator.public_boundaries()
         workspace = GenerationWorkspaceBoundary(operator=operator, media_job_ref=media_job_ref,
             run_reader=participants["episode_production_boundary"], allowed_credential_refs=allowed_credential_refs)
+        image_video = operator.image_video_boundary()
         server = None
         try:
             server = create_server(address, object(), **participants,
                 public_authenticator=public_authenticator, allow_internal_routes=False,
-                generation_workspace_boundary=workspace, generation_only=True)
+                generation_workspace_boundary=workspace, image_video_boundary=image_video, generation_only=True)
             yield server
         finally:
             if server is not None:
                 server.server_close()
             workspace.close()
+            if image_video is not None:
+                image_video.close()
 
 
 def execute_command(operator, operation, target_ref=None):

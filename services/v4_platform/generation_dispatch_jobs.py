@@ -31,6 +31,10 @@ def create_generation_dispatch_job(coordinator, *, verified_grant, request, enve
     The Grant is not an operator command and this function is not a public route.
     It binds and reserves only; original repository.create owns durability/replay.
     """
+    from .image_video_execution import USER_IMAGE_VIDEO_REQUEST_SCHEMA
+    if request.get("schemaVersion") == USER_IMAGE_VIDEO_REQUEST_SCHEMA:
+        return _create_user_image_video_job(coordinator, verified_grant=verified_grant,
+            request=request, envelope=envelope)
     _validate_method_aware_video_request(request)
     if request["schemaVersion"] != DISPATCH_REQUEST_SCHEMA:
         raise MediaJobError("Grant-bound request v2 is required")
@@ -82,6 +86,39 @@ def create_generation_dispatch_job(coordinator, *, verified_grant, request, enve
         "executionContext": {"sourceText": envelope["semanticIntent"]["sourceAction"]["sourceText"],
             "outputConstraints": deepcopy(envelope["outputConstraints"])},
         "executionEnvelope": deepcopy(envelope), "dispatchGrantBinding": binding}
+    return coordinator.repository.create(job)
+
+
+def _create_user_image_video_job(coordinator, *, verified_grant, request, envelope):
+    """The new subject has its own closed shape, not a forged Shot/InputPlan."""
+    from .image_video_execution import (USER_IMAGE_VIDEO_JOB_SCHEMA,
+        build_user_image_video_request, build_user_image_video_envelope,
+        validate_user_image_video_request, validate_user_image_video_envelope)
+    request = validate_user_image_video_request(request)
+    envelope = validate_user_image_video_envelope(envelope, request)
+    expected = build_user_image_video_request(verified_grant,
+        generation_request_ref=request["generationRequestRef"])
+    expected_envelope = build_user_image_video_envelope(expected,
+        verified_grant["executionBinding"]["backendDecision"])
+    if request != expected or envelope != expected_envelope:
+        raise BackendValidationError("technical request is not the exact V5-verified Grant subject")
+    now = coordinator._clock()
+    job = {"schemaVersion": USER_IMAGE_VIDEO_JOB_SCHEMA,
+        "workspaceRef": verified_grant["workspaceRef"],
+        "productionRunRef": verified_grant["productionRunRef"],
+        "jobRef": coordinator._ref_factory("media-job"),
+        "idempotencyKey": internal_dispatch_key(verified_grant["workspaceRef"],
+            verified_grant["productionRunRef"], verified_grant["generationDispatchGrantRef"]),
+        "requestDigest": request["payloadDigest"], "request": deepcopy(request),
+        "state": "QUEUED", "revision": 0, "attempts": [], "lease": None,
+        "artifact": None, "artifactCommitIntent": None, "dispatchResult": None,
+        "maxAttempts": 1, "executionScope": "SINGLE_EPISODE", "batchProductionAllowed": False,
+        "createdAt": now, "updatedAt": now,
+        "backendBinding": deepcopy(envelope["backendBinding"]),
+        "executionContext": {"sourceText": request["description"],
+            "outputConstraints": deepcopy(request["outputConstraints"])},
+        "executionEnvelope": deepcopy(envelope),
+        "dispatchGrantBinding": deepcopy(request["dispatchGrantBinding"])}
     return coordinator.repository.create(job)
 
 

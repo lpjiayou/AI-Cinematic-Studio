@@ -125,6 +125,34 @@ class IntegrationShardingTests(unittest.TestCase):
         self.assertIn("  schedule:\n    - cron: '19 19 * * *'", workflow)
         self.assertNotIn("  push:", workflow)
 
+    def test_image_video_integration_is_registered_without_extending_shard_limit(self):
+        assigned = sum(INTEGRATION_SHARDS.values(), ())
+        self.assertEqual(1, assigned.count("tests/integration/test_image_video_operator.py"))
+        self.assertEqual(6, len(INTEGRATION_SHARDS))
+        self.assertEqual(1200, runner.INTEGRATION_SHARD_LIMIT_SECONDS)
+
+    def test_image_dependency_is_pinned_and_installed_only_for_code_discovery(self):
+        dependency = Path("requirements-image-video.txt").read_text(encoding="utf-8")
+        self.assertEqual("Pillow==12.3.0", dependency.strip())
+        workflow = Path(".github/workflows/repository-validation.yml").read_text(encoding="utf-8")
+        jobs = dict(re.findall(r"^  ([a-z-]+):\n(.*?)(?=^  [a-z-]+:\n|\Z)",
+            workflow.split("jobs:\n", 1)[1], flags=re.MULTILINE | re.DOTALL))
+        install = (
+            "      - name: Install bounded image/video Python dependency\n"
+            "        if: env.CI_SCOPE != 'DOCS_ONLY'\n"
+            "        shell: bash\n"
+            "        run: python -m pip install --disable-pip-version-check -r requirements-image-video.txt\n"
+        )
+        for job in ("unit-tests", "contract-tests", "integration-shards", "integration-tests"):
+            with self.subTest(job=job):
+                self.assertEqual(1, jobs[job].count(install))
+                self.assertLess(jobs[job].index(install), jobs[job].index("      - name: Record setup timing"))
+        for job in ("markdown", "documentation-links"):
+            self.assertNotIn("requirements-image-video.txt", jobs[job])
+        payload = classify_records("pull_request", "1" * 40, "2" * 40,
+            [ChangedFile("A", None, "requirements-image-video.txt", "000000", "100644")]).payload
+        self.assertEqual(FULL_SUITE, payload["classification"])
+
 
 class AffectedIntegrationRunnerTests(unittest.TestCase):
     def payload(self):

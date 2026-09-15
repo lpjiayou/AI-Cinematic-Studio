@@ -2,7 +2,8 @@
 
 Protocol checked against ComfyUI commit
 a7b1d39d342d102f305797fb5ba12dc304d9c1f5 (server.py / execution.py).
-Only POST /prompt, GET /history/<exact UUID>, and GET /view are implemented.
+POST /prompt, GET /history/<exact UUID>, GET /view and the explicitly authorized
+technical input upload are implemented; input upload cannot submit a workflow.
 HTTPConnection has no environment proxy, redirect or request retry machinery.
 """
 from __future__ import annotations
@@ -404,6 +405,110 @@ class ComfyUIStagedTransport:
             return body
         finally:
             connection.close()
+
+    def upload_input_png(self, png_bytes: bytes, content_digest: str, *,
+                         deadline_monotonic: float, authorize) -> dict:
+        """Stage one exact input on this already trusted endpoint, never /prompt.
+
+        The internal host supplies the held policy/coordination authorization
+        callback. It is deliberately separate from the one-shot SendCapability;
+        permission to upload bytes never grants permission to execute a workflow.
+        No retry, redirect, environment proxy or overwrite is introduced here.
+        """
+        from .generation_dispatch_live_result import _validate_png
+        import struct
+        if (os.getpid() != self._pid or not callable(authorize)
+                or type(deadline_monotonic) not in {int, float}
+                or not math.isfinite(deadline_monotonic)
+                or type(png_bytes) is not bytes or not 33 <= len(png_bytes) <= 8 * 1024 * 1024):
+            raise ValueError("technical input staging is not authorized or bounded")
+        _sha(content_digest)
+        if sha256(png_bytes).hexdigest() != content_digest:
+            raise ValueError("technical input content digest mismatch")
+        width, height = struct.unpack_from(">II", png_bytes, 16)
+        if not (1 <= width <= 16384 and 1 <= height <= 16384 and width * height <= 16_777_216):
+            raise ValueError("technical input pixel dimensions exceed bound")
+        _validate_png(png_bytes, width, height)
+        deadline = min(deadline_monotonic,
+            time.monotonic() + self._binding.timeouts["requestTimeoutMs"] / 1000)
+        if deadline <= time.monotonic():
+            raise ValueError("technical input staging deadline expired")
+        filename, folder = content_digest + ".png", "acs-user-image-video"
+        # A random framing token, not an input locator or authorization token.
+        boundary = "acs-input-" + uuid4().hex
+        pieces = []
+        for name, value in (("type", "input"), ("subfolder", folder), ("overwrite", "false")):
+            pieces.append((f"--{boundary}\r\nContent-Disposition: form-data; name=\"{name}\"\r\n\r\n{value}\r\n").encode("ascii"))
+        pieces.extend([
+            (f"--{boundary}\r\nContent-Disposition: form-data; name=\"image\"; filename=\"{filename}\"\r\nContent-Type: image/png\r\n\r\n").encode("ascii"),
+            png_bytes, (f"\r\n--{boundary}--\r\n").encode("ascii"),
+        ])
+        body = b"".join(pieces)
+        connection = None
+        try:
+            # Content-addressed inputs can be shared by independent Jobs. A
+            # successful byte-exact read is reuse, not an upload retry. Only an
+            # explicit 404 permits the single creation attempt below.
+            view_path = "/view?" + urlencode({
+                "filename": filename, "subfolder": folder, "type": "input",
+            })
+            authorize("INPUT_LOOKUP")
+            connection = self._connection(deadline, self._binding.timeouts["connectionTimeoutMs"])
+            connection.connect()
+            authorize("INPUT_LOOKUP_READ")
+            self._timeout(connection, deadline)
+            connection.putrequest("GET", view_path, skip_accept_encoding=True)
+            connection.putheader("Connection", "close")
+            connection.endheaders()
+            status, existing = self._read_body(connection, deadline=deadline,
+                max_bytes=len(png_bytes), expected_media_type="image/png")
+            connection.close()
+            connection = None
+            if status == 200:
+                if len(existing) != len(png_bytes) or sha256(existing).hexdigest() != content_digest:
+                    raise ValueError("existing technical input differs")
+                authorize("INPUT_VERIFIED")
+                return {"inputName": folder + "/" + filename, "contentDigest": content_digest,
+                    "mediaType": "image/png", "byteSize": len(png_bytes)}
+            if status != 404:
+                raise ValueError("technical input existence could not be verified")
+            authorize("INPUT_CONNECT")
+            connection = self._connection(deadline, self._binding.timeouts["connectionTimeoutMs"])
+            connection.connect()
+            self._timeout(connection, deadline)
+            authorize("INPUT_WRITE")
+            self._timeout(connection, deadline)
+            connection.putrequest("POST", "/upload/image", skip_accept_encoding=True)
+            connection.putheader("Content-Type", "multipart/form-data; boundary=" + boundary)
+            connection.putheader("Content-Length", str(len(body)))
+            connection.putheader("Connection", "close")
+            connection.endheaders()
+            self._timeout(connection, deadline)
+            connection.send(body)
+            status, raw = self._read_body(connection, deadline=deadline,
+                max_bytes=8192, expected_media_type="application/json")
+            if status != 200:
+                raise ValueError("technical input staging response failed")
+            received = _exact(_json(raw), {"name", "subfolder", "type"})
+            if received != {"name": filename, "subfolder": folder, "type": "input"}:
+                raise ValueError("technical input server renamed or changed its target")
+            connection.close()
+            connection = None
+            authorize("INPUT_VERIFY")
+            readback = self._get(view_path, deadline=deadline,
+                max_bytes=len(png_bytes), media_type="image/png")
+            if len(readback) != len(png_bytes) or sha256(readback).hexdigest() != content_digest:
+                raise ValueError("technical input readback mismatch")
+            authorize("INPUT_VERIFIED")
+            return {"inputName": folder + "/" + filename, "contentDigest": content_digest,
+                "mediaType": "image/png", "byteSize": len(png_bytes)}
+        except Exception:
+            # An upload may have landed even when the response is unknown. Never
+            # retry it automatically, and never confuse that fact with /prompt.
+            raise ValueError("technical input staging unavailable; no automatic retry") from None
+        finally:
+            if connection is not None:
+                connection.close()
 
     def _history(self, exchange: _Exchange) -> dict:
         prompt_id = validate_prompt_id(exchange.provider_prompt_id)

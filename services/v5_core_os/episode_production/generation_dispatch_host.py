@@ -27,12 +27,16 @@ class D1OperatorHost:
             runtime_original=None, runtime_current=None, cost_owner=None,
             prerequisite_originals=None, prerequisite_verifiers=None,
             approval_original=None, approval_evidence=None, approval_reader=None,
-            store_arguments=None):
+            store_arguments=None, image_video_installation=None):
         c.require(type(configuration) is OriginalFile and type(input_image) is OriginalFile,
             "CONFIG_CHANGED")
         c.require(selection is None or type(selection) is OperatorSelection, "APPROVAL_UNAVAILABLE")
         if selection is not None:
             selection.validate()
+        if image_video_installation is not None:
+            from .image_video import ImageVideoInstallation
+            c.require(type(image_video_installation) is ImageVideoInstallation, "CONFIG_CHANGED")
+            image_video_installation.validate()
         self.configuration, self.input_image = configuration, input_image
         self.selection = deepcopy(selection)
         self.runtime_original, self.runtime_current = runtime_original, runtime_current
@@ -42,6 +46,7 @@ class D1OperatorHost:
         self.approval_original, self.approval_evidence = approval_original, approval_evidence
         self.approval_reader = approval_reader
         self.store_arguments = dict(store_arguments or {})
+        self.image_video_installation = image_video_installation
 
     def _missing(self):
         missing = []
@@ -115,13 +120,14 @@ class D1OperatorHost:
         prerequisites = PinnedPrerequisiteOriginals(originals=self.originals, verifiers=self.verifiers,
             approval_original=self.approval_original, approval_evidence=self.approval_evidence)
         forbidden = {"selection", "approval_reader", "prerequisite_reader", "material_reader",
-            "backend_reader", "runtime_reader", "cost_reader"}
+            "backend_reader", "runtime_reader", "cost_reader", "image_video_installation"}
         c.require(not forbidden.intersection(self.store_arguments), "CONFIG_CHANGED")
         return ExistingStoreOperatorDeployment(**self.store_arguments, selection=self.selection,
             approval_reader=self.approval_reader, prerequisite_reader=prerequisites,
             material_reader=materials, backend_reader=SimpleNamespace(read_current=materials.backend),
             runtime_reader=SimpleNamespace(read_current=materials.runtime),
-            cost_reader=SimpleNamespace(read_current=materials.cost))
+            cost_reader=SimpleNamespace(read_current=materials.cost),
+            image_video_installation=self.image_video_installation)
 
     @contextmanager
     def open(self):

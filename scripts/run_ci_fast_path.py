@@ -59,6 +59,7 @@ INTEGRATION_SHARDS: dict[str, tuple[str, ...]] = {
         "tests/integration/test_m13_v3_media_conformance.py",
         "tests/integration/test_creator_narrative_currentness_m7.py",
         "tests/integration/test_ai_director_project_draft_flow.py",
+        "tests/integration/test_image_video_operator.py",
     ),
     "shard-2": (
         "tests/integration/test_generation_dispatch_a14b_cpu.py",

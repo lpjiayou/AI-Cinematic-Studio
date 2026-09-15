@@ -8,6 +8,7 @@ import json
 from pathlib import Path
 import sys
 import unittest
+from unittest.mock import patch
 
 from apps.creator_workspace_mvp import public_contract
 from services.v4_platform import isolated_speech_runtime as runtime_contract
@@ -973,6 +974,29 @@ class M12IsolatedSpeechManifestAndResponseTests(unittest.TestCase):
 
 
 class M12IsolatedSpeechArchitectureCensusTests(unittest.TestCase):
+    def _assert_dependency_manifest_census(self, dependency_manifests):
+        # ADR-0022's bounded CPU image decoding is not an M12 speech engine.
+        # This exact manifest/pin is the sole exception; the M12 runtime AST
+        # checks below still allow only standard-library and Core imports.
+        self.assertEqual(dependency_manifests, {"requirements-image-video.txt"})
+        self.assertEqual(
+            (ROOT / "requirements-image-video.txt").read_text(encoding="utf-8"),
+            "Pillow==12.3.0\n",
+        )
+
+    def test_dependency_manifest_exception_rejects_unknown_or_changed_dependencies(self):
+        accepted = {"requirements-image-video.txt"}
+        for manifests in (set(), {"requirements.txt"}, accepted | {"requirements.txt"},
+                          accepted | {"services/v4_platform/pyproject.toml"}):
+            with self.subTest(manifests=sorted(manifests)), self.assertRaises(AssertionError):
+                self._assert_dependency_manifest_census(manifests)
+        for payload in ("", "Pillow==12.2.0\n", "Pillow>=12.3.0\n",
+                        "Pillow==12.3.0\ntorch==2.0.0\n",
+                        "Pillow==12.3.0\nPillow==12.3.0\n"):
+            with self.subTest(payload=payload), patch.object(Path, "read_text", return_value=payload):
+                with self.assertRaises(AssertionError):
+                    self._assert_dependency_manifest_census(accepted)
+
     def test_core_production_import_graph_contains_no_ml_packages(self):
         forbidden = {
             "torch",
@@ -1052,7 +1076,7 @@ class M12IsolatedSpeechArchitectureCensusTests(unittest.TestCase):
             )
             and ".git" not in path.parts
         }
-        self.assertEqual(dependency_manifests, set())
+        self._assert_dependency_manifest_census(dependency_manifests)
 
     def test_no_creator_http_runtime_route_was_added(self):
         routes = {

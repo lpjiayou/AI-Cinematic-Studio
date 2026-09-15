@@ -114,6 +114,9 @@ class HostInputBindingTests(unittest.TestCase):
         selection = args.pop("selection")
         for key in ("backend_reader", "runtime_reader", "cost_reader"):
             args.pop(key)
+        # This is the historical PREPARE-only fixture, not an installed new-input
+        # host. The optional port must never be smuggled through store bindings.
+        self.assertIsNone(args.pop("image_video_installation"))
         cost = f.external.template["materials"]["costBasis"]
         raw = c.canonical(cost)
         path = f.root / "test-host-cost-basis.json"
@@ -178,3 +181,19 @@ class HostInputBindingTests(unittest.TestCase):
             with self.assertRaises(c.DispatchError) as stopped:
                 host.deployment()
         self.assertEqual(stopped.exception.code, "CURRENTNESS_FENCE_UNAVAILABLE")
+
+    def test_host_rejects_protected_ports_in_store_arguments_before_opening_stores(self):
+        f = self.fixture()
+        host = self.host(f)
+        before = self.store_hashes(f)
+        stores = dict(host.store_arguments)
+        for key in ("selection", "approval_reader", "prerequisite_reader", "material_reader",
+                    "backend_reader", "runtime_reader", "cost_reader", "image_video_installation"):
+            host.store_arguments = {**stores, key: None}
+            with self.subTest(key=key), \
+                    patch("sqlite3.connect", side_effect=AssertionError("must not open stores")), \
+                    patch("socket.socket", side_effect=AssertionError("must not contact runtime")):
+                with self.assertRaises(c.DispatchError) as stopped:
+                    host.deployment()
+                self.assertEqual(stopped.exception.code, "CONFIG_CHANGED")
+        self.assertEqual(self.store_hashes(f), before)

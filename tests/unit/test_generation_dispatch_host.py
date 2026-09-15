@@ -125,6 +125,67 @@ class HostBindingTests(unittest.TestCase):
         with redirect_stdout(StringIO()):
             self.assertEqual(main(["prepare"], host={}, deployment=Mock()), 2)
 
+    def image_video_installation(self):
+        from services.v5_core_os.episode_production.image_video import ImageVideoInstallation
+        package, _ = make_package()
+        policy = c.sealed({"schemaVersion": "v5.user-image-video-policy.v1",
+            "policyRef": "test-user-policy", "authorityRef": "test-user-owner",
+            "scope": deepcopy(package["plan"]["scope"]),
+            "credentialActors": {"test-user-credential": "test-user-actor"},
+            "limits": deepcopy(package["plan"]["limits"]), "maxGenerations": 1,
+            "maxTotalCostMinor": package["plan"]["limits"]["maxCostMinor"]})
+        return ImageVideoInstallation(policy, SimpleNamespace(prepare_input=Mock(), verify_current=Mock()))
+
+    def complete_host_arguments(self):
+        from services.v5_core_os.episode_production.generation_dispatch_operator import OperatorSelection
+        package, _ = make_package()
+        command = {key: "test-" + key for key in ("workspaceRef", "productionRunRef",
+            "methodAwareInputPlanVersionRef", "creativeShotVersionRef", "beatRef", "inputAssetVersionRef")}
+        command.update({key: package["plan"]["scope"][key] for key in ("workspaceRef", "productionRunRef")})
+        command.update(backendRef=self.config["executionConfig"]["backendRef"],
+            executionConfigRef=self.config["executionConfig"]["configRef"],
+            costBasisRef=package["materials"]["costBasis"]["costBasisRef"],
+            limits=deepcopy(package["plan"]["limits"]))
+        return {"selection": OperatorSelection(command), "runtime_original": self.configuration,
+            "runtime_current": SimpleNamespace(read_current=Mock(), assert_output_available=Mock()),
+            "cost_owner": SimpleNamespace(read_current=Mock(), proof_originals=Mock()),
+            "prerequisite_originals": {kind: self.configuration for kind in c.PREREQUISITES},
+            "prerequisite_verifiers": {kind: Mock() for kind in c.PREREQUISITES},
+            "approval_reader": SimpleNamespace(resolve=Mock()),
+            "store_arguments": {"storage_root": self.root}}
+
+    def test_optional_typed_installation_reaches_original_factory_without_replacing_selection(self):
+        arguments = self.complete_host_arguments()
+        installation = self.image_video_installation()
+        host = self.host(**arguments, image_video_installation=installation)
+        operator, domain = object(), SimpleNamespace(close=Mock())
+        with patch("services.v5_core_os.episode_production.generation_dispatch_composition.open_existing_live_operator",
+                return_value=(operator, domain)) as factory, \
+                patch("socket.socket", side_effect=AssertionError("no network")), \
+                patch("sqlite3.connect", side_effect=AssertionError("no database")):
+            with host.open() as opened:
+                self.assertIs(opened, operator)
+            self.assertIs(factory.call_args.kwargs["image_video_installation"], installation)
+            self.assertEqual(factory.call_args.kwargs["selection"], arguments["selection"])
+            self.assertIsNone(factory.call_args.kwargs["selection"].approved_plan_digest)
+            domain.close.assert_called_once()
+        installation.materials.prepare_input.assert_not_called()
+        installation.materials.verify_current.assert_not_called()
+
+    def test_installation_requires_typed_explicit_port_and_cannot_hide_in_store_arguments(self):
+        installation = self.image_video_installation()
+        with patch.object(OriginalFile, "read", side_effect=AssertionError("no constructor read")):
+            host = self.host(image_video_installation=installation)
+            self.assertIs(host.image_video_installation, installation)
+            self.assertIsNone(self.host().image_video_installation)
+            with self.assertRaises(c.DispatchError):
+                self.host(image_video_installation={"policy": installation.policy})
+        arguments = self.complete_host_arguments()
+        arguments["store_arguments"]["image_video_installation"] = installation
+        with self.assertRaises(c.DispatchError) as caught:
+            self.host(**arguments).deployment()
+        self.assertEqual(caught.exception.code, "CONFIG_CHANGED")
+
 
 class CostOriginalTests(unittest.TestCase):
     def setUp(self):

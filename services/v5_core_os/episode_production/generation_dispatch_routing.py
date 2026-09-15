@@ -60,6 +60,8 @@ class GenerationDispatchRouting:
         with f._gate(workspace_ref) as lease:
             grant = f._grant({"workspaceRef": workspace_ref, "productionRunRef": production_run_ref,
                 "generationDispatchGrantRef": generation_dispatch_grant_ref})
+            if grant["schemaVersion"] == c.USER_IMAGE_VIDEO_GRANT_SCHEMA:
+                return self._route_user_image_video(grant, lease)
             binding = {"generationDispatchGrantRef": grant["generationDispatchGrantRef"],
                 "generationDispatchGrantDigest": grant["payloadDigest"], "subjectDigest": grant["subjectDigest"],
                 "approvedPlanDigest": grant["approval"]["approvedPlanDigest"]}
@@ -137,6 +139,62 @@ class GenerationDispatchRouting:
                 return {**result, "idempotentReplay": replayed}
             except Exception as exc:
                 raise c.CommitOutcomeUnknown() from exc
+
+    def _route_user_image_video(self, grant, lease):
+        """New input, original queue; never invent a VideoMethodRoute/Shot fact."""
+        from services.v4_platform.image_video_execution import (
+            build_user_image_video_request, build_user_image_video_envelope)
+        from services.v4_platform.generation_dispatch_jobs import internal_dispatch_key
+        from services.v4_platform.media_jobs import _validate_job
+        f = self.foundation
+        lease.assert_held()
+        workspace, run = grant["workspaceRef"], grant["productionRunRef"]
+        request = build_user_image_video_request(grant)
+        envelope = build_user_image_video_envelope(request, grant["executionBinding"]["backendDecision"])
+        key = internal_dispatch_key(workspace, run, grant["generationDispatchGrantRef"])
+        matches = [job for job in self.queue.repository.list(workspace, run) if job["idempotencyKey"] == key]
+        c.require(len(matches) <= 1, "IDEMPOTENCY_CONFLICT")
+        if matches:
+            # History reading is valid after expiry/consumption and grants no
+            # continuation. The executor can never claim a second Attempt.
+            job = matches[0]
+            _validate_job(job)
+            c.require(job["request"] == request and job["executionEnvelope"] == envelope
+                and job["dispatchGrantBinding"] == request["dispatchGrantBinding"], "IDEMPOTENCY_CONFLICT")
+            return self._user_image_video_route(job, True)
+        terminal = f._terminal(grant)
+        c.require(terminal is None, "ALREADY_REVOKED" if terminal and terminal["kind"] == "REVOKED" else "ALREADY_CONSUMED")
+        selected = f._selected(grant["approval"]["authorityDecisionRef"])
+        c.require(selected.approval == grant["approval"]
+            and selected.plan_package["plan"] == c.plan_from_grant(grant)
+            and selected.bundle_sha256 == grant["issuanceEvidence"]["approvalBundleSha256"], "APPROVAL_UNAVAILABLE")
+        f._current(selected, lease)
+        c.require(c.utc(grant["limits"]["notBefore"]) <= c.utc(f._now()) < c.utc(grant["limits"]["expiresAt"]),
+            "OUTSIDE_VALIDITY_WINDOW")
+        resolved = self.source.resolve({"workspaceRef": workspace, "productionRunRef": run,
+            "generationRef": grant["subject"]["generationRef"]}, lease)
+        c.require(resolved.subject == grant["subject"]
+            and resolved.scope == {key: grant[key] for key in c.SCOPE_FIELDS}, "SOURCE_CHANGED")
+        lease.assert_held()
+        try:
+            job, replay = create_generation_dispatch_job(self.queue,
+                verified_grant=grant, request=request, envelope=envelope)
+        except Exception as exc:
+            # The queue's own idempotent lookup resolves uncertain returns;
+            # this must never be interpreted as permission to dispatch again.
+            raise c.CommitOutcomeUnknown() from exc
+        return self._user_image_video_route(job, replay)
+
+    @staticmethod
+    def _user_image_video_route(job, replay):
+        return {"schemaVersion": "v5.user-image-video-route.v1",
+            "workspaceRef": job["workspaceRef"], "productionRunRef": job["productionRunRef"],
+            "generationRef": job["request"]["generationRef"],
+            "dispatchGrantBinding": deepcopy(job["dispatchGrantBinding"]),
+            "queuedJobs": [{"generationRequestRef": job["request"]["generationRequestRef"],
+                "generationRequestDigest": job["requestDigest"], "mediaJobRef": job["jobRef"],
+                "queueState": job["state"], "queueReplay": replay}],
+            "publicationAllowed": False, "idempotentReplay": replay}
 
     def _route_payload(self, grant, binding, resolved, request, job, replay):
         plan = resolved.originals["inputPlan"]

@@ -39,6 +39,9 @@ def validate_output(value: Any) -> None:
 
 
 def validate_context(request: Mapping[str, Any], context: Any) -> None:
+    from .image_video_execution import USER_IMAGE_VIDEO_REQUEST_SCHEMA, validate_user_image_video_context
+    if request.get("schemaVersion") == USER_IMAGE_VIDEO_REQUEST_SCHEMA:
+        return validate_user_image_video_context(request, context)
     exact(context, {"sourceText", "outputConstraints"}, "execution context")
     text = context["sourceText"]
     if not isinstance(text, str) or not text.strip() or len(text) > 4000:
@@ -74,6 +77,9 @@ def validate_dispatch_grant_binding(value: Any) -> dict[str, Any]:
 
 
 def validate_envelope(value: Any, request: Mapping[str, Any] | None = None) -> dict[str, Any]:
+    from .image_video_execution import USER_IMAGE_VIDEO_ENVELOPE_SCHEMA, validate_user_image_video_envelope
+    if isinstance(value, Mapping) and value.get("schemaVersion") == USER_IMAGE_VIDEO_ENVELOPE_SCHEMA:
+        return validate_user_image_video_envelope(value, request)
     bound = isinstance(value, Mapping) and value.get("schemaVersion") == DISPATCH_EXECUTION_ENVELOPE_SCHEMA
     exact(value, ENVELOPE_FIELDS | ({"dispatchGrantBinding"} if bound else set()), "execution envelope")
     if value["schemaVersion"] not in {EXECUTION_ENVELOPE_SCHEMA, DISPATCH_EXECUTION_ENVELOPE_SCHEMA}:

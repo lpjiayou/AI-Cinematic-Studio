@@ -52,6 +52,10 @@ class GenerationDispatchOperator:
         c.require(bool(self._public_boundaries), "CURRENTNESS_FENCE_UNAVAILABLE")
         return dict(self._public_boundaries)
 
+    def image_video_boundary(self):
+        """Optional trusted installation; never enables generation by default."""
+        return self._assembly.image_video
+
     def prepare(self):
         result = self._assembly.boundary.prepare(deepcopy(self._selection.prepare_command))
         if "planPackage" in result:
@@ -76,6 +80,9 @@ class GenerationDispatchOperator:
         c.require(all(plan["scope"][k] == command[k] for k in ("workspaceRef", "productionRunRef")),
             "SCOPE_MISMATCH")
         subject = plan["subject"]
+        if subject.get("schemaVersion") == "v5.user-image-video-subject.v1":
+            c.require(subject["generationRef"] == command.get("generationRef"), "SCOPE_MISMATCH")
+            return selected
         c.require(subject["methodAwareInputPlanVersion"]["ref"] == command["methodAwareInputPlanVersionRef"]
             and subject["creativeShotVersion"]["ref"] == command["creativeShotVersionRef"]
             and subject["actionExecutionBeat"]["ref"] == command["beatRef"]
@@ -202,6 +209,9 @@ class GenerationDispatchOperator:
         c.require(job.get("dispatchGrantBinding", {}).get("approvedPlanDigest")
             == self._selection.approved_plan_digest, "APPROVAL_PLAN_MISMATCH")
         request = job["request"]
+        if request.get("schemaVersion") == "v5.user-image-video-generation-request.v1":
+            c.require(request["generationRef"] == command.get("generationRef"), "SCOPE_MISMATCH")
+            return deepcopy(job)
         c.require(all(request[k] == command[k] for k in (
             "methodAwareInputPlanVersionRef", "creativeShotVersionRef", "beatRef")), "SCOPE_MISMATCH")
         return deepcopy(job)
@@ -273,9 +283,12 @@ def compose_live_operator(*, selection, endpoint, worker_context, public_boundar
     selection.validate()
     c.require(selection.prepare_command["workspaceRef"] == participants["workspace_ref"], "SCOPE_MISMATCH")
     assembly = compose_generation_dispatch(**participants)
-    return GenerationDispatchOperator(assembly=assembly, coordinator=participants["queue_coordinators"][0],
+    operator = GenerationDispatchOperator(assembly=assembly, coordinator=participants["queue_coordinators"][0],
         clock=participants["clock"], worker_context=worker_context, endpoint=endpoint, selection=selection,
         public_boundaries=public_boundaries)
+    if assembly.image_video is not None:
+        assembly.image_video.attach_operator(operator)
+    return operator
 
 
 class ExistingStoreOperatorDeployment:
