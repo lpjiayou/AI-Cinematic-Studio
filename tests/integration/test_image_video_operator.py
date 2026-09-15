@@ -129,7 +129,7 @@ class ImageVideoOperatorTests(unittest.TestCase):
                 environment["gpu"], environment["comfyui"]),
                 ("CONNECTED", "READY", "CONNECTED", "CONNECTED"))
             self.assertEqual(environment["queue"], {
-                "state": "IDLE", "runningCount": 0, "pendingCount": 0})
+                "state": "BUSY", "runningCount": 0, "pendingCount": 1})
             self.assertTrue(environment["readOnly"])
             self.assertEqual(server.complete_post_count, 0)
             command = self.command(runtime)
