@@ -5,7 +5,7 @@
 | 字段 | 值 |
 | --- | --- |
 | ADR ID | ADR-0022 |
-| 文档版本 | 1.6；保留既有控制面，增加 §8.5 的零发送失败单次替代例外 |
+| 文档版本 | 1.7；§8.6 限定文件枚举兼容证明与独立批准的窗口平移，其他控制面不变 |
 | Status | Accepted — Architecture Contract Only |
 | 完整 ADR 审批状态 | ACCEPTED_ARCHITECTURE_ONLY；Project Lead 已明确接受全文，不等于实现或生成许可 |
 | 已确认设计方向 | 独立、不可变 Grant；不覆盖历史五字段，不迁移历史摘要 |
@@ -698,6 +698,42 @@ commit/tree 和因此确定性改变的 request-prefix/workflowDigest，ComfyUI 
 仍不可重发。即使替代也零发送失败，亦无第三张 Grant。技术失败关闭、例外授权和真实
 发送是不同事实；测试通过不代表真实 SH09、Owner 输出验收或 publication 通过。
 
+### 8.6 v1.7：无关文件枚举新增与明确批准的新窗口
+
+2026-09-15 Project Lead 授权原 D1 的狭义运行绑定纠错，并明确确认新的五小时
+窗口：修复发布且现场准备完成后记录准确起止；单次最多两小时、总额不超过
+人民币 1,000 元、真实 `/prompt` 总数最多一次、完成后不关机。旧窗口及记录保留。
+这不是默认滚动续期，也不增加第二次发送资格。工程验证不等于真实结果验收。
+
+可信主机可显式安装原完整 object_info 前像的文件 pin 和当前完整前像 observer。
+原始前像摘要必须等于原 attestation 的 objectInfoDigest，当前前像摘要必须等于
+本次 fresh reader 返回的实际 objectInfoDigest；禁止以旧摘要伪装当前观察。
+只有下列四个路径允许新增不重复的字符串选项，旧选项必须完整保留且相对顺序不变：
+
+- `LoadImage.input.required.image[0]`
+- `LoadImageMask.input.required.image[0]`
+- `LoadAudio.input.required.audio[1].options`
+- `LoadVideo.input.required.file[1].options`
+
+归一化只用于上述四处的比较副本；其余完整节点结构和所有其他 runtime facts
+必须完全相等。未安装证明端口时仍严格比较；每次重读原件及当前前像，缺失、摘要
+不符、移除、重排、类型变化、模型枚举变化或其他节点变化均拒绝。实际当前摘要
+保持可审计，原 attestation 作为获批比较基线保留，绝不覆写为“新观察”。
+锚帧字节、六模型、工具、launch、端点、process、lease 和输出冲突检查仍独立执行。
+本条不允许把真正进程重启归类为文件枚举变化。
+
+仅针对 §8.5 已证明未消费零发送失败的唯一替代，新计划可在独立精确批准下平移
+notBefore/expiresAt。新窗口不得早于旧窗口结束，长度不得超过原窗口或五小时，
+且必须容纳原 executionTimeoutSeconds；其余 limits 必须逐字段相同。
+签发前通过原 ApprovalReader 独立重验旧批准包完整原文、原批准决定和原 bundle
+SHA，与持久化原 Grant 对应；同时验证新完整计划及其独立批准，不能只信调用参数。
+成本只允许 costBasisRef、payloadDigest、validFrom、validUntil 随新窗口重算；
+全部费率、上界、币种、出处、责任人及 reviewDecision 必须完全相同。费用有效期
+必须覆盖且等于新窗口。其他绑定仍按 §8.5，scope/subject/model/runtime/配置不变。
+本段仅替代 §8.5 对上述时间及其成本派生字段的绝对相等要求；不可静默扩大费用、
+延长执行超时或更换来源。拒绝路径零新 Grant；原撤销、唯一子槽位、CAS、L1/L2、
+UNKNOWN 不重发及非发布边界保持不变。
+
 ## 9. V5→V4 接线与版本边界
 
 原 manifest v2 无 Grant 的路径继续拒绝。带 Grant 的新路线先完整验证旧对象及其 false/NOT_READY 不变量，再经 V5 验证独立权威；新的 request.executionMode 可为 INTERNAL_SELF_HOSTED，但不得更改历史 Run.executionMode。
@@ -819,6 +855,7 @@ InputPlan、InputAssetVersion、InputAppendAuthority 和旧 v2 runtime attestati
 | 1.4 R3 狭义兼容 | 2026-09-13 Project Lead 授权 A01—A06 与 §5.7 版本化原图、runtime 前像、完整编码及直接依赖接线 | 仅本地 CPU/fixture 候选；Camera/精确绑定 Owner 验收、发布与现场执行仍待后续授权 |
 | 1.5 D1 狭义 live 接线 | 2026-09-13 Project Lead 批准 §5.8 及任务 A/B | 本地工程和限定只读核验；不是候选验收、部署或真实生成批准 |
 | 1.6 零发送失败替代 | 2026-09-15 Project Lead 授权 §8.5 狭义例外、直接回归及受保护发布 | 原记录保留，单次替代；既定真实运行仍受精确计划、时限、预算及一次提交约束 |
+| 1.7 文件枚举与新窗口 | 2026-09-15 Project Lead 授权狭义兼容修正并明确确认新的五小时窗口，其他限制不变 | 仅 §8.6 的完整证明及时间平移；不授权忽略真实进程变化或增加发送次数 |
 
 以下 [S] 项只支持对旧仓库行为的陈述，不表示新增规范已经实现：
 

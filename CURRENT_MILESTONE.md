@@ -12,11 +12,11 @@ not a new Grant, feature acceptance or production-readiness decision.
 <!-- CURRENT_STATE:BEGIN -->
 ```text
 CURRENT_TASK=ACS-D1-PRE-SEND-FAILURE-RECOVERY
-CURRENT_ACTION=BOUNDED_ZERO_SEND_REPLACEMENT_AND_PUBLICATION
+CURRENT_ACTION=BOUNDED_RUNTIME_INVENTORY_AND_EXPLICIT_WINDOW_RENEWAL
 NEXT_TASK=D1_PUBLISHED_FIX_AND_ONE_APPROVED_SH09
-REVIEWED_MAIN=5c8cd918912710fb8c4e23629200753062aebd7d
-REVIEWED_TREE=59e1383d7885617e294c2fc75eb8c5a7eb5a6525
-ADR_0022_ACCEPTED_VERSION=1.6_ZERO_SEND_REPLACEMENT_EXCEPTION
+REVIEWED_MAIN=f481180264a360fe18aa2cfb13e2c20ca1c75244
+REVIEWED_TREE=8696dbecdad155856fd022ec8487ea6c392261ba
+ADR_0022_ACCEPTED_VERSION=1.7_BOUNDED_INVENTORY_AND_EXPLICIT_WINDOW
 R2_F01_ENGINEERING=ACCEPTED_WITHIN_CPU_FIXTURE_SCOPE_AND_MERGED
 R3_F01_ENGINEERING=MERGED
 D1_OPERATOR_CODE=MERGED
@@ -69,9 +69,12 @@ original records. The Owner authorized failure-only cleanup and the ADR-0022
 section 8.5 single-replacement exception; consumed/UNKNOWN cases remain excluded.
 The replacement must bind the published repair and current runtime through the
 original Operator. Its send permission is not active until those gates pass.
-The approved five-hour window, two-hour execution budget and RMB 1,000 cap are not
-silently extended. The later Owner instruction is to leave the GPU powered on;
-storage is billed even when off. No formal 8765 database operation is authorized.
+The old approved window expired. The Owner explicitly confirmed one new five-hour
+window after publication and current preparation, with the two-hour execution and
+RMB 1,000 cap unchanged. Its exact times must be recorded, not silently extended.
+Leave the GPU on; storage remains billed. No formal 8765 database access is allowed.
+The inventory correction permits only proven unrelated file-list additions; real
+process drift still blocks until separately resolved. No new live send is recorded.
 
 The Owner authorized bounded CI optimization after PR #95 passed all five required
 checks and merged. Only an exact isolated-test allowlist may use affected selection;
@@ -91,6 +94,7 @@ another implementation wave or authorize the separate M12 A100 wave.
 | R3/F01, PR #90 | `0b3a0653794656658abac8a7455eeed5801802fe` | Exact offline binding/runtime seam and bounded correction; not current GPU binding |
 | D1, PR #91 | `2c42645a173840d6e17e2eb3541f00f47b2881b5` | Original live Operator and bounded recovery path; not execution approval |
 | D1 binding fix, PR #92 | `1e62786ea75823869c97934b18e22d722b7949f9` | Seven existing-store reader binding; not a real Grant or generated result |
+| D1 zero-send replacement, PR #97 | `f481180264a360fe18aa2cfb13e2c20ca1c75244` | Original Attempt closed FAILED/zero-send; replacement not issued; no video |
 
 These are observed merged commits, not predicted SHAs for this maintenance change.
 Use the [R2 record](docs/status/A14B_STAGED_TRANSPORT_IMPLEMENTATION_2026-09-12.md),

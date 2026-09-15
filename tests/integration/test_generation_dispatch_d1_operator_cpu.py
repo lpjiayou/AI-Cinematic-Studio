@@ -111,6 +111,23 @@ class D1OperatorCpuTests(unittest.TestCase):
                 "gpuObserved": False, "formalGrant": False, "sameJobRecovery": True}))
 
     def test_zero_send_replacement_original_operator_one_post_no_third_grant(self):
+        self._replacement_vertical(renew_window=False)
+
+    def test_expired_zero_send_replacement_new_window_original_operator_one_post(self):
+        from tests.support.generation_dispatch_binding_fixtures import TestOnlyExternalOwners
+        original = TestOnlyExternalOwners._cost_original
+        def standing_terms(owner, reference, cost):
+            # This scenario has independently pinned standing rates, like the
+            # selected host's terms. The old scenario remains window-specific.
+            result = original(owner, reference, cost)
+            result.pop("validFrom")
+            result.pop("validUntil")
+            result["schemaVersion"] = "test-only.standing-cost-evidence.v1"
+            return result
+        with patch.object(TestOnlyExternalOwners, "_cost_original", standing_terms):
+            self._replacement_vertical(renew_window=True)
+
+    def _replacement_vertical(self, *, renew_window):
         from dataclasses import replace
         from hashlib import sha256
         from types import SimpleNamespace
@@ -154,10 +171,32 @@ class D1OperatorCpuTests(unittest.TestCase):
                             original_job["jobRef"], f.grant, lease)
                     self.assertEqual(rejected.exception.code, "ATTEMPT_OR_LEASE_CHANGED")
             package = f.operator._selected().plan_package
+            if renew_window:
+                original_path = f.root / "test-original-window-approval.json"
+                original_path.write_bytes((f.root / "test-generation-approval.json").read_bytes())
+                original_reader = PinnedApprovalReader(original_path,
+                    sha256(original_path.read_bytes()).hexdigest(), original=f.originals)
+                limits = {**package["plan"]["limits"], "notBefore": "2030-01-02T00:00:00.000000Z",
+                    "expiresAt": "2030-01-02T01:00:00.000000Z"}
+                f.external.template["plan"]["limits"] = limits
+                cost = f.external.template["materials"]["costBasis"]
+                cost.update(validFrom=limits["notBefore"], validUntil=limits["expiresAt"])
+                f.external.template["materials"]["costBasis"] = c.sealed(cost)
+                f.external.write_originals()
+                f.clock.value = "2030-01-02T00:00:10.000000Z"
+                f.operator._selection = replace(f.operator._selection, prepare_command=f.prepare_command())
+                prepared = f.operator.prepare()
+                self.assertIn("planPackage", prepared, prepared)
+                package = prepared["planPackage"]
             with patch("tests.support.generation_dispatch_binding_fixtures.approval_for",
                     side_effect=lambda value: approval_for(value, decision_ref="test-new-exact-approval")):
                 f.approve_package(package)
+            if renew_window:
+                current_reader = f.dispatch.selections["approval"]._port
+                f.dispatch.selections["approval"].select_port(SimpleNamespace(resolve=lambda ref: (
+                    original_reader if ref == f.grant["approval"]["authorityDecisionRef"] else current_reader).resolve(ref)))
             f.operator._selection = replace(f.operator._selection,
+                approved_plan_digest=c.digest(package["plan"]),
                 authority_decision_ref=f.approval["authorityDecisionRef"],
                 issue_idempotency_key="test-one-replacement", route_idempotency_key="test-replacement-route")
             revoke = approval_for(grant_digest=f.grant["payloadDigest"])
@@ -170,6 +209,7 @@ class D1OperatorCpuTests(unittest.TestCase):
                 revocation_decision_ref=revoke["authorityDecisionRef"])
             child = result["grant"]
             self.assertEqual(child["schemaVersion"], c.REPLACEMENT_GRANT_SCHEMA)
+            self.assertEqual(child["limits"], package["plan"]["limits"])
             self.assertEqual(child["replacementOf"]["jobDigest"], c.digest(original_job))
             self.assertEqual(foundation._terminal(f.grant)["kind"], "REVOKED")
             self.assertEqual(server.complete_post_count, 0)

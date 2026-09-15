@@ -3,6 +3,7 @@ from copy import deepcopy
 from concurrent.futures import ThreadPoolExecutor
 from threading import Barrier
 from types import SimpleNamespace
+from hashlib import sha256
 import unittest
 
 from services.v5_core_os.episode_production import generation_dispatch_contracts as c
@@ -15,6 +16,11 @@ class GenerationDispatchReplacementTests(unittest.TestCase):
     def fixture(self, *, revoked=True, memory=True, changed_code=True):
         f = Fixture(self, memory=memory)
         f.old = f.service.issue(f.command())["grant"]
+        f.old_package = deepcopy(f.package)
+        from services.v5_core_os.episode_production.generation_dispatch_authority import PinnedApprovalReader
+        old_path = f.root / "original-approval-preserved.json"
+        old_path.write_bytes(f.approval_path.read_bytes())
+        f.original_reader = PinnedApprovalReader(old_path, sha256(old_path.read_bytes()).hexdigest(), original=f.originals)
         if revoked:
             f.revoked = f.service.revoke(f.revoke_command(f.old))["terminal"]
         if changed_code:
@@ -179,3 +185,82 @@ class GenerationDispatchReplacementTests(unittest.TestCase):
         self.assertEqual(len(f.records()), 3)
         self.assertEqual(f.service.issue_replacement(command)["sendPermission"], "NONE")
         self.assertEqual(len(f.records()), 3)
+
+    def renew(self, f):
+        limits = f.package["plan"]["limits"]
+        limits.update(notBefore="2030-01-02T00:00:00.000000Z", expiresAt="2030-01-02T01:00:00.000000Z")
+        cost = f.package["materials"]["costBasis"]
+        cost.update(costBasisRef="test-renewed-cost", validFrom=limits["notBefore"], validUntil=limits["expiresAt"])
+        cost = c.sealed(cost)
+        f.package["materials"]["costBasis"] = cost
+        f.package["plan"]["executionBinding"]["costBasis"] = {"ref": cost["costBasisRef"], "digest": cost["payloadDigest"]}
+        f.approval = approval_for(f.package, decision_ref="test-renewed-window-approved")
+        f.approval["decidedAt"] = limits["notBefore"]
+        f.approval = c.sealed(f.approval, "authorityDecisionDigest")
+        current = f.write_approval()
+        f.service.approval_reader = SimpleNamespace(resolve=lambda ref: (
+            f.original_reader if ref == f.old["approval"]["authorityDecisionRef"] else current).resolve(ref))
+        f.readers.package = deepcopy(f.package)
+        f.clock.value = "2030-01-02T00:00:10.000000Z"
+
+    def test_independently_approved_later_window_preserves_all_caps_and_old_records(self):
+        f = self.fixture()
+        before = deepcopy(f.records())
+        self.renew(f)
+        grant = f.service.issue_replacement(self.command(f))["grant"]
+        self.assertEqual(grant["limits"], f.package["plan"]["limits"])
+        self.assertEqual(grant["limits"]["maxCostMinor"], f.old["limits"]["maxCostMinor"])
+        self.assertEqual(grant["limits"]["executionTimeoutSeconds"], f.old["limits"]["executionTimeoutSeconds"])
+        self.assertTrue(all(row in f.records() for row in before))
+        self.assertEqual(len(f.records()), 3)
+
+    def test_renewal_cannot_drop_original_approval_reader_or_replace_original_bytes(self):
+        for fault in ("missing", "bytes"):
+            f = self.fixture()
+            self.renew(f)
+            before = deepcopy(f.records())
+            if fault == "missing":
+                f.service.approval_reader = f.write_approval()
+            else:
+                (f.root / "original-approval-preserved.json").write_bytes(b'{}')
+            with self.subTest(fault=fault), self.assertRaises(c.DispatchError) as stopped:
+                f.service.issue_replacement(self.command(f))
+            self.assertEqual(stopped.exception.code, "APPROVAL_UNAVAILABLE")
+            self.assertEqual(f.records(), before)
+
+    def test_renewal_cannot_increase_duration_cost_timeout_or_change_rates(self):
+        for fault in ("duration", "budget", "timeout", "rate", "evidence", "earlier-window"):
+            f = self.fixture()
+            self.renew(f)
+            package = deepcopy(f.package)
+            limits, cost = package["plan"]["limits"], package["materials"]["costBasis"]
+            if fault == "duration":
+                limits["expiresAt"] = "2030-01-02T02:00:00.000000Z"
+            elif fault == "budget":
+                limits["maxCostMinor"] += 1
+            elif fault == "timeout":
+                limits["executionTimeoutSeconds"] += 1
+            elif fault == "rate":
+                cost["computeUnitCostMinor"] += 1
+            elif fault == "evidence":
+                cost["sourceEvidence"][0]["digest"] = "f" * 64
+            else:
+                limits.update(notBefore="2029-12-31T00:00:00.000000Z", expiresAt="2029-12-31T01:00:00.000000Z")
+            cost.update(validFrom=limits["notBefore"], validUntil=limits["expiresAt"])
+            package["materials"]["costBasis"] = cost = c.sealed(cost)
+            package["plan"]["executionBinding"]["costBasis"]["digest"] = cost["payloadDigest"]
+            with self.subTest(fault=fault), self.assertRaises(c.DispatchError) as stopped:
+                c.validate_replacement_plan(f.old, package["plan"], approval_for(package, decision_ref="test-renewal"),
+                    original_package=f.old_package, replacement_package=package)
+            self.assertEqual(stopped.exception.code, "COST_BOUND_UNVERIFIED" if fault in ("rate", "evidence") else "APPROVAL_PLAN_MISMATCH")
+
+    def test_window_change_with_stale_plan_approval_never_commits(self):
+        f = self.fixture()
+        before = deepcopy(f.records())
+        self.renew(f)
+        f.approval["approvedPlanDigest"] = c.digest(f.old_package["plan"])
+        f.approval = c.sealed(f.approval, "authorityDecisionDigest")
+        f.service.approval_reader = f.write_approval()
+        with self.assertRaises(c.DispatchError):
+            f.service.issue_replacement(self.command(f))
+        self.assertEqual(f.records(), before)

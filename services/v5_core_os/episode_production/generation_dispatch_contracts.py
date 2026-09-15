@@ -313,17 +313,42 @@ def validate_replacement_proof(value: Any, plan: dict) -> dict:
     return deepcopy(value)
 
 
-def validate_replacement_plan(original: dict, plan: dict, approval: dict) -> None:
+def validate_replacement_plan(original: dict, plan: dict, approval: dict, *,
+                              original_package=None, replacement_package=None) -> None:
     """The exception changes deployed Core bytes, not the approved operation."""
     require(original["schemaVersion"] == GRANT_SCHEMA, "GRANT_SUBJECT_ALREADY_RECORDED")
     previous = plan_from_grant(original)
-    for key in ("scope", "subject", "permissions", "limits"):
+    for key in ("scope", "subject", "permissions"):
         require(canonical(previous[key]) == canonical(plan[key]), "APPROVAL_PLAN_MISMATCH")
+    renewed = previous["limits"] != plan["limits"]
+    if renewed:
+        # A separately approved later window is not a timeout/fee increase. Old
+        # material must be independently resolved by the foundation, not supplied
+        # as a command field. Missing original material preserves v1.6 rejection.
+        require(original_package is not None and replacement_package is not None, "APPROVAL_PLAN_MISMATCH")
+        old_package = validate_plan_package(original_package)
+        new_package = validate_plan_package(replacement_package)
+        require(old_package["plan"] == previous and new_package["plan"] == plan, "APPROVAL_PLAN_MISMATCH")
+        old_limits, new_limits = validate_limits(previous["limits"]), validate_limits(plan["limits"])
+        require({k: v for k, v in old_limits.items() if k not in {"notBefore", "expiresAt"}}
+            == {k: v for k, v in new_limits.items() if k not in {"notBefore", "expiresAt"}}, "APPROVAL_PLAN_MISMATCH")
+        duration = (utc(new_limits["expiresAt"]) - utc(new_limits["notBefore"])).total_seconds()
+        old_duration = (utc(old_limits["expiresAt"]) - utc(old_limits["notBefore"])).total_seconds()
+        require(utc(new_limits["notBefore"]) >= utc(old_limits["expiresAt"])
+            and new_limits["executionTimeoutSeconds"] <= duration <= min(old_duration, 18000), "APPROVAL_PLAN_MISMATCH")
+        old_cost, new_cost = old_package["materials"]["costBasis"], new_package["materials"]["costBasis"]
+        excluded = {"costBasisRef", "payloadDigest", "validFrom", "validUntil"}
+        require({k: v for k, v in old_cost.items() if k not in excluded}
+            == {k: v for k, v in new_cost.items() if k not in excluded}, "COST_BOUND_UNVERIFIED")
+        require(new_cost["validFrom"] == new_limits["notBefore"]
+            and new_cost["validUntil"] == new_limits["expiresAt"], "COST_BOUND_UNVERIFIED")
     def unchanged_binding(value):
         value = deepcopy(value)
         value.pop("workflowDigest")  # deterministic request-prefix changes with the code pin
         value["executionCode"].pop("coreCommit")
         value["executionCode"].pop("coreTree")
+        if renewed:
+            value.pop("costBasis")  # complete old/new cost provenance compared above
         return value
     require(unchanged_binding(previous["executionBinding"]) == unchanged_binding(plan["executionBinding"]),
         "APPROVAL_PLAN_MISMATCH")
