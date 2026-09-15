@@ -62,6 +62,15 @@ class TestOnlyImageVideoBoundary:
         self._record("workspace", scope, credential_ref)
         return {"state": "READY", "generations": [], "canCreate": True}
 
+    def environment(self, scope, credential_ref):
+        self._record("environment", scope, credential_ref)
+        return {"schemaVersion": "creator.runtime-environment.v1",
+            **{key: value for key, value in scope.items() if key != "workspaceRef"},
+            "observedAt": "2026-09-15T10:00:00.000000Z", "core": "CONNECTED",
+            "operator": "READY", "gpu": "CONNECTED", "comfyui": "CONNECTED",
+            "queue": {"state": "IDLE", "runningCount": 0, "pendingCount": 0},
+            "readOnly": True}
+
     def create(self, scope, credential_ref, command):
         self._record("create", scope, credential_ref, command)
         return {"generationRef": "generation-http-fixture", "state": "QUEUED"}
@@ -144,6 +153,23 @@ class CreatorImageVideoHttpContractTests(unittest.TestCase):
             ("workspace", SCOPE, "credential-image-video-fixture"),
         ])
 
+    def test_runtime_environment_is_authenticated_read_only_and_sanitized(self):
+        status, _, result = self.call(query=QUERY, suffix="/runtime-environment")
+        self.assertEqual(status, 200)
+        self.assertEqual(result["environment"], {
+            "schemaVersion": "creator.runtime-environment.v1",
+            **{key: value for key, value in SCOPE.items() if key != "workspaceRef"},
+            "observedAt": "2026-09-15T10:00:00.000000Z", "core": "CONNECTED",
+            "operator": "READY", "gpu": "CONNECTED", "comfyui": "CONNECTED",
+            "queue": {"state": "IDLE", "runningCount": 0, "pendingCount": 0},
+            "readOnly": True,
+        })
+        self.assertNotIn("endpoint", json.dumps(result))
+        self.assertNotIn("model", json.dumps(result))
+        self.assertEqual(self.boundary.calls, [
+            ("environment", SCOPE, "credential-image-video-fixture"),
+        ])
+
     def test_create_forwards_only_closed_command_with_original_idempotency(self):
         status, _, result = self.call(method="POST", body={**QUERY, **COMMAND})
         self.assertEqual(status, 202)
@@ -174,6 +200,7 @@ class CreatorImageVideoHttpContractTests(unittest.TestCase):
         for method, suffix, query, body in (
             ("GET", "", QUERY, None),
             ("POST", "", None, {**QUERY, **COMMAND}),
+            ("GET", "/runtime-environment", QUERY, None),
             ("GET", "/generation-http-fixture", QUERY, None),
             ("GET", "/generation-http-fixture/content", {**QUERY, "sha256": "b" * 64}, None),
         ):

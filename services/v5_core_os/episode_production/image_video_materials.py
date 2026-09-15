@@ -114,6 +114,50 @@ class ImageVideoMaterials:
         self._cost, self._stage = cost_owner, stage_input
         self._clock = clock or _now
 
+    def read_environment(self, lease):
+        """Return a closed, read-only observation for Creator presentation.
+
+        The trusted host reader remains the only observer of the selected GPU
+        runtime. This projection deliberately excludes endpoints, process
+        identifiers, model paths and credentials, and performs no staging,
+        approval, grant, queue mutation or workflow submission.
+        """
+        from services.v4_platform.generation_dispatch_a14b_live import (
+            LIVE_ADAPTER_IDENTITY, LIVE_CAPABILITY, LIVE_ENDPOINT_CLASS,
+            validate_live_profile,
+        )
+        lease.assert_held()
+        value = self._configuration.read()
+        c.exact(value, {"backendDecision", "backendProfile", "executionConfig",
+            "executionCode", "processIdentity"})
+        profile = validate_live_profile(value["backendProfile"])
+        c.validate_execution_config(value["executionConfig"])
+        c.validate_process(value["processIdentity"])
+        for identifier in c.exact(value["executionCode"], {
+                "coreCommit", "coreTree", "comfyuiCommit"}).values():
+            c.git_id(identifier)
+        decision = c.backend.validate_decision(value["backendDecision"])
+        c.require(value["executionCode"]["comfyuiCommit"]
+            == value["processIdentity"]["comfyuiCommit"]
+            == profile["parameters"]["comfyuiCommit"], "CONFIG_CHANGED")
+        c.require(decision["adapterIdentity"] == LIVE_ADAPTER_IDENTITY
+            and decision["adapterCapability"] == LIVE_CAPABILITY
+            and decision["endpointClass"] == LIVE_ENDPOINT_CLASS
+            and decision["backendProfileDigest"] == c.digest(profile)
+            and value["executionConfig"]["backendRef"] == decision["backendRef"],
+            "CONFIG_CHANGED")
+        facts = self._runtime.read_current(deepcopy(value), lease)
+        observed_at = self._clock()
+        c.utc(observed_at)
+        lease.assert_held()
+        return {
+            "observedAt": observed_at,
+            "evidenceClass": facts["evidenceClass"],
+            "gpuCount": facts["gpuCount"],
+            "deviceType": facts["deviceType"],
+            "comfyuiVersion": facts["comfyuiVersion"],
+        }
+
     def _configuration_for(self, scope, subject, limits, lease):
         from services.v4_platform.generation_dispatch_a14b_live import (
             LIVE_ADAPTER_IDENTITY, LIVE_CAPABILITY, LIVE_ENDPOINT_CLASS,

@@ -144,6 +144,20 @@ class ImageVideoMaterialsTests(unittest.TestCase):
             self.new_materials()
         self.assertEqual((self.stages, self.observations), ([], []))
 
+    def test_read_environment_returns_only_sanitized_current_runtime_facts(self):
+        result = self.materials.read_environment(self.lease)
+        self.assertEqual(result, {
+            "observedAt": START,
+            "evidenceClass": "CURRENT_RUNTIME_OBSERVATION",
+            "gpuCount": 1,
+            "deviceType": "cuda",
+            "comfyuiVersion": "0.35.0",
+        })
+        self.assertEqual(len(self.observations), 1)
+        self.assertEqual(self.stages, [])
+        self.assertNotIn("endpoint", result)
+        self.assertNotIn("modelFiles", result)
+
     def test_typed_host_installation_builder_is_inert_and_has_no_default_policy(self):
         from services.v5_core_os.episode_production.image_video import ImageVideoInstallation
         arguments = self.installation_arguments()
