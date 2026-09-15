@@ -11,12 +11,12 @@ not a new Grant, feature acceptance or production-readiness decision.
 
 <!-- CURRENT_STATE:BEGIN -->
 ```text
-CURRENT_TASK=ACS-D1-PRE-SEND-FAILURE-RECOVERY
-CURRENT_ACTION=SAME_SERVICE_RESTART_AND_UNSELECTED_MODEL_INVENTORY_RECOVERY
-NEXT_TASK=D1_PUBLISHED_FIX_AND_ONE_APPROVED_SH09
-REVIEWED_MAIN=20aca1d669214cd9ce6c8dcd2ef4aece0a4e4f43
-REVIEWED_TREE=23a3e80f567ceebc70b1a43f2eec8ad574aadeec
-ADR_0022_ACCEPTED_VERSION=1.8_SAME_SERVICE_RESTART_AND_UNSELECTED_MODEL_ADDITIONS
+CURRENT_TASK=ACS-D1-UI-INTEGRATION
+CURRENT_ACTION=AUTHORIZED_CORE_FRONTEND_PUBLICATION_AND_EXISTING_JOB_PLAYBACK_BINDING
+NEXT_TASK=VERIFY_PUBLISHED_UI_READ_ONLY_SH09_PLAYBACK
+REVIEWED_MAIN=3b49476705f2e9e92ae74c5afca4d6a70ea6392c
+REVIEWED_TREE=dccee15227d5cf8cc9db6507400dbbcc5a482f7d
+ADR_0022_ACCEPTED_VERSION=1.9_BOUNDED_UI_ADAPTER
 R2_F01_ENGINEERING=ACCEPTED_WITHIN_CPU_FIXTURE_SCOPE_AND_MERGED
 R3_F01_ENGINEERING=MERGED
 D1_OPERATOR_CODE=MERGED
@@ -26,7 +26,9 @@ D1_BOUNDED_DEPLOYMENT=OWNER_AUTHORIZED
 D1_EXISTING_DATA_BINDING=ORIGINAL_CUSTODY_WORKSET_BOUNDED_AUTHORIZATION
 D1_SELECTED_SSH_FORWARD_TARGET=127.0.0.1:8188
 D1_RUNTIME_OBSERVATION=DATED_READ_ONLY_METADATA_ONLY
-D1_EXACT_RUN_REQUEST=ORIGINAL_APPROVED_PLAN_REQUIRES_PUBLISHED_FIX_REBINDING
+D1_EXACT_RUN_REQUEST=EXECUTED_ONCE_ORIGINAL_JOB_SUCCEEDED
+SH09_TECHNICAL_VIDEO=OWNER_ACCEPTED
+D1_UI=PUBLICATION_AND_READ_ONLY_EXISTING_JOB_BINDING_AUTHORIZED
 D1_COMPLETE=false
 SYSTEM_RUNTIME_BOUND=false
 PROMPT_SUBMISSION_AUTHORIZED=false
@@ -34,11 +36,11 @@ SPIKE_0_EXECUTED=false
 SPIKE_0_READINESS=BLOCKED_PENDING_EXACT_RUN_GATES
 FORMAL_DATABASE_WRITES_AUTHORIZED=false
 LIVE_GRANT_ISSUED=true
-LIVE_GRANT_CONSUMED=false
+LIVE_GRANT_CONSUMED=true
 OUTPUT_ASSET_ADMISSION_ALLOWED=false
 PUBLICATION_ALLOWED=false
 D2_D3=QUEUED_NOT_AUTHORIZED
-FRONTEND_IMPLEMENTATION_IN_THIS_TASK=NOT_AUTHORIZED
+FRONTEND_IMPLEMENTATION_IN_THIS_TASK=BOUNDED_GENERATION_WORKSPACE_AUTHORIZED
 PRODUCTION_READY=false
 M12_RUNTIME_INSTALLED=false
 M12_RUNTIME_G0=NOT_COMPLETE
@@ -63,23 +65,23 @@ POST_MERGE_DUPLICATE_FULL_CI=REMOVED
 ```
 <!-- CURRENT_STATE:END -->
 
-The original exact SH09 plan was approved and one Grant/Attempt was created, but
-the pre-consumption failure produced no confirmed send or video. Preserve the
-original records. The Owner authorized failure-only cleanup and the ADR-0022
-section 8.5 single-replacement exception; consumed/UNKNOWN cases remain excluded.
-The replacement must bind the published repair and current runtime through the
-original Operator. Its send permission is not active until those gates pass.
-The old approved window expired. The Owner explicitly confirmed one new five-hour
-window after publication and current preparation, with the two-hour execution and
-RMB 1,000 cap unchanged. Its exact times must be recorded, not silently extended.
-Leave the GPU on; storage remains billed. No formal 8765 database access is allowed.
-The Owner explicitly authorized one consolidated correction and publication before
-continuing the original SH09: proven unrelated media/model-list additions and a
-freshly approved same-service restart binding under ADR-0022 section 8.7. Selected
-model bytes, input, launch/configuration, scope, budget and the one-send limit remain
-unchanged. Old records remain immutable; consumed/UNKNOWN cases cannot be retried.
-Current runtime evidence must match the new exact binding before permission becomes
-active. No new live send is recorded by this implementation checkpoint.
+The original Operator completed SH09 at `2026-09-15T04:02:33Z`: one successful
+Attempt, 49 native frames, and a 704x1280 MP4 containing 48 frames at 24 fps (2 s).
+The delivered video digest is
+`c2e047eaa5b5936a8f3f2356b49b2a1ef8416ed775c2b89a51fcbb91df7a046f`.
+The Owner accepted this technical video and explicitly authorized UI/API wiring
+and the minimal ADR-0022 amendment. It is not Asset admission, Master/Export,
+publication approval, or permission for another GPU submission. Prior failures,
+revocation, replacement and UNKNOWN records remain immutable historical evidence.
+
+Current work connects the existing Frontend to authenticated Core projection,
+explicit original-Operator preparation/execution and original-artifact playback.
+Only isolated CPU/loopback data is used for implementation/browser validation.
+The host reuses the original participants; it does not start a second store writer.
+The Owner subsequently authorized publication of the Core/Frontend candidate and
+bounded host binding of the existing successful SH09 Job for read-only playback.
+This adds no live run, Grant consumption or database mutation authority. Leave the
+GPU on; bind the original custody workset without accessing the formal 8765 database.
 
 The Owner authorized bounded CI optimization after PR #95 passed all five required
 checks and merged. Only an exact isolated-test allowlist may use affected selection;
@@ -87,9 +89,8 @@ production and CI changes still run full suites. Six workers rebalance full
 Integration coverage without removing tests. D1 host/input wiring is merged at
 `c4c30eb785a5c342e92ae359e50bd8e482048350`; this is not a live result.
 
-Current work is the bounded D1 repair, direct CPU validation and protected
-publication, followed by the already authorized exact-run gates. It does not open
-another implementation wave or authorize the separate M12 A100 wave.
+The bounded UI adapter does not reopen transport/Operator implementation, open a
+new production wave, or authorize the separate M12 A100 wave.
 
 ## 2. Merged engineering evidence — do not redo
 
@@ -100,6 +101,7 @@ another implementation wave or authorize the separate M12 A100 wave.
 | D1, PR #91 | `2c42645a173840d6e17e2eb3541f00f47b2881b5` | Original live Operator and bounded recovery path; not execution approval |
 | D1 binding fix, PR #92 | `1e62786ea75823869c97934b18e22d722b7949f9` | Seven existing-store reader binding; not a real Grant or generated result |
 | D1 zero-send replacement, PR #97 | `f481180264a360fe18aa2cfb13e2c20ca1c75244` | Original Attempt closed FAILED/zero-send; replacement not issued; no video |
+| D1 restart recovery, PR #99 | `3b49476705f2e9e92ae74c5afca4d6a70ea6392c` | Published correction; subsequent original Operator produced the accepted technical SH09 video |
 
 These are observed merged commits, not predicted SHAs for this maintenance change.
 Use the [R2 record](docs/status/A14B_STAGED_TRANSPORT_IMPLEMENTATION_2026-09-12.md),
@@ -121,10 +123,10 @@ a current observation, not erased from its original evidence. Metadata and SSH
 reachability do not establish `SYSTEM_RUNTIME_BOUND`, exact Camera/plan approval,
 complete cost/window enforcement, a live Grant, SH09 output or Spike-0 PASS.
 
-Next in the same D1: complete the original Operator's read-only prepare and exact
-single-run application; resolve any missing approval/configuration field explicitly.
-Do not rebuild transport, invent a parallel worker, repeat frozen-package searches
-or use synthetic tests as live-generation evidence.
+These old observations are not the current SH09 result. Next in the same D1 is
+review/publication and bounded host binding of the UI candidate, not another live
+run request. Do not rebuild transport, repeat frozen-package searches or use
+synthetic browser tests as live-generation evidence.
 
 ## 4. Audit debt disposition
 
@@ -133,7 +135,7 @@ disposition, not new implementation authority or final Owner acceptance.
 
 | Finding | Present disposition | Bounded follow-up |
 | --- | --- | --- |
-| AUD-001: dispatch consumer gap | Code connected in PR #91/#92; live proof still open | Finish D1's original Operator prepare/run gates, not a new dispatch stack |
+| AUD-001: dispatch consumer gap | Original Operator connected; one technical live SH09 succeeded | UI adapter candidate and bounded deployment; no new dispatch stack |
 | AUD-002: Frontend method-aware islands | Open; eight adapter functions were unused at audit time | One separately authorized real product consumer slice |
 | AUD-003: Project foundation multi-POST | Core recoverable command exists; Frontend cutover open | Consume existing command; no second Project domain |
 | AUD-004: experimental patches | Preserved, not blanket-approved or merged | Reuse only a demonstrated dependency; defer VACE/Phantom expansion |
@@ -147,9 +149,9 @@ disposition, not new implementation authority or final Owner acceptance.
 | AUD-012: code/live/approval conflation | Current status wording corrected | Repository PASS, runtime observation and approved result remain distinct |
 | AUD-013: commercial security/operations | Open product-readiness work | Existing bearer/workspace guards are not complete SaaS security; no public-production claim |
 
-Nearest sequence: finish this small maintenance candidate; resume the existing D1
-read-only prepare and exact run request; after the authorized real result, seek one
-Frontend script-to-shot consumer slice. M12 audio, M14/M15 approval/master and
+Nearest sequence: publish the authorized UI candidate with its compatible Core pin;
+bind the existing successful Job for read-only UI status/playback. The broader script-to-shot
+consumer slice, M12 audio, M14/M15 approval/master and
 commercial operations remain explicit gaps, not prerequisites invented for the
 bounded silent SH09 technical experiment and not silently declared implemented.
 
@@ -172,6 +174,6 @@ HISTORICAL_DOCUMENT_GRANTS_CURRENT_AUTHORITY=false
 HISTORICAL_PATH_NOT_EXECUTION_AUTHORITY=true
 ```
 
-Repository checks and scoped testing follow [AGENTS.md](AGENTS.md). This mixed
-documentation/validator change is not the docs-only CI fast path; required contexts
+Repository checks and scoped testing follow [AGENTS.md](AGENTS.md). This runtime/UI
+integration is not the docs-only CI fast path; required contexts
 and fail-closed safety checks remain unchanged.

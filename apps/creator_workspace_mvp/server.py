@@ -761,6 +761,8 @@ class CreatorRequestHandler(BaseHTTPRequestHandler):
         project_foundation_service: ProjectFoundationApplicationService | None,
         public_authenticator: PublicApiAuthenticator | None,
         allow_internal_routes: bool,
+        generation_workspace_boundary=None,
+        generation_only=False,
         **kwargs: Any,
     ) -> None:
         self.ai_director_service = ai_director_service
@@ -780,6 +782,8 @@ class CreatorRequestHandler(BaseHTTPRequestHandler):
         self.project_foundation_service = project_foundation_service
         self.public_authenticator = public_authenticator
         self.allow_internal_routes = allow_internal_routes
+        self.generation_workspace_boundary = generation_workspace_boundary
+        self.generation_only = generation_only
         self.authenticated_principal: PublicApiPrincipal | None = None
         super().__init__(*args, **kwargs)
 
@@ -787,6 +791,12 @@ class CreatorRequestHandler(BaseHTTPRequestHandler):
         parsed = urlsplit(self.path)
         requested_path = parsed.path
         if not self._authorize_route_class(requested_path):
+            return
+        from .generation_workspace_http import handle_generation_workspace
+        if handle_generation_workspace(self, parsed):
+            return
+        if self.generation_only:
+            self._send_application_error(403, "generation_operation_not_authorized")
             return
         query = parse_qs(parsed.query, keep_blank_values=True)
         if self._reject_client_workspace_query(requested_path, query):
@@ -1375,6 +1385,9 @@ class CreatorRequestHandler(BaseHTTPRequestHandler):
         parsed = urlsplit(self.path)
         if not self._authorize_route_class(parsed.path):
             return
+        if self.generation_only:
+            self._send_application_error(403, "generation_operation_not_authorized")
+            return
         path = _normalize_public_path(parsed.path)
         query = parse_qs(parsed.query, keep_blank_values=True)
         workspace_ref = self._workspace_from_query(parsed.path, query)
@@ -1444,6 +1457,9 @@ class CreatorRequestHandler(BaseHTTPRequestHandler):
         parsed = urlsplit(self.path)
         requested_path = parsed.path
         if not self._authorize_route_class(requested_path):
+            return
+        from .generation_workspace_http import handle_generation_workspace
+        if handle_generation_workspace(self, parsed):
             return
         if requested_path == HEALTH_ENDPOINT:
             self._send_json(200, {"ok": True, "status": "alive"})
@@ -2259,6 +2275,16 @@ class CreatorRequestHandler(BaseHTTPRequestHandler):
 
     def _send_application_error(self, status: int, code: str) -> None:
         messages = {
+            "generation_operator_unavailable": "生成入口尚未绑定当前服务，请完成主机接线后刷新。",
+            "generation_operation_not_authorized": "当前身份仅可查看结果，不能执行生成。",
+            "generation_target_not_found": "当前项目没有匹配的生成作业。",
+            "generation_target_unavailable": "原作业暂时不可读取，未尝试重新生成。",
+            "generation_binding_changed": "批准计划或作业绑定已变化，请刷新。",
+            "generation_revision_changed": "作业状态已更新，请刷新查看，勿重复提交。",
+            "generation_not_restartable": "该作业已执行或结果待核实，不允许重新发送。",
+            "generation_result_unavailable": "视频字节或原作业校验未通过，已阻止播放。",
+            "generation_result_not_found": "未找到匹配的视频结果。",
+            "generation_start_failed": "生成操作未能启动，请刷新核实原作业。",
             "invalid_request": "请检查输入后重试。",
             "client_workspace_scope_forbidden": "工作区由服务身份确定，客户端不能指定。",
             "not_found": "没有找到对应内容。",
@@ -2502,15 +2528,19 @@ def create_server(
     canonical_registration_boundary: CanonicalRegistrationPublicBoundary | None = None,
     project_foundation_service: ProjectFoundationApplicationService | None = None,
     ai_director_candidate_receipt_service: AiDirectorCandidateReceiptService | None = None,
+    generation_workspace_boundary=None,
+    generation_only=False,
 ) -> ThreadingHTTPServer:
     series_boundary = series_episode_boundary or create_in_memory_series_boundary()
     projects = project_boundary or create_in_memory_project_boundary(series_boundary)
     planning = series_planning_boundary or create_in_memory_series_planning_boundary(projects)
     scripts = script_studio_boundary or create_in_memory_script_boundary(series_boundary)
     assembly = series_boundary._lifecycle_assembly_or_none()
-    ai_candidate_receipts = ai_director_candidate_receipt_service or create_candidate_receipt_service(
-        getattr(assembly.state, "database_path", None) if assembly is not None else None
-    )
+    ai_candidate_receipts = ai_director_candidate_receipt_service
+    if ai_candidate_receipts is None and not generation_only:
+        ai_candidate_receipts = create_candidate_receipt_service(
+            getattr(assembly.state, "database_path", None) if assembly is not None else None
+        )
     registration = canonical_registration_boundary or (
         assembly.canonical_registration if assembly is not None else None
     )
@@ -2541,9 +2571,9 @@ def create_server(
         or SeriesDirectorApplicationService(default_text_generation),
         series_plan_candidate_receipt_service=(
             series_plan_candidate_receipt_service
-            or create_server_receipt_service(
+            or (None if generation_only else create_server_receipt_service(
                 getattr(assembly.state, "database_path", None) if assembly is not None else None
-            )
+            ))
         ),
         series_planning_boundary=planning,
         series_intelligence_boundary=series_intelligence_boundary,
@@ -2555,6 +2585,8 @@ def create_server(
         project_foundation_service=foundation_service,
         public_authenticator=public_authenticator,
         allow_internal_routes=allow_internal_routes,
+        generation_workspace_boundary=generation_workspace_boundary,
+        generation_only=generation_only,
     )
     server = ThreadingHTTPServer(address, handler)
     server.daemon_threads = True

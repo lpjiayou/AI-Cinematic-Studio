@@ -5,7 +5,7 @@
 | 字段 | 值 |
 | --- | --- |
 | ADR ID | ADR-0022 |
-| 文档版本 | 1.8；§8.7 集中修正同服务重启恢复与无关模型枚举兼容，其他控制面不变 |
+| 文档版本 | 1.9；§6.3 增加经授权的 UI 狭义适配；§8.7 及其余控制面不变 |
 | Status | Accepted — Architecture Contract Only |
 | 完整 ADR 审批状态 | ACCEPTED_ARCHITECTURE_ONLY；Project Lead 已明确接受全文，不等于实现或生成许可 |
 | 已确认设计方向 | 独立、不可变 Grant；不覆盖历史五字段，不迁移历史摘要 |
@@ -518,7 +518,7 @@ UNKNOWN 禁止补发但不禁止原有效期内查询已记录的 prompt ID；�
 
 ## 6. Operator 与内部端口闭集（R1、R3）
 
-以下是未来实现的领域合同，不是本轮可执行命令。首版无新 Frontend 或公共 HTTP 写路由；Operator 身份来自可信本地操作边界，不能由请求 actor/role 字段自报。
+首版不提供 Frontend 或公共 HTTP 写路由。2026-09-15 Project Lead 在接受 SH09 技术视频后明确授权 UI 接入，并确认公开接口接线及本 ADR 的最小修订；只开放 §6.3 的狭义适配。Operator 身份继续来自可信本地操作边界，不能由请求 actor/role 字段自报。
 
 ### 6.1 prepare / issue / inspect
 
@@ -545,6 +545,22 @@ revoke 请求恰为 `{workspaceRef,productionRunRef,generationDispatchGrantRef,g
 上述动作失败返回统一闭集 `{schemaVersion:v5.generation-dispatch-error.v1,operation,code,writesCommitted:0,sendPermission:NONE}`。code 关闭集为 `INVALID_CLOSED_SCHEMA / APPROVAL_UNAVAILABLE / APPROVAL_PLAN_MISMATCH / SOURCE_CHANGED / CONFIG_CHANGED / RUNTIME_CHANGED / COST_BOUND_UNVERIFIED / OUTSIDE_VALIDITY_WINDOW / CURRENTNESS_FENCE_UNAVAILABLE / SNAPSHOT_CHANGED / IDEMPOTENCY_CONFLICT / GRANT_SUBJECT_ALREADY_RECORDED / TERMINAL_ALREADY_RECORDED / ALREADY_CONSUMED / ALREADY_REVOKED / ATTEMPT_OR_LEASE_CHANGED / SCOPE_MISMATCH / PERSISTENCE_UNAVAILABLE`。
 
 写入结果未知不能返回 writesCommitted=0；必须返回独立的 `{schemaVersion:v5.generation-dispatch-indeterminate.v1,operation,code:COMMIT_OUTCOME_UNKNOWN,sendPermission:NONE}`，随后只读查原幂等记录。消费结果未知永不返回新 SendCapability。
+
+### 6.3 已授权 UI 适配（v1.9）
+
+仅在现有 Creator Public API 和认证边界内增加以下路径：
+
+- `GET /creator/api/v1/episode-production-runs/{runRef}/generation`：读取主机选定的原 Job/Attempt 和结果摘要；不读 GPU、不调用 recover、不改变 Grant。
+- `POST /creator/api/v1/episode-production-runs/{runRef}/generation`：显式 PREPARE 或 EXECUTE_APPROVED；仅调用原 Operator.prepare / execute_one，返回 202 后从 GET 读取进度。
+- `GET /creator/api/v1/episode-production-runs/{runRef}/generation/content`：核实原成功 Job 和原视频字节摘要后播放，不准入 AssetVersion，不创建 Master/Export。
+
+请求范围为 projectRef/seriesRef/episodeRef；workspaceRef 和 credentialRef 只能由原认证上下文注入。POST 另含 operation、mediaJobRef、expectedJobRevision、approvedPlanDigest，闭集拒绝其他字段。媒体 GET 另含 mediaJobRef 和 sha256。响应 schema 为 `creator.generation-workspace.v1`；不公开存储路径、端点、配置、批准原件、Grant 或 SendCapability。
+
+主机只为原同进程装配选定的一个已批准且已派发的 Job 接线，显式配置可操作 credentialRef；未配置则拒绝操作。UI 不签发、替代、消费或自行选取 Grant；execute_one 内的原批准、currentness、有效期、费用、一次 Attempt 和发送门禁全部保留。UI 接入授权本身不是新的 GPU 运行许可。
+
+HTTP 后台线程仅监督原 Operator 调用，不引入新队列或持久化状态。活动标记不是 Job 事实。重复点击不追加 worker；刷新或服务重启从原 Job/Attempt 读回；RUNNING/FAILED/UNKNOWN/SUCCEEDED 不自动重试。主机必须保持 §8 的单控制进程和独占工作集，关闭时等待原调用收尾。不得为 API 另开一个写相同七库的服务。
+
+前端只走同源 Experience Adapter；不得通过 SSH、CLI、ComfyUI 或数据库旁路。结果继续为 TECHNICAL_EVIDENCE_ONLY / publicationAllowed=false。缺主机装配显示未连接；测试夹具不得被称为现场 GPU 接通。UI、部署、真实运行和最终 Owner 验收分别报告。
 
 ## 7. 两个不可变记录的原子性与 CAS
 

@@ -282,6 +282,10 @@ def open_existing_live_operator(*, storage_root, lifecycle_path, run_path, queue
     domain = ControlledStorageDomain(root, owned_paths)
     try:
         operator = compose_live_operator(selection=selection, endpoint=endpoint, worker_context=worker_context,
+            public_boundaries={"series_episode_boundary": lifecycle.series_episode,
+                "project_boundary": lifecycle.project_context, "series_planning_boundary": lifecycle.series_planning,
+                "script_studio_boundary": lifecycle.script_studio, "series_intelligence_boundary": lifecycle.series_intelligence,
+                "episode_production_boundary": boundary},
             lifecycle=lifecycle, root_service=boundary._EpisodeProductionPublicBoundary__service,
             method_media=boundary._EpisodeProductionPublicBoundary__method_aware_media,
             input_assets=boundary._EpisodeProductionPublicBoundary__method_aware_input_assets,

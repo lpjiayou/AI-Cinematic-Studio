@@ -123,6 +123,7 @@ INTEGRATION_SHARDS: dict[str, tuple[str, ...]] = {
     ),
     "shard-6": (
         "tests/integration/test_m13_r1b_render_candidate.py",
+        "tests/integration/test_generation_workspace_operator_cpu.py",
         "tests/integration/test_generation_dispatch_live_result_cpu.py",
         "tests/integration/test_generation_dispatch_consume_send_cpu.py",
         "tests/integration/test_generation_dispatch_prepare_operator.py",
