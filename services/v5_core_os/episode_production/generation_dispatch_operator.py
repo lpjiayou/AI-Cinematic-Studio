@@ -40,11 +40,17 @@ class OperatorSelection:
 class GenerationDispatchOperator:
     """No scanning, daemon, automatic retry, or raw Grant/approval DTO input."""
     def __init__(self, *, assembly, coordinator, clock, worker_context,
-            endpoint, selection):
+            endpoint, selection, public_boundaries=None):
         selection.validate()
         self._selection = deepcopy(selection)
         self._assembly, self._coordinator = assembly, coordinator
         self._clock, self._worker, self._endpoint = clock, worker_context, endpoint
+        self._public_boundaries = dict(public_boundaries or {})
+
+    def public_boundaries(self):
+        """Original host participants, not newly opened stores or private adapters."""
+        c.require(bool(self._public_boundaries), "CURRENTNESS_FENCE_UNAVAILABLE")
+        return dict(self._public_boundaries)
 
     def prepare(self):
         result = self._assembly.boundary.prepare(deepcopy(self._selection.prepare_command))
@@ -177,6 +183,36 @@ class GenerationDispatchOperator:
         command = self._selection.prepare_command
         return self._executor(media_job_ref).execute(command["workspaceRef"], command["productionRunRef"], media_job_ref)
 
+    def read_job(self, media_job_ref):
+        """Local durable read, including after expiry. Never constructs transport.
+
+        The host selects the Job; a public caller cannot choose another Grant,
+        plan, endpoint or worker. Reading completed work needs no live GPU.
+        """
+        from services.v4_platform.media_jobs import _validate_job
+        self._selection.validate(require_approval=True)
+        command = self._selection.prepare_command
+        job = self._coordinator.repository.get(command["workspaceRef"],
+            command["productionRunRef"], c.ref(media_job_ref))
+        c.require(job is not None, "ATTEMPT_OR_LEASE_CHANGED")
+        _validate_job(job)
+        c.require(job["workspaceRef"] == command["workspaceRef"]
+            and job["productionRunRef"] == command["productionRunRef"]
+            and job["jobRef"] == media_job_ref, "SCOPE_MISMATCH")
+        c.require(job.get("dispatchGrantBinding", {}).get("approvedPlanDigest")
+            == self._selection.approved_plan_digest, "APPROVAL_PLAN_MISMATCH")
+        request = job["request"]
+        c.require(all(request[k] == command[k] for k in (
+            "methodAwareInputPlanVersionRef", "creativeShotVersionRef", "beatRef")), "SCOPE_MISMATCH")
+        return deepcopy(job)
+
+    def read_job_content(self, media_job_ref):
+        """Read the original verified artifact, never recover or ingest it."""
+        from services.v4_platform.generation_dispatch_live_result import GenerationDispatchLiveResultBoundary
+        job = self.read_job(media_job_ref)
+        result = GenerationDispatchLiveResultBoundary(self._coordinator, clock=self._clock)
+        return result.read_verified_content(job)
+
     def finalize_unconsumed_expired(self, media_job_ref):
         """Explicit trusted-host failure cleanup, never a retry or send command.
 
@@ -232,13 +268,14 @@ class GenerationDispatchOperator:
         return result
 
 
-def compose_live_operator(*, selection, endpoint, worker_context, **participants):
+def compose_live_operator(*, selection, endpoint, worker_context, public_boundaries=None, **participants):
     """The only D1 assembly: enroll all original writers before exposing actions."""
     selection.validate()
     c.require(selection.prepare_command["workspaceRef"] == participants["workspace_ref"], "SCOPE_MISMATCH")
     assembly = compose_generation_dispatch(**participants)
     return GenerationDispatchOperator(assembly=assembly, coordinator=participants["queue_coordinators"][0],
-        clock=participants["clock"], worker_context=worker_context, endpoint=endpoint, selection=selection)
+        clock=participants["clock"], worker_context=worker_context, endpoint=endpoint, selection=selection,
+        public_boundaries=public_boundaries)
 
 
 class ExistingStoreOperatorDeployment:

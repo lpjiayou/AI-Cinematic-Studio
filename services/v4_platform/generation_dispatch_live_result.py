@@ -374,3 +374,23 @@ class GenerationDispatchLiveResultBoundary:
 
     def read_only(self, workspace_ref, production_run_ref, media_job_ref):
         return self.repository.get(workspace_ref, production_run_ref, media_job_ref)
+
+    def read_verified_content(self, job):
+        """Bounded local playback; no probe process, provider GET or store write."""
+        from .media_jobs import _validate_job
+        from .method_aware_results import MethodAwareMediaJobResultReader
+        _validate_job(job)
+        artifact = job.get("artifact")
+        if (job["state"] != "SUCCEEDED" or not artifact or job.get("artifactCommitIntent") is not None
+                or artifact["mediaType"] != "video/mp4" or artifact["publicationAllowed"] is not False
+                or not 0 < artifact["byteSize"] <= 64 * 1024 * 1024):
+            raise ArtifactVerificationError("playback requires the original committed video")
+        reader = MethodAwareMediaJobResultReader(self.repository, self.coordinator.artifact_root)
+        path = reader._artifact_path(artifact)
+        with path.open("rb") as stream:
+            data = stream.read(64 * 1024 * 1024 + 1)
+        if (len(data) != artifact["byteSize"] or sha256(data).hexdigest() != artifact["sha256"]
+                or self.read_only(job["workspaceRef"], job["productionRunRef"], job["jobRef"]) != job
+                or reader._artifact_path(artifact) != path):
+            raise ArtifactVerificationError("playback content or job changed")
+        return {"content": data, "sha256": artifact["sha256"], "mediaType": "video/mp4"}

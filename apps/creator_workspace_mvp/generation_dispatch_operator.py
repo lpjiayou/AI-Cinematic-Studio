@@ -6,6 +6,36 @@ observation, database path, or permission. No import-time platform I/O.
 """
 import argparse
 import json
+from contextlib import contextmanager
+
+
+@contextmanager
+def open_generation_workspace_server(*, deployment, media_job_ref, public_authenticator,
+        address=("127.0.0.1", 0), allowed_credential_refs=frozenset()):
+    """Explicit trusted-host composition for the existing UI; never enabled by CLI.
+
+    Owns the original deployment once, reuses its public participants, and waits
+    for in-flight work before releasing the existing store/process boundary.
+    Merely opening this context does not prepare, issue, route, or execute a Job.
+    """
+    from .server import create_server
+    from services.v5_core_os.episode_production.generation_workspace import GenerationWorkspaceBoundary
+    if address[0] != "127.0.0.1" or public_authenticator is None:
+        raise ValueError("An authenticated loopback binding is required")
+    with deployment.open() as operator:
+        participants = operator.public_boundaries()
+        workspace = GenerationWorkspaceBoundary(operator=operator, media_job_ref=media_job_ref,
+            run_reader=participants["episode_production_boundary"], allowed_credential_refs=allowed_credential_refs)
+        server = None
+        try:
+            server = create_server(address, object(), **participants,
+                public_authenticator=public_authenticator, allow_internal_routes=False,
+                generation_workspace_boundary=workspace, generation_only=True)
+            yield server
+        finally:
+            if server is not None:
+                server.server_close()
+            workspace.close()
 
 
 def execute_command(operator, operation, target_ref=None):
